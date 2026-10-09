@@ -1,15 +1,19 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_SCALAR_FUNCTION,
   ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
+import {
+  SCALAR_FUNCTION,
+  sourceUri,
+  transportUri,
+} from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -27,7 +31,7 @@ export async function getScalarFunction(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}${buildQuery(version, options)}`;
+  const url = `${SCALAR_FUNCTION.uri(name)}${buildQuery(version, options)}`;
   return makeAdtRequestWithAcceptNegotiation(
     connection,
     {
@@ -47,7 +51,7 @@ export async function getScalarFunctionSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}/source/main${buildQuery(version, options)}`;
+  const url = `${sourceUri(SCALAR_FUNCTION.uri(name))}${buildQuery(version, options)}`;
   return makeAdtRequestWithAcceptNegotiation(
     connection,
     {
@@ -66,7 +70,7 @@ export async function getScalarFunctionTransport(
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}/transport${query}`;
+  const url = `${transportUri(SCALAR_FUNCTION.uri(name))}${query}`;
   return connection.makeAdtRequest({
     url,
     method: 'GET',

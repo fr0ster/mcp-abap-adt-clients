@@ -1,6 +1,7 @@
 /**
- * Integration test for AdtCdsUnitTest
- * Tests using AdtClient for CDS unit test operations
+ * Integration test for a CDS view's ABAP Unit tests: the test-doubles check
+ * through getDdl(), the container class through getClass(), the run through
+ * AdtExecutor.getClassTestRunner()
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -12,19 +13,22 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseUnitTestStart,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  ICdsUnitTestConfig,
-  IUnitTestConfig,
-} from '../../../../core/unitTest';
-import { checkCdsTestDoublesAvailability } from '../../../../core/unitTest/checkCdsTestDoublesAvailability';
+import { AdtExecutor } from '../../../../clients/AdtExecutor';
+import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
+import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -71,7 +75,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-describe('AdtCdsUnitTest (using AdtClient)', () => {
+describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
@@ -259,33 +263,30 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
               'Checking CDS view for unit test doubles:',
               ddlName,
             );
-            const checkResponse = await checkCdsTestDoublesAvailability(
-              connection,
-              ddlName,
-            );
-            expect(checkResponse).toBeDefined();
-            expect(checkResponse.status).toBe(200);
+            const checkResponse = await client
+              .getDdl()
+              .checkCdsTestDoubles(ddlName);
+            expect(checkResponse.ok).toBe(true);
             testsLogger.info?.('CDS view check passed');
           }
 
           // Step 2: Create CDS unit test class
           logTestStep('create', testsLogger);
-          const cdsUnitTestConfigForCreate: ICdsUnitTestConfig = {
-            className,
-            packageName,
-            cdsViewName: ddlName,
-            classTemplate,
-            testClassSource,
-            description:
-              cdsUnitTestConfig.description || `CDS unit test for ${ddlName}`,
-            transportRequest,
-          };
-
-          const createState = await client
-            .getCdsUnitTest()
-            .create(cdsUnitTestConfigForCreate);
+          // A CDS view's tests live in a global class made for them from a
+          // template: an ordinary class create, final, with the template.
+          const createState = expectResult(
+            await client.getClass().create({
+              className,
+              packageName,
+              classTemplate,
+              final: true,
+              description:
+                cdsUnitTestConfig.description || `CDS unit test for ${ddlName}`,
+              transportRequest,
+            }),
+            'createState',
+          );
           expect(createState).toBeDefined();
-          expect(createState.testClassState).toBeDefined();
           testsLogger.info?.('CDS unit test class created successfully');
 
           // Step 3: Activate class
@@ -299,47 +300,68 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
           // Step 4: Read the created test class
           logTestStep('read', testsLogger);
-          const readState = await client.getClass().read({ className });
+          const readState = expectResult(
+            await client.getClass().read({ className }),
+            'readState',
+          );
           expect(readState).toBeDefined();
-          expect(readState?.readResult).toBeDefined();
           testsLogger.info?.('CDS unit test class read successfully');
-          const metadataState = await client
-            .getClass()
-            .readMetadata({ className });
+          const metadataState = expectResult(
+            await client.getClass().readMetadata({ className }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
-          expect(metadataState.metadataResult).toBeDefined();
           testsLogger.info?.('CDS unit test class metadata read successfully');
 
           // Step 5: Run the tests the generated class holds. No create and no
           // update first — running is its own capability.
           logTestStep('run (unit test)', testsLogger);
-          const unitTest = client.getUnitTest();
-          const runId = await unitTest.run(
-            [{ containerClass: className, testClass: testClassName }],
-            testCase.params.unit_test_options || {},
+          // The run's id is in a header of the start's answer; the reading that
+          // finds it, and the check that a start carried one, are strategies.
+          const unitTest = (
+            isLegacy
+              ? new AdtExecutorLegacy(connection, libraryLogger)
+              : new AdtExecutor(connection, libraryLogger)
+          ).getClassTestRunner({
+            ...classTestRunnerDocuments,
+            run: unitTestRunId,
+          });
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass: className, testClass: testClassName }],
+              {
+                ...(testCase.params.unit_test_options || {}),
+                analyse: analyseUnitTestStart,
+              },
+            ),
+            'start CDS unit test run',
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('CDS unit test run started, run ID:', runId);
 
           // Step 6: Ask about the run — its own interface since 16.0.0
           logTestStep('getStatus (run)', testsLogger);
-          const statusResponse = await unitTest.getStatus(
-            runId,
-            testCase.params.unit_test_status?.with_long_polling ?? true,
+          const statusResponse = expectResult(
+            await unitTest.getStatus(
+              runId,
+              testCase.params.unit_test_status?.with_long_polling ?? true,
+            ),
+            'statusResponse',
           );
           expect(statusResponse).toBeDefined();
-          expect(statusResponse.data).toBeDefined();
           testsLogger.info?.('CDS unit test status retrieved');
 
           // Step 7: Fetch the result document
           logTestStep('getResult (run)', testsLogger);
-          const resultResponse = await unitTest.getResult(runId, {
-            withNavigationUris:
-              testCase.params.unit_test_result?.with_navigation_uris || false,
-            format: testCase.params.unit_test_result?.format || 'abapunit',
-          });
+          const resultResponse = expectResult(
+            await unitTest.getResult(runId, {
+              withNavigationUris:
+                testCase.params.unit_test_result?.with_navigation_uris || false,
+              format: testCase.params.unit_test_result?.format || 'abapunit',
+            }),
+            'resultResponse',
+          );
           expect(resultResponse).toBeDefined();
-          expect(resultResponse.data).toBeDefined();
           testsLogger.info?.('CDS unit test result retrieved successfully');
 
           // Step 10: Cleanup

@@ -1,19 +1,28 @@
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+/**
+ * The runtime client's factories: what each accessor builds, and that it
+ * builds it once.
+ *
+ * `getDebugger()` and `getMemorySnapshots()` were asserted here until
+ * interfaces@31.0.0. `IDebugger` and `IMemorySnapshots` left the contracts
+ * package for a research branch — how a debug session is meant to work over
+ * ADT is not measured yet — and the accessors left with them.
+ */
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 import { AtcLog } from '../../../runtime/atc/AtcLog';
 import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
-import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
-import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
-import { Debugger } from '../../../runtime/debugger/Debugger';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
-import { MemorySnapshots } from '../../../runtime/memory/MemorySnapshots';
 import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
-import { Profiler } from '../../../runtime/traces/ProfilerDomain';
+import {
+  Profiler,
+  profilerDocuments,
+} from '../../../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../../../runtime/traces/St05Trace';
 
 describe('AdtRuntimeClient factory pattern', () => {
@@ -48,11 +57,6 @@ describe('AdtRuntimeClient factory pattern', () => {
   it('getSt05Trace() returns an St05Trace instance', () => {
     const { client } = createRuntimeClient();
     expect(client.getSt05Trace()).toBeInstanceOf(St05Trace);
-  });
-
-  it('getDebugger() returns a Debugger instance', () => {
-    const { client } = createRuntimeClient();
-    expect(client.getDebugger()).toBeInstanceOf(Debugger);
   });
 
   it('getApplicationLog() returns an ApplicationLog instance', () => {
@@ -100,115 +104,75 @@ describe('AdtRuntimeClient factory pattern', () => {
     expect(client.getGatewayErrorLog()).toBeInstanceOf(GatewayErrorLog);
   });
 
-  describe('caching', () => {
-    it('getProfiler() returns the same instance on repeated calls', () => {
+  /**
+   * No caching since 23.0.0: each call builds an implementation with the result
+   * set it is given. A cached instance was fixed to whatever set the first call
+   * brought, which is memory between calls; the implementations hold no state,
+   * so a new one costs nothing.
+   */
+  describe('each call builds its own implementation, with its own readings', () => {
+    it('getProfiler() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getProfiler()).toBe(client.getProfiler());
+      expect(client.getProfiler()).not.toBe(client.getProfiler());
     });
 
-    it('getCrossTrace() returns the same instance on repeated calls', () => {
+    it('getCrossTrace() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getCrossTrace()).toBe(client.getCrossTrace());
+      expect(client.getCrossTrace()).not.toBe(client.getCrossTrace());
     });
 
-    it('getSt05Trace() returns the same instance on repeated calls', () => {
+    it('getSt05Trace() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getSt05Trace()).toBe(client.getSt05Trace());
+      expect(client.getSt05Trace()).not.toBe(client.getSt05Trace());
     });
 
-    it('getDebugger() returns the same instance on repeated calls', () => {
+    it('getApplicationLog() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getDebugger()).toBe(client.getDebugger());
+      expect(client.getApplicationLog()).not.toBe(client.getApplicationLog());
     });
 
-    it('getApplicationLog() returns the same instance on repeated calls', () => {
+    it('getAtcLog() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getApplicationLog()).toBe(client.getApplicationLog());
+      expect(client.getAtcLog()).not.toBe(client.getAtcLog());
     });
 
-    it('getAtcLog() returns the same instance on repeated calls', () => {
+    it('getAtc() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getAtcLog()).toBe(client.getAtcLog());
+      expect(client.getAtc()).not.toBe(client.getAtc());
     });
 
-    it('getAtc() returns the same instance on repeated calls', () => {
+    it('getDdicActivation() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getAtc()).toBe(client.getAtc());
+      expect(client.getDdicActivation()).not.toBe(client.getDdicActivation());
     });
 
-    it('getDdicActivation() returns the same instance on repeated calls', () => {
+    it('getDumps() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getDdicActivation()).toBe(client.getDdicActivation());
+      expect(client.getDumps()).not.toBe(client.getDumps());
     });
 
-    it('getDumps() returns the same instance on repeated calls', () => {
+    it('getFeeds() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getDumps()).toBe(client.getDumps());
+      expect(client.getFeeds()).not.toBe(client.getFeeds());
     });
 
-    it('getFeeds() returns the same instance on repeated calls', () => {
+    it('getSystemMessages() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getFeeds()).toBe(client.getFeeds());
+      expect(client.getSystemMessages()).not.toBe(client.getSystemMessages());
     });
 
-    it('getSystemMessages() returns the same instance on repeated calls', () => {
+    it('getGatewayErrorLog() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getSystemMessages()).toBe(client.getSystemMessages());
+      expect(client.getGatewayErrorLog()).not.toBe(client.getGatewayErrorLog());
     });
 
-    it('getGatewayErrorLog() returns the same instance on repeated calls', () => {
+    it('the result set passed is the one the implementation reads with', () => {
       const { client } = createRuntimeClient();
-      expect(client.getGatewayErrorLog()).toBe(client.getGatewayErrorLog());
-    });
-  });
-
-  describe('composite debugger', () => {
-    it('getDebugger().getAbap() returns an AbapDebugger instance', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getAbap()).toBeInstanceOf(AbapDebugger);
-    });
-
-    it('getDebugger().getAmdp() returns an AmdpDebugger instance', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getAmdp()).toBeInstanceOf(AmdpDebugger);
-    });
-
-    it('getDebugger().getMemorySnapshots() returns a MemorySnapshots instance', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getMemorySnapshots()).toBeInstanceOf(MemorySnapshots);
-    });
-
-    it('getDebugger() sub-factories cache their instances', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getAbap()).toBe(dbg.getAbap());
-      expect(dbg.getAmdp()).toBe(dbg.getAmdp());
-      expect(dbg.getMemorySnapshots()).toBe(dbg.getMemorySnapshots());
-    });
-
-    it('getDebugger() has kind "debugger"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().kind).toBe('debugger');
-    });
-
-    it('getDebugger().getAbap() has kind "abapDebugger"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().getAbap().kind).toBe('abapDebugger');
-    });
-
-    it('getDebugger().getAmdp() has kind "amdpDebugger"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().getAmdp().kind).toBe('amdpDebugger');
-    });
-
-    it('getDebugger().getMemorySnapshots() has kind "memorySnapshots"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().getMemorySnapshots().kind).toBe(
-        'memorySnapshots',
-      );
+      const readings = { ...profilerDocuments, list: () => ['read'] };
+      expect(
+        (client.getProfiler(readings) as unknown as { results: unknown })
+          .results,
+      ).toBe(readings);
     });
   });
 
@@ -220,22 +184,21 @@ describe('AdtRuntimeClient factory pattern', () => {
       expect(typeof p.read).toBe('function');
     });
 
-    it('abap debugger has expected methods', () => {
-      const { client } = createRuntimeClient();
-      const d = client.getDebugger().getAbap();
-      expect(typeof d.launch).toBe('function');
-      expect(typeof d.stop).toBe('function');
-      expect(typeof d.getCallStack).toBe('function');
-    });
-
-    // The three capabilities the narrowed return type promises, and nothing
-    // else: no create, no lock, no activate.
-    it('atc has exactly the runnable and reader methods', () => {
+    // The capabilities the narrowed return type promises, and nothing else: no
+    // create, no lock, no activate.
+    //
+    // `run` is gone since 19.0.0 — it made three requests, so the check
+    // variant, the worklist and the run are three members and the caller joins
+    // them.
+    it('atc has the run steps and the readers', () => {
       const { client } = createRuntimeClient();
       const atc = client.getAtc();
-      expect(typeof atc.run).toBe('function');
+      expect(typeof atc.resolveCheckVariant).toBe('function');
+      expect(typeof atc.createWorklist).toBe('function');
+      expect(typeof atc.startRun).toBe('function');
       expect(typeof atc.getRunStatus).toBe('function');
       expect(typeof atc.getFindings).toBe('function');
+      expect((atc as unknown as Record<string, unknown>).run).toBeUndefined();
     });
 
     it('dumps has expected methods', () => {

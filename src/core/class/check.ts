@@ -5,11 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
+import { CLASS } from '../../endpoints/objects';
 
 /**
  * Check class code (syntax, compilation, rules)
@@ -34,8 +35,9 @@ export async function checkClass(
   sourceCode?: string,
   artifactContentType?: string,
 ): Promise<IAdtWireResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
-    await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource } = await import(
+    '../../utils/checkRun'
+  );
 
   let response: IAdtWireResponse;
 
@@ -61,13 +63,6 @@ export async function checkClass(
     );
   }
 
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Class check failed: ${errorMessages}`);
-  }
-
   return response;
 }
 
@@ -82,7 +77,6 @@ export async function checkClass(
  * @param testClassSource - Test class source code to validate
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @returns Check result with errors/warnings
- * @throws Error if check finds errors (chkrun:type="E")
  */
 export async function checkClassLocalTestClass(
   connection: IAbapConnection,
@@ -113,7 +107,6 @@ export async function checkClassLocalTestClass(
  * @param localTypesSource - Local types source code to validate
  * @param version - 'active' or 'inactive'
  * @returns Check result with errors/warnings
- * @throws Error if check finds errors (chkrun:type="E")
  */
 export async function checkClassLocalTypes(
   connection: IAbapConnection,
@@ -144,7 +137,6 @@ export async function checkClassLocalTypes(
  * @param definitionsSource - Definitions source code to validate
  * @param version - 'active' or 'inactive'
  * @returns Check result with errors/warnings
- * @throws Error if check finds errors (chkrun:type="E")
  */
 export async function checkClassDefinitions(
   connection: IAbapConnection,
@@ -175,7 +167,6 @@ export async function checkClassDefinitions(
  * @param macrosSource - Macros source code to validate
  * @param version - 'active' or 'inactive'
  * @returns Check result with errors/warnings
- * @throws Error if check finds errors (chkrun:type="E")
  */
 export async function checkClassMacros(
   connection: IAbapConnection,
@@ -205,7 +196,6 @@ export async function checkClassMacros(
  * @param version - 'active' or 'inactive'
  * @param includeName - Human-readable name for error messages
  * @returns Check result with errors/warnings
- * @throws Error if check finds errors (chkrun:type="E")
  */
 async function checkClassInclude(
   connection: IAbapConnection,
@@ -218,10 +208,8 @@ async function checkClassInclude(
 ): Promise<IAdtWireResponse> {
   const { getTimeout } = await import('../../utils/timeouts');
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
-  const { parseCheckRunResponse } = await import('../../utils/checkRun');
 
-  const encodedName = encodeSapObjectName(className.toLowerCase());
-  const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
+  const objectUri = `${CLASS.uri(className)}`;
   const includeUri = `${objectUri}/includes/${includeType}`;
 
   // Encode source to base64
@@ -252,18 +240,6 @@ async function checkClassInclude(
     data: xmlBody,
     headers,
   });
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages =
-      checkResult.errors.length > 0
-        ? checkResult.errors
-            .map((err: { text?: string }) => err.text)
-            .join('; ')
-        : `status=${checkResult.status}, message=${checkResult.message || 'none'}`;
-    throw new Error(`${includeName} check failed: ${errorMessages}`);
-  }
 
   return response;
 }

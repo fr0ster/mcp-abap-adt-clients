@@ -3,13 +3,11 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { safeStringify } from '../../utils/internalUtils';
+import { TRANSPORT_REQUEST } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTransportParams } from './types';
 
@@ -36,61 +34,15 @@ function buildCreateTransportXml(
 }
 
 /**
- * Parse transport creation response
- */
-function parseTransportResponse(xmlData: string): Record<string, unknown> {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-  });
-
-  const result = parser.parse(xmlData);
-  const root = result['tm:root'] || result.root;
-
-  if (!root) {
-    throw new Error(
-      'Invalid transport response XML structure - no tm:root found',
-    );
-  }
-
-  const request = root['tm:request'] || {};
-  const task = request['tm:task'] || {};
-
-  return {
-    transport_number: request['tm:number'],
-    description: request['tm:desc'] || request['tm:description'],
-    type: request['tm:type'],
-    target_system: request['tm:target'],
-    target_desc: request['tm:target_desc'],
-    cts_project: request['tm:cts_project'],
-    cts_project_desc: request['tm:cts_project_desc'],
-    uri: request['tm:uri'],
-    parent: request['tm:parent'],
-    owner: task['tm:owner'] || request['tm:owner'],
-  };
-}
-
-/**
  * Create ABAP transport request
  */
 export async function createTransport(
   connection: IAbapConnection,
   params: ICreateTransportParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.description) {
-    throw new Error('Transport description is required');
-  }
+  const username = params.owner as string;
 
-  const username = params.owner;
-
-  if (!username) {
-    throw new Error(
-      'Cannot create transport request: owner is required. Please provide owner in params.',
-    );
-  }
-
-  const url = `/sap/bc/adt/cts/transportrequests`;
+  const url = TRANSPORT_REQUEST.collection;
 
   const xmlBody = buildCreateTransportXml(params, username);
   const headers = {
@@ -98,44 +50,15 @@ export async function createTransport(
     'Content-Type': 'text/plain',
   };
 
-  try {
-    const response = await connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: xmlBody,
-      headers,
-    });
-
-    const transportInfo = parseTransportResponse(response.data);
-    const requestOwner = params.owner || username;
-
-    return {
-      data: {
-        success: true,
-        transport_request: transportInfo.transport_number,
-        description: transportInfo.description,
-        type: transportInfo.type,
-        target_system: transportInfo.target_system,
-        target_desc: transportInfo.target_desc,
-        cts_project: transportInfo.cts_project,
-        owner: requestOwner,
-        uri: transportInfo.uri,
-        message: `Transport request ${transportInfo.transport_number} created successfully`,
-      },
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    } as IAdtWireResponse;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    const errorMessage = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : safeStringify(e.response.data)
-      : e.message;
-
-    throw new Error(`Failed to create transport request: ${errorMessage}`);
-  }
+  // The document, as it arrived. What a caller wants out of it is the
+  // reading's question. A refusal comes back as the transport's failure, with
+  // SAP's answer on it — it used to be rewrapped in a new Error carrying the
+  // text alone, which dropped the response the caller's `analyse` reads.
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers,
+  });
 }

@@ -1,61 +1,46 @@
 /**
  * Message class update operations
- *
- * Uses read-modify-write pattern: GET current XML → apply description override
- * → rebuild full XML (messages preserved) → PUT with lock handle.
  */
 
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { MESSAGE_CLASS } from '../../endpoints/objects';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { getMessageClassSource } from './read';
-import { buildMessageClassXml, parseMessageClass } from './xml';
 
-const BASE = '/sap/bc/adt/messageclass';
+const BASE = MESSAGE_CLASS.collection;
 
 /**
- * Update a message class description.
- * Reads the current XML first to preserve all existing messages and attributes,
- * then rebuilds the full XML with the description override and PUTs it back.
+ * `PUT /messageclass/{name}` with the document the caller built — one request.
  *
- * NOTE: Caller must enable stateful session and hold a valid lockHandle.
+ * Until 23.0.0 this read the class first, patched the description into it and
+ * PUT the rebuilt XML: two requests, and a document this library composed in
+ * place of the caller's. The read is now the caller's (`readMetadata`, then
+ * `parseMessageClass` / `buildMessageClassXml` if they want them), as for every
+ * other document-shaped object here.
+ *
+ * NOTE: the caller holds the lock and passes its handle.
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateMessageClass(
   connection: IAbapConnection,
   name: string,
-  lockHandle: string,
-  description: string | undefined,
+  document: string,
+  lockHandle: string | undefined,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  // 1. Read current state to preserve existing messages and all SAP-managed attrs
-  const currentResponse = await getMessageClassSource(connection, name);
-  const current = parseMessageClass(String(currentResponse.data));
-
-  // 2. Apply only the description override; everything else is preserved
-  const updated = {
-    ...current,
-    ...(description !== undefined ? { description } : {}),
-  };
-
-  // 3. Rebuild full XML (round-trip preserving rawAttrs)
-  const xmlBody = buildMessageClassXml(updated);
-
-  // 4. PUT with lock handle
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const corrNrParam = transportRequest?.trim()
-    ? `&corrNr=${encodeURIComponent(transportRequest)}`
-    : '';
-  const url = `${BASE}/${encoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
-
   return connection.makeAdtRequest({
-    url,
+    url: `${BASE}/${encoded}${writeQuery(lockHandle, transportRequest?.trim())}`,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: xmlBody,
+    data: document,
     headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
   });
 }

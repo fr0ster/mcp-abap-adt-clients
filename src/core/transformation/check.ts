@@ -1,12 +1,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-  runCheckRun,
-} from '../../utils/checkRun';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 
 /**
  * Check transformation syntax
@@ -25,12 +21,6 @@ export async function checkTransformation(
     'abapCheckRun',
     sourceCode,
   );
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Transformation check failed: ${errorMessages}`);
-  }
 
   return response;
 }

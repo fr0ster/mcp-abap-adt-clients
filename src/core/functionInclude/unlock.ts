@@ -3,8 +3,11 @@
  * NOTE: Caller should call connection.setSessionType("stateless") after unlocking.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { FUNCTION_INCLUDE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -16,22 +19,10 @@ export async function unlockFunctionInclude(
   groupName: string,
   includeName: string,
   lockHandle: string,
-): Promise<void> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
+): Promise<IAdtWireResponse> {
+  const url = `${FUNCTION_INCLUDE.uri(groupName, includeName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
-  const groupLower = encodeSapObjectName(groupName).toLowerCase();
-  const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
-  const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
-
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),

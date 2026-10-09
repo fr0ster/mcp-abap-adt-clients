@@ -5,14 +5,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { DOMAIN } from '../../endpoints/objects';
+import { runCheckRun } from '../../utils/checkRun';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -37,8 +37,7 @@ export async function checkDomainSyntax(
 
   if (xmlContent) {
     // Check with XML content (for unsaved changes or new content validation)
-    const encodedName = encodeSapObjectName(domainName.toLowerCase());
-    const objectUri = `/sap/bc/adt/ddic/domains/${encodedName}`;
+    const objectUri = `${DOMAIN.uri(domainName)}`;
     const base64Content = Buffer.from(xmlContent, 'utf-8').toString('base64');
 
     // TODO: analyze whether chkrun:contentType can be extracted to a constant
@@ -77,13 +76,6 @@ export async function checkDomainSyntax(
       'abapCheckRun',
       undefined,
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Domain check failed: ${errorMessages}`);
   }
 
   return response;

@@ -3,8 +3,11 @@
  * NOTE: Caller should call connection.setSessionType("stateless") after unlocking
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -15,18 +18,10 @@ export async function unlockAuthorizationField(
   connection: IAbapConnection,
   name: string,
   lockHandle: string,
-): Promise<void> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
+): Promise<IAdtWireResponse> {
+  const url = `${AUTHORIZATION_FIELD.uri(name)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
-  const encoded = encodeSapObjectName(name.toUpperCase());
-  const url = `/sap/bc/adt/aps/iam/auth/${encoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
-
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),

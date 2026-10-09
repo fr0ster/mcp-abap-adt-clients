@@ -1,32 +1,27 @@
 /**
- * Shared types for cross-cutting ADT operations
+ * Shared types for cross-cutting ADT operations.
+ *
+ * The parameter types come from `@mcp-abap-adt/interfaces-adt`, which is where a
+ * consumer reads what a member takes. What a *reading* builds is the reading's,
+ * and the readings live in `@mcp-abap-adt/adt-strategies`.
  */
 
-// Types defined in @mcp-abap-adt/interfaces
 export type {
   AdtObjectType,
   AdtObjectTypeLower,
   AdtSourceObjectType,
   AdtSourceObjectTypeLower,
   IGetDiscoveryParams,
-  IGetPackageContentsListOptions,
-  IGetPackageHierarchyOptions,
+  IGetNodeContentsOptions,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
-  IGetWhereUsedListParams,
   IGetWhereUsedParams,
   IGetWhereUsedScopeParams,
-  IInactiveObjectsResponse,
   IObjectReference,
-  IPackageContentItem,
-  IPackageHierarchyNode,
   IReadOptions,
   ISearchObjectsParams,
-  ISearchResult,
   IVirtualFoldersPreselection,
-  IWhereUsedListResult,
-  IWhereUsedReference,
-  PackageHierarchyCodeFormat,
-  PackageHierarchySupportedType,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+
+export type { INamedItem } from './utilResults';

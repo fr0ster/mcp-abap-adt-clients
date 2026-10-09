@@ -3,13 +3,13 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
+import { safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
   type EnhancementType,
@@ -29,37 +29,35 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  * @param connection - SAP connection
  * @param args - Update parameters
  * @returns Axios response
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function update(
   connection: IAbapConnection,
-  args: IUpdateEnhancementParams,
+  // See the note in behaviorDefinition/update.ts: the handle is passed as given.
+  args: Omit<IUpdateEnhancementParams, 'lock_handle'> & {
+    lock_handle?: string;
+  },
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!args.enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!args.enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-  if (!args.source_code) {
-    throw new Error('source_code is required');
-  }
-  if (!args.lock_handle) {
-    throw new Error('lock_handle is required');
-  }
-
   if (!supportsSourceCode(args.enhancement_type)) {
     throw new Error(
       `Enhancement type '${args.enhancement_type}' does not support source code update. Only 'enhoxhh' supports source code.`,
     );
   }
 
-  const encodedName = encodeSapObjectName(args.enhancement_name).toLowerCase();
-  const baseUri = getEnhancementUri(args.enhancement_type, encodedName);
+  const baseUri = getEnhancementUri(
+    args.enhancement_type,
+    args.enhancement_name as string,
+  );
 
   // Build URL with parameters
   const params = new URLSearchParams();
-  params.append('lockHandle', args.lock_handle);
+  if (args.lock_handle) {
+    params.append('lockHandle', args.lock_handle);
+  }
   if (args.transport_request) {
     params.append('corrNr', args.transport_request);
   }
@@ -130,7 +128,7 @@ export async function updateEnhancement(
   enhancementType: EnhancementType,
   enhancementName: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle: string | undefined,
   transportRequest?: string,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

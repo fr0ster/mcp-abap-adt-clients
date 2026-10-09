@@ -5,106 +5,35 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { CLASS, CLASS_INCLUDE, sourceUri } from '../../endpoints/objects';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-
-/**
- * Update class source code with validation (high-level function)
- *
- * This function:
- * 1. Validates source code using check operation
- * 2. Only updates if validation passes (no errors)
- * 3. Allows warnings to pass through
- *
- * Requires class to be locked first
- *
- * @param connection - SAP connection
- * @param className - Class name
- * @param sourceCode - Source code to validate and update
- * @param lockHandle - Lock handle from lock operation
- * @param transportRequest - Optional transport request
- * @returns Update result
- * @throws Error if check finds errors or update fails
- *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
- */
-export async function updateClassWithCheck(
-  connection: IAbapConnection,
-  className: string,
-  sourceCode: string,
-  lockHandle: string,
-  transportRequest?: string,
-  sourceContentType?: string,
-): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('source_code is required');
-  }
-
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
-  // Import check function
-  const { checkClass } = await import('./check');
-  const { parseCheckRunResponse } = await import('../../utils/checkRun');
-
-  // Check source code before update
-  const checkResponse = await checkClass(
-    connection,
-    className,
-    'inactive',
-    sourceCode,
-  );
-  const checkResult = parseCheckRunResponse(checkResponse);
-
-  // Block update if there are errors
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors
-      .map((err: { text?: string }) => err.text)
-      .join('; ');
-    throw new Error(`Class check failed, update blocked: ${errorMessages}`);
-  }
-
-  // Proceed with update (warnings are allowed)
-  return await updateClass(
-    connection,
-    className,
-    sourceCode,
-    lockHandle,
-    transportRequest,
-    sourceContentType,
-  );
-}
 
 /**
  * Update class source code (low-level function)
  * Requires class to be locked first
  *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateClass(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('source_code is required');
-  }
-
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  // **No lock handle is not this library's verdict.** It used to throw here, and
+  // an update without a lock is a thing ADT judges: it answers its own refusal,
+  // naming what it wants, and that answer is what a caller should read. The
+  // parameter is simply left off the URL rather than sent empty.
+  const url = `${sourceUri(CLASS.uri(className))}${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {
@@ -131,23 +60,11 @@ export async function updateClassImplementations(
   connection: IAbapConnection,
   className: string,
   implementationCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
-  if (!implementationCode) {
-    throw new Error('implementationCode is required');
-  }
-
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `${CLASS_INCLUDE.uri(className, 'implementations')}${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {

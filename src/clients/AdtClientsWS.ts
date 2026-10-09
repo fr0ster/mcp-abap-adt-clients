@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type {
-  ILogger,
   IWebSocketConnectOptions,
   IWebSocketMessageEnvelope,
   IWebSocketMessageHandler,
   IWebSocketTransport,
-} from '@mcp-abap-adt/interfaces';
-import { DebuggerSessionClient } from './DebuggerSessionClient';
+} from '@mcp-abap-adt/interfaces-network';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface IAdtClientsWSRequestOptions {
   correlationId?: string;
@@ -63,10 +62,6 @@ export class AdtClientsWS {
 
   onEvent(handler: IWebSocketMessageHandler<unknown>): void {
     this.eventHandlers.push(handler);
-  }
-
-  getDebuggerSessionClient(): DebuggerSessionClient {
-    return new DebuggerSessionClient(this);
   }
 
   async request<TPayload = unknown, TResponse = unknown>(

@@ -12,16 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  ITransformationConfig,
-  ITransformationState,
-} from '../../../../core/transformation';
+import type { ITransformationConfig } from '../../../../core/transformation';
 import { getTransformation } from '../../../../core/transformation/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -70,7 +69,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<ITransformationConfig, ITransformationState>;
+  let tester: BaseTester<ITransformationConfig>;
 
   beforeAll(async () => {
     try {
@@ -116,7 +115,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (transformationName: string) => {
@@ -180,19 +179,17 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
 </tt:transform>`;
 
         const sourceCode =
-          testCase?.params?.source_code ||
-          config.sourceCode ||
-          defaultSourceCode;
+          testCase?.params?.source_code || config.source || defaultSourceCode;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             transformationName: config.transformationName,
             transformationType:
               config.transformationType || 'SimpleTransformation',
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },
@@ -299,7 +296,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'Transformation - read standard object');
         } catch (error: any) {

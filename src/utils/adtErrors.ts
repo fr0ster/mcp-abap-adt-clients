@@ -21,7 +21,7 @@
  * It is the library declining to translate a refusal into a fact.
  */
 
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 
 const parser = new XMLParser({
@@ -211,27 +211,25 @@ export function throwIfSapError(xmlData: string): void {
 }
 
 /**
- * The transport list has no saved configuration to run.
+ * An operation this library could not carry out, carrying ADT's own code.
  *
- * Lives here rather than in `@mcp-abap-adt/interfaces` because it is a class: a
- * contract says what a thing is, a class is one way of being it, and shipping
- * one from the contracts package makes "swap in your own implementation" untrue
- * for that piece.
-
- * It survives the move where `AdtOperationError` does not, and the difference is
- * what each carries. This names one condition, says what to do about it, and
- * hands over the `endpoint` a caller needs to act — a failure worth
- * distinguishing. `AdtOperationError` named "an operation failed" and carried two
- * `unknown` fields.
+ * It left `@mcp-abap-adt/interfaces` in 29.0.0 with everything else that emits
+ * code — a contract says what a thing is, a class is one way of being it. It is
+ * kept for the few places that still **throw**: a caller error, or a condition
+ * discovered before any request went out. Everything a server said comes back
+ * as a returned failure instead, where `code` is `IAdtError.code`.
  */
-export class TransportSearchConfigurationMissing extends Error {
-  constructor(public readonly endpoint: string) {
-    super(
-      'No transport search configuration exists on this system. The transport ' +
-        'list is a saved-configuration search, so there is nothing to run: create ' +
-        'a configuration in Eclipse, or pass configUri explicitly. Configurations ' +
-        `live at ${endpoint}`,
-    );
-    this.name = 'TransportSearchConfigurationMissing';
+export class AdtOperationError extends Error {
+  /** ADT error code, e.g. `AdtObjectErrorCodes.UNSUPPORTED_OPERATION`. */
+  code?: string;
+  /** HTTP status, where one was involved. */
+  status?: number;
+  statusText?: string;
+  /** Whatever was caught, kept for a caller that wants to look. */
+  originalError?: unknown;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'AdtOperationError';
   }
 }

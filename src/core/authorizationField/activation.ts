@@ -5,17 +5,15 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 function buildActivationXml(name: string): string {
   const upper = name.toUpperCase();
-  const encoded = encodeSapObjectName(upper);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/aps/iam/auth/${encoded}" adtcore:name="${upper}"/>
+  <adtcore:objectReference adtcore:uri="${AUTHORIZATION_FIELD.uri(upper)}" adtcore:name="${upper}"/>
 </adtcore:objectReferences>`;
 }
 
@@ -26,10 +24,6 @@ export async function activateAuthorizationField(
   connection: IAbapConnection,
   name: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   const xmlBody = buildActivationXml(name);
 
@@ -43,8 +37,6 @@ export async function activateAuthorizationField(
       'Content-Type': 'application/xml',
     },
   });
-
-  assertActivationSucceeded('Authorization field', response.data);
 
   return response;
 }

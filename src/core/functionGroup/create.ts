@@ -2,14 +2,15 @@
  * FunctionGroup create operations
  */
 
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
 import type {
-  HttpError,
   IAbapConnection,
-  IAdtContentTypes,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
+import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionGroupParams } from './types';
@@ -26,7 +27,7 @@ export async function create(
   logger?: ILogger,
   contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
+  const url = `${FUNCTION_GROUP.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const finalMasterSystem = params.masterSystem || undefined;
 
@@ -94,29 +95,6 @@ export async function create(
     return response;
   } catch (error: unknown) {
     const e = error as HttpError;
-    // Special handling: Ignore Kerberos error for FunctionGroup
-    // SAP sometimes returns HTTP 400 with "Kerberos library not loaded" but still creates the object
-    // This is a known issue with FunctionGroup create - we ignore the error
-    if (e.response?.status === 400) {
-      const errorData =
-        typeof e.response.data === 'string'
-          ? e.response.data
-          : safeStringify(e.response.data);
-
-      if (errorData.includes('Kerberos library not loaded')) {
-        logger?.debug?.(
-          `[WARN] FunctionGroup create returned Kerberos error, but object may have been created - ignoring error`,
-        );
-        // Return a mock successful response (status 201)
-        return {
-          ...e.response,
-          status: 201,
-          statusText: 'Created',
-          data: e.response.data,
-        } as IAdtWireResponse;
-      }
-    }
-
     // Log error details for debugging (same as class/create.ts)
     if (e.response && debugEnabled) {
       logger?.error?.(

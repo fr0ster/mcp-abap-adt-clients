@@ -5,7 +5,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { TABLE } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -18,7 +19,7 @@ export async function unlockTable(
   tableName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `${TABLE.uri(tableName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { FUNCTION_INCLUDE } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate function include.
@@ -17,9 +17,7 @@ export async function activateFunctionInclude(
   groupName: string,
   includeName: string,
 ): Promise<IAdtWireResponse> {
-  const groupLower = encodeSapObjectName(groupName).toLowerCase();
-  const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
-  const objectUri = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}`;
+  const objectUri = `${FUNCTION_INCLUDE.uri(groupName, includeName)}`;
 
   return await activateObjectInSession(
     connection,

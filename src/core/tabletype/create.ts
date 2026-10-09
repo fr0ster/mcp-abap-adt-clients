@@ -3,12 +3,12 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
-import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { TABLE_TYPE } from '../../endpoints/objects';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableTypeParams } from './types';
 
@@ -21,13 +21,6 @@ export async function createTableType(
   connection: IAbapConnection,
   params: ICreateTableTypeParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.tabletype_name) {
-    throw new Error('TableType name is required');
-  }
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
   const masterSystem = params.masterSystem || '';
   const responsible = params.responsible || '';
 
@@ -43,13 +36,13 @@ export async function createTableType(
     : '';
 
   // Create empty table type with POST using XML format (ttyp:tableType)
-  const createUrl = `/sap/bc/adt/ddic/tabletypes${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
+  const createUrl = `${TABLE_TYPE.collection}${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
 
   // Empty table type XML (rowType added via update)
   const tableTypeXml = `<?xml version="1.0" encoding="UTF-8"?><ttyp:tableType xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.tabletype_name.toUpperCase()}" adtcore:type="TTYP/DA" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-    
+
   <adtcore:packageRef adtcore:name="${params.package_name.toUpperCase()}"/>
-  
+
 </ttyp:tableType>`;
 
   const headers = {
@@ -57,26 +50,14 @@ export async function createTableType(
     'Content-Type': CT_TABLE_TYPE,
   };
 
-  try {
-    const createResponse = await connection.makeAdtRequest({
-      url: createUrl,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: tableTypeXml,
-      headers,
-    });
-
-    return createResponse;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    const errorMessage = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : safeStringify(e.response.data)
-      : e.message;
-
-    throw new Error(
-      `Failed to create table type ${params.tabletype_name}: ${errorMessage}`,
-    );
-  }
+  // A refusal comes back as the transport's failure, with SAP's answer on it.
+  // It used to be rewrapped in a new Error carrying the text alone, which
+  // dropped the response the caller's `analyse` reads.
+  return connection.makeAdtRequest({
+    url: createUrl,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: tableTypeXml,
+    headers,
+  });
 }

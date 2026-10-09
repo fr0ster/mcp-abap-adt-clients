@@ -12,13 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ITableConfig, ITableState } from '../../../../core/table';
+import type { ITableConfig } from '../../../../core/table';
 import { getTable } from '../../../../core/table/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -66,7 +68,7 @@ describe('Table (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<ITableConfig, ITableState>;
+  let tester: BaseTester<ITableConfig>;
 
   beforeAll(async () => {
     try {
@@ -110,7 +112,7 @@ describe('Table (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            ddlCode: params.ddl_code,
+            source: params.ddl_code,
           };
         },
         ensureObjectReady: async (tableName: string) => {
@@ -164,15 +166,15 @@ describe('Table (using AdtClient)', () => {
 
         const testCase = tester.getTestCaseDefinition();
         const updatedDdlCode =
-          testCase?.params?.updated_ddl_code || config.ddlCode || '';
+          testCase?.params?.updated_ddl_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: updatedDdlCode,
+          source: updatedDdlCode,
           updateConfig: {
             tableName: config.tableName,
             packageName: config.packageName,
             description: config.description || '',
-            ddlCode: updatedDdlCode,
+            source: updatedDdlCode,
           },
         });
       },
@@ -223,8 +225,8 @@ describe('Table (using AdtClient)', () => {
           const resultState = await tester.readTest({
             tableName: standardTableName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const tableConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const tableConfig = resultState;
           if (
             tableConfig &&
             typeof tableConfig === 'object' &&

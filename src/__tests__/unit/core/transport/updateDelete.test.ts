@@ -5,11 +5,12 @@
  * `DELETE` on the item resource. This pins the request shape so neither stub
  * can silently come back.
  */
+import type { ITransportConfig } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 
 const ITEM_URL = '/sap/bc/adt/cts/transportrequests/TRLK900438';
@@ -68,32 +69,53 @@ const connectionOver = (bodyFor: (url: string) => string) => {
 };
 
 describe('AdtRequest.update()', () => {
-  it('issues exactly GET then PUT, both to the item URL, with the new description in the PUT body', async () => {
+  it('issues exactly one PUT, to the item URL, carrying the document given', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).update({
-      transportNumber: 'TRLK900438',
-      description: 'New description',
-    });
+    // The caller reads the request, patches the one mutable field, and passes
+    // the whole document. Since 19.0.0 the read is theirs: a member that read
+    // and wrote was two requests and a merge nobody outside could change.
+    const edited = TRANSPORT_ITEM_XML.replace(
+      /tm:desc="[^"]*"/,
+      'tm:desc="New description"',
+    );
 
-    expect(calls).toHaveLength(2);
+    // The body goes in the options, where the contract puts it.
+    await new AdtRequest(connection).updateMetadata(
+      { transportNumber: 'TRLK900438' },
+      { source: edited },
+    );
 
-    expect(calls[0].method).toBe('GET');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
     expect(calls[0].url).toBe(ITEM_URL);
+    expect(String(calls[0].data)).toContain('tm:desc="New description"');
+    // Everything else the caller kept is still there — because they kept it.
+    expect(String(calls[0].data)).toContain('tm:owner="CB9900000000"');
+    expect(String(calls[0].data)).toContain('tm:number="TRLK900438"');
+  });
 
-    expect(calls[1].method).toBe('PUT');
-    expect(calls[1].url).toBe(ITEM_URL);
-    expect(String(calls[1].data)).toContain('tm:desc="New description"');
-    // Every other field from the GET survives the patch — read-modify-write,
-    // not a body rebuilt from scratch.
-    expect(String(calls[1].data)).toContain('tm:owner="CB9900000000"');
-    expect(String(calls[1].data)).toContain('tm:number="TRLK900438"');
+  /**
+   * **One channel, and the type is what enforces it.**
+   *
+   * Two tests stood here, pinning that the body could arrive in the config as
+   * well as in the options and that the options won. They were the right
+   * tests while the contract said where the body goes twice and differently —
+   * the capability atom put it in the options, `ITransportConfig.source` told
+   * the caller to pass it there. `interfaces-adt` 7.0.0 chose the options
+   * (decision 33) and took the field off the config, so the config form no
+   * longer compiles and there is nothing left to assert about precedence.
+   */
+  it('refuses a body the config has no field for', () => {
+    // @ts-expect-error the payload is `options.source`; a config has no `source`
+    const wrong: Partial<ITransportConfig> = { source: '<tm:root/>' };
+    expect(wrong).toBeDefined();
   });
 
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).update({
+    await new AdtRequest(connection).updateMetadata({
       transportNumber: 'TRLK900438',
       description: 'New description',
     });
@@ -104,24 +126,18 @@ describe('AdtRequest.update()', () => {
     }
   });
 
-  it('rejects without a description before any request goes out', async () => {
+  it('sends what it was given, and judges none of it', async () => {
+    // No guard on the document. A caller who passes nothing writes nothing, and
+    // the server says what it thinks of that — this package does not answer for
+    // it. What the caller must guarantee is that the document is valid.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await expect(
-      new AdtRequest(connection).update({ transportNumber: 'TRLK900438' }),
-    ).rejects.toThrow(/description/i);
+    await new AdtRequest(connection).updateMetadata({
+      transportNumber: 'TRLK900438',
+    });
 
-    expect(calls).toHaveLength(0);
-  });
-
-  it('rejects without a transport number before any request goes out', async () => {
-    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
-
-    await expect(
-      new AdtRequest(connection).update({ description: 'New description' }),
-    ).rejects.toThrow(/transport request number/i);
-
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
   });
 });
 
@@ -147,13 +163,15 @@ describe('AdtRequest.delete()', () => {
     }
   });
 
-  it('rejects without a transport number before any request goes out', async () => {
+  it('sends the delete with what it was given, and judges none of it', async () => {
+    // No guard on the number since 19.0.0: the URL is built from what was
+    // given and the server answers. A caller who names nothing gets the
+    // server's words, which a strategy can read.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await expect(new AdtRequest(connection).delete({})).rejects.toThrow(
-      /transport request number/i,
-    );
+    await new AdtRequest(connection).delete({});
 
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('DELETE');
   });
 });

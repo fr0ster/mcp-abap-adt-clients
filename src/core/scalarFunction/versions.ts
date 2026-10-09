@@ -1,48 +1,49 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  SCALAR_FUNCTION,
+  sourceUri,
+  versionsUri,
+} from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
-import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IScalarFunctionConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 
-// candidate URI — probe-verify on trial
+/**
+ * The version history — the Atom feed, as it arrived (candidate URI,
+ * probe-verify on trial).
+ *
+ * `objectVersions` in @mcp-abap-adt/adt-strategies reads it into entries. A
+ * system without the resource answers 404 or 406, which comes back as the
+ * transport's failure; until 23.0.0 it was thrown as a library error.
+ */
 export async function getScalarFunctionVersions(
   connection: IAbapConnection,
   config: Partial<IScalarFunctionConfig>,
-): Promise<IObjectVersion[]> {
-  if (!config.scalarFunctionName)
-    throw new Error('scalarFunctionName is required');
-  const encodedName = encodeSapObjectName(
-    config.scalarFunctionName.toLowerCase(),
+): Promise<IAdtWireResponse> {
+  const url = versionsUri(
+    sourceUri(SCALAR_FUNCTION.uri(config.scalarFunctionName as string)),
   );
-  const url = `/sap/bc/adt/ddic/dsfd/sources/${encodedName}/source/main/versions`;
-  try {
-    const res = await connection.makeAdtRequest({
-      url,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: { Accept: ACCEPT_VERSION_FEED },
-    });
-    return parseVersionsFeed(String(res.data));
-  } catch (e) {
-    throwVersionsError(e, `scalar function ${config.scalarFunctionName}`);
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: ACCEPT_VERSION_FEED },
+  });
 }
 
+/** The source of one version, by the `contentUri` its entry carried. */
 export async function getScalarFunctionVersionSource(
   connection: IAbapConnection,
   contentUri: string,
-): Promise<string> {
-  try {
-    const res = await connection.makeAdtRequest({
-      url: contentUri,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: { Accept: 'text/plain' },
-    });
-    return String(res.data);
-  } catch (e) {
-    throwVersionsError(e, 'version content');
-  }
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: contentUri,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'text/plain' },
+  });
 }

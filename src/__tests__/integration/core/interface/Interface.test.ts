@@ -12,16 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IInterfaceConfig,
-  IInterfaceState,
-} from '../../../../core/interface';
+import type { IInterfaceConfig } from '../../../../core/interface';
 import { getInterface } from '../../../../core/interface/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -69,7 +68,7 @@ describe('Interface (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IInterfaceConfig, IInterfaceState>;
+  let tester: BaseTester<IInterfaceConfig>;
 
   beforeAll(async () => {
     try {
@@ -113,7 +112,7 @@ describe('Interface (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (interfaceName: string) => {
@@ -166,12 +165,12 @@ describe('Interface (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
-          sourceCode: config.sourceCode,
+          source: config.source,
           updateConfig: {
             interfaceName: config.interfaceName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: config.sourceCode,
+            source: config.source,
           },
         });
       },
@@ -222,8 +221,8 @@ describe('Interface (using AdtClient)', () => {
           const resultState = await tester.readTest({
             interfaceName: standardInterfaceName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const interfaceConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const interfaceConfig = resultState;
           if (
             interfaceConfig &&
             typeof interfaceConfig === 'object' &&

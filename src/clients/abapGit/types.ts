@@ -1,21 +1,36 @@
 /**
- * abapGit client type definitions.
+ * The result strategies an abapGit client is constructed with.
  *
- * The contract types (IAdtAbapGitClient and friends) live in
- * @mcp-abap-adt/interfaces — a consumer must import them to use the client
- * at all, and that package is the one place to import from. Only the two
- * error shapes below stay here: they are not part of the public contract,
- * only thrown internally by the poll loop.
+ * One per member, given once, so every call through the client answers the
+ * shape its strategy makes (decision 22 in the interfaces repository). The
+ * shipped default reads nothing: each member answers the document ADT sent,
+ * and `unlink` — a DELETE with nothing to read — answers nothing. The readings
+ * that used to be applied here (`IAbapGitRepoStatus` and the rest) are
+ * `abapGitRepos`, `abapGitErrorLog` and `abapGitExternalRepo` in
+ * `@mcp-abap-adt/adt-strategies`, for a caller who wants those shapes.
  */
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 
-import type { IAbapGitRepoStatus } from '@mcp-abap-adt/interfaces';
-
-export interface IAbapGitAbortedError extends Error {
-  name: 'AbortError';
-  lastKnownStatus?: IAbapGitRepoStatus;
+export interface IAbapGitResults {
+  readonly linked: IResultStrategy<unknown>;
+  readonly pulled: IResultStrategy<unknown>;
+  readonly unlinked: IResultStrategy<unknown>;
+  readonly repos: IResultStrategy<unknown>;
+  readonly errorLog: IResultStrategy<unknown>;
+  readonly externalRepo: IResultStrategy<unknown>;
 }
 
-export interface IAbapGitTimeoutError extends Error {
-  name: 'TimeoutError';
-  lastKnownStatus?: IAbapGitRepoStatus;
-}
+/**
+ * The shipped default: documents as they arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const abapGitDocuments = {
+  linked: rawDocument,
+  pulled: rawDocument,
+  unlinked: nothing,
+  repos: rawDocument,
+  errorLog: rawDocument,
+  externalRepo: rawDocument,
+} satisfies IAbapGitResults;

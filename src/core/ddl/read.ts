@@ -5,18 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { orThrow } from '../../utils/adtResponse';
-import { encodeSapObjectName } from '../../utils/internalUtils';
-import { noopLogger } from '../../utils/noopLogger';
+import { DDL_SOURCE, transportUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection): AdtUtils {
-  return new AdtUtils(connection, noopLogger);
-}
 
 /**
  * Get ABAP view metadata (without source code)
@@ -26,14 +20,7 @@ export async function getDdlMetadata(
   ddlName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'view',
-      ddlName,
-      undefined,
-      options,
-    ),
-  );
+  return objectMetadataWire(connection, 'view', ddlName, undefined, options);
 }
 
 /**
@@ -45,14 +32,13 @@ export async function getDdlSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'view',
-      ddlName,
-      undefined,
-      version,
-      options,
-    ),
+  return objectSourceWire(
+    connection,
+    'view',
+    ddlName,
+    undefined,
+    version,
+    options,
   );
 }
 
@@ -78,9 +64,8 @@ export async function getDdlTransport(
   ddlName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(ddlName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport${query}`;
+  const url = `${transportUri(DDL_SOURCE.uri(ddlName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

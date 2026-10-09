@@ -1,0 +1,573 @@
+# The lifecycle of an ADT object
+
+Every object type in this library answers the same small set of members, and
+they compose into one flow:
+
+```
+create → lock → update → unlock → activate
+```
+
+**You compose it.** Each member is one ADT request — that is the rule this
+library holds to since 18.0.0 — so the arrows above are calls you make, in the
+order you choose, seeing every answer. Nothing runs behind them.
+
+`read`, `checkDeletion`, `check` and `delete` sit outside the flow. This page
+says what each member actually does and where the flow does not hold — the
+exceptions are few and each of them is a property of ADT, not of this library.
+
+Everything below is measured against a real system. Where a claim is about the
+server rather than about this code, it says so.
+
+## `create()` creates the initial object, and nothing else
+
+This is the rule to hold on to: **a create makes the object shell**. It does not
+write source, it does not activate, it does not publish. For 24 of the 31 types
+it is one POST and the answer to it.
+
+```typescript
+const answer = await client.getClass().create({
+  className: 'ZCL_TEST',
+  packageName: 'ZPACKAGE',
+  description: 'Test class',
+});
+```
+
+What comes back is an object that exists, is inactive, and is empty. Source is a
+separate write, and activation is a separate call — which is exactly the order
+Eclipse uses.
+
+**Nothing extends the create.** Since 18.0.0 it is the POST for every type,
+including the four that used to do more — function group, package, unit test
+class, service binding. The options that asked for extra steps
+(`activateOnCreate`, `deleteOnFailure`) are gone from `IAdtOperationOptions`,
+because there are no extra steps left to attach them to.
+
+That also removes the case a rollback existed for: a create that answers a
+result made exactly one object, and a create that answers a failure made none.
+There is nothing half-made to clean up.
+
+## A member is named for the resource it addresses
+
+Since `@mcp-abap-adt/interfaces` 36.0.0 the four members say which of an object's
+two resources they touch, and a type offers only the pairs it has:
+
+| | reads | writes |
+|---|---|---|
+| the **source** at `source/main` | `read` | `update` |
+| the object's **own document** | `readMetadata` | `updateMetadata` |
+
+A class, a program, a DDL source have a source: `read`/`update`. A **domain, a
+data element, a package, a table type, a function group, a transport request, a
+message class and an authorization field have none** — they *are* their document,
+so they offer `readMetadata`/`updateMetadata` and nothing else. Three types have
+both: a function include, a scalar function implementation and a feature toggle.
+
+```typescript
+// a class — has a source
+await client.getClass().update({ className }, { source, lockHandle });
+
+// a domain — is its document, and the document is what you send
+const current = await client.getDomain().readMetadata({ domainName });
+if (!current.ok) throw new Error(current.getError().message);
+const document = patched(current.getResult().value); // yours to edit
+await client.getDomain().updateMetadata({ domainName }, { source: document, lockHandle });
+```
+
+**The whole document, every time.** An update is a replace, not a merge: read
+what the object holds, change what you mean to change, and pass the result.
+Fields such as a domain's data type used to sit beside `document` in the config
+and were never sent — the create did not carry them either, so an object built
+that way came back with `<doma:datatype/>` empty and SAP refused to activate it.
+They are gone as of `@mcp-abap-adt/interfaces-adt` 4.0.0; the document is the
+only channel, and it always was.
+
+This replaced a shape where one atom demanded both members from every type, and
+eight of them answered `read` and `readMetadata` with the **identical request** —
+one endpoint behind two members. The old contract said so itself: *"For objects
+without source code (Domain, DataElement), this returns metadata XML."*
+
+## `update()` is the write, and the lock window is yours
+
+An update is the PUT. It carries `options.lockHandle` as given, and issues no
+other request:
+
+```typescript
+const cls = client.getClass();
+const config = { className: 'ZCL_TEST' };
+
+const locked = await cls.lock(config);           // the LOCK goes stateful
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+try {
+  await cls.update(config, { source, lockHandle });
+} finally {
+  await cls.unlock(config, lockHandle);           // so does the UNLOCK
+}
+
+await cls.activate(config);                       // when you want it active
+```
+
+`lock` and `unlock` are the only members that change the session type, and
+each only for its own request: the `LOCK` and the `UNLOCK` go out stateful,
+everything between them — the write included — stateless. The `UNLOCK` has to
+reach the ABAP context that holds the lock, which is what the stateful request
+carries it to; a stateless one answers `200` and releases nothing (see
+[STATEFUL_SESSION_GUIDE.md](STATEFUL_SESSION_GUIDE.md)). The `finally` above is
+the shape to copy, because a handle left held refuses the next write.
+
+**`lock` answers the handle SAP sent; `unlock` answers SAP's reply.** The handle
+is read from the `sap-adt-lm-handle` header or from `LOCK_HANDLE` in the body.
+An answer that carries neither reads as `''` — until 23.0.0 that was a thrown
+"Failed to obtain lock handle", a sentence about SAP's answer raised as if the
+library had failed, with the answer lost. Whether a handle-less `200` is a
+refusal is your `analyse` to say; the response is in the answer either way.
+
+**Passing no handle is allowed.** Whether a write without a lock is accepted is
+ADT's judgement about that object on that system; its refusal comes back in the
+answer, naming what it wants. This library does not raise one of its own.
+
+**One lock can cover several writes** — a class and its test include, say, which
+are both written under the *class's* lock. That was always possible by passing
+`lockHandle`; now it is simply how the member works.
+
+**Leaving an object saved-but-inactive is a legitimate state**, and sometimes the
+one you want — several objects activated together afterwards, for instance. Not
+calling `activate` is how you get it.
+
+## What a write sends: one field, and what belongs in it
+
+Every write takes its payload as **`source`** — `options.source` on the call,
+`config.source` where a type still reads it from the configuration. One name,
+because a write is a write: this library does not inspect what it carries, and
+a field named for the kind of content would be asking the caller to classify a
+value nobody here reads. Until `@mcp-abap-adt/interfaces-adt` 6.0.0 the same
+value went by eleven names — `sourceCode`, `document`, `ddlCode`, `ddlSource`,
+`testClassSource`, `xmlContent` and the rest — and which one a type wanted was
+something you found out by trying.
+
+What goes *in* it depends on the member, and there are two kinds.
+
+### `update()` — the object's source, in the object's own language
+
+```typescript
+await client.getClass().update({ className }, { source, lockHandle });
+```
+
+| the type | what `source` holds |
+|---|---|
+| class, interface, program, include, function module, function include, enhancement | ABAP |
+| DDL source, table, structure, append structure, scalar function | CDS DDL |
+| access control | CDS DCL |
+| transformation | XSLT or Simple Transformation |
+| metadata extension | CDS annotations |
+| behavior definition, behavior implementation | RAP behavior language / ABAP |
+| service definition | the `define service` block |
+| scalar function implementation | JSON — the one write that is neither ABAP nor XML |
+
+The server compiles it and answers. Nothing is validated here, and nothing is
+assembled: what you pass is the body.
+
+### `updateMetadata()` — the object's whole document
+
+A domain, a data element, a package, a table type, a function group, a
+transport request and an authorization field have no source at all: the object
+**is** its document, and the write sends that document. Four more types offer
+both members, each addressing a resource of its own — a feature toggle, a
+message class, a function include and a scalar function implementation:
+
+```typescript
+const current = await domain.readMetadata({ domainName });
+const edited  = patch(String(current.getResult().value)); // yours to do
+const handle  = (await domain.lock({ domainName })).getResult().value;
+await domain.updateMetadata({ domainName }, { source: edited, lockHandle: handle });
+```
+
+**The body may travel in either place.** `options.source` is what the
+capability atom documents and what these implementations prefer;
+`config.source` is what each type's own config documents, and it is read when
+the options carry none. The contract states both, in two places, and until it
+settles on one, passing either works.
+
+**It is a replace, never a merge.** Nothing is read inside the member to keep
+what you left out — a field missing from the document you send is a field the
+object loses. So the sequence is read, edit, write, and the read is yours: the
+library stopped fetching-and-patching inside `update` in 19.0.0.
+
+A domain document, for instance, carries three groups, and a fresh `create`
+leaves all three present and empty:
+
+```xml
+<doma:domain adtcore:name="ZDEMO_DOMAIN" adtcore:version="inactive" ...>
+  <doma:content>
+    <doma:typeInformation>
+      <doma:datatype>CHAR</doma:datatype>     <!-- empty after a create -->
+      <doma:length>000010</doma:length>       <!-- six digits, zero-padded -->
+      <doma:decimals>000000</doma:decimals>
+    </doma:typeInformation>
+    <doma:outputInformation>
+      <doma:length>000010</doma:length>
+      <doma:style>0</doma:style>
+      <doma:conversionExit/>
+      <doma:signExists>false</doma:signExists>
+      <doma:lowercase>false</doma:lowercase>
+    </doma:outputInformation>
+    <doma:valueInformation>
+      <doma:valueTableRef adtcore:name="..."/>  <!-- or fixed values -->
+      <doma:fixValues>
+        <doma:fixValue>
+          <doma:position>1</doma:position>
+          <doma:low>X</doma:low>
+          <doma:high/>                          <!-- set: an interval -->
+          <doma:text>Yes</doma:text>
+        </doma:fixValue>
+      </doma:fixValues>
+    </doma:valueInformation>
+  </doma:content>
+</doma:domain>
+```
+
+**A create leaves the type empty, and an empty type is not activatable** —
+`DO(251) Data type ' ' does not exist`. Filling it in is this write, which is
+why a domain is created and then updated rather than created complete.
+
+The other document types follow the same rule with their own namespace:
+`dtel:` for a data element (`dtel:typeKind`, `dtel:typeName`), `pak:` for a
+package, `tm:` for a transport request. What each one contains is the
+**server's** vocabulary, not this library's: read one from your own system and
+you have the authoritative example, which is also what the probe under
+`scripts/probe-domain-document-shape.ts` does.
+
+**A not-ready read answers `200` with an empty body**, not a `404`. An empty
+document patched and written back is a write that empties the object, so check
+the read before editing it.
+
+## `delete()` does not lock, and works on all but one thing
+
+`delete` is the delete, and `checkDeletion` is the approval ADT wants first —
+two members, one request each, both against `/sap/bc/adt/deletion/…`, which is
+ADT's own deletion service. There is no lock to take and none to release.
+
+Both live on `IAdtDeletable`, because anything that can be deleted can be asked
+whether it can be deleted *now*. Almost everything created can be removed; what
+varies is the moment — something still references it, a transport holds it,
+another user holds its lock — and every one of those is the server's to answer.
+The check asks about a **URI**, and its answer names the type and package it
+resolved that address to, so a type with an address has something to ask with.
+
+```typescript
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+
+const approved = await client.getClass().checkDeletion(config, {
+  analyse: analyseDeletion,
+});
+if (!approved.ok) throw new Error(approved.getError().message);
+await client.getClass().delete(config, { analyse: analyseDeletion });
+```
+
+Both answer `200` whether the server agreed or not — the verdict is in the
+body — so without an `analyse` a refusal comes back as a success carrying the
+document. `analyseDeletion` from `@mcp-abap-adt/adt-strategies` reads it: every
+`del:message` in order, each with its own severity, and the T100 key from the
+long-text link, which is the one part of a deletion message that does not
+change with the logon language.
+
+Running `delete` without the check is allowed: ADT answers its own refusal. What
+you lose is the reason — the check's document names what still points at the
+object, and the delete's does not.
+
+The check is a question, and the delete is the answer to a different one. A
+refusal arrives as `del:isDeleted` on the delete — not as `del:isDeletable`,
+which belongs to the check — and `analyseDeletion` reads both. Until 23.0.0
+`getPackage().delete()` applied a reading of its own (`packageDeletionRefusal`)
+when you passed none; now no member does. The same holds for
+`getUtils().deleteObjectsGroup()`, which answers SAP's reply instead of
+throwing on `isDeleted="false"` — pass `analyseDeletion` there too.
+
+**The one thing it cannot remove** is an object that was created and never bound
+to a package. The deletion check resolves an object through its package — its
+answer carries `adtcore:packageName` when it found one and says "Object does not
+exist" when it did not — so an unbound object is reported absent while its name
+stays taken, and there is nothing for the delete to act on.
+
+### A behavior implementation needs a second write, and it is the class's
+
+`create` makes the class. `update` writes its implementation include. Neither
+writes the class's own `source/main` — the generated shell that binds it to its
+behavior definition — and **until that is written the class cannot be read at
+all**: ADT answers `Resource …: wrong input data for processing` to every read.
+
+A behavior implementation *is* a class, so the shell goes in with the class's own
+`update`. `mainSourceFor` is exported to build it:
+
+```typescript
+import { mainSourceFor } from '@mcp-abap-adt/adt-clients';
+
+const bimpl = client.getBehaviorImplementation();
+await bimpl.create(config);
+
+const cls = client.getClass();
+const locked = await cls.lock({ className });
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+try {
+  await cls.update(
+    { className },
+    { source: mainSourceFor(className, behaviorDefinition), lockHandle },
+  );
+  await bimpl.update({ className }, { source, lockHandle });
+} finally {
+  await cls.unlock({ className }, lockHandle);
+}
+
+await bimpl.activate({ className });
+```
+
+There was an `updateMain()` member that composed the template and wrote it. It
+was a second `update` on a type whose two resources are both *sources*, which is
+not a shape the atoms name — so it went, and the template is exported instead.
+
+**`AdtFunctionInclude.updateSource()` went the same way**: writing an include's
+source is `update`, and its `finclude` document is `updateMetadata`.
+
+### The things that are not deleted
+
+Seven types offer neither member, and the omission is the statement: their
+removal is a **write of the parent**, so there is nothing to delete and nothing
+to approve.
+
+| type | what "removing" means |
+|---|---|
+| `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()` | `update()` with an empty source — the class include is emptied, not removed |
+| `getMessageClassMessage()` | the message class is written without that row |
+
+Measured beside it: the deletion service resolves a *message class*
+(`adtcore:type="MSAG/N"`) and knows nothing of the rows inside it. The same holds
+for a class and its includes.
+
+The concrete classes keep a `delete()` as the name for writing emptiness, but the
+contract the factory hands back does not declare it — writing the empty content
+through `update()` is the operation, and it is the one ADT offers.
+
+### Which class include is which
+
+The endpoint says `includes`, but these are sections of the global class, not
+objects of their own — and the four names ADT uses do not match the labels
+Eclipse shows, which is where a caller picks the wrong one.
+
+| this library | endpoint | what Eclipse calls it |
+|---|---|---|
+| `getLocalDefinitions()` | `…/oo/classes/<c>/includes/definitions` | **Class-relevant Local Types** — measured |
+| `getLocalTypes()` | `…/oo/classes/<c>/includes/implementations` | **Local Types** — measured |
+| `getLocalTestClass()` | `…/oo/classes/<c>/includes/testclasses` | Test Classes |
+| `getLocalMacros()` | `…/oo/classes/<c>/includes/macros` | Macros |
+
+The first two are the trap: "Local Types" in the Eclipse editor writes to
+`implementations`, and `definitions` is the one Eclipse calls *Class-relevant*
+Local Types. Both rows are from ADT 3.60.3 traffic against one system:
+
+```
+PUT /sap/bc/adt/oo/classes/zadt_bld_cls02/includes/implementations?lockHandle=4E23…   200   stateless
+PUT /sap/bc/adt/oo/classes/zadt_bld_cls02/includes/definitions?lockHandle=4E23…       200   stateless
+```
+
+The other two rows are the endpoint names, not captured traffic.
+
+Two things those two requests also settle: the write is **stateless**, and the
+`lockHandle` is the *class's* — the same handle serves every include, because
+what is locked is the class. Take it with `getClass().lock()`.
+
+**Not to be confused with `getInclude()`**, which is a `PROG/I` — an include of a
+report, a repository object in its own right at `/sap/bc/adt/programs/includes/`.
+It has nothing to do with classes, and a cloud system will not create one: its
+discovery collection declares an empty `<app:accept/>` and the type answers
+`403 S_DEVELOP`.
+
+## `activate()` and what counts as a failure
+
+`activate()` returns what ADT answered and judges none of it. ADT answers `200`
+whether or not the activation happened, so the status does not carry the
+verdict and this library does not look for one in the body either: reading an
+activation checklist is your `analyse`, written from the responses your own
+system gives.
+
+Two things worth knowing while you write it: `activationExecuted="false"` with
+no message means "nothing to do", and a locked object refuses with HTTP 403,
+which never reaches a body-reading strategy at all.
+`analyseActivation` in `@mcp-abap-adt/adt-strategies` reads both.
+
+## How to check a created object, and when
+
+Four of the checks in this library's own test suite were doing nothing, and all
+four passed. They are worth reading as a list of what not to do.
+
+### Check the answer, not the object
+
+Every member answers an object, whether it found anything or not. So this is a
+constant:
+
+```typescript
+const state = await client.getClass().read({ className });
+if (state) { /* always taken */ }
+```
+
+Three loops in this suite were written that way — two spun twenty round trips
+and ten seconds of sleeping every run, a third reported "the package is ready"
+on its first pass without waiting for anything. The compiler cannot catch it
+wherever the value is `any`, and the tests passed throughout. Read `.ok`:
+
+```typescript
+if (!state.ok) throw new Error(state.getError().message);
+```
+
+### What each step actually guarantees
+
+| After | The object is | A read answers |
+|---|---|---|
+| `create()` | named, and holding the name | **depends on the type** — see below |
+| `update()` | carrying an inactive version | `version=inactive` reads it, even under the lock |
+| `activate()` | carrying an active version | the plain read answers |
+
+What a create leaves varies: a domain is complete, an interface has a generated
+skeleton, a DDL source answers 200 with an empty body, and **a class refuses
+every read** until its source is written. So a read straight after a create
+proves nothing portable — and for a class the refusal describes your request
+rather than the object's state, which is why it invites a retry that can never
+succeed.
+
+**The first check worth making is after the source is written.** Read it back
+and compare it to what you sent.
+
+### Three things that are not existence checks
+
+- **A deletion check.** `del:isDeletable="true"` means nothing is blocking a
+  delete, and nothing blocks deleting what is not there. Measured, an absent
+  `MSAG/N` and an absent `FUGR/FF` both answer `true`; absent classes,
+  structures, data elements and scalar functions answer `false`. Read
+  `<del:text>` instead — it says "does not exist" in every case.
+- **A 2xx.** A refusal arrives with `200` often enough that the status settles
+  nothing: an activation that failed, a deletion that was refused and a
+  publication that was rejected all answer `200` with the verdict in the body.
+- **An empty body.** For several types, absence and emptiness are the same
+  answer: `200` with zero bytes. Which one it is, is your `analyse` to decide.
+
+### What to check instead
+
+Read the thing you actually care about and look at the content. After a create
+and an update, read the source back and compare it to what you wrote; after an
+activation, read the active version. For a message, read the message class —
+a message has no existence of its own to ask about.
+
+### When waiting is the right answer, and when it is not
+
+Waiting helps for exactly one thing: an activation whose effect has not landed
+yet. That is what `withLongPolling` is for, and this library uses it on the read
+that follows an activation.
+
+Waiting never helps for a read that refuses with **"wrong input data"** — the
+object has no version and will not grow one on its own — or for **"does not
+have a TMDIR entry"**, which means the object is not there at all. Both read
+like transient faults. Neither is one.
+
+And nothing in this library polls an asynchronous ADT job for you. A publish
+takes about two minutes of server time and answers its own verdict; if you want
+to watch the state settle afterwards, that loop is yours to write.
+
+## Service bindings: publishing is the editing
+
+The one type where the flow above does not apply. A binding is created once and
+after that it is **published** and **unpublished**; its ADT lock exists for
+those two operations, and `update()` deliberately does not take it, because how
+long a lock is held is a policy the consumer owns.
+
+The full account, with the Eclipse trace and a `try/finally` example, is in
+[CLIENT_API_REFERENCE.md](CLIENT_API_REFERENCE.md#service-bindings-publishing-is-the-editing).
+
+## Message classes: the messages are rows
+
+The other place the flow does not hold, and for a different reason. A message
+class is a container and its messages are rows in it — addressable, lockable,
+and with no write of their own. Measured from a full run, creating, updating and
+deleting message `001` are **indistinguishable on the wire**: all three are the
+same PUT of the whole class, differing only in the body.
+
+```
+GET  …/messageclass/zac_msg01                            read the class whole
+GET  …/messageclass/zac_msg01                            again, for read-modify-write
+POST …/messages/001?_action=LOCK_MSG&accessMode=MODIFY   lock the row
+POST …?_action=LOCK&accessMode=MODIFY&msgNo=001&onSave=X lock the container, naming the row
+PUT  …?lockHandle=…&corrNr=…                             write the class whole
+POST …?_action=UNLOCK&lockHandle=…                       release the container
+POST …/messages/001?_action=UNLOCK_ALL                   release the row
+```
+
+Two locks per write, taken in that order and released in reverse, and the
+container's lock is told which row is being saved. So a member that edits one
+message reads and rewrites the whole class, which is why a handful of message
+operations produce a great many class reads.
+
+**Only the container exists.** The class answers 404 before it is created and
+404 after it is deleted, and 200 in between — ordinary. A row has no existence
+of its own: in the trace above, `LOCK_MSG` on `messages/001` answers `200`
+*before* message 001 exists, because the PUT on the next line is what creates
+it. There is nothing to ask about a row, so nothing refuses.
+
+This is why `getMessageClassMessage().read()` decides for itself: it fetches the
+class document and looks for the number, answering `OBJECT_NOT_FOUND` when it is
+not among the messages. That verdict is this library reading content, not SAP
+reporting absence — and a consumer replacing the reading replaces the verdict
+with it.
+
+The third exception is the **transport request**, which is not a locked object at
+all: it is changed and deleted directly.
+
+## What a bare `create()` actually leaves, per type
+
+A POST sometimes builds a minimal working object and sometimes builds nothing,
+and which one you get is a property of the type: a domain is complete, an
+interface has a generated skeleton, a DDL source answers `200` with an empty
+body, a class has a skeleton that **no read can see until its first source
+write**, and a service definition is created with an empty source (a create
+that sends no responsible person is refused — a different thing).
+`getVersions()` answers `ok` in every one of those states.
+
+## The name is taken from the POST onward, and `validate()` may not say so
+
+Whatever the create leaves behind, it holds the name. A second create is refused
+for every type measured — *"Resource Data Definition ZAC_X does already exist."*
+
+`validate()` does answer it — that is what it is for — but the answer arrives
+two ways, and one of them was being dropped. Measured across seven types:
+
+| Type | How a taken name is refused |
+|---|---|
+| `domain`, `structure`, `table`, `class`, `serviceDefinition` | a failing status |
+| `functionGroup`, `ddl` | **`200`** carrying `<SEVERITY>ERROR</SEVERITY>` |
+
+So a `validate()` that returns a `200` has not told you the name is free. The
+body is the answer, and reading `<SEVERITY>` out of it is your `analyse` — this
+package ships none, because which severities matter depends on what you are
+about to do with the name. `analyseValidation` in `@mcp-abap-adt/adt-strategies`
+is one reading of both forms, for a caller who has no opinion yet.
+
+What `validate()` does **not** answer is whether the object exists: a name that
+is free validates fine whether or not anything was ever created under it. For
+existence, read.
+
+**Which is why an abandoned create is worth cleaning up.** A create whose source
+was never written leaves a name that nothing else can use and — for a class — an
+object that no read can see. Since `create` is one request, that is the only way
+to reach the state: the sequence stopped between the POST and the write, and
+noticing it is yours. `delete` is the remedy while the object is still bound to
+its package.
+
+## Absence does not have one wording
+
+Deleting an object and reading it again answers a different sentence per type —
+*"Error while importing object … from the database"* for a domain, *"Resource
+INTERFACE … does not exist."*, *"Data definition … of version  does not
+exist"*. All mean the same thing, and none is worth matching on: branch on the
+failure your own `analyse` decided.
+
+Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts` and
+`npx ts-node scripts/probe-unfinished-create.ts`.

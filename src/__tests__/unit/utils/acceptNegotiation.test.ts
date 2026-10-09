@@ -63,10 +63,6 @@ describe('acceptNegotiation', () => {
 });
 
 describe('makeAdtRequestWithAcceptNegotiation - 415 retry', () => {
-  beforeEach(() => {
-    clearAcceptCache();
-  });
-
   it('should retry with corrected Content-Type on 415', async () => {
     let callCount = 0;
     const mockConnection = {
@@ -190,5 +186,94 @@ describe('makeAdtRequestWithAcceptNegotiation - 415 retry', () => {
         { enableAcceptCorrection: false },
       ),
     ).rejects.toThrow();
+  });
+});
+
+/**
+ * What one connection learns stays on it. The caches were process globals
+ * keyed by method and URL: a corrected Accept learned on one system was sent
+ * to every other.
+ */
+describe('negotiation state is per connection', () => {
+  const answering406Then = (supported: string) => {
+    const seen: string[] = [];
+    let first = true;
+    const connection = {
+      makeAdtRequest: async (request: any) => {
+        seen.push(request.headers?.Accept);
+        if (first) {
+          first = false;
+          const error: any = new Error('406');
+          error.response = { status: 406, headers: {}, data: supported };
+          throw error;
+        }
+        return { data: 'ok', status: 200, headers: {} };
+      },
+    } as any;
+    return { connection, seen };
+  };
+
+  it('a correction learned on one connection is not sent on another', async () => {
+    const a = answering406Then('application/vnd.sap.adt.a.v2+xml');
+    await makeAdtRequestWithAcceptNegotiation(
+      a.connection,
+      {
+        url: '/sap/bc/adt/x',
+        method: 'GET',
+        timeout: 1000,
+        headers: { Accept: 'application/xml' },
+      },
+      { enableAcceptCorrection: true },
+    );
+    expect(a.seen).toEqual([
+      'application/xml',
+      'application/vnd.sap.adt.a.v2+xml',
+    ]);
+
+    const b = { seen: [] as string[] };
+    const other = {
+      makeAdtRequest: async (request: any) => {
+        b.seen.push(request.headers?.Accept);
+        return { data: 'ok', status: 200, headers: {} };
+      },
+    } as any;
+    await makeAdtRequestWithAcceptNegotiation(
+      other,
+      {
+        url: '/sap/bc/adt/x',
+        method: 'GET',
+        timeout: 1000,
+        headers: { Accept: 'application/xml' },
+      },
+      { enableAcceptCorrection: true },
+    );
+    expect(b.seen).toEqual(['application/xml']);
+  });
+
+  it('clearing one connection forgets only what it learned', async () => {
+    const a = answering406Then('application/vnd.sap.adt.a.v2+xml');
+    await makeAdtRequestWithAcceptNegotiation(
+      a.connection,
+      {
+        url: '/sap/bc/adt/y',
+        method: 'GET',
+        timeout: 1000,
+        headers: { Accept: 'application/xml' },
+      },
+      { enableAcceptCorrection: true },
+    );
+    clearAcceptCache(a.connection);
+    a.seen.length = 0;
+    await makeAdtRequestWithAcceptNegotiation(
+      a.connection,
+      {
+        url: '/sap/bc/adt/y',
+        method: 'GET',
+        timeout: 1000,
+        headers: { Accept: 'application/xml' },
+      },
+      { enableAcceptCorrection: true },
+    );
+    expect(a.seen[0]).toBe('application/xml');
   });
 });

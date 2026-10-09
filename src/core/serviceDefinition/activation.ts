@@ -5,9 +5,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { SERVICE_DEFINITION } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -16,7 +15,7 @@ import { getTimeout } from '../../utils/timeouts';
 function buildActivationXml(serviceDefinitionName: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/srvd/sources/${encodeSapObjectName(serviceDefinitionName.toLowerCase())}" adtcore:name="${serviceDefinitionName.toUpperCase()}"/>
+  <adtcore:objectReference adtcore:uri="${SERVICE_DEFINITION.uri(serviceDefinitionName)}" adtcore:name="${serviceDefinitionName.toUpperCase()}"/>
 </adtcore:objectReferences>`;
 }
 
@@ -47,8 +46,6 @@ export async function activateServiceDefinition(
     data: xmlBody,
     headers,
   });
-
-  assertActivationSucceeded('Service definition', response.data);
 
   return response;
 }

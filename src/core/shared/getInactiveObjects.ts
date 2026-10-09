@@ -2,16 +2,11 @@
  * Get Inactive Objects - retrieve list of objects not yet activated
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
-import type { IInactiveObjectsResponse, IObjectReference } from './types';
-
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-});
 
 /**
  * Get list of inactive objects (objects that are not yet activated)
@@ -30,13 +25,18 @@ const xmlParser = new XMLParser({
  * await activateObjectsGroup(connection, result.objects);
  * ```
  */
-export async function getInactiveObjects(
+/**
+ * The request, and only the request.
+ *
+ * Split from the reading below so the reading can be injected: this is one GET
+ * with one answer, which is exactly the shape an `IResultStrategy` types. The
+ * default reading keeps the document; `utilInactiveObjects` in
+ * `@mcp-abap-adt/adt-strategies` reads it into references.
+ */
+export async function fetchInactiveObjects(
   connection: IAbapConnection,
-  options?: {
-    includeRawXml?: boolean;
-  },
-): Promise<IInactiveObjectsResponse> {
-  const response = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     method: 'GET',
     url: `/sap/bc/adt/activation/inactiveobjects`,
     timeout: getTimeout('default'),
@@ -45,39 +45,4 @@ export async function getInactiveObjects(
         'application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8',
     },
   });
-
-  const xml = response.data;
-  const parsed = xmlParser.parse(xml);
-
-  const objects: IObjectReference[] = [];
-
-  // Parse XML response
-  const root = parsed['ioc:inactiveObjects'];
-  if (!root) {
-    return { objects, xmlStr: options?.includeRawXml ? xml : undefined };
-  }
-
-  const entries = Array.isArray(root['ioc:entry'])
-    ? root['ioc:entry']
-    : root['ioc:entry']
-      ? [root['ioc:entry']]
-      : [];
-
-  for (const entry of entries) {
-    const objectData = entry['ioc:object'];
-    if (!objectData) continue;
-
-    const ref = objectData['ioc:ref'];
-    if (!ref) continue;
-
-    objects.push({
-      type: ref['@_adtcore:type'] || '',
-      name: ref['@_adtcore:name'] || '',
-    });
-  }
-
-  return {
-    objects,
-    xmlStr: options?.includeRawXml ? xml : undefined,
-  };
 }

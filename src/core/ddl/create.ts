@@ -5,8 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VIEW, CT_VIEW } from '../../constants/contentTypes';
+import { DDL_SOURCE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDdlParams } from './types';
@@ -24,7 +25,7 @@ async function createDDLSObject(
   // Handle both string and undefined/null cases safely
   const transportRequest = args.transport_request?.trim();
   const hasTransportRequest = transportRequest && transportRequest.length > 0;
-  const url = `/sap/bc/adt/ddic/ddl/sources${hasTransportRequest ? `?corrNr=${encodeURIComponent(transportRequest)}` : ''}`;
+  const url = `${DDL_SOURCE.collection}${hasTransportRequest ? `?corrNr=${encodeURIComponent(transportRequest)}` : ''}`;
 
   const masterSystem = args.masterSystem || '';
   const responsible = args.responsible || '';

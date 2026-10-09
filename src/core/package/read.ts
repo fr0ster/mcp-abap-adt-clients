@@ -5,11 +5,11 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_PACKAGE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { PACKAGE, transportUri } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -23,11 +23,10 @@ export async function getPackage(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(packageName.toLowerCase());
   const longPollingQuery = options?.withLongPolling
     ? '&withLongPolling=true'
     : '';
-  const url = `/sap/bc/adt/packages/${encodedName}?version=${version}${longPollingQuery}`;
+  const url = `${PACKAGE.uri(packageName)}?version=${version}${longPollingQuery}`;
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -54,9 +53,8 @@ export async function getPackageTransport(
   packageName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(packageName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/packages/${encodedName}/transport${query}`;
+  const url = `${transportUri(PACKAGE.uri(packageName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

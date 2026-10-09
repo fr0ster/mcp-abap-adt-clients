@@ -1,8 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { TRANSFORMATION } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -10,7 +11,7 @@ import { getTimeout } from '../../utils/timeouts';
  * how to interpret it.
  *
  * **This endpoint answered 404 for every request on the one system it was
- * measured against**, including the control that sent every parameter, and E19's
+ * measured against**, including the control that sent every parameter, and that system's
  * discovery document lists no `xslt/validation` collection. So either this URL
  * is wrong or the resource does not exist there.
  *
@@ -25,7 +26,7 @@ export async function validateTransformationName(
   packageName?: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = '/sap/bc/adt/xslt/validation';
+  const url = TRANSFORMATION.validation;
   const queryParams = new URLSearchParams({
     objname: transformationName,
   });

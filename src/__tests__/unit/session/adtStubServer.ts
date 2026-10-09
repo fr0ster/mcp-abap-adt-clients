@@ -11,7 +11,7 @@
  */
 
 import { createServer, type Server } from 'node:http';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface StubRequest {
   method: string;

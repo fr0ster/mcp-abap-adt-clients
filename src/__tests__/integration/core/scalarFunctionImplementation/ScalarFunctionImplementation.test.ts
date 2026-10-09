@@ -19,11 +19,17 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { activationStatusIn } from '../../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
+import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -219,13 +225,30 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             }
             throw e;
           }
-          await sf.update(
-            {
-              scalarFunctionName: funcName,
-              transportRequest,
-              sourceCode: sigSource,
-            },
-            { activateOnUpdate: true },
+          const funcLock = expectResult(
+            await sf.lock({ scalarFunctionName: funcName }),
+            'lock scalar function',
+          );
+          try {
+            expectResult(
+              await sf.update(
+                { scalarFunctionName: funcName, transportRequest },
+                { source: sigSource, lockHandle: funcLock },
+              ),
+              'update scalar function',
+            );
+          } finally {
+            await sf.unlock({ scalarFunctionName: funcName }, funcLock);
+          }
+          await expectLockReleased(
+            (c) => c.getScalarFunction(),
+            { scalarFunctionName: funcName },
+            `scalar function ${funcName}`,
+            testsLogger,
+          );
+          expectResult(
+            await sf.activate({ scalarFunctionName: funcName }),
+            'activate scalar function',
           );
 
           // 2) AMDP class (do NOT solo-activate — it activates with the group).
@@ -235,12 +258,21 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             transportRequest,
             description: 'DSFI integration AMDP implementation',
           });
-          const amdpLock = await cls.lock({ className: amdpName });
+          const amdpLock = expectResult(
+            await cls.lock({ className: amdpName }),
+            'lock AMDP class',
+          );
           await cls.update(
-            { className: amdpName, transportRequest, sourceCode: amdpSource },
-            { lockHandle: amdpLock },
+            { className: amdpName, transportRequest },
+            { source: amdpSource, lockHandle: amdpLock },
           );
           await cls.unlock({ className: amdpName }, amdpLock);
+          await expectLockReleased(
+            (c) => c.getClass(),
+            { className: amdpName },
+            `AMDP class ${amdpName}`,
+            testsLogger,
+          );
 
           // 3) DSFI create + implementation update (PUT /source/main JSON).
           try {
@@ -260,45 +292,99 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             }
             throw e;
           }
-          await dsfi.update({
-            implementationName: implName,
-            transportRequest,
-            sourceCode: implSource,
-          });
+          // Under its own lock, and its answer read. Without the handle the
+          // PUT went out unlocked, ADT did not object audibly, and the source
+          // simply did not change — the run failed three steps later on a
+          // read-back that had no `=>GET_SUM` in it. Two lessons in one call:
+          // the window is the caller's, and an unread answer is an unasked
+          // question.
+          const implLock = expectResult(
+            await dsfi.lock({ implementationName: implName }),
+            'lock DSFI',
+          );
+          try {
+            expectResult(
+              await dsfi.update(
+                { implementationName: implName, transportRequest },
+                { source: implSource, lockHandle: implLock },
+              ),
+              'update DSFI source',
+            );
+          } finally {
+            await dsfi.unlock({ implementationName: implName }, implLock);
+          }
+          await expectLockReleased(
+            (c) => c.getScalarFunctionImplementation(),
+            { implementationName: implName },
+            `scalar function implementation ${implName}`,
+            testsLogger,
+          );
 
-          // 4) Group-activate the trio (synchronous).
-          await orThrow(
-            client.getUtils().activateObjectsGroup([
+          // 4) Group-activate the trio, then wait: step 5 reads the active
+          // source, and reading it straight after the POST would read whatever
+          // was there before. The run id is `utilActivationRunId`'s reading of
+          // `Location`; the shipped default answers the POST as it came.
+          const utils = client.getUtils({
+            ...utilDocuments,
+            activation: utilActivationRunId,
+          });
+          const runId = expectResult(
+            await utils.activateObjectsGroup([
               { type: 'DSFD/SCF', name: funcName },
               { type: 'CLAS/OC', name: amdpName },
               { type: 'DSFI/SFI', name: implName },
             ]),
+            'activation run id',
           );
+          // The wait is this caller's. `activateObjectsGroup` is the POST and
+          // answers the run id; how long to allow, and what a failure costs, are
+          // decisions about this test.
+          let runStatus = '';
+          const runDeadline = Date.now() + 120_000;
+          while (runStatus !== 'finished' && Date.now() < runDeadline) {
+            const run = expectResult(
+              await utils.getActivationRun(runId, { withLongPolling: true }),
+              'activation run status',
+            );
+            runStatus = activationStatusIn(String(run));
+            if (runStatus === 'error' || runStatus === 'failed') {
+              throw new Error(`activation run ${runId} ended as ${runStatus}`);
+            }
+          }
+          if (runStatus !== 'finished') {
+            throw new Error(
+              `activation run ${runId} had not finished at the deadline`,
+            );
+          }
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
-          const readState = await dsfi.read(
-            { implementationName: implName },
-            'active',
+          // The DSFI source resource answers JSON, which the transport parses
+          // on the way in — so the shipped reading re-serialises it rather than
+          // stringifying an object into `[object Object]`.
+          const sourceText = expectResult(
+            await dsfi.read({ implementationName: implName }, 'active'),
+            'read implementation source',
           );
-          expect(readState?.readResult).toBeDefined();
-          const sourceText =
-            typeof readState?.readResult?.data === 'string'
-              ? readState.readResult.data
-              : JSON.stringify(readState?.readResult?.data);
           expect(sourceText).toContain(`${amdpName}=>GET_SUM`);
 
           // 6) Read metadata (blues v2 XML).
-          const metaState = await dsfi.readMetadata({
-            implementationName: implName,
-          });
-          expect(metaState.metadataResult).toBeDefined();
+          const metaState = expectResult(
+            await dsfi.readMetadata({
+              implementationName: implName,
+            }),
+            'metaState',
+          );
+          expect(metaState).toBeDefined();
 
           // 7) Delete the trio.
-          const del = await dsfi.delete({
-            implementationName: implName,
-            transportRequest,
-          });
-          expect(del.deleteResult).toBeDefined();
+          const del = expectResult(
+            await dsfi.delete({
+              implementationName: implName,
+              transportRequest,
+            }),
+            'del',
+          );
+          expect(del).toBeDefined();
           await cls.delete({ className: amdpName, transportRequest });
           await sf.delete({ scalarFunctionName: funcName, transportRequest });
 

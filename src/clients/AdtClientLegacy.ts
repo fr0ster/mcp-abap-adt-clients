@@ -2,7 +2,7 @@
  * AdtClientLegacy - ADT Client for older SAP systems (BASIS < 7.50)
  *
  * Extends AdtClient and overrides methods that differ on legacy systems:
- * - Unsupported object types throw clear errors
+ * - Object types absent on legacy answer a refusal from every member, without a request
  * - Supported types use legacy-compatible deletion (direct DELETE vs /deletion/delete)
  * - Content-Type defaults to v1 (AdtContentTypesBase)
  * - Transport requests use /sap/bc/cts/ instead of /sap/bc/adt/cts/
@@ -13,75 +13,117 @@
  * endpoints not present in legacy system discovery are blocked here.
  */
 
-import type {
-  IAbapConnection,
-  IAdtActivatable,
-  IAdtCheckable,
-  IAdtClientOptions,
-  IAdtCreatable,
-  IAdtCrud,
-  IAdtDataPreview,
-  IAdtDeletable,
-  IAdtDiscovery,
-  IAdtGroupLifecycle,
-  IAdtInformationSystem,
-  IAdtLockable,
-  IAdtObject,
-  IAdtObjectAccess,
-  IAdtPackageBrowsing,
-  IAdtReadable,
-  IAdtRepositoryStructure,
-  IAdtRequest,
-  IAdtRunnable,
-  IAdtSourceObject,
-  IAdtTransportAware,
-  IAdtUpdatable,
-  IAdtValidatable,
-  IClassUnitTestDefinition,
-  IClassUnitTestRunOptions,
-  ILogger,
-  ITestRunInformation,
-} from '@mcp-abap-adt/interfaces';
-import type { IClassConfig, IClassState } from '../core/class';
+import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import {
+  AdtAccessControl,
+  type accessControlDocuments,
+  type IAccessControlResults,
+} from '../core/accessControl';
+import {
+  AdtAuthorizationField,
+  type authorizationFieldDocuments,
+  type IAuthorizationFieldResults,
+} from '../core/authorizationField';
+import {
+  AdtBehaviorDefinition,
+  type behaviorDefinitionDocuments,
+  type IBehaviorDefinitionResults,
+} from '../core/behaviorDefinition';
+import { AdtBehaviorImplementation } from '../core/behaviorImplementation';
+import { classDocuments, type IClassResults } from '../core/class';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';
-import type { IDdlConfig, IDdlState } from '../core/ddl';
+import {
+  AdtDataElement,
+  type dataElementDocuments,
+  type IDataElementResults,
+} from '../core/dataElement';
+import { ddlDocuments, type IDdlResults } from '../core/ddl';
 import { AdtDdlLegacy } from '../core/ddl/AdtDdlLegacy';
-import type {
-  IFunctionGroupConfig,
-  IFunctionGroupState,
+import {
+  AdtDomain,
+  type domainDocuments,
+  type IDomainResults,
+} from '../core/domain';
+import {
+  AdtEnhancement,
+  type enhancementDocuments,
+  type IEnhancementResults,
+} from '../core/enhancement';
+import {
+  AdtFeatureToggle,
+  type featureToggleDocuments,
+  type IFeatureToggleResults,
+} from '../core/featureToggle';
+import {
+  functionGroupDocuments,
+  type IFunctionGroupResults,
 } from '../core/functionGroup';
 import { AdtFunctionGroupLegacy } from '../core/functionGroup/AdtFunctionGroupLegacy';
-import type {
-  IFunctionModuleConfig,
-  IFunctionModuleState,
+import {
+  functionModuleDocuments,
+  type IFunctionModuleResults,
 } from '../core/functionModule';
 import { AdtFunctionModuleLegacy } from '../core/functionModule/AdtFunctionModuleLegacy';
-import type { IInterfaceConfig, IInterfaceState } from '../core/interface';
+import { type IInterfaceResults, interfaceDocuments } from '../core/interface';
 import { AdtInterfaceLegacy } from '../core/interface/AdtInterfaceLegacy';
-import type { IPackageConfig, IPackageState } from '../core/package';
+import {
+  AdtMetadataExtension,
+  type IMetadataExtensionResults,
+  type metadataExtensionDocuments,
+} from '../core/metadataExtension';
+import { type IPackageResults, packageDocuments } from '../core/package';
 import { AdtPackageLegacy } from '../core/package/AdtPackageLegacy';
-import type { IProgramConfig, IProgramState } from '../core/program';
+import { type IProgramResults, programDocuments } from '../core/program';
 import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
-import type { AdtUtils } from '../core/shared/AdtUtils';
+import {
+  AdtServiceBinding,
+  type IServiceResults,
+  type serviceDocuments,
+} from '../core/service';
+import {
+  AdtServiceDefinition,
+  type IServiceDefinitionResults,
+  type serviceDefinitionDocuments,
+} from '../core/serviceDefinition';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtContentTypesBase } from '../core/shared/contentTypes';
+import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
+import {
+  AdtStructure,
+  type IStructureResults,
+  type structureDocuments,
+} from '../core/structure';
+import {
+  AdtTable,
+  type ITableResults,
+  type tableDocuments,
+} from '../core/table';
+import {
+  AdtDdicTableType,
+  type ITableTypeResults,
+  type tableTypeDocuments,
+} from '../core/tabletype';
+import { type ITransportResults, transportDocuments } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
-import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
-import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
+import {
+  ACCESS_CONTROL,
+  AUTHORIZATION_FIELD,
+  BEHAVIOR_DEFINITION,
+  DATA_ELEMENT,
+  DOMAIN,
+  ENHANCEMENT,
+  FEATURE_TOGGLE,
+  METADATA_EXTENSION,
+  SERVICE_BINDING,
+  SERVICE_DEFINITION,
+  STRUCTURE,
+  TABLE,
+  TABLE_TYPE,
+} from '../endpoints/objects';
 import { AdtClient } from './AdtClient';
-
-/**
- * Error message for unsupported object types on legacy systems.
- * The endpoint is not present in the /sap/bc/adt/discovery catalog.
- */
-function unsupportedError(objectType: string, endpoint: string): string {
-  return (
-    `${objectType} is not supported on this SAP system. ` +
-    `The required endpoint ${endpoint} was not found in the system's ` +
-    `ADT discovery catalog (/sap/bc/adt/discovery). ` +
-    `This typically means the system's BASIS version is too old.`
-  );
-}
+import { absentOnLegacy } from './absentOnLegacy';
 
 export class AdtClientLegacy extends AdtClient {
   constructor(
@@ -98,89 +140,97 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Supported types with legacy overrides ---
 
-  override getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
-    return new AdtProgramLegacy(
+  override getProgram<R extends IProgramResults = typeof programDocuments>(
+    results: R = programDocuments as unknown as R,
+  ): AdtProgramLegacy<R> {
+    return new AdtProgramLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getClass(): IAdtSourceObject<IClassConfig, IClassState> {
-    return new AdtClassLegacy(
+  override getClass<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtClassLegacy<R> {
+    return new AdtClassLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
-    return new AdtInterfaceLegacy(
+  override getInterface<
+    R extends IInterfaceResults = typeof interfaceDocuments,
+  >(results: R = interfaceDocuments as unknown as R): AdtInterfaceLegacy<R> {
+    return new AdtInterfaceLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getFunctionGroup(): IAdtCrud<
-    IFunctionGroupConfig,
-    IFunctionGroupState
-  > &
-    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState> {
-    return new AdtFunctionGroupLegacy(
+  override getFunctionGroup<
+    R extends IFunctionGroupResults = typeof functionGroupDocuments,
+  >(
+    results: R = functionGroupDocuments as unknown as R,
+  ): AdtFunctionGroupLegacy<R> {
+    return new AdtFunctionGroupLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getFunctionModule(): IAdtSourceObject<
-    IFunctionModuleConfig,
-    IFunctionModuleState
-  > {
-    return new AdtFunctionModuleLegacy(
+  override getFunctionModule<
+    R extends IFunctionModuleResults = typeof functionModuleDocuments,
+  >(
+    results: R = functionModuleDocuments as unknown as R,
+  ): AdtFunctionModuleLegacy<R> {
+    return new AdtFunctionModuleLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getPackage(): IAdtCrud<IPackageConfig, IPackageState> &
-    IAdtValidatable<IPackageConfig, IPackageState> &
-    IAdtCheckable<IPackageConfig, IPackageState> &
-    IAdtLockable<IPackageConfig, IPackageState> &
-    IAdtTransportAware<IPackageConfig, IPackageState> {
-    return new AdtPackageLegacy(
+  override getPackage<R extends IPackageResults = typeof packageDocuments>(
+    results: R = packageDocuments as unknown as R,
+  ): AdtPackageLegacy<R> {
+    return new AdtPackageLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
-    return new AdtDdlLegacy(this.connection, this.logger, this.systemContext);
-  }
-
-  // --- Unit tests with legacy endpoints ---
-
-  override getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
-    IAdtReadable<IUnitTestConfig, IUnitTestState> &
-    IAdtUpdatable<IUnitTestConfig, IUnitTestState> &
-    IAdtDeletable<IUnitTestConfig, IUnitTestState> &
-    IAdtValidatable<IUnitTestConfig, IUnitTestState> &
-    IAdtLockable<IUnitTestConfig, IUnitTestState> &
-    IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions> &
-    ITestRunInformation {
-    return new AdtUnitTestLegacy(this.connection, this.logger);
+  override getDdl<R extends IDdlResults = typeof ddlDocuments>(
+    results: R = ddlDocuments as unknown as R,
+  ): AdtDdlLegacy<R> {
+    return new AdtDdlLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+      results,
+    );
   }
 
   // --- Transport with legacy URL prefix ---
@@ -205,11 +255,14 @@ export class AdtClientLegacy extends AdtClient {
    * So the declaration is honest about the type and silent about the behaviour,
    * and the gap is tracked rather than papered over: #109.
    */
-  override getRequest(): IAdtRequest {
-    return new AdtRequestLegacy(
+  override getRequest<R extends ITransportResults = typeof transportDocuments>(
+    results: R = transportDocuments as unknown as R,
+  ): AdtRequestLegacy<R> {
+    return new AdtRequestLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
+      results,
     );
   }
 
@@ -231,112 +284,151 @@ export class AdtClientLegacy extends AdtClient {
    * contract branches on `ok` either way, and a legacy system is not a reason to
    * be told about a refusal differently.
    */
-  override getUtils(): IAdtInformationSystem &
-    IAdtRepositoryStructure &
-    IAdtPackageBrowsing &
-    IAdtGroupLifecycle &
-    IAdtDataPreview &
-    IAdtDiscovery &
-    IAdtObjectAccess {
-    return new AdtUtilsLegacy(this.connection, this.logger);
+  override getUtils<R extends IUtilResults = typeof utilDocuments>(
+    results: R = utilDocuments as unknown as R,
+  ): AdtUtilsLegacy<R> {
+    return new AdtUtilsLegacy<R>(this.connection, this.logger, results);
   }
 
-  // --- CDS Unit Test: requires modern CDS endpoints ---
+  // --- Types absent from legacy /sap/bc/adt/discovery ---
+  //
+  // Handed out all the same: every member answers a refusal and sends no
+  // request (see absentOnLegacy).
 
-  override getCdsUnitTest(): never {
-    throw new Error(
-      unsupportedError(
-        'CDS Unit Test',
-        '/sap/bc/adt/ddic/ddl/sources (CDS framework)',
-      ),
+  override getDomain<R extends IDomainResults = typeof domainDocuments>(
+    _results?: R,
+  ): AdtDomain<R> {
+    return absentOnLegacy<AdtDomain<R>>(AdtDomain, 'Domain', DOMAIN.collection);
+  }
+
+  override getDataElement<
+    R extends IDataElementResults = typeof dataElementDocuments,
+  >(_results?: R): AdtDataElement<R> {
+    return absentOnLegacy<AdtDataElement<R>>(
+      AdtDataElement,
+      'DataElement',
+      DATA_ELEMENT.collection,
     );
   }
 
-  // --- Unsupported types: endpoints absent from legacy /sap/bc/adt/discovery ---
-
-  override getDomain(): never {
-    throw new Error(unsupportedError('Domain', '/sap/bc/adt/ddic/domains'));
-  }
-
-  override getDataElement(): never {
-    throw new Error(
-      unsupportedError('DataElement', '/sap/bc/adt/ddic/dataelements'),
+  override getStructure<
+    R extends IStructureResults = typeof structureDocuments,
+  >(_results?: R): AdtStructure<R> {
+    return absentOnLegacy<AdtStructure<R>>(
+      AdtStructure,
+      'Structure',
+      STRUCTURE.collection,
     );
   }
 
-  override getStructure(): never {
-    throw new Error(
-      unsupportedError('Structure', '/sap/bc/adt/ddic/structures'),
+  override getTable<R extends ITableResults = typeof tableDocuments>(
+    _results?: R,
+  ): AdtTable<R> {
+    return absentOnLegacy<AdtTable<R>>(AdtTable, 'Table', TABLE.collection);
+  }
+
+  override getTableType<
+    R extends ITableTypeResults = typeof tableTypeDocuments,
+  >(_results?: R): AdtDdicTableType<R> {
+    return absentOnLegacy<AdtDdicTableType<R>>(
+      AdtDdicTableType,
+      'TableType',
+      TABLE_TYPE.collection,
     );
   }
 
-  override getTable(): never {
-    throw new Error(unsupportedError('Table', '/sap/bc/adt/ddic/tables'));
-  }
-
-  override getTableType(): never {
-    throw new Error(
-      unsupportedError('TableType', '/sap/bc/adt/ddic/tabletypes'),
+  override getAccessControl<
+    R extends IAccessControlResults = typeof accessControlDocuments,
+  >(_results?: R): AdtAccessControl<R> {
+    return absentOnLegacy<AdtAccessControl<R>>(
+      AdtAccessControl,
+      'AccessControl',
+      ACCESS_CONTROL.collection,
     );
   }
 
-  override getAccessControl(): never {
-    throw new Error(
-      unsupportedError('AccessControl', '/sap/bc/adt/acm/dcl/sources'),
+  override getServiceDefinition<
+    R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
+  >(_results?: R): AdtServiceDefinition<R> {
+    return absentOnLegacy<AdtServiceDefinition<R>>(
+      AdtServiceDefinition,
+      'ServiceDefinition',
+      SERVICE_DEFINITION.collection,
     );
   }
 
-  override getServiceDefinition(): never {
-    throw new Error(
-      unsupportedError('ServiceDefinition', '/sap/bc/adt/ddic/srvd/sources'),
+  override getServiceBinding<
+    R extends IServiceResults = typeof serviceDocuments,
+  >(_results?: R): AdtServiceBinding<R> {
+    return absentOnLegacy<AdtServiceBinding<R>>(
+      AdtServiceBinding,
+      'ServiceBinding',
+      SERVICE_BINDING.collection,
     );
   }
 
-  override getServiceBinding(): never {
-    throw new Error(
-      unsupportedError(
-        'ServiceBinding',
-        '/sap/bc/adt/businessservices/bindings',
-      ),
+  override getBehaviorDefinition<
+    R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
+  >(_results?: R): AdtBehaviorDefinition<R> {
+    return absentOnLegacy<AdtBehaviorDefinition<R>>(
+      AdtBehaviorDefinition,
+      'BehaviorDefinition',
+      BEHAVIOR_DEFINITION.collection,
     );
   }
 
-  override getService(): never {
-    throw new Error(
-      unsupportedError(
-        'ServiceBinding',
-        '/sap/bc/adt/businessservices/bindings',
-      ),
+  override getBehaviorImplementation<
+    R extends IClassResults = typeof classDocuments,
+  >(_results?: R): AdtBehaviorImplementation<R> {
+    return absentOnLegacy<AdtBehaviorImplementation<R>>(
+      AdtBehaviorImplementation,
+      'BehaviorImplementation',
+      BEHAVIOR_DEFINITION.collection,
     );
   }
 
-  override getBehaviorDefinition(): never {
-    throw new Error(
-      unsupportedError(
-        'BehaviorDefinition',
-        '/sap/bc/adt/bo/behaviordefinitions',
-      ),
+  override getMetadataExtension<
+    R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
+  >(_results?: R): AdtMetadataExtension<R> {
+    return absentOnLegacy<AdtMetadataExtension<R>>(
+      AdtMetadataExtension,
+      'MetadataExtension',
+      METADATA_EXTENSION.collection,
     );
   }
 
-  override getBehaviorImplementation(): never {
-    throw new Error(
-      unsupportedError(
-        'BehaviorImplementation',
-        '/sap/bc/adt/bo/behaviordefinitions',
-      ),
+  override getEnhancement<
+    R extends IEnhancementResults = typeof enhancementDocuments,
+  >(_results?: R): AdtEnhancement<R> {
+    return absentOnLegacy<AdtEnhancement<R>>(
+      AdtEnhancement,
+      'Enhancement',
+      ENHANCEMENT.root,
     );
   }
 
-  override getMetadataExtension(): never {
-    throw new Error(
-      unsupportedError('MetadataExtension', '/sap/bc/adt/ddic/ddlx/sources'),
+  override getAuthorizationField<
+    R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
+  >(_results?: R): AdtAuthorizationField<R> {
+    return absentOnLegacy<AdtAuthorizationField<R>>(
+      AdtAuthorizationField,
+      'AuthorizationField',
+      AUTHORIZATION_FIELD.collection,
     );
   }
 
-  override getEnhancement(): never {
-    throw new Error(
-      unsupportedError('Enhancement', '/sap/bc/adt/enhancements'),
+  override getFeatureToggle<
+    R extends IFeatureToggleResults = typeof featureToggleDocuments,
+  >(_results?: R): AdtFeatureToggle<R> {
+    return absentOnLegacy<AdtFeatureToggle<R>>(
+      AdtFeatureToggle,
+      'FeatureToggle',
+      FEATURE_TOGGLE.collection,
     );
+  }
+
+  /** @deprecated Use getServiceBinding(). */
+  override getService(): AdtServiceBinding {
+    return this.getServiceBinding();
   }
 }

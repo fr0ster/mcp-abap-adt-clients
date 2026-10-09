@@ -1,24 +1,25 @@
 /**
  * FeedRepository - Domain object for feed operations
  *
- * Provides access to feed reader, runtime dumps, system messages,
- * and gateway error feeds with Atom XML parsing.
+ * Provides access to the feed reader, runtime dumps, system messages and
+ * gateway error feeds. Every member answers its feed as it arrived; the Atom
+ * readings live in `@mcp-abap-adt/adt-strategies` (`feedEntries` & co.).
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
-import type { IRuntimeAnalysisObject } from '../types';
-import { fetchFeed, getFeeds, getFeedVariants } from './read';
 import type {
-  IFeedDescriptor,
-  IFeedEntry,
+  IAdtAnalyseOptions,
+  IAdtError,
+  IAdtResponse,
   IFeedQueryOptions,
   IFeedRepository,
-  IFeedVariant,
-  IGatewayErrorDetail,
-  IGatewayErrorEntry,
-  ISystemMessageEntry,
-} from './types';
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
+import type { IRuntimeAnalysisObject } from '../types';
+import { fetchFeed, getFeeds, getFeedVariants } from './read';
 
 const FEED_URLS = {
   dumps: '/sap/bc/adt/runtime/dumps',
@@ -26,261 +27,71 @@ const FEED_URLS = {
   gatewayErrors: '/sap/bc/adt/gw/errorlog',
 };
 
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  removeNSPrefix: true,
-  processEntities: false,
-});
-
 /**
- * Parse Atom XML feed response into IFeedEntry array
+ * One strategy per member of a feed repository.
+ *
+ * `IFeedRepository<TFeeds, TVariants, TEntries, TSystemMessages,
+ * TGatewayErrors, TGatewayErrorDetail>` is generic in all six, and this fills
+ * them in.
  */
-function parseAtomFeed(xml: string): IFeedEntry[] {
-  const parsed = xmlParser.parse(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    id: entry.id ?? '',
-    title:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    updated: entry.updated ?? '',
-    link: entry.link?.['@_href'] ?? '',
-    content:
-      typeof entry.content === 'object'
-        ? (entry.content['#text'] ?? '')
-        : String(entry.content ?? ''),
-    author: entry.author?.name,
-    category:
-      typeof entry.category === 'object' ? entry.category['@_term'] : undefined,
-  }));
+export interface IFeedResults {
+  readonly feeds: IResultStrategy<unknown>;
+  readonly variants: IResultStrategy<unknown>;
+  /** Any feed's entries — `dumps` and `byUrl`. */
+  readonly entries: IResultStrategy<unknown>;
+  readonly systemMessages: IResultStrategy<unknown>;
+  readonly gatewayErrors: IResultStrategy<unknown>;
+  readonly gatewayErrorDetail: IResultStrategy<unknown>;
 }
 
 /**
- * Parse Atom XML feed list into IFeedDescriptor array
+ * The shipped default: every feed answered as the document it arrived as.
+ *
+ * Until now these parsed the Atom — the readings are `feedDescriptors`,
+ * `feedVariants`, `feedEntries`, `feedSystemMessages`, `feedGatewayErrors` and
+ * `feedGatewayErrorDetail` in `@mcp-abap-adt/adt-strategies`.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
  */
-function parseFeedDescriptors(xml: string): IFeedDescriptor[] {
-  const parsed = xmlParser.parse(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
+export const feedDocuments = {
+  feeds: rawDocument,
+  variants: rawDocument,
+  entries: rawDocument,
+  systemMessages: rawDocument,
+  gatewayErrors: rawDocument,
+  gatewayErrorDetail: rawDocument,
+} satisfies IFeedResults;
 
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    id: entry.id ?? '',
-    title:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    url: entry.link?.['@_href'] ?? '',
-    category:
-      typeof entry.category === 'object' ? entry.category['@_term'] : undefined,
-  }));
-}
-
-/**
- * Parse Atom XML feed variants into IFeedVariant array
- */
-function parseFeedVariants(xml: string): IFeedVariant[] {
-  const parsed = xmlParser.parse(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    id: entry.id ?? '',
-    title:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    url: entry.link?.['@_href'] ?? '',
-  }));
-}
-
-/**
- * Parse Atom XML system messages feed into ISystemMessageEntry array
- */
-function parseSystemMessages(xml: string): ISystemMessageEntry[] {
-  const parsed = xmlParser.parse(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => {
-    // System message fields may be in the content or as extensions
-    const content =
-      typeof entry.content === 'object'
-        ? (entry.content['#text'] ?? '')
-        : String(entry.content ?? '');
-    return {
-      id: entry.id ?? '',
-      title:
-        typeof entry.title === 'object'
-          ? (entry.title['#text'] ?? '')
-          : String(entry.title ?? ''),
-      text: content,
-      severity: entry.category?.['@_term'] ?? entry['sm:severity'] ?? '',
-      validFrom: entry['sm:validFrom'] ?? entry.updated ?? '',
-      validTo: entry['sm:validTo'] ?? '',
-      createdBy: entry.author?.name ?? '',
-    };
-  });
-}
-
-/**
- * Parse Atom XML gateway error feed into IGatewayErrorEntry array
- */
-function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
-  const parsed = xmlParser.parse(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    type:
-      typeof entry.category === 'object'
-        ? (entry.category['@_term'] ?? '')
-        : String(entry.category ?? ''),
-    shortText:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    transactionId: entry.id ?? '',
-    package: entry['gw:package'] ?? '',
-    applicationComponent: entry['gw:applicationComponent'] ?? '',
-    dateTime: entry.updated ?? '',
-    username: entry.author?.name ?? '',
-    client: entry['gw:client'] ?? '',
-    requestKind: entry['gw:requestKind'] ?? '',
-  }));
-}
-
-/**
- * Parse XML gateway error detail into IGatewayErrorDetail
- */
-function parseGatewayErrorDetail(xml: string): IGatewayErrorDetail {
-  const parsed = xmlParser.parse(xml);
-  const root = parsed['errorlog:errorEntry'] ?? parsed['errorEntry'] ?? parsed;
-
-  const callStackRaw =
-    root['errorlog:callStack']?.['errorlog:entry'] ??
-    root['callStack']?.['entry'] ??
-    [];
-  const callStack = (
-    Array.isArray(callStackRaw) ? callStackRaw : [callStackRaw]
-  ).map((e: any, idx: number) => ({
-    number: e['@_number'] ?? idx,
-    event: e['@_event'] ?? '',
-    program: e['@_program'] ?? '',
-    name: e['@_name'] ?? '',
-    line: e['@_line'] ?? 0,
-  }));
-
-  const linesRaw =
-    root['errorlog:sourceCode']?.['errorlog:line'] ??
-    root['sourceCode']?.['line'] ??
-    [];
-  const sourceLines = (Array.isArray(linesRaw) ? linesRaw : [linesRaw]).map(
-    (l: any, idx: number) => ({
-      number: l['@_number'] ?? idx,
-      content: typeof l === 'object' ? (l['#text'] ?? '') : String(l ?? ''),
-      isError: l['@_isError'] === 'true' || l['@_isError'] === true,
-    }),
-  );
-
-  const exceptionsRaw =
-    root['errorlog:errorContext']?.['errorlog:exceptions']?.[
-      'errorlog:exception'
-    ] ??
-    root['errorContext']?.['exceptions']?.['exception'] ??
-    [];
-  const exceptions = (
-    Array.isArray(exceptionsRaw) ? exceptionsRaw : [exceptionsRaw]
-  ).map((ex: any) => ({
-    type: ex['@_type'] ?? '',
-    text: ex['#text'] ?? '',
-    raiseLocation: ex['@_raiseLocation'] ?? '',
-    attributes: undefined,
-  }));
-
-  return {
-    type: root['@_type'] ?? '',
-    shortText: root['errorlog:shortText'] ?? root['shortText'] ?? '',
-    transactionId:
-      root['errorlog:transactionId'] ?? root['transactionId'] ?? '',
-    package: root['errorlog:package'] ?? root['package'] ?? '',
-    applicationComponent:
-      root['errorlog:applicationComponent'] ??
-      root['applicationComponent'] ??
-      '',
-    dateTime: root['errorlog:dateTime'] ?? root['dateTime'] ?? '',
-    username: root['errorlog:username'] ?? root['username'] ?? '',
-    client: root['errorlog:client'] ?? root['client'] ?? '',
-    requestKind: root['errorlog:requestKind'] ?? root['requestKind'] ?? '',
-    serviceInfo: {
-      namespace:
-        root['errorlog:serviceInfo']?.['@_namespace'] ??
-        root['serviceInfo']?.['@_namespace'] ??
-        '',
-      serviceName:
-        root['errorlog:serviceInfo']?.['@_serviceName'] ??
-        root['serviceInfo']?.['@_serviceName'] ??
-        '',
-      serviceVersion:
-        root['errorlog:serviceInfo']?.['@_serviceVersion'] ??
-        root['serviceInfo']?.['@_serviceVersion'] ??
-        '',
-      groupId:
-        root['errorlog:serviceInfo']?.['@_groupId'] ??
-        root['serviceInfo']?.['@_groupId'] ??
-        '',
-      serviceRepository:
-        root['errorlog:serviceInfo']?.['@_serviceRepository'] ??
-        root['serviceInfo']?.['@_serviceRepository'] ??
-        '',
-      destination:
-        root['errorlog:serviceInfo']?.['@_destination'] ??
-        root['serviceInfo']?.['@_destination'] ??
-        '',
-    },
-    errorContext: {
-      errorInfo:
-        root['errorlog:errorContext']?.['errorlog:errorInfo'] ??
-        root['errorContext']?.['errorInfo'] ??
-        '',
-      resolution: {},
-      exceptions,
-    },
-    sourceCode: {
-      lines: sourceLines,
-      errorLine:
-        root['errorlog:sourceCode']?.['@_errorLine'] ??
-        root['sourceCode']?.['@_errorLine'] ??
-        0,
-    },
-    callStack,
-  };
-}
-
-export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
+export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
+  implements
+    IFeedRepository<
+      ReturnType<R['feeds']>,
+      ReturnType<R['variants']>,
+      ReturnType<R['entries']>,
+      ReturnType<R['systemMessages']>,
+      ReturnType<R['gatewayErrors']>,
+      ReturnType<R['gatewayErrorDetail']>
+    >,
+    IRuntimeAnalysisObject
+{
   readonly kind = 'feedRepository' as const;
 
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = feedDocuments as unknown as R,
   ) {}
 
-  async list(): Promise<IFeedDescriptor[]> {
-    const response = await getFeeds(this.connection);
-    return parseFeedDescriptors(response.data);
+  /** The feeds this system offers. */
+  async list<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['feeds']>, E>> {
+    return answering(
+      () => getFeeds(this.connection),
+      this.results.feeds as IResultStrategy<ReturnType<R['feeds']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -289,69 +100,100 @@ export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
    * Required, because the endpoint requires it: without a category
    * `/sap/bc/adt/feeds/variants` answers `400 ExceptionParameterNotFound`,
    * "Parameter category could not be found." Everything that called this before
-   * was getting that 400.
-   *
-   * The parameter was optional here for one release, with a `throw` behind it,
-   * only because `IFeedRepository` declared no parameter and a required one
-   * would not have satisfied it. `@mcp-abap-adt/interfaces@26.0.0` fixed the
-   * contract, so the workaround goes with it.
+   * `@mcp-abap-adt/interfaces@26.0.0` fixed the contract was getting that 400.
    */
-  async variants(category: string): Promise<IFeedVariant[]> {
-    // The compiler rejects a missing category since interfaces 26.0.0;
-    // JavaScript callers reach here anyway, so it says so rather than sending a
-    // request the server answers with 400 — the same shape `Profiler.read()`
-    // uses for a view that does not exist.
+  async variants<E extends IAdtError = IAdtError>(
+    category: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['variants']>, E>> {
+    // The compiler rejects a missing category; JavaScript callers reach here
+    // anyway, so it says so rather than sending a request the server answers
+    // with 400.
     if (!category) {
       throw new Error(
         'FeedRepository.variants() requires a category — /sap/bc/adt/feeds/variants ' +
           'answers 400 ExceptionParameterNotFound without one.',
       );
     }
-    const response = await getFeedVariants(this.connection, category);
-    return parseFeedVariants(response.data);
+    return answering(
+      () => getFeedVariants(this.connection, category),
+      this.results.variants as IResultStrategy<ReturnType<R['variants']>>,
+      options?.analyse,
+    );
   }
 
-  async dumps(options?: IFeedQueryOptions): Promise<IFeedEntry[]> {
+  /** The runtime dumps feed. */
+  async dumps<E extends IAdtError = IAdtError>(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['entries']>, E>> {
     return this.byUrl(FEED_URLS.dumps, options);
   }
 
-  async systemMessages(
-    options?: IFeedQueryOptions,
-  ): Promise<ISystemMessageEntry[]> {
-    const response = await fetchFeed(
-      this.connection,
-      FEED_URLS.systemMessages,
-      options,
+  /** The system-messages feed. */
+  async systemMessages<E extends IAdtError = IAdtError>(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['systemMessages']>, E>> {
+    return answering(
+      () => fetchFeed(this.connection, FEED_URLS.systemMessages, options),
+      this.results.systemMessages as IResultStrategy<
+        ReturnType<R['systemMessages']>
+      >,
+      options?.analyse,
     );
-    return parseSystemMessages(response.data);
-  }
-
-  async gatewayErrors(
-    options?: IFeedQueryOptions,
-  ): Promise<IGatewayErrorEntry[]> {
-    const response = await fetchFeed(
-      this.connection,
-      FEED_URLS.gatewayErrors,
-      options,
-      'username',
-    );
-    return parseGatewayErrors(response.data);
-  }
-
-  async gatewayErrorDetail(feedUrl: string): Promise<IGatewayErrorDetail> {
-    const response = await fetchFeed(this.connection, feedUrl);
-    return parseGatewayErrorDetail(response.data);
   }
 
   /**
-   * Fetch and parse any feed URL as generic IFeedEntry array.
-   * Internal helper — not part of IFeedRepository.
+   * The gateway-error feed.
+   *
+   * Filtered by `username`, not `user`: this feed names the parameter
+   * differently from the others.
    */
-  async byUrl(
+  async gatewayErrors<E extends IAdtError = IAdtError>(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['gatewayErrors']>, E>> {
+    return answering(
+      () =>
+        fetchFeed(
+          this.connection,
+          FEED_URLS.gatewayErrors,
+          options,
+          'username',
+        ),
+      this.results.gatewayErrors as IResultStrategy<
+        ReturnType<R['gatewayErrors']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /** One gateway error, in full. */
+  async gatewayErrorDetail<E extends IAdtError = IAdtError>(
     feedUrl: string,
-    options?: IFeedQueryOptions,
-  ): Promise<IFeedEntry[]> {
-    const response = await fetchFeed(this.connection, feedUrl, options);
-    return parseAtomFeed(response.data);
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['gatewayErrorDetail']>, E>> {
+    return answering(
+      () => fetchFeed(this.connection, feedUrl),
+      this.results.gatewayErrorDetail as IResultStrategy<
+        ReturnType<R['gatewayErrorDetail']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Any feed URL, read as entries.
+   *
+   * Not part of `IFeedRepository`: a caller who has a feed's URL from `list()`
+   * can read it without this package naming that feed.
+   */
+  async byUrl<E extends IAdtError = IAdtError>(
+    feedUrl: string,
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['entries']>, E>> {
+    return answering(
+      () => fetchFeed(this.connection, feedUrl, options),
+      this.results.entries as IResultStrategy<ReturnType<R['entries']>>,
+      options?.analyse,
+    );
   }
 }

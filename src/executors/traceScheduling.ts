@@ -12,70 +12,133 @@
  */
 
 import type {
-  IAbapConnection,
-  INamedItem,
+  IAdtAnalyseOptions,
+  IAdtError,
+  IAdtResponse,
   IProfilerTraceParameters,
-  ITraceRequestEntry,
+  IResultStrategy,
   ITraceScheduling,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   createTraceParameters,
-  extractProfilerIdFromResponse,
   getTraceRequestsByUri,
   listObjectTypes,
   listProcessTypes,
   listTraceRequests,
 } from '../runtime/traces/profiler';
-import {
-  parseNamedItems,
-  parseTraceRequests,
-} from '../runtime/traces/traceParsing';
+import { answering } from '../utils/adtResponse';
+import { rawDocument } from '../utils/resultStrategy';
 
-export class TraceScheduling implements ITraceScheduling {
-  constructor(private readonly connection: IAbapConnection) {}
+/** One strategy per distinct answer of trace scheduling. */
+export interface ITraceSchedulingResults {
+  /**
+   * A trace catalogue — `listObjectTypes` and `listProcessTypes`, both a
+   * `nameditem:namedItemList`. `traceSchedulingTypes` reads it.
+   */
+  readonly types: IResultStrategy<unknown>;
+  /**
+   * The schedule — `listRequests` and `getRequestsByUri`, an Atom feed.
+   * `traceSchedulingRequests` reads it.
+   */
+  readonly requests: IResultStrategy<unknown>;
+  /**
+   * What `scheduleTrace` was answered with. The request id is in `Location`
+   * and nowhere else, so `rawDocument` — which reads the body — answers `''`;
+   * a caller who wants the id passes `traceSchedulingProfilerId`.
+   */
+  readonly scheduled: IResultStrategy<unknown>;
+}
 
-  async listObjectTypes(): Promise<INamedItem[]> {
-    return parseNamedItems(await listObjectTypes(this.connection));
+/**
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const traceSchedulingDocuments = {
+  types: rawDocument,
+  requests: rawDocument,
+  scheduled: rawDocument,
+} satisfies ITraceSchedulingResults;
+
+export class TraceScheduling<
+  R extends ITraceSchedulingResults = typeof traceSchedulingDocuments,
+> implements
+    ITraceScheduling<
+      ReturnType<R['types']>,
+      ReturnType<R['requests']>,
+      ReturnType<R['scheduled']>
+    >
+{
+  constructor(
+    private readonly connection: IAbapConnection,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = traceSchedulingDocuments as unknown as R,
+  ) {}
+
+  async listObjectTypes<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+    return answering(
+      () => listObjectTypes(this.connection),
+      this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      options?.analyse,
+    );
   }
 
-  async listProcessTypes(): Promise<INamedItem[]> {
-    return parseNamedItems(await listProcessTypes(this.connection));
+  async listProcessTypes<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+    return answering(
+      () => listProcessTypes(this.connection),
+      this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      options?.analyse,
+    );
   }
 
   /**
    * What is queued.
    *
    * An empty answer means nothing is scheduled — the runs that fulfil requests
-   * consume them — not that the endpoint is dead. That distinction nearly cost
-   * this collection its place in the contract.
+   * consume them — not that the endpoint is dead.
    */
-  async listRequests(): Promise<ITraceRequestEntry[]> {
-    return parseTraceRequests(await listTraceRequests(this.connection));
+  async listRequests<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+    return answering(
+      () => listTraceRequests(this.connection),
+      this.results.requests as IResultStrategy<ReturnType<R['requests']>>,
+      options?.analyse,
+    );
   }
 
-  async getRequestsByUri(uri: string): Promise<ITraceRequestEntry[]> {
-    return parseTraceRequests(
-      await getTraceRequestsByUri(this.connection, uri),
+  async getRequestsByUri<E extends IAdtError = IAdtError>(
+    uri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+    return answering(
+      () => getTraceRequestsByUri(this.connection, uri),
+      this.results.requests as IResultStrategy<ReturnType<R['requests']>>,
+      options?.analyse,
     );
   }
 
   /**
-   * Configure a measurement, and answer with the request id.
+   * Configure a measurement.
    *
-   * The id comes from the response's `Location`, which is the only place it
-   * appears: reading the created resource back answers `200` with an **empty
-   * body**, measured. So this is not a read-modify-write surface, and a caller
-   * that loses the id cannot recover it from the resource.
+   * The request id comes back in the response's `Location`, which is the only
+   * place it appears: reading the created resource back answers `200` with an
+   * **empty body**, measured. So a caller that loses the id cannot recover it
+   * from the resource — read it with `traceSchedulingProfilerId`, and judge a
+   * missing one with `analyse`.
    */
-  async scheduleTrace(options?: IProfilerTraceParameters): Promise<string> {
-    const response = await createTraceParameters(this.connection, options);
-    const id = extractProfilerIdFromResponse(response);
-    if (!id) {
-      throw new Error(
-        'Trace scheduling returned no request id: the Location header of the ' +
-          'created parameters resource was absent or unparseable.',
-      );
-    }
-    return id;
+  async scheduleTrace<E extends IAdtError = IAdtError>(
+    options?: IProfilerTraceParameters & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['scheduled']>, E>> {
+    return answering(
+      () => createTraceParameters(this.connection, options),
+      this.results.scheduled as IResultStrategy<ReturnType<R['scheduled']>>,
+      options?.analyse,
+    );
   }
 }

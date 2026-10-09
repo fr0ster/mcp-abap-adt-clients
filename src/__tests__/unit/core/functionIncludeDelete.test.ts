@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { deleteFunctionInclude } from '../../../core/functionInclude/delete';
 
 function connReturning(xml: string): IAbapConnection {
@@ -20,44 +20,51 @@ const REFUSED_XML =
   '<?xml version="1.0" encoding="utf-8"?><del:deletionResult xmlns:del="http://www.sap.com/adt/deletion"><del:object del:isDeleted="false" adtcore:type="FUGR/I" adtcore:name="LZG_T01" xmlns:adtcore="http://www.sap.com/adt/core"><del:message del:priority="0" del:type="E"><del:text>Only delete function module includes using Function Builder</del:text><atom:link href="/x" rel="longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/></del:message></del:object></del:deletionResult>';
 
 describe('deleteFunctionInclude', () => {
-  it('resolves with a success payload when the server reports isDeleted="true"', async () => {
+  it('hands back the server\'s document when it reports isDeleted="true"', async () => {
     const conn = connReturning(OK_XML);
     const res = await deleteFunctionInclude(conn, {
       function_group_name: 'ZG',
       include_name: 'LZG_C01',
     });
-    expect((res.data as any).success).toBe(true);
-    expect((res.data as any).include_name).toBe('LZG_C01');
+
+    // The document, not `{ success: true, include_name: 'LZG_C01' }` — prose
+    // this library wrote about a call it had not read, handed to a caller in
+    // place of what SAP said.
+    expect(res.data).toBe(OK_XML);
   });
 
-  it('resolves on the real success response shape (isDeleted="true" + type="S" empty message)', async () => {
+  it('does the same on the real success shape (isDeleted="true" + type="S" empty message)', async () => {
     const conn = connReturning(OK_XML_WITH_S_MESSAGE);
     const res = await deleteFunctionInclude(conn, {
       function_group_name: 'ZOK_TEST_FG_01',
       include_name: 'LZOK_TEST_FG_01ZOK',
     });
-    expect((res.data as any).success).toBe(true);
+
+    expect(res.data).toBe(OK_XML_WITH_S_MESSAGE);
   });
 
-  it('throws the server message when isDeleted="false" (does not mask as success)', async () => {
+  // Until 23.0.0 the two cases below threw: the wire function parsed
+  // `del:isDeleted` and raised "was not deleted" itself. That is a verdict about
+  // SAP's answer, so it belongs to the caller's `analyse` (`analyseDeletion` in
+  // @mcp-abap-adt/adt-strategies); the wire hands the answer over whole.
+  it('hands back the refusal document when isDeleted="false", unjudged', async () => {
     const conn = connReturning(REFUSED_XML);
-    await expect(
-      deleteFunctionInclude(conn, {
-        function_group_name: 'ZG',
-        include_name: 'LZG_T01',
-      }),
-    ).rejects.toThrow(
-      'Only delete function module includes using Function Builder',
-    );
+    const res = await deleteFunctionInclude(conn, {
+      function_group_name: 'ZG',
+      include_name: 'LZG_T01',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data).toBe(REFUSED_XML);
   });
 
-  it('throws (not silent success) on an empty/unparseable body', async () => {
+  it('hands back an empty body as it came', async () => {
     const conn = connReturning('');
-    await expect(
-      deleteFunctionInclude(conn, {
-        function_group_name: 'ZG',
-        include_name: 'LZG_X',
-      }),
-    ).rejects.toThrow('was not deleted');
+    const res = await deleteFunctionInclude(conn, {
+      function_group_name: 'ZG',
+      include_name: 'LZG_X',
+    });
+
+    expect(res.data).toBe('');
   });
 });

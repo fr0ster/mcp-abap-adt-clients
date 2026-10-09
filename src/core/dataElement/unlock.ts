@@ -6,8 +6,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { DATA_ELEMENT } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -19,10 +19,7 @@ export async function unlockDataElement(
   dataElementName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const dataElementNameEncoded = encodeSapObjectName(
-    dataElementName.toLowerCase(),
-  );
-  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `${DATA_ELEMENT.uri(dataElementName.toLowerCase())}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

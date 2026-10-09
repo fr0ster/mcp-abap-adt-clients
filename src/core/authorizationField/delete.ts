@@ -5,14 +5,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 export interface IDeleteAuthorizationFieldParams {
@@ -21,7 +21,7 @@ export interface IDeleteAuthorizationFieldParams {
 }
 
 function objectUri(name: string): string {
-  return `/sap/bc/adt/aps/iam/auth/${encodeSapObjectName(name.toUpperCase())}`;
+  return `${AUTHORIZATION_FIELD.uri(name)}`;
 }
 
 /**
@@ -31,10 +31,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
-
   const uri = objectUri(params.authorization_field_name);
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -61,10 +57,6 @@ export async function deleteAuthorizationField(
   connection: IAbapConnection,
   params: IDeleteAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
-
   const uri = objectUri(params.authorization_field_name);
   const transportTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`
@@ -88,14 +80,10 @@ export async function deleteAuthorizationField(
     },
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      authorization_field_name: params.authorization_field_name,
-      object_uri: uri,
-      transport_request: params.transport_request || 'local',
-      message: `Authorization field ${params.authorization_field_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

@@ -22,9 +22,11 @@ import type { AdtClient } from '../../../clients/AdtClient';
 /** The atoms, and the methods each one is. */
 export const ATOM_METHODS = {
   creatable: ['create'],
-  readable: ['read', 'readMetadata'],
+  readable: ['read'],
+  metadataReadable: ['readMetadata'],
   updatable: ['update'],
-  deletable: ['delete'],
+  metadataUpdatable: ['updateMetadata'],
+  deletable: ['delete', 'checkDeletion'],
   validatable: ['validate'],
   checkable: ['check'],
   activatable: ['activate'],
@@ -39,6 +41,7 @@ export type Atom = keyof typeof ATOM_METHODS;
 const FULL = [
   'creatable',
   'readable',
+  'metadataReadable',
   'updatable',
   'deletable',
   'validatable',
@@ -127,29 +130,27 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getClass(),
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     config: {
-      sourceCode: 'CLASS zcl_guard DEFINITION PUBLIC. ENDCLASS.',
+      source: 'CLASS zcl_guard DEFINITION PUBLIC. ENDCLASS.',
       className: 'ZCL_GUARD',
       packageName: '$TMP',
       description: 'guard',
     },
     requests: {
       create: '/sap/bc/adt/oo/classes',
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/source/main',
+      read: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/classes/zcl_guard',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard',
-      getVersions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/main/versions',
+      getVersions: '/sap/bc/adt/oo/classes/zcl_guard/includes/main/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
     capabilities: FULL,
@@ -158,29 +159,27 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getInterface(),
     subject: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
     config: {
-      sourceCode: 'INTERFACE zif_guard PUBLIC. ENDINTERFACE.',
+      source: 'INTERFACE zif_guard PUBLIC. ENDINTERFACE.',
       interfaceName: 'ZIF_GUARD',
       packageName: '$TMP',
       description: 'guard',
     },
     requests: {
       create: '/sap/bc/adt/oo/interfaces',
-      read: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
+      read: '/sap/bc/adt/oo/interfaces/zif_guard/source/main',
       readMetadata: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
-      update: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      update: '/sap/bc/adt/oo/interfaces/zif_guard/source/main',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/interfaces/zif_guard',
       unlock: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
-      getVersions: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main/versions',
+      getVersions: '/sap/bc/adt/oo/interfaces/zif_guard/source/main/versions',
       readTransport: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/transport',
     },
     capabilities: FULL,
@@ -189,7 +188,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getInclude(),
     subject: '/sap/bc/adt/programs/includes/ZGUARD_INC',
     config: {
-      sourceCode: '" guard',
+      source: '" guard',
       includeName: 'ZGUARD_INC',
       packageName: '$TMP',
       description: 'guard',
@@ -199,7 +198,18 @@ export const HANDLERS = {
       read: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
       readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
       update: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
-      delete: '/sap/bc/adt/programs/includes/zguard_inc',
+      // The manifest was wrong about ADT here, and the handler was written to
+      // match it: an include's delete went to `DELETE …/includes/<name>` with a
+      // `lockHandle`, on the belief that a deletion needs a lock. It does not —
+      // a lock is what an *update* needs, and an existing one blocks a delete.
+      // The endpoint answered `400 Parameter lockHandle could not be found` to
+      // every cleanup, because nothing locks an object in order to remove it.
+      // Measured on E19, no lock taken and no stateful session:
+      // `POST /deletion/check` → `del:isDeletable="true" adtcore:type="PROG/I"`,
+      // then `POST /deletion/delete` → `del:isDeleted="true"`. Same service as
+      // every other type, so the entry now says what they say.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/includes/validation',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/programs/includes/zguard_inc',
@@ -214,6 +224,7 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'deletable',
       'validatable',
@@ -225,7 +236,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getProgram(),
     subject: '/sap/bc/adt/programs/programs/ZGUARD',
     config: {
-      sourceCode: 'REPORT zguard.',
+      source: 'REPORT zguard.',
       programName: 'ZGUARD',
       packageName: '$TMP',
       description: 'guard',
@@ -235,13 +246,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/programs/programs/ZGUARD/source/main',
       readMetadata: '/sap/bc/adt/programs/programs/ZGUARD',
       update: '/sap/bc/adt/programs/programs/zguard/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/programs/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -256,7 +265,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getDdl(),
     subject: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
     config: {
-      sourceCode: 'define view zguard_ddl as select from t000 { mandt }',
+      source: 'define view zguard_ddl as select from t000 { mandt }',
       ddlName: 'ZGUARD_DDL',
       packageName: '$TMP',
       description: 'guard',
@@ -264,21 +273,22 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/ddic/ddl/sources',
       read: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main',
+      update: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl/source/main',
       readMetadata: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/ddl/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl',
       unlock: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl',
       getVersions:
-        '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main/versions',
+        // ADT's own rel=versions link; /source/main/versions answered 404 'No
+        // suitable resource found' on an on-premise and a cloud system.
+        '/sap/bc/adt/ddic/ddl/sources/zguard_ddl/versions',
       readTransport: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/transport',
     },
     capabilities: FULL,
@@ -287,7 +297,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getTable(),
     subject: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
     config: {
-      sourceCode: "@EndUserText.label: 'guard'\ndefine table zguard_tab {}",
+      source: "@EndUserText.label: 'guard'\ndefine table zguard_tab {}",
       tableName: 'ZGUARD_TAB',
       packageName: '$TMP',
       description: 'guard',
@@ -295,14 +305,13 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/ddic/tables',
       read: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main',
+      update: '/sap/bc/adt/ddic/tables/zguard_tab/source/main',
       readMetadata: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/tables/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -317,7 +326,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getStructure(),
     subject: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
     config: {
-      sourceCode: 'define structure zguard_stru {}',
+      source: 'define structure zguard_stru {}',
       structureName: 'ZGUARD_STRU',
       packageName: '$TMP',
       description: 'guard',
@@ -325,14 +334,13 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/ddic/structures',
       read: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main',
+      update: '/sap/bc/adt/ddic/structures/zguard_stru/source/main',
       readMetadata: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/structures/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -348,38 +356,53 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getTableType(),
     subject: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
     config: {
-      sourceCode: 'define table type zguard_ttyp of zguard_stru;',
+      source: 'define table type zguard_ttyp of zguard_stru;',
+      rowTypeName: 'ZGUARD_STRU',
       tableTypeName: 'ZGUARD_TTYP',
       packageName: '$TMP',
       description: 'guard',
     },
     requests: {
       create: '/sap/bc/adt/ddic/tabletypes',
-      read: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
       readMetadata: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/ddic/tabletypes/zguard_ttyp',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/tabletypes/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
       unlock: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
       getVersions:
-        '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/source/main/versions',
+        // A table type has no /source/main (discovery documents none for it on
+        // an on-premise or a cloud system); its rel=versions link is on the
+        // object, and <object>/versions answered 200 on both.
+        '/sap/bc/adt/ddic/tabletypes/zguard_ttyp/versions',
       readTransport: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/transport',
     },
-    capabilities: FULL,
+    // Not FULL since 36.0.0: a table type is its own document and has no source,
+    // so it composes the metadata pair rather than `readable`/`updatable`.
+    capabilities: [
+      'creatable',
+      'metadataReadable',
+      'metadataUpdatable',
+      'deletable',
+      'validatable',
+      'checkable',
+      'activatable',
+      'lockable',
+      'versionable',
+      'transportAware',
+    ],
   },
   accessControl: {
     factory: (c: AdtClient) => c.getAccessControl(),
     subject: '/sap/bc/adt/acm/dcl/sources/ZGUARD_DCL',
     config: {
-      sourceCode: "@EndUserText.label: 'guard'\ndefine role zguard_dcl {}",
+      source: "@EndUserText.label: 'guard'\ndefine role zguard_dcl {}",
       accessControlName: 'ZGUARD_DCL',
       packageName: '$TMP',
       description: 'guard',
@@ -389,20 +412,19 @@ export const HANDLERS = {
       read: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
       readMetadata: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
       update: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/acm/dcl/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
       unlock: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
       getVersions:
-        '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main/versions',
+        // ADT's own rel=versions link, as for DDL sources.
+        '/sap/bc/adt/acm/dcl/sources/zguard_dcl/versions',
       readTransport: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/transport',
     },
     capabilities: FULL,
@@ -411,7 +433,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getAppendStructure(),
     subject: '/sap/bc/adt/ddic/structures/ZGUARD_APP',
     config: {
-      sourceCode: 'extend structure zguard_tab with zguard_app {}',
+      source: 'extend structure zguard_tab with zguard_app {}',
       appendStructureName: 'ZGUARD_APP',
       baseObject: 'ZGUARD_TAB',
       packageName: '$TMP',
@@ -422,13 +444,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/structures/zguard_app/source/main',
       readMetadata: '/sap/bc/adt/ddic/structures/zguard_app',
       update: '/sap/bc/adt/ddic/structures/zguard_app/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/structures/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -444,7 +464,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getBehaviorDefinition(),
     subject: '/sap/bc/adt/bo/behaviordefinitions/ZGUARD_BDEF',
     config: {
-      sourceCode: 'managed implementation in class zbp_guard unique;',
+      source: 'managed implementation in class zbp_guard unique;',
       name: 'ZGUARD_BDEF',
       rootEntity: 'ZGUARD_VIEW',
       implementationType: 'managed',
@@ -456,13 +476,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
       readMetadata: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
       update: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/bo/behaviordefinitions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -478,7 +496,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getBehaviorImplementation(),
     subject: '/sap/bc/adt/oo/classes/ZBP_GUARD',
     config: {
-      sourceCode: 'CLASS zbp_guard DEFINITION PUBLIC. ENDCLASS.',
+      source: 'CLASS zbp_guard DEFINITION PUBLIC. ENDCLASS.',
       className: 'ZBP_GUARD',
       behaviorDefinition: 'ZGUARD_BDEF',
       packageName: '$TMP',
@@ -486,26 +504,21 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/oo/classes',
-      read: '/sap/bc/adt/oo/classes/ZBP_GUARD/source/main',
+      read: '/sap/bc/adt/oo/classes/zbp_guard/source/main',
       readMetadata: '/sap/bc/adt/oo/classes/ZBP_GUARD',
-      update: [
-        '/sap/bc/adt/oo/classes/zbp_guard/source/main',
-        '/sap/bc/adt/oo/classes/zbp_guard/includes/implementations',
-      ],
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      update: '/sap/bc/adt/oo/classes/zbp_guard/includes/implementations',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/classes/zbp_guard',
       unlock: '/sap/bc/adt/oo/classes/zbp_guard',
       getVersions:
-        '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations/versions',
+        '/sap/bc/adt/oo/classes/zbp_guard/includes/implementations/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZBP_GUARD/transport',
     },
     capabilities: FULL,
@@ -513,12 +526,19 @@ export const HANDLERS = {
   metadataExtension: {
     factory: (c: AdtClient) => c.getMetadataExtension(),
     subject: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX',
-    config: { name: 'ZGUARD_DDLX', packageName: '$TMP', description: 'guard' },
+    config: {
+      name: 'ZGUARD_DDLX',
+      source: 'annotate view zguard_ddl with {}',
+      packageName: '$TMP',
+      description: 'guard',
+    },
     requests: {
       create: '/sap/bc/adt/ddic/ddlx/sources',
       read: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main',
+      update: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main',
       readMetadata: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
       delete: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/ddlx/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -538,7 +558,7 @@ export const HANDLERS = {
       // enhoxhh is the flavour whose source can be updated; the others have no
       // source resource, so update would refuse before issuing anything.
       enhancementType: 'enhoxhh',
-      sourceCode: '" guard',
+      source: '" guard',
       packageName: '$TMP',
       description: 'guard',
     },
@@ -547,13 +567,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
       readMetadata: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
       update: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/enhancements/enhoxhh/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -569,7 +587,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getServiceDefinition(),
     subject: '/sap/bc/adt/ddic/srvd/sources/ZGUARD_SRVD',
     config: {
-      sourceCode: 'define service zguard_srvd { expose t000; }',
+      source: 'define service zguard_srvd { expose t000; }',
       serviceDefinitionName: 'ZGUARD_SRVD',
       packageName: '$TMP',
       description: 'guard',
@@ -579,13 +597,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
       readMetadata: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
       update: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/srvd/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -601,7 +617,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getFunctionModule(),
     subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
     config: {
-      sourceCode: 'FUNCTION zguard_fm. ENDFUNCTION.',
+      source: 'FUNCTION zguard_fm. ENDFUNCTION.',
       functionGroupName: 'ZGUARD_FG',
       functionModuleName: 'ZGUARD_FM',
       packageName: '$TMP',
@@ -613,13 +629,11 @@ export const HANDLERS = {
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
       update:
         '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/functions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -636,7 +650,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getScalarFunction(),
     subject: '/sap/bc/adt/ddic/dsfd/sources/ZGUARD_DSFD',
     config: {
-      sourceCode: 'define function zguard_dsfd returns { x : abap.int4; }',
+      source: 'define function zguard_dsfd returns { x : abap.int4; }',
       scalarFunctionName: 'ZGUARD_DSFD',
       packageName: '$TMP',
       description: 'guard',
@@ -646,13 +660,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
       readMetadata: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
       update: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/dsfd/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -670,7 +682,7 @@ export const HANDLERS = {
     config: {
       implementationName: 'ZGUARD_DSFI',
       scalarFunctionName: 'ZGUARD_DSFD',
-      sourceCode: 'METHOD guard. ENDMETHOD.',
+      source: 'METHOD guard. ENDMETHOD.',
       packageName: '$TMP',
       description: 'guard',
     },
@@ -679,13 +691,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
       readMetadata: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
       update: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // Its blues v2 document, beside the JSON source `update` writes.
+      updateMetadata: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/dsfi/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -694,13 +706,29 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/transport',
     },
-    capabilities: FULL,
+    // Not FULL since 36.0.0: a DSFI has *both* writable resources — its JSON
+    // source at `source/main` and its blues document at its own URL — so it is
+    // one of the three types composing both update atoms.
+    capabilities: [
+      'creatable',
+      'readable',
+      'metadataReadable',
+      'updatable',
+      'metadataUpdatable',
+      'deletable',
+      'validatable',
+      'checkable',
+      'activatable',
+      'lockable',
+      'versionable',
+      'transportAware',
+    ],
   },
   transformation: {
     factory: (c: AdtClient) => c.getTransformation(),
     subject: '/sap/bc/adt/xslt/transformations/ZGUARD_XSLT',
     config: {
-      sourceCode: '<xsl:transform version="1.0"/>',
+      source: '<xsl:transform version="1.0"/>',
       transformationName: 'ZGUARD_XSLT',
       transformationType: 'XSLT',
       packageName: '$TMP',
@@ -711,13 +739,11 @@ export const HANDLERS = {
       read: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
       readMetadata: '/sap/bc/adt/xslt/transformations/zguard_xslt',
       update: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/xslt/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -736,7 +762,9 @@ export const HANDLERS = {
       bindingName: 'ZGUARD_SRVB',
       serviceDefinitionName: 'ZGUARD_SRVD',
       serviceName: 'ZGUARD_SRV',
-      serviceType: 'ODataV4',
+      // Lowercase, because `GeneratedServiceType` is `'odatav2' | 'odatav4'`
+      // and it goes straight into the job's URL.
+      serviceType: 'odatav4',
       serviceVersion: '0001',
       bindingVariant: 'ODATA_V4_UI',
       desiredPublicationState: 'published',
@@ -744,28 +772,41 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
+      create: '/sap/bc/adt/businessservices/bindings',
+      // One POST to a job endpoint, and nothing before it: a binding's
+      // update *is* its publication.
+      update: {
+        method: 'POST',
+        path: '/sap/bc/adt/businessservices/odatav4/publishjobs',
+      },
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      delete: [
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
-      validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+      validate: '/sap/bc/adt/cts/transportchecks',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       readTransport: '/sap/bc/adt/cts/transportchecks',
+      lock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      unlock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
     },
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'deletable',
       'validatable',
       'checkable',
       'activatable',
       'transportAware',
+      'lockable',
     ],
-    why: 'getService() hands out a service binding, so it has the binding’s set: no versions resource, and ADT offers no lock for one. Caught by the guard 2026-08-14 — this entry claimed the full set.',
+    why:
+      'getService() hands out a service binding, so it has the binding’s set: ' +
+      'no versions resource, and the binding’s lock. Caught by the guard ' +
+      '2026-08-14 — this entry claimed the full set; and again 2026-09-05, ' +
+      'when the binding gained the lock Eclipse was measured taking.',
   },
 
   // ── Objects with no version history ──────────────────────────────────────
@@ -779,16 +820,13 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/ddic/domains',
-      read: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
       readMetadata: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
-      update: '/sap/bc/adt/ddic/domains/zguard_dom',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/ddic/domains/zguard_dom',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/domains/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -798,8 +836,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -815,21 +853,18 @@ export const HANDLERS = {
     config: {
       dataElementName: 'ZGUARD_DTEL',
       typeKind: 'domain',
-      typeName: 'ZGUARD_DOM',
       packageName: '$TMP',
       description: 'guard',
     },
     requests: {
       create: '/sap/bc/adt/ddic/dataelements',
-      read: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
       readMetadata: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/ddic/dataelements/zguard_dtel',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/dataelements/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -839,8 +874,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -859,21 +894,14 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
-      create: [
-        '/sap/bc/adt/functions/validation',
-        '/sap/bc/adt/functions/groups',
-        '/sap/bc/adt/checkruns',
-      ],
-      read: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      create: '/sap/bc/adt/functions/groups',
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
-      update: '/sap/bc/adt/functions/groups/ZGUARD_FG',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/functions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -883,8 +911,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -905,16 +933,14 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
-      create: ['/sap/bc/adt/packages/validation', '/sap/bc/adt/packages'],
-      read: '/sap/bc/adt/packages/ZGUARD_PKG',
+      create: '/sap/bc/adt/packages',
       readMetadata: '/sap/bc/adt/packages/ZGUARD_PKG',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/packages/zguard_pkg',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/packages/validation',
       check: '/sap/bc/adt/checkruns',
       lock: '/sap/bc/adt/packages/zguard_pkg',
@@ -923,8 +949,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -937,6 +963,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getFunctionInclude(),
     subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01',
     config: {
+      source: '* include source',
       functionGroupName: 'ZGUARD_FG',
       includeName: 'LZGUARD_FGF01',
       packageName: '$TMP',
@@ -947,26 +974,31 @@ export const HANDLERS = {
       read: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/source/main',
       readMetadata:
         '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
-      update: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      update:
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/source/main',
+      updateMetadata:
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/functions/groups/zguard_fg',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
       unlock: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      // ADT's own rel=versions link is source/main/versions; `<include>/versions`
+      // answered 404 "No suitable resource found" on both systems (2026-10-01).
       getVersions:
-        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/versions',
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/source/main/versions',
     },
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -986,16 +1018,13 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/aps/iam/auth',
-      read: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
       readMetadata: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
-      update: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/aps/iam/auth/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1004,8 +1033,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -1021,19 +1050,21 @@ export const HANDLERS = {
       featureToggleName: 'ZGUARD_FT',
       packageName: '$TMP',
       description: 'guard',
+      // `update` writes the toggle's JSON source since 18.0.0, so the fixture
+      // carries one; the document write is `updateMetadata`.
+      source: { rollout: { defaultEnabledFor: 'none' } },
     },
     requests: {
       create: '/sap/bc/adt/sfw/featuretoggles',
       read: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
       readMetadata: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
-      update: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      update: '/sap/bc/adt/sfw/featuretoggles/zguard_ft/source/main',
+      updateMetadata: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       // The collection answers a GET with 400 "URI-Mapping cannot be
       // performed"; discovery advertises this sub-resource for validation, and
       // it answers a POST with CHECK_RESULT. Measured on E19 2026-08-31.
@@ -1046,7 +1077,9 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -1062,7 +1095,9 @@ export const HANDLERS = {
       bindingName: 'ZGUARD_SRVB',
       serviceDefinitionName: 'ZGUARD_SRVD',
       serviceName: 'ZGUARD_SRV',
-      serviceType: 'ODataV4',
+      // Lowercase, because `GeneratedServiceType` is `'odatav2' | 'odatav4'`
+      // and it goes straight into the job's URL.
+      serviceType: 'odatav4',
       serviceVersion: '0001',
       bindingVariant: 'ODATA_V4_UI',
       desiredPublicationState: 'published',
@@ -1070,28 +1105,41 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
+      create: '/sap/bc/adt/businessservices/bindings',
+      // One POST to a job endpoint, and nothing before it: a binding's
+      // update *is* its publication.
+      update: {
+        method: 'POST',
+        path: '/sap/bc/adt/businessservices/odatav4/publishjobs',
+      },
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      delete: [
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
-      validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+      validate: '/sap/bc/adt/cts/transportchecks',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       readTransport: '/sap/bc/adt/cts/transportchecks',
+      lock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      unlock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
     },
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'deletable',
       'validatable',
       'checkable',
       'activatable',
       'transportAware',
+      'lockable',
     ],
-    why: 'No versions resource, and ADT offers no lock for a service binding.',
+    why:
+      'No versions resource. It DOES lock: measured from Eclipse on the trial, ' +
+      '`_action=LOCK&accessMode=MODIFY` before a publish job and `_action=UNLOCK` ' +
+      'when the editor closes — publishing is what editing a binding is. ' +
+      'This entry used to say ADT offers no lock, which was never checked.',
   },
 
   // ── Parts of an object: no create ────────────────────────────────────────
@@ -1101,26 +1149,25 @@ export const HANDLERS = {
     include: 'testclasses',
     config: {
       className: 'ZCL_GUARD',
-      testClassCode: 'CLASS ltcl DEFINITION FOR TESTING.',
+      source: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
     requests: {
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses',
+      read: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/classes/zcl_guard',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard',
       getVersions:
-        '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses/versions',
+        '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1134,25 +1181,24 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getLocalTypes(),
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'implementations',
-    config: { className: 'ZCL_GUARD', localTypesCode: 'TYPES ty_x TYPE i.' },
+    config: { className: 'ZCL_GUARD', source: 'TYPES ty_x TYPE i.' },
     requests: {
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations',
+      read: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/classes/zcl_guard',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard',
       getVersions:
-        '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations/versions',
+        '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1168,26 +1214,25 @@ export const HANDLERS = {
     include: 'definitions',
     config: {
       className: 'ZCL_GUARD',
-      definitionsCode: 'CLASS lcl DEFINITION.',
+      source: 'CLASS lcl DEFINITION.',
     },
     requests: {
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions',
+      read: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/classes/zcl_guard',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard',
       getVersions:
-        '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions/versions',
+        '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1201,24 +1246,23 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getLocalMacros(),
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'macros',
-    config: { className: 'ZCL_GUARD', macrosCode: 'DEFINE mac.' },
+    config: { className: 'ZCL_GUARD', source: 'DEFINE mac.' },
     requests: {
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros',
+      read: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/oo/classes/zcl_guard',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard',
-      getVersions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros/versions',
+      getVersions: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1236,24 +1280,21 @@ export const HANDLERS = {
     config: { name: 'ZGUARD_MSG', packageName: '$TMP', description: 'guard' },
     requests: {
       create: '/sap/bc/adt/messageclass',
-      read: '/sap/bc/adt/messageclass/zguard_msg',
       readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
-      update: '/sap/bc/adt/messageclass/zguard_msg',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
+      updateMetadata: '/sap/bc/adt/messageclass/zguard_msg',
+      // One request each, since 18.0.0: `delete` deletes, and the approval
+      // ADT wants first is `checkDeletion` — a member the consumer calls, and
+      // whose refusal it reads, rather than a half of this one it cannot see.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/messageclass/validation',
       lock: '/sap/bc/adt/messageclass/zguard_msg',
       unlock: '/sap/bc/adt/messageclass/zguard_msg',
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'lockable',
@@ -1267,11 +1308,9 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/messageclass/zguard_msg',
       read: '/sap/bc/adt/messageclass/zguard_msg',
-      readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
       update: '/sap/bc/adt/messageclass/zguard_msg',
-      delete: '/sap/bc/adt/messageclass/zguard_msg',
     },
-    capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
+    capabilities: ['creatable', 'readable', 'updatable'],
     why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
   },
   transport: {
@@ -1284,97 +1323,24 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/cts/transportrequests',
-      read: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       readMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      updateMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       delete: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      // Measured: the deletion service answers `No URI-Mapping defined for
+      // URI /sap/bc/adt/cts/transportrequests/…`, so this type asks the only
+      // resource that can answer — its own.
+      checkDeletion: {
+        method: 'GET',
+        path: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      },
     },
-    capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
+    capabilities: [
+      'creatable',
+      'metadataReadable',
+      'metadataUpdatable',
+      'deletable',
+    ],
     why: 'A request is created, read, described anew and deleted while empty. Its number is system-generated, so there is nothing to validate before creating one.',
-  },
-
-  // ── Unit tests: CRUD over the container, and running ─────────────────────
-  unitTest: {
-    factory: (c: AdtClient) => c.getUnitTest(),
-    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS',
-    include: 'testclasses',
-    config: {
-      className: 'ZCL_GUARD_TESTS',
-      packageName: '$TMP',
-      description: 'guard',
-      testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
-    },
-    requests: {
-      create: [
-        '/sap/bc/adt/oo/classes',
-        // The class is POSTed and then the tests are PUT into it —
-        // both are the operation, and the second is the point of it.
-        {
-          method: 'PUT',
-          path: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
-        },
-      ],
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS/includes/testclasses',
-      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS',
-      update: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
-      validate: '/sap/bc/adt/checkruns',
-      lock: '/sap/bc/adt/oo/classes/zcl_guard_tests',
-      unlock: '/sap/bc/adt/oo/classes/zcl_guard_tests',
-    },
-    capabilities: [
-      'creatable',
-      'readable',
-      'updatable',
-      'deletable',
-      'validatable',
-      'lockable',
-    ],
-    why: 'The subject is the container class and its testclasses include. Activation, check, versions and transport are the class’s, reached through getClass(). Running is IAdtRunnable, not an object capability.',
-  },
-  cdsUnitTest: {
-    factory: (c: AdtClient) => c.getCdsUnitTest(),
-    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS',
-    include: 'testclasses',
-    config: {
-      className: 'ZCL_GUARD_CDS_TESTS',
-      packageName: '$TMP',
-      description: 'guard',
-      cdsViewName: 'ZGUARD_VIEW',
-      testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
-    },
-    requests: {
-      create: [
-        '/sap/bc/adt/oo/classes',
-        // The class is POSTed and then the tests are PUT into it —
-        // both are the operation, and the second is the point of it.
-        {
-          method: 'PUT',
-          path: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests/includes/testclasses',
-        },
-      ],
-      read: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS/includes/testclasses',
-      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS',
-      update: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests/includes/testclasses',
-      delete: [
-        // ADT refuses a delete it has not approved, so the check is the
-        // operation's first half rather than a nicety: a delete that skips it
-        // is a different operation from the one this capability names.
-        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-        '/sap/bc/adt/deletion/delete',
-      ],
-      validate: '/sap/bc/adt/checkruns',
-      lock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
-      unlock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
-    },
-    capabilities: [
-      'creatable',
-      'readable',
-      'updatable',
-      'deletable',
-      'validatable',
-      'lockable',
-    ],
-    why: 'As unitTest, plus the CDS test-double check, which is its own interface.',
   },
 } as const satisfies Record<string, HandlerEntry>;
 

@@ -3,9 +3,12 @@
  * Use AdtInterface.update() for high-level operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { INTERFACE, sourceUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -19,14 +22,17 @@ export async function upload(
   lockHandle: string,
   corrNr: string | undefined,
   sourceContentType?: string,
-): Promise<void> {
-  let url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
+): Promise<IAdtWireResponse> {
+  let url = `${sourceUri(INTERFACE.uri(interfaceName))}?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }
 
   const contentType = sourceContentType || CT_SOURCE;
-  await connection.makeAdtRequest({
+  // The answer is returned rather than discarded: what a write becomes is the
+  // consumer's result strategy to decide, and a function that swallowed it left
+  // that strategy nothing to read.
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),

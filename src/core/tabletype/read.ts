@@ -3,18 +3,18 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
   CT_TABLE_TYPE,
 } from '../../constants/contentTypes';
+import { sourceUri, TABLE_TYPE, transportUri } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -27,9 +27,8 @@ export async function getTableTypeMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${query}`;
+  const url = `${TABLE_TYPE.uri(tableTypeName)}${query}`;
   const acceptHeader = options?.accept ?? CT_TABLE_TYPE;
 
   try {
@@ -80,7 +79,6 @@ export async function getTableTypeSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(tableTypeName);
   const versionParam = version ? `version=${version}` : '';
   const longPollingParam = options?.withLongPolling
     ? 'withLongPolling=true'
@@ -91,7 +89,7 @@ export async function getTableTypeSource(
     .join('&');
   const query = queryParams ? `?${queryParams}` : '';
 
-  const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main${query}`;
+  const url = `${sourceUri(TABLE_TYPE.uri(tableTypeName))}${query}`;
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -129,9 +127,8 @@ export async function getTableTypeTransport(
   tableTypeName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/transport${query}`;
+  const url = `${transportUri(TABLE_TYPE.uri(tableTypeName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

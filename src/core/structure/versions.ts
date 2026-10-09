@@ -1,45 +1,43 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { STRUCTURE, sourceUri, versionsUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
-import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IStructureConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 
-// candidate URI — probe-verify on trial
+/**
+ * The version history — the Atom feed, as it arrived (candidate URI,
+ * probe-verify on trial).
+ *
+ * `objectVersions` in @mcp-abap-adt/adt-strategies reads it into entries. A
+ * system without the resource answers 404 or 406, which comes back as the
+ * transport's failure; until 23.0.0 it was thrown as a library error.
+ */
 export async function getStructureVersions(
   connection: IAbapConnection,
   config: Partial<IStructureConfig>,
-): Promise<IObjectVersion[]> {
-  if (!config.structureName) throw new Error('structureName is required');
-  const encodedName = encodeSapObjectName(config.structureName);
-  const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main/versions`;
-  try {
-    const res = await connection.makeAdtRequest({
-      url,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: { Accept: ACCEPT_VERSION_FEED },
-    });
-    return parseVersionsFeed(String(res.data));
-  } catch (e) {
-    throwVersionsError(e, `structure ${config.structureName}`);
-  }
+): Promise<IAdtWireResponse> {
+  const url = `${versionsUri(sourceUri(STRUCTURE.uri(config.structureName as string)))}`;
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: ACCEPT_VERSION_FEED },
+  });
 }
 
+/** The source of one version, by the `contentUri` its entry carried. */
 export async function getStructureVersionSource(
   connection: IAbapConnection,
   contentUri: string,
-): Promise<string> {
-  try {
-    const res = await connection.makeAdtRequest({
-      url: contentUri,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: { Accept: 'text/plain' },
-    });
-    return String(res.data);
-  } catch (e) {
-    throwVersionsError(e, 'version content');
-  }
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: contentUri,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'text/plain' },
+  });
 }

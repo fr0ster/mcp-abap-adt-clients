@@ -1,9 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FEATURE_TOGGLE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 // NOTE: withLongPolling is intentionally not accepted here. The SFW feature-
@@ -15,10 +15,9 @@ export async function readFeatureToggle(
   name: string,
   version: 'active' | 'inactive' = 'active',
 ): Promise<IAdtWireResponse> {
-  const encoded = encodeSapObjectName(name.toLowerCase());
   return connection.makeAdtRequest({
     method: 'GET',
-    url: `/sap/bc/adt/sfw/featuretoggles/${encoded}`,
+    url: `${FEATURE_TOGGLE.uri(name)}`,
     timeout: getTimeout('default'),
     params: { version },
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_METADATA },

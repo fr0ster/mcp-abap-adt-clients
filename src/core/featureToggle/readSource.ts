@@ -1,9 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FEATURE_TOGGLE, sourceUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 export async function readFeatureToggleSource(
@@ -11,10 +11,9 @@ export async function readFeatureToggleSource(
   name: string,
   version: 'active' | 'inactive' = 'active',
 ): Promise<IAdtWireResponse> {
-  const encoded = encodeSapObjectName(name.toLowerCase());
   return connection.makeAdtRequest({
     method: 'GET',
-    url: `/sap/bc/adt/sfw/featuretoggles/${encoded}/source/main`,
+    url: `${sourceUri(FEATURE_TOGGLE.uri(name))}`,
     timeout: getTimeout('default'),
     params: { version },
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_SOURCE },

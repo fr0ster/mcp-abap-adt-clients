@@ -5,8 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
@@ -26,7 +27,7 @@ export async function validatePackageBasic(
     packagetype: args.package_type || 'development',
     checkmode: 'basic',
   });
-  const url = `/sap/bc/adt/packages/validation?${qs}`;
+  const url = `${PACKAGE.validation}?${qs}`;
 
   return connection.makeAdtRequest({
     url,
@@ -58,7 +59,7 @@ export async function validatePackageFull(
     recordChanges: 'false',
     checkmode: 'full',
   });
-  const url = `/sap/bc/adt/packages/validation?${qs}`;
+  const url = `${PACKAGE.validation}?${qs}`;
 
   return connection.makeAdtRequest({
     url,

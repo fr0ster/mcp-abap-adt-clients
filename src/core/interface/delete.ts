@@ -5,14 +5,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { INTERFACE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteInterfaceParams } from './types';
 
@@ -25,12 +25,7 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { interface_name } = params;
 
-  if (!interface_name) {
-    throw new Error('interface_name is required');
-  }
-
-  const encodedName = encodeSapObjectName(interface_name);
-  const objectUri = `/sap/bc/adt/oo/interfaces/${encodedName}`;
+  const objectUri = `${INTERFACE.uri(interface_name)}`;
 
   const checkUrl = `/sap/bc/adt/deletion/check`;
 
@@ -62,12 +57,7 @@ export async function deleteInterface(
 ): Promise<IAdtWireResponse> {
   const { interface_name, transport_request } = params;
 
-  if (!interface_name) {
-    throw new Error('interface_name is required');
-  }
-
-  const encodedName = encodeSapObjectName(interface_name);
-  const objectUri = `/sap/bc/adt/oo/interfaces/${encodedName}`;
+  const objectUri = `${INTERFACE.uri(interface_name)}`;
 
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
@@ -99,14 +89,10 @@ export async function deleteInterface(
     headers,
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      interface_name,
-      object_uri: objectUri,
-      transport_request: transport_request || 'local',
-      message: `Interface ${interface_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

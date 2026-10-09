@@ -9,13 +9,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FUNCTION_INCLUDE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -29,16 +28,7 @@ export async function checkFunctionInclude(
   xmlContent?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-
-  const groupLower = encodeSapObjectName(groupName).toLowerCase();
-  const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
-  const objectUri = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}`;
+  const objectUri = `${FUNCTION_INCLUDE.uri(groupName, includeName)}`;
 
   let xmlBody: string;
   if (xmlContent) {
@@ -72,12 +62,6 @@ export async function checkFunctionInclude(
       'Content-Type': CT_CHECK_OBJECTS,
     },
   });
-
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Function include check failed: ${errorMessages}`);
-  }
 
   return response;
 }

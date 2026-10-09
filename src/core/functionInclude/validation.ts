@@ -9,8 +9,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 // Include both v3 (required on modern on-prem and cloud) and v2/v1 (older systems)
@@ -25,13 +25,9 @@ export async function validateFunctionIncludeName(
   groupName: string,
   _includeName: string,
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  const groupLower = encodeSapObjectName(groupName).toLowerCase();
   return connection.makeAdtRequest({
     method: 'GET',
-    url: `/sap/bc/adt/functions/groups/${groupLower}`,
+    url: `${FUNCTION_GROUP.uri(groupName)}`,
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_FUNCTION_GROUP_ANY_VERSION },
   });

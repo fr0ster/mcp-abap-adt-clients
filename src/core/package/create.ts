@@ -5,8 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
+import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
@@ -18,11 +19,7 @@ export async function createPackage(
   connection: IAbapConnection,
   params: ICreatePackageParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
-  const url = `/sap/bc/adt/packages`;
+  const url = PACKAGE.collection;
 
   const escapeXml = (str: string | undefined): string =>
     (str || '')
@@ -38,14 +35,11 @@ export async function createPackage(
   );
   const packageType = params.package_type || 'development';
 
-  const masterSystem = params.master_system;
+  const masterSystem = params.master_system as string;
   const lang = params.master_language?.trim() || 'EN';
   const responsibleUser = params.responsible || '';
 
   // Software component is required for package creation
-  if (!params.software_component) {
-    throw new Error('Software component is required for package creation');
-  }
   const softwareComponentXml = `<pak:softwareComponent pak:name="${escapeXml(params.software_component)}"/>`;
 
   const transportLayerXml = params.transport_layer

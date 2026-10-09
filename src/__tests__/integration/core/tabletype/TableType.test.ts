@@ -12,16 +12,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  ITableTypeConfig,
-  ITableTypeState,
-} from '../../../../core/tabletype';
+import type { ITableTypeConfig } from '../../../../core/tabletype';
 import { getTableType } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -69,7 +69,7 @@ describe('TableType (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<ITableTypeConfig, ITableTypeState>;
+  let tester: BaseTester<ITableTypeConfig>;
 
   beforeAll(async () => {
     try {
@@ -115,10 +115,6 @@ describe('TableType (using AdtClient)', () => {
             description: params.description,
             // TableType is XML-based (like Domain/DataElement), uses structure as rowType
             rowTypeName: params.row_type_name,
-            rowTypeKind: params.row_type_kind || 'dictionaryType',
-            accessType: params.access_type || 'standard',
-            primaryKeyDefinition: params.primary_key_definition || 'standard',
-            primaryKeyKind: params.primary_key_kind || 'nonUnique',
           };
         },
         ensureObjectReady: async (tableTypeName: string) => {
@@ -171,16 +167,18 @@ describe('TableType (using AdtClient)', () => {
         // TableType is XML-based, no sourceCode needed
         // Update config contains XML parameters (rowTypeName, etc.)
         await tester.flowTestAuto({
+          updateTakesDocument: (current) =>
+            patchXmlAttribute(
+              current,
+              'adtcore:description',
+              `${config?.description || ''} (updated)`.slice(0, 60),
+            ),
           updateConfig: config
             ? {
                 tableTypeName: config.tableTypeName,
                 packageName: config.packageName,
                 description: config.description || '',
                 rowTypeName: config.rowTypeName,
-                rowTypeKind: config.rowTypeKind,
-                accessType: config.accessType,
-                primaryKeyDefinition: config.primaryKeyDefinition,
-                primaryKeyKind: config.primaryKeyKind,
               }
             : undefined,
         });
@@ -232,8 +230,8 @@ describe('TableType (using AdtClient)', () => {
           const resultState = await tester.readTest({
             tableTypeName: standardTableTypeName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const tableTypeConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const tableTypeConfig = resultState;
           if (
             tableTypeConfig &&
             typeof tableTypeConfig === 'object' &&

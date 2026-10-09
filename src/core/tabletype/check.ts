@@ -6,12 +6,12 @@ import type { CheckRunVersion } from '../../utils/checkRun';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { TABLE_TYPE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -25,8 +25,7 @@ function buildCheckRunPayload(
   sourceCode?: string,
   version: CheckRunVersion = 'new',
 ): string {
-  const uriName = encodeSapObjectName(tableTypeName).toLowerCase();
-  const objectUri = `/sap/bc/adt/ddic/tabletypes/${uriName}`;
+  const objectUri = `${TABLE_TYPE.uri(tableTypeName)}`;
 
   if (sourceCode) {
     // Check with source code content (for unsaved changes or new code validation)

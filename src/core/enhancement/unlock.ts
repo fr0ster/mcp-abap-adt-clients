@@ -5,8 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 import { type EnhancementType, getEnhancementUri } from './types';
 
@@ -29,8 +28,7 @@ export async function unlockEnhancement(
   enhancementName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
-  const url = `${getEnhancementUri(enhancementType, encodedName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `${getEnhancementUri(enhancementType, enhancementName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return await connection.makeAdtRequest({
     url,

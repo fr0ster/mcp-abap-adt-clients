@@ -1,27 +1,25 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteScalarFunctionImplementationParams } from './types';
 
 function objectUri(name: string): string {
-  return `/sap/bc/adt/ddic/dsfi/${encodeSapObjectName(name.toLowerCase())}`;
+  return `${SCALAR_FUNCTION_IMPLEMENTATION.uri(name)}`;
 }
 
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteScalarFunctionImplementationParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.implementation_name)
-    throw new Error('implementation_name is required');
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri(params.implementation_name)}"/>
@@ -42,8 +40,6 @@ export async function deleteScalarFunctionImplementation(
   connection: IAbapConnection,
   params: IDeleteScalarFunctionImplementationParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.implementation_name)
-    throw new Error('implementation_name is required');
   const transportNumberTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`
     : '<del:transportNumber/>';
@@ -60,14 +56,10 @@ export async function deleteScalarFunctionImplementation(
     data: xmlPayload,
     headers: { Accept: ACCEPT_DELETION, 'Content-Type': CT_DELETION },
   });
-  return {
-    ...response,
-    data: {
-      success: true,
-      implementation_name: params.implementation_name,
-      object_uri: objectUri(params.implementation_name),
-      transport_request: params.transport_request || 'local',
-      message: `Scalar function implementation ${params.implementation_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

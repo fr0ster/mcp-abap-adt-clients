@@ -22,12 +22,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IIncludeConfig } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IIncludeConfig,
-  IIncludeState,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../clients/AdtClient';
 import { getIncludeSource } from '../../core/include';
@@ -117,7 +116,7 @@ describe('ObjectType (using AdtClient)', () => {
   let crudHasConfig = false;
   let isCloudSystem = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IIncludeConfig, IIncludeState>;
+  let tester: BaseTester<IIncludeConfig>;
 
   beforeAll(async () => {
     try {
@@ -133,7 +132,7 @@ describe('ObjectType (using AdtClient)', () => {
       client = resolved;
       crudHasConfig = true;
 
-      tester = new BaseTester<IIncludeConfig, IIncludeState>(
+      tester = new BaseTester<IIncludeConfig>(
         client.getInclude(), // the handler under test
         'ObjectType', // log prefix
         'create_include', // section in test-config.yaml
@@ -161,7 +160,7 @@ describe('ObjectType (using AdtClient)', () => {
               resolver?.getTransportRequest?.() ||
               resolveTransportRequest(params.transport_request),
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         // Idempotence: a create test deletes what a previous run left.
@@ -234,14 +233,13 @@ describe('ObjectType (using AdtClient)', () => {
       }
 
       const testCase = tester.getTestCaseDefinition();
-      const sourceCode =
-        testCase?.params?.source_code || config.sourceCode || '';
+      const source = testCase?.params?.source_code || config.source || '';
 
       await tester.flowTestAuto({
-        sourceCode,
+        source,
         updateConfig: {
           ...config,
-          sourceCode: testCase?.params?.update_source_code || sourceCode,
+          source: testCase?.params?.update_source_code || source,
         },
       });
     }, 900000);

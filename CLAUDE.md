@@ -26,12 +26,28 @@ npm run format          # Format code with Biome
 
 # Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.yaml)
 # IMPORTANT: Always save full log first, then analyze. Never pipe through grep/tail/head.
-npm test 2>&1 | tee test-run.log                  # Run all tests, save log
+#
+# RUNNING FROM AN LLM CLI: use `npm run test:detached`. A full run is ~27 minutes,
+# and an agent CLI supervises what its tool calls start — it stops long background
+# commands when it judges the machine short of memory, judging from the whole
+# machine rather than from this run. Measured: three runs killed that way in one
+# session while jest held 338 MB and 11 GB were free, with no OOM entry in the
+# kernel log at all. `test:detached` reparents the run to init, so it finishes on
+# its own and there is nothing left to stop. Read `test-run.log` afterwards.
+npm run test:detached                             # RECOMMENDED from an agent; writes test-run.log
+npm run test:detached -- integration/core/class   # …one directory
+npm test 2>&1 | tee test-run.log                  # Interactive shell: fine, you are watching it
 npm test -- integration/class 2>&1 | tee test-run.log   # Tests for specific object type
 npm test -- e2e 2>&1 | tee test-run.log            # End-to-end tests (excluded from default run)
 npm run shared:setup 2>&1 | tee shared-setup.log   # Create shared dependencies
 DEBUG_TESTS=true npm test -- integration/class 2>&1 | tee test-run.log   # With connection debug logs
 DEBUG_ADT_TESTS=true npm test -- integration/view 2>&1 | tee test-run.log # With ADT operation logs
+VERIFY_LOCK_RELEASED=false npm test 2>&1 | tee test-run.log   # Skip the second-session proof that each UNLOCK released its lock (on by default; one extra logon per check)
+
+# Ask SAP directly: one request to several systems, every answer printed whole
+# (status, headers, body). Targets are session files under ~/.config/mcp-abap-adt/sessions/;
+# the system kind is stated (:onprem|:cloud|:legacy or SAP_SYSTEM_TYPE), never inferred.
+npx ts-node scripts/adt-nc.ts --to e19-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
 
 # Type-check tests without running
 npm run test:check              # All test tsconfigs
@@ -42,50 +58,62 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 
 ### Client Classes (`src/clients/`)
 
-- **AdtClient** (`AdtClient.ts`): High-level CRUD operations via factory methods (`getClass()`, `getProgram()`, `getPackage()`, `getDdl()` (DDL sources — formerly `getView()`), `getTable()`, `getScalarFunction()`, `getScalarFunctionImplementation()`, `getAppendStructure()`, etc.). Each method returns an `IAdtObject<Config, State>` handler. Also: `getUtils()` for shared operations, `getLocalTestClass()`/`getLocalTypes()`/`getLocalDefinitions()`/`getLocalMacros()` for class includes.
-- **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations exposed via factory accessors — `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()` (composite: `getAbap()`, `getAmdp()`, `getMemorySnapshots()`), `getApplicationLog()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()` (FeedRepository), `getSystemMessages()`, `getGatewayErrorLog()`.
-- **AdtExecutor** (`AdtExecutor.ts`): Program/class execution with optional profiling — `getClassExecutor()`, `getProgramExecutor()`.
+- **AdtClient** (`AdtClient.ts`): High-level CRUD operations via factory methods (`getClass()`, `getProgram()`, `getPackage()`, `getDdl()` (DDL sources — formerly `getView()`), `getTable()`, `getScalarFunction()`, `getScalarFunctionImplementation()`, `getAppendStructure()`, `getRequest()`, etc.). Each factory takes an optional result set (`getClass({ ...classDocuments, versions: objectVersions })`) and returns the intersection of the capability atoms that object supports. Also: `getUtils()` for shared operations, `getLocalTestClass()`/`getLocalTypes()`/`getLocalDefinitions()`/`getLocalMacros()` for class includes. `AdtClientLegacy` and `createAdtClient()` cover BASIS < 7.50.
+- **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations exposed via factory accessors — `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()` (FeedRepository), `getSystemMessages()`, `getGatewayErrorLog()`. Each takes an optional result set and builds a fresh implementation per call — nothing is cached.
+- **AdtExecutor** (`AdtExecutor.ts`): Program/class execution — `getClassExecutor(results?)`, `getProgramExecutor(results?)`: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace` and the listings).
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
-- **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Seven public methods — link, pull (async with abort/timeout + lastKnownStatus recovery), unlink (`/repos/{key}`), listRepos, getRepo, getErrorLog, checkExternalRepo. Not a factory on AdtClient — consumers `new` it directly per the "AdtClient = IAdtObject-only" architectural rule. Available on cloud + modern on-prem (ABAP Platform 2022+).
-- **Batch clients** (`AdtClientBatch`, `AdtRuntimeClientBatch`): Mirror main clients but collect requests into `multipart/mixed` batch via `BatchRecordingConnection`.
+- **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Six members, one request each — `link`, `pull({ package, pullLink })` (starts the pull and does not wait; polling `listRepos` is the caller's), `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo`. The key, pull link and log link come from `listRepos`; there is no `getRepo`. Result set as the fourth constructor argument (`abapGitDocuments` by default). Not a factory on AdtClient — consumers `new` it directly. Available on cloud + modern on-prem (ABAP Platform 2022+).
 
-All clients accept `IAbapConnection` + `ILogger`. Optional: `options.enableAcceptCorrection` for automatic `Accept` header negotiation on HTTP 406.
+All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. Optional: `options.enableAcceptCorrection` — `Accept` negotiation on HTTP 406 is on unless it is `false` or `ADT_ACCEPT_CORRECTION=false`; its state lives on the connection.
 
 ### Core Modules (`src/core/`)
 
-28 object-type modules (class, program, interface, ddl, table, structure, domain, dataElement, package, functionGroup, functionModule, functionInclude, accessControl, serviceDefinition, service, behaviorDefinition, behaviorImplementation, metadataExtension, enhancement, tabletype, transport, unitTest, authorizationField, featureToggle, scalarFunction, scalarFunctionImplementation, appendStructure). Each follows this structure:
+30 object-type modules (class, program, include, interface, ddl, table, structure, domain, dataElement, package, functionGroup, functionModule, functionInclude, accessControl, serviceDefinition, service, behaviorDefinition, behaviorImplementation, metadataExtension, enhancement, tabletype, transport, transformation, unitTest, authorizationField, featureToggle, messageClass, scalarFunction, scalarFunctionImplementation, appendStructure) plus `shared/`. Each follows this structure:
 
-- `AdtXxx.ts` — High-level class implementing `IAdtObject<Config, State>`
-- `types.ts` — `IXxxConfig` (camelCase, public API) and `IXxxState` (operation results, errors array) and `ICreateXxxParams` (snake_case, low-level internal)
+- `AdtXxx.ts` — High-level class implementing the capability atoms the type supports, generic over its result set
+- `types.ts` — the `IXxxResults` result set and its `xxxDocuments` default; configs (`IXxxConfig`) come from `@mcp-abap-adt/interfaces-adt`; `ICreateXxxParams` (snake_case, low-level internal)
 - `create.ts`, `read.ts`, `update.ts`, `delete.ts` — Low-level CRUD functions that build XML, set headers, call `connection.makeAdtRequest()`
-- `lock.ts`, `unlock.ts` — Session management (lock returns `LOCK_HANDLE`)
+- `lock.ts`, `unlock.ts` — Session management; the handle is read by `lockHandleOf` (`src/utils/lockHandle.ts`), `''` when SAP sent none
 - `activation.ts`, `check.ts`, `validation.ts` — Supporting operations
 - `index.ts` — Re-exports public API of the module
 
-**Shared module** (`src/core/shared/AdtUtils.ts`): Large utility class (~1000 lines) — search, where-used, package hierarchy, SQL queries, inactive objects, group activation/deletion, discovery, type info, virtual folders, etc.
+**Shared module** (`src/core/shared/AdtUtils.ts`): Large utility class — search, where-used, SQL queries, inactive objects, group activation/deletion, discovery, type info, virtual folders, etc. Result set `IUtilResults` / `utilDocuments`.
+
+### Object addresses (`src/endpoints/objects.ts`)
+
+The one place an object's ADT address is built: a record per kind (`PROGRAM`, `PROGRAM_INCLUDE`, `FUNCTION_INCLUDE`, `CLASS_INCLUDE`, …) with its full paths and a `uri(...)` taking exactly what the address needs. Never write `/sap/bc/adt/<collection>/…` in a module; `noHardcodedObjectAddresses.test.ts` enforces it with the TypeScript parser. `scripts/address-matrix.ts` checks every record against real systems.
 
 ### Design Patterns
 
-**Factory + Handler Pattern**: `AdtClient` creates object-specific handlers that manage operation chains automatically.
+**Factory pattern**: `AdtClient` creates object-specific implementations of the capability contracts in `@mcp-abap-adt/interfaces-adt`.
 
-**Operation Chains**: Handlers orchestrate multi-step operations:
-- Create: validate → create → check → lock → update → unlock → activate
-- Update: lock → check → update → unlock → activate
-- Delete: check(deletion) → delete
+**Interprets nothing**: the result strategy is given when the implementation is built (a result set per object type; the shipped `<x>Documents` answer the document as it arrived via `rawDocument`, or `nothing`); the error strategy (`options.analyse`, `IAdtAnalyseOptions`) is given with every call. No member substitutes its own reading or verdict (`analyse ??` fallbacks are banned by `src/__tests__/unit/onlyCorpusStrategiesShip.test.ts`). Every reading and verdict lives in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). A failure caused by SAP's answer comes back through the strategy — never a throw, never a rewrap that drops the response; a member throws only for a cause inside the library (a caller argument missing before a request is built, a defect). Decision 15 in `docs/architecture/DECISIONS.md`.
 
-Error handling in chains: automatic unlock + `setSessionType('stateless')` on any failure. `lockHandle` is always preserved for cleanup.
+**One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller.
 
-**Session Management**: Handlers toggle between stateful (during lock) and stateless modes automatically via `connection.setSessionType()`.
+A multi-step operation is therefore the consumer's sequence, in the order it chooses:
+
+```typescript
+const locked = await cls.lock(config);
+if (!locked.ok) throw new Error(locked.getError().message);
+const handle = locked.getResult().value;
+await cls.update(config, { source, lockHandle: handle });
+await cls.unlock(config, handle);
+await cls.activate(config);
+```
+
+The one exception is `AdtMessageClassMessage`, where a message is a row inside its class's document: the write is one PUT, but it needs two lock handles and a read-modify-write of XML this library assembles.
+
+**Session Management**: only the `LOCK` and the `UNLOCK` request are stateful. `lock` sets stateful for its own request and is back to stateless as soon as that request answers; `unlock` does the same for its `UNLOCK`. Everything between them — the write included — goes stateless, as Eclipse sends it. The `UNLOCK` must be stateful: the connector (`@mcp-abap-adt/connection` ≥ 9.3.1) sends the context cookie `sap-contextid` with stateful requests only, and a stateless `UNLOCK` runs in a fresh ABAP context, answers 200 and releases nothing — the next activation or delete is refused with `EU/510` "currently editing". No other member touches `connection.setSessionType()`. Both rules are asserted by `src/__tests__/unit/capabilities/behaviour.test.ts` ("LOCK and UNLOCK are the stateful requests", "a member leaves the session alone"). The one exception is `AdtMessageClassMessage`, whose write holds two locks and manages its own window.
 
 **Interface-Only Communication**: All code depends on `IAbapConnection` interface, not concrete implementations. `@mcp-abap-adt/connection` (dev dependency) provides the concrete implementation, used only in tests.
 
 ### Supporting Layers
 
-- **Batch** (`src/batch/`): `BatchRecordingConnection` proxies `IAbapConnection`, collects requests, builds `multipart/mixed` payload, parses batch response and resolves deferred promises.
-- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): On HTTP 406, extracts supported content types from response, caches correct `Accept` per URL, retries. Wraps `connection.makeAdtRequest`.
-- **Runtime** (`src/runtime/`): Debugger, memory snapshots, profiler traces, application logs, runtime dumps — each in its own subfolder.
-- **Executors** (`src/executors/`): Class/program execution with profiling support.
-- **Cloud vs On-premise** (`src/utils/systemInfo.ts`): `getSystemInformation()` and `isCloudEnvironment()` — some operations differ between SAP Cloud and on-premise systems.
+- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): On HTTP 406, extracts supported content types from response, caches the correct `Accept` per URL, retries once. Wraps `connection.makeAdtRequest`; the caches and the switch are per connection.
+- **Runtime** (`src/runtime/`): profiler and cross/ST05 traces, application logs, ATC, DDIC activation graph, runtime dumps, feeds, system messages, gateway error log — each in its own subfolder, each with its result set.
+- **Executors** (`src/executors/`): Class/program execution and trace scheduling.
+- **System probes** (`src/utils/systemInfo.ts`, `src/utils/discoveryEndpoints.ts`): `getSystemInformation()`, `isModernAdtSystem()`, `fetchDiscoveryEndpoints()` answer 404/405/501 as an absent endpoint and raise any other failure.
 
 ## Code Standards
 
@@ -103,10 +131,11 @@ Error handling in chains: automatic unlock + `setSessionType('stateless')` on an
 
 - All tests are integration tests against real SAP systems (no mocks); unit tests exist but are minimal (`src/__tests__/unit/`)
 - Tests require `.env` with SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) and `src/__tests__/helpers/test-config.yaml` with object names and parameters. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
+- **Where credentials come from**: `~/Documents/mcp-abap-adt/sessions/<system>.env` (`e19.env`, `e77.env`, …) is the one source; copy what a run needs into the repo's `.env` before it starts. There are no per-system `*.env` copies in the repo root any more — they went stale as passwords rotated and produced 401s. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`. `.env` must still end up with `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`
 - **Test config setup**: `npm run test:init` (or `cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml`). Template works out of the box — edit only lines marked `# ← CHANGE`: `system` (`"onprem"` or `"cloud"` — this is what picks the connector, and it is stated, never inferred from `SAP_URL` or the auth type), `default_package`, `default_transport`, `default_master_system`, `shared_dependencies.super_package`. On-prem package tests also need `transport_layer`.
 - **Root package prerequisite**: The package specified in `default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do not create this package — they only create objects inside it.
 - `TestConfigResolver` resolves params with priority: `testCase.params` > `environment.default_*` > `SAP_*` env vars
-- **Tests never build a connection themselves.** `createTestConnection(logger)` from `src/__tests__/helpers/sessionConfig.ts` reads the target system and the authentication from config, picks the connector accordingly, opens the session, and returns it ready to use; `await connection.disconnect()` in `afterAll` releases it. `reset()` is gone as of `@mcp-abap-adt/connection` 5.0.0 — it dropped the cookie locally and left the session open on the server
+- **Tests never build a connection themselves.** `createTestConnection(logger)` from `src/__tests__/helpers/sessionConfig.ts` reads the target system and the authentication from config, picks the connector accordingly, opens the session, and returns it ready to use; `await connection.disconnect()` in `afterAll` releases it. `createTestConnection(logger, { ownSession: true })` opens a session of its own instead of joining the run's — the caller closes it with `closeOwnTestConnection()`; `expectLockReleased` (`helpers/lockReleased.ts`) is its one user. `reset()` is gone as of `@mcp-abap-adt/connection` 5.0.0 — it dropped the cookie locally and left the session open on the server
 - Tests are idempotent: CREATE tests delete existing objects first; other tests create missing objects
 - Only user-defined objects (Z_/Y_ prefix) can be modified in tests
 - Tests run sequentially (`maxWorkers: 1`, `maxConcurrency: 1`) to avoid conflicts with shared SAP objects; timeout is 15 minutes
@@ -158,10 +187,7 @@ environment:
 
 These vars CANNOT be in `.env` — `dotenv` doesn't expand `PATH`. Pass them at launch.
 
-```bash
-# Copy target system credentials first
-cp e77.env .env
-```
+Put the target system's credentials into `.env` first — from `~/Documents/mcp-abap-adt/sessions/e77.env` (see "Where credentials come from" above).
 
 Windows (Git Bash):
 ```bash
@@ -182,21 +208,22 @@ SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC
 SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm test -- integration/core/class
 ```
 
-**Available .env files:** `e77.env` (legacy), `e19.env`, `dev.env`, `trial.env`, `mdd-sk-dev.env`
-
 See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for full details.
 
 ## Key Dependencies
 
-- `@mcp-abap-adt/interfaces` — All interfaces (`IAbapConnection`, `IAdtObject`, `IAdtResponse`, `IWebSocketTransport`, etc.)
-- `@mcp-abap-adt/logger` — Logging interface
+- `@mcp-abap-adt/interfaces-adt` — ADT contracts (capability atoms, configs, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`)
+- `@mcp-abap-adt/interfaces-adt-connection` — the connection contract (`IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, `ADT_SESSION_ERROR`)
+- `@mcp-abap-adt/interfaces-network` — `IWebSocketTransport`, `HttpError`; `@mcp-abap-adt/interfaces-utils` — `ILogger`, `XmlNode`
+- `@mcp-abap-adt/logger` — Logging implementation
 - `fast-xml-parser` — XML parsing for ADT responses
 - `axios` — HTTP client (used internally by connection layer)
-- `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests
+- `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests; `@mcp-abap-adt/interfaces-auth` and `-auth-sap` are dev-only too
+- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, published on its own, and **not a workspace**: no local link. adt-clients' tests take it from npm as a devDependency (`^0.7.0`); the package builds and tests against what it installs from the registry (`npm ci --prefix packages/adt-strategies`). A strategy change that adt-clients' tests need is published first.
 
 ## Public API (`src/index.ts`)
 
-Exports all client classes, batch classes, all `IXxxConfig`/`IXxxState` types for every object type, shared types (`AdtObjectType`, `ObjectReference`, `PackageHierarchyNode`, `WhereUsedListResult`, `SearchObjectsParams`, etc.), and `AdtService`/`AdtServiceBinding` classes.
+Exports the client classes, the handler classes exported directly, the result sets (`<x>Documents` + `I…Results`) for every implementation, the building blocks `rawDocument`/`nothing`/`wireItself`/`nothingIsARefusal`, `AdtSAPError`/`AdtParseError`, and the system probes. No contract type is re-exported — consumers import those from the contract packages — and no reading or verdict ships here. The exact value surface is pinned by `src/__tests__/unit/publicApiSurface.test.ts`.
 
 ## Plans and Specs
 

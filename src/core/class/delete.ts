@@ -5,14 +5,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { CLASS } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteClassParams } from './types';
 
@@ -25,12 +25,7 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { class_name } = params;
 
-  if (!class_name) {
-    throw new Error('class_name is required');
-  }
-
-  const encodedName = encodeSapObjectName(class_name);
-  const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
+  const objectUri = `${CLASS.uri(class_name)}`;
 
   const checkUrl = `/sap/bc/adt/deletion/check`;
 
@@ -62,12 +57,7 @@ export async function deleteClass(
 ): Promise<IAdtWireResponse> {
   const { class_name, transport_request } = params;
 
-  if (!class_name) {
-    throw new Error('class_name is required');
-  }
-
-  const encodedName = encodeSapObjectName(class_name);
-  const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
+  const objectUri = `${CLASS.uri(class_name)}`;
 
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
@@ -99,14 +89,10 @@ export async function deleteClass(
     headers,
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      class_name,
-      object_uri: objectUri,
-      transport_request: transport_request || 'local',
-      message: `Class ${class_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

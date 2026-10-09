@@ -34,7 +34,7 @@ import {
   type ICloudTransport,
   type IOnPremTransport,
 } from '@mcp-abap-adt/connection';
-import type { IAuthProvider } from '@mcp-abap-adt/interfaces';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 /**
  * A connection that can hand its session to another, and take one.

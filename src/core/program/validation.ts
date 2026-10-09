@@ -6,8 +6,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { PROGRAM } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -16,11 +17,10 @@ import { getTimeout } from '../../utils/timeouts';
  *
  * Endpoint: POST /sap/bc/adt/programs/validation
  *
- * `packageName` is required, not optional. Measured on E19 (`RFCSAPRL 816`) on
- * 2026-08-28: with `objname` and `objtype` alone the server answers **400,
- * "Parameter packagename could not be found."**, and with all three it answers
- * 200. Sending it conditionally produced a request that could only fail — see
- * `docs/evidence/2026-08-28-profiler-contract-e19.md`, Task 0.4.
+ * `packageName` is required, not optional. Measured 2026-08-28: with `objname`
+ * and `objtype` alone the server answers **400, "Parameter packagename could
+ * not be found."**, and with all three it answers 200. Sending it conditionally
+ * produced a request that could only fail.
  *
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
@@ -32,7 +32,7 @@ export async function validateProgramName(
   packageName: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/programs/validation`;
+  const url = PROGRAM.validation;
   const queryParams = new URLSearchParams({
     objname: programName,
     objtype: 'PROG/P',

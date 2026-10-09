@@ -6,21 +6,18 @@
  * that is precisely what a batch connection cannot supply mid-recording.
  */
 
+import type { IListTransportsParams } from '@mcp-abap-adt/interfaces-adt';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IListTransportsParams,
-  ITransportSearchConfiguration,
-} from '@mcp-abap-adt/interfaces';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_TRANSPORT_CONFIGURATIONS,
   ACCEPT_TRANSPORT_LIST,
 } from '../../constants/contentTypes';
+import { TRANSPORT_REQUEST } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
-import { parseSearchConfigurations } from './parseSearchConfigurations';
-
-export { parseSearchConfigurations };
 
 /**
  * List ABAP transport requests for a saved search.
@@ -39,7 +36,7 @@ export async function listTransports(
     );
   }
 
-  const url = `/sap/bc/adt/cts/transportrequests?configUri=${encodeURIComponent(
+  const url = `${TRANSPORT_REQUEST.collection}?configUri=${encodeURIComponent(
     params.configUri,
   )}`;
 
@@ -51,16 +48,24 @@ export async function listTransports(
   });
 }
 
-/** The saved transport searches this system holds. One request, parsed. */
-export async function getTransportSearchConfigurations(
+/**
+ * The saved transport searches this system holds. One request, unread.
+ *
+ * Separate from the parse below so the answer can reach a caller's own
+ * `analyse` before anything is made of it — `AdtRequest.searchConfigurations()`
+ * hands this to `answering()`, the same way every other member's low level is
+ * handed over. Without it the only way to this endpoint was a member that had
+ * already decided what the answer meant.
+ *
+ * Without this exact `Accept` the endpoint answers **406**.
+ */
+export async function requestTransportSearchConfigurations(
   connection: IAbapConnection,
-): Promise<ITransportSearchConfiguration[]> {
-  const response = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     url: TRANSPORT_SEARCH_CONFIGURATIONS_URL,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_TRANSPORT_CONFIGURATIONS },
   });
-
-  return parseSearchConfigurations(response.data);
 }

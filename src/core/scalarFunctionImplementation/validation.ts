@@ -1,8 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -20,7 +21,7 @@ export async function validateScalarFunctionImplementationName(
   });
   if (description) queryParams.append('description', description);
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/ddic/dsfi/validation?${queryParams.toString()}`,
+    url: `${SCALAR_FUNCTION_IMPLEMENTATION.validation}?${queryParams.toString()}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_VALIDATION },

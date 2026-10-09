@@ -5,8 +5,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { PROGRAM } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -18,7 +18,7 @@ export async function unlockProgram(
   programName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `${PROGRAM.uri(programName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

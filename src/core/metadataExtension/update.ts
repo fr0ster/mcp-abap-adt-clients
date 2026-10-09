@@ -7,9 +7,10 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { METADATA_EXTENSION, sourceUri } from '../../endpoints/objects';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -34,17 +35,19 @@ import { getTimeout } from '../../utils/timeouts';
  *
  * await updateMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', sourceCode, lockHandle);
  * ```
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateMetadataExtension(
   connection: IAbapConnection,
   name: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  const lowerName = encodeSapObjectName(name).toLowerCase();
-  const corrNrParam = transportRequest ? `&corrNr=${transportRequest}` : '';
-  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${writeQuery(lockHandle, transportRequest)}`;
 
   const headers = {
     Accept: ACCEPT_SOURCE,

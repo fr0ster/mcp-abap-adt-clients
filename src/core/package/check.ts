@@ -5,12 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { PACKAGE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -31,7 +31,7 @@ export async function checkPackage(
   xmlContent?: string,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/checkruns`;
-  const objectUri = `/sap/bc/adt/packages/${encodeSapObjectName(packageName).toLowerCase()}`;
+  const objectUri = `${PACKAGE.uri(packageName)}`;
 
   let xmlBody: string;
 

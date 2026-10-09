@@ -5,12 +5,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateMessageClassParams } from './types';
 import { buildMessageClassXml } from './xml';
 
-const BASE = '/sap/bc/adt/messageclass';
+const BASE = MESSAGE_CLASS.collection;
 
 /**
  * Create a new message class (shell — no messages yet).
@@ -31,6 +32,9 @@ export async function createMessageClass(
     packageName: params.package_name.toUpperCase(),
     language: lang,
     masterLanguage: lang,
+    // Left out of the document when absent, never written empty.
+    masterSystem: params.masterSystem || undefined,
+    responsible: params.responsible || undefined,
     messages: [],
   });
 

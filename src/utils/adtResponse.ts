@@ -29,11 +29,11 @@ import type {
   AdtNoFailure,
   IAdtError,
   IAdtResponse,
-  IAdtResult,
-  IAdtWireResponse,
+  IAnalyse,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
 
 /**
@@ -44,7 +44,9 @@ import { AdtSAPError } from './adtErrors';
  * on `ok` first — a forgotten check is a type error rather than an `undefined`
  * that reads like an empty answer.
  */
-export function succeeded<T>(value: T): IAdtResponse<T> {
+export function succeeded<T, E extends IAdtError = IAdtError>(
+  value: T,
+): IAdtResponse<T, E> {
   return {
     ok: true,
     getResult: () => ({ value }),
@@ -52,7 +54,9 @@ export function succeeded<T>(value: T): IAdtResponse<T> {
 }
 
 /** An answer that failed, carrying what the error strategy made of it. */
-export function failed<T>(error: IAdtError): IAdtResponse<T> {
+export function failed<T, E extends IAdtError = IAdtError>(
+  error: E,
+): IAdtResponse<T, E> {
   return {
     ok: false,
     getError: () => error,
@@ -81,7 +85,7 @@ interface IWithResponse {
  * It is rethrown by {@link answering} rather than dressed as a verdict about
  * SAP.
  */
-function recogniseFailure(error: unknown): IAdtError {
+export function recogniseFailure(error: unknown): IAdtError {
   if (error instanceof AdtSAPError) {
     return {
       origin: 'refusal',
@@ -110,17 +114,22 @@ function recogniseFailure(error: unknown): IAdtError {
 }
 
 /**
- * What a caller may supply to overrule the default verdict.
+ * The failure strategy that never finds one.
  *
- * Handed the default's verdict **and** the answer it was reached from, so it can
- * overrule in either direction: name a failure the default let through, or clear
- * one it raised. It answers {@link ADT_NO_FAILURE} for "not a failure here" —
- * never `undefined`, which already means "no strategy was supplied".
+ * Every exchange that produced an answer comes back as a success carrying that
+ * answer, refusals included, so a caller can read the body themselves — a 403
+ * with an exception document is the document, not an `IAdtError` with the
+ * document buried a field down.
+ *
+ * This package ships no reading that turns such a body into a verdict. Which
+ * documents count as a refusal depends on the system and on what the caller is
+ * about to do, so the decision is theirs and this is how they take all of it.
+ *
+ * `answering` still fails a request that returned nothing at all. There is no
+ * answer to read, and a success built from none would be a lie the type cannot
+ * catch.
  */
-export type IAnalyse = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-) => IAdtError | AdtNoFailure;
+export const nothingIsARefusal: IAnalyse<IAdtError> = () => ADT_NO_FAILURE;
 
 /**
  * Run one request and compose the two strategies over its answer.
@@ -146,11 +155,11 @@ export type IAnalyse = (
  * wrong system entirely. A document this library cannot read is its own failure
  * and surfaces as itself.
  */
-export async function answering<T>(
+export async function answering<T, E extends IAdtError = IAdtError>(
   run: () => Promise<IAdtWireResponse>,
   read: IResultStrategy<T>,
-  analyse?: IAnalyse,
-): Promise<IAdtResponse<T>> {
+  analyse?: IAnalyse<E>,
+): Promise<IAdtResponse<T, E>> {
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
 
@@ -161,28 +170,37 @@ export async function answering<T>(
     wire = (error as IWithResponse)?.response;
   }
 
-  const overruled = analyse ? analyse(verdict, wire) : verdict;
-
-  if (overruled !== ADT_NO_FAILURE) {
-    return failed<T>(overruled);
+  // Two casts below, and one reason for both: `E` is only ever given a value by
+  // the `analyse` argument. Where the code falls back to the library's own
+  // verdict — no strategy was supplied, or nothing came back for one to read —
+  // `E` is its default `IAdtError`, which is what that verdict already is. The
+  // compiler cannot see that from inside the body; a caller never sees either.
+  if (analyse) {
+    const overruled = analyse(verdict, wire);
+    if (overruled !== ADT_NO_FAILURE) {
+      return failed<T, E>(overruled);
+    }
+  } else if (verdict !== ADT_NO_FAILURE) {
+    return failed<T, E>(verdict as E);
   }
 
   if (!wire) {
     // Cleared, but nothing came back. Enforced here rather than left to the
     // caller: a success built from no answer would be a lie the type cannot
-    // catch, so the original verdict stands.
-    return failed<T>(
-      verdict === ADT_NO_FAILURE
+    // catch, so the original verdict stands. A strategy that adds fields has
+    // none to add about a request that never arrived.
+    return failed<T, E>(
+      (verdict === ADT_NO_FAILURE
         ? {
             origin: 'connection',
             message: 'The request did not complete, and carried no answer',
           }
-        : verdict,
+        : verdict) as E,
     );
   }
 
   // Outside any catch, on purpose. The reading's own exception is the reading's.
-  return succeeded(read(wire));
+  return succeeded<T, E>(read(wire));
 }
 
 /**

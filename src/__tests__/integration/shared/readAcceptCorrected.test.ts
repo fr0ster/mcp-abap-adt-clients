@@ -7,11 +7,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { clearAcceptCache } from '../../../utils/acceptNegotiation';
@@ -47,8 +48,33 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const isStatusOk = (status?: number): boolean =>
-  status === 200 || status === 204;
+/**
+ * The answer, or a failure naming what SAP said.
+ *
+ * Not a status. ADT answers a refusal inside a 200, so `status === 200` passed
+ * whether or not the read worked; and these read the state bag's `readResult`,
+ * which no longer exists — every one of them threw "no response for …" on the
+ * first run after the migration. The contract is the verdict now, and the
+ * document is what a read is for.
+ */
+function assertAnswered(answer: unknown, label: string, name: string): void {
+  const contract = answer as IAdtResponse<unknown> | undefined;
+  if (!contract || typeof contract.ok !== 'boolean') {
+    throw new Error(`Read ${label} failed: no answer for ${name}`);
+  }
+  if (!contract.ok) {
+    throw new Error(
+      `Read ${label} failed for ${name} [${contract.getError().origin}]: ` +
+        contract.getError().message,
+    );
+  }
+  const value = contract.getResult().value;
+  if (typeof value !== 'string') {
+    throw new Error(
+      `Read ${label} for ${name} answered ${typeof value}, not a document`,
+    );
+  }
+}
 
 async function runReadWithAcceptLogging<T>(
   label: string,
@@ -67,26 +93,8 @@ async function runReadWithAcceptLogging<T>(
   }
 }
 
-function assertReadResult(state: any, label: string, name: string): void {
-  if (!state || !state.readResult) {
-    throw new Error(`Read ${label} failed: no response for ${name}`);
-  }
-  const status = state.readResult.status;
-  if (!isStatusOk(status)) {
-    throw new Error(`Read ${label} failed: HTTP ${status} for ${name}`);
-  }
-}
-
-function assertMetadataResult(state: any, label: string, name: string): void {
-  const result = state?.metadataResult || state?.readResult;
-  if (!result) {
-    throw new Error(`Read ${label} failed: no metadata response for ${name}`);
-  }
-  const status = result.status;
-  if (!isStatusOk(status)) {
-    throw new Error(`Read ${label} failed: HTTP ${status} for ${name}`);
-  }
-}
+const assertReadResult = assertAnswered;
+const assertMetadataResult = assertAnswered;
 
 async function runReadMetadataWithAcceptLogging<T>(
   label: string,
@@ -118,8 +126,9 @@ describe('Shared - read Accept headers (corrected)', () => {
 
   beforeAll(async () => {
     try {
-      clearAcceptCache();
       connection = await createTestConnection(connectionLogger);
+      // The run shares one connection, and what it learned lives on it.
+      clearAcceptCache(connection);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -374,7 +383,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read domain', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read domain',
-      client.getDomain().read({ domainName }),
+      client.getDomain().readMetadata({ domainName }),
     );
     assertReadResult(state, 'domain', domainName);
 
@@ -400,7 +409,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read data element', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read data element',
-      client.getDataElement().read({ dataElementName }),
+      client.getDataElement().readMetadata({ dataElementName }),
     );
     assertReadResult(state, 'data element', dataElementName);
 
@@ -482,7 +491,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read table type', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read table type',
-      client.getTableType().read({ tableTypeName }),
+      client.getTableType().readMetadata({ tableTypeName }),
     );
     assertReadResult(state, 'table type', tableTypeName);
 
@@ -534,7 +543,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read function group', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read function group',
-      client.getFunctionGroup().read({ functionGroupName }),
+      client.getFunctionGroup().readMetadata({ functionGroupName }),
     );
     assertReadResult(state, 'function group', functionGroupName);
 
@@ -606,7 +615,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read package', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read package',
-      client.getPackage().read({ packageName }),
+      client.getPackage().readMetadata({ packageName }),
     );
     assertReadResult(state, 'package', packageName);
 

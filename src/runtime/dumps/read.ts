@@ -8,32 +8,26 @@
  */
 
 import type {
+  IRuntimeDumpReadOptions,
+  IRuntimeDumpsListOptions,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
-export interface IRuntimeDumpsListOptions {
-  query?: string;
-  inlinecount?: 'allpages' | 'none';
-  top?: number;
-  skip?: number;
-  orderby?: string;
-  from?: string; // YYYYMMDDHHMMSS
-  to?: string; // YYYYMMDDHHMMSS
-}
-
-export type IRuntimeDumpReadView = 'default' | 'summary' | 'formatted';
-
-export interface IRuntimeDumpReadOptions {
-  view?: IRuntimeDumpReadView;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type {
+  IRuntimeDumpReadOptions,
+  IRuntimeDumpReadView,
+  IRuntimeDumpsListOptions,
+} from '@mcp-abap-adt/interfaces-adt';
 
 function normalizeDumpId(dumpId: string): string {
   const normalized = dumpId?.trim();
-  if (!normalized) {
-    throw new Error('Runtime dump ID is required');
-  }
   if (normalized.includes('/')) {
     throw new Error('Runtime dump ID must not contain "/"');
   }

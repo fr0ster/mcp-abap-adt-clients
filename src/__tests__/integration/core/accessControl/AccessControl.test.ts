@@ -12,16 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IAccessControlConfig,
-  IAccessControlState,
-} from '../../../../core/accessControl';
+import type { IAccessControlConfig } from '../../../../core/accessControl';
 import { getAccessControl } from '../../../../core/accessControl/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -70,7 +69,7 @@ describe('AccessControl (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IAccessControlConfig, IAccessControlState>;
+  let tester: BaseTester<IAccessControlConfig>;
 
   beforeAll(async () => {
     try {
@@ -114,7 +113,7 @@ describe('AccessControl (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (accessControlName: string) => {
@@ -169,16 +168,16 @@ describe('AccessControl (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
           testCase?.params?.source_code ||
-          config.sourceCode ||
+          config.source ||
           `@EndUserText.label: '${config.description || config.accessControlName}'\n@MappingRole: true\ndefine role ${config.accessControlName} {\n  grant select on ${config.accessControlName}\n  where ( ) = aspect pfcg_auth( , , );\n}`;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             accessControlName: config.accessControlName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },
@@ -285,7 +284,7 @@ describe('AccessControl (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'AccessControl - read standard object');
         } catch (error: any) {

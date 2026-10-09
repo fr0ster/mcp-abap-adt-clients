@@ -8,13 +8,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IBehaviorDefinitionConfig,
-  IBehaviorDefinitionState,
-} from '../../../../core/behaviorDefinition';
+import type { IBehaviorDefinitionConfig } from '../../../../core/behaviorDefinition';
 import { read as readBdef } from '../../../../core/behaviorDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -59,7 +57,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IBehaviorDefinitionConfig, IBehaviorDefinitionState>;
+  let tester: BaseTester<IBehaviorDefinitionConfig>;
 
   beforeAll(async () => {
     try {
@@ -104,7 +102,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
               params.transport_request ||
               getEnvironmentConfig().default_transport ||
               '',
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (bdefName: string) => {
@@ -187,11 +185,10 @@ describe('BehaviorDefinition (using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
+        const sourceCode = testCase?.params?.source_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },
           updateConfig: {
@@ -200,7 +197,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
             rootEntity: config.rootEntity,
             implementationType: config.implementationType,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

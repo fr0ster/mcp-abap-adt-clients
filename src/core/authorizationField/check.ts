@@ -5,14 +5,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_AUTHORIZATION_FIELD,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -31,12 +30,7 @@ export async function checkAuthorizationField(
   version: 'active' | 'inactive',
   xmlContent?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
-  const encoded = encodeSapObjectName(name.toUpperCase());
-  const uri = `/sap/bc/adt/aps/iam/auth/${encoded}`;
+  const uri = `${AUTHORIZATION_FIELD.uri(name)}`;
 
   let xmlBody: string;
   if (xmlContent) {
@@ -68,12 +62,6 @@ export async function checkAuthorizationField(
       'Content-Type': CT_CHECK_OBJECTS,
     },
   });
-
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Authorization field check failed: ${errorMessages}`);
-  }
 
   return response;
 }

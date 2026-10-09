@@ -6,7 +6,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -31,7 +32,7 @@ export async function validateFunctionModuleName(
   functionModuleName: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/functions/validation`;
+  const url = FUNCTION_GROUP.validation;
   const queryParams = new URLSearchParams({
     objtype: 'FUGR/FF',
     objname: functionModuleName,
@@ -66,7 +67,6 @@ export async function validateFunctionModuleName(
  * @param version - 'active' (default) or 'inactive' - version context for validation
  * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
- * @throws Error if validation finds syntax errors
  */
 export async function validateFunctionModuleSource(
   connection: IAbapConnection,
@@ -75,8 +75,9 @@ export async function validateFunctionModuleSource(
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',
 ): Promise<IAdtWireResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
-    await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource } = await import(
+    '../../utils/checkRun'
+  );
 
   // Build object type path for function module
   const objectType = 'function_module';
@@ -102,26 +103,6 @@ export async function validateFunctionModuleSource(
       objectName,
       version,
       'abapCheckRun',
-    );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Source validation failed: ${errorMessages}`);
-  }
-
-  if (checkResult.warnings.length > 0) {
-    throw new Error(
-      `Source validation failed: ${checkResult.message || 'Warnings found'}`,
-    );
-  }
-
-  // If status is 'notProcessed', it's an error
-  if (checkResult.status === 'notProcessed') {
-    throw new Error(
-      `Source validation failed: ${checkResult.message || 'Object could not be processed'}`,
     );
   }
 

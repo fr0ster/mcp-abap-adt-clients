@@ -31,11 +31,9 @@ import {
   createLibraryLogger,
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
-import type {
-  IPackageContentItem,
-  IPackageHierarchyNode,
-} from '../src/core/shared/types';
-import { orThrow } from '../src/utils/adtResponse';
+import type {} from '../src/core/shared/types';
+import type { IWalkedNode } from './lib/packageWalk';
+import { walkPackage } from './lib/packageWalk';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -80,7 +78,26 @@ function parseArgs(argv: string[]): Options {
   return { packageName, treeMode, includeSubpackages, jsonOutput, maxDepth };
 }
 
-function printTable(items: IPackageContentItem[]): void {
+/** What the table prints, now that the package ships no content-item shape. */
+interface IFlatItem {
+  readonly name: string;
+  readonly type: string;
+  readonly packageName: string;
+}
+
+/** The walk, as a list — one line per object, packages included. */
+function flatten(node: IWalkedNode, parent = ''): IFlatItem[] {
+  const here: IFlatItem[] =
+    node.isPackage && !parent
+      ? []
+      : [{ name: node.name, type: node.type, packageName: parent }];
+  for (const child of node.children) {
+    here.push(...flatten(child, node.isPackage ? node.name : parent));
+  }
+  return here;
+}
+
+function printTable(items: IFlatItem[]): void {
   if (items.length === 0) {
     console.log('No objects found.');
     return;
@@ -93,16 +110,16 @@ function printTable(items: IPackageContentItem[]): void {
 
   // Print header
   console.log(
-    `${'NAME'.padEnd(nameWidth)}  ${'TYPE'.padEnd(typeWidth)}  ${'PACKAGE'.padEnd(pkgWidth)}  DESCRIPTION`,
+    `${'NAME'.padEnd(nameWidth)}  ${'TYPE'.padEnd(typeWidth)}  ${'PACKAGE'.padEnd(pkgWidth)}`,
   );
   console.log(
-    `${'-'.repeat(nameWidth)}  ${'-'.repeat(typeWidth)}  ${'-'.repeat(pkgWidth)}  ${'-'.repeat(30)}`,
+    `${'-'.repeat(nameWidth)}  ${'-'.repeat(typeWidth)}  ${'-'.repeat(pkgWidth)}`,
   );
 
   // Print rows
   for (const item of items) {
     console.log(
-      `${item.name.padEnd(nameWidth)}  ${item.type.padEnd(typeWidth)}  ${item.packageName.padEnd(pkgWidth)}  ${item.description || ''}`,
+      `${item.name.padEnd(nameWidth)}  ${item.type.padEnd(typeWidth)}  ${item.packageName.padEnd(pkgWidth)}`,
     );
   }
 
@@ -110,16 +127,11 @@ function printTable(items: IPackageContentItem[]): void {
   console.log(`Total: ${items.length} object(s)`);
 }
 
-function printTree(
-  node: IPackageHierarchyNode,
-  prefix = '',
-  isLast = true,
-): void {
+function printTree(node: IWalkedNode, prefix = '', isLast = true): void {
   const connector = isLast ? '└── ' : '├── ';
   const typeLabel = node.type || '';
-  const descPart = node.description ? ` - ${node.description}` : '';
 
-  console.log(`${prefix}${connector}${node.name} (${typeLabel})${descPart}`);
+  console.log(`${prefix}${connector}${node.name} (${typeLabel})`);
 
   const children = node.children || [];
   const newPrefix = prefix + (isLast ? '    ' : '│   ');
@@ -129,7 +141,7 @@ function printTree(
   }
 }
 
-function countObjects(node: IPackageHierarchyNode): {
+function countObjects(node: IWalkedNode): {
   packages: number;
   objects: number;
 } {
@@ -182,12 +194,10 @@ async function run(): Promise<void> {
   try {
     if (options.treeMode) {
       // Tree mode - use getPackageHierarchy
-      const tree = await orThrow(
-        utils.getPackageHierarchy(options.packageName, {
-          includeSubpackages: options.includeSubpackages,
-          maxDepth: options.maxDepth,
-          includeDescriptions: true,
-        }),
+      const tree = await walkPackage(
+        connection,
+        options.packageName,
+        options.includeSubpackages ? options.maxDepth : 1,
       );
 
       if (options.jsonOutput) {
@@ -202,12 +212,12 @@ async function run(): Promise<void> {
       }
     } else {
       // List mode - use getPackageContentsList
-      const items = await orThrow(
-        utils.getPackageContentsList(options.packageName, {
-          includeSubpackages: options.includeSubpackages,
-          maxDepth: options.maxDepth,
-          includeDescriptions: true,
-        }),
+      const items = flatten(
+        await walkPackage(
+          connection,
+          options.packageName,
+          options.includeSubpackages ? options.maxDepth : 1,
+        ),
       );
 
       if (options.jsonOutput) {

@@ -1,15 +1,19 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_SOURCE,
   ACCEPT_TRANSFORMATION,
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
+import {
+  sourceUri,
+  TRANSFORMATION,
+  transportUri,
+} from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -23,7 +27,6 @@ export async function getTransformation(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(transformationName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
     queryParams.push(`version=${version}`);
@@ -32,7 +35,7 @@ export async function getTransformation(
     queryParams.push('withLongPolling=true');
   }
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `/sap/bc/adt/xslt/transformations/${encodedName}${query}`;
+  const url = `${TRANSFORMATION.uri(transformationName)}${query}`;
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -58,7 +61,6 @@ export async function getTransformationSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(transformationName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
     queryParams.push(`version=${version}`);
@@ -67,7 +69,7 @@ export async function getTransformationSource(
     queryParams.push('withLongPolling=true');
   }
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `/sap/bc/adt/xslt/transformations/${encodedName}/source/main${query}`;
+  const url = `${sourceUri(TRANSFORMATION.uri(transformationName))}${query}`;
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -91,9 +93,8 @@ export async function getTransformationTransport(
   transformationName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(transformationName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/xslt/transformations/${encodedName}/transport${query}`;
+  const url = `${transportUri(TRANSFORMATION.uri(transformationName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

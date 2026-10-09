@@ -12,14 +12,23 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
-import type { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
+import { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -51,6 +60,15 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
+const feedReading = {
+  feeds: feedDescriptors,
+  variants: feedVariants,
+  entries: feedEntries,
+  systemMessages: feedSystemMessages,
+  gatewayErrors: feedGatewayErrors,
+  gatewayErrorDetail: feedGatewayErrorDetail,
+};
+
 const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
@@ -58,12 +76,17 @@ const testsLogger: ILogger = createTestsLogger();
 describe('FeedRepository (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let runtime: AdtRuntimeClient;
+  // Built here rather than taken from `feeds`: the repository
+  // answers each feed as its document by default, and these cases assert the
+  // entries, so they construct it with the Atom readings.
+  let feeds: FeedRepository<typeof feedReading>;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
+      feeds = new FeedRepository(connection, libraryLogger, feedReading);
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -105,9 +128,8 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list feed catalog', testsLogger);
-        const feeds = await runtime.getFeeds().list();
-        expect(feeds).toBeDefined();
-        expect(Array.isArray(feeds)).toBe(true);
+        const catalog = expectResult(await feeds.list(), 'feed catalog');
+        expect(Array.isArray(catalog)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -161,8 +183,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         // this test used to call that a skip.
         // No cast since `@mcp-abap-adt/interfaces@26.0.0` — `IFeedRepository`
         // declares the parameter, so the contract and the endpoint agree.
-        const variants = await runtime.getFeeds().variants('dumps');
-        expect(variants).toBeDefined();
+        const variants = expectResult(
+          await feeds.variants('dumps'),
+          'feed variants',
+        );
         expect(Array.isArray(variants)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -217,8 +241,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('get dumps via feed', testsLogger);
-        const entries = await runtime.getFeeds().dumps();
-        expect(entries).toBeDefined();
+        const entries = expectResult(await feeds.dumps(), 'dumps feed');
         expect(Array.isArray(entries)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -269,10 +292,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('fetch feed by URL /sap/bc/adt/runtime/dumps', testsLogger);
-        const entries = await (runtime.getFeeds() as FeedRepository).byUrl(
-          '/sap/bc/adt/runtime/dumps',
+        const entries = expectResult(
+          await feeds.byUrl('/sap/bc/adt/runtime/dumps'),
+          'feed by URL',
         );
-        expect(entries).toBeDefined();
         expect(Array.isArray(entries)).toBe(true);
 
         logTestSuccess(testsLogger, testName);

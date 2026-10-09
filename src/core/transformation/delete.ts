@@ -1,14 +1,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { TRANSFORMATION } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteTransformationParams } from './types';
 
@@ -21,12 +21,7 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { transformation_name } = params;
 
-  if (!transformation_name) {
-    throw new Error('transformation_name is required');
-  }
-
-  const encodedName = encodeSapObjectName(transformation_name);
-  const objectUri = `/sap/bc/adt/xslt/transformations/${encodedName}`;
+  const objectUri = `${TRANSFORMATION.uri(transformation_name)}`;
 
   const checkUrl = '/sap/bc/adt/deletion/check';
 
@@ -58,12 +53,7 @@ export async function deleteTransformation(
 ): Promise<IAdtWireResponse> {
   const { transformation_name, transport_request } = params;
 
-  if (!transformation_name) {
-    throw new Error('transformation_name is required');
-  }
-
-  const encodedName = encodeSapObjectName(transformation_name);
-  const objectUri = `/sap/bc/adt/xslt/transformations/${encodedName}`;
+  const objectUri = `${TRANSFORMATION.uri(transformation_name)}`;
 
   const deletionUrl = '/sap/bc/adt/deletion/delete';
 
@@ -95,14 +85,10 @@ export async function deleteTransformation(
     headers,
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      transformation_name,
-      object_uri: objectUri,
-      transport_request: transport_request || 'local',
-      message: `Transformation ${transformation_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

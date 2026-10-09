@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "17.0.0",
+  "version": "25.0.1",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -51,6 +51,7 @@
   },
   "files": [
     "dist",
+    "docs/usage",
     "README.md",
     "LICENSE",
     "COPYING"
@@ -79,15 +80,16 @@
   "scripts": {
     "chrono": "./tools/version-stats.sh",
     "clean": "node -e \"const fs=require('fs');['dist','tsconfig.tsbuildinfo'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true})}catch{}})\"",
-    "lint": "npx biome check --write src",
-    "lint:check": "npx biome check src && npm run --silent check:docs",
+    "lint": "npx biome check --write src packages",
+    "lint:check": "npx biome check src packages && npm run --silent check:docs",
     "check:docs": "node scripts/check-doc-imports.js",
-    "format": "npx biome format --write src",
-    "build": "npm run --silent clean && npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
+    "format": "npx biome format --write src packages",
+    "build": "npm run --silent clean && npx biome check src packages --diagnostic-level=error && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "test:init": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "npx jest --runInBand",
+    "test:detached": "bash scripts/run-detached.sh",
     "test:check": "npx tsc --noEmit --project tsconfig.test.json",
     "test:type-check": "npm run test:check",
     "test:check:integration": "npx tsc --noEmit --project tsconfig.test.integration.json",
@@ -103,20 +105,33 @@
     "pretest": "npm run test:check:integration && npm run --silent check:config",
     "prepublishOnly": "npm run build",
     "prepare": "husky",
-    "check:config": "node scripts/check-config-drift.js"
+    "check:config": "node scripts/check-config-drift.js",
+    "corpus:capture": "npx ts-node scripts/capture-adt-corpus.ts",
+    "build:packages": "npm --prefix packages/adt-strategies run build",
+    "test:packages": "npm --prefix packages/adt-strategies test",
+    "release:publish": "bash scripts/publish-changed.sh",
+    "publish:clients": "npm publish --access public",
+    "publish:strategies": "npm publish ./packages/adt-strategies --access public"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces": "^31.0.0",
-    "@mcp-abap-adt/logger": "^0.1.3",
+    "@mcp-abap-adt/interfaces-adt": "^12.0.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^1.0.0",
+    "@mcp-abap-adt/interfaces-network": "^2.0.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.0",
+    "@mcp-abap-adt/logger": "^0.4.0",
     "axios": "^1.18.1",
     "fast-xml-parser": "^5.9.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@mcp-abap-adt/connection": "^6.0.1",
+    "@mcp-abap-adt/adt-strategies": "^0.7.0",
+    "@mcp-abap-adt/auth-providers": "^5.0.1",
+    "@mcp-abap-adt/connection": "^10.0.2",
+    "@mcp-abap-adt/interfaces-auth": "^3.0.0",
+    "@mcp-abap-adt/interfaces-auth-sap": "^1.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",
     "dotenv": "^17.3.1",

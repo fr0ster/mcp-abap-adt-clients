@@ -7,14 +7,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
+import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
   createTestAdtClient,
@@ -35,7 +36,13 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
+import {
+  type ReadingProfiler,
+  readingClassExecutor,
+  readingProfiler,
+  traceIdsNow,
+  waitForNewTrace,
+} from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -129,6 +136,11 @@ describe('ClassExecutor (integration)', () => {
   let client: AdtClient;
   let executor: AdtExecutor;
   let runtimeClient: AdtRuntimeClient;
+  // Built with the readings, not taken from the clients' factories: the
+  // profiler and the scheduling answer documents by default, and these cases
+  // assert entries, rows and the scheduled request id.
+  let profilerReading: ReadingProfiler;
+  let classRunner: ReturnType<typeof readingClassExecutor>;
   let hasConfig = false;
   let isLegacy = false;
   /** Trace ids this file produced, deleted at teardown. */
@@ -147,6 +159,8 @@ describe('ClassExecutor (integration)', () => {
       isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
       runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
+      profilerReading = readingProfiler(connection, libraryLogger);
+      classRunner = readingClassExecutor(connection, libraryLogger);
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -171,7 +185,7 @@ describe('ClassExecutor (integration)', () => {
     // knowingly rather than risk deleting a stranger's.
     for (const traceId of tracesCreated) {
       try {
-        await runtimeClient.getProfiler().delete(traceId);
+        await profilerReading.delete(traceId);
       } catch (cleanupError) {
         testsLogger.warn?.(
           `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
@@ -212,14 +226,19 @@ describe('ClassExecutor (integration)', () => {
   async function runClassWithReadinessRetry(
     className: string,
     maxAttempts: number = 3,
-  ) {
-    let lastResponse: any;
+  ): Promise<string> {
+    let lastOutput = '';
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      lastResponse = await executor.getClassExecutor().run({ className });
-      if (!isMissingClassRunMainMessage(lastResponse.data)) return lastResponse;
+      // The run answers what the reading makes of the response, and the shipped
+      // one is the document. A failed run is a failure, not a body to retry.
+      lastOutput = expectResult(
+        await classRunner.run({ className }),
+        'run class',
+      );
+      if (!isMissingClassRunMainMessage(lastOutput)) return lastOutput;
       if (attempt < maxAttempts) await wait(1000);
     }
-    return lastResponse;
+    return lastOutput;
   }
 
   it(
@@ -259,11 +278,10 @@ describe('ClassExecutor (integration)', () => {
         logTestStep('run', testsLogger);
         const response = await runClassWithReadinessRetry(className);
 
-        expect(response.status).toBe(200);
-        expect(response.data).toBeDefined();
-        const runOutput = String(response.data);
+        expect(response).toBeDefined();
+        const runOutput = String(response);
         expectRunnableRunOutput(runOutput);
-        logTestStep(`run output: ${toShortText(response.data)}`, testsLogger);
+        logTestStep(`run output: ${toShortText(response)}`, testsLogger);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -279,7 +297,7 @@ describe('ClassExecutor (integration)', () => {
   it(
     'should execute class with profiling and return trace id',
     async () => {
-      const testName = 'ClassExecutor - runWithProfiling';
+      const testName = 'ClassExecutor - scheduleTrace then runWithProfiler';
       const testCase = getEnabledTestCase(
         'execute_class',
         'adt_class_executor',
@@ -323,31 +341,46 @@ describe('ClassExecutor (integration)', () => {
 
         logTestStep('warm-up run before profiling', testsLogger);
         const warmupResponse = await runClassWithReadinessRetry(className);
-        expectRunnableRunOutput(String(warmupResponse.data));
+        expectRunnableRunOutput(warmupResponse);
 
         // What exists BEFORE the run is how a new trace is recognised. The
         // feed's order is not age, so "the newest entry" is not an answer to
         // "what did my run produce".
-        const profiler = runtimeClient.getProfiler();
+        const profiler = profilerReading;
         const before = await traceIdsNow(profiler);
 
-        logTestStep('schedule a trace + run with profiler', testsLogger);
-        let result = await executor
-          .getClassExecutor()
-          .runWithProfiling({ className }, { profilerParameters });
-        if (isMissingClassRunMainMessage(result.response.data)) {
+        // Two calls since 19.0.0: schedule the measurement, then run under it.
+        // `runWithProfiling` did both, and the order was fixed in the library.
+        logTestStep('schedule a trace, then run with profiler', testsLogger);
+        const classExecutor = classRunner;
+        const profiledRun = async () => {
+          const profilerId = expectResult(
+            await classExecutor.scheduleTrace(profilerParameters),
+            'scheduled trace',
+          );
+          return {
+            run: expectResult(
+              await classExecutor.runWithProfiler(
+                { className },
+                { profilerId },
+              ),
+              'result',
+            ),
+            profilerId,
+          };
+        };
+
+        let result = await profiledRun();
+        if (isMissingClassRunMainMessage(result.run)) {
           await client.getClass().read({ className }, 'active', {
             withLongPolling: true,
           });
           await wait(1000);
           await runClassWithReadinessRetry(className);
-          result = await executor
-            .getClassExecutor()
-            .runWithProfiling({ className }, { profilerParameters });
+          result = await profiledRun();
         }
 
-        expect(result.response.status).toBe(200);
-        const runOutput = String(result.response.data);
+        const runOutput = String(result.run);
         expectRunnableRunOutput(runOutput);
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
@@ -355,10 +388,7 @@ describe('ClassExecutor (integration)', () => {
         // The run promises no trace, so the result must not carry one.
         expect(result).not.toHaveProperty('traceId');
 
-        logTestStep(
-          `run output: ${toShortText(result.response.data)}`,
-          testsLogger,
-        );
+        logTestStep(`run output: ${toShortText(result.run)}`, testsLogger);
 
         logTestStep('wait for the trace this run produced', testsLogger);
         const traceId = await waitForNewTrace(profiler, before, {
@@ -371,15 +401,24 @@ describe('ClassExecutor (integration)', () => {
         tracesCreated.push(traceId);
 
         logTestStep('read all three views', testsLogger);
-        const hitlist = await profiler.read(traceId, 'hitlist', {
-          withSystemEvents: false,
-        });
-        const statements = await profiler.read(traceId, 'statements', {
-          withSystemEvents: false,
-        });
-        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
-          withSystemEvents: false,
-        });
+        const hitlist = expectResult(
+          await profiler.read(traceId, 'hitlist', {
+            withSystemEvents: false,
+          }),
+          'hitlist',
+        );
+        const statements = expectResult(
+          await profiler.read(traceId, 'statements', {
+            withSystemEvents: false,
+          }),
+          'statements',
+        );
+        const dbAccesses = expectResult(
+          await profiler.read(traceId, 'dbAccesses', {
+            withSystemEvents: false,
+          }),
+          'dbAccesses',
+        );
 
         // Parsed, not a status code: a 200 carrying an unparseable body used to
         // pass here, and the whole point of the typed views is that it no

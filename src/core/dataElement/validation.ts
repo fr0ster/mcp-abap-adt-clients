@@ -6,8 +6,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { DATA_ELEMENT } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -22,7 +23,7 @@ import { getTimeout } from '../../utils/timeouts';
  */
 /**
  * `description` is required by the endpoint **and may not be empty**. Measured
- * on E19 (`RFCSAPRL 816`) 2026-08-28: sending `description=` answers **400,
+ * 2026-08-28: sending `description=` answers **400,
  * "The description is missing for VALIDATION"**, which is why passing
  * `description || ''` never satisfied it. It moves ahead of the optional
  * `packageName`, which this endpoint does NOT require. See `docs/evidence/2026-08-28-validation-required-params.md`.
@@ -33,7 +34,7 @@ export async function validateDataElementName(
   description: string,
   packageName?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/dataelements/validation`;
+  const url = DATA_ELEMENT.validation;
   const queryParams = new URLSearchParams({
     objtype: 'dtel',
     objname: dataElementName,

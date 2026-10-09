@@ -1,68 +1,58 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
- * AdtDdlLegacy - View handler for legacy SAP systems (BASIS < 7.50)
+ * AdtDdlLegacy - DDL source handler for legacy SAP systems (BASIS < 7.50)
  *
- * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
+ * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API,
+ * and refuses checkCdsTestDoubles(): the CDS test-doubles framework endpoint is
+ * not present below 7.50 (issue #207).
  */
 
-import {
-  encodeSapObjectName,
-  safeErrorMessage,
-} from '../../utils/internalUtils';
+import type {
+  IAdtAnalyseOptions,
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import { DDL_SOURCE } from '../../endpoints/objects';
+import { answering, failed } from '../../utils/adtResponse';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtDdl } from './AdtDdl';
-import { lockDDLS } from './lock';
-import type { IDdlConfig, IDdlState } from './types';
-import { unlockDDLS } from './unlock';
+import type { ddlDocuments, IDdlConfig, IDdlResults } from './types';
 
-export class AdtDdlLegacy extends AdtDdl {
-  override async delete(config: Partial<IDdlConfig>): Promise<IDdlState> {
-    if (!config.ddlName) {
-      throw new Error('View name is required');
-    }
+export class AdtDdlLegacy<
+  R extends IDdlResults = typeof ddlDocuments,
+> extends AdtDdl<R> {
+  override async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IDdlConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = config.ddlName as string;
 
-    const state: IDdlState = { errors: [] };
-    let lockHandle: string | undefined;
+    const objectUrl = `${DDL_SOURCE.uri(name)}`;
+    return answering(
+      () =>
+        deleteObjectDirect(
+          this.connection,
+          objectUrl,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
+  }
 
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      this.logger?.info?.('Locking view for deletion');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockDDLS(this.connection, config.ddlName);
-
-      this.logger?.info?.('Deleting view (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(config.ddlName).toLowerCase()}`;
-      state.deleteResult = await deleteObjectDirect(
-        this.connection,
-        objectUrl,
-        lockHandle,
-        config.transportRequest,
-      );
-      this.logger?.info?.('View deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
-      if (lockHandle) {
-        try {
-          await unlockDDLS(this.connection, config.ddlName, lockHandle);
-        } catch (unlockError: unknown) {
-          this.logger?.error?.(
-            'Unlock after delete failure also failed:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
+  /** Refused without a request: the endpoint does not exist below 7.50. */
+  override async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
+    _cdsViewName: string,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {
+    return failed<ReturnType<R['testDoubles']>, E>({
+      origin: 'refusal',
+      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+      message:
+        'The CDS test-doubles check needs BASIS 7.50 or later; this system has no such endpoint.',
+    } as E);
   }
 }

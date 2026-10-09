@@ -17,7 +17,7 @@ export { check, checkEnhancement } from './check';
 // Low-level functions
 export { create } from './create';
 export { checkDeletion, deleteEnhancement } from './delete';
-export { lockEnhancement, lockEnhancementForUpdate } from './lock';
+export { lockEnhancement } from './lock';
 export {
   getEnhancementMetadata,
   getEnhancementSource,
@@ -30,13 +30,13 @@ export type {
   ICreateEnhancementParams,
   IDeleteEnhancementParams,
   IEnhancementConfig,
-  IEnhancementMetadata,
-  IEnhancementState,
+  IEnhancementResults,
   IUpdateEnhancementParams,
   IValidateEnhancementParams,
 } from './types';
 export {
   ENHANCEMENT_TYPE_CODES,
+  enhancementDocuments,
   getEnhancementBaseUrl,
   getEnhancementUri,
   isImplementationType,

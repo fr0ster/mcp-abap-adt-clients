@@ -17,14 +17,20 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDataElementConfig } from '../../../../core/dataElement';
-import { getDataElement } from '../../../../core/dataElement/read';
 import type { IDomainConfig } from '../../../../core/domain';
-import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  deleteDataElement,
+  deleteDomain,
+  recreateActiveDataElement,
+  recreateActiveDomain,
+  removeLeftoverDataElement,
+} from '../../../helpers/lockTargets';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -65,6 +71,8 @@ describe('Session lock registry (using AdtClient)', () => {
   let isCloudSystem = false;
   let domainConfig: IDomainConfig | undefined;
   let dataElementConfig: IDataElementConfig | undefined;
+  let domainType: { datatype?: string; length?: number; decimals?: number } =
+    {};
 
   beforeAll(async () => {
     try {
@@ -101,8 +109,10 @@ describe('Session lock registry (using AdtClient)', () => {
           packageName: domainPackage,
           transportRequest: domainResolver.getTransportRequest(),
           description: dp.description,
-          datatype: dp.datatype || 'CHAR',
-          length: dp.length || 5,
+        };
+        domainType = {
+          datatype: dp.datatype,
+          length: dp.length,
           decimals: dp.decimals,
         };
       }
@@ -121,14 +131,6 @@ describe('Session lock registry (using AdtClient)', () => {
           packageName: dePackage,
           transportRequest: deResolver.getTransportRequest(),
           description: ep.description,
-          typeKind: ep.type_kind || 'predefinedAbapType',
-          dataType: ep.data_type || 'CHAR',
-          length: ep.length,
-          decimals: ep.decimals,
-          shortLabel: ep.short_label,
-          mediumLabel: ep.medium_label,
-          longLabel: ep.long_label,
-          headingLabel: ep.heading_label,
         } as IDataElementConfig;
       }
 
@@ -155,25 +157,17 @@ describe('Session lock registry (using AdtClient)', () => {
     }
 
     try {
-      // Ensure both objects exist (idempotent: create only if missing).
-      try {
-        await getDomain(connection, domainConfig.domainName);
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
-          await client.getDomain().create(domainConfig);
-        } else {
-          throw error;
-        }
-      }
-      try {
-        await getDataElement(connection, dataElementConfig.dataElementName);
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
-          await client.getDataElement().create(dataElementConfig);
-        } else {
-          throw error;
-        }
-      }
+      // Typed and active, not the shells a create alone makes. The element
+      // is typed by the domain: a leftover element goes first (it references
+      // the domain, which cannot be deleted under it), then the domain is
+      // rebuilt, then the element.
+      await removeLeftoverDataElement(client, dataElementConfig);
+      await recreateActiveDomain(client, domainConfig, domainType);
+      await recreateActiveDataElement(
+        client,
+        dataElementConfig,
+        domainConfig.domainName,
+      );
 
       // Lock both through the SAME client session — deliberately no unlock.
       await client.getDomain().lock(domainConfig);
@@ -198,40 +192,13 @@ describe('Session lock registry (using AdtClient)', () => {
     }
   }, 900000);
 
-  // This test needs two lockable objects and nothing more — it never activates
-  // them, so what it creates is an inactive shell with no data type. Leaving
-  // those behind put invalid objects in the system and, while the names were
-  // shared with Domain's and DataElement's own tests, made those skip as
-  // "already exists" on every run. Create-only is fine here; not cleaning up
-  // was not.
+  // A failed cleanup fails the suite: the leftovers are what this used to be.
   afterAll(async () => {
     if (!client) return;
-    // Data element first: it may reference the domain.
-    const deName = dataElementConfig?.dataElementName;
-    if (deName) {
-      await client
-        .getDataElement()
-        .delete({ dataElementName: deName })
-        .catch((error: unknown) =>
-          testsLogger.warn?.(
-            `cleanup: ${deName} not removed: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          ),
-        );
-    }
-    const domName = domainConfig?.domainName;
-    if (domName) {
-      await client
-        .getDomain()
-        .delete({ domainName: domName })
-        .catch((error: unknown) =>
-          testsLogger.warn?.(
-            `cleanup: ${domName} not removed: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          ),
-        );
-    }
+    // A lock the test left held blocks the delete rather than enabling it.
+    await client.unlockAll();
+    // Data element first: it references the domain.
+    if (dataElementConfig) await deleteDataElement(client, dataElementConfig);
+    if (domainConfig) await deleteDomain(client, domainConfig);
   }, 300000);
 });

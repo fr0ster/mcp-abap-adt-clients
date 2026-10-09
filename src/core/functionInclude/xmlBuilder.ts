@@ -8,6 +8,7 @@
  * from the parent function group and must NOT appear in the include payload.
  */
 
+import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import type { ICreateFunctionIncludeParams } from './types';
 
@@ -31,13 +32,12 @@ export function buildFunctionIncludeXml(
 ): string {
   const name = args.include_name.toUpperCase();
   const groupUpper = args.function_group_name.toUpperCase();
-  const groupLower = args.function_group_name.toLowerCase();
   const description = escapeXml(
     limitDescription(args.description || args.include_name),
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <finclude:abapFunctionGroupInclude xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXml(name)}" adtcore:type="FUGR/I" adtcore:description="${description}">
-  <adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/${escapeXml(groupLower)}" adtcore:type="FUGR/F" adtcore:name="${escapeXml(groupUpper)}"/>
+  <adtcore:containerRef adtcore:uri="${escapeXml(FUNCTION_GROUP.uri(args.function_group_name))}" adtcore:type="FUGR/F" adtcore:name="${escapeXml(groupUpper)}"/>
 </finclude:abapFunctionGroupInclude>`;
 }

@@ -7,8 +7,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
+import { INTERFACE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -22,8 +23,7 @@ import { getTimeout } from '../../utils/timeouts';
  * - Error: <exc:exception> with message about existing object or validation failure
  */
 /**
- * `packageName` is required by the endpoint, not optional. Measured on E19
- * (`RFCSAPRL 816`) 2026-08-28: without `packagename` it answers **400,
+ * `packageName` is required by the endpoint, not optional. Measured * 2026-08-28: without `packagename` it answers **400,
  * "Parameter packagename could not be found."** — see
  * `docs/evidence/2026-08-28-validation-required-params.md`.
  */
@@ -44,7 +44,7 @@ export async function validateInterfaceName(
     params.append('description', description);
   }
 
-  const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
+  const url = `${INTERFACE.validation}?${params.toString()}`;
   const headers = {
     Accept: ACCEPT_VALIDATION_CLASS_NAME,
   };

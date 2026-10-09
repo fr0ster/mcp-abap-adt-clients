@@ -26,12 +26,11 @@ export {
   resolveBindingVariant,
 } from './core/service';
 
-export { parseSearchResults } from './core/shared';
 export {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
-export { parseTransportTree } from './core/transport/parseTransportTree';
+export { changeTransportTaskType } from './core/transport/objects';
 /**
  * The refusal a 2xx can carry.
  *
@@ -49,7 +48,6 @@ export { parseTransportTree } from './core/transport/parseTransportTree';
 export {
   AdtParseError,
   AdtSAPError,
-  TransportSearchConfigurationMissing,
 } from './utils/adtErrors';
 export {
   fetchDiscoveryEndpoints,

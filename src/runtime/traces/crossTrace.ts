@@ -9,27 +9,22 @@
  * - Get trace activations
  *
  * **Nothing here has a measured non-empty shape.** Both a modern on-prem system
- * and a cloud trial answered `200` with an empty root — `<sxt:traces/>` and
+ * and one system answered `200` with an empty root — `<sxt:traces/>` and
  * `<sxt:activations/>` — under the typed content types. That is an answer, not
  * a gap: the endpoints exist and are served. It does mean any assumption about
  * the contents of an entry is unevidenced, so the readers hand the body back
  * rather than shaping it.
  */
 
+import type { IListCrossTracesOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
-/**
- * List traces options
- */
-export interface IListCrossTracesOptions {
-  traceUser?: string;
-  actCreateUser?: string;
-  actChangeUser?: string;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type { IListCrossTracesOptions } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * List cross traces

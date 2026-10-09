@@ -7,8 +7,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -24,7 +25,7 @@ import { getTimeout } from '../../utils/timeouts';
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message (e.g., "Function group ... already exists")
  */
 /**
- * `description` is required by the endpoint. Measured on E19 2026-08-28:
+ * `description` is required by the endpoint. Measured 2026-08-28:
  * omitting it answers **400, "Parameter description could not be found."**, and
  * an empty value is accepted. `packagename` is genuinely optional here, which
  * is why it stays conditional. See `docs/evidence/2026-08-28-validation-required-params.md`.
@@ -35,7 +36,7 @@ export async function validateFunctionGroupName(
   packageName?: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/functions/validation`;
+  const url = FUNCTION_GROUP.validation;
   const queryParams = new URLSearchParams({
     objtype: 'FUGR/F',
     objname: functionGroupName,

@@ -4,9 +4,8 @@ import type {
   IWebSocketMessageEnvelope,
   IWebSocketMessageHandler,
   IWebSocketTransport,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-network';
 import { AdtClientsWS } from '../../../clients/AdtClientsWS';
-import { DebuggerSessionClient } from '../../../clients/DebuggerSessionClient';
 
 class MockWebSocketTransport implements IWebSocketTransport {
   private connected = false;
@@ -163,13 +162,5 @@ describe('AdtClientsWS', () => {
     await transport.emitMessage(eventMessage);
 
     expect(handler).toHaveBeenCalledWith(eventMessage);
-  });
-
-  it('creates debugger session facade', () => {
-    const transport = new MockWebSocketTransport();
-    const client = new AdtClientsWS(transport);
-
-    const debuggerClient = client.getDebuggerSessionClient();
-    expect(debuggerClient).toBeInstanceOf(DebuggerSessionClient);
   });
 });

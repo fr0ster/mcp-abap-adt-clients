@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate behavior definition
@@ -32,7 +32,7 @@ export async function activate(
   name: string,
   preauditRequested: boolean = true,
 ): Promise<IAdtWireResponse> {
-  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
+  const objectUri = `${BEHAVIOR_DEFINITION.uri(name)}`;
   return await activateObjectInSession(
     connection,
     objectUri,

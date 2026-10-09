@@ -7,9 +7,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { PROGRAM_INCLUDE, sourceUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -31,12 +31,7 @@ export async function getInclude(
   connection: IAbapConnection,
   includeName: string,
 ): Promise<IAdtWireResponse> {
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-
-  const encodedName = encodeSapObjectName(includeName.toLowerCase());
-  const url = `/sap/bc/adt/programs/includes/${encodedName}/source/main`;
+  const url = `${sourceUri(PROGRAM_INCLUDE.uri(includeName))}`;
 
   return connection.makeAdtRequest({
     url,

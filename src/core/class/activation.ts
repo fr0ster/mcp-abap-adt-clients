@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { CLASS } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate class
@@ -19,6 +19,6 @@ export async function activateClass(
   connection: IAbapConnection,
   className: string,
 ): Promise<IAdtWireResponse> {
-  const objectUri = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`;
+  const objectUri = `${CLASS.uri(className)}`;
   return await activateObjectInSession(connection, objectUri, className, true);
 }

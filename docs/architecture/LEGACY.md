@@ -4,11 +4,13 @@
 
 Legacy SAP systems (BASIS versions older than 7.50) lack many ADT endpoints available on modern systems. The library provides `AdtClientLegacy` — a subclass of `AdtClient` that blocks unsupported operations and uses legacy-compatible alternatives where possible.
 
-System detection is automatic: `createAdtClient()` checks `/sap/bc/adt/core/discovery` (present only on modern systems) and returns either `AdtClient` or `AdtClientLegacy`.
+System detection is automatic: `createAdtClient()` asks `/sap/bc/adt/core/discovery` and returns `AdtClient` only when the answer is XML, `AdtClientLegacy` otherwise. "Absent" is not one answer on a legacy system: BASIS 7.40 answers `404` "No application class found for URI" over RFC and `200 text/html` with an empty body over HTTP — which is why `isModernAdtSystem()` reads the content type rather than the status. Measured on premise, BASIS 7.40, 2026-10-01: over RFC `isModernAdtSystem()` answers `false` and `createAdtClient()` returns `AdtClientLegacy`.
 
 ## Connection: RFC vs HTTP
 
-Legacy systems do not support the `x-sap-adt-sessiontype: stateful` HTTP header (introduced in BASIS 7.50). Without stateful sessions, lock handles are lost between HTTP requests — making create/update/delete operations impossible.
+Legacy systems do not support the `x-sap-adt-sessiontype: stateful` HTTP header (introduced in BASIS 7.50). Without stateful sessions, lock handles are lost between HTTP requests — making updates, which are written under a lock, impossible. Create and delete need no lock.
+
+Measured on premise, BASIS 7.40, 2026-10-01, three session shapes over HTTP: no header at all; the header on `LOCK`/`UNLOCK` only; the header and the context cookie on every request. In each, `LOCK` answers `200` with a `LOCK_HANDLE` but sets no `sap-contextid`, and the next `PUT` under that handle answers `423` "Resource … is not locked (invalid lock handle: …)". No session shape a client chooses changes it: **over HTTP a legacy system cannot update an object, and updates go over RFC.** See [Measured on BASIS 7.40](#measured-on-basis-740).
 
 **RFC transport** solves this by using SAP's `SADT_REST_RFC_ENDPOINT` function module (the same mechanism Eclipse ADT uses via JCo). RFC connections are inherently stateful — one ABAP session per connection — so lock handles persist across calls.
 
@@ -29,9 +31,9 @@ See [RFC_CONNECTION.md](../usage/RFC_CONNECTION.md) for setup and configuration.
 ```text
 createAdtClient(connection)
   │
-  ├── /sap/bc/adt/core/discovery available? → AdtClient (modern, full CRUD)
+  ├── /sap/bc/adt/core/discovery answers XML? → AdtClient (modern, full CRUD)
   │
-  └── not available? → AdtClientLegacy
+  └── 404, or anything but XML? → AdtClientLegacy
         ├── Supported types: *Legacy handlers (direct DELETE, v1 content types)
         ├── Unsupported types: throw error with missing endpoint name
         └── Content types: AdtContentTypesBase (versionless headers)
@@ -42,7 +44,7 @@ createAdtClient(connection)
 | Component | Modern (AdtClient) | Legacy (AdtClientLegacy) |
 |-----------|-------------------|--------------------------|
 | Content types | `AdtContentTypesModern` (v2+/v3+/v4+) | `AdtContentTypesBase` (v1 / versionless) |
-| Delete | `POST /sap/bc/adt/deletion/check` + `/delete` | Direct `DELETE {objectUrl}?lockHandle=...` |
+| Delete | `POST /sap/bc/adt/deletion/check` + `/delete` | Direct `DELETE {objectUrl}` — no lock is needed; a `lockHandle` is passed through only when the caller gives one |
 | Transport | `/sap/bc/adt/cts/transportrequests` | `/sap/bc/cts/transportrequests` |
 | Source content type | `text/plain; charset=utf-8` | `text/plain` (requires `SAP_UNICODE=false` in `.env`) |
 
@@ -59,17 +61,26 @@ These types have dedicated `*Legacy` handler classes with legacy-compatible dele
 | Interface | `getInterface()` | `/sap/bc/adt/oo/interfaces` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | Function Group | `getFunctionGroup()` | `/sap/bc/adt/functions/groups` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | Function Module | `getFunctionModule()` | `/sap/bc/adt/functions/groups/.../fmodules` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
-| Function Include | `getFunctionInclude()` | `/sap/bc/adt/functions/groups/.../includes` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
+| Function Include | `getFunctionInclude()` | `/sap/bc/adt/functions/groups/.../includes` | ✅ | ❌⁴ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | DDL Source (CDS view, AMDP table function) | `getDdl()` | `/sap/bc/adt/ddic/ddl/sources` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | Package | `getPackage()` | `/sap/bc/adt/packages` | ❌² | ❌³ | ✅ | ✅ | ✅¹ | — | — |
 
-¹ Delete uses direct `DELETE` with lockHandle (no `/sap/bc/adt/deletion/check` + `/delete` API)
+¹ Delete uses direct `DELETE` on the object (no `/sap/bc/adt/deletion/check` + `/delete` API); it needs no lock
 ² `/sap/bc/adt/packages/validation` not present in legacy discovery
 ³ Package creation on legacy systems is only possible via SAP GUI (SE80/SE21)
+⁴ `create` sends `application/vnd.sap.adt.functions.fincludes.v2+xml` straight from `constants/contentTypes.ts`, past `IAdtContentTypes`, and BASIS 7.40 answers `400` "No content handler found for content type 'application/vnd.sap.adt.functions.fincludes.v2+xml'" (measured on premise, 2026-10-01). The discovery document of that system names no function-include type at all, so the type it does accept is still to be measured
 
 ### Not supported (endpoints absent from discovery)
 
-These types throw an error with the exact missing endpoint when the getter is called.
+The getter still hands out a handler, so code written against `AdtClient` keeps
+running on a legacy system. Every member of that handler answers a refusal
+without sending a request: `ok: false`, `origin: 'refusal'`,
+`code: UNSUPPORTED_OPERATION`, and a message naming the missing endpoint. Until
+this release the getter threw before any request.
+
+abapGit is the exception in this table: it is a separate client, not a getter,
+and nothing in it is blocked — its requests reach a legacy system and are
+answered there.
 
 | Object Type | Getter | Missing Endpoint |
 |-------------|--------|------------------|
@@ -93,9 +104,11 @@ These types throw an error with the exact missing endpoint when the getter is ca
 
 | Object Type | Getter | Note |
 |-------------|--------|------|
-| CDS Unit Test | `getCdsUnitTest()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — not blocked |
-| Unit Test | `getUnitTest()` | Same endpoint — works |
-| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `create()`/`read()`/`list()` work; `listNodes()` throws (the `/sap/bc/cts/transportrequests` payload has never been captured) |
+| ABAP Unit run | `AdtExecutorLegacy.getClassTestRunner()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — `run` answers the finished result; `getStatus`/`getResult` refuse without a request |
+| ABAP Unit run of a function group or module | `AdtExecutorLegacy.getFunctionGroupTestRunner()`, `getFunctionModuleTestRunner()` | refused without a request — no legacy endpoint measured to find them |
+| ABAP Unit run of a report | `AdtExecutorLegacy.getProgramTestRunner()` | refused without a request — `/abapunit/testruns` given a report's URI answered an empty result where `/abapunit/runs` found the tests |
+| CDS test-doubles check | `getDdl().checkCdsTestDoubles()` | `/sap/bc/adt/aunit/dbtestdoubles/cds/validation` absent — refused without a request |
+| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `read()`/`list()` work, `create()`/`update()`/`delete()` answer a refusal. `list()` takes no `configUri` (the endpoint is no saved search, and one that is passed is refused rather than ignored) and answers the document as it came; its payload has never been captured, so `transportTree` from adt-strategies may not read it — inject a reading for your system |
 
 ## Shared Utilities (AdtUtils) Support
 
@@ -103,23 +116,23 @@ These types throw an error with the exact missing endpoint when the getter is ca
 
 | Utility | Method | Endpoint |
 |---------|--------|----------|
-| Search objects | `searchObjects()` | `/sap/bc/adt/repository/informationsystem/search` |
+| Search objects | `search()` | `/sap/bc/adt/repository/informationsystem/search` |
 | Node structure | `fetchNodeStructure()` | `/sap/bc/adt/repository/nodestructure` |
-| Package hierarchy | `getPackageHierarchy()` | (uses nodeStructure) |
-| Package contents | `getPackageContentsList()` | (uses nodeStructure) |
+| Package hierarchy | removed in 19.0.0 — the caller walks `fetchNodeStructure()` | (uses nodeStructure) |
+| Package contents | removed in 19.0.0 — the caller walks `fetchNodeStructure()` | (uses nodeStructure) |
 | Object structure | `getObjectStructure()` | `/sap/bc/adt/repository/objectstructure` |
 | Read metadata | `readObjectMetadata()` | `/sap/bc/adt/repository/informationsystem/metadata` |
 | Inactive objects | `getInactiveObjects()` | `/sap/bc/adt/activation/inactiveobjects` |
 | Discovery | `getDiscovery()` | `/sap/bc/adt/discovery` |
 | Single activation | (used internally) | `POST /sap/bc/adt/activation?method=activate` |
+| Group activation | `activateObjectsGroup()` (`AdtUtilsLegacy`) | `POST /sap/bc/adt/activation?method=activate` — synchronous, no `/activation/runs`; a success answers `200` with an empty body ([Measured on BASIS 7.40](#measured-on-basis-740)) |
 | Check runs | (used internally) | `/sap/bc/adt/checkruns` |
 
 ### Not available on legacy
 
 | Utility | Method | Missing Endpoint | Legacy Alternative |
 |---------|--------|------------------|--------------------|
-| Where-used | `getWhereUsed()`, `getWhereUsedList()` | `/sap/bc/adt/repository/informationsystem/usageReferences` | Old API exists: `POST .../whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY` + `.../fullnamemapping` — not yet implemented |
-| Group activation | `activateObjectsGroup()` | `/sap/bc/adt/activation/runs` | Sync API exists: `POST /sap/bc/adt/activation?method=activate` — not yet adapted for group use |
+| Where-used | `getWhereUsedScope()`, `modifyWhereUsedScope()`, `getWhereUsed()` | `/sap/bc/adt/repository/informationsystem/usageReferences` | Old API exists: `POST .../whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY` + `.../fullnamemapping` — not yet implemented |
 | Group deletion | `checkDeletionGroup()`, `deleteObjectsGroup()` | `/sap/bc/adt/deletion/check` + `/delete` | Direct `DELETE` per object (used by Legacy handlers) |
 | Table contents | `getTableContents()` | `/sap/bc/adt/datapreview/ddic` | None |
 | SQL query | `getSqlQuery()` | `/sap/bc/adt/datapreview/freestyle` | None |
@@ -154,6 +167,30 @@ These validation endpoints **are not** present:
 | `/sap/bc/adt/ddic/tables/validation` | Table validation |
 | `/sap/bc/adt/ddic/structures/validation` | Structure validation |
 | `/sap/bc/adt/ddic/tabletypes/validation` | TableType validation |
+
+## Measured on BASIS 7.40
+
+On premise, BASIS 7.40, 2026-10-01, over RFC and over HTTP.
+
+- **No update over HTTP.** In three session shapes — no `x-sap-adt-sessiontype`
+  header; the header on `LOCK`/`UNLOCK` only; the header and the full cookie jar
+  on every request — `LOCK` answered `200` with a `LOCK_HANDLE` and set no
+  `sap-contextid`, and the next `PUT` under that handle answered `423`
+  "Resource … is not locked (invalid lock handle: …)". Over RFC on the same
+  system create → lock → two writes → unlock → activate → delete were all
+  accepted.
+- **`/sap/bc/adt/activation/inactiveobjects` answers the older document**, a flat
+  `adtcore:objectReferences` with one `adtcore:objectReference` per object
+  (`adtcore:uri`, `adtcore:type`, `adtcore:name`; a function module carries its
+  group as `adtcore:parentUri`), not `ioc:inactiveObjects`. `getInactiveObjects()`
+  keeps the document (`inactive: rawDocument`); a reading of the newer shape
+  alone answers an empty list over objects that are inactive.
+- **A group activation answers `200` with an empty body on success** — no
+  checklist, no messages, no run id. Six objects activated that way; the
+  inactive-objects list read afterwards named none of them.
+- **`/sap/bc/adt/core/discovery`** answers `404` "No application class found
+  for URI" over RFC and `200 text/html`, empty, over HTTP — see
+  [Overview](#overview).
 
 ## Content Type Versioning
 

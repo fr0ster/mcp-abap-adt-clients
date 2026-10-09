@@ -15,7 +15,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import {
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -23,6 +31,8 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { feedDocuments } from '../src/runtime/feeds/FeedRepository';
+import { resultOf } from './resultOf';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -53,11 +63,20 @@ async function main() {
     const runtime = new AdtRuntimeClient(connection, undefined, {
       enableAcceptCorrection: true,
     });
-    const feeds = runtime.getFeeds();
+    // The feeds answer Atom documents as they arrived; this script reads them.
+    const feeds = runtime.getFeeds({
+      ...feedDocuments,
+      feeds: feedDescriptors,
+      variants: feedVariants,
+      entries: feedEntries,
+      systemMessages: feedSystemMessages,
+      gatewayErrors: feedGatewayErrors,
+      gatewayErrorDetail: feedGatewayErrorDetail,
+    });
 
     if (!topic) {
       console.log('\n=== Feed Catalog ===\n');
-      const catalog = await feeds.list();
+      const catalog = resultOf(await feeds.list());
       for (const entry of catalog) {
         console.log(`  ${entry.title}`);
         console.log(`    url: ${entry.url}`);
@@ -71,7 +90,7 @@ async function main() {
       console.log(
         `\n=== Dumps Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
       );
-      const entries = await feeds.dumps(options);
+      const entries = resultOf(await feeds.dumps(options));
       console.log(`Found ${entries.length} entries:\n`);
       for (const entry of entries) {
         console.log(`  [${entry.updated}] ${entry.title}`);
@@ -92,7 +111,7 @@ async function main() {
       console.log(
         `\n=== System Messages Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
       );
-      const entries = await feeds.systemMessages(options);
+      const entries = resultOf(await feeds.systemMessages(options));
       console.log(`Found ${entries.length} entries:\n`);
       for (const entry of entries) {
         console.log(`  [${entry.id}] ${entry.title}`);
@@ -109,7 +128,7 @@ async function main() {
       console.log(
         `\n=== Gateway Errors Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
       );
-      const entries = await feeds.gatewayErrors(options);
+      const entries = resultOf(await feeds.gatewayErrors(options));
       console.log(`Found ${entries.length} entries:\n`);
       for (const entry of entries) {
         console.log(`  [${entry.type}] ${entry.shortText}`);

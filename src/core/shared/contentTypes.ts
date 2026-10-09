@@ -12,7 +12,10 @@
  * are implementation (354 lines, 38 methods), not contract.
  */
 
-import type { IAdtContentTypes, IAdtHeaders } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtContentTypes,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Base content types — v1 headers, works on all SAP systems including older BASIS

@@ -1,42 +1,43 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
- * AdtPackage - High-level CRUD operations for Package objects
+ * AdtPackage - CRUD for `DEVC/K` packages.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * A package is a **container**: it has no source, so `read` and `readMetadata`
+ * fetch the same document and there is no activation.
  *
- * Uses low-level functions directly (not Builder classes).
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- *
- * Operation chains:
+ * The sequences Eclipse follows — each step is its own member here, one
+ * request each, and the caller composes them:
  * - Create: validate → create → check
- * - Update: lock → check(inactive) → update → unlock → check
+ * - Update: lock → check → update → unlock
  * - Delete: check(deletion) → delete
- *
- * Note: Packages are containers and don't have source code.
- * Update only changes metadata (description, superPackage, etc.).
- * Packages don't have activate operation (they are not activated).
  */
 
 import type {
-  HttpError,
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCheckable,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
+  IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
-  ILogger,
-  IObjectVersion,
-} from '@mcp-abap-adt/interfaces';
-import { parseCheckRunResponse } from '../../utils/checkRun';
-import { safeErrorMessage } from '../../utils/internalUtils';
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
@@ -48,17 +49,32 @@ import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
-import type { IPackageConfig, IPackageState } from './types';
+import {
+  type IPackageConfig,
+  type IPackageResults,
+  packageDocuments,
+} from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
-export class AdtPackage
+
+export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   implements
-    IAdtCrud<IPackageConfig, IPackageState>,
-    IAdtValidatable<IPackageConfig, IPackageState>,
-    IAdtCheckable<IPackageConfig, IPackageState>,
-    IAdtLockable<IPackageConfig, IPackageState>,
-    IAdtTransportAware<IPackageConfig, IPackageState>
+    IAdtCreatable<IPackageConfig, ReturnType<R['created']>>,
+    IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<
+      Partial<IPackageConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
+    IAdtDeletable<
+      IPackageConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IPackageConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IPackageConfig, ReturnType<R['check']>>,
+    IAdtLockable<IPackageConfig>,
+    IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -71,6 +87,8 @@ export class AdtPackage
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = packageDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -78,657 +96,330 @@ export class AdtPackage
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      (packageName, lockHandle) =>
-        unlockPackage(this.connection, packageName, lockHandle),
+      (name, lockHandle) => unlockPackage(this.connection, name, lockHandle),
     );
   }
 
   /**
-   * Validate package configuration before creation
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
    */
-  async validate(config: Partial<IPackageConfig>): Promise<IPackageState> {
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
-    if (!config.superPackage) {
-      throw new Error('Super package is required for validation');
-    }
-
-    const response = await validatePackageBasic(this.connection, {
-      package_name: config.packageName,
-      super_package: config.superPackage,
-      description: config.description,
-      package_type: config.packageType,
-      software_component: config.softwareComponent,
-      transport_layer: config.transportLayer,
-      transport_request: config.transportRequest,
-      application_component: config.applicationComponent,
-      responsible: config.responsible,
-      record_changes: config.recordChanges ?? false,
-    });
-
-    return {
-      validationResponse: response,
-      errors: [],
-    };
+  private name(config: Partial<IPackageConfig>): string {
+    return config.packageName as string;
   }
 
-  /**
-   * Create package with full operation chain
-   * Note: Packages are containers, so no source code update after create
-   */
-  async create(
-    config: IPackageConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IPackageState> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.superPackage) {
-      throw new Error('Super package is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    if (!config.softwareComponent) {
-      throw new Error('Software component is required');
-    }
-    if (!config.responsible && !this.systemContext.responsible) {
-      throw new Error(
-        'Responsible person is required: provide it in package config or in AdtClient options',
-      );
-    }
-
-    let objectCreated = false;
-
-    try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating package configuration');
-      await validatePackageBasic(this.connection, {
-        package_name: config.packageName,
-        super_package: config.superPackage,
-        description: config.description,
-        package_type: config.packageType,
-        software_component: config.softwareComponent,
-        transport_layer: config.transportLayer,
-        transport_request: config.transportRequest,
-        application_component: config.applicationComponent,
-        responsible: config.responsible,
-        record_changes: config.recordChanges ?? false,
-      });
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating package');
-      await createPackage(this.connection, {
-        package_name: config.packageName,
-        super_package: config.superPackage,
-        description: config.description,
-        package_type: config.packageType,
-        software_component: config.softwareComponent,
-        transport_layer: config.transportLayer,
-        transport_request: config.transportRequest,
-        application_component: config.applicationComponent,
-        responsible: config.responsible ?? this.systemContext.responsible,
-        master_system: this.systemContext.masterSystem,
-        master_language:
-          config.masterLanguage?.trim() ||
-          this.systemContext.masterLanguage?.trim() ||
-          undefined,
-        record_changes: config.recordChanges ?? false,
-      });
-      this.logger?.info?.('Package created');
-
-      // 2.5. Read with long polling (wait for object to be ready)
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read({ packageName: config.packageName }, 'active', {
-          withLongPolling: true,
-        });
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.(
-          'read with long polling failed (object may not be ready yet):',
-          safeErrorMessage(readError),
-        );
-        // Continue anyway - check might still work
-      }
-      objectCreated = true;
-
-      // 3. Check, the way Eclipse does it — a checkrun on the new object, not a
-      //    second call to the validation endpoint. Captured on E19 2026-08-31
-      //    creating ZOK_MESSAGE... sorry, TEST_INNER_PKG05: validation, create,
-      //    then `POST /sap/bc/adt/checkruns` on the created package, before it
-      //    is ever locked. This class's own header has said
-      //    "Create: validate → create → check" from the start; the check was
-      //    the part that was never written.
-      //
-      //    Packages are containers, so this is not a syntax check — it is the
-      //    server's own verdict on the object that was just created, and a
-      //    failure here is worth surfacing rather than discovering at the next
-      //    operation.
-      this.logger?.info?.('Step 3: Checking package');
-      try {
-        const checkResponse = await checkPackage(
-          this.connection,
-          config.packageName,
-          'active',
-        );
-        const checkResult = parseCheckRunResponse(checkResponse);
-        if (checkResult.has_errors) {
-          this.logger?.warn?.(
-            `Check reported errors after create: ${checkResult.errors
-              .map((e) => e.text)
-              .join('; ')}`,
-          );
-          return {
-            errors: checkResult.errors.map((e) => ({
-              method: 'create',
-              error: new Error(String(e.text)),
-              timestamp: new Date(),
-            })),
-          };
-        }
-        this.logger?.info?.('Check passed');
-      } catch (checkError) {
-        // A check that cannot run is not a create that failed — the object is
-        // there, and saying otherwise would send the caller deleting it.
-        this.logger?.warn?.(
-          'Check after create could not run:',
-          safeErrorMessage(checkError),
-        );
-      }
-
-      return { errors: [] };
-    } catch (error: unknown) {
-      // Ensure stateless if needed
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting package after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deletePackage(this.connection, {
-            package_name: config.packageName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete package after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Read package
-   */
-  async read(
+  /** Validate the package's configuration before creating it. */
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IPackageState | undefined> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      const response = await getPackage(
-        this.connection,
-        config.packageName,
-        version,
-        options,
-        this.logger,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
-  }
+    const name = this.name(config);
 
-  /**
-   * Read package metadata (object characteristics: package, responsible, description, etc.)
-   * For packages, read() already returns metadata since there's no source code.
-   */
-  async readMetadata(
-    config: Partial<IPackageConfig>,
-    options?: IReadOptions,
-  ): Promise<IPackageState> {
-    const state: IPackageState = { errors: [] };
-    if (!config.packageName) {
-      const error = new Error('Package name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      // For objects without source code, read() already returns metadata
-      const response = await getPackage(
-        this.connection,
-        config.packageName,
-        'active',
-        options,
-        this.logger,
-      );
-      state.metadataResult = response;
-      state.readResult = response;
-      this.logger?.info?.('Package metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Read transport request information for the package
-   */
-  async readTransport(
-    config: Partial<IPackageConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IPackageState> {
-    const state: IPackageState = { errors: [] };
-    if (!config.packageName) {
-      const error = new Error('Package name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getPackageTransport(
-        this.connection,
-        config.packageName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Package transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update package with full operation chain
-   * Always starts with lock
-   * Note: Packages only support metadata updates (description, superPackage, etc.)
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IPackageState> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.superPackage) {
-      throw new Error('Super package is required for update');
-    }
-    if (!config.softwareComponent) {
-      throw new Error('Software component is required for update');
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      const updateResponse = await updatePackage(
-        this.connection,
-        {
-          package_name: config.packageName,
-          super_package: config.superPackage,
-          software_component: config.softwareComponent,
-          transport_layer: config.transportLayer,
+    return answering(
+      () =>
+        validatePackageBasic(connection, {
+          package_name: name,
+          super_package: config.superPackage as string,
           description: config.description,
           package_type: config.packageType,
+          software_component: config.softwareComponent,
+          transport_layer: config.transportLayer,
+          transport_request: config.transportRequest,
+          application_component: config.applicationComponent,
           responsible: config.responsible,
           record_changes: config.recordChanges ?? false,
-        },
-        options.lockHandle,
-      );
-      this.logger?.info?.('Package updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
-    }
-
-    // Package update over RFC fails, and not for the reason this comment used
-    // to give. It said the PUT "cannot access the PAK lock created by the LOCK
-    // call". Measured on E19 2026-08-31, that is wrong: the PUT reads the
-    // parameter, validates the handle, and accepts ours. Four answers from the
-    // same endpoint, same session, same package, over rfc:
-    //
-    //   PUT with no lockHandle     400  ExceptionParameterNotFound
-    //                                   SADT_RESOURCE/017  "Parameter lockHandle
-    //                                   could not be found"
-    //   PUT with a made-up handle  423  ExceptionResourceInvalidLockHandle
-    //                                   SADT_RESOURCE/026  "is not locked
-    //                                   (invalid lock handle: DEADBEEF…)"
-    //   a second _action=LOCK      403  ExceptionResourceNoAccess
-    //                                   EU/510  "User … is currently editing"
-    //   PUT with OUR handle        400  ExceptionResourceAlreadyExists
-    //                                   PAK/058  "Package … is already locked"
-    //
-    // The first two say the lock handle is read and checked, and ours passes
-    // both checks — a PUT that could not see the lock would answer 423, exactly
-    // as the made-up handle does. The third says the ADT resource lock is ours
-    // and is recognised as ours: asking for it again is refused under EU/510,
-    // a different message class from what the PUT reports.
-    //
-    // So the refusal comes from a layer past the ADT lock. PAK is the package
-    // framework's own message class, and PAK/058 is what it answers when its
-    // own lock cannot be taken — while the exception type says the resource
-    // already exists, which is what PAK reports when a save arrives without the
-    // edit state a LOCK is meant to have left it. That state does not survive
-    // the hop between internal contexts that SADT_REST_RFC_ENDPOINT makes per
-    // call; the enqueue handle does, which is why UNLOCK afterwards answers 200.
-    //
-    // It is packages alone. In the same rfc run 31 other updates pass — classes,
-    // interfaces, domains, data elements, tables, structures, DDL, behaviour
-    // definitions — and no PAK message appears anywhere else in the log. Every
-    // other type keeps its state where a lock handle can reach it from any
-    // context; the package is the one with a second locking layer of its own.
-    //
-    // Not critical for release: http is the primary transport for modern
-    // on-premise systems, and rfc exists for BASIS < 7.50, where package CRUD
-    // is not supported regardless. What is written above is measured; why PAK
-    // takes the create path rather than the change path is not, and would need
-    // the ABAP side to answer.
-
-    let lockHandle: string | undefined;
-    let lockCorrNr: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      // 1. Lock — stateful mode stays active until after unlock
-      this.logger?.info?.('Step 1: Locking package');
-      this.connection.setSessionType('stateful');
-      const lockResult = await lockPackage(this.connection, config.packageName);
-      lockHandle = lockResult.lockHandle;
-      lockCorrNr = lockResult.corrNr;
-      this.lockTracker.track(config.packageName, lockHandle);
-      this.logger?.info?.(
-        `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
-      );
-
-      // 2. Check inactive with XML for update (if provided)
-      const xmlToCheck = options?.xmlContent;
-      if (xmlToCheck) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await checkPackage(
-          this.connection,
-          config.packageName,
-          'inactive',
-          xmlToCheck,
-        );
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 3. Update metadata
-      if (lockHandle) {
-        this.logger?.info?.('Step 3: Updating package metadata');
-        await updatePackage(
-          this.connection,
-          {
-            package_name: config.packageName,
-            super_package: config.superPackage,
-            description:
-              config.updatedDescription ||
-              config.description ||
-              config.packageName,
-            package_type: config.packageType,
-            software_component: config.softwareComponent,
-            transport_layer: config.transportLayer,
-            transport_request: config.transportRequest || lockCorrNr,
-            application_component: config.applicationComponent,
-            responsible: config.responsible ?? this.systemContext.responsible,
-            master_system:
-              config.masterSystem ?? this.systemContext.masterSystem,
-            record_changes: config.recordChanges,
-          },
-          lockHandle,
-        );
-        this.logger?.info?.('Package updated');
-
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ packageName: config.packageName }, 'inactive', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 4. Unlock — set stateful before unlock, stateless after (standard pattern)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking package');
-        this.connection.setSessionType('stateful');
-        await unlockPackage(this.connection, config.packageName, lockHandle);
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.packageName);
-        lockHandle = undefined;
-        this.logger?.info?.('Package unlocked');
-      }
-
-      // Note: Packages have no source code — no check or activate needed
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getPackage(
-        this.connection,
-        config.packageName,
-      );
-      return {
-        updateResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking package during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockPackage(this.connection, config.packageName, lockHandle);
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.packageName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting package after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deletePackage(this.connection, {
-            package_name: config.packageName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete package after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+        }),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Delete package
+   * Create the package: one POST. Eclipse validates before it and runs a
+   * check after it; both are members of their own here.
+   *
+   * That check is a checkrun on the new object, the way Eclipse does it, not a
+   * second call to the validation endpoint — captured 2026-08-31, which
+   * validates, creates, then posts `/sap/bc/adt/checkruns` on the created
+   * package before it is ever locked.
+   *
+   * A package can be saved only once per ABAP session: PAK/058.
+   * Over RFC the create counts as that save.
    */
-  async delete(config: Partial<IPackageConfig>): Promise<IPackageState> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IPackageConfig, 'source'> & { source?: never },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **No guard here, unlike every other create.**
+    //
+    // Elsewhere `packageName` is the package an object is bound to, and an
+    // object created without one cannot be removed through ADT — that is the
+    // one hazard this package guards. For a package it is the package's own
+    // name; what binds it is `superPackage`, and a top-level package has none
+    // by design. There is no field here whose absence traps anything.
 
-    try {
-      // Check for deletion (no stateful needed)
-      this.logger?.info?.('Checking package for deletion');
-      await checkPackageDeletion(this.connection, {
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Deletion check passed');
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-      // Delete.
-      //
-      // A package this session has just updated cannot be deleted by this
-      // session — measured on E19 2026-08-31: `deletion/check` answers
-      // `isDeletable="true"` while `deletion/delete` answers HTTP 200 carrying
-      // `isDeleted="false"` and PAK/058, "package is already locked", even
-      // though the UNLOCK moments earlier answered 200. It is not a delay:
-      // retried for 30 seconds inside the run it never succeeds, and the same
-      // request one second after the run ends deletes it on the first attempt.
-      // The PAK lock belongs to the ABAP session and goes with it, which is
-      // what the note on `update()` above says about the RFC case and is just
-      // as true here.
-      //
-      // So this reports the failure rather than waiting for something that
-      // cannot happen while the caller still holds the session.
-      //
-      // And reporting is as far as it can go. `IAbapConnection` is `connect`,
-      // `getBaseUrl`, `getSessionId`, `setSessionType`, `makeAdtRequest` — no
-      // `disconnect`, no `recycle`. Nothing here can end the session that holds
-      // the PAK state, and nothing here should: the connection belongs to the
-      // caller and is usually shared, so tearing it down mid-operation would
-      // take every other user of it down as well. Recycling is the consumer's
-      // call. See docs/usage/STATEFUL_SESSION_GUIDE.md, and
-      // recycleTestSession() in the test harness for what that looks like.
-      this.logger?.info?.('Deleting package');
-      const result = await deletePackage(this.connection, {
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Package deleted');
+    const name = this.name(config);
+    return answering(
+      () =>
+        createPackage(connection, {
+          package_name: name,
+          super_package: config.superPackage as string,
+          description: config.description,
+          package_type: config.packageType,
+          software_component: config.softwareComponent,
+          transport_layer: config.transportLayer,
+          transport_request: config.transportRequest,
+          application_component: config.applicationComponent,
+          responsible: config.responsible ?? this.systemContext.responsible,
+          master_system: this.systemContext.masterSystem,
+          master_language:
+            config.masterLanguage?.trim() ||
+            this.systemContext.masterLanguage?.trim() ||
+            undefined,
+          record_changes: config.recordChanges ?? false,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
+  }
 
-      return { deleteResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+  /** The same document `read` fetches — a package has no second resource. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getPackage(
+          connection,
+          name,
+          options?.version ?? 'active',
+          options,
+          this.logger,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the package belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => getPackageTransport(connection, name, options),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Check package
+   * Update the package's metadata.
+   *
+   * A package can be saved only once per ABAP session: PAK/058.
+   * Opening a new session is the caller's.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
-  async check(
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const superPackage = config.superPackage as string;
+    const softwareComponent = config.softwareComponent;
+
+    const fields = {
+      package_name: name,
+      super_package: superPackage,
+      software_component: softwareComponent,
+      transport_layer: config.transportLayer,
+      description: config.description,
+      package_type: config.packageType,
+      responsible: config.responsible,
+      record_changes: config.recordChanges ?? false,
+      // **Without this the request never reaches the URL.** `updatePackage`
+      // appends `corrNr` when it is given one, and this field was the only
+      // thing missing between a caller's `transportRequest` and that query
+      // parameter. A local package never noticed; a package that records
+      // changes refuses the PUT outright — measured against an on-premise
+      // system, 2026-09-21: `400 SADT_RESOURCE 017`, "Parameter corrNr could
+      // not be found."
+      transport_request: config.transportRequest,
+    };
+
+    return answering(
+      () =>
+        updatePackage(
+          connection,
+          fields,
+          // The document the caller built, from the options — see
+          // `AdtDomain.updateMetadata`; the fields above describe a create.
+          options?.source as string,
+          options?.lockHandle as string,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkPackageDeletion(connection, {
+          package_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Delete the package.
+   *
+   * A package can be saved only once per ABAP session: PAK/058.
+   * A delete from a session that saved the package
+   * is refused; from a new session it succeeds.
+   *
+   * The answer is a 200 either way, and `isDeleted="false"` is in its body: a
+   * caller who wants that read as a failure passes `analyseDeletion` (from
+   * `@mcp-abap-adt/adt-strategies`) — this member reads nothing into it, and it
+   * does not wait for something that cannot happen while the caller still holds
+   * the session. `IAbapConnection` has no `disconnect` and no `recycle`, and
+   * should not: the connection belongs to the caller and is usually shared, so
+   * tearing it down mid-operation would take every other user of it down as
+   * well. Recycling is the consumer's call. See
+   * docs/usage/STATEFUL_SESSION_GUIDE.md.
+   */
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    return answering(
+      () =>
+        deletePackage(connection, {
+          package_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Check the package. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     status?: string,
-  ): Promise<IPackageState> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    // Map status to version
+    const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    return {
-      checkResult: await checkPackage(
-        this.connection,
-        config.packageName,
-        version,
-      ),
-      errors: [],
-    };
+
+    return answering(
+      () => checkPackage(connection, name, version),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Lock package for modification
+   * Lock the package — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
    */
-  async lock(config: Partial<IPackageConfig>): Promise<string> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    const name = this.name(config);
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          lockPackage(this.connection, name),
+        ),
+      lockHandleOf,
+      options?.analyse,
+    );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
     }
-
-    this.connection.setSessionType('stateful');
-    const lockResult = await lockPackage(this.connection, config.packageName);
-    this.lockTracker.track(config.packageName, lockResult.lockHandle);
-    return lockResult.lockHandle;
+    return answer;
   }
 
-  /**
-   * Unlock package
-   */
-  async unlock(
+  /** Unlock the package. */
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     lockHandle: string,
-  ): Promise<IPackageState> {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockPackage(
-      this.connection,
-      config.packageName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockPackage(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      nothing,
+      options?.analyse,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.packageName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 }

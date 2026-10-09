@@ -4,7 +4,7 @@
  * Issue #115, steps 5 and 6. Two questions, one trip:
  *
  *  1. **Synchronous or not.** The closed PR behind #112 claims the endpoint
- *     answers with the finished result. `AdtUnitTestLegacy` already owns the
+ *     answers with the finished result. `ClassTestRunnerLegacy` already owns the
  *     same URL and treats it as async. Both cannot be right about one URL on
  *     one system. What decides it is the **root element of the response body**
  *     and whether a `Location` header is present — not the status code, which
@@ -39,7 +39,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 import * as dotenv from 'dotenv';
 import {
@@ -67,7 +67,7 @@ const V4 = {
     'Does the typed pair answer with a finished result, and without a Location?',
 };
 
-/** What `AdtUnitTestLegacy` sends to the same URL. */
+/** What `ClassTestRunnerLegacy` sends to the same URL. */
 const GENERIC = {
   label: 'generic-xml',
   contentType: 'application/xml',

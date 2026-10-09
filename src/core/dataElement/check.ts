@@ -5,17 +5,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-  runCheckRun,
-} from '../../utils/checkRun';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { DATA_ELEMENT } from '../../endpoints/objects';
+import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -41,8 +37,7 @@ export async function checkDataElement(
 
   if (xmlContent) {
     // Check with XML content (for unsaved changes or new content validation)
-    const encodedName = encodeSapObjectName(dataElementName.toLowerCase());
-    const objectUri = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
+    const objectUri = `${DATA_ELEMENT.uri(dataElementName)}`;
     const base64Content = Buffer.from(xmlContent, 'utf-8').toString('base64');
 
     // TODO: analyze whether chkrun:contentType can be extracted to a constant
@@ -81,31 +76,6 @@ export async function checkDataElement(
       'abapCheckRun',
       undefined,
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-  if (checkResult.has_errors) {
-    const errorTexts = checkResult.errors
-      .map((err) => err.text || '')
-      .join(' ')
-      .toLowerCase();
-
-    // Ignore messages that should not cause failure
-    const shouldIgnore =
-      (errorTexts.includes('importing') && errorTexts.includes('database')) ||
-      // For newly created empty data elements, these errors are expected until object is fully initialized
-      (errorTexts.includes('no domain') &&
-        errorTexts.includes('data type was defined')) ||
-      errorTexts.includes('datatype is expected');
-
-    if (!shouldIgnore) {
-      const errorMessages = checkResult.errors
-        .map((err) => err.text)
-        .join('; ');
-      throw new Error(`Data element check failed: ${errorMessages}`);
-    }
   }
 
   return response;

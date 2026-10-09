@@ -1,8 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { ACCESS_CONTROL } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -11,7 +12,7 @@ import { getTimeout } from '../../utils/timeouts';
  */
 /**
  * Both `packageName` and `description` are required by the endpoint, and both
- * used to be sent conditionally. Measured on E19 2026-08-28: omitting either
+ * used to be sent conditionally. Measured 2026-08-28: omitting either
  * answers **400, "Parameter … could not be found."**, while an empty
  * `description` is accepted. See `docs/evidence/2026-08-28-validation-required-params.md`.
  */
@@ -21,7 +22,7 @@ export async function validateAccessControlName(
   packageName: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = '/sap/bc/adt/acm/dcl/validation';
+  const url = ACCESS_CONTROL.validation;
   const queryParams = new URLSearchParams({
     objname: accessControlName,
     packagename: packageName,

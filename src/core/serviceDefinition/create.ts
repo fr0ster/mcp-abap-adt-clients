@@ -6,10 +6,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_SERVICE_DEFINITION } from '../../constants/contentTypes';
+import { SERVICE_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateServiceDefinitionParams } from './types';
 
 /**
@@ -20,10 +22,10 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateServiceDefinitionParams,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/srvd/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
+  const url = `${SERVICE_DEFINITION.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  const username = args.responsible || '';
-  const masterSystem = args.masterSystem || '';
+  const username = escapeXmlAttr(args.responsible || '');
+  const masterSystem = escapeXmlAttr(args.masterSystem || '');
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
@@ -31,11 +33,13 @@ export async function create(
   );
   const serviceDefinitionName = args.service_definition_name.toUpperCase();
 
+  // Absent means absent: an empty attribute is not "no responsible person".
+  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} adtcore:responsible="${username}" srvd:srvdSourceType="S">
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr} srvd:srvdSourceType="S">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </srvd:srvdSource>`;
 

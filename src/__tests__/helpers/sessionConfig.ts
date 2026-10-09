@@ -6,21 +6,23 @@
 import type { AgentOptions } from 'node:https';
 import {
   BasicAuthProvider,
+  TokenAuthProvider,
+} from '@mcp-abap-adt/auth-providers';
+import {
   CloudHttpTransport,
   LegacyOnPremHttpTransport,
   OnPremHttpTransport,
   RfcTransport,
   rfcConversationFrom,
   type SapConfig,
-  TokenAuthProvider,
 } from '@mcp-abap-adt/connection';
+import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtClientOptions,
-  IAuthProvider,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';
@@ -90,8 +92,7 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
  * Returns 'http' (default) or 'rfc'.
  *
  * Exported because a suite occasionally has to know. `available_in` gates on the
- * kind of system; this gates on the wire, and one known limitation lives there —
- * see the package lifecycle test.
+ * kind of system; this gates on the wire.
  */
 export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
@@ -281,6 +282,45 @@ export function getTargetSystem(): 'onprem' | 'cloud' {
 }
 
 /**
+ * Whether each test file works on a session of its own.
+ *
+ * Read at the call rather than once, so a probe can set it for one file without
+ * the module having been imported at a different moment deciding for it.
+ */
+function perFileSession(): boolean {
+  return process.env.PER_FILE_SESSION === '1';
+}
+
+/** How a caller of {@link createTestConnection} wants its session. */
+export interface ITestConnectionOptions {
+  /**
+   * Open a session of this connection's own instead of joining the run's.
+   *
+   * For a second ABAP session that must NOT be the one the test works on —
+   * `expectLockReleased` locks from here to prove the test's UNLOCK released
+   * what its LOCK took, which the test's own session cannot prove: a lock is
+   * granted again to the session that already holds it. The caller closes it
+   * with {@link closeOwnTestConnection}; the trial grants two sessions, and
+   * this is the second.
+   */
+  ownSession?: boolean;
+}
+
+/**
+ * The run's session material to adopt, or `null` to open a new session.
+ *
+ * Factored out so the decision is testable without a system: an own session
+ * and `PER_FILE_SESSION=1` both answer `null` without reading the material.
+ */
+export function sessionToJoin(
+  options: ITestConnectionOptions = {},
+  read: () => ISessionMaterial | null = readSessionMaterial,
+): ISessionMaterial | null {
+  if (options.ownSession || perFileSession()) return null;
+  return read();
+}
+
+/**
  * The one place a test gets a connection.
  *
  * Every test used to build its own with `createAbapConnection(config, logger)`,
@@ -293,6 +333,7 @@ export function getTargetSystem(): 'onprem' | 'cloud' {
  */
 export async function createTestConnection(
   logger: ILogger = createConnectionLogger(),
+  options: ITestConnectionOptions = {},
 ): Promise<IAbapConnection & ISessionLifecycleAware & ISessionSharing> {
   const config = getConfig();
   const system = getTargetSystem();
@@ -307,7 +348,12 @@ export async function createTestConnection(
       ? new SharedCloudConnector(
           config,
           credential,
-          new CloudHttpTransport(materialOf(credential), logger, wire),
+          // Wrapped like the on-prem transports are. Without this `WIRE_LOG`
+          // was silently a no-op against a cloud system — the flag was set, the
+          // file stayed empty, and the run looked like it had nothing to say.
+          withWireLog(
+            new CloudHttpTransport((): AgentOptions => ({}), logger, wire),
+          ),
           logger,
         )
       : new SharedOnPremConnector(
@@ -323,7 +369,21 @@ export async function createTestConnection(
   //
   // No material means nobody published any — a single file run on its own —
   // and opening one is then the right thing.
-  const shared = readSessionMaterial();
+  // `PER_FILE_SESSION=1` opts out: the file opens its own session and closes it
+  // in `afterAll`, instead of joining the run's.
+  //
+  // An experiment, not a default. What it is for: `E_ABAP_GENPH` is released
+  // when the session that took it ends, so a run on one session carries every
+  // activation's lock until the very end — and past it, since the teardown's
+  // goodbye is dispatched rather than awaited. A session per file would end
+  // them file by file.
+  //
+  // What it costs is the reason it is not the default: sixty-nine sessions
+  // where there was one, against a pool this suite has already exhausted twice.
+  // Each has to close for that to stay bounded, which is exactly what this
+  // measures. HTTP only — an RFC conversation IS its session, and adopts
+  // nothing.
+  const shared = sessionToJoin(options);
   if (shared) connection.adoptSession(shared);
 
   // Still connect(): adopting the cookies does not make the connection
@@ -390,6 +450,20 @@ async function endSession(conn: IReleasableConnection): Promise<void> {
 }
 
 /**
+ * End a session opened with `createTestConnection(logger, { ownSession: true })`.
+ *
+ * Unconditional, unlike {@link releaseTestConnection}: the session is this
+ * caller's alone, so `disconnect()` — the platform logoff on on-prem — ends
+ * only it, and nobody else is on it. `close()` for RFC.
+ */
+export async function closeOwnTestConnection(
+  connection: IReleasableConnection | undefined | null,
+): Promise<void> {
+  if (!connection) return;
+  await endSession(connection);
+}
+
+/**
  * Give a connection back at the end of a test file.
  *
  * A test file does not own the session it works on. `globalSetup` opens one for
@@ -416,8 +490,9 @@ export async function releaseTestConnection(
 ): Promise<void> {
   if (!connection) return;
   // Material on disk means the run owns the session, and `globalTeardown` is
-  // the one place that knows the run is over.
-  if (readSessionMaterial()) return;
+  // the one place that knows the run is over — unless this file opened its own,
+  // in which case it is the one place that knows to close it.
+  if (!perFileSession() && readSessionMaterial()) return;
   await endSession(connection);
 }
 
@@ -456,25 +531,12 @@ function credentialFor(config: SapConfig): IAuthProvider {
     // and there is nothing behind it to renew from. It is good for the length
     // of a run — which is why an expired one must fail loudly rather than be
     // mistaken for "SAP is not configured here".
-    return new TokenAuthProvider(config.jwtToken as string);
+    return TokenAuthProvider.fixed(config.jwtToken as string);
   }
   return new BasicAuthProvider(
     config.username as string,
     config.password as string,
   );
-}
-
-/**
- * The TLS material a wire should present, asked for when the wire needs it.
- *
- * A thunk rather than a value because the material is loaded during
- * `connect()`: a wire that read it at construction would read nothing, and
- * mTLS would silently not happen — the connection builds, the requests go out,
- * and the server refuses them for a reason that says nothing about the
- * certificate.
- */
-function materialOf(credential: IAuthProvider): () => AgentOptions {
-  return () => credential.transportMaterial() as AgentOptions;
 }
 
 /**
@@ -493,7 +555,9 @@ function onPremWire(
   if (getConnectionType() === 'rfc') {
     return withWireLog(new RfcTransport(rfcConversationFrom(config), logger));
   }
-  const material = materialOf(credentialFor(config));
+  // Agent settings only: the credential's TLS material reaches the wire at
+  // logon, through the provider's establish() (connection 10).
+  const material = (): AgentOptions => ({});
   return withWireLog(
     isLegacyEnvironment()
       ? new LegacyOnPremHttpTransport(material, logger, wire)

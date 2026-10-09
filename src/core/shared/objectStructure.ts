@@ -7,7 +7,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -32,13 +32,6 @@ export async function getObjectStructure(
   objectType: string,
   objectName: string,
 ): Promise<IAdtWireResponse> {
-  if (!objectType) {
-    throw new Error('Object type is required');
-  }
-  if (!objectName) {
-    throw new Error('Object name is required');
-  }
-
   const encodedType = encodeURIComponent(objectType);
   const encodedName = encodeURIComponent(encodeSapObjectName(objectName));
   const url = `/sap/bc/adt/repository/objectstructure?objecttype=${encodedType}&objectname=${encodedName}`;

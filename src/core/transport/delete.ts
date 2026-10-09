@@ -10,9 +10,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { TRANSPORT_REQUEST } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -24,12 +24,7 @@ export async function deleteTransport(
   connection: IAbapConnection,
   transportNumber: string,
 ): Promise<IAdtWireResponse> {
-  if (!transportNumber) {
-    throw new Error('Transport request number is required');
-  }
-
-  const encodedNumber = encodeSapObjectName(transportNumber);
-  const url = `/sap/bc/adt/cts/transportrequests/${encodedNumber}`;
+  const url = `${TRANSPORT_REQUEST.uri(transportNumber)}`;
 
   return connection.makeAdtRequest({
     url,

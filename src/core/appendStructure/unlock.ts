@@ -1,8 +1,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { STRUCTURE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 export async function unlockAppendStructure(
@@ -10,8 +10,7 @@ export async function unlockAppendStructure(
   name: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const encoded = encodeSapObjectName(name.toLowerCase());
-  const url = `/sap/bc/adt/ddic/structures/${encoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `${STRUCTURE.uri(name)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
   return connection.makeAdtRequest({
     url,
     method: 'POST',

@@ -7,11 +7,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_AUTHORIZATION_FIELD,
   CT_AUTHORIZATION_FIELD,
 } from '../../constants/contentTypes';
+import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateAuthorizationFieldParams } from './types';
 import { buildAuthorizationFieldXml } from './xmlBuilder';
@@ -23,14 +24,7 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
-  if (!args.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
-  if (!args.package_name) {
-    throw new Error('package_name is required');
-  }
-
-  const url = `/sap/bc/adt/aps/iam/auth${args.transport_request ? `?corrNr=${encodeURIComponent(args.transport_request)}` : ''}`;
+  const url = `${AUTHORIZATION_FIELD.collection}${args.transport_request ? `?corrNr=${encodeURIComponent(args.transport_request)}` : ''}`;
 
   const xmlBody = buildAuthorizationFieldXml(args);
 

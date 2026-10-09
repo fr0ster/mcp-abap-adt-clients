@@ -11,15 +11,16 @@
  * target. Elsewhere this request fails for a reason no header can fix.
  */
 
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtContentTypes,
   IAdtWireResponse,
-  ICreateIncludeParams,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
+import type { ICreateIncludeParams } from './types';
 
 /** Measured on the includes collection; the programs one advertises a different type. */
 export const CT_INCLUDE = 'application/vnd.sap.adt.programs.includes.v2+xml';
@@ -45,7 +46,7 @@ export async function create(
   const responsibleAttr = args.responsible
     ? ` adtcore:responsible="${escapeXmlAttr(args.responsible)}"`
     : '';
-  const url = `/sap/bc/adt/programs/includes${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
+  const url = `${PROGRAM_INCLUDE.collection}${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
   const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${name}" adtcore:type="PROG/I" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${pkg}"/>

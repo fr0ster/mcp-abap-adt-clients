@@ -21,17 +21,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IIncludeConfig,
-  IIncludeState,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IIncludeConfig } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { getIncludeSource } from '../../../../core/include';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -73,7 +71,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IIncludeConfig, IIncludeState>;
+  let tester: BaseTester<IIncludeConfig>;
 
   beforeAll(async () => {
     try {
@@ -88,7 +86,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
       client = resolvedClient;
       hasConfig = true;
 
-      tester = new BaseTester<IIncludeConfig, IIncludeState>(
+      tester = new BaseTester<IIncludeConfig>(
         client.getInclude(),
         'Include',
         'create_include',
@@ -115,7 +113,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (includeName: string) => {
@@ -199,18 +197,16 @@ describe('Include (PROG/I, using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
-        const updateSourceCode =
-          testCase?.params?.update_source_code || sourceCode;
+        const source = testCase?.params?.source_code || config.source || '';
+        const updateSourceCode = testCase?.params?.update_source_code || source;
 
         await tester.flowTestAuto({
-          sourceCode,
+          source,
           updateConfig: {
             includeName: config.includeName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: updateSourceCode,
+            source: updateSourceCode,
           },
         });
       },
@@ -256,10 +252,12 @@ describe('Include (PROG/I, using AdtClient)', () => {
         });
 
         try {
-          const state = await client
-            .getInclude()
-            .readMetadata({ includeName: standard.name });
-          const body = String((state?.readResult as any)?.data ?? '');
+          const body = expectResult(
+            await client
+              .getInclude()
+              .readMetadata({ includeName: standard.name }),
+            'read include metadata',
+          );
 
           // The whole reason this is a separate module: an include answers with
           // its own root and type, and carries none of the program attributes.

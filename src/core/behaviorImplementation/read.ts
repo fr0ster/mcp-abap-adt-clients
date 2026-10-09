@@ -5,18 +5,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
+import { CLASS_INCLUDE } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { orThrow } from '../../utils/adtResponse';
-import { noopLogger } from '../../utils/noopLogger';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection, logger?: ILogger): AdtUtils {
-  return new AdtUtils(connection, logger ?? noopLogger);
-}
 
 /**
  * Get behavior implementation class metadata (without source code)
@@ -29,13 +24,13 @@ export async function getBehaviorImplementationMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection, logger).readObjectMetadata(
-      'class',
-      className,
-      undefined,
-      options,
-    ),
+  return objectMetadataWire(
+    connection,
+    'class',
+    className,
+    undefined,
+    options,
+    logger,
   );
 }
 
@@ -52,14 +47,14 @@ export async function getBehaviorImplementationSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection, logger).readObjectSource(
-      'class',
-      className,
-      undefined,
-      version,
-      options,
-    ),
+  return objectSourceWire(
+    connection,
+    'class',
+    className,
+    undefined,
+    version,
+    options,
+    logger,
   );
 }
 
@@ -76,11 +71,17 @@ export async function getBehaviorImplementationImplementations(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const { encodeSapObjectName } = await import('../../utils/internalUtils');
+  const { encodeSapObjectName, longPollingQuery } = await import(
+    '../../utils/internalUtils'
+  );
   const { getTimeout } = await import('../../utils/timeouts');
 
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${version !== 'active' ? `?version=${version}` : ''}`;
+  // The version query is conditional here, so the base arrives both with and
+  // without a `?` — which is why appending is the helper's job, not a literal.
+  const url = longPollingQuery(
+    `${CLASS_INCLUDE.uri(className, 'implementations')}${version !== 'active' ? `?version=${version}` : ''}`,
+    options?.withLongPolling,
+  );
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,

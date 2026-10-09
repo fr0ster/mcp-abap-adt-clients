@@ -8,14 +8,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAdtResponse, IAdtResult } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtResponse,
-  IAdtResult,
   IAdtWireResponse,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { expectResult } from '../../helpers/contract';
@@ -84,10 +83,8 @@ describe('Shared - discovery', () => {
     // `unknown` and stop checking anything.
     const answer = (await withAcceptHandling(
       client.getUtils().discovery(),
-    )) as IAdtResponse<IAdtResult<IAdtWireResponse>>;
-    const result = expectResult(answer, 'discovery');
-
-    const xml = String(result.data);
+    )) as IAdtResponse<string>;
+    const xml = expectResult(answer, 'discovery');
     expect(xml.length).toBeGreaterThan(0);
     expect(xml).toMatch(/<app:service|<service/);
 

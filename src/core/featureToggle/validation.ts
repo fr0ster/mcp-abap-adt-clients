@@ -1,8 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
+import { FEATURE_TOGGLE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -17,7 +18,7 @@ import { getTimeout } from '../../utils/timeouts';
  * `POST /sap/bc/adt/sfw/featuretoggles/validation` is the resource discovery
  * advertises for this — a GET on it answers 405, a POST with the usual
  * `objname`/`packagename`/`description` query answers 200 with
- * `<CHECK_RESULT>X</CHECK_RESULT>`. Measured on E19 2026-08-31.
+ * `<CHECK_RESULT>X</CHECK_RESULT>`. Measured 2026-08-31.
  */
 export async function validateFeatureToggleName(
   connection: IAbapConnection,
@@ -25,16 +26,13 @@ export async function validateFeatureToggleName(
   packageName?: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Feature toggle name is required');
-  }
   const params: Record<string, string> = { objname: name.toUpperCase() };
   if (packageName) params.packagename = packageName.toUpperCase();
   if (description) params.description = description;
 
   return connection.makeAdtRequest({
     method: 'POST',
-    url: '/sap/bc/adt/sfw/featuretoggles/validation',
+    url: FEATURE_TOGGLE.validation,
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_METADATA },
     params,

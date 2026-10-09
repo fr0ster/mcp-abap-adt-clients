@@ -1,13 +1,136 @@
 /**
- * Package module type definitions
+ * Package module type definitions.
+ *
+ * `IPackageState` is gone with the other state bags: a member now answers what
+ * its own endpoint produced, and a failure carries the request that produced it.
+ * What each member answers is declared here, beside the implementation that
+ * produces it, because a result is the implementation's to name — the contract
+ * says only that it is answered.
  */
 
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import { rawDocument } from '../../utils/resultStrategy';
+
 // Types defined in @mcp-abap-adt/interfaces
-export type {
-  ICreatePackageParams,
-  IDeletePackageParams,
-  IPackageConfig,
-  IPackageState,
-  IReadPackageParams,
-  IUpdatePackageParams,
-} from '@mcp-abap-adt/interfaces';
+export type { IPackageConfig } from '@mcp-abap-adt/interfaces-adt';
+
+/**
+ * What the create answers: the package's metadata document.
+ */
+export type PackageCreated = string;
+
+/**
+ * What `read` answers: the package's metadata document.
+ *
+ * A package is a container and has no source; `read` and `readMetadata` fetch the
+ * same resource.
+ *
+ * Measured: a read of a package that is not ready answers 200 with an **empty**
+ * body, which silently corrupts a read-modify-write.
+ */
+export type PackageSource = string;
+
+/**
+ * The package's metadata document — the same resource `read` fetches.
+ */
+export type PackageMetadata = string;
+
+/**
+ * What a check run answers: `chkl:messages`.
+ *
+ * Not a syntax check — a package is a container — but the server's own verdict
+ * on the object, which Eclipse runs right after a create.
+ */
+export type PackageCheckResult = string;
+
+/**
+ * What the validation endpoint answers.
+ */
+export type PackageValidationResult = string;
+
+/**
+ * What the deletion answers.
+ *
+ * A refusal arrives as **200** carrying `isDeleted="false"`, so the document,
+ * not the status, is the verdict. A package can be saved only once per ABAP
+ * session: PAK/058.
+ */
+export type PackageDeletionResult = string;
+
+/**
+ * What the metadata write answers.
+ */
+export type PackageUpdated = string;
+
+/**
+ * The transport document for the package.
+ */
+export type PackageTransport = string;
+
+/** One strategy per member of a package implementation. See `IClassResults`. */
+export interface IPackageResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly check: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly metadataUpdated: IResultStrategy<unknown>;
+  readonly transport: IResultStrategy<unknown>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<unknown>;
+}
+
+/**
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const packageDocuments = {
+  created: rawDocument,
+  source: rawDocument,
+  metadata: rawDocument,
+  check: rawDocument,
+  validation: rawDocument,
+  deletion: rawDocument,
+  metadataUpdated: rawDocument,
+  transport: rawDocument,
+  deletionCheck: rawDocument,
+} satisfies IPackageResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICreatePackageParams {
+  package_name: string;
+  description?: string;
+  super_package: string;
+  package_type?: string;
+  software_component?: string;
+  transport_layer?: string;
+  transport_request?: string;
+  application_component?: string;
+  responsible?: string;
+  master_system?: string;
+  /** Master/original language (e.g. "EN", "DE"). Defaults to EN when unset. */
+  master_language?: string;
+  record_changes: boolean;
+}
+
+export interface IDeletePackageParams {
+  package_name: string;
+  transport_request?: string;
+}
+
+export interface IUpdatePackageParams {
+  package_name: string;
+  transport_request?: string;
+}

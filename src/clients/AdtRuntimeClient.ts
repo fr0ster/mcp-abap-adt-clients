@@ -5,9 +5,8 @@
  * - getProfiler() — Profiler traces
  * - getCrossTrace() — Cross trace analysis
  * - getSt05Trace() — ST05 performance traces
- * - getDebugger() — Composite debugger (ABAP, AMDP, memory snapshots)
  * - getApplicationLog() — Application log analysis
- * - getAtc() — ATC check runs: start one, poll it, read the worklist
+ * - getAtc() — ATC: the check variant, a worklist, a run, its status, its findings
  * - getAtcLog() — ATC check failure and execution logs
  * - getDdicActivation() — DDIC activation graph
  * - getDumps() — Runtime dump analysis
@@ -26,79 +25,87 @@
  * const traceParams = await client.getProfiler().getParameters();
  *
  * // Debugging
- * await client.getDebugger().getAbap().launch({ debuggingMode: 'external' });
- * const callStack = await client.getDebugger().getAbap().getCallStack();
  *
  * // Logs
  * const appLog = await client.getApplicationLog().getObject('Z_MY_LOG');
- * const started = await client.getAtc().run({
+ * const atc = client.getAtc();
+ * const variant = await atc.resolveCheckVariant();
+ * const worklistId = await atc.createWorklist(variant);
+ * const started = await atc.startRun(worklistId, {
  *   objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
  * });
  * const atcLogs = await client.getAtcLog().getCheckFailureLogs();
  * ```
  */
 
-import type {
-  IAbapConnection,
-  IAdtRunnable,
-  IApplicationLog,
-  IAtcFindings,
-  IAtcLog,
-  IAtcRunOptions,
-  IAtcRunResult,
-  IAtcRunStatusReadable,
-  IAtcRunTarget,
-  ICrossTrace,
-  IDdicActivation,
-  IDebugger,
-  IFeedRepository,
-  IGatewayErrorLog,
-  ILogger,
-  IProfiler,
-  IRuntimeDumps,
-  ISt05Trace,
-  ISystemMessages,
-} from '@mcp-abap-adt/interfaces';
-import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
-import { AdtAtc } from '../runtime/atc/AdtAtc';
-import { AtcLog } from '../runtime/atc/AtcLog';
-import { DdicActivation } from '../runtime/ddic/DdicActivation';
-import { Debugger } from '../runtime/debugger/Debugger';
-import { RuntimeDumps } from '../runtime/dumps/RuntimeDumps';
-import { FeedRepository } from '../runtime/feeds/FeedRepository';
-import { GatewayErrorLog } from '../runtime/gatewayErrorLog/GatewayErrorLog';
-import { SystemMessages } from '../runtime/systemMessages/SystemMessages';
-import { CrossTrace } from '../runtime/traces/CrossTraceDomain';
-import { Profiler } from '../runtime/traces/ProfilerDomain';
-import { St05Trace } from '../runtime/traces/St05Trace';
-import { withRefusalDetection } from '../utils/refusalAware';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import {
+  ApplicationLog,
+  applicationLogDocuments,
+  type IApplicationLogResults,
+} from '../runtime/applicationLog/ApplicationLog';
+import { AdtAtc, atcDocuments, type IAtcResults } from '../runtime/atc/AdtAtc';
+import {
+  AtcLog,
+  atcLogDocuments,
+  type IAtcLogResults,
+} from '../runtime/atc/AtcLog';
+import {
+  DdicActivation,
+  ddicActivationDocuments,
+  type IDdicActivationResults,
+} from '../runtime/ddic/DdicActivation';
+import {
+  type IRuntimeDumpsResults,
+  RuntimeDumps,
+  runtimeDumpsDocuments,
+} from '../runtime/dumps/RuntimeDumps';
+import {
+  FeedRepository,
+  feedDocuments,
+  type IFeedResults,
+} from '../runtime/feeds/FeedRepository';
+import {
+  GatewayErrorLog,
+  gatewayErrorLogDocuments,
+  type IGatewayErrorLogResults,
+} from '../runtime/gatewayErrorLog/GatewayErrorLog';
+import {
+  type ISystemMessagesResults,
+  SystemMessages,
+  systemMessagesDocuments,
+} from '../runtime/systemMessages/SystemMessages';
+import {
+  CrossTrace,
+  crossTraceDocuments,
+  type ICrossTraceResultSet,
+} from '../runtime/traces/CrossTraceDomain';
+import {
+  type IProfilerResults,
+  Profiler,
+  profilerDocuments,
+} from '../runtime/traces/ProfilerDomain';
+import {
+  type ISt05TraceResults,
+  St05Trace,
+  st05TraceDocuments,
+} from '../runtime/traces/St05Trace';
+import { withRequestTrace } from '../utils/requestTrace';
 
 export class AdtRuntimeClient {
   protected readonly connection: IAbapConnection;
   protected readonly logger: ILogger;
-
-  private _profiler?: Profiler;
-  private _crossTrace?: CrossTrace;
-  private _st05Trace?: St05Trace;
-  private _debugger?: Debugger;
-  private _applicationLog?: ApplicationLog;
-  private _atc?: AdtAtc;
-  private _atcLog?: AtcLog;
-  private _ddicActivation?: DdicActivation;
-  private _dumps?: RuntimeDumps;
-  private _feeds?: FeedRepository;
-  private _systemMessages?: SystemMessages;
-  private _gatewayErrorLog?: GatewayErrorLog;
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     options?: { enableAcceptCorrection?: boolean },
   ) {
-    // Wrapped once, here, where a connection enters the library. A refusal SAP
-    // sends with a 2xx would otherwise be stored as a result and reported as
-    // success — see src/utils/refusalAware.ts for what that measured.
-    this.connection = withRefusalDetection(connection);
+    // Wrapped once, here, where a connection enters the library. The wrapper
+    // puts the request back on the answer and reads nothing: what a body means
+    // is the caller's, through the `analyse` they pass.
+    this.connection = withRequestTrace(connection);
     this.logger = logger ?? {
       debug: () => {},
       info: () => {},
@@ -111,9 +118,13 @@ export class AdtRuntimeClient {
         wrapConnectionAcceptNegotiation,
         getAcceptCorrectionEnabled,
       } = require('../utils/acceptNegotiation');
-      setAcceptCorrectionEnabled(options.enableAcceptCorrection);
+      setAcceptCorrectionEnabled(
+        this.connection,
+        options.enableAcceptCorrection,
+      );
       const shouldWrap =
-        options.enableAcceptCorrection ?? getAcceptCorrectionEnabled();
+        options.enableAcceptCorrection ??
+        getAcceptCorrectionEnabled(this.connection);
       if (shouldWrap) {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
@@ -122,7 +133,7 @@ export class AdtRuntimeClient {
         getAcceptCorrectionEnabled,
         wrapConnectionAcceptNegotiation,
       } = require('../utils/acceptNegotiation');
-      if (getAcceptCorrectionEnabled()) {
+      if (getAcceptCorrectionEnabled(this.connection)) {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
     }
@@ -132,39 +143,28 @@ export class AdtRuntimeClient {
   // Domain Object Factories
   // ============================================================================
 
-  getProfiler(): IProfiler {
-    if (!this._profiler) {
-      this._profiler = new Profiler(this.connection, this.logger);
-    }
-    return this._profiler;
+  getProfiler<R extends IProfilerResults = typeof profilerDocuments>(
+    results: R = profilerDocuments as unknown as R,
+  ): Profiler<R> {
+    return new Profiler<R>(this.connection, this.logger, results);
   }
 
-  getCrossTrace(): ICrossTrace {
-    if (!this._crossTrace) {
-      this._crossTrace = new CrossTrace(this.connection, this.logger);
-    }
-    return this._crossTrace;
+  getCrossTrace<R extends ICrossTraceResultSet = typeof crossTraceDocuments>(
+    results: R = crossTraceDocuments as unknown as R,
+  ): CrossTrace<R> {
+    return new CrossTrace<R>(this.connection, this.logger, results);
   }
 
-  getSt05Trace(): ISt05Trace {
-    if (!this._st05Trace) {
-      this._st05Trace = new St05Trace(this.connection, this.logger);
-    }
-    return this._st05Trace;
+  getSt05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>(
+    results: R = st05TraceDocuments as unknown as R,
+  ): St05Trace<R> {
+    return new St05Trace<R>(this.connection, this.logger, results);
   }
 
-  getDebugger(): IDebugger {
-    if (!this._debugger) {
-      this._debugger = new Debugger(this.connection, this.logger);
-    }
-    return this._debugger;
-  }
-
-  getApplicationLog(): IApplicationLog {
-    if (!this._applicationLog) {
-      this._applicationLog = new ApplicationLog(this.connection, this.logger);
-    }
-    return this._applicationLog;
+  getApplicationLog<
+    R extends IApplicationLogResults = typeof applicationLogDocuments,
+  >(results: R = applicationLogDocuments as unknown as R): ApplicationLog<R> {
+    return new ApplicationLog<R>(this.connection, this.logger, results);
   }
 
   /**
@@ -173,58 +173,49 @@ export class AdtRuntimeClient {
    * The intersection is spelled here rather than given a name: one getter has
    * this set, and a composite earns a name when more than one handler does.
    */
-  getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> &
-    IAtcRunStatusReadable &
-    IAtcFindings {
-    if (!this._atc) {
-      this._atc = new AdtAtc(this.connection, this.logger);
-    }
-    return this._atc;
+  getAtc<R extends IAtcResults = typeof atcDocuments>(
+    results: R = atcDocuments as unknown as R,
+  ): AdtAtc<R> {
+    return new AdtAtc<R>(this.connection, this.logger, results);
   }
 
-  getAtcLog(): IAtcLog {
-    if (!this._atcLog) {
-      this._atcLog = new AtcLog(this.connection, this.logger);
-    }
-    return this._atcLog;
+  getAtcLog<R extends IAtcLogResults = typeof atcLogDocuments>(
+    results: R = atcLogDocuments as unknown as R,
+  ): AtcLog<R> {
+    return new AtcLog<R>(this.connection, this.logger, results);
   }
 
-  getDdicActivation(): IDdicActivation {
-    if (!this._ddicActivation) {
-      this._ddicActivation = new DdicActivation(this.connection, this.logger);
-    }
-    return this._ddicActivation;
+  getDdicActivation<
+    R extends IDdicActivationResults = typeof ddicActivationDocuments,
+  >(results: R = ddicActivationDocuments as unknown as R): DdicActivation<R> {
+    return new DdicActivation<R>(this.connection, this.logger, results);
   }
 
-  getDumps(): IRuntimeDumps {
-    if (!this._dumps) {
-      this._dumps = new RuntimeDumps(this.connection, this.logger);
-    }
-    return this._dumps;
+  getDumps<R extends IRuntimeDumpsResults = typeof runtimeDumpsDocuments>(
+    results: R = runtimeDumpsDocuments as unknown as R,
+  ): RuntimeDumps<R> {
+    return new RuntimeDumps<R>(this.connection, this.logger, results);
   }
 
   // ============================================================================
   // Feed, SystemMessages, GatewayErrorLog Factories
   // ============================================================================
 
-  getFeeds(): IFeedRepository {
-    if (!this._feeds) {
-      this._feeds = new FeedRepository(this.connection, this.logger);
-    }
-    return this._feeds;
+  getFeeds<R extends IFeedResults = typeof feedDocuments>(
+    results: R = feedDocuments as unknown as R,
+  ): FeedRepository<R> {
+    return new FeedRepository<R>(this.connection, this.logger, results);
   }
 
-  getSystemMessages(): ISystemMessages {
-    if (!this._systemMessages) {
-      this._systemMessages = new SystemMessages(this.connection, this.logger);
-    }
-    return this._systemMessages;
+  getSystemMessages<
+    R extends ISystemMessagesResults = typeof systemMessagesDocuments,
+  >(results: R = systemMessagesDocuments as unknown as R): SystemMessages<R> {
+    return new SystemMessages<R>(this.connection, this.logger, results);
   }
 
-  getGatewayErrorLog(): IGatewayErrorLog {
-    if (!this._gatewayErrorLog) {
-      this._gatewayErrorLog = new GatewayErrorLog(this.connection, this.logger);
-    }
-    return this._gatewayErrorLog;
+  getGatewayErrorLog<
+    R extends IGatewayErrorLogResults = typeof gatewayErrorLogDocuments,
+  >(results: R = gatewayErrorLogDocuments as unknown as R): GatewayErrorLog<R> {
+    return new GatewayErrorLog<R>(this.connection, this.logger, results);
   }
 }

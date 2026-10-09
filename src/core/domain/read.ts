@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DOMAIN, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { DOMAIN, transportUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -24,9 +24,8 @@ export async function getDomain(
   domainName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(domainName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/domains/${encodedName}${query}`;
+  const url = `${DOMAIN.uri(domainName)}${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -52,8 +51,7 @@ export async function getDomainTransport(
   domainName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(domainName);
-  let url = `/sap/bc/adt/ddic/domains/${encodedName}/transport`;
+  let url = `${transportUri(DOMAIN.uri(domainName))}`;
   if (options?.withLongPolling) {
     url += '?withLongPolling=true';
   }

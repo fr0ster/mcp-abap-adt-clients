@@ -6,11 +6,11 @@
  * - Get feed variants
  */
 
+import type { IFeedQueryOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IFeedQueryOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -38,7 +38,7 @@ export async function getFeeds(
  * Get feed variants
  *
  * The endpoint requires `category` and refuses the request without it — measured
- * on E19 2026-08-31: `GET /sap/bc/adt/feeds/variants` answers
+ * 2026-08-31: `GET /sap/bc/adt/feeds/variants` answers
  * `400 ExceptionParameterNotFound`, `SADT_RESOURCE/017`, "Parameter category
  * could not be found", and the same call with a category answers 200. It was
  * being sent without one, so this never worked.
@@ -56,9 +56,6 @@ export async function getFeedVariants(
   connection: IAbapConnection,
   category: string,
 ): Promise<IAdtWireResponse> {
-  if (!category) {
-    throw new Error('category is required for /sap/bc/adt/feeds/variants');
-  }
   const url = `/sap/bc/adt/feeds/variants?category=${encodeURIComponent(category)}`;
 
   return connection.makeAdtRequest({
@@ -75,7 +72,8 @@ export async function getFeedVariants(
  * Build query string from IFeedQueryOptions.
  * Shared by all feed-backed runtime modules.
  *
- * @param options - Query options
+ * @param options - Query options; `query`, when set, is the `$query` sent
+ *   as given and `user` is not turned into one of its own
  * @param userAttribute - Feed-specific user attribute name ('user' for dumps, 'username' for gateway)
  */
 export function buildFeedQueryParams(
@@ -84,7 +82,11 @@ export function buildFeedQueryParams(
 ): string {
   if (!options) return '';
   const params = new URLSearchParams();
-  if (options.user) {
+  // One request carries one `$query`: a caller filtering on more than the user
+  // states the whole expression, the user included, and it is sent as given.
+  if (options.query?.trim()) {
+    params.set('$query', options.query.trim());
+  } else if (options.user) {
     params.set(
       '$query',
       `and ( equals ( ${userAttribute} , ${options.user.trim()} ) )`,

@@ -5,14 +5,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { getEnhancementUri, type IDeleteEnhancementParams } from './types';
 
@@ -29,15 +28,7 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type } = params;
 
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-
-  const encodedName = encodeSapObjectName(enhancement_name);
-  const objectUri = getEnhancementUri(enhancement_type, encodedName);
+  const objectUri = getEnhancementUri(enhancement_type, enhancement_name);
 
   const checkUrl = `/sap/bc/adt/deletion/check`;
 
@@ -73,15 +64,7 @@ export async function deleteEnhancement(
 ): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type, transport_request } = params;
 
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-
-  const encodedName = encodeSapObjectName(enhancement_name);
-  const objectUri = getEnhancementUri(enhancement_type, encodedName);
+  const objectUri = getEnhancementUri(enhancement_type, enhancement_name);
 
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
@@ -113,15 +96,10 @@ export async function deleteEnhancement(
     headers,
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      enhancement_name,
-      enhancement_type,
-      object_uri: objectUri,
-      transport_request: transport_request || 'local',
-      message: `Enhancement ${enhancement_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

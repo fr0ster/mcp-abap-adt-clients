@@ -2,9 +2,9 @@
  * Program update operations - low-level functions for AdtProgram
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { PROGRAM, sourceUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -20,7 +20,7 @@ export async function uploadProgramSource(
   _sessionId: string,
   corrNr?: string,
 ) {
-  let url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
+  let url = `${sourceUri(PROGRAM.uri(programName))}?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }

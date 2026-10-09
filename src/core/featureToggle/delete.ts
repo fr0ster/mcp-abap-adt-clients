@@ -5,19 +5,19 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FEATURE_TOGGLE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteFeatureToggleParams } from './types';
 
 function objectUri(name: string): string {
-  return `/sap/bc/adt/sfw/featuretoggles/${encodeSapObjectName(name.toLowerCase())}`;
+  return `${FEATURE_TOGGLE.uri(name)}`;
 }
 
 /**
@@ -27,10 +27,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.feature_toggle_name) {
-    throw new Error('feature_toggle_name is required');
-  }
-
   const uri = objectUri(params.feature_toggle_name);
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -57,10 +53,6 @@ export async function deleteFeatureToggle(
   connection: IAbapConnection,
   params: IDeleteFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.feature_toggle_name) {
-    throw new Error('feature_toggle_name is required');
-  }
-
   const uri = objectUri(params.feature_toggle_name);
   const transportTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`
@@ -84,14 +76,10 @@ export async function deleteFeatureToggle(
     },
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      feature_toggle_name: params.feature_toggle_name,
-      object_uri: uri,
-      transport_request: params.transport_request || 'local',
-      message: `Feature toggle ${params.feature_toggle_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

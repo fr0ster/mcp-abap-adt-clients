@@ -12,12 +12,14 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { selectEveryColumn } from '../../../../scripts/lib/tableSelect';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -120,14 +122,22 @@ describe('Shared - getTableContents', () => {
     const maxRows = resolver.getParam('max_rows', 10);
 
     logTestStep('get table contents', testsLogger);
-    const result = await withAcceptHandling(
-      client.getUtils().getTableContents({
-        table_name: tableName,
-        max_rows: maxRows,
-      }),
-    );
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    // The contract, not the status: ADT answers a refusal inside a 200, and
+    // on a legacy system this endpoint is absent altogether — both come back
+    // as the failure half, naming which.
+    const document = expectResult(
+      await withAcceptHandling(
+        client.getUtils().getTableContents({
+          table_name: tableName,
+          max_rows: maxRows,
+          // The statement is the caller's since 19.0.0. This one reproduces
+          // what the member used to build for itself.
+          sql_query: await selectEveryColumn(connection, tableName),
+        }),
+      ),
+      'table contents',
+    ) as string;
+    expect(typeof document).toBe('string');
   }, 30000);
 
   it('should use default max_rows if not provided', async () => {
@@ -173,13 +183,19 @@ describe('Shared - getTableContents', () => {
     const tableName = resolver.getObjectName('table_name', 'table')!;
 
     logTestStep('get table contents with default max_rows', testsLogger);
-    const result = await withAcceptHandling(
-      client.getUtils().getTableContents({
-        table_name: tableName,
-      }),
-    );
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    // The contract, not the status: ADT answers a refusal inside a 200, and
+    // on a legacy system this endpoint is absent altogether — both come back
+    // as the failure half, naming which.
+    const document = expectResult(
+      await withAcceptHandling(
+        client.getUtils().getTableContents({
+          table_name: tableName,
+          sql_query: await selectEveryColumn(connection, tableName),
+        }),
+      ),
+      'table contents',
+    ) as string;
+    expect(typeof document).toBe('string');
   }, 30000);
 
   it('should throw error if table name is missing', async () => {
@@ -211,11 +227,19 @@ describe('Shared - getTableContents', () => {
       return;
     }
 
-    logTestStep('validate error if table name is missing', testsLogger);
-    await expect(
-      client.getUtils().getTableContents({
-        table_name: '',
-      }),
-    ).rejects.toThrow('Table name is required');
+    // No guard on the name any more: the URL is built from what was given and
+    // the server answers. What comes back is the server's words, which a
+    // strategy can read — the sentence this package used to compose was not.
+    logTestStep('an empty table name is answered by the server', testsLogger);
+    const answer = await client.getUtils().getTableContents({
+      table_name: '',
+      sql_query: 'SELECT 1 FROM T000',
+    });
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected the server to refuse');
+    testsLogger.info?.(
+      `📛 ${answer.getError().origin}: ${answer.getError().message}`,
+    );
   });
 });

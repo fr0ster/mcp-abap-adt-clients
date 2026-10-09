@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { create } from '../../../../core/authorizationField/create';
 import { updateAuthorizationField } from '../../../../core/authorizationField/update';
 import { buildAuthorizationFieldXml } from '../../../../core/authorizationField/xmlBuilder';
@@ -50,14 +50,14 @@ describe('authorizationField wire', () => {
   it('keeps both namespaces and the adtcore attributes on that root', () => {
     const xml = buildAuthorizationFieldXml({
       ...PARAMS,
-      master_system: 'E19',
+      master_system: 'SID',
       responsible: 'OKYSLYTSIA',
     });
     expect(xml).toContain('xmlns:auth="http://www.sap.com/iam/auth"');
     expect(xml).toContain('xmlns:adtcore="http://www.sap.com/adt/core"');
     expect(xml).toContain('adtcore:name="ZAC_AUTH01"');
     expect(xml).toContain('adtcore:type="AUTH"');
-    expect(xml).toContain('adtcore:masterSystem="E19"');
+    expect(xml).toContain('adtcore:masterSystem="SID"');
     expect(xml).toContain('adtcore:responsible="OKYSLYTSIA"');
     expect(xml).toContain('<adtcore:packageRef adtcore:name="TEST_MCP"/>');
   });
@@ -77,7 +77,7 @@ describe('authorizationField wire', () => {
     const { c, conn } = cap();
     await updateAuthorizationField(conn, PARAMS, 'LH/1');
     expect(c.method).toBe('PUT');
-    expect(c.url).toBe('/sap/bc/adt/aps/iam/auth/ZAC_AUTH01?lockHandle=LH%2F1');
+    expect(c.url).toBe('/sap/bc/adt/aps/iam/auth/zac_auth01?lockHandle=LH%2F1');
     expect(c.data).toContain('<auth:auth ');
   });
 });

@@ -5,10 +5,11 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
+import { CLASS, CLASS_INCLUDE } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -19,25 +20,14 @@ export async function updateClassTestInclude(
   connection: IAbapConnection,
   className: string,
   testClassSource: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   // Empty source is legitimate: PUTting it is how a test class is deleted.
   // Only a missing argument is an error.
-  if (testClassSource === undefined || testClassSource === null) {
-    throw new Error('Test class source code is required');
-  }
 
-  if (!lockHandle) {
-    throw new Error('lockHandle is required to update test classes');
-  }
-
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `${CLASS_INCLUDE.uri(className, 'testclasses')}${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {
@@ -59,9 +49,8 @@ export async function activateClassTestClasses(
   className: string,
   testClassName: string,
 ): Promise<IAdtWireResponse> {
-  const encodedClass = encodeSapObjectName(className).toLowerCase();
   const encodedTest = encodeSapObjectName(testClassName).toUpperCase();
-  const objectUri = `/sap/bc/adt/oo/classes/${encodedClass}#testclass=${encodedTest}`;
+  const objectUri = `${CLASS.uri(className)}#testclass=${encodedTest}`;
   const objectName = `${className.toUpperCase()}#${encodedTest}`;
   return activateObjectInSession(connection, objectUri, objectName, true);
 }

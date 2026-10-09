@@ -5,14 +5,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
   CT_FEATURE_TOGGLE_METADATA,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FEATURE_TOGGLE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,12 +27,7 @@ export async function checkFeatureToggle(
   version: 'active' | 'inactive',
   xmlContent?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Feature toggle name is required');
-  }
-
-  const encoded = encodeSapObjectName(name.toLowerCase());
-  const uri = `/sap/bc/adt/sfw/featuretoggles/${encoded}`;
+  const uri = `${FEATURE_TOGGLE.uri(name)}`;
 
   let xmlBody: string;
   if (xmlContent) {
@@ -65,12 +59,6 @@ export async function checkFeatureToggle(
       'Content-Type': CT_CHECK_OBJECTS,
     },
   });
-
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Feature toggle check failed: ${errorMessages}`);
-  }
 
   return response;
 }

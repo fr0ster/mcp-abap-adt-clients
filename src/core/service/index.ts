@@ -1,11 +1,8 @@
 export { AdtService, AdtServiceBinding } from './AdtService';
 export type {
-  AdtServiceBindingType,
   DesiredPublicationState,
   GeneratedServiceType,
   IActivateServiceBindingParams,
-  IAdtService,
-  IAdtServiceBinding,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
@@ -16,7 +13,7 @@ export type {
   IPublishODataV2Params,
   IReadServiceBindingParams,
   IServiceBindingConfig,
-  IServiceBindingState,
+  IServiceResults,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
   IUpdateServiceBindingParams,
@@ -25,4 +22,8 @@ export type {
   ServiceBindingVariant,
   ServiceBindingVersion,
 } from './types';
-export { resolveBindingVariant, SERVICE_BINDING_VARIANT_MAP } from './types';
+export {
+  resolveBindingVariant,
+  SERVICE_BINDING_VARIANT_MAP,
+  serviceDocuments,
+} from './types';

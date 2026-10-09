@@ -5,9 +5,10 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { CLASS_INCLUDE } from '../../endpoints/objects';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -15,27 +16,19 @@ import { getTimeout } from '../../utils/timeouts';
  * Requires class to be locked first
  *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateBehaviorImplementation(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('sourceCode is required');
-  }
-
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `${CLASS_INCLUDE.uri(className, 'implementations')}${writeQuery(lockHandle, transportRequest)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

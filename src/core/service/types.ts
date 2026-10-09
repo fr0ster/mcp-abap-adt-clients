@@ -1,41 +1,31 @@
+import type {
+  GeneratedServiceType as GST,
+  IResultStrategy,
+  IServiceBindingConfig as ISBC,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
+  type DesiredPublicationState,
   type GeneratedServiceType,
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingType,
   type ServiceBindingVariant,
   type ServiceBindingVersion,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
-  AdtServiceBindingType,
   DesiredPublicationState,
   GeneratedServiceType,
-  IActivateServiceBindingParams,
-  IAdtService,
-  IAdtServiceBinding,
-  IAdtServiceOperationOptions,
-  ICheckServiceBindingParams,
-  IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateAndGenerateServiceBindingParamsLegacy,
   ICreateServiceBindingParams,
-  IDeleteServiceBindingParams,
-  IGenerateServiceBindingParams,
-  IGetServiceBindingODataParams,
-  IPublishODataV2Params,
-  IReadServiceBindingParams,
   IServiceBindingConfig,
-  IServiceBindingState,
-  ITransportCheckServiceBindingParams,
-  IUnpublishODataV2Params,
-  IUpdateServiceBindingParams,
-  IValidateServiceBindingParams,
   ServiceBindingType,
   ServiceBindingVariant,
   ServiceBindingVersion,
-} from '@mcp-abap-adt/interfaces';
-export { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+export { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/interfaces-adt';
 
 export function resolveBindingVariant(variant: ServiceBindingVariant): {
   bindingType: ServiceBindingType;
@@ -44,4 +34,285 @@ export function resolveBindingVariant(variant: ServiceBindingVariant): {
   serviceType: GeneratedServiceType;
 } {
   return SERVICE_BINDING_VARIANT_MAP[variant];
+}
+
+/**
+ * One strategy per member of a service binding implementation.
+ *
+ * A record rather than fourteen positional type parameters — the fourteenth
+ * would be unnameable without spelling the thirteen before it, and a consumer
+ * overriding one reading writes the key. `IServiceBindingResults` in the
+ * contract names five of these; the rest belong to the capability atoms.
+ */
+export interface IServiceResults {
+  /** What the create answers: the binding's own document. */
+  readonly created: IResultStrategy<unknown>;
+  /** What a read answers: the binding document, active or inactive. */
+  readonly source: IResultStrategy<unknown>;
+  /** The same document, read as metadata — a binding has no second resource. */
+  readonly metadata: IResultStrategy<unknown>;
+  /** What a check run answers: `chkl:messages`, whose `E` entries are the verdict. */
+  readonly check: IResultStrategy<unknown>;
+  /** What activation answers. */
+  readonly activation: IResultStrategy<unknown>;
+  /** What the pre-create transport check answers. */
+  readonly validation: IResultStrategy<unknown>;
+  /** What the deletion answers. */
+  readonly deletion: IResultStrategy<unknown>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<unknown>;
+  /** What a publication change answers. */
+  readonly updated: IResultStrategy<unknown>;
+  /** What the transport check answers. */
+  readonly transport: IResultStrategy<unknown>;
+  /** The binding types this system offers. */
+  readonly bindingTypes: IResultStrategy<unknown>;
+  /** What generating the service answers. */
+  readonly generation: IResultStrategy<unknown>;
+  /** What an OData v2 or v4 read of the binding answers. */
+  readonly odata: IResultStrategy<unknown>;
+  /** What publishing or withdrawing answers. */
+  readonly publication: IResultStrategy<unknown>;
+  /** What classifying the binding answers. */
+  readonly classification: IResultStrategy<unknown>;
+}
+
+/**
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const serviceDocuments = {
+  created: rawDocument,
+  source: rawDocument,
+  metadata: rawDocument,
+  check: rawDocument,
+  activation: rawDocument,
+  validation: rawDocument,
+  deletion: rawDocument,
+  updated: rawDocument,
+  transport: rawDocument,
+  bindingTypes: rawDocument,
+  generation: rawDocument,
+  odata: rawDocument,
+  publication: rawDocument,
+  classification: rawDocument,
+  deletionCheck: rawDocument,
+} satisfies IServiceResults;
+
+/**
+ * What a publication change needs, as this package currently understands it.
+ *
+ * Declared **here** rather than in `@mcp-abap-adt/interfaces` on purpose: the
+ * shape is still being settled against measured ADT traffic, and a contract
+ * moves to the contracts package once it does what it needs to, not before.
+ *
+ * **The binding and the protocol, and nothing else.** The job is posted with no
+ * query string and a body that names the target by type and name, so the
+ * service name and version have nowhere to go — they were derived from the
+ * binding's own document by a read that made this member two requests, and both
+ * the read and the fields went. `serviceType` stays because it selects the
+ * endpoint (`odatav2` or `odatav4`), and a caller holding a binding knows it
+ * from the variant.
+ *
+ * There is no `publishODataV2` and no `publishODataV4`: the protocol is a
+ * **parameter**, not a method name. Two members that differ only by a value
+ * they could have taken as an argument are two names for one endpoint.
+ */
+/**
+ * What a caller must name to change a binding's publication, **in the signature
+ * they call**.
+ *
+ * `Partial<IServiceBindingConfig>` is what `IAdtUpdatable` gives every other
+ * type, and for a binding it is too loose in two ways a compiler could catch:
+ * `serviceType` is optional there, and `desiredPublicationState` still admits
+ * `'unchanged'`. Both compiled and then threw before reaching the wire, which
+ * is a demand made where the caller cannot see it.
+ */
+export type IServiceBindingPublicationConfig = Partial<ISBC> & {
+  /** Which binding. Without it there is no object to publish. */
+  bindingName: string;
+  /** `unchanged` is not one of them: there is no request that changes nothing. */
+  desiredPublicationState: 'published' | 'unpublished';
+  /** Selects the endpoint, `odatav2` or `odatav4`. */
+  serviceType: GST;
+};
+
+/**
+ * What a publication job needs, which is not the same for the two protocols.
+ *
+ * **V2 requires the service name and version; V4 does not.** Measured on a trial,
+ * 2026-09-29, on one binding per protocol with a known publication state and a
+ * single job each — the only difference being the query string:
+ *
+ * ```
+ * odatav2, no query string : "Local un-publish of service ␠ with version 0000
+ *                             failed — Service ZMCP_PRV_SB version ␠ does not exist."
+ * odatav2, with it         : 200, SEVERITY OK,
+ *                           "service ZMCP_PRV_SB with version 0001 un-published locally"
+ * odatav4, no query string : 200, SEVERITY OK
+ * ```
+ *
+ * The blanks in the V2 refusal are the server saying it had nothing to resolve: the
+ * body names the target by type (`SCGR`) and name, and for V2 that is not enough.
+ * A capture of Eclipse showed no query string and the job answered `SEVERITY OK`,
+ * which is where this package dropped the two fields — a measurement from one
+ * system, and it did not hold for V2.
+ *
+ * So the demand lives in the TYPE, per protocol, rather than as an optional field
+ * with a throw a caller cannot see. V4 is left exactly as it was measured working:
+ * whether it also accepts the query string was never measured, and a change nobody
+ * has measured is not an improvement.
+ */
+export type IServiceBindingPublicationParams =
+  | IServiceBindingPublicationV2Params
+  | IServiceBindingPublicationV4Params;
+
+/** The fields both protocols need. */
+interface IServiceBindingPublicationCommon {
+  bindingName: string;
+  /**
+   * `published` or `unpublished`. `unchanged` is refused: a binding's update
+   * *is* its publication, so there is no request that changes nothing.
+   */
+  desiredPublicationState: DesiredPublicationState;
+  /**
+   * How long to wait for the publication job, in milliseconds.
+   *
+   * A publication is the slowest request this library makes — ~135s measured on
+   * a trial, and one unpublish still unsettled after eleven minutes — so the
+   * 120s `SAP_TIMEOUT_LONG` default is a floor. `IAdtOperationOptions.timeout`
+   * has carried this all along and `update` used to drop it, which left a
+   * caller no way to wait longer than the library had decided to.
+   */
+  timeout?: number;
+}
+
+/** OData V2, where the job resolves the service by name and version. */
+export interface IServiceBindingPublicationV2Params
+  extends IServiceBindingPublicationCommon {
+  serviceType: 'odatav2';
+  /**
+   * `srvb:services/@srvb:name`. **Required**: without it the job answers a
+   * refusal naming an empty service and version `0000`.
+   */
+  serviceName: string;
+  /** `srvb:content/@srvb:version`, e.g. `0001`. Required for the same reason. */
+  serviceVersion: string;
+}
+
+/** OData V4, where the body alone names the target. */
+export interface IServiceBindingPublicationV4Params
+  extends IServiceBindingPublicationCommon {
+  serviceType: 'odatav4';
+}
+
+/**
+ * What identifies the OData service group a binding publishes.
+ *
+ * Declared here for the same reason as
+ * {@link IServiceBindingPublicationParams}: the shape is being settled against
+ * measured traffic before it moves to `@mcp-abap-adt/interfaces`.
+ *
+ * The difference from `IGetServiceBindingODataParams` there is `serviceType`.
+ * The contract has none, so the protocol had to live in the method name —
+ * `getODataV2ServiceBinding` and `getODataV4ServiceBinding`, one endpoint under
+ * two names differing by a value they could have taken as an argument.
+ */
+export interface IServiceGroupParams {
+  /** The binding, as the URL addresses it. */
+  objectname: string;
+  /** Which protocol's service group to read. */
+  serviceType: GeneratedServiceType;
+  servicename?: string;
+  serviceversion?: string;
+  srvdname?: string;
+}
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface IActivateServiceBindingParams {
+  bindingName: string;
+  preauditRequested?: boolean;
+}
+
+export interface ICheckServiceBindingParams {
+  bindingName: string;
+  version?: 'active' | 'inactive';
+}
+
+export interface IClassifyServiceBindingParams {
+  objectname: string;
+  bindtype?: string;
+  bindtypeversion?: string;
+  repositoryid?: string;
+  servicename?: string;
+  serviceversion?: string;
+}
+
+export interface IDeleteServiceBindingParams {
+  bindingName: string;
+  transportRequest?: string;
+}
+
+export interface IGenerateServiceBindingParams {
+  serviceType: GeneratedServiceType;
+  bindingName: string;
+  serviceName: string;
+  serviceVersion: string;
+  serviceDefinitionName: string;
+}
+
+export interface IGetServiceBindingODataParams {
+  objectname: string;
+  servicename?: string;
+  serviceversion?: string;
+  srvdname?: string;
+}
+
+export interface IPublishODataV2Params {
+  servicename: string;
+  serviceversion?: string;
+}
+
+export interface IReadServiceBindingParams {
+  bindingName: string;
+  version?: 'active' | 'inactive';
+}
+
+export interface ITransportCheckServiceBindingParams {
+  objectName: string;
+  packageName: string;
+  description?: string;
+  operation?: 'I' | 'U' | 'D';
+}
+
+export interface IUnpublishODataV2Params {
+  servicename: string;
+  serviceversion?: string;
+}
+
+export interface IUpdateServiceBindingParams {
+  bindingName: string;
+  desiredPublicationState: DesiredPublicationState;
+  serviceType: GeneratedServiceType;
+  serviceName: string;
+  serviceVersion?: string;
+}
+
+export interface IValidateServiceBindingParams {
+  objname: string;
+  serviceDefinition: string;
+  serviceBindingVersion?: string;
+  description?: string;
+  package?: string;
 }

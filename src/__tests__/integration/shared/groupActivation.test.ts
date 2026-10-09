@@ -12,15 +12,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// The source path, not the package: this reading is new in adt-strategies and
+// the package's built entry point does not carry it until it is released.
+import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { orThrow } from '../../../utils/adtResponse';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
+import { expectLockReleased } from '../../helpers/lockReleased';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -374,20 +380,13 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDomain().create(
-            {
-              domainName: domainName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test domain for group activation`,
-              datatype: testCase.params.domain_datatype || 'CHAR',
-              length: testCase.params.domain_length || 10,
-              decimals: testCase.params.domain_decimals || 0,
-              transportRequest: transportRequest,
-            },
-            { activateOnCreate: false },
-          );
+          await client.getDomain().create({
+            domainName: domainName,
+            packageName: packageName,
+            description:
+              testCase.params.description || `Test domain for group activation`,
+            transportRequest: transportRequest,
+          });
           domainCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -430,19 +429,15 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDataElement().create(
-            {
-              dataElementName: dataElementName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test data element for group activation`,
-              typeKind: testCase.params.data_element_type_kind || 'domain',
-              typeName: domainName, // Reference to domain
-              transportRequest: transportRequest,
-            },
-            { activateOnCreate: false },
-          );
+          await client.getDataElement().create({
+            dataElementName: dataElementName,
+            packageName: packageName,
+            description:
+              testCase.params.description ||
+              `Test data element for group activation`,
+            typeKind: testCase.params.data_element_type_kind || 'domain',
+            transportRequest: transportRequest,
+          });
           dataElementCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -488,17 +483,14 @@ define structure ${structureName} {
  mandt : abap.clnt;
  test_field : ${dataElementName};
 }`;
-        await client.getStructure().create(
-          {
-            structureName: structureName,
-            packageName: packageName,
-            description:
-              testCase.params.description ||
-              `Test structure for group activation`,
-            transportRequest: transportRequest,
-          },
-          { activateOnCreate: false },
-        );
+        await client.getStructure().create({
+          structureName: structureName,
+          packageName: packageName,
+          description:
+            testCase.params.description ||
+            `Test structure for group activation`,
+          transportRequest: transportRequest,
+        });
         structureCreated = true;
         await new Promise((resolve) =>
           setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -508,21 +500,28 @@ define structure ${structureName} {
         currentStep = 'update structure';
         logTestStep(currentStep, testsLogger);
         const structureHandler = client.getStructure();
-        const structureLockHandle = await structureHandler.lock({
-          structureName,
-        });
+        const structureLockHandle = expectResult(
+          await structureHandler.lock({ structureName }),
+          'lock structure',
+        );
         try {
           await structureHandler.update(
             {
               structureName: structureName,
-              ddlCode: structureDdlCode,
+              source: structureDdlCode,
               transportRequest: transportRequest,
             },
-            { activateOnUpdate: false, lockHandle: structureLockHandle },
+            { lockHandle: structureLockHandle },
           );
         } finally {
           await structureHandler.unlock({ structureName }, structureLockHandle);
         }
+        await expectLockReleased(
+          (c) => c.getStructure(),
+          { structureName },
+          `structure ${structureName}`,
+          testsLogger,
+        );
         await new Promise((resolve) =>
           setTimeout(resolve, getOperationDelay('update', testCase)),
         );
@@ -536,17 +535,47 @@ define structure ${structureName} {
           { type: 'TABL/DS', name: structureName },
         ];
 
-        // Step 4: Group activation - activate all objects together
-        const activationResult = await orThrow(
-          client.getUtils().activateObjectsGroup(objectsToActivate, false),
+        // Step 4: start the run, wait for it, read what it produced.
+        //
+        // Three calls since 19.0.0, because they are three requests. A run id
+        // on its own is not success: it says the server accepted the work, and
+        // the results document is what says how the work went. A fixed sleep in
+        // its place was a guess about someone else's system.
+        // The run id is `utilActivationRunId`'s reading of `Location`; the
+        // shipped default answers the POST as it came.
+        const utils = client.getUtils({
+          ...utilDocuments,
+          activation: utilActivationRunId,
+        });
+        const runId = expectResult(
+          await utils.activateObjectsGroup(objectsToActivate, false),
+          'activation run id',
         );
-        expect(activationResult).toBeDefined();
-        expect(activationResult.status).toBe(200);
-        testsLogger.info?.('✅ Group activation completed successfully');
+        expect(runId).toBeTruthy();
 
-        // Wait a bit for activation to fully complete
-        await new Promise((resolve) =>
-          setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
+        // The wait is this test's. `activateObjectsGroup` is the POST, read
+        // here into the run id; `finished` is what this test needs, and `error`
+        // or `failed` is what it must not accept as one.
+        let runStatus = '';
+        const runDeadline = Date.now() + 120_000;
+        while (runStatus !== 'finished' && Date.now() < runDeadline) {
+          const run = expectResult(
+            await utils.getActivationRun(runId, { withLongPolling: true }),
+            'activation run status',
+          );
+          runStatus = activationStatusIn(String(run));
+          if (runStatus === 'error' || runStatus === 'failed') {
+            throw new Error(`activation run ${runId} ended as ${runStatus}`);
+          }
+        }
+        expect(runStatus).toBe('finished');
+
+        const results = expectResult(
+          await utils.getActivationResults(runId),
+          'activation results',
+        );
+        testsLogger.info?.(
+          `✅ run ${runId} finished; results: ${String(results).slice(0, 120)}`,
         );
 
         logTestSuccess(testsLogger, 'Group Activation - full workflow');

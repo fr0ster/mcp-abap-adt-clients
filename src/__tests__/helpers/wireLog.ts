@@ -10,12 +10,30 @@
  *
  *   WIRE_LOG=/tmp/wire.txt npx jest --runInBand integration/core/package
  *
- * It wraps the transport rather than the connection on purpose. By the time a
- * request reaches `send()` every header is on it — CSRF, cookies, session type,
- * connection id — which is exactly the set worth comparing. Above that they do
- * not exist yet.
+ * Bodies are cut at 1200 characters by default, which is right for comparing
+ * headers and wrong for reading what SAP answered — a package read is 876 KB.
+ * `WIRE_LOG_BODY` sets the cut: a number of characters, or `full` for none.
+ *
+ *   WIRE_LOG=/tmp/wire.txt WIRE_LOG_BODY=full npm test
+ *
+ * At `full` the file runs to hundreds of megabytes over a whole suite. That is
+ * the point of it, but it is worth knowing before starting one.
+ *
+ * It wraps the transport rather than the connection on purpose: everything the
+ * *connection* adds is on the request by the time it reaches `send()` — the
+ * session type, the connection id, the request id, the CSRF token.
+ *
+ * **What it does not show, and this has misled a reading already.** The
+ * transport dresses the request inside `send()`, after this wrapper has seen
+ * it, so the cookies and the load-balancer affinity headers
+ * (`sap-adt-saplb: fetch`, `saplb`, `saplb-options`) — and, on cloud,
+ * `x-sap-security-session` — never appear here. A full run's log contains zero
+ * `Cookie` lines, which is the giveaway: every request obviously carries them.
+ * Counting a transport-level header in this file and finding none means the
+ * file cannot see it, not that it was not sent.
  */
 
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 
 interface WireRequest {
@@ -34,19 +52,51 @@ interface WireResponse {
 }
 
 /** Header names whose value is a credential or a token, never written out. */
-const REDACT = new Set([
-  'authorization',
-  'x-csrf-token',
-  'cookie',
-  'set-cookie',
-]);
+const REDACT = new Set(['authorization', 'x-csrf-token']);
+
+/**
+ * Cookies as identity, never as value.
+ *
+ * `cookie` and `set-cookie` used to be redacted whole, which hid the one thing
+ * an `ICMENOSESSION` investigation needs: whether the failing request presented
+ * the session id the server had, or a stale one. The name is not a secret and
+ * the fingerprint is not reversible — eight hex of SHA-256 over a 40-character
+ * session id — so the identity can be followed across a log without the value
+ * ever appearing in it.
+ *
+ *   SAP_SESSIONID_E19_100=#3f9a1c4e; sap-usercontext=#b1d0e772
+ */
+function fingerprintCookies(value: string): string {
+  return value
+    .split(/;\s*/)
+    .filter(Boolean)
+    .map((pair) => {
+      const eq = pair.indexOf('=');
+      if (eq < 0) return pair;
+      const name = pair.slice(0, eq);
+      const raw = pair.slice(eq + 1);
+      // Attributes of a Set-Cookie carry no identity and no secret.
+      if (
+        /^(path|domain|expires|max-age|samesite|secure|httponly)$/i.test(name)
+      ) {
+        return pair;
+      }
+      const digest = createHash('sha256').update(raw).digest('hex').slice(0, 8);
+      return `${name}=#${digest}`;
+    })
+    .join('; ');
+}
 
 function headerLines(headers: unknown, indent = '  '): string {
   if (!headers || typeof headers !== 'object') return `${indent}(none)\n`;
   const entries = Object.entries(headers as Record<string, unknown>)
     .map(([k, v]) => [
       k,
-      REDACT.has(k.toLowerCase()) ? '<redacted>' : String(v),
+      REDACT.has(k.toLowerCase())
+        ? '<redacted>'
+        : /^(cookie|set-cookie)$/i.test(k)
+          ? fingerprintCookies(String(v))
+          : String(v),
     ])
     .sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) return `${indent}(none)\n`;
@@ -56,10 +106,26 @@ function headerLines(headers: unknown, indent = '  '): string {
     .join('');
 }
 
+/**
+ * How much of a body to write, from `WIRE_LOG_BODY`.
+ *
+ * Read once: an env var that changes mid-run would make two halves of the same
+ * file mean different things. `Number.POSITIVE_INFINITY` rather than a flag, so
+ * the one comparison below covers both cases.
+ */
+const BODY_LIMIT = (() => {
+  const asked = process.env.WIRE_LOG_BODY;
+  if (!asked) return undefined;
+  if (asked === 'full' || asked === '0') return Number.POSITIVE_INFINITY;
+  const parsed = Number.parseInt(asked, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+})();
+
 function bodyLine(data: unknown, limit = 1200): string {
   if (data === undefined || data === null || data === '') return '';
+  const cut = BODY_LIMIT ?? limit;
   const text = typeof data === 'string' ? data : JSON.stringify(data);
-  return `  body: ${text.length > limit ? `${text.slice(0, limit)}… (${text.length} chars)` : text}\n`;
+  return `  body: ${text.length > cut ? `${text.slice(0, cut)}… (${text.length} chars)` : text}\n`;
 }
 
 /**
@@ -69,6 +135,9 @@ function bodyLine(data: unknown, limit = 1200): string {
  * different constructors, and both reach private fields, so anything that
  * copies them would have to be written twice and would break on the next field
  * either one gains.
+ *
+ * It only ever appends. Emptying the file belongs to `truncateWireLog`,
+ * called once per run from `globalSetup`.
  */
 export function withWireLog<T extends object>(transport: T): T {
   const path = process.env.WIRE_LOG;

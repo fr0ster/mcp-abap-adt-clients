@@ -5,9 +5,10 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { BEHAVIOR_DEFINITION, sourceUri } from '../../endpoints/objects';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateBehaviorDefinitionParams } from './types';
 
@@ -46,23 +47,21 @@ import type { IUpdateBehaviorDefinitionParams } from './types';
  * });
  * await unlock(connection, 'Z_MY_BDEF', lockHandle, sessionId);
  * ```
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function update(
   connection: IAbapConnection,
-  params: IUpdateBehaviorDefinitionParams,
+  // The handle is accepted as given, including not at all. The params type in
+  // the interfaces package still requires one; whether a write without a lock
+  // is allowed is ADT's judgement, so this function does not add its own.
+  params: Omit<IUpdateBehaviorDefinitionParams, 'lockHandle'> & {
+    lockHandle?: string;
+  },
 ): Promise<IAdtWireResponse> {
-  if (!params.sourceCode) {
-    throw new Error('sourceCode is required');
-  }
-
-  if (!params.lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
-  let url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(params.name).toLowerCase()}/source/main?lockHandle=${encodeURIComponent(params.lockHandle)}`;
-  if (params.transportRequest) {
-    url += `&corrNr=${params.transportRequest}`;
-  }
+  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(params.name as string))}${writeQuery(params.lockHandle, params.transportRequest)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

@@ -6,7 +6,7 @@
  * no hardcoded object names.
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';

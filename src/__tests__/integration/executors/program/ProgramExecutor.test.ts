@@ -7,15 +7,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  ILogger,
-  IProfiler,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
 import {
   createTestAdtClient,
@@ -37,7 +37,13 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
+import {
+  type ReadingProfiler,
+  readingProfiler,
+  readingProgramExecutor,
+  traceIdsNow,
+  waitForNewTrace,
+} from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -113,7 +119,8 @@ describe('ProgramExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
-  let profiler: IProfiler;
+  let profiler: ReadingProfiler;
+  let programRunner: ReturnType<typeof readingProgramExecutor>;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
@@ -144,9 +151,11 @@ describe('ProgramExecutor (integration)', () => {
       traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      // No cast since 15.0.0: it reached `latestTraceId()`, which is gone, and
-      // this file only ever needed what `IProfiler` already declares.
-      profiler = runtime.getProfiler();
+      // Built with the readings rather than taken from the factories: the
+      // profiler and the scheduling answer documents by default, and these
+      // cases assert entries, rows and the scheduled request id.
+      profiler = readingProfiler(connection, libraryLogger);
+      programRunner = readingProgramExecutor(connection, libraryLogger);
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -170,7 +179,7 @@ describe('ProgramExecutor (integration)', () => {
     // appeared in between belongs to somebody else.
     for (const traceId of tracesCreated) {
       try {
-        await runtime.getProfiler().delete(traceId);
+        await profiler.delete(traceId);
       } catch (cleanupError) {
         testsLogger.warn?.(
           `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
@@ -242,15 +251,15 @@ describe('ProgramExecutor (integration)', () => {
       try {
         const programName = sharedRunnableProgram(testCase);
         logTestStep('run', testsLogger);
-        const response = await executor
-          .getProgramExecutor()
-          .run({ programName });
+        const response = expectResult(
+          await programRunner.run({ programName }),
+          'response',
+        );
 
-        expect(response.status).toBe(200);
-        expect(response.data).toBeDefined();
-        const runOutput = String(response.data);
+        expect(response).toBeDefined();
+        const runOutput = String(response);
         expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
-        logTestStep(`run output: ${toShortText(response.data)}`, testsLogger);
+        logTestStep(`run output: ${toShortText(response)}`, testsLogger);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -321,20 +330,36 @@ describe('ProgramExecutor (integration)', () => {
         // be told apart from the ones already there.
         const tracesBefore = await traceIdsNow(profiler, { user: traceUser });
 
-        logTestStep('create trace parameters + run with profiler', testsLogger);
-        const result = await executor
-          .getProgramExecutor()
-          .runWithProfiling({ programName }, { profilerParameters });
+        // Two calls since 19.0.0: schedule the measurement, then run under it.
+        // `runWithProfiling` did both, and the order was fixed in the library.
+        logTestStep(
+          'create trace parameters, then run with profiler',
+          testsLogger,
+        );
+        const programExecutor = programRunner;
+        const profilerId = expectResult(
+          await programExecutor.scheduleTrace(profilerParameters),
+          'scheduled trace',
+        );
+        const result = {
+          run: expectResult(
+            await programExecutor.runWithProfiler(
+              { programName },
+              { profilerId },
+            ),
+            'result',
+          ),
+          profilerId,
+        };
 
-        expect(result.response.status).toBe(200);
-        const runOutput = String(result.response.data);
+        const runOutput = String(result.run);
         expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
 
         logTestStep(
-          `run output: ${toShortText(result.response.data)}; profilerId=${result.profilerId}`,
+          `run output: ${toShortText(result.run)}; profilerId=${result.profilerId}`,
           testsLogger,
         );
 
@@ -368,15 +393,22 @@ describe('ProgramExecutor (integration)', () => {
         logTestStep(`traceId=${traceId}`, testsLogger);
 
         logTestStep('read all three views', testsLogger);
-        const hitlist = await profiler.read(traceId, 'hitlist', {
-          withSystemEvents: false,
-        });
-        const statements = await profiler.read(traceId, 'statements', {
-          withSystemEvents: false,
-        });
-        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
-          withSystemEvents: false,
-        });
+        const hitlist = expectResult(
+          await profiler.read(traceId, 'hitlist', { withSystemEvents: false }),
+          'read hitlist',
+        );
+        const statements = expectResult(
+          await profiler.read(traceId, 'statements', {
+            withSystemEvents: false,
+          }),
+          'read statements',
+        );
+        const dbAccesses = expectResult(
+          await profiler.read(traceId, 'dbAccesses', {
+            withSystemEvents: false,
+          }),
+          'read dbAccesses',
+        );
 
         // Parsed rows, not a status code: a 200 with a body nothing could read
         // used to satisfy this.

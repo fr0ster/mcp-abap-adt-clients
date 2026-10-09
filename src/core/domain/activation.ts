@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { DOMAIN } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate domain
@@ -19,7 +19,7 @@ export async function activateDomain(
   connection: IAbapConnection,
   domainName: string,
 ): Promise<IAdtWireResponse> {
-  const objectUri = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(domainName.toLowerCase())}`;
+  const objectUri = `${DOMAIN.uri(domainName)}`;
   return await activateObjectInSession(
     connection,
     objectUri,

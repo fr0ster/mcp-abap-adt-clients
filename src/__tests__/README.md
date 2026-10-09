@@ -168,8 +168,7 @@ Some tests may fail due to SAP authorization:
 - **S_ABPLNGVS** — the ABAP *language version* authorization object, not a role.
   It is raised wherever the language version cannot be satisfied, which includes
   writing into a package that does not exist — so the message names authorization
-  while the cause is often a wrong package. See
-  [docs/usage/TROUBLESHOOTING.md](../../docs/usage/TROUBLESHOOTING.md).
+  while the cause is often a wrong package.
 - Tests will log authorization errors but continue with cleanup
 
 ## Test Pattern

@@ -24,7 +24,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -340,7 +340,7 @@ async function run(): Promise<void> {
             options.functionGroup,
           ),
         );
-        testsLogger.info?.(`Metadata status: ${metadata.status}`);
+        testsLogger.info?.(`Metadata: ${metadata.length} bytes`);
       } catch (error) {
         logHttpError(error, 'Read metadata');
       }
@@ -414,14 +414,12 @@ async function run(): Promise<void> {
       );
     }
     try {
-      await client.getClass().update(
-        {
-          className: options.objectName,
-          transportRequest,
-          sourceCode: updatedSource,
-        },
-        { sourceCode: updatedSource },
-      );
+      await client
+        .getClass()
+        .update(
+          { className: options.objectName, transportRequest },
+          { source: updatedSource },
+        );
     } catch (error) {
       logHttpError(error, 'Update');
       throw error;
@@ -471,14 +469,12 @@ async function run(): Promise<void> {
   } finally {
     if (updateSucceeded && originalSource) {
       testsLogger.info?.('Restoring original source...');
-      await client.getClass().update(
-        {
-          className: options.objectName,
-          transportRequest,
-          sourceCode: originalSource,
-        },
-        { sourceCode: originalSource },
-      );
+      await client
+        .getClass()
+        .update(
+          { className: options.objectName, transportRequest },
+          { source: originalSource },
+        );
       await client.getClass().activate({ className: options.objectName });
       const restored = await readSource(client, connection, 'active');
       const restoredOk = restored === originalSource;

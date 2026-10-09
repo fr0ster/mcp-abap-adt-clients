@@ -2,7 +2,11 @@
  * Runtime Traces - Exports
  */
 
-export { CrossTrace } from './CrossTraceDomain';
+export {
+  CrossTrace,
+  crossTraceDocuments,
+  type ICrossTraceResultSet,
+} from './CrossTraceDomain';
 export {
   getCrossTrace,
   getCrossTraceActivations,
@@ -11,14 +15,16 @@ export {
   type IListCrossTracesOptions,
   listCrossTraces,
 } from './crossTrace';
-export { Profiler } from './ProfilerDomain';
+export {
+  type IProfilerResults,
+  type IProfilerViews,
+  Profiler,
+  profilerDocuments,
+} from './ProfilerDomain';
 export {
   buildTraceParametersXml,
   createTraceParameters,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
-  extractProfilerIdFromResponse,
-  extractTraceIdFromTraceFeed,
-  extractTraceIdFromTraceRequestsResponse,
   getTraceDbAccesses,
   getTraceHitList,
   getTraceParameters,
@@ -30,15 +36,17 @@ export {
   type IProfilerTraceHitListOptions,
   type IProfilerTraceParameters,
   type IProfilerTraceStatementsOptions,
-  type ITraceFeedEntry,
   listObjectTypes,
   listProcessTypes,
   listTraceFiles,
   listTraceRequests,
   normalizeProfilerTraceId,
-  parseTraceFeedEntries,
 } from './profiler';
-export { St05Trace } from './St05Trace';
+export {
+  type ISt05TraceResults,
+  St05Trace,
+  st05TraceDocuments,
+} from './St05Trace';
 export {
   getSt05TraceDirectory,
   getSt05TraceState,

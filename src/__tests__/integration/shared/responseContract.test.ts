@@ -26,14 +26,18 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// The source path, not the package: these readings are new in adt-strategies
+// and the package's built entry point does not carry them until it is released.
+import { utilSearchHits } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { AdtParseError, AdtSAPError } from '../../../utils/adtErrors';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -41,7 +45,7 @@ import {
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestStep } from '../../helpers/testProgressLogger';
+import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -85,10 +89,20 @@ describe('Response contract - 17.0.0', () => {
 
   describe('the successful half', () => {
     it('answers ok, and the result is the member’s own contract', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'answers ok, and the result is the member’s own contract',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep('search for objects that exist', testsLogger);
 
-      const answer = await client.getUtils().search({ query: 'CL_ABAP*' });
+      // The hits are a reading the caller asks for; the default is the document.
+      const answer = await client
+        .getUtils({ ...utilDocuments, search: utilSearchHits })
+        .search({ query: 'CL_ABAP*' });
 
       expect(answer.ok).toBe(true);
       if (!answer.ok) {
@@ -107,7 +121,14 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
 
     it('has no error on the successful half', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'has no error on the successful half',
+          'No SAP configuration',
+        );
+        return;
+      }
 
       const answer = await client.getUtils().getAllTypes(50);
 
@@ -116,14 +137,23 @@ describe('Response contract - 17.0.0', () => {
         throw new Error(`expected a result: ${answer.getError().message}`);
       }
       // The union's other guarantee, and the one a caller relies on when they
-      // branch: on the success side there is nothing to read as a failure.
-      expect(answer.getError()).toBeUndefined();
+      // branch: the success half declares no `getError` at all, so reaching for
+      // one does not compile. Asserted here as the runtime shape, since the
+      // compile-time half is what the narrowing above already proves.
+      expect('getError' in answer).toBe(false);
     }, 60000);
   });
 
   describe('the failing half — what a stub cannot prove', () => {
     it('recognises a refusal about an object the server has never heard of', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'recognises a refusal about an object the server has never heard of',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep(`read metadata for ${NEVER_EXISTS}`, testsLogger);
 
       const answer = await client
@@ -159,7 +189,14 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
 
     it('says what SAP said, not what this library guessed', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'says what SAP said, not what this library guessed',
+          'No SAP configuration',
+        );
+        return;
+      }
 
       const answer = await client
         .getUtils()
@@ -180,89 +217,139 @@ describe('Response contract - 17.0.0', () => {
         );
       }
 
-      // Whatever it was, it is the server's word or ours — and `cause` says
-      // which, by type.
-      if (failure.origin === 'refusal') {
-        expect(failure.cause).toBeInstanceOf(AdtSAPError);
-      } else if (failure.origin === 'parse') {
-        expect(failure.cause).toBeInstanceOf(AdtParseError);
-      }
+      // Two origins, and no `cause`. interfaces 31.0.0 removed both the third
+      // origin and the thrown error behind the failure: `parse` described this
+      // library failing to read a document, which is not a verdict about the
+      // server, and `cause` published what it had thrown internally.
+      expect(['connection', 'refusal']).toContain(failure.origin);
     }, 60000);
 
     it('a package that does not exist is not an empty package', async () => {
-      if (!hasConfig) return;
-      logTestStep(`package hierarchy for ${NEVER_EXISTS}`, testsLogger);
-
-      const answer = await client.getUtils().getPackageHierarchy(NEVER_EXISTS);
-
-      // The sharpest case in this file. "There is nothing in it" and "there is
-      // no such thing" are different answers, and a parser that finds no nodes
-      // reports the first for both. That is how a logon page from an expired
-      // session read as "the package is empty".
-      if (answer.ok) {
-        const tree = answer.getResult().value;
-        throw new Error(
-          `a package that does not exist answered a result: ${JSON.stringify(tree).slice(0, 200)}`,
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'a package that does not exist is not an empty package',
+          'No SAP configuration',
         );
+        return;
       }
+      logTestStep(`node structure for ${NEVER_EXISTS}`, testsLogger);
 
-      expect(answer.getError().message.length).toBeGreaterThan(0);
+      const answer = await client
+        .getUtils()
+        .fetchNodeStructure('DEVC/K', NEVER_EXISTS);
+
+      // The sharpest case in this file, and since 19.0.0 it is a statement
+      // about the endpoint rather than about a verdict this package gives.
+      //
+      // `/repository/nodestructure` answers 200 with an **empty body** for a
+      // package that does not exist, and 200 with a tree for one that does.
+      // "There is nothing in it" and "there is no such thing" arrive
+      // byte-identical, so nothing below the caller can tell them apart — which
+      // is how a logon page from an expired session once read as an empty
+      // package.
+      //
+      // The walk that used to raise for this left with the other multi-request
+      // members. A caller who needs the distinction makes it here, on the body,
+      // and `scripts/lib/packageWalk.ts` shows one doing exactly that.
+      expect(answer.ok).toBe(true);
+      if (!answer.ok) throw new Error('expected an answer to read');
+
+      // The default reading is the document itself. This read `.data` off the
+      // value while the default was a parse, which is `undefined` on any value
+      // and so asserted nothing; the body is what carries the claim.
+      const body = String(answer.getResult().value ?? '');
+      expect(body.trim().length).toBe(0);
       testsLogger.info?.(
-        `📛 ${answer.getError().origin}: ${answer.getError().message}`,
+        `📛 ${NEVER_EXISTS} answered 200 with ${body.length} bytes — absence and emptiness are the same document`,
       );
     }, 60000);
   });
 
-  describe('the per-type handlers, which have not migrated', () => {
-    it('answers undefined for an object that does not exist', async () => {
-      if (!hasConfig) return;
-      logTestStep(`read class ${NEVER_EXISTS}`, testsLogger);
-
-      // Not a defect, and this case asserted otherwise at first. `read()` is
-      // typed `Promise<IClassState | undefined>` and answers `undefined` for a
-      // 404 on purpose: for a read, "there is no such object" is an answer, and
-      // the type says so where a caller cannot miss it.
-      //
-      // What 17.0.0 changed is the *other* case — a refusal SAP delivers while
-      // the request itself succeeded, which used to be stored as a result with
-      // `errors: []`. That one is covered by unit tests against a stub, because
-      // it needs a server that answers 200 with an exception document.
-      const state = await client.getClass().read({ className: NEVER_EXISTS });
-
-      expect(state).toBeUndefined();
-    }, 60000);
-
-    it('surfaces a refusal on a write rather than reporting success', async () => {
-      if (!hasConfig) return;
-      logTestStep(`activate ${NEVER_EXISTS}`, testsLogger);
-
-      // A write is where reporting success on a refusal costs something: the
-      // caller believes an object exists, or was activated, and it was not.
-      const outcome = await client
-        .getClass()
-        .activate({ className: NEVER_EXISTS })
-        .then(
-          (state) => ({ threw: false as const, state }),
-          (error: unknown) => ({ threw: true as const, error }),
+  describe('the per-type handlers', () => {
+    it('never reports an object that does not exist as one that does', async () => {
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'never reports an object that does not exist as one that does',
+          'No SAP configuration',
         );
-
-      if (outcome.threw) {
-        const error = outcome.error as Error;
-        testsLogger.info?.(`📛 ${error.name}: ${error.message.slice(0, 120)}`);
-        if (error instanceof AdtSAPError) {
-          expect(error.message.length).toBeGreaterThan(0);
-          expect(error.request?.url).toContain('/sap/bc/adt/');
-        }
         return;
       }
+      logTestStep(`read class ${NEVER_EXISTS}`, testsLogger);
 
-      // If it did not throw, the state must say so — an empty `errors` here is
-      // the library reporting success for something the server refused.
-      const errors = outcome.state?.errors ?? [];
-      testsLogger.info?.(
-        `state returned, errors=${errors.length}: ${JSON.stringify(errors).slice(0, 200)}`,
-      );
-      expect(errors.length).toBeGreaterThan(0);
+      const answer = await client.getClass().read({ className: NEVER_EXISTS });
+
+      // **Two shapes, both honest, and which one you get is the system's.**
+      // Some systems answer a read for an object that is not there with 200 and
+      // an empty body; others 404 it. Measured on the cloud trial: a class that
+      // does not exist at all is refused, while a class that exists without an
+      // active version answers the empty body. This library does not paper over
+      // the difference — whether an empty body *is* absence is the caller's
+      // `analyse` to decide, and a status the transport refused is a failure.
+      //
+      // What must never happen is the third thing: a populated result for an
+      // object nobody has. That is what this asserts.
+      if (answer.ok) {
+        const source = answer.getResult().value;
+        testsLogger.info?.(
+          `📄 absence reached the caller as an empty read (${String(source).length} bytes)`,
+        );
+        expect(String(source)).toBe('');
+      } else {
+        const failure = answer.getError();
+        testsLogger.info?.(
+          `📛 absence reached the caller as [${failure.origin}] ${failure.message}`,
+        );
+        expect(failure.message.length).toBeGreaterThan(0);
+        expect(['connection', 'refusal']).toContain(failure.origin);
+      }
+    }, 60000);
+
+    it('hands a refusal on a write to the caller, who names it', async () => {
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'hands a refusal on a write to the caller, who names it',
+          'No SAP configuration',
+        );
+        return;
+      }
+      logTestStep(`activate ${NEVER_EXISTS}`, testsLogger);
+
+      // **This is what 19.0.0 changed, and the assertion is the change.**
+      //
+      // ADT answers a failed activation with `200` and a checklist carrying
+      // `<msg type="E">`. Until 19.0.0 this package read that document and
+      // called it a failure. It no longer reads bodies at all, so the exchange
+      // arrives as a success carrying the checklist, and whether the checklist
+      // means "not activated" is the caller's to decide.
+      const unjudged = await client
+        .getClass()
+        .activate({ className: NEVER_EXISTS });
+
+      expect(unjudged.ok).toBe(true);
+      if (!unjudged.ok) throw new Error('expected the answer, not a verdict');
+      const document = String(unjudged.getResult().value ?? '');
+      expect(document.length).toBeGreaterThan(0);
+
+      // And here the caller decides, with the strategy this package stopped
+      // shipping. A consumer builds theirs from their own corpus of answers;
+      // this one is deliberately crude, because its shape is not the point.
+      const refusalIsAFailure: IAnalyse<IAdtError> = (verdict, answer) =>
+        /type="?E"?/.test(String(answer?.data ?? ''))
+          ? { origin: 'refusal', message: String(answer?.data ?? '') }
+          : verdict;
+
+      const judged = await client
+        .getClass()
+        .activate({ className: NEVER_EXISTS }, { analyse: refusalIsAFailure });
+
+      expect(judged.ok).toBe(false);
+      if (judged.ok) throw new Error('expected the caller to decide');
+      const failure = judged.getError();
+      expect(failure.origin).toBe('refusal');
+      expect(failure.message.length).toBeGreaterThan(0);
     }, 60000);
   });
 });

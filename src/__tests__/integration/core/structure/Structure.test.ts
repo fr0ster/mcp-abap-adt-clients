@@ -12,16 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IStructureConfig,
-  IStructureState,
-} from '../../../../core/structure';
+import type { IStructureConfig } from '../../../../core/structure';
 import { getStructure } from '../../../../core/structure/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -69,7 +68,7 @@ describe('Structure (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IStructureConfig, IStructureState>;
+  let tester: BaseTester<IStructureConfig>;
 
   beforeAll(async () => {
     try {
@@ -113,7 +112,7 @@ describe('Structure (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            ddlCode: params.ddl_code,
+            source: params.ddl_code,
           };
         },
         ensureObjectReady: async (structureName: string) => {
@@ -167,15 +166,15 @@ describe('Structure (using AdtClient)', () => {
 
         const testCase = tester.getTestCaseDefinition();
         const updatedDdlCode =
-          testCase?.params?.updated_ddl_code || config.ddlCode || '';
+          testCase?.params?.updated_ddl_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: updatedDdlCode,
+          source: updatedDdlCode,
           updateConfig: {
             structureName: config.structureName,
             packageName: config.packageName,
             description: config.description || '',
-            ddlCode: updatedDdlCode,
+            source: updatedDdlCode,
           },
         });
       },
@@ -226,8 +225,8 @@ describe('Structure (using AdtClient)', () => {
           const resultState = await tester.readTest({
             structureName: standardStructureName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const structureConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const structureConfig = resultState;
           if (
             structureConfig &&
             typeof structureConfig === 'object' &&

@@ -7,9 +7,16 @@
 # ┌──────────────────────────────────────────────────────────────────┐
 # │  PREREQUISITE (do this BEFORE running any tests):                │
 # │                                                                  │
-# │  Create the root package manually in your SAP system (ADT/SE80) │
-# │  e.g. ZADT_BLD_PKG03. Tests do NOT create this package —        │
-# │  they only create objects INSIDE it.                             │
+# │  Create the root package manually in your SAP system (ADT/SE80). │
+# │  Tests do NOT create this package — they only create objects     │
+# │  INSIDE it. Every value below written as <LIKE_THIS> is a        │
+# │  placeholder: the file will not run until you replace it.        │
+# │                                                                  │
+# │  ON-PREM: make that package TRANSPORTABLE — software component,  │
+# │  transport layer, change recording ON — and give it ONE request  │
+# │  that is never released. A local package registers nothing in    │
+# │  CTS, so transport defects stay invisible and suites pass on a   │
+# │  lie; a second request meets CTS_WBO_API 019 on the first write. │
 # │                                                                  │
 # │  REQUIRED CHANGES (edit these after copying):                    │
 # │                                                                  │
@@ -19,7 +26,9 @@
 # │  4. shared_dependencies.super_package — parent package           │
 # │                                                                  │
 # │  ON-PREM ONLY (if creating packages):                            │
-# │  5. create_package.transport_layer    — e.g. "ZE19"             │
+# │  5. create_package.transport_layer    — e.g. "Z<SID>"            │
+# │  6. create_transport.target_system    — the transport target,    │
+# │     without slashes; create() adds them itself                   │
 # └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
@@ -37,7 +46,7 @@
 # - Structures: ZAC_STRU01, ZAC_STRU02, etc.
 # - Views: ZAC_VIEW01, ZAC_VIEW02, etc.
 # - Scalar Functions: ZADT_SCALAR_FUNC, ZAC_DSFD01, etc.
-# - Service Definitions: ZAC_SRVD01, ZAC_SRVD02, etc.
+# - Service Definitions: ZAC_SHR_SRVD01, ZAC_SHR_SRVD02, etc.
 # - Service Bindings: ZAC_SRVB01, ZAC_SRVB02, etc.
 # - Packages: ZAC_PKG01, ZAC_PKG02, etc.
 #
@@ -71,7 +80,31 @@ test_settings:
 
 # Session persistence configuration
 session_config:
-  cleanup_session_after_test: true
+  # Off, because on it opens an ABAP session per test and never closes one.
+  #
+  # A run is meant to hold one session: `globalSetup` opens it, publishes the
+  # material, and every test file adopts it. With this on, `BaseTester` calls
+  # `recycleTestSession` in the cleanup step of every test that created an
+  # object — `endSession()` and then immediately `connect()`.
+  #
+  # The connector's own documentation says why that leaks: `disconnect()`
+  # "dispatches the logoff without awaiting it, so the request is still being
+  # assembled while the connection is already free to connect() again", and the
+  # live cookie is then merged over the snapshot, so "the goodbye for the old
+  # session arrives addressed to the new one". The old session survives to its
+  # 30-minute idle timeout.
+  #
+  # Measured on E19, 2026-09-07: with this on, a new session every 1-2 seconds
+  # for the length of the run, none released; turned off, one session for the
+  # whole run, and the same suites pass — 7 suites / 14 tests green.
+  #
+  # It was on to drop locks a failed step left behind, by ending the session
+  # holding them. That is the part which does not work: `E_ABAP_GENPH` locks
+  # were measured surviving both the run and the deletion of the object they
+  # name, so the sessions were being spent on something they do not achieve.
+  # Turn it back on only for a system where ending the session is measured to
+  # release them.
+  cleanup_session_after_test: false
 
 # Lock persistence configuration
 lock_config:
@@ -85,8 +118,18 @@ environment:
   system: "onprem"                            # ← CHANGE: "onprem" or "cloud". Stated, never guessed —
                                               #   the two manage sessions differently and the server
                                               #   cannot be asked which it is.
-  default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+  default_package: "<DEV_PACKAGE>"             # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+                                              #   ON-PREM: make it TRANSPORTABLE — a software component,
+                                              #   a transport layer, and change recording ON. A local
+                                              #   package registers nothing in CTS, so every transport
+                                              #   defect stays invisible and four suites pass on a lie.
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
+                                              #   ON-PREM: ONE request, reused by every run and never
+                                              #   released. An object stays registered in the request
+                                              #   that created it, so a second request meets
+                                              #   `CTS_WBO_API 019` on the first write. It must carry a
+                                              #   transport TARGET, or creating anything in a package on
+                                              #   a transport layer is refused with `CTS_WBO_API 048`.
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
   default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
@@ -99,15 +142,28 @@ environment:
 # Naming convention: ZAC_SHR_{COMPONENT}_{OBJTYPE}
 shared_dependencies:
   package: "ZAC_SHR_PKG"
-  super_package: "ZADT_TEST"                 # ← CHANGE: parent package (same as environment.default_package)
-  software_component: ""                     # e.g., HOME (leave empty for cloud)
-  transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
+  super_package: "<DEV_PACKAGE>"              # ← CHANGE: parent package (same as environment.default_package)
+  software_component: ""                     # ← CHANGE (on-prem): e.g. HOME (leave empty for cloud)
+  transport_layer: ""                        # ← CHANGE (on-prem): e.g. Z<SID> (leave empty for cloud)
+  record_changes: false                      # ← CHANGE (on-prem, transportable component such as HOME): true — SAP refuses such a package without change recording (TR432)
 
   domains:
     - name: "ZAC_SHR_GA_DOM"
       description: "Shared domain — base of the group-activation chain"
       datatype: "CHAR"
       length: 10
+
+  data_elements:
+    # The authorization field's update needs a data element, and it must be one
+    # this project owns: every `ZAC_DTEL*` in the config belongs to a flow that
+    # creates and deletes it, so pointing at one races that flow. SAP's own
+    # `CHAR10` is refused on ABAP Cloud — "Data Element CHAR10 is deprecated.
+    # Use own type declaration or own object instead." — which is what made the
+    # authorization field look unavailable there.
+    - name: "ZAC_SHR_AUTH_DTEL"
+      description: "Shared data element for the authorization field tests"
+      available_in: ["onprem", "cloud"]
+      domain_name: "ZAC_SHR_GA_DOM"
 
   structures:
     - name: "ZAC_SHR_STRU"
@@ -316,6 +372,47 @@ shared_dependencies:
           ENDMETHOD.
         ENDCLASS.
 
+    - name: "ZAC_SHR_ATC_DIRTY"
+      description: "Shared class with deliberate ATC violations — the object an ATC run is expected to find something in"
+      available_in: ["onprem", "cloud"]
+      source: |
+        " Deliberately dirty. Every statement below is here to be found by an
+        " ATC check, and the comment above it names the check it is aimed at.
+        " A run over this class that reports FINDING_STATS "0,0,0" is not a
+        " clean class — it is a check variant that looks for none of this.
+        CLASS zac_shr_atc_dirty DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            METHODS dirty
+              IMPORTING iv_input         TYPE i
+              RETURNING VALUE(rv_result) TYPE i.
+        ENDCLASS.
+
+        CLASS zac_shr_atc_dirty IMPLEMENTATION.
+          METHOD dirty.
+            " Declared and never read — the "unused variable" check.
+            DATA lv_never_used TYPE i.
+
+            " EQ instead of = — the "obsolete relational operator" check.
+            DATA lv_zero TYPE abap_bool VALUE abap_false.
+            IF iv_input EQ 0.
+              lv_zero = abap_true.
+            ENDIF.
+
+            " An empty handler on the root exception class — the "catch
+            " CX_ROOT" and "empty CATCH block" checks. The divisor is the
+            " parameter, so the division survives to runtime rather than
+            " being rejected as a constant division by zero.
+            TRY.
+                rv_result = 100 / iv_input.
+              CATCH cx_root.
+            ENDTRY.
+
+            IF lv_zero = abap_true.
+              rv_result = 0.
+            ENDIF.
+          ENDMETHOD.
+        ENDCLASS.
+
   interfaces:
     - name: "ZAC_SHR_IF01"
       description: "Shared interface for read-only tests"
@@ -341,6 +438,24 @@ shared_dependencies:
           ev_output = |Result: { iv_input }|.
         ENDFUNCTION.
 
+
+  # Includes of a shared function group.
+  #
+  # An include's name is derived — `L<GROUP>` plus a suffix — so it carries the
+  # group's `SHR` whether or not the include itself is shared. What makes this
+  # one shared is that it is declared here and nothing deletes it: the
+  # `create_function_include` workflow owns `LZAC_SHR_FUGRZ03` and takes that
+  # one apart every run, while the read-only tests read this one.
+  function_group_includes:
+    - name: "LZAC_SHR_FUGRZ02"
+      function_group: "ZAC_SHR_FUGR"
+      description: "Shared function group include for read-only tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        *&---------------------------------------------------------------------*
+        *& Include LZAC_SHR_FUGRZ02
+        *&---------------------------------------------------------------------*
+        DATA: gv_adt_shr_include TYPE string VALUE 'AdtFunctionInclude shared'.
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
       description: "Shared service definition for read-only tests"
@@ -361,6 +476,19 @@ shared_dependencies:
           expose ZAC_SHR_BIMP_DDLS;
         }
 
+    # Publishing is a change to the system, so it gets a service definition of
+    # its own rather than borrowing one. Two bindings contending for a single
+    # definition is the thing to avoid, and a publish run must not depend on an
+    # object another test creates and deletes.
+    - name: "ZAC_SHR_SRVD03"
+      description: "Shared service definition reserved for publish/unpublish"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label: 'Shared service definition for publishing'
+        define service ZAC_SHR_SRVD03 {
+          expose ZAC_SHR_CDSUT_DDLS;
+        }
+
   service_bindings:
     - name: "ZAC_SHR_SRVB01"
       description: "Shared service binding for read-only tests"
@@ -368,6 +496,26 @@ shared_dependencies:
       skip_activation: true
       service_definition: "ZAC_SHR_SRVD02"
       service_name: "ZAC_SHR_SRVD02"
+      service_version: "0001"
+      binding_type: "ODATA"
+      binding_version: "V4"
+      binding_variant: "ODATA_V4_WEB_API"
+
+    # The subject of publish_service_binding / unpublish_service_binding. Both
+    # are disabled by default and turned on for a deliberate run, so this sits
+    # unpublished the rest of the time.
+    #
+    # Unlike its neighbour it is activated, because a publish needs an active
+    # binding over an active definition — which is also why it takes SRVD03
+    # rather than SRVD02, the one carrying `skip_activation`. Untested as a
+    # default: the publish cases have never run from a clean setup, so if
+    # activation here turns out to need the same exemption, that is the
+    # measurement to record rather than a surprise.
+    - name: "ZAC_SHR_SRVB02"
+      description: "Shared service binding reserved for publish/unpublish tests"
+      available_in: ["onprem", "cloud"]
+      service_definition: "ZAC_SHR_SRVD03"
+      service_name: "ZAC_SHR_SRVD03"
       service_version: "0001"
       binding_type: "ODATA"
       binding_version: "V4"
@@ -414,9 +562,13 @@ standard_objects:
       description: "Shared runnable class (from shared_dependencies)"
       available_in: ["onprem", "cloud"]
 
+  # `available_in` is required on every entry: resolveStandardObject filters
+  # on it, and an entry without it is never selected — these four were
+  # silently skipped by their read tests on every system.
   interfaces:
     - name: "ZAC_SHR_IF01"
       description: "Shared interface (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   # Basic DDIC objects — guaranteed to exist on all ABAP systems
   domains:
@@ -467,15 +619,29 @@ standard_objects:
   views:
     - name: "ZAC_SHR_CDSUT_DDLS"
       description: "Shared CDS view (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   function_groups:
     - name: "ZAC_SHR_FUGR"
       description: "Shared function group (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   function_modules:
     - name: "Z_AC_SHR_FM01"
       group: "ZAC_SHR_FUGR"
       description: "Shared function module (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
+
+  # SAP-delivered, read-only fixtures: nothing is created for them.
+  includes:
+    - name: "LSVIMTOP"
+      description: "Standard program include (PROG/I)"
+      available_in: ["onprem", "legacy"]
+
+  transformations:
+    - name: "ID"
+      description: "Standard identity XSLT transformation"
+      available_in: ["onprem", "legacy"]
 
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
@@ -849,7 +1015,8 @@ update_class_local_macros:
     - name: "local_macros"
       enabled: true
       available_in: ["onprem", "legacy"]
-      description: "Update class macros include (on-premise only; not available in ABAP Cloud)"
+      skip_reason: "DEFINE is forbidden by the ABAP for Cloud language version; the macros include itself is writable there — PUT .../includes/macros answers 200"
+      description: "Update class macros include. On-prem only, and the reason is DEFINE, not the include: a cloud class has a writable macros include (PUT answers 200), but the ABAP for Cloud language version forbids DEFINE"
       params:
         class_name: "ZAC_CLS13"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
@@ -871,13 +1038,18 @@ create_package:
       available_in: ["onprem", "cloud"]
       description: "Package reserved for AdtPackage tests"
       params:
-        package_name: "ZADT_TEST"                 # ← CHANGE: parent package (existing, must be structure/main type)
+        package_name: "<DEV_PACKAGE>"              # ← CHANGE: parent package (existing, must be structure/main type)
         test_package: "ZAC_INNER_PKG02"    # Package created by the test
         description: "AdtPackage workflow package"
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
         software_component: "HOME"              # ← CHANGE: on-prem "HOME", cloud "ZLOCAL"
-        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "ZE19"
+        record_changes: true                    # A package under a transportable parent MUST record
+                                                #   changes, or create is refused with `TR 432`,
+                                                #   "Change recording must be activated for package …"
+                                                #   — and the symptom is the package never becoming
+                                                #   readable, which reads like a timing problem.
+        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "Z<SID>"
         # transport_request: ""                 # Uses environment.default_transport if omitted
 
 # Create Domain
@@ -955,14 +1127,10 @@ create_data_element:
       params:
         data_element_name: "ZAC_LOCKREG_DTEL"
         description: "SessionLockRegistry lock target"
-        type_kind: "predefinedAbapType"
-        data_type: "CHAR"
-        length: 10
-        decimals: 0
-        short_label: "LockReg"
-        medium_label: "LockReg Elem"
-        long_label: "LockRegistry Element"
-        heading_label: "LockRegistry Element"
+        # Typed by the domain this test creates first (lock_registry_domain),
+        # so the element is built and activated from a full document.
+        type_kind: "domain"
+        domain_name: "ZAC_LOCKREG_DOM"
 
 # Create Authorization Field
 # Authorization fields (SUSO/AUTH, endpoint /sap/bc/adt/aps/iam/auth/{name}) are
@@ -973,7 +1141,11 @@ create_authorization_field:
   test_cases:
     - name: "adt_authorization_field"
       enabled: true
-      available_in: ["onprem"]
+      # Measured on the cloud trial: validate 200, create 201, read 2285 bytes,
+      # update 200 — the type is fully available there. The onprem-only flag was
+      # never measured; what actually failed on cloud was this case's own
+      # fixture, `CHAR10`, which ABAP Cloud refuses as deprecated.
+      available_in: ["onprem", "cloud"]
       description: "Authorization field reserved for AdtAuthorizationField tests"
       params:
         authorization_field_name: "ZAC_AUTH01"
@@ -986,8 +1158,13 @@ create_authorization_field:
         # domname: "CHAR10"
         # outputlen: "10"
         update_description: "AdtAuthorizationField workflow field (updated)"
-        update_domname: "CHAR10"
-        update_roll_name: "CHAR10"
+        # Not `CHAR10`: ABAP Cloud answers "Data Element CHAR10 is deprecated.
+        # Use own type declaration or own object instead." A field needs a data
+        # element — an empty one is answered "contains errors and therefore
+        # cannot be saved" — and it must be one this project owns, because every
+        # other `ZAC_DTEL*` here belongs to a flow that creates and deletes it.
+        update_domname: ""
+        update_roll_name: "ZAC_SHR_AUTH_DTEL"   # → shared_dependencies.data_elements
 
 # Create Interface
 create_interface:
@@ -1168,13 +1345,18 @@ create_service_definition:
       available_in: ["onprem", "cloud"]
       description: "Service definition reserved for AdtServiceDefinition tests"
       params:
-        service_definition_name: "ZAC_SRVD01"  # Replace with your service definition name
+        # Its own name: this flow CREATES AND DELETES its subject, while
+        # create_service_binding below depends on ZAC_SHR_SRVD01 permanently.
+        # Sharing one name makes the delete answer "Used by 1 other object",
+        # every run. ZAC_SRVD03 is unrelated to the shared ZAC_SHR_SRVD03 —
+        # different names, and only this one is created and removed per run.
+        service_definition_name: "ZAC_SRVD03"  # Replace with your service definition name
         description: "AdtServiceDefinition workflow service definition"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
           @EndUserText.label: 'AdtServiceDefinition workflow service definition'
-          define service ZAC_SRVD01 {
+          define service ZAC_SRVD03 {
             expose ZAC_SHR_CDSUT_DDLS;
           }
 
@@ -1381,11 +1563,37 @@ create_service_binding:
       description: "Service binding reserved for AdtServiceBinding tests"
       params:
         binding_name: "ZAC_SRVB01"  # Replace with your service binding name
-        service_definition_name: "ZAC_SRVD01"  # Existing SRVD name used by ServiceBinding integration test
-        service_name: "ZAC_SRVD01"  # Usually same as service_definition_name
+        # ZAC_SHR_SRVD01, not ZAC_SRVD01. The old name was called "existing" and
+        # nothing ever created it — shared:setup makes ZAC_SHR_SRVD01 and
+        # ZAC_SHR_SRVD02 — so the publish failed with "Service Definition
+        # ZAC_SRVD01 not yet active", which reads like a timing problem and is
+        # an absent object. Measured on E19: a ZAC_* search returns both shared
+        # definitions and no ZAC_SRVD01.
+        #
+        # SRVD01 is the free one on purpose: the shared binding ZAC_SHR_SRVB01
+        # takes SRVD02 (see shared_dependencies.service_bindings), so this test
+        # can publish its own binding without two bindings contending for one
+        # service definition.
+        service_definition_name: "ZAC_SHR_SRVD01"
+        service_name: "ZAC_SHR_SRVD01"  # Usually same as service_definition_name
         service_version: "0001"
         binding_variant: "ODATA_V4_WEB_API"
-        desired_publication_state: "published"  # published | unpublished | unchanged
+        # `unchanged`, and the full run must keep it that way.
+        #
+        # The flow creates a *fresh* binding, and a fresh binding is not
+        # published: asking to unpublish it is a transition ADT refuses
+        # (`Invalid state transition: cannot unpublish … allowedAction=PUBLISH`),
+        # and asking to publish it costs ~135s and leaves an object the flow
+        # cannot delete — ADT refuses to delete a binding with published
+        # endpoints, and one unpublish was measured still not settled after
+        # eleven minutes.
+        #
+        # **Publishing is exercised by two deliberate runs, not by the full
+        # one.** Set this to `published` and run
+        # `npm test -- integration/core/serviceBinding`, then set it to
+        # `unpublished` and run it again, preparing the system by hand if the
+        # first run did not settle.
+        desired_publication_state: "unchanged"  # published | unpublished | unchanged
         description: "AdtServiceBinding workflow service binding"
         # software_component: "HOME"  # Optional; if omitted, inherited from parent package metadata
         package_type: "development"
@@ -1396,10 +1604,20 @@ create_service_binding:
 # Create Feature Toggle (FTG2/FT) — core module; users need both to create
 # custom feature toggles and to switch their state. Start onprem-only: the
 # FTG2/FT create authorization is usually SAP-reserved on cloud trial.
+# Feature toggles — A DELIBERATE RUN, never the full suite (issue #131).
+#
+# Many systems refuse to have feature toggles created at all: "It is not
+# allowed to create/update feature toggles in this system" (FTG2/035), and
+# nothing in this library can get past that. The domain methods and the
+# on/off switch then act on an object that was never made. Like service
+# binding publication, this is `enabled: false` by default and turned on by
+# hand, on a system where Switch Framework permits it:
+#   1. set create_feature_toggle.enabled: true
+#   2. `npm test -- integration/core/featureToggle`
 create_feature_toggle:
   test_cases:
     - name: "adt_feature_toggle"
-      enabled: true
+      enabled: false                # ← turn on for a deliberate feature-toggle run
       available_in: ["onprem"]
       description: "Feature toggle reserved for AdtFeatureToggle tests"
       params:
@@ -1448,21 +1666,28 @@ create_function_include:
   test_cases:
     - name: "adt_function_include"
       enabled: true
-      available_in: ["onprem"]
+      # Measured on the cloud trial with ADT 3.60.3: LOCK then
+      # PUT .../functions/groups/<g>/includes/<i>/source/main?lockHandle=...
+      # both answer 200. The previous onprem-only flag was never measured.
+      available_in: ["onprem", "cloud"]
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
-        include_name: "LZAC_SHR_FUGRZ01"      # FUGR include names follow L<fugr>Znn pattern
+        # Z03, not Z02. This case creates the include and deletes it again, and
+        # Z02 is the shared one declared in shared_dependencies — pointing both
+        # at the same name means every run destroys the shared object, and the
+        # read-only test that wants it skips itself as "does not exist".
+        include_name: "LZAC_SHR_FUGRZ03"      # FUGR include names follow L<fugr>Znn pattern
         description: "AdtFunctionInclude workflow include"
         # transport_request: ""
         source_code: |
           *&---------------------------------------------------------------------*
-          *& Include LZAC_SHR_FUGRZ01
+          *& Include LZAC_SHR_FUGRZ03
           *&---------------------------------------------------------------------*
           DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude test'.
         update_source_code: |
           *&---------------------------------------------------------------------*
-          *& Include LZAC_SHR_FUGRZ01 (updated)
+          *& Include LZAC_SHR_FUGRZ03 (updated)
           *&---------------------------------------------------------------------*
           DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude updated'.
 
@@ -1475,6 +1700,13 @@ create_transport:
       description: "Transport reserved for AdtRequest tests"
       params:
         description: "AdtRequest workflow transport"
+        target_system: ""                     # ← CHANGE (on-prem): the transport target WITHOUT slashes,
+                                              #   as SE10 shows it between them — `AdtRequest.create`
+                                              #   adds the slashes itself, so "/FOO/" here is wrong.
+                                              #   This block creates one request and deletes it again, and
+                                              #   without a target it cannot carry an object out of a
+                                              #   package on a transport layer: `CTS_WBO_API 048`,
+                                              #   "Request … does not have transport target /…/".
         # package_name: "ZAC_PKG01"
 
 # Create Behavior Definition
@@ -1627,6 +1859,84 @@ run_unit_test:
           format: "abapunit"  # or "junit"
 
 # Create CDS Unit Test
+# ABAP Unit on a report. The test class sits in an include the report pulls in
+# — the usual shape — and the run names the report (`osl:object type="PROG"`,
+# as Eclipse does), which finds it there. Measured on premise, 2026-09-30.
+# The test builds both objects, runs them, and deletes them.
+run_program_unit_test:
+  test_cases:
+    - name: "adt_program_unit_test"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Run the ABAP Unit tests of a report whose test class is in an include"
+      params:
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        program_name: "ZAC_UTST_PROG"
+        include_name: "ZAC_UTST_PROG_T"
+        program_source: |
+          REPORT zac_utst_prog.
+
+          INCLUDE zac_utst_prog_t.
+        include_source: |
+          CLASS ltc_program DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS passes FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltc_program IMPLEMENTATION.
+            METHOD passes.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 1 ).
+            ENDMETHOD.
+          ENDCLASS.
+        expected_test_methods: ["PASSES"]
+        # skip_cleanup: false  # true leaves the report and include for analysis
+
+# ABAP Unit on a function group and on one of its modules. The test class sits
+# in an include of the group (creating it adds the INCLUDE to the group's main
+# program); the group run (`FUGR`) runs every test of the group, the module run
+# (`FUNC`, what Eclipse sends) the tests that exercise that module. Measured on
+# premise, 2026-09-30. The test builds the group, runs both, and deletes it.
+run_function_group_unit_test:
+  test_cases:
+    - name: "adt_function_group_unit_test"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Run the ABAP Unit tests of a function group and of one of its modules"
+      params:
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        function_group_name: "ZAC_UTST_FUGR"
+        function_module_name: "Z_AC_UTST_FM"
+        include_name: "LZAC_UTST_FUGRT99"
+        function_module_source: |
+          FUNCTION z_ac_utst_fm
+            IMPORTING
+              VALUE(iv_in) TYPE i
+            EXPORTING
+              VALUE(ev_out) TYPE i.
+            ev_out = iv_in * 2.
+          ENDFUNCTION.
+        include_source: |
+          CLASS ltc_module DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS doubles FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltc_module IMPLEMENTATION.
+            METHOD doubles.
+              DATA lv_out TYPE i.
+              CALL FUNCTION 'Z_AC_UTST_FM'
+                EXPORTING
+                  iv_in  = 2
+                IMPORTING
+                  ev_out = lv_out.
+              cl_abap_unit_assert=>assert_equals( act = lv_out exp = 4 ).
+            ENDMETHOD.
+          ENDCLASS.
+        expected_test_methods: ["DOUBLES"]
+        # skip_cleanup: false  # true leaves the group for analysis
+
 create_cds_unit_test:
   test_cases:
     - name: "cds_unit_test"
@@ -1872,7 +2182,7 @@ read_metadata:
       description: "Validate error for unsupported object type"
       params: {}
 
-# Where-Used (getWhereUsed, getWhereUsedList, getWhereUsedScope)
+# Where-Used (getWhereUsedScope, modifyWhereUsedScope, getWhereUsed)
 # Searches for references to an ABAP object across the system.
 # Two-step flow: 1) GET scope (available object types), 2) POST search with scope.
 # Supported object types: class, program, include, functionGroup, functionModule,
@@ -1918,7 +2228,7 @@ where_used:
     - name: "where_used_list_parsed"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Test getWhereUsedList with parsed results. Uses shared_dependencies.tables."
+      description: "The scope, edited, then the search, read into references. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         object_type: "table"
@@ -1927,11 +2237,10 @@ where_used:
     - name: "where_used_list_raw_xml"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Test getWhereUsedList with raw XML included. Uses shared_dependencies.tables."
+      description: "The same search, answered as the document. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         object_type: "table"
-        include_raw_xml: true
 
     - name: "where_used_list_filtered"
       enabled: true
@@ -2049,7 +2358,91 @@ runtime_gateway_errors:
       params:
         max_results: 10
 
+# ATC check runs (AdtRuntimeClient.getAtc())
+# ATC — off until you name a check variant that runs on your system.
+#
+# Which variant works is the system's own answer: one it nominates can abort
+# every run with TOOL_FAILURE "ATC check run aborted, due to missing
+# prerequisites", while an SAP-delivered one (DEFAULT, SLIN_DEFAULT) runs.
+# To turn it on:
+#   1. set params.check_variant below to a variant that runs on your system
+#   2. set enabled: true
+atc_run:
+  test_cases:
+    - name: "adt_atc_run"
+      enabled: false                # ← CHANGE: true once check_variant is set
+      description: "Run ATC over the deliberately dirty shared class and read the worklist"
+      # No `available_in`: ATC exists on every system this library targets, and
+      # `getEnvironmentType()` answers "onprem" everywhere anyway — it defaults
+      # to it and nothing ever refines it — so a ["cloud"] filter here would
+      # skip the test on the very system it was measured on.
+      #
+      # The case runs everywhere because what it asserts by default is not
+      # system-specific: a class written to be found in must produce at least
+      # one finding, whatever the system's nominated variant checks.
+      params:
+        class_name: "ZAC_SHR_ATC_DIRTY"
+        # ← CHANGE (optional): pin the exact finding, once you have seen it.
+        #
+        # Left unset on purpose — which finding a run reports is the check
+        # variant's answer, not this library's, so a value measured on one
+        # system would turn a legitimately different variant into a red test
+        # on the next. Set BOTH or neither — the test refuses half a pair by
+        # name rather than skipping or failing obscurely — and both must be
+        # carried by the same finding.
+        #
+        # Measured on the BTP trial, 2026-09-08 under
+        # ABAP_CLOUD_DEVELOPMENT_DEFAULT: SLIN message 0245 ("No exception
+        # handling after the CATCH statement." — the empty CATCH cx_root) at
+        # priority 2, with FINDING_STATS "0,1,0". The test logs every finding
+        # it saw with its message and priority, so filling these in is a copy
+        # from your own run rather than a guess.
+        #
+        # expected_message_id: "0245"
+        # expected_priority: 2
+        # The check variant the run uses. Empty ("") asks the system for the one
+        # it nominates (/atc/customizing) — what a consumer gets; a run that
+        # then finishes with TOOL_FAILURE "missing prerequisites" means that
+        # variant cannot run here, so name one that can.
+        check_variant: "<CHECK_VARIANT>"   # ← CHANGE: e.g. DEFAULT, or "" for the system's own
+        poll_timeout_ms: 300000
+        poll_interval_ms: 3000
+
 # Profiler traces operations (AdtRuntimeClient)
+
+# ATC over programs and every kind of include (interfaces-adt 12.0.0). ATC
+# checks an include as the object that owns it, so each reference names the
+# owner the finished worklist must list. The owner needs findings under the
+# check variant, or the worklist lists nothing.
+atc_object_kinds:
+  test_cases:
+    - name: "adt_atc_object_kinds"
+      enabled: false                # ← CHANGE: true; list what this system holds
+      description: "ATC over a function include, a class include and, on premise, a program and a program include"
+      params:
+        # check_variant: "DEFAULT"   # ← CHANGE (optional): pin one when the system's nominated variant does not run
+        refs:
+          - object_type: "function_include"
+            object_name: "LZAC_SHR_FUGRTOP"
+            function_group: "ZAC_SHR_FUGR"
+            owner_type: "FUGR"
+            owner_name: "ZAC_SHR_FUGR"
+          - object_type: "class_include"
+            object_name: "ZAC_SHR_ATC_DIRTY"
+            include_kind: "implementations"
+            owner_type: "CLAS"
+            owner_name: "ZAC_SHR_ATC_DIRTY"
+          # On premise only — ABAP Cloud holds no program and no program include:
+          # - object_type: "program"
+          #   object_name: "ZAC_SHR_PROG"
+          #   owner_type: "PROG"
+          #   owner_name: "ZAC_SHR_PROG"
+          # - object_type: "program_include"
+          #   object_name: "<AN INCLUDE WITH FINDINGS>"   # ← CHANGE
+          #   owner_type: "PROG"
+          #   owner_name: "<ITS MAIN PROGRAM>"            # ← CHANGE
+          #   findings_outside: true   # only where the program has findings outside this include
+
 profiler_traces:
   test_cases:
     - name: "adt_profiler_traces"
@@ -2167,3 +2560,61 @@ execute_program:
             max_size_for_trace_file: 30720
             amdp_trace: true
             max_time_for_tracing: 1800
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Service binding publication — TWO DELIBERATE RUNS, never the full suite.
+#
+# Publishing is the slowest thing this library asks of ADT: ~135s measured on a
+# trial, and one unpublish still unsettled after eleven minutes. ADT also
+# refuses to delete a binding whose endpoints are published, so a flow that
+# publishes cannot clean up after itself. That is why these are their own test
+# cases, `enabled: false` by default, and why the workflow flow above keeps
+# `desired_publication_state: "unchanged"`.
+#
+# To exercise publication:
+#   1. set publish_service_binding.enabled: true, run
+#      `npm test -- integration/core/serviceBinding/publication`
+#   2. check the binding in Eclipse ADT — the test prints what to look at
+#   3. set unpublish_service_binding.enabled: true (and publish back to false),
+#      run the same file again
+#
+# `timeout_ms` is passed to the member, not taken from SAP_TIMEOUT_LONG: since
+# 18.0.0 `update` honours `IAdtOperationOptions.timeout`, which it used to drop.
+publish_service_binding:
+  test_cases:
+    - name: "publish_binding"
+      enabled: false                # ← turn on for a deliberate publish run
+      available_in: ["onprem", "cloud"]
+      description: "Publish ZAC_SHR_SRVB02 and leave it published for inspection"
+      params:
+        # The shared binding reserved for this, not the one the workflow test
+        # creates and deletes — publishing must not race another test's subject.
+        binding_name: "ZAC_SHR_SRVB02"
+        service_name: "ZAC_SHR_SRVD03"
+        service_version: "0001"
+        service_type: "odatav4"
+        # How long the *request* waits before the client gives up.
+        timeout_ms: 300000
+        # How long the *test* keeps asking afterwards. The two are different
+        # things: a publication is a job, and it has been measured finishing
+        # after the client had already timed out — so a timeout is not an
+        # answer, it is the moment to start checking.
+        wait_minutes: 5
+        poll_seconds: 15
+
+unpublish_service_binding:
+  test_cases:
+    - name: "unpublish_binding"
+      enabled: false                # ← turn on for the deliberate unpublish run
+      available_in: ["onprem", "cloud"]
+      description: "Unpublish ZAC_SHR_SRVB02 after it has been checked in Eclipse"
+      params:
+        binding_name: "ZAC_SHR_SRVB02"
+        service_name: "ZAC_SHR_SRVD03"
+        service_version: "0001"
+        service_type: "odatav4"
+        timeout_ms: 300000
+        # Longer than the publish budget: unpublish has been the slower of the
+        # two, once still unsettled after eleven minutes.
+        wait_minutes: 12
+        poll_seconds: 15

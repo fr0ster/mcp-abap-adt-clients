@@ -11,10 +11,11 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { functionGroupChildren } from '../../../../scripts/lib/functionGroupChildren';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import {
@@ -81,8 +82,11 @@ describe('Shared - listFunctionGroupIncludes', () => {
       testsLogger,
     );
 
-    const result = await orThrow(
-      client.getUtils().listFunctionGroupIncludes(SHARED_FUNCTION_GROUP),
+    const result = await functionGroupChildren(
+      connection,
+      SHARED_FUNCTION_GROUP,
+      'FUGR/I',
+      testsLogger,
     );
 
     testsLogger.info?.(`🎯 Includes: ${JSON.stringify(result)}`);

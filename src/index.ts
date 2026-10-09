@@ -4,7 +4,6 @@
  * Client APIs (Public API):
  * - AdtClient: High-level CRUD operations (validate/create/read/update/delete/activate/check)
  * - AdtRuntimeClient: Runtime operations (stable APIs)
- * - AdtRuntimeClientExperimental: Runtime APIs in progress (may change)
  *
  * @example
  * ```typescript
@@ -24,5 +23,6 @@ export { AdtInclude, CT_INCLUDE } from './core/include';
 export * from './index.abapgit';
 export * from './index.core';
 export * from './index.executors';
+export * from './index.readings';
 export * from './index.runtime';
 export * from './index.ws';

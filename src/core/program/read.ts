@@ -5,18 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { orThrow } from '../../utils/adtResponse';
-import { encodeSapObjectName } from '../../utils/internalUtils';
-import { noopLogger } from '../../utils/noopLogger';
+import { PROGRAM, transportUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection): AdtUtils {
-  return new AdtUtils(connection, noopLogger);
-}
 
 /**
  * Get ABAP program metadata (without source code)
@@ -26,13 +20,12 @@ export async function getProgramMetadata(
   programName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'program',
-      programName,
-      undefined,
-      options,
-    ),
+  return objectMetadataWire(
+    connection,
+    'program',
+    programName,
+    undefined,
+    options,
   );
 }
 
@@ -45,14 +38,13 @@ export async function getProgramSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'program',
-      programName,
-      undefined,
-      version,
-      options,
-    ),
+  return objectSourceWire(
+    connection,
+    'program',
+    programName,
+    undefined,
+    version,
+    options,
   );
 }
 
@@ -78,9 +70,8 @@ export async function getProgramTransport(
   programName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(programName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/programs/programs/${encodedName}/transport${query}`;
+  const url = `${transportUri(PROGRAM.uri(programName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

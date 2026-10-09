@@ -12,16 +12,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  featureToggleCheckState,
+  featureToggleRuntimeState,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IFeatureToggleObject } from '../../../../core/featureToggle';
+import { featureToggleDocuments } from '../../../../core/featureToggle/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -42,6 +47,12 @@ import {
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+
+const featureToggleReadings = {
+  ...featureToggleDocuments,
+  runtimeState: featureToggleRuntimeState,
+  checkState: featureToggleCheckState,
+};
 
 const {
   getEnabledTestCase,
@@ -221,7 +232,8 @@ describe('FeatureToggle (using AdtClient)', () => {
     );
     if (!tc) {
       return {
-        skipReason: 'Test case disabled or not found',
+        skipReason:
+          'create_feature_toggle is disabled — this is a deliberate run (#131)',
         testCase: null,
         featureToggleName: null,
       };
@@ -429,13 +441,15 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const state = await handler.getRuntimeState({ featureToggleName });
-        expect(state.runtimeState).toBeDefined();
-        expect(state.runtimeState?.name).toBe(featureToggleName.toUpperCase());
-        expect(['on', 'off', 'undefined']).toContain(
-          state.runtimeState?.clientState,
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
+        const state = expectResult(
+          await handler.getRuntimeState({ featureToggleName }),
+          'getRuntimeState',
         );
+        expect(state.name).toBe(featureToggleName.toUpperCase());
+        expect(['on', 'off', 'undefined']).toContain(state.clientState);
       },
       getTimeout('test'),
     );
@@ -451,12 +465,14 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const state = await handler.checkState({ featureToggleName });
-        expect(state.checkStateResult).toBeDefined();
-        expect(typeof state.checkStateResult?.customizingTransportAllowed).toBe(
-          'boolean',
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
+        const state = expectResult(
+          await handler.checkState({ featureToggleName }),
+          'checkState',
         );
+        expect(typeof state.customizingTransportAllowed).toBe('boolean');
       },
       getTimeout('test'),
     );
@@ -472,10 +488,17 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const state = await handler.readSource({ featureToggleName });
-        expect(state.readResult).toBeDefined();
-        expect(state.sourceResult).toBeDefined();
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
+        // The source document, as it arrived. A caller who wants
+        // `IFeatureToggleSource` parsed out of it supplies a strategy that does
+        // it — this member does not decide that for everyone.
+        const source = expectResult(
+          await handler.readSource({ featureToggleName }),
+          'readSource',
+        );
+        expect(typeof source).toBe('string');
       },
       getTimeout('test'),
     );
@@ -498,23 +521,35 @@ describe('FeatureToggle (using AdtClient)', () => {
         const transportRequest = resolveTransportRequest(
           testCase?.params?.transport_request,
         );
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const onState = await handler.switchOn(
-          { featureToggleName },
-          { transportRequest },
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
+        // The switch answers the toggle's own response; the runtime state is a
+        // second request, and the test makes it because the library no longer
+        // makes it for the caller.
+        expectResult(
+          await handler.switchOn({ featureToggleName }, { transportRequest }),
+          'switchOn',
+        );
+        const onState = expectResult(
+          await handler.getRuntimeState({ featureToggleName }),
+          'onState',
         );
         expect(
-          onState.runtimeState?.clientState === 'on' ||
-            onState.runtimeState?.clientState === 'undefined',
+          onState?.clientState === 'on' || onState?.clientState === 'undefined',
         ).toBe(true);
 
-        const offState = await handler.switchOff(
-          { featureToggleName },
-          { transportRequest },
+        expectResult(
+          await handler.switchOff({ featureToggleName }, { transportRequest }),
+          'switchOff',
+        );
+        const offState = expectResult(
+          await handler.getRuntimeState({ featureToggleName }),
+          'offState',
         );
         expect(
-          offState.runtimeState?.clientState === 'off' ||
-            offState.runtimeState?.clientState === 'undefined',
+          offState?.clientState === 'off' ||
+            offState?.clientState === 'undefined',
         ).toBe(true);
       },
       getTimeout('test'),

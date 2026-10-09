@@ -1,8 +1,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { TRANSFORMATION } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -14,10 +14,7 @@ export async function unlockTransformation(
   transformationName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const transformationNameEncoded = encodeSapObjectName(
-    transformationName.toLowerCase(),
-  );
-  const url = `/sap/bc/adt/xslt/transformations/${transformationNameEncoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `${TRANSFORMATION.uri(transformationName.toLowerCase())}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

@@ -12,13 +12,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IMetadataExtensionConfig,
-  IMetadataExtensionState,
-} from '../../../../core/metadataExtension';
+import type { IMetadataExtensionConfig } from '../../../../core/metadataExtension';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -59,7 +57,7 @@ describe('MetadataExtension (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isLegacy = false;
-  let tester: BaseTester<IMetadataExtensionConfig, IMetadataExtensionState>;
+  let tester: BaseTester<IMetadataExtensionConfig>;
 
   function generateDefaultSourceCode(
     extName: string,
@@ -183,12 +181,12 @@ extend view ${targetEntity} with "${extName}"
         }
 
         await tester.flowTestAuto({
-          sourceCode: config.sourceCode,
+          source: config.source,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },
           updateConfig: {
             name: config.name,
-            sourceCode: config.sourceCode,
+            source: config.source,
           },
         });
       },

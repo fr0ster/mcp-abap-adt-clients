@@ -9,139 +9,37 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_ACTIVATION } from '../constants/contentTypes';
-import { encodeSapObjectName } from './internalUtils';
+import { getEnhancementUri } from '../core/enhancement/types';
+import {
+  ACCESS_CONTROL,
+  AUTHORIZATION_FIELD,
+  BEHAVIOR_DEFINITION,
+  CLASS,
+  DATA_ELEMENT,
+  DDIC_VIEW,
+  DDL_SOURCE,
+  DOMAIN,
+  FEATURE_TOGGLE,
+  FUNCTION_GROUP,
+  FUNCTION_INCLUDE,
+  FUNCTION_MODULE,
+  INTERFACE,
+  METADATA_EXTENSION,
+  PACKAGE,
+  PROGRAM,
+  PROGRAM_INCLUDE,
+  SCALAR_FUNCTION,
+  SCALAR_FUNCTION_IMPLEMENTATION,
+  SERVICE_BINDING,
+  SERVICE_DEFINITION,
+  STRUCTURE,
+  TABLE,
+  TABLE_TYPE,
+  TRANSFORMATION,
+} from '../endpoints/objects';
 import { getTimeout } from './timeouts';
-
-/**
- * Extract a human-readable text from a single ADT `<msg>` node.
- */
-function extractActivationMsgText(msg: {
-  shortText?: { txt?: unknown } | string;
-  objDescr?: unknown;
-}): string {
-  const shortText = msg?.shortText;
-  if (shortText && typeof shortText === 'object' && 'txt' in shortText) {
-    const txt = (shortText as { txt?: unknown }).txt;
-    if (typeof txt === 'string' && txt.trim()) {
-      return txt.trim();
-    }
-  }
-  if (typeof shortText === 'string' && shortText.trim()) {
-    return shortText.trim();
-  }
-  if (typeof msg?.objDescr === 'string' && msg.objDescr.trim()) {
-    return msg.objDescr.trim();
-  }
-  return 'activation error';
-}
-
-/**
- * Inspect an ADT activation response body for an **explicit failure signal**.
- *
- * ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation
- * fails on a syntax error, carrying a `<chkl:messages>` body with
- * `<msg type="E">` entries. Treating "no HTTP error" as success masks these
- * failures (issue #78).
- *
- * **The failure signal is an `E` message, not `activationExecuted="false"`.**
- * This originally treated the flag alone as a failure, which is wrong — probed
- * against a trial system:
- *
- * | scenario                       | HTTP | activationExecuted | `msg` |
- * |--------------------------------|------|--------------------|-------|
- * | class already active           | 200  | `false`            | none  |
- * | DDIC table already active      | 200  | `true`             | none  |
- * | class does not exist           | 200  | `false`            | `E`   |
- * | locked by another session      | 403  | —                  | —     |
- *
- * A class that needs no activation reports `false` with an empty message list —
- * indistinguishable, by the flag alone, from a class that does not exist. So the
- * flag says whether ADT did any work, not whether the work succeeded, and only
- * the messages carry the verdict. The lock case the old wording named is a 403
- * and never reached this function at all.
- *
- * Conservative by design: returns a failure detail string ONLY on a positive
- * error signal. Empty, unparseable, or unrecognized bodies return `null`
- * (success) so the many object types whose success-body shape differs are never
- * regressed into false failures.
- *
- * @returns failure detail text, or `null` when no failure signal is present
- */
-function detectActivationFailure(responseData: unknown): string | null {
-  if (typeof responseData !== 'string' || responseData.trim() === '') {
-    return null;
-  }
-
-  let parsed: Record<string, unknown>;
-  try {
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-    });
-    parsed = parser.parse(responseData) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-
-  const messages = parsed?.['chkl:messages'] as
-    | {
-        msg?: unknown;
-      }
-    | undefined;
-  if (!messages) {
-    return null;
-  }
-
-  const rawMsg = messages.msg;
-  const msgList = Array.isArray(rawMsg) ? rawMsg : rawMsg ? [rawMsg] : [];
-  const errorTexts = msgList
-    .filter((m) => {
-      const severity =
-        (m as { type?: unknown; severity?: unknown })?.type ??
-        (m as { severity?: unknown })?.severity;
-      return typeof severity === 'string' && severity.toUpperCase() === 'E';
-    })
-    .map((m) =>
-      extractActivationMsgText(
-        m as Parameters<typeof extractActivationMsgText>[0],
-      ),
-    );
-
-  return errorTexts.length > 0 ? errorTexts.join('; ') : null;
-}
-
-/**
- * Throw unless an activation response is free of error messages.
- *
- * Nine object types each carried a private copy of this check, all written the
- * same way — `activationExecuted && checkExecuted`, with the `<msg>` list never
- * read at all. That shape is wrong twice over:
- *
- * - It refuses a valid response. An object that needs no activation answers
- *   `activationExecuted="false"`, so `AdtClient` threw over objects that were
- *   already active. See `detectActivationFailure` above for the probed table.
- * - It discards what SAP said. A genuine failure carries the reason in
- *   `<msg type="E">` — "Class ZAC_… does not have a TMDIR entry" — and every
- *   copy replaced it with the fixed string "Activation failed".
- *
- * One rule in one place, so the nine cannot drift apart again. Callers keep
- * their own prefix, which is the only part that was ever type-specific.
- *
- * @param objectLabel prefix for the thrown message, e.g. `'Scalar function'`
- * @throws when the response carries at least one error-severity message
- */
-export function assertActivationSucceeded(
-  objectLabel: string,
-  responseData: unknown,
-): void {
-  const failure = detectActivationFailure(responseData);
-  if (failure) {
-    throw new Error(`${objectLabel} activation failed: ${failure}`);
-  }
-}
 
 /**
  * Build object URI from name and type
@@ -157,17 +55,10 @@ export function buildObjectUri(
   type?: string,
   parentName?: string,
 ): string {
-  const lowerName = encodeSapObjectName(name).toLowerCase();
-
   if (!type) {
-    // Try to guess type from name prefix
-    if (name.startsWith('ZCL_') || name.startsWith('CL_')) {
-      return `/sap/bc/adt/oo/classes/${lowerName}`;
-    } else if (name.startsWith('Z') && name.includes('_PROGRAM')) {
-      return `/sap/bc/adt/programs/programs/${lowerName}`;
-    }
-    // Default: assume program
-    return `/sap/bc/adt/programs/programs/${lowerName}`;
+    // The name does not say what an object is: ZCL_ is a convention, not a
+    // type, and every other name used to be taken for a program.
+    throw new Error(`buildObjectUri needs the object type for ${name}`);
   }
 
   // Map type to URI path
@@ -180,104 +71,157 @@ export function buildObjectUri(
     // package CRUD worked while the group operations did not.
     case 'DEVC/K':
     case 'DEVC':
-      return `/sap/bc/adt/packages/${lowerName}`;
+      return `${PACKAGE.uri(name)}`;
 
     case 'CLAS/OC':
     case 'CLAS':
-      return `/sap/bc/adt/oo/classes/${lowerName}`;
+      return `${CLASS.uri(name)}`;
 
     case 'PROG/P':
     case 'PROG':
-      return `/sap/bc/adt/programs/programs/${lowerName}`;
+      return `${PROGRAM.uri(name)}`;
+
+    case 'PROG/I':
+      return `${PROGRAM_INCLUDE.uri(name)}`;
 
     case 'FUGR/FF': {
-      if (parentName) {
-        const lowerParent = encodeSapObjectName(parentName).toLowerCase();
-        return `/sap/bc/adt/functions/groups/${lowerParent}/fmodules/${lowerName}`;
+      // A module is addressed under its group. This used to put the module's
+      // own name in the group's place when none was passed — an address that
+      // exists nowhere.
+      if (!parentName) {
+        throw new Error(
+          `A function module (FUGR/FF) is addressed under its function group; pass the group as parentName for ${name}`,
+        );
       }
-      return `/sap/bc/adt/functions/groups/${lowerName}/fmodules/${lowerName}`;
+      return FUNCTION_MODULE.uri(parentName, name);
+    }
+
+    case 'FUGR/I': {
+      // A function include lives under its group, and the address is
+      // meaningless without it: `/functions/groups/<group>/includes/<NAME>`,
+      // with the include's name upper-cased the way its own activation sends
+      // it. The group is the caller's to give — it is their argument that is
+      // missing, not anything SAP said, so it is thrown.
+      if (!parentName) {
+        throw new Error(
+          `A function include (FUGR/I) is addressed under its function group; pass the group as parentName for ${name}`,
+        );
+      }
+      return `${FUNCTION_INCLUDE.uri(parentName, name)}`;
     }
 
     case 'FUGR':
     case 'FUGR/F':
     case 'FUNC':
-      return `/sap/bc/adt/functions/groups/${lowerName}`;
+      return `${FUNCTION_GROUP.uri(name)}`;
 
     case 'TABL/DT':
     case 'TABL':
-      return `/sap/bc/adt/ddic/tables/${lowerName}`;
+      return `${TABLE.uri(name)}`;
 
     case 'TABL/DS':
     case 'STRU/DS':
     case 'STRU':
-      return `/sap/bc/adt/ddic/structures/${lowerName}`;
+      return `${STRUCTURE.uri(name)}`;
 
     case 'DDLS/DF':
     case 'DDLS':
-      return `/sap/bc/adt/ddic/ddl/sources/${lowerName}`;
+      return `${DDL_SOURCE.uri(name)}`;
 
     case 'VIEW/DV':
     case 'VIEW':
-      return `/sap/bc/adt/ddic/views/${lowerName}`;
+      return `${DDIC_VIEW.uri(name)}`;
 
     case 'DTEL/DE':
     case 'DTEL':
-      return `/sap/bc/adt/ddic/dataelements/${lowerName}`;
+      return `${DATA_ELEMENT.uri(name)}`;
 
     case 'DOMA/DD':
     case 'DOMA':
-      return `/sap/bc/adt/ddic/domains/${lowerName}`;
+      return `${DOMAIN.uri(name)}`;
 
     case 'INTF/OI':
     case 'INTF':
-      return `/sap/bc/adt/oo/interfaces/${lowerName}`;
+      return `${INTERFACE.uri(name)}`;
 
     case 'TTYP/DF':
     case 'TTYP/TT':
     case 'TTYP':
-      return `/sap/bc/adt/ddic/tabletypes/${lowerName}`;
+      return `${TABLE_TYPE.uri(name)}`;
 
     case 'SRVD/SRV':
     case 'SRVD':
-      return `/sap/bc/adt/ddic/srvd/sources/${lowerName}`;
+      return `${SERVICE_DEFINITION.uri(name)}`;
 
     case 'SRVB/SVB':
     case 'SRVB':
-      return `/sap/bc/adt/businessservices/bindings/${lowerName}`;
+      return SERVICE_BINDING.uri(name);
 
     case 'DDLX/EX':
     case 'DDLX':
-      return `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
+      return `${METADATA_EXTENSION.uri(name)}`;
 
     case 'BDEF/BDO':
     case 'BDEF':
-      return `/sap/bc/adt/ddic/bdef/sources/${lowerName}`;
+      // `/bo/behaviordefinitions`, as a BDEF's own activation and the
+      // inactive-objects list both address it. This read `/ddic/bdef/sources`
+      // until #173: SAP resolved that to nothing and answered
+      // `activationExecuted="false"` with no message, so a group activation
+      // reported success and left the behavior definition inactive.
+      return `${BEHAVIOR_DEFINITION.uri(name)}`;
 
     case 'DCLS/DL':
     case 'DCLS':
-      return `/sap/bc/adt/acm/dcl/sources/${lowerName}`;
+      return `${ACCESS_CONTROL.uri(name)}`;
 
     case 'DSFD/SCF':
-      return `/sap/bc/adt/ddic/dsfd/sources/${lowerName}`;
+      return `${SCALAR_FUNCTION.uri(name)}`;
 
     case 'DSFI/SFI':
-      return `/sap/bc/adt/ddic/dsfi/${lowerName}`;
+      return `${SCALAR_FUNCTION_IMPLEMENTATION.uri(name)}`;
 
-    case 'ENHO/ENH':
+    case 'XSLT/VT':
+    case 'XSLT':
+      return `${TRANSFORMATION.uri(name)}`;
+
+    case 'AUTH':
+      return `${AUTHORIZATION_FIELD.uri(name)}`;
+
+    case 'FTG2/FT':
+    case 'FTG2':
+      return `${FEATURE_TOGGLE.uri(name)}`;
+
+    // The subtype is a path segment — `/enhancements/enhoxh/<name>` — so it is
+    // read off the type code, and built by the same function the enhancement's
+    // own activation uses. This case built `/enhancements/<name>` until #173's
+    // check found it, and the subtyped codes fell through to `default`.
+    case 'ENHO/EXH':
+      return getEnhancementUri('enhoxh', name);
+    case 'ENHO/EXHB':
+      return getEnhancementUri('enhoxhb', name);
+    case 'ENHO/EXHH':
+      return getEnhancementUri('enhoxhh', name);
+    case 'ENHS/EXS':
+      return getEnhancementUri('enhsxs', name);
+    case 'ENHS/EXSB':
+      return getEnhancementUri('enhsxsb', name);
+
     case 'ENHO':
-      return `/sap/bc/adt/enhancements/${lowerName}`;
+    case 'ENHS':
+      // Which subtype is the caller's to say; guessing one is the `default`
+      // branch's mistake below. Their argument is short, not SAP's answer.
+      throw new Error(
+        `${type} does not say which enhancement subtype ${name} is, and the subtype is part of its address; pass the full type (e.g. ENHO/EXH, ENHO/EXHB, ENHO/EXHH, ENHS/EXS, ENHS/EXSB)`,
+      );
 
     default:
-      // A guess dressed as a mapping: right when the ADT path happens to be the
-      // lowercased type code, silent when it is not. `DEVC/K` is the case that
-      // showed it — the address it built exists nowhere, and ADT's complaint
-      // arrived inside a 200 where nothing was reading it.
-      //
-      // Left in place rather than made to throw: the types above are mapped, and
-      // the ones that are not are reached by callers passing a type this library
-      // never claimed to know. Making that a throw is a separate decision about
-      // how strict `IObjectReference` should be.
-      return `/sap/bc/adt/${type.toLowerCase()}/${lowerName}`;
+      // Used to build `/sap/bc/adt/<type lowercased>/<name>` — right only when
+      // the ADT path happened to be the type code, and a 200 carrying ADT's
+      // complaint otherwise (`DEVC/K` showed it). A type this library has no
+      // record for is the caller's argument, so it is refused before a request.
+      throw new Error(
+        `No ADT address is known for object type '${type}' (${name}); pass one of the codes this library maps, e.g. CLAS/OC, PROG/P, PROG/I, FUGR/I.`,
+      );
   }
 }
 
@@ -318,13 +262,9 @@ export async function activateObjectInSession(
     headers,
   });
 
-  // ADT returns HTTP 200 even on failed activation (locked object, syntax
-  // errors). Surface an explicit failure signal as a thrown error instead of
-  // letting callers report a false success (issue #78).
-  const failure = detectActivationFailure(response.data);
-  if (failure) {
-    throw new Error(`Activation of ${objectName} failed: ${failure}`);
-  }
-
+  // The answer, as it arrived. ADT returns 200 even on a failed activation
+  // (locked object, syntax errors), so the status does not carry the verdict
+  // and neither does this function. Whether a checklist body means the
+  // activation happened is read by the caller's own `analyse`.
   return response;
 }

@@ -1,15 +1,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { STRUCTURE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 function buildActivationXml(name: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/structures/${encodeSapObjectName(name.toLowerCase())}" adtcore:name="${name.toUpperCase()}"/>
+  <adtcore:objectReference adtcore:uri="${STRUCTURE.uri(name)}" adtcore:name="${name.toUpperCase()}"/>
 </adtcore:objectReferences>`;
 }
 
@@ -25,6 +24,5 @@ export async function activateAppendStructure(
     data: buildActivationXml(name),
     headers: { Accept: 'application/xml', 'Content-Type': 'application/xml' },
   });
-  assertActivationSucceeded('Append structure', response.data);
   return response;
 }

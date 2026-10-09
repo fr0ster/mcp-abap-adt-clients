@@ -5,8 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DOMAIN, CT_DOMAIN } from '../../constants/contentTypes';
+import { DOMAIN } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDomainParams } from './types';
@@ -24,7 +25,7 @@ export async function create(
   const corrNrParam = args.transport_request
     ? `?corrNr=${args.transport_request}`
     : '';
-  const url = `/sap/bc/adt/ddic/domains${corrNrParam}`;
+  const url = `${DOMAIN.collection}${corrNrParam}`;
 
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';

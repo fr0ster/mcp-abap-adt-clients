@@ -4,11 +4,12 @@
  *
  * Bug: BDEF URLs were built with `${name.toLowerCase()}` (raw), so a name like
  * `/NSP/R_TEST` produced `.../behaviordefinitions//nsp/r_test`, with raw slashes
- * that break the ADT path. The encoded form must be `%2fnsp%2fr_test`.
+ * that break the ADT path. The encoded form is `%2Fnsp%2Fr_test`: encodeURIComponent's
+ * uppercase hex, equivalent under RFC 3986 to the `%2f` ADT writes.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { lock, lockForUpdate } from '../../../../core/behaviorDefinition/lock';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { lock } from '../../../../core/behaviorDefinition/lock';
 import { unlock } from '../../../../core/behaviorDefinition/unlock';
 import { update } from '../../../../core/behaviorDefinition/update';
 
@@ -25,7 +26,7 @@ function firstUrl(connection: IAbapConnection): string {
 }
 
 const NS_NAME = '/NSP/R_TEST';
-const ENCODED = 'behaviordefinitions/%2fnsp%2fr_test';
+const ENCODED = 'behaviordefinitions/%2Fnsp%2Fr_test';
 const RAW_SLASHES = 'behaviordefinitions//nsp';
 
 describe('behavior definition namespace URL encoding', () => {
@@ -37,12 +38,11 @@ describe('behavior definition namespace URL encoding', () => {
     expect(url).not.toContain(RAW_SLASHES);
   });
 
-  it('lockForUpdate() encodes the namespaced name in the path', async () => {
+  it('lock() answers the LOCK as it came, without reading a handle', async () => {
     const connection = createConnectionMock(LOCK_RESPONSE);
-    await lockForUpdate(connection, NS_NAME, 'session');
-    const url = firstUrl(connection);
-    expect(url).toContain(ENCODED);
-    expect(url).not.toContain(RAW_SLASHES);
+    const answer = await lock(connection, NS_NAME);
+    // The handle is `lockHandleOf`'s to read, in the member.
+    expect(answer.data).toBe(LOCK_RESPONSE);
   });
 
   it('update() encodes the namespaced name in the path', async () => {

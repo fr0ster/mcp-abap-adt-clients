@@ -6,33 +6,81 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
 
 - `AdtClient` and `Adt*` objects operate through `IAbapConnection`.
 - The connection maintains the ADT session (`sap-adt-connection-id`).
-- Lock/unlock operations return a `lockHandle` used by update/delete flows.
+- `lock` returns the `lockHandle`; `update` and `delete` carry it in
+  `options.lockHandle`, and `unlock` gives it back.
+- **Only `lock` and `unlock` change the session type**, and each covers its own
+  request and nothing more: `lock` sends its `LOCK` stateful and puts the
+  session back to stateless before returning; `unlock` does the same for its
+  `UNLOCK`. The window between them is *not* stateful — the write inside it
+  goes out stateless, carrying the handle in `options.lockHandle`.
+- **The `UNLOCK` must be stateful.** From `@mcp-abap-adt/connection` 9.3.1 the
+  connector sends the context cookie `sap-contextid` with stateful requests
+  only. A stateless `UNLOCK` then runs in a fresh ABAP context, answers `200`
+  and releases nothing; the next activation or delete is refused with `403`
+  EU/510 "currently editing". Every `unlock` in this library sends it stateful
+  since 23.0.2 — before that, `AdtInclude`, `AdtService` and `AdtMessageClass`
+  did not. A caller with its own `IAbapConnection` needs the same: the cookie
+  on the `LOCK` and the `UNLOCK`.
+- This is Eclipse's model, measured at two scales. A full run against the cloud
+  trial: 803 requests, of which exactly 100 carry `x-sap-adt-sessiontype:
+  stateful` — the 50 `LOCK`s and the 50 `UNLOCK`s, and nothing else. A probe
+  doing two write windows on one class: 12 requests and 4 such headers, again
+  the locks and the unlocks alone. The ratio is what the rule predicts, and the
+  source `PUT`, the activation and every read are stateless at both scales.
+- **A refused `lock` leaves the session stateless, not stateful.** The switch is
+  in a `finally`, so an object someone else holds, an expired session or a
+  dropped connection restores the session on the way out. This matters because
+  the connection is shared: before 18.0.0 a failed acquire left it stateful, and
+  the next unrelated request — a read, an activation, anything — went out inside
+  a session nobody had asked for, holding whatever the server took during it
+  until that session ended.
+- **A lock the server takes during activation outlives the `unlock`.** Activation
+  generates, and generation takes `E_ABAP_GENPH` on the generated program; that
+  one belongs to the ABAP session, not to the object, and is released when the
+  session ends — measured visible in SM12 for exactly as long as the
+  session lives. Nothing in this library can release it earlier.
 - Tests and helpers track locks in `.locks/active-locks.json`.
 
 ## Workflow Example
 
+Every member is one request, so the window is yours to open and close:
+
 ```typescript
 const client = new AdtClient(connection);
+const cls = client.getClass();
+const config = { className: 'ZCL_TEST' };
 
-await client.getClass().create({
-  className: 'ZCL_TEST',
-  packageName: 'ZPKG',
-  description: 'Test',
-}, { activateOnCreate: true });
+// The POST that makes the class shell. Nothing else.
+await cls.create({ ...config, packageName: 'ZPKG', description: 'Test' });
 
-await client.getClass().update({
-  className: 'ZCL_TEST',
-}, { sourceCode: updatedCode, activateOnUpdate: true });
+const locked = await cls.lock(config);          // the LOCK goes stateful
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+try {
+  await cls.update(config, { source: updatedCode, lockHandle });
+} finally {
+  await cls.unlock(config, lockHandle);          // so does the UNLOCK
+}
+
+await cls.activate(config);
 ```
+
+Passing no `lockHandle` is allowed. Whether a write without a lock is accepted
+is ADT's judgement about that object on that system, and its refusal comes back
+in the answer rather than as an exception this library invented.
 
 ## Cleanup Guidance
 
-- Always unlock or delete objects after failures.
+- Always unlock or delete objects after failures — the `try/finally` above is
+  the shape, because a handle left held makes the next create answer 403 with
+  nothing appearing to hold it.
 - Use the lock registry helpers to recover stale locks.
 
 ## The session belongs to the caller, not to this library
 
-`IAbapConnection` — the whole contract this library depends on — is five
+`IAbapConnection` — the whole contract this library depends on, from
+`@mcp-abap-adt/interfaces-adt-connection` since 23.0.0 — is five
 methods: `connect`, `getBaseUrl`, `getSessionId`, `setSessionType`,
 `makeAdtRequest`. There is no `disconnect`, no `close`, no `recycle`. That is
 deliberate, and it has a consequence worth knowing before you meet it:
@@ -44,11 +92,10 @@ middle of one operation would take every other caller down with it. The library
 goes as far as `setSessionType('stateful' | 'stateless')` and no further.
 
 Some ADT operations cannot be done twice in one ABAP session, and this is where
-that lands on you rather than on us. The clearest case: a package the session
-has just updated **cannot be deleted by that same session** — ADT answers
-`PAK/058`, and the same delete from any other session succeeds on the first
-attempt, immediately, while the first session is still open. It is ownership of
-the framework's state, not a delay: retried for 30 seconds it never succeeds.
+that lands on you rather than on us. The clearest case: a package can be saved
+only once per ABAP session — the next update or delete from that session is
+refused with `PAK/058`, and the same request from any other session succeeds at
+once. It is `CL_PACKAGE`'s session buffer, not a delay: retrying never helps.
 
 So when an operation refuses in a way that names editing or locking, and the
 object is one your session has just changed, the fix is a different session —
@@ -58,13 +105,16 @@ and only you can make one:
 // The consumer owns the lifecycle, so the consumer recycles.
 await connection.disconnect();   // on your concrete connector, not on IAbapConnection
 await connection.connect();
-await client.getPackage().delete({ packageName });
+await client.getPackage().delete({ packageName }, { analyse: analyseDeletion });
 ```
 
-This library's part is to report the refusal rather than swallow it.
-`AdtPackage.delete()` reads `del:isDeleted` out of the response body and throws
-with the message id — a `200` from a deletion endpoint means the request was
-understood, not that the object went away.
+This library's part is to hand the refusal back whole rather than swallow it —
+and yours is to read it. A `200` from a deletion endpoint means the request was
+understood, not that the object went away: SAP says which in `del:isDeleted` and
+its `del:message`s. Pass `analyseDeletion` from `@mcp-abap-adt/adt-strategies`
+and a declined delete is a failure carrying every message SAP sent, each with its
+T100 key; pass nothing and it is the document, for you to read. Until 23.0.0
+`AdtPackage.delete()` applied that reading on its own.
 
 The test harness does exactly this, in `recycleTestSession()`, under the
 `cleanup_session_after_test` flag in `test-config.yaml`. That is harness code on

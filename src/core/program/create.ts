@@ -2,20 +2,14 @@
  * Program create operations - Low-level functions
  */
 
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import {
-  ACCEPT_SOURCE,
-  CT_PROGRAM,
-  CT_SOURCE,
-} from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { CT_PROGRAM } from '../../constants/contentTypes';
+import { PROGRAM } from '../../endpoints/objects';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateProgramParams } from './types';
 
@@ -92,7 +86,7 @@ export async function create(
   const description = limitDescription(args.description || args.programName);
   const programType = convertProgramType(args.programType);
   const application = args.application || '*';
-  const url = `/sap/bc/adt/programs/programs${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
+  const url = `${PROGRAM.collection}${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
@@ -118,34 +112,6 @@ export async function create(
     method: 'POST',
     timeout: getTimeout('default'),
     data: metadataXml,
-    headers,
-  });
-}
-
-/**
- * Upload program source code
- */
-async function _uploadProgramSource(
-  connection: IAbapConnection,
-  programName: string,
-  sourceCode: string,
-  lockHandle: string,
-  _sessionId: string,
-  transportRequest?: string,
-): Promise<IAdtWireResponse> {
-  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
-
-  const headers = {
-    Accept: ACCEPT_SOURCE,
-    'Content-Type': CT_SOURCE,
-  };
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'PUT',
-    timeout: getTimeout('default'),
-    data: sourceCode,
     headers,
   });
 }

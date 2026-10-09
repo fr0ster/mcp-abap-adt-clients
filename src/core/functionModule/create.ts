@@ -5,8 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_FUNCTION_MODULE } from '../../constants/contentTypes';
+import { FUNCTION_GROUP, FUNCTION_MODULE } from '../../endpoints/objects';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -22,11 +23,7 @@ export async function create(
   connection: IAbapConnection,
   params: ICreateFunctionModuleParams,
 ): Promise<IAdtWireResponse> {
-  const encodedGroupName = encodeSapObjectName(
-    params.functionGroupName,
-  ).toLowerCase();
-
-  const url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
+  const url = `${FUNCTION_MODULE.collection(params.functionGroupName)}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const masterSystem = params.masterSystem || undefined;
   const username = params.responsible || undefined;
@@ -40,7 +37,7 @@ export async function create(
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:name="${params.functionModuleName}" adtcore:type="FUGR/FF"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:containerRef adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:uri="/sap/bc/adt/functions/groups/${encodedGroupName}"/>
+  <adtcore:containerRef adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:uri="${FUNCTION_GROUP.uri(params.functionGroupName)}"/>
 </fmodule:abapFunctionModule>`;
 
   return connection.makeAdtRequest({

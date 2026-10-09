@@ -2,20 +2,17 @@
  * FunctionModule check operations
  */
 
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-} from '../../utils/checkRun';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FUNCTION_MODULE } from '../../endpoints/objects';
+import type { CheckRunVersion } from '../../utils/checkRun';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,9 +25,7 @@ function buildCheckRunXml(
   sourceCode?: string,
   sourceContentType?: string,
 ): string {
-  const encodedGroup = encodeSapObjectName(functionGroupName).toLowerCase();
-  const encodedModule = encodeSapObjectName(functionModuleName).toLowerCase();
-  const objectUri = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedModule}`;
+  const objectUri = `${FUNCTION_MODULE.uri(functionGroupName, functionModuleName)}`;
 
   if (sourceCode) {
     // TODO: analyze whether chkrun:contentType can be extracted to a constant
@@ -97,26 +92,6 @@ export async function checkFunctionModule(
     data: xmlBody,
     headers,
   });
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Function module check failed: ${errorMessages}`);
-  }
-
-  if (checkResult.warnings.length > 0) {
-    throw new Error(
-      `Function module check failed: ${checkResult.message || 'Warnings found'}`,
-    );
-  }
-
-  // If status is 'notProcessed', it's an error
-  if (checkResult.status === 'notProcessed') {
-    throw new Error(
-      `Function module check failed: ${checkResult.message || 'Object could not be processed'}`,
-    );
-  }
 
   return response;
 }

@@ -2,20 +2,62 @@
  * ATC check runs.
  *
  * Written against the captures in `docs/evidence/2026-08-16-atc-trial-probe.md`
- * and `docs/evidence/2026-08-17-atc-objecttype-confirmed.md`, and the numbering
- * follows the plan's test list.
+ * and `docs/evidence/2026-08-17-atc-objecttype-confirmed.md`.
  *
- * Three groups earn their place for different reasons: the ones that read the
- * **request** (headers and payload), because in ATC the media type is the
- * resource and the payload is the whole instruction; the ones that assert a
- * **rejection**, because every silent default this package has removed had the
- * shape of a missing field quietly becoming a plausible value; and the URI
- * table, because those seven templates are the only part of the contract that
- * rests on evidence rather than on reasoning.
+ * What is asserted here is the request — headers and payload, because in ATC
+ * the media type is the resource and the payload is the whole instruction —
+ * which strategy reads which answer, and the URI table, because those seven
+ * templates are the only part of the contract that rests on evidence rather
+ * than on reasoning. What the answers *mean* is the readings' business: they
+ * moved to `@mcp-abap-adt/adt-strategies` with their cases
+ * (`atcReadings.test.ts`), and they are imported here from its source until
+ * the package index exports them.
  */
 
-import type { IAbapConnection, IAtcRunTarget } from '@mcp-abap-adt/interfaces';
-import { AdtAtc } from '../../../runtime/atc/AdtAtc';
+import {
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+} from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAtcRunOptions,
+  IAtcRunTarget,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { AdtAtc, atcDocuments } from '../../../runtime/atc/AdtAtc';
+import { expectResult } from '../../helpers/contract';
+
+/** An ATC client that reads its answers — the set a caller passes. */
+const reading = {
+  ...atcDocuments,
+  checkVariant: atcSystemCheckVariant,
+  worklist: atcWorklistId,
+  startedRun: atcStartedRun,
+  waitingRun: atcWaitingRun,
+  runStatus: atcRunStatus,
+};
+
+/**
+ * The sequence `AdtAtc.run` performed until 19.0.0, written out: the check
+ * variant, a worklist for it, then the run. Three requests, so it could not
+ * stay one member — the order and the worklist's reuse are the caller's.
+ */
+const runAtc = async (
+  atc: AdtAtc<typeof reading>,
+  target: IAtcRunTarget,
+  options?: IAtcRunOptions,
+) => {
+  const checkVariant =
+    options?.checkVariant ??
+    expectResult(await atc.resolveCheckVariant(), 'check variant');
+  const worklistId = expectResult(
+    await atc.createWorklist(checkVariant),
+    'worklist',
+  );
+  return atc.startRun(worklistId, target, options);
+};
 
 // The properties as the trial sent them: four of them, and the one this client
 // needs is not the first.
@@ -116,29 +158,32 @@ function connectionFor(
 const urlsOf = (calls: { url: string }[]) => calls.map((c) => c.url);
 
 describe('AdtAtc — resolving the check variant', () => {
-  // 1. The interface makes `options` optional. A handler reading `options.wait`
+  // The interface makes `options` optional. A handler reading `options.wait`
   // throws on this call, and a test passing `{}` would sail past it.
   it('run(target) with no options at all uses every default', async () => {
     const { connection, calls } = connectionFor();
 
-    const result = await new AdtAtc(connection, logger() as never).run(TARGET);
+    const result = expectResult(
+      await runAtc(new AdtAtc(connection, logger() as never, reading), TARGET),
+      'result',
+    );
 
-    expect(result).toEqual({
-      waited: false,
-      worklistId: WORKLIST_ID,
-      runId: RUN_ID,
-    });
+    expect(result).toEqual({ waited: false, runId: RUN_ID });
     expect(urlsOf(calls)[0]).toContain('/atc/customizing');
     const run = calls.find((c) => c.url.includes('/atc/runs?'));
     expect(run?.url).toContain('clientWait=false');
+    expect(run?.url).toContain(`worklistId=${WORKLIST_ID}`);
     expect(run?.data).toContain('maximumVerdicts="100"');
   });
 
-  // 2.
   it('reads customizing with GET and uses systemCheckVariant', async () => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run(TARGET, {});
+    await runAtc(
+      new AdtAtc(connection, logger() as never, reading),
+      TARGET,
+      {},
+    );
 
     const customizing = calls.find((c) => c.url.includes('/atc/customizing'));
     expect(customizing?.method).toBe('GET');
@@ -147,12 +192,12 @@ describe('AdtAtc — resolving the check variant', () => {
     );
   });
 
-  // 3. Asserting the request was never made, not merely that the right variant
+  // Asserting the request was never made, not merely that the right variant
   // was used — a handler could read customizing and then ignore it.
   it('an explicit checkVariant skips /atc/customizing entirely', async () => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run(TARGET, {
+    await runAtc(new AdtAtc(connection, logger() as never, reading), TARGET, {
       checkVariant: 'ZMY_VARIANT',
     });
 
@@ -164,20 +209,108 @@ describe('AdtAtc — resolving the check variant', () => {
     );
   });
 
-  // 4.
-  it('customizing without systemCheckVariant rejects locally', async () => {
+  // It used to throw ATC_NO_CHECK_VARIANT from inside the member. A
+  // customizing without a variant is SAP's answer lacking something: it comes
+  // back as the answer, and a caller who counts that a failure says so.
+  it('customizing without systemCheckVariant is the answer, judged by analyse', async () => {
     const { connection, calls } = connectionFor({
       customizing: { status: 200, data: '<atc:customizing/>', headers: {} },
     });
+    const atc = new AdtAtc(connection, logger() as never, reading);
 
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET),
-    ).rejects.toMatchObject({ code: 'ATC_NO_CHECK_VARIANT' });
+    expect(expectResult(await atc.resolveCheckVariant(), 'variant')).toBe('');
 
-    // No worklist created with `undefined` in the URL.
-    expect(urlsOf(calls).some((u) => u.includes('/atc/worklists?'))).toBe(
-      false,
+    const judged = await atc.resolveCheckVariant({
+      analyse: (verdict, answer) =>
+        atcSystemCheckVariant(answer as never) === ''
+          ? { origin: 'refusal', message: 'no systemCheckVariant' }
+          : verdict,
+    });
+    expect(judged.ok).toBe(false);
+    if (!judged.ok)
+      expect(judged.getError().message).toBe('no systemCheckVariant');
+    expect(
+      calls.filter((c) => c.url.includes('/atc/customizing')),
+    ).toHaveLength(2);
+  });
+});
+
+describe('AdtAtc — one request per member, each answer through its slot', () => {
+  it('answers every document as it arrived when no reading is given', async () => {
+    const { connection } = connectionFor();
+    const atc = new AdtAtc(connection, logger() as never);
+
+    expect(expectResult(await atc.resolveCheckVariant(), 'variant')).toBe(
+      CUSTOMIZING,
     );
+    expect(expectResult(await atc.createWorklist('V'), 'worklist')).toBe(
+      WORKLIST_ID,
+    );
+    expect(expectResult(await atc.getRunStatus(RUN_ID), 'status')).toBe(
+      STATUS_FINISHED,
+    );
+    expect(expectResult(await atc.getFindings(WORKLIST_ID), 'findings')).toBe(
+      '<worklist/>',
+    );
+    // A run started without waiting answers 201 with an empty body; the run
+    // id is in Location, which only `atcStartedRun` reads.
+    expect(
+      expectResult(await atc.startRun(WORKLIST_ID, TARGET), 'started'),
+    ).toBe('');
+    expect(connection.makeAdtRequest).toHaveBeenCalledTimes(5);
+  });
+
+  // `wait` decides the shape of the answer, so it decides which strategy
+  // reads it.
+  it('a started run is read by startedRun, a waiting run by waitingRun', async () => {
+    const started = connectionFor();
+    expect(
+      expectResult(
+        await new AdtAtc(
+          started.connection,
+          logger() as never,
+          reading,
+        ).startRun(WORKLIST_ID, TARGET),
+        'started',
+      ),
+    ).toEqual({ waited: false, runId: RUN_ID });
+
+    const waiting = connectionFor({
+      run: { status: 200, data: WAITING_RUN, headers: {} },
+    });
+    expect(
+      expectResult(
+        await new AdtAtc(
+          waiting.connection,
+          logger() as never,
+          reading,
+        ).startRun(WORKLIST_ID, TARGET, { wait: true }),
+        'waiting',
+      ),
+    ).toEqual({ waited: true, worklistId: WORKLIST_ID, findingStats: '0,0,1' });
+  });
+
+  it("passes the caller's analyse through on every member", async () => {
+    const { connection } = connectionFor();
+    const atc = new AdtAtc(connection, logger() as never);
+    const refuse = {
+      analyse: () => ({ origin: 'refusal' as const, message: 'no' }),
+    };
+
+    const answers = [
+      await atc.resolveCheckVariant(refuse),
+      await atc.createWorklist('V', refuse),
+      await atc.startRun(WORKLIST_ID, TARGET, refuse),
+      await atc.getRunStatus(RUN_ID, refuse),
+      await atc.getFindings(WORKLIST_ID, refuse),
+    ];
+    expect(answers.map((a) => a.ok)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });
 
@@ -188,7 +321,8 @@ describe('AdtAtc — the request itself', () => {
   it('the run payload carries every object, the inclusive kind and the cap', async () => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run(
+    await runAtc(
+      new AdtAtc(connection, logger() as never, reading),
       {
         objects: [
           { objectType: 'class', objectName: 'ZCL_X' },
@@ -201,8 +335,8 @@ describe('AdtAtc — the request itself', () => {
     const body = String(calls.find((c) => c.url.includes('/atc/runs?'))?.data);
     expect(body).toContain('maximumVerdicts="500"');
     expect(body).toContain('<objectSet kind="inclusive">');
-    expect(body).toContain('adtcore:uri="/sap/bc/adt/oo/classes/ZCL_X"');
-    expect(body).toContain('adtcore:uri="/sap/bc/adt/ddic/tables/ZT_Y"');
+    expect(body).toContain('adtcore:uri="/sap/bc/adt/oo/classes/zcl_x"');
+    expect(body).toContain('adtcore:uri="/sap/bc/adt/ddic/tables/zt_y"');
   });
 
   it('clientWait follows the wait option', async () => {
@@ -210,7 +344,9 @@ describe('AdtAtc — the request itself', () => {
       run: { status: 200, data: WAITING_RUN, headers: {} },
     });
 
-    await new AdtAtc(connection, logger() as never).run(TARGET, { wait: true });
+    await runAtc(new AdtAtc(connection, logger() as never, reading), TARGET, {
+      wait: true,
+    });
 
     expect(calls.find((c) => c.url.includes('/atc/runs?'))?.url).toContain(
       'clientWait=true',
@@ -222,9 +358,9 @@ describe('AdtAtc — the request itself', () => {
   // and a checkstyle Accept is refused with 406.
   it('every request carries the media types the server answers to', async () => {
     const { connection, calls } = connectionFor();
-    const atc = new AdtAtc(connection, logger() as never);
+    const atc = new AdtAtc(connection, logger() as never, reading);
 
-    await atc.run(TARGET);
+    await runAtc(atc, TARGET);
     await atc.getRunStatus(RUN_ID);
     await atc.getFindings(WORKLIST_ID);
 
@@ -254,204 +390,19 @@ describe('AdtAtc — the request itself', () => {
   });
 });
 
-describe('AdtAtc — what a started run answers with', () => {
-  // 6. worklistId and runId are different values from different responses, and
-  // the worklist id is what getFindings is called with next.
-  it('wait: false returns the run id from Location and the created worklist id', async () => {
-    const { connection } = connectionFor();
-
-    const result = await new AdtAtc(connection, logger() as never).run(TARGET);
-
-    expect(result).toEqual({
-      waited: false,
-      worklistId: WORKLIST_ID,
-      runId: RUN_ID,
-    });
-  });
-
-  // 7. The silent-success shape this package removed from fifteen handlers.
-  it('wait: false with no Location rejects instead of using the worklist id', async () => {
-    const { connection } = connectionFor({
-      run: { status: 201, data: '', headers: {} },
-    });
-
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET),
-    ).rejects.toMatchObject({ code: 'ATC_NO_RUN_LOCATION' });
-  });
-
-  // 8. The happy path, saying nothing about where the id came from — that is
-  // test 15's job.
-  it('wait: true returns the stats verbatim and the worklist id', async () => {
-    const { connection } = connectionFor({
-      run: { status: 200, data: WAITING_RUN, headers: {} },
-    });
-
-    const result = await new AdtAtc(connection, logger() as never).run(TARGET, {
-      wait: true,
-    });
-
-    expect(result).toEqual({
-      waited: true,
-      worklistId: WORKLIST_ID,
-      findingStats: '0,0,1',
-    });
-  });
-
-  // 9. A confident zero is indistinguishable from a clean check.
-  it('wait: true with no FINDING_STATS rejects instead of reporting "0,0,0"', async () => {
-    const { connection } = connectionFor({
-      run: {
-        status: 200,
-        data: '<atcworklist:worklistRun/>',
-        headers: {},
-      },
-    });
-
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).rejects.toMatchObject({ code: 'ATC_NO_FINDING_STATS' });
-  });
-
-  // 15. Which id is authoritative. A positive test where the two agree cannot
-  // tell "returns the created id" from "trusts the response id". This asserts a
-  // SUCCESS: the spec defines no failure here, and an implementation plan does
-  // not get to add one.
-  it('a differing echoed worklist id is warned about, not obeyed, and not fatal', async () => {
-    const log = logger();
-    const { connection } = connectionFor({
-      run: {
-        status: 200,
-        data: WAITING_RUN.replace(WORKLIST_ID, 'SOMEONE_ELSES_WORKLIST'),
-        headers: {},
-      },
-    });
-
-    const result = await new AdtAtc(connection, log as never).run(TARGET, {
-      wait: true,
-    });
-
-    expect(result).toMatchObject({ waited: true, worklistId: WORKLIST_ID });
-    expect(log.warn).toHaveBeenCalledWith(
-      expect.stringContaining('SOMEONE_ELSES_WORKLIST'),
-    );
-  });
-
-  it('a waiting run with no echoed worklist id still succeeds', async () => {
-    const { connection } = connectionFor({
-      run: {
-        status: 200,
-        data: `<atcworklist:worklistRun><atcworklist:infos><atcinfo:info><atcinfo:type>FINDING_STATS</atcinfo:type><atcinfo:description>1,2,3</atcinfo:description></atcinfo:info></atcworklist:infos></atcworklist:worklistRun>`,
-        headers: {},
-      },
-    });
-
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).resolves.toMatchObject({
-      worklistId: WORKLIST_ID,
-      findingStats: '1,2,3',
-    });
-  });
-});
-
-describe('AdtAtc — asking whether a run is done', () => {
-  // 10.
-  it('isFinished is exact: "finished" yes, "unfinished" and "not_finished" no', async () => {
-    for (const [status, expected] of [
-      ['finished', true],
-      ['FINISHED', true],
-      ['unfinished', false],
-      ['not_finished', false],
-      ['running', false],
-    ] as const) {
-      const { connection } = connectionFor({
-        status: {
-          status: 200,
-          data: `<runs:run runs:status="${status}"/>`,
-          headers: {},
-        },
-      });
-
-      const result = await new AdtAtc(
-        connection,
-        logger() as never,
-      ).getRunStatus(RUN_ID);
-
-      expect(result.status).toBe(status);
-      expect(result.isFinished).toBe(expected);
-    }
-  });
-
-  // 11. Both links, each from its own rel. Asserting only the absent case
-  // leaves a parser free to take the first href it sees, or to swap the two.
-  it('takes each id from its own atom link', async () => {
-    const { connection } = connectionFor();
-
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
-    );
-
-    expect(result.worklistId).toBe(WORKLIST_ID);
-    expect(result.resultId).toBe('RESULT99');
-  });
-
-  // 12. The state polling exists for, and the one nobody has captured.
-  it('resolves without the links, leaving the ids undefined', async () => {
-    const { connection } = connectionFor({
-      status: {
-        status: 200,
-        data: '<runs:run runs:status="running"/>',
-        headers: {},
-      },
-    });
-
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
-    );
-
-    expect(result).toEqual({
-      status: 'running',
-      isFinished: false,
-      worklistId: undefined,
-      resultId: undefined,
-    });
-  });
-
-  // 14. `status` is not optional in the contract; resolving with undefined
-  // through it is a lie the type cannot catch.
-  it('a run resource with no runs:status rejects', async () => {
-    const { connection } = connectionFor({
-      status: { status: 200, data: '<runs:run/>', headers: {} },
-    });
-
-    await expect(
-      new AdtAtc(connection, logger() as never).getRunStatus(RUN_ID),
-    ).rejects.toMatchObject({ code: 'ATC_RUN_STATUS_MISSING' });
-  });
-});
-
 describe('AdtAtc — refusing before the request', () => {
-  // 13. Non-empty and nothing more: no length, no character class, since no
-  // contract states a format.
-  it('an empty worklist id rejects rather than being run against', async () => {
-    const { connection, calls } = connectionFor({
-      worklist: { status: 200, data: '   ', headers: {} },
-    });
-
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET),
-    ).rejects.toMatchObject({ code: 'ATC_NO_WORKLIST_ID' });
-
-    expect(urlsOf(calls).some((u) => u.includes('/atc/runs?'))).toBe(false);
-  });
-
   // 16. The tuple type stops a TypeScript caller; a JavaScript one arrives.
+  //
+  // Asserted against `startRun` rather than the composed sequence: since
+  // 19.0.0 the variant and the worklist are the caller's own calls, so "before
+  // any request" is a claim about this member, not about the three together.
   it('an empty object set rejects before any request', async () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never).run({ objects: [] } as never),
+      new AdtAtc(connection, logger() as never).startRun('WL1', {
+        objects: [],
+      } as never),
     ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
 
     expect(connection.makeAdtRequest).not.toHaveBeenCalled();
@@ -468,7 +419,7 @@ describe('AdtAtc — refusing before the request', () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, {
+      new AdtAtc(connection, logger() as never).startRun('WL1', TARGET, {
         maximumVerdicts: value,
       }),
     ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
@@ -477,128 +428,24 @@ describe('AdtAtc — refusing before the request', () => {
   });
 });
 
-/**
- * Two things about an XML document carry no meaning: the order of attributes on
- * an element, and which prefix a namespace was bound to. Every case here is a
- * document a server may validly send that differs from the trial's captures in
- * one of those two ways, and every one of them defeated the pattern-matching
- * this file's first implementation used.
- */
-describe('AdtAtc — the documents are read structurally', () => {
-  it('finds the check variant with the attributes the other way round', async () => {
-    const { connection, calls } = connectionFor({
-      customizing: {
-        status: 200,
-        data: '<atc:customizing><properties><property value="ZREVERSED" name="systemCheckVariant"/></properties></atc:customizing>',
-        headers: {},
-      },
-    });
-
-    await new AdtAtc(connection, logger() as never).run(TARGET);
-
-    expect(calls.find((c) => c.url.includes('/atc/worklists?'))?.url).toContain(
-      'checkVariant=ZREVERSED',
-    );
-  });
-
-  it('reads runs:status under any namespace prefix', async () => {
-    const { connection } = connectionFor({
-      status: {
-        status: 200,
-        data: '<r:run r:status="finished" xmlns:r="http://www.sap.com/adt/backgroundruns"/>',
-        headers: {},
-      },
-    });
-
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
-    );
-
-    expect(result).toMatchObject({ status: 'finished', isFinished: true });
-  });
-
-  it('takes each atom link id with rel before href', async () => {
-    const { connection } = connectionFor({
-      status: {
-        status: 200,
-        data: `<runs:run runs:status="finished"><runs:result>
-<atom:link rel="http://www.sap.com/abap/checks/atc/relations/results/worklistid" href="/sap/bc/adt/atc/worklists/${WORKLIST_ID}" type="application/xml"/>
-<atom:link rel="http://www.sap.com/abap/checks/atc/relations/results/displayid" href="/sap/bc/adt/atc/results/RESULT99" type="application/xml"/>
-</runs:result></runs:run>`,
-        headers: {},
-      },
-    });
-
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
-    );
-
-    expect(result.worklistId).toBe(WORKLIST_ID);
-    expect(result.resultId).toBe('RESULT99');
-  });
-
-  it('finds FINDING_STATS past an earlier info and with description first', async () => {
-    const { connection } = connectionFor({
-      run: {
-        status: 200,
-        data: `<atcworklist:worklistRun>
-<atcworklist:worklistId>${WORKLIST_ID}</atcworklist:worklistId>
-<atcworklist:infos>
-<atcinfo:info><atcinfo:type>SOMETHING_ELSE</atcinfo:type><atcinfo:description>9,9,9</atcinfo:description></atcinfo:info>
-<atcinfo:info><atcinfo:description>4,5,6</atcinfo:description><atcinfo:type>FINDING_STATS</atcinfo:type></atcinfo:info>
-</atcworklist:infos></atcworklist:worklistRun>`,
-        headers: {},
-      },
-    });
-
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).resolves.toMatchObject({ findingStats: '4,5,6' });
-  });
-
-  // An all-digit id is a string, not a number: `String(12345)` would round-trip
-  // but an id with a leading zero, or one long enough to lose precision, would
-  // not — and both are shapes ADT has been seen to send.
-  it('keeps an all-digit worklist id a string', async () => {
-    const digits = '00000000000000000000000000000000';
-    const { connection } = connectionFor({
-      run: {
-        status: 200,
-        data: `<atcworklist:worklistRun><atcworklist:worklistId>${digits}</atcworklist:worklistId>
-<atcworklist:infos><atcinfo:info><atcinfo:type>FINDING_STATS</atcinfo:type><atcinfo:description>0,0,0</atcinfo:description></atcinfo:info></atcworklist:infos>
-</atcworklist:worklistRun>`,
-        headers: {},
-      },
-    });
-    const log = logger();
-
-    const result = await new AdtAtc(connection, log as never).run(TARGET, {
-      wait: true,
-    });
-
-    // The echo differs from the created id, so it is warned about verbatim —
-    // which is where a number would have shown itself.
-    expect(result).toMatchObject({ findingStats: '0,0,0' });
-    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining(digits));
-  });
-});
-
 // 18. The one part of the contract resting on evidence rather than reasoning:
 // each template was confirmed by a run submitted at it whose finished worklist
 // then listed that object under that type. A changed template must fail loudly.
+// Lowercase since 2026-10-01: ATC listed the class for a lowercase reference on
+// an on-premise and a cloud system alike.
 describe('AdtAtc — the confirmed URI templates', () => {
   it.each([
-    ['class', '/sap/bc/adt/oo/classes/ZX'],
-    ['interface', '/sap/bc/adt/oo/interfaces/ZX'],
-    ['function_group', '/sap/bc/adt/functions/groups/ZX'],
-    ['package', '/sap/bc/adt/packages/ZX'],
-    ['ddl_source', '/sap/bc/adt/ddic/ddl/sources/ZX'],
-    ['table', '/sap/bc/adt/ddic/tables/ZX'],
-    ['behavior_definition', '/sap/bc/adt/bo/behaviordefinitions/ZX'],
+    ['class', '/sap/bc/adt/oo/classes/zx'],
+    ['interface', '/sap/bc/adt/oo/interfaces/zx'],
+    ['function_group', '/sap/bc/adt/functions/groups/zx'],
+    ['package', '/sap/bc/adt/packages/zx'],
+    ['ddl_source', '/sap/bc/adt/ddic/ddl/sources/zx'],
+    ['table', '/sap/bc/adt/ddic/tables/zx'],
+    ['behavior_definition', '/sap/bc/adt/bo/behaviordefinitions/zx'],
   ] as const)('%s is checked at %s', async (objectType, uri) => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run({
+    await new AdtAtc(connection, logger() as never).startRun('WL1', {
       objects: [{ objectType, objectName: 'ZX' }],
     });
 
@@ -617,11 +464,15 @@ describe('AdtAtc — the confirmed URI templates', () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never).run({
+      new AdtAtc(connection, logger() as never).startRun('WL1', {
         // A member the union does not have yet — the shape a future addition
         // arrives in, before anyone adds its template.
-        objects: [{ objectType: 'program' as never, objectName: 'ZX' }],
+        objects: [
+          { objectType: 'enhancement_spot' as never, objectName: 'ZX' },
+        ],
       }),
-    ).rejects.toThrow(/No ADT URI is known for ATC object type 'program'/);
+    ).rejects.toThrow(
+      /No ADT URI is known for ATC object type 'enhancement_spot'/,
+    );
   });
 });

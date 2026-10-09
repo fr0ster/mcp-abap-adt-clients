@@ -26,7 +26,7 @@ export function buildFeatureToggleXml(
 ): string {
   const name = params.feature_toggle_name.toUpperCase();
   const description = params.description ?? '';
-  const pkg = params.package_name;
+  const pkg = params.package_name as string;
 
   const adtcoreAttrs = [
     `adtcore:name="${escapeXml(name)}"`,

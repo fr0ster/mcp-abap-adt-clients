@@ -12,16 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IServiceDefinitionConfig,
-  IServiceDefinitionState,
-} from '../../../../core/serviceDefinition';
+import type { IServiceDefinitionConfig } from '../../../../core/serviceDefinition';
 import { getServiceDefinition } from '../../../../core/serviceDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -74,7 +73,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IServiceDefinitionConfig, IServiceDefinitionState>;
+  let tester: BaseTester<IServiceDefinitionConfig>;
 
   beforeAll(async () => {
     try {
@@ -118,7 +117,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (serviceDefinitionName: string) => {
@@ -173,16 +172,16 @@ describe('ServiceDefinition (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
           testCase?.params?.source_code ||
-          config.sourceCode ||
+          config.source ||
           `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n expose ZOK_C_CDS_TEST;\n}`;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             serviceDefinitionName: config.serviceDefinitionName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },
@@ -302,9 +301,9 @@ describe('ServiceDefinition (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           // ServiceDefinition read returns service definition config - check if serviceDefinitionName is present
-          const serviceDefinitionConfig = resultState.readResult;
+          const serviceDefinitionConfig = resultState;
           if (
             serviceDefinitionConfig &&
             typeof serviceDefinitionConfig === 'object' &&

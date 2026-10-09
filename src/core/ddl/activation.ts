@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { DDL_SOURCE } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate DDLS
@@ -16,6 +16,6 @@ export async function activateDDLS(
   connection: IAbapConnection,
   ddlName: string,
 ): Promise<IAdtWireResponse> {
-  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`;
+  const objectUri = `${DDL_SOURCE.uri(ddlName)}`;
   return await activateObjectInSession(connection, objectUri, ddlName, true);
 }

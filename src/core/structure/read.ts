@@ -5,18 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { orThrow } from '../../utils/adtResponse';
-import { encodeSapObjectName } from '../../utils/internalUtils';
-import { noopLogger } from '../../utils/noopLogger';
+import { STRUCTURE, transportUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection): AdtUtils {
-  return new AdtUtils(connection, noopLogger);
-}
 
 /**
  * Get ABAP structure metadata (without source code)
@@ -26,13 +20,12 @@ export async function getStructureMetadata(
   structureName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'structure',
-      structureName,
-      undefined,
-      options,
-    ),
+  return objectMetadataWire(
+    connection,
+    'structure',
+    structureName,
+    undefined,
+    options,
   );
 }
 
@@ -45,14 +38,13 @@ export async function getStructureSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'structure',
-      structureName,
-      undefined,
-      version,
-      options,
-    ),
+  return objectSourceWire(
+    connection,
+    'structure',
+    structureName,
+    undefined,
+    version,
+    options,
   );
 }
 
@@ -78,9 +70,8 @@ export async function getStructureTransport(
   structureName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(structureName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/structures/${encodedName}/transport${query}`;
+  const url = `${transportUri(STRUCTURE.uri(structureName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

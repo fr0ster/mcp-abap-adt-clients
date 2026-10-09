@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { FUNCTION_MODULE } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate function module
@@ -17,10 +17,7 @@ export async function activateFunctionModule(
   functionGroupName: string,
   functionModuleName: string,
 ): Promise<IAdtWireResponse> {
-  const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
-  const encodedModuleName =
-    encodeSapObjectName(functionModuleName).toLowerCase();
-  const objectUri = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}`;
+  const objectUri = `${FUNCTION_MODULE.uri(functionGroupName, functionModuleName)}`;
 
   return await activateObjectInSession(
     connection,

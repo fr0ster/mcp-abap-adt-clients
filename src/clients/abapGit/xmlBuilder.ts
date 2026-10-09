@@ -11,7 +11,7 @@ import type {
   IAbapGitExternalRepoCredentials,
   IAbapGitLinkArgs,
   IAbapGitPullArgs,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 const NS_ABAPGITREPO = 'http://www.sap.com/adt/abapgit/repositories';
 const NS_ABAPGIT_EXTERNAL_REPO = 'http://www.sap.com/adt/abapgit/externalRepo';
@@ -50,13 +50,13 @@ export function buildLinkBody(args: IAbapGitLinkArgs): string {
 
 export function buildPullBody(
   args: IAbapGitPullArgs,
-  resolvedBranch: string,
+  resolvedBranch?: string,
 ): string {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<abapgitrepo:repository xmlns:abapgitrepo="${NS_ABAPGITREPO}">` +
     childRepo('package', args.package) +
-    childRepo('branchName', resolvedBranch) +
+    childRepo('branchName', resolvedBranch ?? args.branchName ?? '') +
     childRepo('remoteUser', args.remoteUser) +
     childRepo('remotePassword', args.remotePassword) +
     childRepo('transportRequest', args.transportRequest) +

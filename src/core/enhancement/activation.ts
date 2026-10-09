@@ -5,9 +5,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { type EnhancementType, getEnhancementUri } from './types';
 
 /**
@@ -26,8 +25,7 @@ export async function activateEnhancement(
   enhancementType: EnhancementType,
   enhancementName: string,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
-  const objectUri = getEnhancementUri(enhancementType, encodedName);
+  const objectUri = getEnhancementUri(enhancementType, enhancementName);
 
   return await activateObjectInSession(
     connection,

@@ -5,12 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DATA_ELEMENT,
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { DATA_ELEMENT, transportUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -22,9 +22,8 @@ export async function getDataElement(
   dataElementName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}${query}`;
+  const url = `${DATA_ELEMENT.uri(dataElementName)}${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -47,9 +46,8 @@ export async function getDataElementTransport(
   dataElementName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}/transport${query}`;
+  const url = `${transportUri(DATA_ELEMENT.uri(dataElementName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

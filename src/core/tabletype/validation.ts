@@ -6,8 +6,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { TABLE_TYPE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -25,7 +26,7 @@ export async function validateTableTypeName(
   tableTypeName: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/tabletypes/validation`;
+  const url = TABLE_TYPE.validation;
   const queryParams = new URLSearchParams({
     objtype: 'ttypda',
     objname: tableTypeName,

@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { PROGRAM } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate program
@@ -17,7 +17,7 @@ export async function activateProgram(
   connection: IAbapConnection,
   programName: string,
 ): Promise<IAdtWireResponse> {
-  const objectUri = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`;
+  const objectUri = `${PROGRAM.uri(programName)}`;
   return await activateObjectInSession(
     connection,
     objectUri,

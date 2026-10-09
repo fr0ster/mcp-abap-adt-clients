@@ -23,36 +23,90 @@
  */
 
 import type {
+  AdtTaskType,
+  IAdtAnalyseOptions,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
+  IAdtOperationOptions,
+  IAdtRequest,
+  IAdtResponse,
   IAdtSystemContext,
-  ITransportTree,
-} from '@mcp-abap-adt/interfaces';
-import {
-  type HttpError,
-  hasDeferredResponses,
-  type IAbapConnection,
-  type IAdtCreatable,
-  type IAdtModifiable,
-  type IAdtOperationOptions,
-  type IAdtReadable,
-  type IListTransportsOptions,
-  type ILogger,
-  type IObjectVersion,
-  TRANSPORT_SEARCH_CONFIGURATIONS_URL,
-} from '@mcp-abap-adt/interfaces';
-import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
-import { safeErrorMessage } from '../../utils/internalUtils';
+  IAdtTransportObjectActions,
+  IListTransportsOptions,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IDeferredResponseConnection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
-import { getTransportSearchConfigurations, listTransports } from './list';
-import { parseTransportTree } from './parseTransportTree';
+import { listTransports, requestTransportSearchConfigurations } from './list';
+import {
+  addObjectToTransport,
+  changeTransportTaskType,
+  createTransportTask,
+  readTransportActionLog,
+  readTransportObjects,
+  removeObjectFromTransport,
+} from './objects';
 import { getTransport } from './read';
-import type { ITransportConfig, ITransportState } from './types';
+import {
+  type IAbapObjectEntry,
+  type ITransportConfig,
+  type ITransportResults,
+  transportDocuments,
+} from './types';
 import { updateTransport } from './update';
-export class AdtRequest
+
+/**
+ * Whether awaiting this connection's answers is safe right now.
+ *
+ * It left `@mcp-abap-adt/interfaces` in 29.0.0 with everything else that
+ * emitted code: the contract declares `IDeferredResponseConnection`, and the
+ * narrowing over it is an implementation.
+ *
+ * Not a proof of absence — a third-party connection that defers answers without
+ * declaring it will still deadlock. It makes the known case honest.
+ */
+export function hasDeferredResponses<T extends object>(
+  connection: T,
+): connection is T & IDeferredResponseConnection {
+  return (
+    (connection as Partial<IDeferredResponseConnection>)
+      .responsesAreDeferred === true
+  );
+}
+
+export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   implements
-    IAdtCreatable<ITransportConfig, ITransportState>,
-    IAdtReadable<ITransportConfig, ITransportState>,
-    IAdtModifiable<ITransportConfig, ITransportState>
+    IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
+    IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<
+      Partial<ITransportConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
+    IAdtDeletable<
+      ITransportConfig,
+      ReturnType<R['deleted']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtRequest<ReturnType<R['list']>>,
+    IAdtTransportObjectActions<
+      ReturnType<R['removedObject']>,
+      ReturnType<R['addedObject']>,
+      ReturnType<R['createdTask']>,
+      ReturnType<R['actionLog']>,
+      ReturnType<R['objects']>,
+      ReturnType<R['taskTypeChanged']>
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -63,271 +117,475 @@ export class AdtRequest
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = transportDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
   }
 
-  /**
-   * Create transport request
-   */
-  async create(
-    config: ITransportConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransportState> {
-    if (!config.description) {
-      throw new Error('Transport request description is required');
-    }
-
-    try {
-      this.logger?.info?.('Creating transport request');
-      const response = await createTransport(this.connection, {
-        transport_type:
-          config.transportType === 'customizing' ? 'customizing' : 'workbench',
-        description: config.description,
-        target_system: config.targetSystem,
-        owner: config.owner ?? this.systemContext.responsible,
-      });
-
-      const transportNumber = response.data?.transport_request;
-
-      if (!transportNumber) {
-        throw new Error(
-          'Failed to create transport request: transport number not returned',
-        );
-      }
-
-      this.logger?.info?.('Transport request created:', transportNumber);
-
-      return {
-        createResult: response,
-        transportNumber,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+  /** The request number, or the caller's mistake. */
+  private number(config: Partial<ITransportConfig>): string {
+    return config.transportNumber as string;
   }
 
   /**
-   * Read transport request
-   */
-  async read(
-    config: Partial<ITransportConfig>,
-    _version?: 'active' | 'inactive',
-  ): Promise<ITransportState | undefined> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
-
-    try {
-      const response = await getTransport(
-        this.connection,
-        config.transportNumber,
-      );
-
-      // Parse response data to extract transport request details
-      // Response format depends on ADT API
-      const _data = response.data;
-
-      return {
-        transportNumber: config.transportNumber,
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * List transport requests.
+   * Create a transport request.
    *
-   * With `configUri`: one request. Without: two — the configurations, then the
-   * list. The five filter parameters this used to take were never read by the
-   * server; filtering is a property of the saved configuration.
+   * The number is the system's to generate, so there is nothing to validate
+   * before the POST — which is why this module has no `validate`.
    */
-  async list(options?: IListTransportsOptions): Promise<ITransportState> {
-    const configUri =
-      options?.configUri ?? (await this.resolveSearchConfiguration());
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<ITransportConfig, 'source'> & { source?: never },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
+    this.logger?.info?.('Creating transport request');
+    return answering(
+      () =>
+        createTransport(connection, {
+          transport_type:
+            config.transportType === 'customizing'
+              ? 'customizing'
+              : 'workbench',
+          description: config.description,
+          target_system: config.targetSystem,
+          owner: config.owner ?? this.systemContext.responsible,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The request's own document: its description, owner and tasks.
+   *
+   * A transport request has no source, so this is the whole of reading one —
+   * which is why the type composes `IAdtMetadataReadable` and nothing else.
+   * There used to be a `read` beside this whose body was `return
+   * this.readMetadata(...)`; one endpoint behind two members, admitted in the
+   * code.
+   */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const number = this.number(config);
+
+    return answering(
+      () => getTransport(connection, number),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The transport requests the server lists.
+   *
+   * Until 30.0.0 this resource had three members — `list`, `listNodes`, and a
+   * `listNodes<T>(parse, …)` overload — which answered the identical document
+   * read to three different depths. One request, one member: the reading is
+   * chosen when this implementation is constructed. The default hands the
+   * document back as it came; `parseTransportTree` is the reading that builds
+   * the tree.
+   *
+   * One request, run by the saved search the caller names. Until
+   * interfaces-adt 11 a missing `configUri` made this read the configurations
+   * and choose one, refusing when there were none or several — a second request
+   * and a choice that is the caller's (decision 37). `searchConfigurations`
+   * answers what there is to choose from. The five filter parameters this used
+   * to take were never read by the server; filtering is a property of the
+   * saved configuration.
+   */
+  async list<E extends IAdtError = IAdtError>(
+    options: IListTransportsOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+    const { configUri } = options;
     this.logger?.info?.('Listing transport requests', { configUri });
-    const response = await listTransports(this.connection, { configUri });
-
-    return { listResult: response, errors: [] };
-  }
-
-  /**
-   * The transport tree, parsed.
-   *
-   * Adds no request to `list()` — with a `configUri` that is one call, without
-   * one it is two, exactly as `list()` alone.
-   *
-   * Rejects on a body the parser does not recognise: the signature promises
-   * `ITransportTree`, and a reader takes a signature for a guarantee, so the
-   * guarantee here is "this shape or an error" — never a silently empty tree.
-   * An empty `tm:root` is not that failure: it resolves with `requests: []`,
-   * the permanent correct answer on a system holding no transport requests.
-   *
-   * A consumer whose system answers in a shape the default parser does not fit
-   * passes its own and keeps a type; telling it to fall back on the raw
-   * response would be telling it to go untyped, which is the defect this
-   * exists to remove.
-   */
-  async listNodes(options?: IListTransportsOptions): Promise<ITransportTree>;
-  async listNodes<T>(
-    parse: (data: unknown) => T,
-    options?: IListTransportsOptions,
-  ): Promise<T>;
-  async listNodes<T>(
-    first?: IListTransportsOptions | ((data: unknown) => T),
-    second?: IListTransportsOptions,
-  ): Promise<ITransportTree | T> {
-    const parse = typeof first === 'function' ? first : undefined;
-    const options = typeof first === 'function' ? second : first;
-
-    const state = await this.list(options);
-    const data = state.listResult?.data;
-
-    return parse ? parse(data) : parseTransportTree(data);
-  }
-
-  /**
-   * Which saved search to run when the caller named none.
-   *
-   * Deterministic or it throws — never "the first one", which would silently
-   * run somebody else's filters.
-   *
-   * The deferred-connection check lives HERE and not in `list()`: an explicit
-   * `configUri` waits for nothing, so a batch call that supplies one is
-   * legitimate. Guarding earlier would reject it.
-   */
-  protected async resolveSearchConfiguration(): Promise<string> {
-    if (hasDeferredResponses(this.connection)) {
-      throw new Error(
-        'configUri is required on a batch client: resolving a search ' +
-          'configuration needs a response that a batch cannot deliver until ' +
-          'execute().',
-      );
-    }
-
-    const configurations = await getTransportSearchConfigurations(
-      this.connection,
-    );
-
-    if (configurations.length === 0) {
-      throw new TransportSearchConfigurationMissing(
-        TRANSPORT_SEARCH_CONFIGURATIONS_URL,
-      );
-    }
-
-    if (configurations.length === 1) {
-      return configurations[0].uri;
-    }
-
-    // Several. Picking one would mean guessing which attribute marks a default,
-    // and the payload on the only system we have carries no such marker — one
-    // configuration cannot show what several would look like. So: say so, and
-    // let the caller choose. This branch gets a rule when a system with several
-    // configurations has actually been read.
-    throw new Error(
-      `This system has ${configurations.length} transport search configurations ` +
-        'and none can be shown to be the default; pass configUri explicitly. ' +
-        `Available: ${configurations.map((c) => c.uri).join(', ')}`,
+    return answering(
+      () => listTransports(this.connection, { configUri }),
+      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      options.analyse,
     );
   }
 
   /**
-   * Read transport request metadata
-   * For transport requests, read() already returns all metadata (description, owner, etc.)
-   */
-  async readMetadata(
-    config: Partial<ITransportConfig>,
-  ): Promise<ITransportState> {
-    // For transport requests, metadata is the same as read() result
-    const readResult = await this.read(config);
-    if (!readResult) {
-      throw new Error('Transport request not found');
-    }
-    return readResult;
-  }
-
-  /**
-   * Update transport request description
+   * The saved transport searches this system holds.
    *
-   * ADT's only mutable field on a request is its description. Read-modify-write:
-   * GET the current XML, patch the description into it, PUT it back — building
-   * the body from scratch would drop every server-managed field the client does
-   * not model.
+   * **What `list` needs.** A listing is a saved search, and since
+   * interfaces-adt 11 `list` takes the one to run rather than choosing among
+   * them itself — this is where a caller finds out what there is. One request,
+   * read by the strategy this implementation was built with and judged by the
+   * caller's `analyse`.
    */
-  async update(
-    config: Partial<ITransportConfig>,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransportState> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
-    if (!config.description) {
-      throw new Error('Transport request description is required for update');
-    }
+  async searchConfigurations<E extends IAdtError = IAdtError>(
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['searchConfigurations']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      this.logger?.info?.(
-        'Updating transport request description:',
-        config.transportNumber,
-      );
-      const response = await updateTransport(
-        this.connection,
-        config.transportNumber,
-        config.description,
-      );
-
-      return {
-        transportNumber: config.transportNumber,
-        updateResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => requestTransportSearchConfigurations(connection),
+      this.results.searchConfigurations as IResultStrategy<
+        ReturnType<R['searchConfigurations']>
+      >,
+      options?.analyse,
+    );
   }
 
   /**
-   * Delete transport request
+   * Update the request's description.
+   *
+   * The description is ADT's only mutable field on a request, and the document
+   * carries every server-managed field beside it. So a caller reads the current
+   * document, patches the description into it, and passes the result — building
+   * a body from the description alone would drop the rest.
+   *
+   * That read used to happen here. It does not: two requests in one member is
+   * an order and a merge the caller cannot replace.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const number = this.number(config);
+
+    this.logger?.info?.('Updating transport request:', number);
+    return answering(
+      () => updateTransport(connection, number, options?.source as string),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Delete the request.
    *
    * ADT accepts this only for a request that holds no objects; a non-empty
    * request is rejected by the server, not by this client.
    */
-  async delete(config: Partial<ITransportConfig>): Promise<ITransportState> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
+  /**
+   * Ask whether the transport request can be deleted now.
+   *
+   * **The deletion service cannot answer this one, measured rather than
+   * assumed.** A check for `/sap/bc/adt/cts/transportrequests/{n}` comes back
+   * `No URI-Mapping defined for URI …` — the service resolves repository
+   * objects through their package, and a transport request is not one. That
+   * answer is a fact about the address this library chose, not about the
+   * request, and a caller cannot act on it.
+   *
+   * So this asks the resource that *can* answer: the request itself. ADT
+   * deletes only an empty, unreleased request, and both facts are in its own
+   * document — `tm:task` entries and the objects under them. Reading the
+   * verdict out of it is the `deletionCheck` strategy's job, which is why the
+   * default hands the document over as it arrived.
+   *
+   * One request, like every other member; it is simply not the same one the
+   * other twenty-nine types use.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      this.logger?.info?.(
-        'Deleting transport request:',
-        config.transportNumber,
-      );
-      const response = await deleteTransport(
-        this.connection,
-        config.transportNumber,
-      );
+    const number = this.number(config);
 
-      return {
-        transportNumber: config.transportNumber,
-        deleteResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => getTransport(connection, number),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const number = this.number(config);
+
+    this.logger?.info?.('Deleting transport request:', number);
+    return answering(
+      () => deleteTransport(connection, number),
+      this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Detach one object from a request or task — ADT's `removeobject`.
+   *
+   * **The gap this closes.** Deleting an object leaves its CTS
+   * object-directory entry on the request that carried it, and SAP says so at
+   * the time: *"Release transport … to remove the object directory entry."*
+   * Until the entry goes, creating the same name again is refused with
+   * `CTS_WBO_API 019` — even passing that same request as `corrNr`. Before
+   * this member the ways out were releasing the whole request, shipping
+   * everything else in it, or SE09 by hand.
+   *
+   * **Addressed at the task**, not at the request above it: objects live on
+   * tasks, and that is what the captured exchange did.
+   *
+   * ```typescript
+   * const request = client.getRequest();
+   * await request.removeObject('E19K905942', {
+   *   name: 'ZMCP_BLD_FGR_H1',
+   *   type: 'FUGR',
+   *   position: '000025',
+   * });
+   * const log = await request.readActionLog('E19K905942');
+   * ```
+   *
+   * **`position` is required, and it is what makes the call do anything.**
+   * Measured against an on-premise system, 2026-09-21: 22 objects asked by
+   * `type` and `name`
+   * alone all answered `200`, with the usual echo document, and all 22 were
+   * still on the task afterwards. The same document carrying `tm:position`
+   * removed every one. Read the number from the task's listing —
+   * `tm:position` on the entry — rather than counting the rows yourself.
+   *
+   * The answer echoes the object that was asked about and nothing else, so a
+   * `200` is not evidence: {@link readActionLog}, or a re-read of the task, is
+   * what confirms the removal happened.
+   */
+  async removeObject<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    object: IAbapObjectEntry & { position: string },
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['removedObject']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      `Removing ${object.type} ${object.name} from transport request ${transportNumber}`,
+    );
+    return answering(
+      () => removeObjectFromTransport(connection, transportNumber, object),
+      this.results.removedObject as IResultStrategy<
+        ReturnType<R['removedObject']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Attach one object to a request or task — ADT's `addobject`.
+   *
+   * **Refused when the object is held elsewhere**, with `SCTS_ADT_MSG 009` and
+   * a longtext naming the task that holds it: *"There are no links to this
+   * request/task."* That is a third lock flavour — not the enqueue lock, not
+   * the request-versus-task one — and it is the server's verdict to read,
+   * not a state this client checks for beforehand.
+   *
+   * **The same message, with longtext TK127, was also returned for an
+   * Unclassified task** on an on-premise system, 2026-09-25 — including one
+   * created explicitly through {@link createTask}. Classify it through
+   * {@link changeTaskType} before adding objects directly.
+   */
+  async addObject<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['addedObject']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      `Adding ${object.type} ${object.name} to transport request ${transportNumber}`,
+    );
+    return answering(
+      () => addObjectToTransport(connection, transportNumber, object),
+      this.results.addedObject as IResultStrategy<ReturnType<R['addedObject']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Create a task under a request — ADT's `newtask`.
+   *
+   * The new task is itself a request resource at the same endpoint shape: it
+   * reads, writes and releases like one, and {@link removeObject} addresses
+   * it directly.
+   *
+   * **`targetUser` is required.** It was optional when this shipped, on the
+   * reasoning that the server would pick an owner when the attribute was
+   * absent. Measured against an on-premise system it does not: the body
+   * without `tm:targetuser` came back `400 SCTS_ADT_MSG 009`, *"User  does not
+   * exist in the system (or locked)"* — an empty name — and the same call
+   * carrying it answered 200 with a task number. This client cannot fill it
+   * in: the connection does not say who is authenticated, and asking would
+   * cost a second request.
+   */
+  async createTask<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options: { targetUser: string } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['createdTask']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Creating task under transport request:',
+      transportNumber,
+    );
+    return answering(
+      () =>
+        createTransportTask(connection, transportNumber, options.targetUser),
+      this.results.createdTask as IResultStrategy<ReturnType<R['createdTask']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * What has happened to this request — ADT's `actionlogs`.
+   *
+   * One `log:entry` per lifecycle event: created, object added, object
+   * deleted, owner changed. Read-only, and the only way to confirm that a
+   * {@link removeObject} landed, since that action's own answer merely repeats
+   * what it was asked.
+   */
+  async readActionLog<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['actionLog']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Reading action log of transport request:',
+      transportNumber,
+    );
+    return answering(
+      () => readTransportActionLog(connection, transportNumber),
+      this.results.actionLog as IResultStrategy<ReturnType<R['actionLog']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Give a task its type — Development/Correction, Repair, or back to
+   * Unclassified.
+   *
+   * **A task is born without one**, and passing a type to
+   * {@link createTask} does not change that: measured against BTP ABAP on
+   * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
+   * every task on that system read back as `Unclassified`. That system is a
+   * trial with no transport system configured, so the CTS edit flow never
+   * creates a request there and every request and task is made by hand. All
+   * of them came through `newtask`, from this library's tests and from
+   * mcp-abap-adt's, and until this member existed neither changed a task's
+   * type.
+   *
+   * **The creation path matters.** When locking an object starts the normal
+   * CTS flow and the user chooses to create a request, CTS creates both the
+   * request and its task and classifies that task correctly. It can likewise
+   * classify an existing Unclassified task selected in that flow. That is not
+   * what this client's direct `addobject` action does. A task created
+   * explicitly through {@link createTask} stays `Unclassified`, and
+   * {@link addObject} onto it was refused on an on-premise system, 2026-09-25,
+   * with `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are only allowed
+   * in correction/repair"*. After `changeTaskType(task, 'S')` the same call
+   * answered 200. A caller that intends to add objects directly must
+   * therefore classify the task first. SAP states the same rule in
+   * [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
+   * *"You cannot add any objects if the task type is Unclassified. You need
+   * to change the task type to Development/Correction or Repair."*
+   *
+   * ```ts
+   * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);
+   * ```
+   *
+   * `'S'`, `'R'` and `'X'` are the measured vocabulary; `'Q'` is a
+   * customizing type and is refused on a workbench request, and `'K'`/`'W'`
+   * are REQUEST types, refused as unknown. Addressed at the TASK — that is
+   * where the listing puts the `changetasktype` link.
+   *
+   * As with every user action here, `ok` means the document was understood.
+   * Read the request back to see the type.
+   */
+  async changeTaskType<E extends IAdtError = IAdtError>(
+    taskNumber: string,
+    type: AdtTaskType,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['taskTypeChanged']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(`Changing the type of task ${taskNumber} to`, type);
+    return answering(
+      () => changeTransportTaskType(connection, taskNumber, type),
+      this.results.taskTypeChanged as IResultStrategy<
+        ReturnType<R['taskTypeChanged']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The objects this request or task holds, each with its `tm:position`.
+   *
+   * **Read this before {@link removeObject}, because that is where the
+   * position comes from.** Nothing else here answers one as a value:
+   * `readMetadata` hands back the document and leaves the caller to dig
+   * `tm:position` out of it by hand. This member answers the same resource
+   * through the `objects` strategy: construct the implementation with
+   * `parseObjectEntries` there to be answered entries, each with its
+   * `position`. The default hands the document back as it came.
+   *
+   * It is *not* that `readMetadata` cannot see them. That was said here on
+   * the belief that sending no `Accept` gets a thinner representation, and it
+   * is wrong: measured against an on-premise system, 2026-09-21, the same URL
+   * with and without
+   * `application/vnd.sap.adt.transportorganizer.v1+xml` — 95411 bytes and 166
+   * `tm:abap_object` for a request, 55549 and 88 for a task, byte for byte
+   * identical either way. The header changes nothing; the parsing is the
+   * point.
+   *
+   * It is also the re-read that confirms a removal, beside
+   * {@link readActionLog}: the action's own answer merely repeats what it was
+   * asked, so an entry being gone from this list is the evidence.
+   *
+   * ```ts
+   * // constructed with { ...transportDocuments, objects: (a) => parseObjectEntries(a.data) }
+   * const listed = await request.readObjects(task);
+   * const entry = listed.ok
+   *   ? listed.getResult().value.find((o) => o.name === 'ZCL_X')
+   *   : undefined;
+   * // `position` is optional on a listed entry — an entry the server
+   * // described without one cannot be removed, and the compiler says so
+   * // rather than letting an invented `''` reach the server.
+   * if (entry?.position)
+   *   await request.removeObject(task, { ...entry, position: entry.position });
+   * ```
+   */
+  async readObjects<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['objects']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Reading the object list of transport request:',
+      transportNumber,
+    );
+    return answering(
+      () => readTransportObjects(connection, transportNumber),
+      this.results.objects as IResultStrategy<ReturnType<R['objects']>>,
+      options?.analyse,
+    );
   }
 }

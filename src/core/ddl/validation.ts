@@ -6,8 +6,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { DDL_SOURCE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -21,7 +22,7 @@ import { getTimeout } from '../../utils/timeouts';
  * - Error: <exc:exception> with message about existing object or validation failure
  */
 /**
- * `packageName` is required by the endpoint. Measured on E19 2026-08-28:
+ * `packageName` is required by the endpoint. Measured 2026-08-28:
  * without `packagename` it answers **400, "Parameter packagename could not be
  * found."**; `description` must be present but may be empty. See
  * `docs/evidence/2026-08-28-validation-required-params.md`.
@@ -32,7 +33,7 @@ export async function validateDdlName(
   packageName: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/ddic/ddl/validation`;
+  const url = DDL_SOURCE.validation;
   const queryParams = new URLSearchParams({
     objtype: 'ddls',
     objname: ddlName,

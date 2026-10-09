@@ -5,15 +5,14 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_ENHANCEMENT,
   ACCEPT_SOURCE_UTF8,
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 import {
@@ -38,8 +37,7 @@ export async function getEnhancementMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
-  let url = getEnhancementUri(enhancementType, encodedName);
+  let url = getEnhancementUri(enhancementType, enhancementName);
 
   if (options?.withLongPolling) {
     url += '?withLongPolling=true';
@@ -84,9 +82,8 @@ export async function getEnhancementSource(
     );
   }
 
-  const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  let url = `${getEnhancementUri(enhancementType, encodedName)}/source/main?version=${versionParam}`;
+  let url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main?version=${versionParam}`;
 
   if (options?.withLongPolling) {
     url += '&withLongPolling=true';
@@ -121,8 +118,7 @@ export async function getEnhancementTransport(
   enhancementName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
-  let url = `${getEnhancementUri(enhancementType, encodedName)}/transport`;
+  let url = `${getEnhancementUri(enhancementType, enhancementName)}/transport`;
 
   if (options?.withLongPolling) {
     url += '?withLongPolling=true';

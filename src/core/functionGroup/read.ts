@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { FUNCTION_GROUP, transportUri } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -19,9 +19,8 @@ export async function getFunctionGroup(
   functionGroupName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(functionGroupName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/functions/groups/${encodedName}${query}`;
+  const url = `${FUNCTION_GROUP.uri(functionGroupName)}${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -42,9 +41,8 @@ export async function getFunctionGroupTransport(
   functionGroupName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(functionGroupName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/functions/groups/${encodedName}/transport${query}`;
+  const url = `${transportUri(FUNCTION_GROUP.uri(functionGroupName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

@@ -1,35 +1,34 @@
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { FEATURE_TOGGLE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
+/**
+ * `POST …?_action=LOCK` on the feature toggle — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer.
+ */
 export async function lockFeatureToggle(
   connection: IAbapConnection,
   name: string,
-  logger?: ILogger,
-): Promise<string> {
-  const encoded = encodeSapObjectName(name.toLowerCase());
-  const resp = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     method: 'POST',
-    url: `/sap/bc/adt/sfw/featuretoggles/${encoded}`,
+    url: `${FEATURE_TOGGLE.uri(name)}`,
     timeout: getTimeout('default'),
     params: { _action: 'LOCK', accessMode: 'MODIFY' },
     headers: {
-      'X-sap-adt-sessiontype': 'stateful',
+      // No `X-sap-adt-sessiontype` here: `setSessionType('stateful')` in the
+      // handler is what puts it on this request, the same as every other type.
+      // Setting it here as well meant the header could appear on a request the
+      // connection did not consider stateful.
       Accept:
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.Result2,' +
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.Result',
     },
   });
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const parsed = parser.parse(resp.data);
-  const handle = parsed?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  if (!handle) {
-    logger?.error?.(`FeatureToggle lock: no LOCK_HANDLE in response`);
-    throw new Error(`FeatureToggle ${name}: lock response has no LOCK_HANDLE`);
-  }
-  return String(handle);
 }

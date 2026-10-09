@@ -1,9 +1,11 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { parseMessageClass } from '../../core/messageClass';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
+import { expectFailure, expectResult } from '../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="D"><adtcore:packageRef adtcore:name="ZP"/></mc:messageClass>`;
 const CLASS_XML_WITH_MSG = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="OLD"><adtcore:packageRef adtcore:name="ZP"/><mc:messages mc:msgno="001" mc:msgtext="Hello"/></mc:messageClass>`;
@@ -116,25 +118,16 @@ describe('AdtMessageClass', () => {
     );
   });
 
-  it('update appends &corrNr= on the PUT when transportRequest is set', async () => {
-    const { conn: c, calls } = recorder(async (_rec, idx) => {
-      if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtWireResponse;
-      if (idx === 1)
-        return {
-          data: CLASS_XML_WITH_MSG,
-          status: 200,
-          headers: {},
-        } as IAdtWireResponse;
-      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
-    });
-    await new AdtMessageClass(c, noopLogger).update({
-      name: 'ZT',
-      description: 'NEW',
-      transportRequest: 'DEVK900001',
-    });
+  it('update carries the handle and the transport it was given', async () => {
+    const { conn: c, calls } = recorder(
+      async () => ({ data: '', status: 200, headers: {} }) as IAdtWireResponse,
+    );
+    await new AdtMessageClass(c, noopLogger).updateMetadata(
+      { name: 'ZT', transportRequest: 'DEVK900001' },
+      { source: CLASS_XML_WITH_MSG, lockHandle: 'LOCK_HANDLE_42' },
+    );
     const put = calls.find((x) => x.method === 'PUT');
-    expect(put?.url).toContain('lockHandle=');
+    expect(put?.url).toContain('lockHandle=LOCK_HANDLE_42');
     expect(put?.url).toContain('&corrNr=DEVK900001');
   });
 
@@ -211,8 +204,13 @@ describe('AdtMessageClass', () => {
       ),
       noopLogger,
     );
-    const st = await mc.read({ name: 'ZT' });
-    expect(st?.messageClass?.name).toBe('ZT');
+    // The document, as it arrived. `parseMessageClass` is the reading beside
+    // it — the member answers the class, not a shape chosen for the caller.
+    const document = expectResult(
+      await mc.readMetadata({ name: 'ZT' }),
+      'read',
+    );
+    expect(parseMessageClass(String(document)).name).toBe('ZT');
   });
 
   it('carries no method for what a message class cannot do', () => {
@@ -234,61 +232,39 @@ describe('AdtMessageClass', () => {
     }
   });
 
-  it('update: LOCK→GET(read)→PUT(preserves msg)→UNLOCK sequence', async () => {
+  it('update is one PUT whose body is the document the caller passed', async () => {
     const {
       conn: c,
       calls,
       sessionTypes,
-    } = recorder(async (rec, idx) => {
-      // idx 0: LOCK POST → return lock XML
-      if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtWireResponse;
-      // idx 1: GET (read current inside updateMessageClass) → return XML with msg 001
-      if (idx === 1)
-        return {
-          data: CLASS_XML_WITH_MSG,
-          status: 200,
-          headers: {},
-        } as IAdtWireResponse;
-      // idx 2: PUT
-      if (idx === 2)
-        return { data: '', status: 200, headers: {} } as IAdtWireResponse;
-      // idx 3: UNLOCK POST
-      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
-    });
+    } = recorder(
+      async () => ({ data: '', status: 200, headers: {} }) as IAdtWireResponse,
+    );
 
     const mc = new AdtMessageClass(c, noopLogger);
-    await mc.update({ name: 'ZT', description: 'NEW' });
+    // The caller built this document — here the class with a new description
+    // and its message kept. Until 23.0.0 the member read the class itself and
+    // patched `config.description` into it; that read is the caller's now.
+    const document = CLASS_XML_WITH_MSG.replace('"OLD"', '"NEW"');
+    await mc.updateMetadata(
+      { name: 'ZT' },
+      { source: document, lockHandle: 'LOCK_HANDLE_42' },
+    );
 
-    // Sequence: LOCK → GET (read) → PUT → UNLOCK
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toContain('/sap/bc/adt/messageclass/zt');
+    expect(calls[0].url).toContain('lockHandle=LOCK_HANDLE_42');
+    // Sent as given, byte for byte: nothing here rebuilds it.
+    expect(calls[0].data).toBe(document);
 
-    // call[0]: LOCK
-    expect(calls[0].method).toBe('POST');
-    expect(calls[0].url).toContain('_action=LOCK');
-    expect(calls[0].url).toContain('accessMode=MODIFY');
-
-    // call[1]: GET (read inside updateMessageClass)
-    expect(calls[1].method).toBe('GET');
-    expect(calls[1].url).toContain('/sap/bc/adt/messageclass/');
-
-    // call[2]: PUT with lockHandle; body must carry NEW description AND preserved msg 001
-    expect(calls[2].method).toBe('PUT');
-    expect(calls[2].url).toContain('lockHandle=');
-    const putBody = String(calls[2].data);
-    expect(putBody).toContain('NEW');
-    expect(putBody).toContain('mc:msgno="001"');
-
-    // call[3]: UNLOCK
-    expect(calls[3].method).toBe('POST');
-    expect(calls[3].url).toContain('_action=UNLOCK');
-
-    // session: stateful before lock, stateless after unlock
-    expect(sessionTypes[0]).toBe('stateful');
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+    // No lock, no unlock, and the session untouched: the window is the
+    // consumer's to open, and it is the consumer that holds the handle above.
+    expect(calls.some((x) => String(x.url).includes('_action='))).toBe(false);
+    expect(sessionTypes).toEqual([]);
   });
 
-  it('delete: stateless deletion service (check → delete), no lock/DELETE', async () => {
+  it('checkDeletion asks the deletion service, and delete deletes', async () => {
     const { conn: c, calls } = recorder(
       async (rec) =>
         ({
@@ -300,62 +276,72 @@ describe('AdtMessageClass', () => {
     );
 
     const mc = new AdtMessageClass(c, noopLogger);
-    await mc.delete({ name: 'ZT' });
 
-    expect(calls).toHaveLength(2);
-
-    // call[0]: deletion check
+    // Two members, one request each. Whether to ask before deleting is the
+    // consumer's call, and it can read the answer to it.
+    await mc.checkDeletion({ name: 'ZT' });
+    expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/deletion/check');
     expect(String(calls[0].data)).toContain(
       'adtcore:uri="/sap/bc/adt/messageclass/zt"',
     );
 
-    // call[1]: deletion delete (stateless service, NOT a direct DELETE)
+    await mc.delete({ name: 'ZT' });
+    expect(calls).toHaveLength(2);
+    // The deletion service, not a direct DELETE on the object.
     expect(calls[1].method).toBe('POST');
     expect(calls[1].url).toBe('/sap/bc/adt/deletion/delete');
     expect(String(calls[1].data)).toContain('del:deletionRequest');
 
-    // no direct object DELETE, no lock cycle
     expect(calls.some((c2) => c2.method === 'DELETE')).toBe(false);
     expect(calls.some((c2) => String(c2.url).includes('_action=LOCK'))).toBe(
       false,
     );
   });
 
-  it('update error-cleanup: UNLOCK + stateless called even if PUT throws', async () => {
+  it('a refused PUT comes back as the failure it is', async () => {
     const {
       conn: c,
       calls,
       sessionTypes,
-    } = recorder(async (_rec, idx) => {
-      if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtWireResponse;
-      if (idx === 1)
-        return {
-          data: CLASS_XML_WITH_MSG,
-          status: 200,
-          headers: {},
-        } as IAdtWireResponse;
-      if (idx === 2)
-        throw Object.assign(new Error('PUT failed'), {
-          response: { status: 500 },
-        });
-      // idx 3: UNLOCK (called during error cleanup)
-      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
+    } = recorder(async () => {
+      throw Object.assign(new Error('PUT failed'), {
+        response: { status: 500 },
+      });
     });
 
     const mc = new AdtMessageClass(c, noopLogger);
-    await expect(mc.update({ name: 'ZT', description: 'NEW' })).rejects.toThrow(
-      'PUT failed',
+    expect(
+      expectFailure(
+        await mc.updateMetadata(
+          { name: 'ZT' },
+          { source: CLASS_XML_WITH_MSG, lockHandle: 'LOCK_HANDLE_42' },
+        ),
+        'update whose PUT the server refused',
+      ).message,
+    ).toContain('PUT failed');
+
+    // Nothing after it: no unlock this member never made, and no session to
+    // put back. The handle is the caller's, and so is releasing it.
+    expect(calls).toHaveLength(1);
+    expect(sessionTypes).toEqual([]);
+  });
+
+  it('lock answers the handle SAP gave, and a handle-less 200 as an empty one', async () => {
+    let body = LOCK_XML;
+    const mc = new AdtMessageClass(
+      conn(
+        async () =>
+          ({ data: body, status: 200, headers: {} }) as IAdtWireResponse,
+      ),
+      noopLogger,
     );
+    expect(expectResult(await mc.lock({ name: 'ZT' }), 'lock')).toBe('LH');
 
-    // UNLOCK must still have been called (call index 3)
-    expect(calls).toHaveLength(4);
-    expect(calls[3].method).toBe('POST');
-    expect(calls[3].url).toContain('_action=UNLOCK');
-
-    // stateless must be set after cleanup
-    expect(sessionTypes).toContain('stateless');
+    // Until 23.0.0 this threw "Failed to extract lock handle". Whether a 200
+    // without a handle is a refusal is the caller's analyse to say.
+    body = '<asx:abap xmlns:asx="http://www.sap.com/abapxml"/>';
+    expect(expectResult(await mc.lock({ name: 'ZT' }), 'lock')).toBe('');
   });
 });

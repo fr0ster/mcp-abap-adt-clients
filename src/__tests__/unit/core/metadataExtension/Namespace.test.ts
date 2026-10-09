@@ -4,10 +4,13 @@
  *
  * Bug: DDLX URLs were built with `${name.toLowerCase()}` (raw), so a name like
  * `/NSP/C_TEST` produced `.../ddlx/sources//nsp/c_test`, with raw slashes that
- * break the ADT path. The encoded form must be `%2fnsp%2fc_test`.
+ * break the ADT path. The encoded form is `%2Fnsp%2Fc_test`: the escapes in
+ * encodeURIComponent's uppercase hex, which RFC 3986 makes equivalent to the
+ * `%2f` ADT writes, and which ADT accepted for a namespaced class on an
+ * on-premise and a cloud system (2026-10-01).
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { activateMetadataExtension } from '../../../../core/metadataExtension/activate';
 import { deleteMetadataExtension } from '../../../../core/metadataExtension/delete';
 import { lockMetadataExtension } from '../../../../core/metadataExtension/lock';
@@ -32,7 +35,7 @@ function firstUrl(connection: IAbapConnection): string {
 }
 
 const NS_NAME = '/NSP/C_TEST';
-const ENCODED = 'ddic/ddlx/sources/%2fnsp%2fc_test';
+const ENCODED = 'ddic/ddlx/sources/%2Fnsp%2Fc_test';
 const RAW_SLASHES = 'ddic/ddlx/sources//nsp';
 
 describe('metadata extension namespace URL encoding', () => {

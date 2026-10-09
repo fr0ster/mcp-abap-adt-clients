@@ -15,14 +15,19 @@
  *   DEBUG_ADT_LIBS=true      — library runtime logs
  */
 
+import {
+  abapGitExternalRepo,
+  abapGitRepos,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
-  IAdtAbapGitClient,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
+import { abapGitDocuments } from '../../../../clients/abapGit/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -43,7 +48,14 @@ const {
 
 describe('AbapGit (standalone AdtAbapGitClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let abapGit: IAdtAbapGitClient;
+  // Read with the adt-strategies readings: the client answers documents, and
+  // these assertions are about the shapes a consumer asks for.
+  const results = {
+    ...abapGitDocuments,
+    repos: abapGitRepos,
+    externalRepo: abapGitExternalRepo,
+  };
+  let abapGit: AdtAbapGitClient<typeof results>;
   let isCloudSystem = false;
   let hasConfig = false;
 
@@ -51,7 +63,12 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     try {
       connection = await createTestConnection(createConnectionLogger());
       isCloudSystem = await isCloudEnvironment(connection);
-      abapGit = new AdtAbapGitClient(connection, createLibraryLogger());
+      abapGit = new AdtAbapGitClient(
+        connection,
+        createLibraryLogger(),
+        undefined,
+        results,
+      );
       hasConfig = true;
     } catch (err) {
       createTestsLogger().warn(
@@ -82,7 +99,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     'should list abapGit repositories',
     async () => {
       if (!hasConfig || !listCase || !isAvailable(listCase)) return;
-      const repos = await abapGit.listRepos();
+      const repos = expectResult(await abapGit.listRepos(), 'list repos');
       expect(Array.isArray(repos)).toBe(true);
       for (const r of repos) {
         expect(typeof r.package).toBe('string');
@@ -104,9 +121,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       ) {
         return;
       }
-      const info = await abapGit.checkExternalRepo({
-        url: checkCase.params.url,
-      });
+      const info = expectResult(
+        await abapGit.checkExternalRepo({ url: checkCase.params.url }),
+        'check external repo',
+      );
       expect(Array.isArray(info.branches)).toBe(true);
     },
     getTimeout('test'),
@@ -130,17 +148,61 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         branchName: flowCaseDef.params.branch,
       });
 
-      const pullResult = await abapGit.pull({
-        package: flowCaseDef.params.package,
-        branchName: flowCaseDef.params.branch,
-        pollIntervalMs: 2000,
-        maxPollDurationMs: 300_000,
-      });
-      expect(pullResult.finalStatus.status).not.toBe('R');
-
-      if (typeof (abapGit as any).unlink === 'function') {
-        await abapGit.unlink({ package: flowCaseDef.params.package });
+      // Four steps since 19.0.0, because a pull was four requests: find the
+      // link, post, wait, and read the log if the status says to. The waiting
+      // is here because it belongs to whoever is waiting.
+      const repos = expectResult(await abapGit.listRepos(), 'repositories');
+      const repo = repos.find(
+        (r) =>
+          r.package.toUpperCase() === flowCaseDef.params.package.toUpperCase(),
+      );
+      if (!repo?.pullLink) {
+        throw new Error(
+          `abapGit repository for ${flowCaseDef.params.package} reported no pull link`,
+        );
       }
+
+      expectResult(
+        await abapGit.pull({
+          package: flowCaseDef.params.package,
+          pullLink: repo.pullLink,
+          branchName: flowCaseDef.params.branch,
+        }),
+        'pull',
+      );
+
+      // The first read is unconditional. `repo` was fetched *before* the POST,
+      // so its status says nothing about this pull — starting the loop on it
+      // would skip the wait entirely and let `unlink` run against a job still
+      // in progress. There is no `getRepo` since interfaces-adt 11: the list,
+      // read by the caller's strategy, is the one resource, and finding the
+      // row is the caller's.
+      const readStatus = async () => {
+        const row = expectResult(
+          await abapGit.listRepos(),
+          'repository status',
+        ).find((r) => r.repositoryId === repo.repositoryId);
+        if (!row) throw new Error(`repository ${repo.repositoryId} vanished`);
+        return row;
+      };
+
+      const deadline = Date.now() + 300_000;
+      let status = await readStatus();
+      while (status.status === 'R' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        status = await readStatus();
+      }
+      expect(status.status).not.toBe('R');
+
+      if (!repo.repositoryId) {
+        throw new Error(
+          'listRepos reported no key, so there is nothing to unlink by',
+        );
+      }
+      expectResult(
+        await abapGit.unlink({ repositoryId: repo.repositoryId }),
+        'unlink',
+      );
     },
     getTimeout('test'),
   );

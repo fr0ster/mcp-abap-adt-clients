@@ -6,8 +6,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_STRUCTURE } from '../../constants/contentTypes';
+import { STRUCTURE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateStructureParams } from './types';
@@ -20,7 +21,7 @@ export async function create(
   connection: IAbapConnection,
   params: ICreateStructureParams,
 ): Promise<IAdtWireResponse> {
-  const createUrl = `/sap/bc/adt/ddic/structures${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
+  const createUrl = `${STRUCTURE.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const masterSystem = params.masterSystem || '';
   const responsible = params.responsible || '';

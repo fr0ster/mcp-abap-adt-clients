@@ -3,5 +3,8 @@
  */
 
 export { getSystemMessage, listSystemMessages } from './read';
-export { SystemMessages } from './SystemMessages';
-export type { ISystemMessageEntry } from './types';
+export {
+  type ISystemMessagesResults,
+  SystemMessages,
+  systemMessagesDocuments,
+} from './SystemMessages';

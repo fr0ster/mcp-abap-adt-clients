@@ -5,9 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
+import { escapeXmlAttr } from '../../utils/xml';
 
 /**
  * Run an ABAP class that implements if_oo_adt_classrun interface.
@@ -86,33 +86,28 @@ export async function runClass(
 export type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
-} from '../unitTest/types';
+} from '@mcp-abap-adt/interfaces-adt';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {
   return (value ?? fallback) ? 'true' : 'false';
 }
 
-import {
-  ACCEPT_JUNIT_RESULT,
-  ACCEPT_SOURCE,
-  ACCEPT_UNIT_TEST_RESULT,
-  ACCEPT_UNIT_TEST_STATUS,
-  CT_UNIT_TEST_RUN,
-} from '../../constants/contentTypes';
 import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
-} from '../unitTest/types';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ACCEPT_SOURCE, CT_UNIT_TEST_RUN } from '../../constants/contentTypes';
+import {
+  getUnitTestRunResult,
+  getUnitTestRunStatus,
+  startUnitTestRunByObject,
+} from '../shared/abapUnit';
 
 export async function startClassUnitTestRun(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
   options?: IClassUnitTestRunOptions,
 ): Promise<IAdtWireResponse> {
-  if (!tests.length) {
-    throw new Error('At least one test definition is required');
-  }
-
   const scope = options?.scope ?? {
     ownTests: true,
     foreignTests: false,
@@ -132,11 +127,12 @@ export async function startClassUnitTestRun(
   const testsXml = tests
     .map(
       (test) =>
-        `<aunit:test containerClass="${encodeSapObjectName(test.containerClass).toUpperCase()}" class="${test.testClass}"/>`,
+        // XML attributes, not URLs — see `core/shared/abapUnit`.
+        `<aunit:test containerClass="${escapeXmlAttr(test.containerClass.toUpperCase())}" class="${escapeXmlAttr(test.testClass)}"/>`,
     )
     .join('');
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" title="${options?.title || tests[0].testClass}" context="${options?.context || 'MCP ABAP ADT Client'}">
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" title="${escapeXmlAttr(options?.title || tests[0].testClass)}" context="${escapeXmlAttr(options?.context || 'MCP ABAP ADT Client')}">
   <aunit:options>
     <aunit:scope ownTests="${boolAttr(scope.ownTests, true)}" foreignTests="${boolAttr(scope.foreignTests, false)}" addForeignTestsAsPreview="${boolAttr(scope.addForeignTestsAsPreview, true)}"/>
     <aunit:riskLevel harmless="${boolAttr(risk.harmless, true)}" dangerous="${boolAttr(risk.dangerous, true)}" critical="${boolAttr(risk.critical, true)}"/>
@@ -158,99 +154,25 @@ export async function startClassUnitTestRun(
   });
 }
 
-export async function getClassUnitTestStatus(
-  connection: IAbapConnection,
-  runId: string,
-  withLongPolling: boolean = true,
-): Promise<IAdtWireResponse> {
-  if (!runId) {
-    throw new Error('runId is required');
-  }
-  const query = withLongPolling ? '?withLongPolling=true' : '';
-  return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/runs/${runId}${query}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: ACCEPT_UNIT_TEST_STATUS,
-    },
-  });
-}
+/** Poll a run. The run id is ADT's, not a class's — see `core/shared/abapUnit`. */
+export const getClassUnitTestStatus = getUnitTestRunStatus;
 
-export async function getClassUnitTestResult(
-  connection: IAbapConnection,
-  runId: string,
-  options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
-): Promise<IAdtWireResponse> {
-  if (!runId) {
-    throw new Error('runId is required');
-  }
-  const params: string[] = [];
-  if (options?.withNavigationUris === false) {
-    params.push('withNavigationUris=false');
-  }
-  const query = params.length ? `?${params.join('&')}` : '';
-  const format = options?.format || 'abapunit';
-  const accept =
-    format === 'junit' ? ACCEPT_JUNIT_RESULT : ACCEPT_UNIT_TEST_RESULT;
-
-  return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/results/${runId}${query}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: accept,
-    },
-  });
-}
+/** A finished run's result document — see `core/shared/abapUnit`. */
+export const getClassUnitTestResult = getUnitTestRunResult;
 
 /**
- * Start ABAP Unit test run by object (for CDS unit tests)
- * Uses osl:objectSet instead of aunit:tests
+ * Start ABAP Unit test run for a whole class, by object.
+ * Uses osl:objectSet instead of aunit:tests, so every test class in the
+ * container runs without the caller naming one.
  */
 export async function startClassUnitTestRunByObject(
   connection: IAbapConnection,
   className: string,
   options?: IClassUnitTestRunOptions,
 ): Promise<IAdtWireResponse> {
-  if (!className) {
-    throw new Error('className is required');
-  }
-
-  const scope = options?.scope ?? {
-    ownTests: true,
-    foreignTests: false,
-    addForeignTestsAsPreview: true,
-  };
-  const risk = options?.riskLevel ?? {
-    harmless: true,
-    dangerous: true,
-    critical: true,
-  };
-  const duration = options?.duration ?? {
-    short: true,
-    medium: true,
-    long: true,
-  };
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:osl="http://www.sap.com/api/osl" title="${options?.title || className}" context="${options?.context || 'MCP ABAP ADT Client'}">
-  <aunit:options>
-    <aunit:scope ownTests="${boolAttr(scope.ownTests, true)}" foreignTests="${boolAttr(scope.foreignTests, false)}" addForeignTestsAsPreview="${boolAttr(scope.addForeignTestsAsPreview, true)}"/>
-    <aunit:riskLevel harmless="${boolAttr(risk.harmless, true)}" dangerous="${boolAttr(risk.dangerous, true)}" critical="${boolAttr(risk.critical, true)}"/>
-    <aunit:duration short="${boolAttr(duration.short, true)}" medium="${boolAttr(duration.medium, true)}" long="${boolAttr(duration.long, true)}"/>
-  </aunit:options>
-  <osl:objectSet xsi:type="osl:flatObjectSet">
-    <osl:object name="${encodeSapObjectName(className).toUpperCase()}" type="CLAS"/>
-  </osl:objectSet>
-</aunit:run>`;
-
-  return connection.makeAdtRequest({
-    url: '/sap/bc/adt/abapunit/runs',
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: xml,
-    headers: {
-      'Content-Type': CT_UNIT_TEST_RUN,
-    },
-  });
+  return startUnitTestRunByObject(
+    connection,
+    { name: className, type: 'CLAS' },
+    options,
+  );
 }

@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 import {
   ENHANCEMENT_TYPE_CODES,
@@ -30,13 +30,6 @@ export async function validateEnhancementName(
 ): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type, package_name, description } =
     params;
-
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
 
   const typeCode = ENHANCEMENT_TYPE_CODES[enhancement_type];
 

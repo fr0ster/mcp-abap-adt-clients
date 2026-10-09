@@ -26,18 +26,36 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
+import {
+  analyseDeletion,
+  analyseUnsupportedStatus,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
-  IAbapConnection,
   IAdtActivatable,
   IAdtCreatable,
-  IAdtModifiable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
+  IAdtResponse,
+  IAdtUpdatable,
   IAdtValidatable,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
-import { LogLevel } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { getTimeout } from '../../utils/timeouts';
+import { expectResult } from './contract';
+import {
+  expectLockReleased,
+  factoryOf,
+  type ILockWindow,
+  lockReleaseCheckEnabled,
+} from './lockReleased';
 import { recycleTestSession, releaseTestConnection } from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
 import {
@@ -58,14 +76,47 @@ export interface ITestCaseParams {
 }
 
 export interface IFlowTestOptions {
-  sourceCode?: string;
-  xmlContent?: string;
+  /**
+   * What the update writes — ABAP text for a class, an XML document for a
+   * domain. One field, because the contract has one: `sourceCode` and
+   * `xmlContent` used to sit here side by side, split by what the body
+   * happened to contain, and every caller had to pick the right one.
+   */
+  source?: string;
   updateConfig?: any;
+  /**
+   * This type's write takes a complete document.
+   *
+   * Six types stopped fetching-and-patching inside `update` in 19.0.0 — domain,
+   * package, dataElement, tableType, transport and functionGroup. The read, the
+   * edit and the lock window are the caller's now, so this harness performs
+   * them, which is what a consumer performs.
+   *
+   * `true` writes back what was read. A function receives the current document
+   * and returns the one to write, which is where a test changes a field.
+   */
+  updateTakesDocument?: boolean | ((current: string) => string);
   activateOnCreate?: boolean;
   activateOnUpdate?: boolean;
   timeout?: number;
   readMetadata?: boolean;
   readMetadataOptions?: { withLongPolling?: boolean };
+  /**
+   * A step this flow cannot know about, run after `create` and before anything
+   * reads the object.
+   *
+   * One type needs it: a behavior implementation's `create` makes the class and
+   * `update` writes its implementation include, but the class's own
+   * `source/main` — the generated shell binding it to its behavior definition —
+   * is written with the **class's** `update`, from the exported
+   * `mainSourceFor`. Until it is written the class is not readable at all: ADT
+   * answers `wrong input data for processing`.
+   *
+   * A hook rather than a flag, because what belongs here is the caller's
+   * knowledge of its own type, and this harness has no business holding a list
+   * of such knowledge.
+   */
+  afterCreate?: () => Promise<void>;
 }
 
 export interface IReadTestOptions {
@@ -95,18 +146,54 @@ export interface IBaseTesterSetupOptions {
  * It used to demand `IAdtObject`, the full set, which made this helper the last
  * place insisting every handler can do everything — a feature toggle has no
  * version history, a service binding has no lock, and neither could be tested
- * here once their types stopped claiming otherwise. These are the seven methods
+ * here once their types stopped claiming otherwise. These are the six methods
  * the class calls; `activate` is optional because not every object is
  * activated, and the call site already guards on it.
+ *
+ * Every member answers `IAdtResponse<unknown>` since interfaces 31.0.0: what a
+ * handler makes of an answer is its consumer's choice, and a test harness is
+ * one consumer among several. It reads the values through `expectResult`, which
+ * fails the test with SAP's own sentence when there is no value.
  */
-export type TestableObject<TConfig, TState> = IAdtCreatable<TConfig, TState> &
-  IAdtReadable<TConfig, TState> &
-  IAdtModifiable<TConfig, TState> &
-  IAdtValidatable<TConfig, TState> &
-  Partial<IAdtActivatable<TConfig, TState>>;
+export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
+  // **Both pairs are optional, and a type has at least one.** Since interfaces
+  // 36.0.0 a member is named for the resource it addresses, and eight types
+  // have no source at all — a domain, a package, a transport request *are*
+  // their document — while a class, a program and their neighbours have a
+  // source and no separate document to write. "At least one of the two" is not
+  // something a TypeScript type can say, so both are optional here and
+  // `readWhatItHas`/`writeWhatItHas` below fail loudly when an object turns out
+  // to offer neither, which is a defect in that object rather than in a test.
+  Partial<IAdtReadable<TConfig, unknown>> &
+  Partial<IAdtMetadataReadable<TConfig, unknown>> &
+  Partial<IAdtUpdatable<Partial<TConfig>, unknown>> &
+  Partial<IAdtMetadataUpdatable<Partial<TConfig>, unknown>> &
+  IAdtDeletable<TConfig, unknown, unknown> &
+  IAdtValidatable<TConfig, unknown> &
+  Partial<IAdtActivatable<TConfig, unknown>> &
+  // Since 18.0.0 `update` takes the handle it is given and issues one request.
+  // Acquiring and releasing that handle is the caller's, and this harness is a
+  // caller — so the pair belongs in the shape it depends on. Optional because
+  // some objects have no lock at all (a message class row, a feature toggle's
+  // runtime switch), and the call site falls back to an unlocked write, which
+  // is a thing ADT is free to refuse and say why.
+  Partial<IAdtLockable<TConfig>>;
 
-export class BaseTester<TConfig, TState> {
-  private readonly adtObject: TestableObject<TConfig, TState>;
+/** The object's names from its config — `className`, `domainName`, … */
+function describeObject(config: unknown): string {
+  const names = Object.entries((config ?? {}) as Record<string, unknown>)
+    .filter(
+      ([key, value]) =>
+        key.endsWith('Name') &&
+        key !== 'packageName' &&
+        typeof value === 'string',
+    )
+    .map(([, value]) => value as string);
+  return names.length ? names.join('/') : '(unnamed)';
+}
+
+export class BaseTester<TConfig, TState = unknown> {
+  private readonly adtObject: TestableObject<TConfig>;
   private readonly loggerPrefix: string;
   private readonly testCaseKey: string;
   private readonly testCaseName: string;
@@ -114,6 +201,8 @@ export class BaseTester<TConfig, TState> {
   private objectCreated: boolean = false;
   private objectLocked: boolean = false;
   private lockHandle: string | undefined;
+  /** The client factory for this handler, once {@link factoryOf} found it. */
+  private lockFactory: string | undefined;
 
   // Setup state
   private connection?: IAbapConnection;
@@ -165,7 +254,7 @@ export class BaseTester<TConfig, TState> {
    *                Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
    */
   constructor(
-    adtObject: TestableObject<TConfig, TState>,
+    adtObject: TestableObject<TConfig>,
     loggerPrefix: string,
     testCaseKey: string,
     testCaseName: string,
@@ -259,7 +348,7 @@ export class BaseTester<TConfig, TState> {
       if (this.cleanupObjectFn) {
         await this.cleanupObjectFn(config);
       } else {
-        await this.adtObject.delete(config as Partial<TConfig>);
+        await this.deleteOrRaise(config as Partial<TConfig>);
       }
       this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
       this.objectCreated = false;
@@ -279,6 +368,172 @@ export class BaseTester<TConfig, TState> {
   /**
    * Ensure object is unlocked if it was locked
    */
+  /**
+   * Delete, and raise what SAP said.
+   *
+   * `await this.adtObject.delete(config)` with the answer dropped was how a
+   * cleanup came to report success while the object stayed on the system: the
+   * delete stopped throwing when failures became the other half of the answer,
+   * so the `catch` blocks around these calls — written for a throw, and
+   * carrying a deliberate policy about what to do with a failed cleanup — never
+   * fired again. Measured twice: TEST_INNER_PKG02 on E19, and ZAC_INNER_PKG04
+   * on the trial, where the suite passed three runs in a row and left the
+   * package behind every time.
+   */
+  private async deleteOrRaise(config: Partial<TConfig>): Promise<void> {
+    // `isDeleted="false"` arrives inside a 200 and the library reads nothing
+    // into it; the test wants the real outcome, so it asks for the reading.
+    const answer = await this.adtObject.delete(config, {
+      analyse: analyseDeletion,
+    });
+    if (!answer.ok) {
+      const failure = answer.getError();
+      // The headline names the object; SAP's reason is in `messages`, and a
+      // red cleanup without it cannot be told apart from a misreading.
+      const said = (failure.messages ?? [])
+        .map(
+          (m) =>
+            `${m.type} ${m.text}` +
+            (m.t100 ? ` [${m.t100.id}/${m.t100.no}]` : ''),
+        )
+        .join('; ');
+      throw new Error(
+        `[${failure.origin}] ${failure.message}` +
+          (failure.request?.url ? ` (${failure.request.url})` : '') +
+          (said ? ` — SAP: ${said}` : ''),
+      );
+    }
+  }
+
+  /**
+   * The lock window, which is the caller's since 18.0.0.
+   *
+   * `update` is one request and carries the handle it is given; opening and
+   * closing the window around it is the consumer's job, and a test harness is a
+   * consumer. Three things this does that a chain inside `update` could not:
+   * it fails the test on a refused lock with SAP's own sentence, it unlocks
+   * whatever the update answered, and it reports a failed unlock rather than
+   * swallowing it — a handle left held is what makes the next run's create
+   * answer 403 with nothing appearing to hold it.
+   */
+  /**
+   * The object's source if it has one, its document if that is all it is.
+   *
+   * `read` and `update` address a source; `readMetadata` and `updateMetadata`
+   * address the object's own document. Which pair a type offers is a property
+   * of the type, so this harness asks for what is there rather than assuming
+   * both — the assumption the contracts dropped in 36.0.0, after eight types
+   * were measured answering `read` and `readMetadata` with one request.
+   */
+  private readWhatItHas(
+    config: Partial<TConfig>,
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<unknown>> {
+    if (this.adtObject.read) {
+      return this.adtObject.read(config, version, options);
+    }
+    if (this.adtObject.readMetadata) {
+      return this.adtObject.readMetadata(config, { ...options, version });
+    }
+    throw new Error(
+      `${this.loggerPrefix} offers neither read() nor readMetadata() — every ` +
+        'ADT object has one of the two, so this is the handler to look at.',
+    );
+  }
+
+  private writeWhatItHas(
+    config: Partial<TConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<unknown>> {
+    if (this.adtObject.update) {
+      return this.adtObject.update(config, options);
+    }
+    if (this.adtObject.updateMetadata) {
+      return this.adtObject.updateMetadata(config, options);
+    }
+    throw new Error(
+      `${this.loggerPrefix} offers neither update() nor updateMetadata() — ` +
+        'every writable ADT object has one of the two.',
+    );
+  }
+
+  private async updateUnderLock(
+    config: Partial<TConfig>,
+    options: IAdtOperationOptions,
+  ): Promise<unknown> {
+    if (!(this.adtObject.lock && this.adtObject.unlock)) {
+      // No lock resource for this type. The write goes out without a handle,
+      // and whether that is allowed is ADT's answer to give.
+      return await this.writeWhatItHas(config, options);
+    }
+
+    const handle = expectResult(await this.adtObject.lock(config), 'lock');
+    this.objectLocked = true;
+    this.lockHandle = handle;
+    let unlocked = false;
+    let written: unknown;
+    try {
+      written = await this.writeWhatItHas(config, {
+        ...options,
+        lockHandle: handle,
+      });
+    } finally {
+      const released = await this.adtObject.unlock(config, handle);
+      this.objectLocked = false;
+      this.lockHandle = undefined;
+      unlocked = released.ok;
+      if (!released.ok) {
+        this.log(
+          LogLevel.WARN,
+          `unlock after update failed, the handle may still be held: ${released.getError().message}`,
+        );
+      }
+    }
+    // Only after an UNLOCK that answered ok: that is the answer that can be
+    // wrong — a stateless UNLOCK answers 200 and releases nothing.
+    if (unlocked) await this.expectLockReleased(config);
+    return written;
+  }
+
+  /**
+   * Prove the UNLOCK above released the lock, from a second ABAP session.
+   *
+   * The handler this tester holds is bound to the test's connection, so the
+   * check builds the same class of handler on its own — found once on the
+   * test's client by {@link factoryOf}. Same class, same lock target: a class
+   * include's tester locks the class, and so does its check.
+   */
+  private async expectLockReleased(config: Partial<TConfig>): Promise<void> {
+    if (!lockReleaseCheckEnabled()) return;
+    logTestStep('verify unlock released the lock', this.logger);
+    // The factory is found on the verifier's own client: it is an AdtClient
+    // like any other, and not every tester hands its client to setup().
+    const handlerClass = this.adtObject;
+    await expectLockReleased(
+      (client) => {
+        if (this.lockFactory === undefined) {
+          this.lockFactory = factoryOf(client, handlerClass);
+        }
+        const factory = this.lockFactory;
+        if (!factory) {
+          throw new Error(
+            `${this.loggerPrefix}: no zero-argument factory on the client ` +
+              `builds a ${handlerClass.constructor.name}, so the lock-release ` +
+              'check cannot open this handler on its own session. Set ' +
+              'VERIFY_LOCK_RELEASED=false to run without it.',
+          );
+        }
+        return (
+          client as unknown as Record<string, () => ILockWindow<unknown>>
+        )[factory]();
+      },
+      config,
+      `${this.loggerPrefix} ${describeObject(config)}`,
+      this.logger,
+    );
+  }
+
   private async ensureUnlock(_config: Partial<TConfig>): Promise<void> {
     if (this.objectLocked && this.lockHandle) {
       try {
@@ -446,9 +701,9 @@ export class BaseTester<TConfig, TState> {
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
       // No source URL logging by default (keep logs concise)
-      let readState: TState | undefined;
+      let answer: IAdtResponse<unknown>;
       try {
-        readState = await this.adtObject.read(
+        answer = await this.readWhatItHas(
           config as Partial<TConfig>,
           version,
           withLongPolling ? { withLongPolling: true } : undefined,
@@ -463,7 +718,7 @@ export class BaseTester<TConfig, TState> {
           );
           // Small delay before retry to allow ADT to finalize object state
           await new Promise((resolve) => setTimeout(resolve, 1000));
-          readState = await this.adtObject.read(
+          answer = await this.readWhatItHas(
             config as Partial<TConfig>,
             version,
             undefined,
@@ -472,10 +727,9 @@ export class BaseTester<TConfig, TState> {
           throw error;
         }
       }
-      if (!readState || !(readState as any)?.readResult) {
-        throw new Error(`Read ${version} failed: no response`);
-      }
-      const payload = getPayloadText((readState as any)?.readResult?.data);
+      // A refusal is in the answer now, not thrown, so this is where a failed
+      // read stops the test — with SAP's own sentence rather than "no response".
+      const payload = getPayloadText(expectResult(answer, `read ${version}`));
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -488,14 +742,17 @@ export class BaseTester<TConfig, TState> {
       withLongPolling: boolean = false,
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
-      const metadataState = await this.adtObject.readMetadata(
+      const answer = await this.adtObject.readMetadata?.(
         config as Partial<TConfig>,
         withLongPolling ? { withLongPolling: true } : undefined,
       );
-      const metadataResult =
-        (metadataState as any)?.metadataResult ||
-        (metadataState as any)?.readResult;
-      const payload = getPayloadText(metadataResult?.data);
+      if (!answer) {
+        throw new Error(
+          `${this.loggerPrefix} offers no readMetadata() — the flow asked for ` +
+            'the object document and this type has none.',
+        );
+      }
+      const payload = getPayloadText(expectResult(answer, 'readMetadata'));
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -650,38 +907,47 @@ export class BaseTester<TConfig, TState> {
       // 1. Validate
       currentStep = 'validate';
       logTestStep(currentStep, this.logger);
-      const validationState = await this.adtObject.validate(
+      // No status check: a non-2xx is a returned failure since 31.0.0, and
+      // `expectResult` reports it with what SAP said.
+      //
+      // One failure is not the flow's: a system that has no validation resource
+      // at all answers `UNSUPPORTED_OPERATION`, and it has therefore not judged
+      // the name. There is nothing to read, and the rest of the flow is still
+      // worth running — so it is logged and stepped over. Every other failure
+      // still fails the test.
+      // A system without a validation resource answers 404, 405 or 501. The
+      // library reports that as it came; the test names it unsupported, so a
+      // missing resource skips the step instead of failing it.
+      const validationAnswer = await this.adtObject.validate(
         config as Partial<TConfig>,
+        {
+          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
+        },
       );
-      const validationResponse =
-        (validationState as any)?.validationResponse || validationState;
-
-      // Check HTTP status
-      if (validationResponse?.status !== 200) {
-        const errorData =
-          typeof validationResponse?.data === 'string'
-            ? validationResponse.data
-            : JSON.stringify(validationResponse?.data);
-        const error = new Error(
-          `Validation failed (HTTP ${validationResponse?.status}): ${errorData}`,
+      const validationUnavailable =
+        !validationAnswer.ok &&
+        validationAnswer.getError().code ===
+          AdtObjectErrorCodes.UNSUPPORTED_OPERATION;
+      if (validationUnavailable && !validationAnswer.ok) {
+        logTestStep(
+          `validate skipped: ${validationAnswer.getError().message}`,
+          this.logger,
         );
-        logTestStepError(currentStep, error);
-        throw error;
       }
+      const validationDocument = validationUnavailable
+        ? ''
+        : String(expectResult(validationAnswer, 'validate') ?? '');
 
-      // Check for error tables in validation response (even if HTTP 200)
-      // Validation can return HTTP 200 but with error/warning tables in XML
-      if (
-        validationResponse?.data &&
-        typeof validationResponse.data === 'string'
-      ) {
+      // The document still has to be read: validation reports a rejected name
+      // inside a 200, in an error table.
+      if (validationDocument) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
             attributeNamePrefix: '@_',
           });
-          const parsed = parser.parse(validationResponse.data);
+          const parsed = parser.parse(validationDocument);
 
           // Check for error table (adtcore:errorTable or similar)
           const errorTable =
@@ -785,14 +1051,48 @@ export class BaseTester<TConfig, TState> {
       // 2. Create
       currentStep = 'create';
       logTestStep(currentStep, this.logger);
-      const createOptions: IAdtOperationOptions = {
-        activateOnCreate: options?.activateOnCreate || false,
+      // `create` is the POST. `activateOnCreate` is still the flow's word for
+      // "leave this active", but it is this harness that acts on it now, with
+      // an `activate` call of its own below — the option no longer reaches into
+      // the library and asks it to run a second request.
+      // No `sourceCode`: a create posts a metadata document and no create
+      // endpoint has a body for the source, so passing it wrote nothing and
+      // said nothing. `@mcp-abap-adt/interfaces@38.0.0` refuses it at the type,
+      // which is how this line was found. The source goes in through the
+      // update below, under the lock this harness takes.
+      const createOptions: IAdtCreateOptions = {
         timeout: options?.timeout,
-        sourceCode: options?.sourceCode,
-        xmlContent: options?.xmlContent,
       };
-      await this.adtObject.create(config, createOptions);
+      // The source is stripped rather than cast away. `create` takes
+      // `Omit<TConfig, 'source'> & { source?: never }`, and a *generic*
+      // `TConfig` cannot satisfy that — the compiler has no way to know the
+      // concrete type lacks the field. A concrete caller writes
+      // `create({ className })` and needs none of this; a wrapper like this one
+      // has to say out loud what it is not sending, which is the right thing to
+      // say anyway.
+      const { source: _sourceIsNotCreates, ...createConfig } =
+        config as TConfig & { source?: unknown };
+      expectResult(
+        await this.adtObject.create(
+          createConfig as Omit<TConfig, 'source'> & { source?: never },
+          createOptions,
+        ),
+        'create',
+      );
       this.objectCreated = true;
+
+      if (options?.afterCreate) {
+        logTestStep("afterCreate (the caller's own step)", this.logger);
+        await options.afterCreate();
+      }
+
+      if (options?.activateOnCreate && this.adtObject.activate) {
+        logTestStep('activate (after create)', this.logger);
+        expectResult(
+          await this.adtObject.activate(config as Partial<TConfig>),
+          'activate after create',
+        );
+      }
       // Delay after create
       await this.waitDelay(
         this.getOperationDelay('create', testCaseParams),
@@ -834,24 +1134,60 @@ export class BaseTester<TConfig, TState> {
           );
         }
 
+        // The read-modify-write a document update needs, in the order the
+        // migration note prescribes: read, edit, then lock. Reading inside the
+        // lock window would be this harness inventing a sequence the library no
+        // longer performs.
+        let documentToWrite: string | undefined;
+        if (options?.updateTakesDocument) {
+          const current = await readMetadata(
+            'read document (before update)',
+            false,
+          );
+          // Not checked for emptiness, and deliberately. Whether what was
+          // read is a complete document is not something this side can know —
+          // the server is the only one that knows what it will accept, and it
+          // says so in its own words. A guard here would answer that question
+          // on its behalf and be wrong the first time it disagreed.
+          documentToWrite =
+            typeof options.updateTakesDocument === 'function'
+              ? options.updateTakesDocument(current ?? '')
+              : (current ?? '');
+        }
+
         currentStep = 'update';
         logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
-          activateOnUpdate: options?.activateOnUpdate || false,
           // The UPDATE content, not the create content. Every handler resolves
-          // `options.sourceCode ?? config.sourceCode` with options winning, so
+          // `options.source ?? config.source` with options winning, so
           // passing the create source here overwrote the object with what it
           // already held and the update became a no-op — measured on E19 with
           // the include suite, where the stored source stayed 52 characters
           // while `update_source_code` was 62.
-          sourceCode: options?.updateConfig?.sourceCode ?? options?.sourceCode,
-          xmlContent: options?.updateConfig?.xmlContent ?? options?.xmlContent,
+          // A document write and a source write take the same channel: the
+          // contract says the body is `options.source` for `update` and for
+          // `updateMetadata` alike. `documentToWrite` is what the read-patch
+          // step above produced for the types whose write takes a whole
+          // document; it wins, because for those types there is nothing else.
+          source:
+            documentToWrite ?? options?.updateConfig?.source ?? options?.source,
           timeout: options?.timeout,
         };
-        await this.adtObject.update(
-          { ...config, ...options.updateConfig } as Partial<TConfig>,
-          updateOptions,
+        expectResult(
+          (await this.updateUnderLock(
+            { ...config, ...options.updateConfig } as Partial<TConfig>,
+            updateOptions,
+          )) as IAdtResponse<unknown>,
+          'update',
         );
+
+        if (options?.activateOnUpdate && this.adtObject.activate) {
+          logTestStep('activate (after update)', this.logger);
+          expectResult(
+            await this.adtObject.activate(config as Partial<TConfig>),
+            'activate after update',
+          );
+        }
         // Delay after update
         await this.waitDelay(
           this.getOperationDelay('update', testCaseParams),
@@ -876,27 +1212,12 @@ export class BaseTester<TConfig, TState> {
       ) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
-        const activateState = await this.adtObject.activate(
-          config as Partial<TConfig>,
+        // A refused activation is a failure in the answer — the handlers read
+        // `<msg type="E">` for it, which a status check never could.
+        expectResult(
+          await this.adtObject.activate(config as Partial<TConfig>),
+          'activate',
         );
-        // activate returns state object, check for errors
-        const activateResponse =
-          (activateState as any)?.activateResponse || activateState;
-        if (
-          activateResponse?.status &&
-          activateResponse.status !== 200 &&
-          activateResponse.status !== 204
-        ) {
-          const errorData =
-            typeof activateResponse?.data === 'string'
-              ? activateResponse.data
-              : JSON.stringify(activateResponse?.data);
-          const error = new Error(
-            `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
-          );
-          logTestStepError(currentStep, error);
-          throw error;
-        }
         // Delay after activate
         await this.waitDelay(
           this.getOperationDelay('activate', testCaseParams),
@@ -922,21 +1243,21 @@ export class BaseTester<TConfig, TState> {
         // object — a legitimate edit — wrote empty and was then compared
         // against the content it had before, reporting a mismatch on a correct
         // update. Emptiness is a value; only absence is absence.
-        const updateContent =
-          options.updateConfig?.sourceCode ??
-          options.updateConfig?.xmlContent ??
-          options.sourceCode ??
-          options.xmlContent;
+        const updateContent = options.updateConfig?.source ?? options.source;
+        // **What the content IS decides how it is compared**, and one field no
+        // longer says. It used to: `sourceCode` meant text and `xmlContent`
+        // meant a document, which is the classification the contract stopped
+        // asking for — both are `source` now. `updateTakesDocument` already
+        // marks the types whose write takes a whole document, so it is what
+        // answers here. Nothing changes for today's suites: a document type
+        // passes no `source` at all, the harness reads and patches the
+        // document itself, and the kind stays `unknown` as before.
         const updateContentKind =
-          options.updateConfig?.sourceCode !== undefined
-            ? 'source'
-            : options.updateConfig?.xmlContent !== undefined
+          updateContent === undefined
+            ? 'unknown'
+            : options.updateTakesDocument
               ? 'xml'
-              : options.sourceCode !== undefined
-                ? 'source'
-                : options.xmlContent !== undefined
-                  ? 'xml'
-                  : 'unknown';
+              : 'source';
 
         if (preUpdateActive && postUpdateInactive) {
           if (updateContentKind === 'source') {
@@ -994,7 +1315,7 @@ export class BaseTester<TConfig, TState> {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
         try {
-          const metadataResponse = await this.adtObject.readMetadata(
+          const metadataResponse = await this.adtObject.readMetadata?.(
             config as Partial<TConfig>,
             options.readMetadataOptions,
           );
@@ -1026,7 +1347,7 @@ export class BaseTester<TConfig, TState> {
                   acceptHint ? `; ${acceptHint}` : ''
                 }`,
               );
-              return validationState;
+              return validationDocument as unknown as TState;
             }
           }
           logTestStepError(currentStep, error);
@@ -1046,7 +1367,16 @@ export class BaseTester<TConfig, TState> {
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
             await recycleTestSession(this.connection);
           }
-          await this.adtObject.delete(config as Partial<TConfig>);
+          // The suite's own removal, when it declared one. It was declared and
+          // then ignored on this path — only the pre-existing-object cleanup
+          // used it — which left a type whose delete needs something extra
+          // (a package needs a fresh session: the PAK lock belongs to the ABAP
+          // session, measured on E19) with no way to say so.
+          if (this.cleanupObjectFn) {
+            await this.cleanupObjectFn(config);
+          } else {
+            await this.deleteOrRaise(config as Partial<TConfig>);
+          }
           // Delay after delete
           await this.waitDelay(
             this.getOperationDelay('delete', testCaseParams),
@@ -1089,7 +1419,7 @@ export class BaseTester<TConfig, TState> {
         );
       }
 
-      return validationState;
+      return validationDocument as unknown as TState;
     } catch (error: any) {
       // Log step error with details before failing test
       if (currentStep) {
@@ -1110,7 +1440,7 @@ export class BaseTester<TConfig, TState> {
             await recycleTestSession(this.connection);
           }
           logTestStep('delete (cleanup)', this.logger);
-          await this.adtObject.delete(config as Partial<TConfig>);
+          await this.deleteOrRaise(config as Partial<TConfig>);
           // Delay after delete (cleanup on error)
           await this.waitDelay(
             this.getOperationDelay('delete', testCaseParams),
@@ -1178,24 +1508,25 @@ export class BaseTester<TConfig, TState> {
   async readTest(
     config: Partial<TConfig>,
     options?: IReadTestOptions,
-  ): Promise<TState | undefined> {
+  ): Promise<unknown> {
     // Ensure connection is open (RFC connections may close after flowTest cleanup)
     await this.ensureConnection();
 
     try {
       logTestStep('read', this.logger);
-      const readState = await this.adtObject.read(
-        config,
-        options?.version || 'active',
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+      // The value, or the test fails with what SAP said. An object that is not
+      // there answers 200 with an empty body — the caller's `analyse` decides
+      // whether that is absence, and this harness reads it as an empty read.
+      const readState = expectResult(
+        await this.readWhatItHas(
+          config,
+          options?.version || 'active',
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+        'read',
       );
-
-      if (!readState) {
-        this.log(LogLevel.WARN, 'read failed: object not found');
-        return undefined;
-      }
 
       if (options?.skipReadMetadata) {
         return readState;
@@ -1203,7 +1534,7 @@ export class BaseTester<TConfig, TState> {
 
       logTestStep('readMetadata', this.logger);
       try {
-        await this.adtObject.readMetadata(
+        await this.adtObject.readMetadata?.(
           config,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
@@ -1442,7 +1773,14 @@ export class BaseTester<TConfig, TState> {
           : this.isLegacySystem
             ? 'legacy'
             : 'on-premise';
-        this.skipReason = `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
+        // `available_in` decides; `skip_reason` explains. A generic sentence
+        // sends the next reader to the flag and no further, which is how
+        // "not available on cloud" survived next to an endpoint that answers
+        // 200 — the flag was right and the reason was never written down.
+        this.skipReason =
+          typeof tc?.skip_reason === 'string' && tc.skip_reason.length > 0
+            ? tc.skip_reason
+            : `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
         this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
         this.testCase = null;
         this.configResolver = null;
@@ -1467,11 +1805,26 @@ export class BaseTester<TConfig, TState> {
         const camelPrefix =
           this.loggerPrefix.charAt(0).toLowerCase() +
           this.loggerPrefix.slice(1);
+        // The last resort is what makes this reliable. The three lookups above
+        // derive the config key from the logger prefix, and two testers name
+        // themselves something their config does not use: `BehaviorImplementation`
+        // holds a `className`, and the DDL tester is called `View` and holds a
+        // `ddlName`. Neither derived key existed, so `objectName` was undefined
+        // and the hook was never called — silently, because a hook that does not
+        // run looks exactly like one that found nothing to clean.
+        //
+        // So fall back to whichever config key ends in `Name` and is the
+        // object's own. `packageName` is excluded by name: it is the parent, and
+        // deleting it would be a different and much worse bug.
+        const ownNameKey = Object.keys(this.config as object).find(
+          (key) => key.endsWith('Name') && key !== 'packageName',
+        );
         const objectName =
           (this.config as any)[`${camelPrefix}Name`] ||
           (this.config as any)[`${this.loggerPrefix.toLowerCase()}Name`] ||
           (this.config as any).name ||
-          (this.config as any).objectName;
+          (this.config as any).objectName ||
+          (ownNameKey ? (this.config as any)[ownNameKey] : undefined);
         if (objectName) {
           const cleanup = await this.ensureObjectReadyFn(objectName);
           if (!cleanup.success) {
@@ -1597,7 +1950,7 @@ export class BaseTester<TConfig, TState> {
     ): Promise<string | undefined> => {
       currentStep = label;
       logTestStep(label, this.logger);
-      const state = await this.adtObject.read(
+      const state = await this.readWhatItHas(
         config as Partial<TConfig>,
         version,
       );
@@ -1618,12 +1971,10 @@ export class BaseTester<TConfig, TState> {
       currentStep = 'update';
       logTestStep(currentStep, this.logger);
       const updateOptions: IAdtOperationOptions = {
-        activateOnUpdate: options?.activateOnUpdate || false,
-        sourceCode: options?.sourceCode,
-        xmlContent: options?.xmlContent,
+        source: options?.source,
         timeout: options?.timeout,
       };
-      const updateState = await this.adtObject.update(
+      const updateState = await this.updateUnderLock(
         { ...config, ...options?.updateConfig } as Partial<TConfig>,
         updateOptions,
       );
@@ -1677,7 +2028,7 @@ export class BaseTester<TConfig, TState> {
       if (options?.readMetadata && this.adtObject.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
-        await this.adtObject.readMetadata(
+        await this.adtObject.readMetadata?.(
           config as Partial<TConfig>,
           options.readMetadataOptions?.withLongPolling
             ? { withLongPolling: true }
@@ -1717,7 +2068,7 @@ export class BaseTester<TConfig, TState> {
       params: {},
     };
 
-    this.raiseIfSetupFailed(testName, definition);
+    await this.raiseIfSetupFailed(testName, definition);
 
     if (this.shouldSkip()) {
       logTestStart(this.logger, testName, definition);
@@ -1784,9 +2135,37 @@ export class BaseTester<TConfig, TState> {
    * mistaken for "does not apply here".
    */
   // biome-ignore lint/suspicious/noExplicitAny: logTestStart's own parameter
-  private raiseIfSetupFailed(testName: string, definition: any): void {
+  private async raiseIfSetupFailed(
+    testName: string,
+    definition: any,
+  ): Promise<void> {
     if (!this.setupError) return;
     logTestStart(this.logger, testName, definition);
+
+    // A leftover object is removed here, before the throw, because there is no
+    // later chance: the cleanup this class runs lives at the end of a flow, and
+    // the flow is exactly what this throw prevents. `ensureObjectReady` sets
+    // `objectCreated` and says "post-test cleanup will delete it" — that was
+    // true of the skip path and false of this one, so the object survived and
+    // every following run failed the same way. Measured on the trial: a
+    // function include stayed through three runs, each reporting that cleanup
+    // would remove it.
+    if (this.objectCreated && this.config) {
+      const { shouldCleanup } = this.getCleanupSettings(
+        this.testCase?.params as ITestCaseParams | undefined,
+      );
+      if (shouldCleanup) {
+        try {
+          await this.cleanupExistingObject(this.config);
+        } catch (cleanupError) {
+          this.log(
+            LogLevel.WARN,
+            `Leftover object could not be removed: ${(cleanupError as Error).message}`,
+          );
+        }
+      }
+    }
+
     const error = new Error(
       `Test could not be set up: ${this.setupError}. The system was not in a ` +
         'state this test could run against, so nothing was verified.',
@@ -1803,7 +2182,7 @@ export class BaseTester<TConfig, TState> {
       params: {},
     };
 
-    this.raiseIfSetupFailed(testName, definition);
+    await this.raiseIfSetupFailed(testName, definition);
 
     if (this.shouldSkip()) {
       logTestStart(this.logger, testName, definition);
@@ -1853,7 +2232,7 @@ export class BaseTester<TConfig, TState> {
    * Read test with automatic config loading
    * Uses config from beforeEach
    */
-  async readTestAuto(options?: IReadTestOptions): Promise<TState | undefined> {
+  async readTestAuto(options?: IReadTestOptions): Promise<unknown> {
     const testName = `${this.loggerPrefix} - read standard object`;
     const definition = this.getTestCaseDefinition() || {
       name: this.testCaseKey,

@@ -1,9 +1,1907 @@
 # @mcp-abap-adt/adt-clients – Changelog
 
-All notable changes to this package are documented here.  
+All notable changes to this package are documented here.
+
+**This repository holds more than one package, and each keeps its own
+changelog.** This file is `adt-clients`', which still lives at the root;
+`packages/adt-strategies` has [its own](packages/adt-strategies/CHANGELOG.md).
+
+There is no repository-wide changelog and there will not be one. The versions
+here move independently — `adt-clients` is at 19.0.0 while `adt-strategies`
+starts at 0.1.0 — so a single file would be a list of entries most readers have
+to skip, against versions their package never had. A monorepo that bumps every
+package together can have one; this one cannot. Tags follow the same rule:
+`v<version>` is `adt-clients`', `adt-strategies@<version>` is the other's.
+
+When `adt-clients` moves into `packages/`, this file goes with it.
+
+Releases go out with `npm run release:publish`, which publishes only the
+packages whose version is missing from the registry — the same consequence of
+independent versions. One package at a time: `npm run publish:clients` and
+`npm run publish:strategies`.
+  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [25.0.1] - 2026-10-03
+
+Every create carries the responsible person and the master system the client
+holds. Measured on an on-premise system (2026-10-03): a message class, a
+program include and a transformation created with a system context record its
+responsible person; the system records its own id as the master system of a
+local object, whatever is sent.
+
+### Fixed
+
+- Every create carries the responsible person and master system the client has,
+  and writes no attribute it lacks. A message class create now sends
+  `adtcore:masterSystem` and `adtcore:responsible` from the client's system
+  context (an include create also falls back to the context's master language);
+  an include create and a behavior implementation create (obtained
+  through `AdtClient`) now receive that context too, where they had an empty
+  one. Service definition, transformation and access control creates wrote
+  `adtcore:responsible=""` when there was no responsible person; they now omit
+  the attribute, as `adtcore:masterSystem` already was.
+
+## [25.0.0] - 2026-10-02
+
+ATC checks programs and every kind of include, and every object address is
+built in one place. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
+
+### Breaking
+
+- **`@mcp-abap-adt/interfaces-adt` `^12.0.0`** (was `^11`). Its `IAtcObjectRef`
+  is a union that carries what each kind's address needs. A consumer that
+  imports `interfaces-adt` itself moves to 12 as well, or the tree holds two
+  copies and TypeScript sees two types. (#200)
+- **Group activation, group deletion and where-used throw for a reference they
+  cannot address**, before any request: one without a type, one with a type
+  this library has no address for, and a function module or function include
+  without its group. Until now a missing type was guessed from the name
+  (`ZCL_…` → class, anything else → program) and an unknown type built
+  `/sap/bc/adt/<type>/<name>`, an address that exists nowhere. (#197)
+- **On a legacy system (BASIS < 7.50), the factories for object types it lacks
+  no longer throw.** `getDomain`, `getDataElement`, `getStructure`, `getTable`,
+  `getTableType`, `getAccessControl`, `getServiceDefinition`,
+  `getServiceBinding` (and the deprecated `getService`),
+  `getBehaviorDefinition`, `getBehaviorImplementation`,
+  `getMetadataExtension`, `getEnhancement`, and now also
+  `getAuthorizationField` and `getFeatureToggle`, hand out a handler whose every
+  member answers a refusal (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`)
+  without sending a request. The last two used to send their requests. (#192)
+
+### Added
+
+- **ATC over programs and every kind of include**: `program`,
+  `program_include`, `function_include` (with `functionGroup`) and
+  `class_include` (with `includeKind`), each sent at its own address. ATC
+  checks an include as the object that owns it, and the findings are not
+  limited to the include sent. Measured on an on-premise and a cloud system;
+  see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs).
+  (#200)
+
+### Fixed
+
+- **`getVersions()` reaches the version history** of DDL sources, access
+  controls, function includes and table types. It asked an address SAP answers
+  with `404`. (#197)
+- An enhancement with a namespaced name is no longer encoded twice (`%252f`).
+  (#197)
+
+### Changed
+
+- **Every object address comes from one registry** (`src/endpoints/objects.ts`),
+  checked against an on-premise and a cloud system; a unit test fails on an
+  object address written anywhere else. Names go out lowercase, a namespace as
+  `%2F`; a transport request number keeps its case, because SAP reads it
+  case-sensitively. Request traffic is otherwise unchanged. (#197)
+- `adt-strategies` is no longer a workspace: adt-clients' tests take it from
+  npm (`^0.7.0`), and it builds against what it installs. Nothing a consumer
+  installs changes. (#198)
+- Legacy documentation: what BASIS 7.40 answers over RFC and HTTP, measured.
+  (#195)
+- `axios` 1.20.0, `brace-expansion` patched. (#188, #190)
+
+## [24.1.0] - 2026-10-01
+
+### Added
+
+- **A feed's `$query`, sent as given.** `IFeedQueryOptions.query`
+  (`@mcp-abap-adt/interfaces-adt` 11.1.0) reaches every feed-backed reader —
+  dumps, system messages, the gateway error log — through
+  `buildFeedQueryParams`. A runtime feed filters on the attributes its
+  descriptor declares (the dumps feed: user, runtime error, exception, object,
+  package, component, the responsible people, date/time), combined with
+  `and`/`or`; `user` alone reached one of them. When `query` is set, `user` is
+  not turned into a query of its own: one request carries one `$query`, so the
+  caller puts the user into the expression.
+
+## [24.0.1] - 2026-09-30
+
+A developer release: not published to npm.
+
+### Changed
+
+- **Tests and documentation on `@mcp-abap-adt/connection` 10.** The credentials a connector is handed now come from `@mcp-abap-adt/auth-providers` (a dev dependency, like `connection`): `BasicAuthProvider`, and `TokenAuthProvider.fixed(token)` in place of `new TokenAuthProvider(token)`. The TLS material is no longer wired into the HTTP transport by hand — the provider hands it over at logon. The README and `docs/usage/` snippets import the providers from there. Nothing in the published package changes.
+
+## [24.0.0] - 2026-09-30
+
+### Removed — BREAKING
+
+- **The unit-test handlers: `getUnitTest()`, `getCdsUnitTest()`, `AdtUnitTest`,
+  `AdtCdsUnitTest`, `AdtUnitTestLegacy`.** A unit test is not an object type —
+  it is a local test class in a class's `testclasses` include — and measured
+  against the endpoints, no member of either handler had a request of its own:
+  create was the class's POST, read/update/delete the local test class's GET
+  and PUT, lock the class's LOCK, the CDS delete the class's DELETE. Each now
+  lives with the object it touches. See
+  [MIGRATION-24.md](docs/usage/MIGRATION-24.md).
+- **`AdtClass.lockTestClasses`, `unlockTestClasses`, `checkTestClass`.** The
+  first two were `lock`/`unlock` of the same class without the lock tracker;
+  the third was `getLocalTestClass().check`'s request.
+- **`IUnitTestResults`, `unitTestDocuments`.**
+- **The duplicate run module.** `core/unitTest/run.ts` was a byte-identical copy
+  of the ABAP Unit half of `core/class/run.ts`, and the two handlers imported
+  from both.
+
+### Added
+
+- **`AdtExecutor.getClassTestRunner()`** — running a class's ABAP Unit tests
+  (`run`, by class name or by `{ containerClass, testClass }` list) and asking
+  about the run (`getStatus`, `getResult`), with its own result set
+  `classTestRunnerDocuments`. Running is an executor's, beside `classrun`.
+- **`AdtExecutor.getProgramTestRunner()`** — running a report's ABAP Unit
+  tests, wherever they sit: its own source or an include it pulls in. Same
+  `/abapunit/runs` as a class, naming the report as `osl:object type="PROG"` —
+  what Eclipse sends. Measured on premise (2026-09-30) against a report with its
+  test class inline and one with it in an include; both ran. Own result set
+  `programTestRunnerDocuments`. The legacy runner refuses without a request:
+  `/abapunit/testruns` given a report's URI answered an empty result for a
+  report whose tests `/abapunit/runs` found.
+- **`AdtExecutor.getFunctionGroupTestRunner()` and
+  `getFunctionModuleTestRunner()`** — every ABAP Unit test of a function group
+  (`osl:object type="FUGR"`), or the tests that exercise one module
+  (`type="FUNC"`, what Eclipse sends). Measured on premise (2026-09-30): the
+  group run found all seven test methods of a group; the module run found the
+  seven that exercise the module and none for a module they do not. Legacy
+  variants refuse without a request, as the report's does.
+- **`AbapUnitRunner`** — the base every runner stands on: `getStatus` and
+  `getResult` by run id, and a start for one object of the runner's type. One
+  result set, `abapUnitRunnerDocuments`; the per-runner names
+  (`classTestRunnerDocuments`, `programTestRunnerDocuments`,
+  `functionGroupTestRunnerDocuments`, `functionModuleTestRunnerDocuments`) are
+  the same object.
+- **Integration tests for every runner.** `ProgramUnitTest` and
+  `FunctionGroupUnitTest` build their objects (a report with its test class in
+  an include; a group, a module and a test include), run them, assert the test
+  methods they wrote were found and raised no alert, and delete them;
+  `UnitTest` also runs its class by name. New test cases
+  `run_program_unit_test` and `run_function_group_unit_test` in
+  `test-config.yaml.template`.
+- **`core/shared/abapUnit.ts`** — starting a run for one object of any type,
+  and polling and fetching a run by id, once for every runner.
+  `startClassUnitTestRunByObject`, `getClassUnitTestStatus` and
+  `getClassUnitTestResult` stay exported and delegate to it.
+- **`AdtExecutorLegacy` and `createAdtExecutor`** — the executor twin of
+  `AdtClientLegacy`/`createAdtClient`. Below 7.50 the runner posts to
+  `/abapunit/testruns`, answers the finished result, and refuses
+  `getStatus`/`getResult` without a request.
+- **`getDdl().checkCdsTestDoubles()`** — the CDS test-doubles check, on the
+  view's handler, answered through the new `ddlDocuments.testDoubles` slot.
+  `AdtDdlLegacy` refuses it without a request.
+
+### Fixed
+
+- **A namespaced name reached ABAP Unit as another name.** The run body is XML,
+  and the object name went into it URL-encoded: `/ACME/CL_CLASS` was sent as
+  `%2FACME%2FCL_CLASS`, which XML does not decode. It is escaped for an XML
+  attribute now — in the run by object, in the `containerClass` of a run by test
+  class (both older than this release), and in `title`, `context` and the test
+  class name, which were not escaped at all.
+
+## [23.0.5] - 2026-09-29
+
+### Fixed
+
+- **An OData V2 publication could not succeed.** The publish and unpublish jobs
+  were posted with no query string, so the server had no service to resolve and
+  answered `200` with `<SEVERITY>ERROR</SEVERITY>`, naming an EMPTY service and
+  version `0000`: *"Local un-publish of service ␠ with version 0000 failed —
+  Service ZMCP_PRV_SB version ␠ does not exist."* The binding was active and
+  `srvb:allowedAction` named the very action asked for.
+
+  `servicename` and `serviceversion` had been dropped from the request because a
+  capture of Eclipse showed neither and the job answered `SEVERITY OK` — measured
+  on one system, and it does not hold for V2. Measured on a trial, 2026-09-29, one
+  binding per protocol with a known publication state and a single job each, the
+  only difference being the query string:
+
+  **All four binding variants, measured** — because the branch is by protocol and
+  whether the CATEGORY mattered was the question that could have invalidated it:
+
+  | variant | no query string | with it | on the wire |
+  |---|---|---|---|
+  | `ODATA_V2_UI` | the refusal above | `200`, `SEVERITY OK`, published | `?servicename=ZMCP_PRV_V2&serviceversion=0001` |
+  | `ODATA_V2_WEB_API` | the same refusal | `200`, `SEVERITY OK`, published | `?servicename=ZMCP_PRV_WA2&serviceversion=0001` |
+  | `ODATA_V4_UI` | `200`, `SEVERITY OK` (two bindings) | not measured | — |
+  | `ODATA_V4_WEB_API` | `200`, `SEVERITY OK` | not measured | `POST …/odatav4/publishjobs`, no query string |
+
+  Web API behaves exactly as UI does on each protocol, so the category is not the
+  axis and `serviceType` is. Had Web API gone through without the query string, this
+  branch would have had to be by category instead — which is why it was measured
+  first.
+
+  **Verified with the patched code against the system**, through this repository's
+  own `serviceBinding/publication` integration test on a V2 binding created for it:
+  `before: published=false allowedAction=PUBLISH` → one request, `POST
+  …/odatav2/publishjobs` → *the job answered OK after 133s* → `settled at
+  published=true after 135s`. That is the same call that answered the blank-service
+  refusal before this change.
+
+  So a V2 job now carries `?servicename=<SERVICE>&serviceversion=<VERSION>` and a
+  V4 job still carries none. V4 is left exactly as it was measured working: whether
+  it also accepts the query string was never measured, and an unmeasured change is
+  not an improvement. New entry in
+  [`ERRATA.md`](docs/usage/ERRATA.md#a-v2-publication-job-resolves-the-service-by-name-and-version).
+
+### Changed
+
+- **`IServiceBindingPublicationParams` is a union per protocol.**
+  `serviceType: 'odatav2'` now requires `serviceName` and `serviceVersion`;
+  `'odatav4'` accepts neither. The demand is in the type because that is where a
+  caller sees it — the same reason `serviceType` itself was made required rather
+  than checked in the implementation. `update()` throws, naming both fields, for a
+  V2 config that omits them, which is the runtime half for JavaScript callers.
+
+  **A patch, not a break.** A V2 caller that passed only `serviceType` does stop
+  compiling — worth knowing before upgrading — but that call could not succeed
+  against any system: it is the exact request the fix above measures being refused.
+  Nothing that worked stops working, so there is no working contract to break.
+
+### Development
+
+- `@mcp-abap-adt/connection` `^9.4.2` (was `^9.4.0`), a dev dependency: 9.4.2
+  requires `sap-rfc-lite` `^0.2.1`, the first npm package whose JS client has
+  `resetServerContext` — 0.2.0 was packed with a stale `lib/`, so RFC runs fell
+  back to a new connection per stateless call (about 1010 s against 684 s for a
+  full run). The lockfile resolves 0.2.1. Consumers are unaffected: they choose
+  their own connector.
+
+## [23.0.4] - 2026-09-27
+
+**Documentation only — no library code changed.**
+
+### Documentation
+
+- `ERRATA.md`: **a package walk lists a binding's generated objects** —
+  `G4BA`, `SCO2`, `SUSH` beside a published binding, with no ADT address. A
+  group deletion check over them refuses the whole group ("No URI-Mapping
+  defined for URI"); leave them out, they go with the binding. Measured on a
+  cloud system while cleaning a test package. Linked from the service binding's
+  branch of the object tree.
+
+## [23.0.3] - 2026-09-27
+
+**Documentation and tests only — no library code changed.** What ships in
+`docs/usage/` changes: `WORKAROUNDS.md` and `TROUBLESHOOTING.md` are gone, and
+`ERRATA.md` replaces both. A link into either old file from outside this
+package now needs `ERRATA.md` — the anchors are listed in its contents. Use it
+with `@mcp-abap-adt/adt-strategies` 0.6.0, which ships the same errata and
+`analysePublicationLock`.
+
+### Documentation
+
+- **`WORKAROUNDS.md` is now `ERRATA.md`, and `TROUBLESHOOTING.md` is merged
+  into it** — one document for what SAP answers that it does not mean. It opens
+  with **the object tree**: every object this library addresses, as it hangs
+  together (a child lives in its parent or is built on it), each branch with an
+  unusual answer linked to its section, the sections in tree order — first
+  among them a `403` on a service binding's LOCK, which is to be ignored
+  (`analysePublicationLock`). Then every case with symptom, cause, rule,
+  workaround and evidence. Four cases that lived only in troubleshooting are
+  entries now: a validation answering a taken name inside a `200`, a deletion
+  check that says no, "No URI-Mapping" inside a `200`, and an object created
+  without a package that cannot be deleted; the `S_ABPLNGVS` explanation moved
+  into its entry. Every link is updated. It ships in adt-clients under
+  `docs/usage/` and, copied at pack time, in adt-strategies.
+- `ERRATA.md`: two entries on service bindings, measured on a cloud
+  system. **A binding publishes only once it is active** — a publish straight
+  after the create answers `200` with "Service Binding … does not exist";
+  neither the lock nor the service information `GET` changes that, the
+  activation does. **An unpublish straight after a publish is refused** —
+  "Error while creating service interface …" within a second, while the same
+  request minutes later succeeds (134 s). The binding-lock entry now says that
+  Eclipse posts the job after its own LOCK's `403`, and points to
+  `analysePublicationLock` (adt-strategies). The publication example in
+  `CLIENT_API_REFERENCE.md` passes it, unlocks only a handle it got, and
+  activates a new binding first.
+
+- `ERRATA.md`: two new entries. **A function module's source answers
+  `500`** ("An exception was raised", `SY/530`) for a module that does not
+  exist; only its long text says so (FL651), while the metadata answers `404`.
+  **An empty responsible person is refused as "Check of condition failed"**
+  (`00/001`, `XML_OFFSET` at the end of the root start tag). The table of what
+  a bare create leaves said a service definition's POST is refused outright;
+  that measurement came from a client without a responsible person. With one,
+  the POST answers `201` and the source reads empty. `OBJECT_LIFECYCLE.md`
+  said the same and is corrected.
+
+### Tests
+
+- `serviceBinding/publication.test.ts` runs the sequence the errata
+  recommends — lock read by `analysePublicationLock`, the job read by
+  `analysePublication`, unlock only of a handle taken — and fails at once on a
+  refusal that arrives immediately instead of waiting it out. Run on a cloud
+  system: publish under our lock, 134 s.
+- `publicationLock.test.ts`: a binding LOCK answered `403` goes through
+  `AdtServiceBinding.lock` as a lock without a handle under
+  `analysePublicationLock`, and as a refusal without it.
+
+- **`shared:setup` asks about existence on the object's metadata, and judges
+  a refusal by SAP's text.** It read the source and took an empty one for
+  absence. A service definition created but not written answers `200` with an
+  empty source, so a second run called it missing and created it again. A
+  missing function module's source answers `500`; the check read the
+  transport's "Request failed with status code 500" rather than SAP's
+  "does not exist", and stopped. `answerSaysAbsent` reads the document first
+  and falls back to the status only when there is no text.
+- **A shared service definition with `skip_activation` gets its source.** Since
+  23.0.0 `create` is the POST alone and ignores `source`. The deferred branch
+  wrote nothing, so the object stayed an empty inactive shell that a service
+  binding was then built on. It is now locked, written and unlocked, and left
+  for the group activation (`writeSource`).
+
+## [23.0.2] - 2026-09-27
+
+**Upgrade if you use `@mcp-abap-adt/connection` 9.3.1 or later** — `^9.x`
+resolves to it. There, the UNLOCK of an include, a service binding or a
+message class released nothing on 23.0.1 and earlier. Nothing
+else changes for a consumer: no API change, and the connector stays a dev
+dependency. A consumer with its own `IAbapConnection` must carry the ABAP
+context on the `LOCK` and the `UNLOCK` — see `STATEFUL_SESSION_GUIDE.md`.
+
+### Fixed
+
+- **`AdtInclude`, `AdtService` and `AdtMessageClass` send their UNLOCK
+  stateful.** Only the LOCK and the UNLOCK are stateful: `lock` returns to
+  stateless once its request answers, so `unlock` must switch to stateful for
+  its own request, as every other handler does. These three sent it stateless.
+  An older connector carried the context cookie on every request, which hid
+  it; from `@mcp-abap-adt/connection` 9.3.1 a stateless request carries no
+  `sap-contextid`, so the UNLOCK ran in a fresh ABAP context, answered `200`
+  and released nothing. Measured on an on-premise system with connection
+  9.4.0: the include activation then answered `403` EU/510 "currently
+  editing", and its cleanup delete was refused the same way. **Anyone on
+  adt-clients 23.0.1 with connection 9.3.1 or later is affected** — `^9.x`
+  resolves to it. `behaviour.test.ts` now stamps every LOCK and UNLOCK with the
+  mode it went out in, for every lockable handler.
+
+### Documentation
+
+- `STATEFUL_SESSION_GUIDE.md`, `OBJECT_LIFECYCLE.md`, `ARCHITECTURE.md` and
+  `docs/README.md` said `unlock` "restores stateless". They now say what the
+  code does: the `LOCK` and the `UNLOCK` each go out stateful and nothing
+  between them does. The guide says why the `UNLOCK` must be stateful.
+
+### Development
+
+- `@mcp-abap-adt/connection` `^9.4.0` (was `^9.3.0`), a dev dependency: the
+  integration suite now runs on the connector that keeps a request that is not
+  stateful out of the stateful context, over HTTP (9.3.1) and RFC (9.3.2,
+  9.3.4; 9.4.0 requires `sap-rfc-lite` 0.2.0, so the lockfile resolves it and
+  the RFC context reset is used). `ERRATA.md` notes that the connector handles PAK/058; the
+  entry stays for callers with their own `IAbapConnection`.
+
+### Tests
+
+- **Every UNLOCK the integration suite relies on is now proven, not assumed.**
+  The suites checked only that an UNLOCK answered 200, which is exactly what a
+  stateless UNLOCK does while releasing nothing. `expectLockReleased`
+  (`src/__tests__/helpers/lockReleased.ts`) opens a second ABAP session and
+  LOCKs the same object: a refusal fails the test with SAP's sentence (e.g.
+  403 EU/510 "currently editing"), a grant is released again, and the session
+  is closed in every case. It runs after `BaseTester`'s update-step UNLOCK —
+  every lockable type in the flow tests, class includes against the class
+  lock — and after the hand-written lock windows in the append structure,
+  scalar function, scalar function implementation, behavior implementation,
+  unit test, group activation and transport suites. On by default;
+  `VERIFY_LOCK_RELEASED=false` turns it off, since each check is one extra
+  logon. `createTestConnection` takes `{ ownSession: true }` for this, and
+  `closeOwnTestConnection` ends such a session.
+
+## [23.0.1] - 2026-09-27
+
+### Fixed
+
+- **A package update without a lock handle no longer sends
+  `?lockHandle=undefined`.** `updatePackage` interpolated
+  `encodeURIComponent(lockHandle)` unconditionally, so a call with no handle
+  asked SAP to check a handle literally named `undefined`, and the refusal
+  (423 `SADT_RESOURCE/026`, "invalid lock handle: undefined", measured on
+  E19) named a handle nobody passed. The PUT now builds its query with
+  `writeQuery`, like every other write: an absent handle or transport is left
+  out. No change for a caller that passes both.
+
+### Documentation
+
+- **SAP-side behaviour a consumer has to work around is in one place:
+  [`docs/usage/ERRATA.md`](docs/usage/ERRATA.md).** Sixteen cases,
+  each with the same sections — symptom, cause, rule, workaround, evidence
+  (system and date) and the members it bites: PAK/058, the session-type
+  header, class includes under the class lock, the service-binding lock,
+  refusals inside a `200`, empty `200` reads, the untyped `S::000` message on a
+  successful delete, `S_ABPLNGVS` for a missing package, what a bare create
+  leaves, check runs without the object, activation flags and settling, the
+  transport search, tree and task typing, and the ATC check variant.
+- **PAK/058 now states the rule for both transports.** A package can be saved
+  only once per ABAP session: over RFC from the create onward, over HTTP every
+  stateful lock → update → unlock counts (the stateless create does not), and
+  a delete from a session that saved the package is refused. Measured on E19
+  over HTTP and RFC (#176). It is `CL_PACKAGE`'s session buffer, not state lost
+  between RFC contexts.
+- **The guides point to it instead of repeating it.** `RFC_TESTING.md`,
+  `RFC_CONNECTION.md`, `STATEFUL_SESSION_GUIDE.md`, `TROUBLESHOOTING.md` and
+  `OBJECT_LIFECYCLE.md` keep a sentence or two and a link, and the
+  `AdtPackage` `create` / `updateMetadata` / `delete` comments carry the
+  one-line rule. Linked from `README.md`, `docs/README.md` and
+  `ANSWER_SHAPES.md`.
+
+## [23.0.0] - 2026-09-26
+
+**This package interprets nothing.** Every member makes one ADT request. What
+the answer becomes is the result strategy the implementation was built with —
+and every shipped default is the document as it arrived (`rawDocument`) or
+`nothing`. Whether it is a failure is the `analyse` the caller passes with the
+call — and no member supplies one of its own. Every reading and verdict this
+package used to apply is a named strategy in `@mcp-abap-adt/adt-strategies`.
+A failure caused by SAP's answer comes back through the strategy; a member
+throws only for a cause inside the library. Decision 15 in
+[`docs/architecture/DECISIONS.md`](docs/architecture/DECISIONS.md).
+
+**[`docs/usage/MIGRATION-23.md`](docs/usage/MIGRATION-23.md) has the replacing
+code for every item below**; the section numbers in brackets point into it.
+
+### Added
+
+- **A result set for every runtime, executor and abapGit implementation**, and
+  its default: `abapGitDocuments`, `applicationLogDocuments`, `atcDocuments`,
+  `atcLogDocuments`, `classExecutorDocuments`, `crossTraceDocuments`,
+  `ddicActivationDocuments`, `feedDocuments`, `gatewayErrorLogDocuments`,
+  `profilerDocuments`, `programExecutorDocuments`, `runtimeDumpsDocuments`,
+  `st05TraceDocuments`, `systemMessagesDocuments`, `traceSchedulingDocuments`,
+  with their `I…Results` types. Build with one to get a shape
+  (`runtime.getProfiler({ ...profilerDocuments, list: profilerTraceEntries })`).
+- **`versions` and `versionSource` slots** in every versionable type's result
+  set; **`switched`, `runtimeState` and `checkState`** in the feature toggle's,
+  which `getFeatureToggle(results)` is now typed by (`IFeatureToggleObject`).
+- **`@mcp-abap-adt/interfaces-adt-connection` `^1.0.0`** as a dependency.
+
+### Changed
+
+- **BREAKING: `@mcp-abap-adt/interfaces-adt` `^11.0.0`** (was `^9.0.0`), and the
+  connection contract from `@mcp-abap-adt/interfaces-adt-connection`:
+  `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`,
+  the connection capability atoms and `ADT_SESSION_ERROR` are no longer exported
+  by `interfaces-adt`. Import them from the connection package, and move
+  `interfaces-adt` to 11 in the same step so one copy of each contract is in the
+  tree [§1].
+- **BREAKING: every member takes `options.analyse`** — 79 that had none,
+  including `lock`, `unlock`, `getVersions`, the unit-test run members, every
+  `getUtils()`, runtime, executor and abapGit member. Where a member had no
+  options parameter, it is a new last parameter [§2].
+- **BREAKING: no member applies a verdict of its own.** `getPackage().delete`,
+  `getServiceBinding().update`, `getMessageClassMessage().read`, `validate` on
+  scalar function, scalar function implementation, append structure and
+  transformation, `getUnitTest().run`, `getCdsUnitTest().run(className)` and
+  `checkCdsTestDoubles` answer SAP's reply. Pass `analyseDeletion`,
+  `analysePublication`, `analyseMessageClassMessage(msgno)`,
+  `analyseUnsupportedStatus(statuses, what)`, `analyseUnitTestStart` or
+  `analyseCdsTestDoubles` to keep the old verdict [§3].
+- **BREAKING: every default reading is the document.** The transport listing,
+  created request, object entries and search configurations; `getVersions`;
+  unit-test `run`; the feature toggle's states; `search`, `getAllTypes`,
+  `fetchNodeStructure`, `getInactiveObjects`, `activateObjectsGroup`; the
+  abapGit listing, error log and external-repository check; ATC, profiler,
+  trace-scheduling and feed members. **Most are typed `unknown` either way, so
+  the compiler will not show this** — pass the reading from adt-strategies for
+  the slot [§4, §9].
+- **BREAKING: `getRequest().list({ configUri })` requires the saved search it
+  runs** and makes one request; it no longer reads the configurations and
+  chooses. Take one from `searchConfigurations()`. `AdtClientLegacy`'s `list`
+  takes none and refuses one [§4].
+- **BREAKING: every slot of `ITransportResults` is required.** The seven added
+  after 19.0.0 were optional and fell back to the shipped defaults inside the
+  implementation; a hand-written result set now names every slot — spread
+  `transportDocuments` and override.
+- **BREAKING: `lock` answers `''` for a `200` without a handle** instead of
+  throwing "Failed to obtain lock handle" as a connection failure; **`unlock`
+  answers SAP's reply** instead of an empty value built here [§5].
+- **BREAKING: `getVersions`/`getVersionSource` answer the feed and the source as
+  they came**; a `404`/`406` is the transport's failure instead of a thrown
+  `UNSUPPORTED_OPERATION` [§4].
+- **BREAKING: unit tests remember nothing.** `run` answers the start's document
+  (the id is in a header — `unitTestRunId` reads it); `getStatus(runId, …)` and
+  `getResult(runId, …)` take the run. On a legacy system `getStatus`/`getResult`
+  refuse with `UNSUPPORTED_OPERATION` instead of replaying a remembered answer
+  [§6].
+- **BREAKING: `getMessageClass().updateMetadata` is one PUT of `options.source`**
+  under `options.lockHandle`; it no longer reads the class and patches
+  `config.description` into it [§7].
+- **BREAKING: `AdtAbapGitClient`** makes one request per member and takes a
+  result set as its fourth constructor argument; `unlink({ repositoryId })` and
+  `getErrorLog(logLink)` take what `listRepos` reported [§8].
+- **BREAKING: `AdtRuntimeClient` and `AdtExecutor` factories take a result set
+  and build a fresh implementation per call** — no caching, so one caller's
+  readings never reach another. `getAtc().resolveCheckVariant()` and
+  `createWorklist()` answer `IAdtResponse` instead of a bare string, and ATC's
+  and trace scheduling's throws on SAP's answer are gone [§9].
+- **BREAKING: `getUtils().deleteObjectsGroup` answers SAP's reply** instead of
+  throwing on `del:isDeleted="false"`; pass `analyseDeletion` [§4].
+- **BREAKING: where-used addresses objects with `buildObjectUri`**, the address
+  group activation and deletion use; friendly names map onto type codes, and
+  `'intf/if'` and `'stru/dt'` — not ADT codes — are thrown before any request.
+  Use `'interface'`/`'INTF/OI'` and `'structure'`/`'TABL/DS'` [§4].
+- **BREAKING: `isModernAdtSystem`, `getSystemInformation` and
+  `fetchDiscoveryEndpoints` raise failures other than `404`/`405`/`501`**
+  instead of answering `false`/`null`/empty, so `createAdtClient` no longer hands
+  a legacy client to a modern system reached over a broken connection [§10].
+- **Accept negotiation keeps its state per connection.** The caches and the
+  on/off switch were module globals shared by every client in the process [§10].
+- **Creates and unlocks no longer rewrap a refusal** in an `Error` that dropped
+  the response (behavior definition, interface, table, table type, transport);
+  the interface create no longer re-checks the status, the function-include
+  delete no longer judges `isDeleted`, and the legacy transport read no longer
+  fabricates a `404` [§11].
+- **`@mcp-abap-adt/interfaces-auth` is a dev dependency.** Nothing outside the
+  test helpers imports it; as a dependency it went to every consumer for
+  nothing.
+- `@mcp-abap-adt/connection` (dev) `^9.3.0`.
+
+### Removed
+
+- **BREAKING: the readings exported from the root** — `parseTransportTree`,
+  `parseCreatedTransport`, `parseObjectEntries`, `parseSearchResults`,
+  `searchHits`, `namedItems`, `nodeContents`, `inactiveObjects`,
+  `activationRunId`, `extractRunId`, `whereUsedReferences`, `compareRecordedAt` —
+  and the types that described their output (`ObjectVersion`, `ISearchResult`,
+  `ITransportTree` and its node types, `ICreatedTransport`,
+  `ITransportObjectEntry`, `IWhereUsedListResult`, …). All are in
+  `@mcp-abap-adt/adt-strategies`, the parsers as strategies [§12].
+- **BREAKING: `TransportSearchConfigurationMissing`** and the resolver that
+  threw it [§4].
+- **BREAKING: `AdtAbapGitClient.getRepo`**; take the entry from `listRepos`
+  [§8]. `IAbapGitAbortedError`/`IAbapGitTimeoutError`, thrown by a poll loop
+  gone since 19.0.0.
+- **BREAKING: unit-test `getRunId`, `getStatusResponse`, `getResultResponse`,
+  `getClassName`, `getCdsViewName`** [§6].
+- Dead code nothing reached: `LockCapability`, `VersionsCapability`, the
+  `*ForUpdate` lock helpers, `acquireLockHandle`, `getDomainInfo`,
+  `checkTransportRequirements`, `parsePackageDeletionCheck`,
+  `searchObjectsTyped`, the `Unsupported*OperationError` classes, the internal
+  verdicts (`packageDeletionRefusal`, `publicationRefusal`,
+  `validationUnsupported`, `validationUnavailable`, `startedRun`,
+  `testDoublesVerdict`, `runId`), `utils/managementOperations.ts`,
+  `utils/readOperations.ts`, `utils/validation.ts`, and `answeringValue`, which
+  wrapped a value the library computed in a fabricated `200`.
+
+### Fixed
+
+- **Group activation and group deletion address eleven types the way each
+  type's own activation does** (#173). Where the two disagreed, SAP resolved the
+  address to nothing and answered `activationExecuted="false"` with no message,
+  which reads as success — measured on E19 for `BDEF/BDO`, which the group left
+  inactive. `BDEF/BDO`, `PROG/I`, `FUGR/I`, `XSLT/VT`, `AUTH`, `FTG2/FT` and the
+  enhancement types now get their real addresses; a bare `ENHO`/`ENHS` without
+  its subtype, or a `FUGR/I` without its group, is thrown naming what is
+  missing.
+- **A declined deletion names SAP's reason** (#172) — through `analyseDeletion`
+  in `@mcp-abap-adt/adt-strategies`, which now reads every `del:message` and its
+  T100 key. See that package's changelog.
+
+## [22.0.1] - 2026-09-25
+
+Documentation only — no code changed, and nothing a consumer imports or sends
+is different.
+
+### Documentation
+
+- **A task is typed by CTS only in the edit flow; a task made by hand has to
+  be typed by its caller.** 22.0.0 said *"CTS assigns the type when the first
+  object lands"*. That is not so for a task created through `newtask` /
+  `createTask()`. When an object is locked and the user picks or creates a
+  request, CTS creates the task and gives it its type. A request and task
+  created by hand stay `Unclassified`, and the direct `addobject` is not that
+  flow. On premise, 2026-09-25, `addObject()` onto a fresh Unclassified task
+  was refused with `400 SCTS_ADT_MSG 009` and longtext TK127, *"Changes to
+  objects are only allowed in correction/repair"*. After
+  `changeTaskType(task, 'S')` the same call answered 200. SAP documents the
+  rule in
+  [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
+  *"You cannot add any objects if the task type is Unclassified. You need to
+  change the task type to Development/Correction or Repair."*
+- **Why every task on the BTP trial read as Unclassified.** The trial has no
+  transport system configured, so the CTS edit flow never creates a request
+  there, and every request and task on it was made by hand through `newtask`.
+  Until `changeTaskType` existed, nothing typed them.
+- The `addObject` / `addObjectToTransport` docs name the TK127 refusal next to
+  the held-elsewhere one, which carries the same `SCTS_ADT_MSG 009`.
+
+## [22.0.0] - 2026-09-24
+
+### Why this is a major
+
+Measured against the published 21.0.0 tarball, following every re-export:
+**586 names then, 592 now, and nothing removed.** Six were added — the transport
+request's object-list members. So no import of a consumer's breaks, and semver
+would allow a minor.
+
+It is a major for two things a name count cannot show:
+
+1. **The contract moves a major, and a consumer has to move with it.** 21.0.0
+   declares `@mcp-abap-adt/interfaces@^48.0.0` — the facade, which is now
+   deleted. This release declares `interfaces-adt@^9.0.0` and four siblings. A
+   consumer holding types from the facade, or from `interfaces-adt@8`, ends up
+   with two copies of the contract in one tree and types that do not match
+   across the seam. That is work on their side, and a minor would say otherwise.
+
+2. **`updateMetadata` reads `options.source` only.** There is no `config.source`
+   left in any `src/core/*/update.ts`. A caller who passed the body in the config
+   now sends nothing there, and the compiler catches it only once they are on
+   `interfaces-adt@9`, where the field is gone from those six config types.
+
+### Changed — the contract packages, by name
+
+- **BREAKING: the `@mcp-abap-adt/interfaces` facade is gone from this package.**
+  It takes `@mcp-abap-adt/interfaces-adt` `^9.0.0`, `-network` `^2.0.0`,
+  `-utils` `^1.1.0` and `-auth` `^1.2.0` directly, plus `-auth-sap` `^1.0.0` as
+  a **dev** dependency, for the one unit test that builds an `ISapConfig`. 729
+  import and re-export statements across 694 files were repointed; all names
+  resolved and **none** needed the facade, which is now deleted — npm serves
+  51.0.0 to anyone pinned to it and nothing further ships there.
+
+  Re-measured against the released packages: **189 distinct names — 178 from
+  `-adt`, 6 `-network`, 3 `-utils`, 1 `-auth`, 1 `-auth-sap`.**
+
+- **Three contracts changed package, and this release follows them.**
+  `interfaces-adt` 9.0.0 moved everything that is not ADT out, so:
+
+  | name | was | is | why |
+  |---|---|---|---|
+  | `HttpError` | `-adt` | `-network` | nothing about an HTTP failure is ABAP; 14 files here import it |
+  | `XmlNode` | `-adt` | `-utils` | a parser's output shape is not an ADT contract |
+  | `ITimeoutConfig` | `-network` | `-adt` | its `csrf` field names an SAP operation, not a transport primitive |
+
+  17 files repointed, nothing renamed and no shape changed, so a consumer that
+  imports these names from this package's dependencies changes an import path
+  and nothing else. The packages were resolved from each one's installed
+  `dist/index.d.ts` rather than from a list written by hand.
+
+  **Why it matters to a consumer, measured.** Every symbol the facade forwards
+  is already marked *"@deprecated Import from …"*, and forwarding is what
+  couples a consumer to everyone else's release rate: the facade has had 48
+  majors, `interfaces-adt` 5, `-auth` 1, `-utils` and `-network` none. Across
+  the sibling repositories the effect is not churn but **freezing** — they sit
+  on facade majors 2, 5, 7, 11, 39 and 46 because one step costs them every
+  other package's history.
+
+  A consumer of this package imports the contract itself (this package
+  re-exports none of it), so the change reaches them as an import path at
+  their next dependency update.
+
+- **BREAKING: the six document writes read `options.source` only.** 21.0.0's
+  successor shipped them reading `options?.source ?? config.source`, because
+  the contract said where a write's body goes twice and differently. It chose
+  in `interfaces-adt` 7.0.0 — decision 33 — and took `source` off
+  `IDomainConfig`, `IDataElementConfig`, `IPackageConfig`, `ITableTypeConfig`,
+  `IFunctionGroupConfig` and `ITransportConfig`, so the fallback had nothing
+  left to read.
+
+  ```diff
+  - await domain.updateMetadata({ domainName, source: edited }, { lockHandle });
+  + await domain.updateMetadata({ domainName }, { source: edited, lockHandle });
+  ```
+
+  A `check` or `validate` still takes its source in the config: it compiles
+  text the server does not hold yet and has no options channel. Those six types
+  have no such member, which is why they are the six.
+
+- **`TransportTaskType` is gone; `AdtTaskType` and `ADT_TASK_TYPE` come from
+  the contract.** The local alias repeated a union the contract declared
+  inline, because there was no name to import. There is now, and the letters
+  are SAP's: `changeTaskType(task, ADT_TASK_TYPE.developmentCorrection)`.
+
+  **Not a break, and the earlier claim that it was one is wrong.** The alias and
+  the union are mutually assignable, and the name was never in a published
+  surface: the 21.0.0 tarball exports 586 names and `TransportTaskType` is not
+  among them. It was added and removed between releases.
+
+### Added
+
+- **`AdtRequest.changeTaskType(task, type)`** — a task is created without a
+  type, and this is how one is given.
+
+  Measured against BTP ABAP, 2026-09-23. Every task reads back as
+  `Unclassified` after `newtask`, including tasks created long before this
+  library existed, and `tm:type` passed to the creating call is accepted and
+  ignored. CTS assigns the type when the first object lands; a caller who
+  wants it sooner assigns it here.
+
+  **The type goes on a `tm:task` child, not on the root**, which is the whole
+  of the difficulty and took six refusals to establish: every spelling tried
+  on the root answered `400 "Specified request type or task type  is
+  unknown"` — two spaces where the value belongs, an empty read each time.
+  The nested shape answers 200 and a re-read shows the new type. The same
+  message names the value when one arrives (`… type K is unknown`), which is
+  what told an empty read apart from a wrong one.
+
+  Vocabulary, from the same run: `S` Development/Correction, `R` Repair, `X`
+  back to Unclassified. `Q` is refused — *"You can only change the type of
+  tasks in workbench requests"* — and `K`/`W` are request types, refused as
+  unknown.
+
+  Addressed at the TASK's own URL, which is where the listing puts the
+  `changetasktype` link. `taskTypeChanged` joins `ITransportResults` as an
+  optional slot, like every member added since 19.0.0.
+
+  It reaches the contract as well as the class: `AdtRequest` now declares
+  `IAdtTransportObjectActions` — with the sixth type argument the member
+  brought — so `client.getRequest().changeTaskType(...)` compiles for a
+  consumer holding the contract, and a member going missing becomes a build
+  error rather than a runtime one.
+
+  Exercised against a live system in `Transport.test.ts`, at the one moment a
+  task is known to be fresh: `newtask`, then the type, then a re-read that has
+  to show `tm:type="S"`.
+
+### Changed — `@mcp-abap-adt/interfaces` ^50.0.0
+
+- **BREAKING: one name for what a write sends — `source`.** The payload had
+  eleven names across this package's configs and options: `sourceCode` in 15
+  configs, `document` in 6, `ddlCode` and `ddlSource` for the same thing in
+  neighbouring files, `testClassSource`, and on the write options `sourceCode`
+  *and* `xmlContent`, divided by what the body happened to contain. All of them
+  are `source`.
+
+  ```diff
+  - await cls.update({ className }, { sourceCode, lockHandle });
+  + await cls.update({ className }, { source, lockHandle });
+
+  - await domain.updateMetadata({ domainName, document: edited }, { lockHandle });
+  + await domain.updateMetadata({ domainName }, { source: edited, lockHandle });
+  ```
+
+  This library does not read what it carries. For a class it is ABAP, for a
+  domain the object's own XML document, for a scalar function implementation
+  JSON — and which is which is documentation, not a type:
+  `docs/usage/OBJECT_LIFECYCLE.md` gains **"What a write sends: one field, and
+  what belongs in it"**, with the shape of a domain document and the rule that
+  an `updateMetadata` is a replace, never a merge.
+
+  Recorded as **decision 32** in `mcp-abap-adt-interfaces`. It withdraws the
+  half of decision 31 that called for a typed document model;
+  `docs/superpowers/specs/inputs-per-operation.md` says so and keeps what is
+  still to do.
+
+- **BREAKING: a create takes no payload, and now it cannot.** Every `create`
+  here excluded `sourceCode` from its config; the field it must exclude is
+  `source`, and leaving the exclusion on the old name would have re-opened the
+  hole it was added to close — a create accepting a body the endpoint drops.
+  32 handlers moved.
+
+  `AdtCdsUnitTest.create` is the one place this changed behaviour. Its template
+  path required `className && classTemplate && testClassSource`, and the source
+  it required was never used in the branch — which posts the class and nothing
+  else. With the payload off the member, that condition could no longer be met
+  by anyone and the path was unreachable. **The template alone selects it now.**
+
+- **Fixed on review: the documented `updateMetadata` call sent `undefined`.**
+  The six document writes — domain, data element, package, table type,
+  function group, transport request — read the body from `config.source` only,
+  while `IAdtMetadataUpdatable.updateMetadata` documents `options` as
+  "`source` for the body". The call in this package's own documentation was
+  the broken one.
+
+  The contract states both, in two places: the atom puts the body in the
+  options, and each type's config says a caller "reads the document … and
+  passes it here". So both are read now, the options winning, which makes
+  neither sentence a lie — and **which of the two the contract keeps is a
+  decision for `mcp-abap-adt-interfaces`**, not one to settle by silently
+  preferring one here. Two unit tests pin both channels.
+
+- `scripts/transport-admin.ts describe` never sent a body at all: it passed a
+  `description` field no request builder reads, and reported success. It reads
+  the request, patches `tm:desc` and writes the document, like every other
+  caller of a document write.
+
+- The test harness follows: `IFlowTestOptions.sourceCode` and `.xmlContent`
+  are one `source`. How an update's content is compared — text equality or an
+  XML subset — used to be decided by which of the two fields the caller filled
+  in; it is decided by `updateTakesDocument`, which already marks the types
+  whose write takes a whole document. No suite passed `xmlContent`, so nothing
+  changes in what runs.
+
+### Fixed
+
+- A comment in `AdtCdsUnitTest` had Cyrillic in an English word — "not
+  активated". Present since 18.0.0.
+
+
+## [21.0.0] - 2026-09-22
+
+### Removed — `@mcp-abap-adt/interfaces` ^48.0.0
+
+- **The parameter shapes moved here, where the code that reads them lives.** 84
+  `ICreate*Params` / `IUpdate*Params` types left the contract in
+  `interfaces-adt` 3.0.0 and are declared in their own module's `types.ts`
+  instead. They describe the argument of the request builders in the same
+  folder; a search of every dependent repository found them imported by nobody,
+  and twelve that *are* imported stayed behind.
+
+  Being nobody's contract is how they came to lie. **85 of their fields were
+  ignored by the very code that took them**: a domain created with
+  `datatype: 'CHAR', length: 10` came back with `<doma:datatype/>` empty, and
+  SAP refused to activate it — `DO(251) Data type ' ' does not exist`, measured
+  on a cloud trial beside a domain whose type was in the request body, which
+  activated with no messages at all. Whether a field is honoured is decided in
+  this package, which is now also where it is declared.
+
+  The compiler found every place this package was handing those fields over:
+  **44 forwarding lines in five files**, `AdtDataElement.updateMetadata` alone
+  passing nineteen.
+
+- **46 fields left 16 `IXxxConfig` types** in `interfaces-adt` 4.0.0 — the types
+  a consumer writes against. Two were worse than a dropped value: `onLock` was
+  declared on nine types and invoked on one, so a caller who passed a callback
+  was promised a call that never came; `sessionId` was declared on five and read
+  by none, the locks it was meant for taking a parameter named `_sessionId`.
+
+  `IDomainConfig` loses the eight that say what a domain *is*,
+  `IDataElementConfig` its type name and four labels, `IStructureConfig` its
+  `fields` and `includes` (a structure is built from its `ddlCode`),
+  `IFunctionModuleConfig` a `packageName` a module takes from its group,
+  `ITableTypeConfig` the row-type kind, the access type and the primary-key
+  pair.
+
+### Migration
+
+- **If you imported one of the 84 parameter types**, declare it yourself. They
+  were never re-exported from this package's `src/index.ts`, so a consumer that
+  only used the public surface is unaffected.
+- **If you set one of the 46 config fields**, stop: it was being dropped before
+  and nothing you send changes. Not setting an optional field compiles against
+  both 47.0.0 and 48.0.0, so the edit can be made before upgrading.
+- **A domain, a data element, a table type and their neighbours take their
+  shape through `document`.** Read the object with `readMetadata`, patch what
+  you mean to change, and pass the result to `updateMetadata` — the update is a
+  replace, not a merge. `docs/usage/OBJECT_LIFECYCLE.md` shows the sequence.
+
+### Fixed
+
+- **A table type's create keeps the description it was given.** Trimming the
+  update's dead fields took `description` out of the create call as well, where
+  `createTableType` does read it — an object created in between would have been
+  described by its own name. Caught in review before release.
+
+
+## [20.0.0] - 2026-09-21
+
+### Changed — `@mcp-abap-adt/interfaces` ^46.0.0
+
+- **The contract a consumer holds agrees with the object behind it.** 20.0.0
+  was built against 45.1.0, where `createTask`'s options argument and
+  `removeObject`'s `position` were both optional and `readObjects` did not
+  exist at all. So `getRequest()` handed back a type that permitted
+  `createTask(n)` and `removeObject(n, { name, type })` — the two calls the
+  first server run had just measured to be impossible — while hiding the
+  member added to answer them. The implementation required what the contract
+  did not, a disagreement only a consumer finds, and only at runtime.
+
+  `interfaces-adt` 2.0.0 / `interfaces` 46.0.0 carry all three, so
+  `IRequestContract` names the fifth type argument and the local
+  `IAdtTransportObjectListing` — declared here for one commit while the
+  contract caught up — is gone.
+
+  Both wrong shapes are pinned as `@ts-expect-error` in
+  `src/__tests__/unit/clients/transportObjectActionsContract.test.ts`: if
+  either requirement is loosened, the directive errors as unused and the build
+  says so.
+
+### Changed — the contracts these members need moved to their own package
+
+- **Needs `@mcp-abap-adt/interfaces` 45.1.0**, up from 44.0.0. That package
+  split its contracts into four in 45.0.0 and became a facade that re-exports
+  them; nothing a consumer imports disappeared and no contract changed shape,
+  but the dependency graph did, and a consumer holding 44 alongside this
+  package would have two declarations of every type — which TypeScript
+  reconciles for interfaces and does not for enums.
+
+  This is why the release is a major. The API below is additive.
+
+- **`IAbapObjectEntry` and `IAdtTransportObjectActions` are imported, not
+  declared here.** They were declared in `AdtClient.ts` for one release,
+  beside `IAdtTransportSearchable` and for the same stated reason: the
+  interfaces package was a major ahead, and tying a transport capability to
+  that bump would have held it hostage. It is not ahead any more —
+  `@mcp-abap-adt/interfaces-adt` 1.2.0 carries both, which is where a request
+  parameter and a capability contract belong.
+
+  `IAdtTransportSearchable` stays declared locally until it makes the same
+  journey. `core/transport` re-exports `IAbapObjectEntry` so a caller reaching
+  for it there still finds it, and the package no longer exports a second
+  declaration of its own.
+
+### Added
+
+- **The three user actions on a request's object list, its action log, and
+  the reading that lists it.** `AdtRequest` gains `removeObject`, `addObject`,
+  `createTask`, `readActionLog` and `readObjects`.
+
+  Deleting an ABAP object does not free its name: the CTS object-directory
+  entry stays on the request that carried it, and SAP says so as it happens —
+  *"Release transport … to remove the object directory entry."* Until that
+  entry is detached, creating the same name again is refused with
+  `CTS_WBO_API 019`, **even when the same request is passed as `corrNr`**. The
+  ways out were releasing the whole request and shipping everything else in
+  it, or SE09 by hand. That is what found this: an on-premise integration
+  suite where two shared function groups became permanently unusable
+  (consumer-side report, fr0ster/mcp-abap-adt#221).
+
+  The library was already half-committed to these. `ITransportTreeLink` keeps
+  every `atom:link` a request and its tasks carry and says why — *"so a caller
+  follows an href rather than assembling a URL by convention"* — and
+  `ITransportTreeTask.links` keeps them in document order for the same reason.
+  So the operation URIs were handed over on purpose, with nothing that could
+  act on one: following an href meant a raw `PUT` with a hand-built `tm:root`
+  and a `useraction` attribute. Which is the gap `searchConfigurations()`
+  closed for the listing itself in 19.1.0.
+
+  Every request shape here is a capture, from Eclipse ADT 3.60.0 against an
+  on-premise system on 2026-09-21, and the tests assert what that server was
+  sent and answered rather than what looks tidy:
+
+  - **`removeObject(task, object, options?)`** — `useraction="removeobject"`,
+    addressed at the **task**, since objects live on tasks. Its answer merely
+    echoes the object it was asked about, so `readActionLog` — or a re-read
+    with `readObjects` — is what confirms the removal landed. **`position` is
+    required**: see the measurement below.
+  - **`readObjects(task, options?)`** — the entries the request or task holds,
+    each with the `tm:position` `removeObject` needs. **It exists for the
+    parsing, not for the request.** This first said `readMetadata` sends no
+    `Accept` and therefore gets a representation carrying no `tm:abap_object`,
+    so the positions could not be read from it however it was parsed. Measured
+    against an on-premise system — the same URL with the header and without —
+    that is false: 95411 bytes and 166 `tm:abap_object` for a request, 55549
+    and 88 for a task, byte for byte either way. The header settles nothing.
+    What this member gives a caller is entries whose `position` is a value,
+    where `readMetadata` gives a document they would have to regex. The
+    reading walks the document for `tm:abap_object` rather than addressing a
+    path, because only the elements and their attributes were measured, not
+    where in the tree they sit.
+
+    `position` is **optional** on a listed entry. Every entry measured carried
+    one, but filling a missing `tm:position` with `''` — which this did — is
+    the one answer the member must never give: `''` satisfies `removeObject`'s
+    required `position`, so the call compiles, reaches the server and removes
+    nothing while answering `200`. That is the defect these members exist to
+    end, re-created by the reading added to prevent it. Left optional, such an
+    entry is still reported — the request does hold the object — and cannot be
+    spread into `removeObject` without the caller deciding what to do.
+  - **`addObject(task, object, options?)`** — the same shape, the other
+    action. Refused when the object is held by an unrelated task, with
+    `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links
+    to this request/task."* A third lock flavour, distinct from the enqueue
+    lock and from the request-versus-task one — the server's verdict to read,
+    not a state this client checks for first.
+  - **`createTask(request, { targetUser })`** — `useraction="newtask"`,
+    answering 200 with the number both in `Location` and as `tm:number` on the
+    root. The task is itself a request resource at the same endpoint shape.
+    **`targetUser` is required**: see below.
+  - **`readActionLog(request, options?)`** — one `log:entry` per lifecycle
+    event: created, object added, object deleted, owner changed.
+
+  **Two of these signatures were refuted by the first run against a server**,
+  before any of it shipped, and the members below say what the captures could
+  not. Eclipse sends every attribute on every call, so no capture of Eclipse
+  could show which of them were load-bearing.
+
+  - **`removeObject` requires `object.position`.** Twenty-two objects asked
+    for by `pgmid`/`type`/`name` alone each answered `200` with the usual echo
+    document, and a re-read of the task found all twenty-two still on it. The
+    same documents carrying `tm:position` removed every one, 22 down to 0,
+    each confirmed by a re-read. A `200` from this endpoint remains no
+    evidence of anything.
+  - **`createTask` requires `targetUser`.** Without `tm:targetuser` the server
+    resolves the owner to an empty name and refuses: `400 SCTS_ADT_MSG 009`,
+    *"User  does not exist in the system (or locked)"* — two spaces. The same
+    call carrying it answered 200 and a task number. This client cannot fill
+    it in: the connection does not say who is authenticated, and asking would
+    cost a second request.
+
+  `pgmid` defaults to `R3TR`, and `obj_desc` is written only when given —
+  decoration either way. Both `PUT`s go out as `Content-Type: text/plain` with
+  the transport-organizer `Accept` — a pairing that looks wrong for an XML
+  body, is what Eclipse sends, and is pinned in a test so it is not
+  "corrected" by someone reading only the body.
+
+  `removedObject`, `addedObject`, `createdTask`, `actionLog` and `objects` are
+  **optional** slots in `ITransportResults`, for the same reason
+  `searchConfigurations` is: a hand-written result set from before these
+  members existed keeps compiling.
+
+  **`parseCreatedTransport` reads two shapes now.** A created request carries
+  its fields on `tm:request` inside the root; a created *task* carries them on
+  the root itself and has no `tm:request` at all. Read the old way,
+  `createTask()` answered `transportNumber: ''` for every task — a number
+  nothing can be done with, handed back as a success. The root stands in where
+  the request element is absent; a request document is unaffected, since its
+  root carries none of those attributes.
+
+  `IAbapObjectEntry` is exported from the package, beside `ICreatedTransport`
+  and the tree types. A parameter type a caller cannot name is a parameter
+  they cannot build.
+
+  `IAdtTransportObjectActions` is declared in this package rather than in
+  `@mcp-abap-adt/interfaces`, exactly as `IAdtTransportSearchable` was and for
+  the same reason — that package is a major ahead of what this one depends on,
+  and tying a transport capability to that bump would hold it hostage. Without
+  it the members would exist at runtime and be invisible to a consumer's
+  compiler.
+
+## [19.1.0] - 2026-09-16
+
+### Added
+
+- **`AdtRequest.searchConfigurations(options?)` — where a `configUri` comes
+  from.** A transport listing is a saved search, and `list()` resolves one
+  itself when it is not given a `configUri`. That resolution was unreachable
+  in both directions a caller might need it:
+
+  - **its answer could not be read.** The request happens inside a member
+    called for something else, behind a `protected` method, so a caller's
+    `analyse` never saw it and their result strategy never shaped it. A
+    refusal from `/searchconfiguration/configurations` arrived as a throw out
+    of `list()`.
+  - **its verdict could not be acted on.** On a system holding several saved
+    searches the resolver throws — rightly, since the payload carries no
+    default marker — and tells the caller to pass a `configUri` explicitly,
+    while `getTransportSearchConfigurations()` was documented as "internal to
+    `list()`'s resolution step and not part of the public surface". The advice
+    named no supported way to follow it. The consumer that hit this reached
+    the URL with a raw request of its own, which is this library failing at
+    its job rather than the consumer misusing it.
+
+  One request, the caller's strategies over it, and the choice theirs:
+
+  ```typescript
+  const request = client.getRequest();
+  const configurations = await request.searchConfigurations({ analyse });
+  if (!configurations.ok) return configurations.getError();
+  for (const { uri } of configurations.getResult().value) {
+    await request.list({ configUri: uri });
+  }
+  ```
+
+  `list()` is untouched, and so is its request count: `searchConfigurations()`
+  followed by `list({ configUri })` makes the same two requests `list()` alone
+  makes, with the first one now the caller's.
+
+- **`IAdtTransportSearchable<TConfigurations>`, and `IRequestContract` carries
+  it.** Without this the member was on the implementation and invisible to the
+  compiler: `client.getRequest()` answers `IRequestContract`, and a consumer
+  writing the call from the documentation got `TS2339: Property
+  'searchConfigurations' does not exist`. The capability belongs beside
+  `list()` in `IAdtRequest`, in `@mcp-abap-adt/interfaces`, and should move
+  there — it is declared in this package instead because that one is at 45.0.0
+  while this depends on `^44.0.0`, so putting it there would tie a transport
+  fix to a major dependency bump. A test reaches the member through
+  `client.getRequest()`, so the contract cannot lose it silently: the test file
+  stops compiling.
+
+- **A `searchConfigurations` slot on `ITransportResults`**, so that member's
+  reading is injected like every other. **Optional, where every other slot is
+  required** — it arrived after 19.0.0, and making it required would stop a
+  hand-written result set compiling over a member it never had. Left out, the
+  shipped `parseSearchConfigurations` reads it: the same reading the internal
+  resolver has always used.
+
+- **`requestTransportSearchConfigurations(connection)`** in the transport low
+  level — the same request as `getTransportSearchConfigurations`, answering
+  the wire response instead of a parse, so the answer can reach a strategy
+  before anything is made of it. The parsing sibling stays for the internal
+  resolver.
+
+
+## [19.0.0] - 2026-09-12
+
+**BREAKING — this package stops deciding anything.**
+
+Two rules produced every change, and both were the design's stated intent. The
+verdict on a response belongs to the consumer, because the strategies are
+injected so that decision is theirs. And one member issues one endpoint call,
+because a member that sends several has already chosen an order and cannot be
+given a reading at all — `IResultStrategy` takes one answer.
+
+Needs `@mcp-abap-adt/interfaces` 44.0.0.
+
+Full migration: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
+
+### Removed — readings that produced a verdict
+
+`activationRefusal`, `validationRefusal`, `deletionRefusal` — the three failure
+strategies, unwired from the 81 call sites where they were the default.
+`parseCheckRunResponse` and the `CheckMessage` shape. `parseDeletionCheck`,
+`assertDeletable`, `DeletionNotPermittedError`, `assertActivationSucceeded`.
+`withRefusalDetection` — see Changed. `waitForCleanCheckRun`, which polled a
+check run until the report came back empty and judged every answer on the way.
+
+Their source is recoverable at the `18.0.2` tag.
+
+### Removed — members that made several requests
+
+The package walks `getPackageContents`, `getPackageContentsList`,
+`getPackageHierarchy`; the object walks `getIncludesList`,
+`listFunctionModules`, `listFunctionGroupIncludes`; and the sequences
+`getWhereUsedList`, `AdtClass.updateTestClasses`, `updateClassWithCheck`,
+`AdtAtc.run`, `runWithProfiling` on both executors.
+
+Every single-request step they were built from stays, and the migration shows
+the sequence for each. `AdtMessageClassMessage.writeClass` is the one exception:
+a message is a row inside its class's document, and no endpoint writes one.
+
+### Added
+
+- `nothingIsARefusal` — the one failure strategy here, and it finds none. Every
+  exchange that produced an answer comes back as a success carrying it.
+- `withRequestTrace` — the mechanical half of the old connection wrapper: it
+  puts `{ method, url }` back on an answer the connection normalised it off, on
+  both the returning and the throwing path.
+- `whereUsedReferences` — the reference-list shape the old walker returned,
+  offered by name rather than imposed. Not a default.
+- `getTableColumns`, `getActivationRun`, `getActivationResults`, `activationRunId`,
+  `extractRunId`,
+  `AdtAtc.resolveCheckVariant`, `AdtAtc.createWorklist`, `AdtAtc.startRun` — the
+  steps promoted so a caller can compose what the removed members joined.
+- `pullLink` on `IAbapGitRepoStatus`, because a caller who cannot see it cannot
+  start a pull.
+
+### Changed
+
+- **The default `analyse` is none.** An ADT refusal delivered inside a `2xx` now
+  arrives as a success carrying that document. A transport failure is still a
+  failure, carrying its response and its request.
+- **Eighteen `check.ts` modules return their report** instead of raising. A
+  check run that finds a syntax error is a check run that worked, and the throw
+  cost the findings, the line numbers and the T100 keys. The `ddl` and
+  `accessControl` retries went with them: both were waits on the server.
+- **`update` writes the whole content, on every type.** It always did — ADT's
+  `PUT` replaces — but six types hid it by fetching the current document and
+  patching the config's named fields into it: domain, package, dataElement,
+  tableType, transport and functionGroup. They take `config.document` now, and
+  the patch helpers went with the read. For source-bearing types nothing
+  changed; what changed is that the rule is now stated, in the migration note,
+  the README, the API reference and the doc comment of every `update`. An
+  incomplete write does not announce itself — the server accepts a document that
+  says less, and the object becomes what was sent.
+- **`pull` is one POST** and answers nothing, like `link` and `unlink`.
+  `IAbapGitPullResult` held a `finalStatus` and an `errorLog`, both products of
+  the polling.
+- **`getTableContents` posts the statement it is given.**
+- **A create no longer reads `/core/http/systeminformation`** to fill
+  `masterSystem` and `responsible`. Both come from the config, and that read
+  swallowed its own failure and answered `null`.
+- **454 input guards are gone.** The field was already required in the type; the
+  guard added a string this package invented, thrown out of a member whose
+  contract promises an `IAdtResponse`. **One stays**, on the `create` of the 25
+  handlers whose object lives in a package: an object created without one cannot
+  be removed through ADT at all.
+- **Three validations stop reading a status.** `metadataExtension` and
+  `behaviorImplementation` caught a `400` and handed the response back as a
+  success; `behaviorDefinition` replaced the error with a sentence this package
+  invented, losing the response. All three now let the exchange through as it
+  came. One status cannot be the rule: recorded in `corpus/adt/`, a name already
+  taken answers `400` with an `exc:exception` for a class, a domain and a table,
+  and `200` with `<SEVERITY>ERROR</SEVERITY>` for a DDL source and a function
+  group. A caller who reads a taken name as a success says so in `analyse`,
+  which receives the document either way.
+- **Notes name no system.** 51 references to the system an observation came from
+  are gone across 32 files; the observations and their dates stay.
+
+### Changed — every member of `AdtUtils` takes a reading
+
+`IUtilResults` grew from five slots to twenty: one for each member that makes a
+request.
+
+The fifteen added are not a widening. Those members were typed
+`IAdtResponse<string>` in the contract until `@mcp-abap-adt/interfaces` 44.0.0,
+so the contract had chosen the document and no reading could have been offered
+for them. Now each result is a type parameter, and every one is filled from the
+injected set:
+
+`whereUsedScope`, `folders`, `objectStructure`, `activation`, `run`, `results`,
+`deletionCheck`, `deletion`, `query`, `columns`, `contents`, `discovery`,
+`source`, `metadata`, `include`.
+
+`modifyWhereUsedScope`, `supportsSourceCode` and `getObjectSourceUri` take none
+and never will: they make no request, so there is no answer for a strategy to
+read.
+
+### Unchanged
+
+**No member answers differently.** Every one of the fifteen new slots defaults
+to the shape that member already produced — `rawDocument` for fourteen of them,
+and `activationRunId` for `activateObjectsGroup`, which is what it already
+applied. `wireItself` still hands back the whole exchange.
+
+## [18.0.2] - 2026-09-08
+
+**Documentation only — what `FINDING_STATS` counts, measured twice instead of
+once.**
+
+The ATC client returns the server's triple verbatim and says so, and until now
+it also said that which position means which severity had been seen exactly
+once. That was true when it was written. It is not any more, and a consumer
+reading the published docs would still be told to treat the ordering as
+unknown.
+
+### Documentation
+
+- **`docs/usage/CLIENT_API_REFERENCE.md`** and the JSDoc on
+  `IAtcRunResult.findingStats`: a worklist with one priority-3 finding read
+  `"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (BTP
+  trial, 2026-09-08). Two points, and `(priority 1, priority 2, priority 3)` is
+  the only ordering that fits both. A non-zero **first** position has still
+  never been observed, which is why `findingStats` remains a string rather than
+  becoming `{ errors, warnings, infos }` — naming the fields would publish a
+  guess about the one position nobody has watched the server fill.
+
+### Unchanged
+
+No behaviour changed, and no API. `src/runtime/atc/types.ts` carries no runtime
+export at all — the diff there is a comment. Everything else in this release is
+test and probe material, which the package does not ship: an ATC integration
+test, the shared class it runs against, and the check-variant probe that
+produced the measurement above.
+
+## [18.0.1] - 2026-09-08
+
+**Documentation only — 18.0.0 shipped without the migration note it owed.**
+
+This repository's rule for a breaking release is a note saying what a consumer
+on the old contract must now do. 18.0.0 is forty-odd breaking entries listed in
+the order they were made, which is the wrong order for someone holding 17.x code
+that has stopped compiling.
+
+### Documentation
+
+- **`docs/usage/MIGRATION-18.0.md`** (new): organised by what a consumer has to
+  change, with the 17.x call beside its replacement — the write sequence is
+  theirs now, every member answers instead of throwing, eight types have no
+  source and answer `readMetadata`, `delete` no longer asks permission for you,
+  a write states what it needs, timeouts and the session, and the smaller
+  removals as a table. It ends with the three questions that resolve almost
+  every compile error.
+- `README.md` carries the notice, and `docs/README.md` the link.
+
+### Packaging
+
+- **`docs/usage` now ships in the package** (+172 KB on a 3.0 MB tarball). The
+  migration note is no use to a consumer if reading it means leaving their
+  editor for GitHub, and the same holds for the API reference and the object
+  lifecycle beside it. The rest of `docs/` — architecture, development,
+  discovery dumps — is for contributors and stays on GitHub.
+
+### Upgrading
+
+Nothing to do. Patch over 18.0.0: no source, no declaration, no behaviour.
+
+## [18.0.0] - 2026-09-08
+
+Requires `@mcp-abap-adt/interfaces@^39.0.0`.
+
+**Every member answers the contract, issues one request, and the reading is
+yours.** 17.0.0 moved `getUtils()` onto `IAdtResponse` and said the per-type
+handlers had not followed; this is them following, plus the decisions the
+contracts made in 30.0.0 through 34.0.0 — one member per endpoint, the result
+shape injected into the implementation once rather than chosen at each call, and
+the sequence around a write handed back to the consumer.
+
+### Breaking
+
+- **BREAKING: no client-side deadline by default.** Every request this library
+  makes carried `timeout: 45000` — 436 of them — and `SAP_TIMEOUT_DEFAULT` now
+  defaults to `0`, which the HTTP clients here read as "do not abort".
+
+  Aborting a request the server is still executing costs more than it saves.
+  Measured on the cloud trial: `POST /deletion/delete` was aborted at 45 s, the
+  retry came back `400 … Session Timed Out or Not Found` **with a new session
+  cookie**, and everything after it ran in a session nobody asked for. Of 794
+  responses in that run, 30 carried `set-cookie` — 29 were `_action=LOCK`
+  binding a stateful session, and the 30th was that error.
+
+  The damage is not the failed request. Over HTTP a session is two layers: the
+  ICF one the cookie addresses, and the ABAP one beneath it that holds the
+  enqueue locks. An abort replaces the first and strands the second — the lock
+  handle dies, the lock does not, and nothing can reach it again. That is the
+  same effect already recorded here as "a session recycle does not clear it;
+  only the unlock does". RFC never shows it, having one ABAP session for the
+  connection's lifetime and no ICF layer to replace.
+
+  **A caller who wants a deadline still has one** — `IAdtOperationOptions.timeout`
+  per call, `SAP_TIMEOUT_DEFAULT` for a system-wide floor. What is gone is this
+  library choosing it for them, which is the rule it already follows for the
+  lock window and the operation sequence.
+
+  That per-call promise is now kept, which it was not when this entry was first
+  written. The low-level functions take positional arguments and end in
+  `makeAdtRequest({ …, timeout: getTimeout('default') })` at 444 places, none of
+  which could see the option — so `options.timeout` did nothing anywhere except
+  a service binding's publication, and a caller who wanted a deadline had a
+  documented parameter that was ignored and an environment variable that was
+  process-wide. A member wraps its connection once now
+  (`withCallTimeout`, `src/utils/callTimeout.ts`) and everything below inherits
+  the deadline, including low-level functions that issue more than one request.
+  287 members across 36 files; `undefined` returns the connection itself, so a
+  caller who asks for nothing gets exactly what they had. A parameterised guard
+  asserts, for every member that declares an options bag, that the number the
+  caller passed is on every request the member issues.
+
+  A request that genuinely hangs now waits for the server or for TCP. That is
+  the trade, made deliberately: the abort ended nothing server-side, it only
+  ended what this side knew.
+
+- **A failed lock window restores the session.** `LockCapability` and
+  twenty-six handlers set the session stateful, ran the request, and set it back
+  as the last statement of the success path — so a refused `LOCK` left the
+  connection stateful. The connection is shared, so the next unrelated request
+  went out inside a session nobody asked for, and what the server takes during
+  such a request is held until that session ends. The rationale for the
+  success-only form named three cleanup layers, and the third of them — the
+  operation chains' catch blocks — is what this release removed. One atom now
+  holds the invariant (`inStatefulSession`, `src/core/shared/capabilities/statefulSession.ts`),
+  41 unprotected windows became 0, and a guard that refuses every request
+  asserts it for both members of every lockable type. That guard found seven
+  sites a mechanical sweep had missed, because they spell the call
+  `setSessionType?.(`.
+
+- **A write takes its source from `options.sourceCode` and nowhere else.**
+  Sixteen `update`/`updateMetadata` implementations read
+  `options?.sourceCode || config.sourceCode`, so one value had two channels and
+  the contract documented one. `AdtProgram.create` had the same expression and
+  handed the result to a function that ignores it — the POST carries metadata
+  only — and `AdtBehaviorImplementation.update` had three channels, of which
+  nothing in this repository ever set two.
+
+  `config.sourceCode` stays on the config types, because `check` needs it and
+  has nowhere else to get it: a syntax check compiles a source that is not on
+  the server yet. Its meaning is now single — the source being checked, not a
+  second way to write.
+
+  ```typescript
+  // before — either worked
+  await cls.update({ className, sourceCode }, { lockHandle });
+  await cls.update({ className }, { sourceCode, lockHandle });
+
+  // now — the second one
+  await cls.update({ className }, { sourceCode, lockHandle });
+  ```
+
+  A write with no `options.sourceCode` is refused before the request, as it
+  always was when neither channel carried one.
+
+  **Two more creates were handing a source to a function that ignores it.**
+  `getTable().create()` passed `ddl_code` and `getDdl().create()` passed
+  `ddl_source`; `createTable` reads five fields and `createDdl` seven, and
+  neither reads those. Same silence as the program's, found by looking for the
+  same expression. Both are gone from the call.
+
+  The type-specific channels that remain are the class includes and the DDL
+  configs — `testClassCode`, `localTypesCode`, `definitionsCode`, `macrosCode`,
+  `ddlCode`, `ddlSource` — which callers and tests do set, and which are a
+  separate decision from this one.
+
+- **A write states what it needs.** Every implementation of `IAdtUpdatable` and
+  `IAdtMetadataUpdatable` now names its own config instead of inheriting a
+  `Partial` the atom applied on everyone's behalf. For the 37 types whose write
+  really is all-optional nothing changes but the spelling —
+  `IAdtUpdatable<Partial<IClassConfig>, …>` — and for the one where it is not,
+  the requirement is finally sayable: a service binding's `update` is its
+  publication job, and `IServiceBindingPublicationConfig` demands the binding
+  name and the protocol that selects the endpoint. Previously the class narrowed
+  the parameter and the interface let the bad call through anyway, because
+  method parameters are bivariant; it compiled and threw before the wire.
+
+- **One endpoint, one member — the operation chains are gone.** A member issues
+  exactly one ADT request. `create` is the POST; `update` is the write and
+  carries `options.lockHandle` as given; `delete` is the DELETE. None of them
+  validates, checks, locks, polls for readiness, activates or rolls back any
+  more, and none of them touches `connection.setSessionType()`.
+
+  A multi-step operation is the consumer's sequence, because it is the consumer
+  that knows what belongs between the steps and what a failure at each one
+  means:
+
+  ```typescript
+  // before — one call, six requests, and no way to see or steer them
+  await client.getClass().create(config, { activateOnCreate: true });
+
+  // after — the calls are yours, and every one answers
+  const cls = client.getClass();
+  await cls.create(config);
+
+  const locked = await cls.lock(config);
+  if (!locked.ok) throw new Error(locked.getError().message);
+  const lockHandle = locked.getResult().value;
+  try {
+    await cls.update(config, { sourceCode, lockHandle });
+  } finally {
+    await cls.unlock(config, lockHandle);
+  }
+
+  await cls.activate(config);
+  ```
+
+  **Passing no lock handle is allowed.** Whether an unlocked write is accepted
+  is ADT's judgement about that object on that system, and its refusal comes
+  back in the answer. The seven low-level writes that used to throw
+  `lockHandle is required` before reaching the wire no longer do — they were
+  turning a server verdict into an exception the caller could not read.
+
+- **`activateOnCreate`, `activateOnUpdate` and `deleteOnFailure` are gone** from
+  `IAdtOperationOptions` (interfaces 34.0.0). They asked for extra steps, and
+  there are none left to ask for. Call `activate()` when you want the object
+  active. Nothing needs a rollback: a `create` that answers a result made
+  exactly one object, and one that answers a failure made none.
+
+- **`checkDeletion()` is a member of `IAdtDeletable`, on 30 types.** The
+  deletion approval ADT wants before a delete used to run inside `delete()`,
+  where a caller could neither skip it nor read what it said. Call it yourself:
+
+  ```typescript
+  const approved = await client.getClass().checkDeletion(config);
+  if (!approved.ok) throw new Error(approved.getError().message);
+  await client.getClass().delete(config);
+  ```
+
+  Deleting without it is allowed — ADT answers its own refusal. What you lose is
+  the reason: the check's document names what still points at the object.
+
+  It is not a capability of its own. Almost everything created can be removed;
+  what varies is the *moment* — something still references it, a transport holds
+  it, another user holds its lock — and every one of those is the server's to
+  answer. So anything that can be deleted can be asked, and the two members are
+  one atom.
+
+  **It reads its own document.** Every result set that carries the member gained
+  a `deletionCheck` strategy beside `check`, defaulting to `rawDocument`, and
+  the contract's third type parameter comes from that slot. The two are
+  different documents from different endpoints — `chkl:messages` from
+  `POST /checkruns` against `del:checkResponse` from `POST /deletion/check` —
+  and a consumer who injects a parser for their check runs must not have it
+  handed a deletability verdict.
+
+  **Not every type asks the deletion service.** A transport request cannot:
+  `/sap/bc/adt/deletion/check` answers `No URI-Mapping defined for URI
+  /sap/bc/adt/cts/transportrequests/…` — a fact about the address, not about the
+  request. `AdtRequest.checkDeletion` reads the request itself instead, where
+  the two things ADT actually requires (empty, unreleased) are stated. Measured
+  on the cloud trial; a standalone include and a metadata extension *are*
+  resolved by the service, and answer as a class does.
+
+  Measured on the cloud trial: the check is asked about a **URI**, and its
+  answer names the type and package it resolved that address to. A type with an
+  address has something to ask with, whether or not its own delete goes through
+  the deletion service — which is how `getInclude()`, `getMetadataExtension()`
+  and `getRequest()` came to offer it.
+
+- **Seven types no longer declare `IAdtDeletable`**, because they do not delete:
+  `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`,
+  `getLocalMacros()`, `getMessageClassMessage()`, `getUnitTest()` and
+  `getCdsUnitTest()`. Removing any of them is a **write of the parent** —
+  `delete()` on a class include is literally `update({ testClassCode: '' })`,
+  and removing a message rewrites its message class. There is no resource to
+  DELETE and none to ask about; the deletion service resolves a *message class*
+  and knows nothing of the rows inside it.
+
+  The concrete classes keep a `delete()` as the name for writing emptiness, but
+  the contract the factory hands back no longer declares it. **A caller reaching
+  it through the factory writes the empty content instead**, which is the
+  operation ADT actually offers:
+
+  ```typescript
+  // before
+  await client.getLocalTestClass().delete({ className: 'ZCL_X' });
+
+  // after
+  await client.getLocalTestClass().update(
+    { className: 'ZCL_X', testClassCode: '' },
+    { lockHandle },
+  );
+  ```
+
+- **Two endpoints that were reachable no other way became members**, and both
+  ended up with the names the resource split gave them: writing a function
+  include's `/source/main` is `update` (its `finclude` document is
+  `updateMetadata`), and the generated shell that binds a behavior
+  implementation to its definition is written with the **class's** `update`,
+  from the exported `mainSourceFor`. The `updateSource()` and `updateMain()`
+  names existed briefly on this branch and are not in the release.
+
+- **Removed for being compositions rather than requests:**
+  `AdtServiceBinding.createAndGenerateServiceBinding()` (call `create` then
+  `generateServiceBinding`), and the implicit unpublish inside a binding's
+  `delete()` — a published binding is unpublished with
+  `update({ desiredPublicationState: 'unpublished' })`, which is a call whose
+  answer you can see.
+
+- **`AdtUnitTest` and `AdtCdsUnitTest`: `create` is the container class's POST
+  and `validate` is its name validation.** Writing the tests into the class is
+  `getLocalTestClass().update()`, and the class must be active before its
+  include can be locked — an order that is not free, which is exactly why it
+  belongs to the caller rather than to a chain it cannot see into.
+
+- **`switchOn` / `switchOff` on a feature toggle answer the toggle's own
+  response**, not a runtime state read after it. Use `getRuntimeState()` for the
+  state.
+
+- **`AdtMessageClassMessage` keeps its chain, and is the only member that does.**
+  A message is a row inside its class's document: the write is one PUT, but it
+  needs two lock handles and a read-modify-write of XML this library assembles.
+  Making it single-request would mean publishing that assembly.
+
+- **`getInactiveObjects()` takes its reading from the result set.** It is one
+  GET with one answer, which is exactly what an `IResultStrategy` types, and it
+  was the last such member answering a shape nobody could change. `IUtilResults`
+  gained an `inactive` strategy, `getUtils(results)` declares
+  `IAdtGroupLifecycle<ReturnType<R['inactive']>>`, and the `includeRawXml` flag
+  is gone with the split — a consumer who wants the document passes
+  `rawDocument`, the same removal that flag got on `getWhereUsedList`.
+
+  `getPackageContents`, `getPackageHierarchy` and `getWhereUsedList` keep their
+  fixed readings, and the reason is measured rather than habitual: each makes
+  *several* requests — one node-structure request per object type plus a walk
+  into subpackages, or the scope then the search — and assembles one shape from
+  all of them. `IResultStrategy<T> = (answer: IAdtWireResponse) => T` cannot
+  type that. A consumer who wants another shape implements
+  `IAdtPackageBrowsing` or `IAdtInformationSystem` themselves; that the factory
+  cannot hand them one is a gap in the composition, recorded as open in the
+  contracts package's `DECISIONS.md` rather than claimed to be solved here.
+
+- **Every member answers `IAdtResponse<T>`.** `client.getClass().create(...)`
+  and its neighbours return a result or a failure instead of a state object, and
+  signal a refusal in the answer instead of throwing. Reading the result without
+  narrowing on `ok` does not compile.
+
+  ```typescript
+  // before
+  const state = await client.getClass().create(config);
+  if (state.errors.length) { /* … */ }
+
+  // after
+  const answer = await client.getClass().create(config);
+  if (!answer.ok) throw new Error(answer.getError().message);
+  answer.getResult().value;
+  ```
+
+- **The `IXxxState` types are gone**, all twenty-eight of them, along with the
+  stored envelopes on them (`createResult`, `updateResult`, `checkResult`,
+  `readResult`, `validationResponse`, `transportResult`, …) and the `errors`
+  array. A member answers one value; a failure is the other half of the answer.
+
+- **`AdtFailureOrigin` has two values**, `'connection'` and `'refusal'`, and
+  `IAdtError.cause` is gone. `'parse'` described *this library* failing to read a
+  document, which is not a verdict about the server — it pointed callers at a
+  system that had answered them correctly. That case throws `AdtParseError` as
+  itself now, and so does a consumer's own reading.
+
+- **The reading is injected once, at construction.** Every `parse` parameter and
+  every overload taking one is gone: `readWith(parse, …)`, `listNodes(parse)`,
+  `search(query, parse)`. Pass a result set to the factory instead:
+
+  ```typescript
+  import { classDocuments } from '@mcp-abap-adt/adt-clients';
+
+  const parsed = client.getClass({
+    ...classDocuments,
+    source: (answer) => myParser(String(answer.data)),
+  });
+  ```
+
+- **One endpoint, one member.** Removed for having a twin over the same request:
+  `AdtUtils.searchObjects` (use `search`), `AdtRequest.listNodes` (use `list`),
+  `Profiler.readWith` (implement `IProfiler`), `AdtServiceBinding`'s eight
+  `xxxServiceBinding` duplicates (use the atoms: `create`, `read`, `update`,
+  `delete`, `activate`, `check`), and `getWhereUsedList`'s `includeRawXml` flag
+  (use `getWhereUsed`, which answers the document).
+
+- **Result shapes moved to this package.** `ISearchResult`, `IWhereUsedListResult`,
+  `ITransportTree` and its four node types, `IRepositoryNodeContents`,
+  `INamedItem`, `IPackageHierarchyNode`, `IObjectReference`,
+  `IInactiveObjectsResponse`, `ObjectVersion`, the feed/ATC/trace shapes and the
+  abapGit ones now come from `@mcp-abap-adt/adt-clients` rather than from
+  `@mcp-abap-adt/interfaces`. A contract carries what is needed to use or replace
+  it; a shape a replacement reading would not produce is neither.
+
+- **`AdtRuntimeClientExperimental` is deleted.** It was `class X extends
+  AdtRuntimeClient {}` — an empty body, a rename wearing a class. Use
+  `AdtRuntimeClient`.
+
+- **`AdtAuthorizationField` no longer claims `IAdtTransportAware`.** The APS IAM
+  endpoint exposes no transport resource; `readTransport()` re-read the object at
+  its own URL and returned that.
+
+- **`AdtFunctionInclude.readSource()` is gone.** `read()` is the source, as the
+  contract says of an object that has one.
+
+- **`publishODataV2` and `unpublishODataV2` are gone.** They were two method
+  names for one endpoint with a `serviceType` parameter, and both issued a GET
+  to a `…jobs` URL that Eclipse POSTs to — so neither was the publish they were
+  named for. `update({ desiredPublicationState, serviceType })` covers odatav2
+  and odatav4 alike.
+
+- **`getODataV2ServiceBinding` and `getODataV4ServiceBinding` are one member:**
+  `getServiceGroup({ objectname, serviceType, … })`. Same defect, next door. Its
+  `Accept` now carries v1 as well as v2, as Eclipse sends it; v2 alone is a 406
+  on a system that serves only v1.
+
+- **The capability guard counts requests now, and found seven members that
+  make more than one.** Naming the right request proves it happened, not that it
+  happened alone — a member that reads the object and then writes it passed
+  every assertion the guard had. Two kinds turned up, both recorded as named
+  exceptions rather than quietly allowed:
+
+  - **read-modify-write**, which is ADT's shape and not a choice: a domain, a
+    data element, a table type, a package, a message class, an authorization
+    field and a function group *are* their document, and the endpoint takes it
+    whole, so changing one field is GET, patch, PUT. A caller holding the whole
+    document passes `options.xmlContent` and skips the read;
+  - **`getSystemInformation()`**, which decides cloud or on-premise and is
+    cached per client — a request, but not a step of the operation.
+
+  Everything else issues exactly what its capability names. The rule now fails
+  a build rather than a review.
+
+- **BREAKING: publishing takes the binding and the protocol, and nothing else.**
+  `serviceType` is **required** — it selects the endpoint, `odatav2` or
+  `odatav4`, and a caller holding a binding knows it from the variant. The
+  service name and version are **not accepted any more**: the job is posted with
+  no query string, to a body naming the target by type and name, so there is
+  nowhere for them to go.
+
+  ```typescript
+  await bindings.update(
+    { bindingName: 'ZAC_SRVB01', desiredPublicationState: 'published',
+      serviceType: 'odatav4' },
+    { timeout: 300_000 },
+  );
+  ```
+
+  **The signature says so.** `update` on a binding takes
+  `IServiceBindingPublicationConfig`, not `Partial<IServiceBindingConfig>`:
+  `serviceType` is required and `desiredPublicationState` is
+  `'published' | 'unpublished'`. Both calls that used to compile and then throw
+  before the wire now fail to compile, which is where a caller meets them.
+
+  Mid-branch this member read the binding first and filled all three in from its
+  own document. That read made one member two requests, and the state check it
+  also did is the server's answer anyway. A caller who wants to decide
+  beforehand reads the binding and looks at `srvb:allowedAction`.
+
+- **`desiredPublicationState: 'unchanged'` is refused by `update`.** A binding's
+  update *is* its publication, so there is no request that changes nothing. It
+  stays legitimate on a binding's *config*, where it says a create should not
+  publish.
+
+- **`AdtServiceBinding` gains `lock()` and `unlock()`**, and the manifest's
+  claim that "ADT offers no lock for a service binding" is retired — measured
+  from Eclipse, it takes one: `_action=LOCK&accessMode=MODIFY` before a publish
+  job, `_action=UNLOCK&lockHandle=…` when the editor closes. Publishing is what
+  editing a binding is.
+
+  **The library does not take it for you.** How long a lock is held is a policy
+  — an editor holds one across several publishes, a script for one call — and
+  the connection is shared. See "Service bindings: publishing is the editing" in
+  `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
+
+- **`IAdtServiceBinding` is gone from `@mcp-abap-adt/interfaces`**, and
+  `IServiceBindingPublicationParams` / `IServiceGroupParams` are declared in this
+  package. A per-object interface that restated the capability atoms told a
+  consumer nothing the atoms did not, and it named two members that no longer
+  exist.
+
+- **`AdtInclude.delete` takes no lock handle, and `deleteInclude` lost the
+  parameter.** A `PROG/I` include was the one type deleted with
+  `DELETE /programs/includes/<name>?lockHandle=…`, and the file said so: "requires
+  a lock, like every other ADT deletion". Both halves were wrong. A lock is what
+  an *update* needs; a deletion is `POST /deletion/check` then
+  `POST /deletion/delete`, which every other type here already used, and an
+  existing lock does not let a delete through — it blocks it.
+
+  So the endpoint answered `400 Parameter lockHandle could not be found` to every
+  caller that had none, which is every cleanup, since nothing locks an object in
+  order to remove it. `Include - Full workflow` failed that way on both
+  transports.
+
+  Measured on E19 against a leftover the broken suite had left behind — no lock
+  taken, no stateful session:
+
+  ```
+  POST /sap/bc/adt/deletion/check   -> del:isDeletable="true" adtcore:type="PROG/I"
+  POST /sap/bc/adt/deletion/delete  -> del:isDeleted="true"
+  ```
+
+  `options.lockHandle` is gone from the signature rather than ignored, so a
+  caller cannot pass one and believe it mattered. As everywhere else, `200` from
+  the deletion service means accepted — `del:isDeleted` in the body is the
+  verdict.
+
+- **`AdtRequest.create()` answers the created request**, not its document:
+  `{ transportNumber, description, type, targetSystem, owner, uri, … }`. The
+  low-level `createTransport` hands the document on and `parseCreatedTransport`
+  is its shipped reading — it used to parse inside the writer and return the
+  object in place of the response, so the reading had nothing to read.
+
+### Fixed
+
+- **`withLongPolling` never reached the wire for five reads.** The four
+  class-include reads — `definitions`, `macros`, `testclasses`,
+  `implementations` — and `getBehaviorImplementationImplementations` took
+  `IReadOptions`, used it for `accept`, and never asked about long polling. A
+  caller set the option and nothing happened.
+
+  What they had in common is the separator. Their URL already carries
+  `?version=…`, so the `'?withLongPolling=true'` literal used elsewhere in that
+  layer could not be reused, and they dropped the option rather than joining it
+  correctly. `longPollingQuery(url, wanted)` now holds that decision in one
+  place.
+
+  The other 23 reads taking `IReadOptions` were never affected: they hand it to
+  `objectSourceWire`, `objectMetadataWire`, a local `buildQuery` or
+  `getClassTransport`, and all four read it. A count of 28 comes from grepping
+  bodies for the literal without following the delegation.
+
+  Pinned by ten unit tests asserting the whole URL, not merely that the
+  parameter appears in it — a second `?` is silently wrong, since SAP reads the
+  query up to it and ignores the rest. Unit coverage was necessary because the
+  integration suites cannot catch this: one full E19 run put 47 class-include
+  reads on the wire and not one asked for long polling, because no caller sets
+  it.
+
+- **A `deleteOnFailure` create deleted the object it had just made.** The
+  rollback was registered with `chain`'s `onScopeEnd`, which runs on every path
+  including success, and its `created` guard was true by then. Twenty-four
+  handlers. Fixed by naming the two kinds apart — `chain` gained `onFailure`
+  beside `onScopeEnd` — and then removed entirely with the chains themselves: a
+  `create` that is one POST has nothing to roll back. Recorded because the
+  defect shipped, and because the shape that produced it (cleanup and rollback
+  sharing one registration) is worth recognising elsewhere.
+
+- **A refused activation was reported as a connection failure.** Every activation
+  path threw a plain `Error` for the `<msg type="E">` ADT delivers inside a 200,
+  and `recogniseFailure` classified it `origin: 'connection'` — a caller told to
+  check a network that had worked. The writers hand the answer on, and all
+  forty-four `activate` call sites default to `activationRefusal`.
+
+- **`AdtEnhancement.readTransport` and `AdtTransformation.readTransport` read the
+  object**, not the transport. `getEnhancementTransport` and
+  `getTransformationTransport` were still there, unused.
+
+- **The authorization field and the feature toggle polled `version=active` after
+  a write they had not activated** — the version the update cannot have changed.
+
+- **`AdtUnitTest.validate` took the create path on any failed read**, so a 500
+  validated a NAME for a class that already existed. Only an empty body and a 404
+  mean absence.
+
+- **`AdtScalarFunctionImplementation.validate` lost its `validationUnsupported`
+  default**, reporting a rejected name where the system simply has no validation
+  resource.
+
+- **`AdtFunctionModuleLegacy.delete` passed `(module, group)`** to a lock taking
+  `(group, module)`.
+
+- **A publish or unpublish job's own verdict was thrown away.** `POST
+  …/{serviceType}/publishjobs` answers `<SEVERITY>` and `<SHORT_TEXT>` in an
+  `asx:abap` envelope — measured: `OK` / `ZAC_SRVB01 published locally`. The
+  member answered the document and a caller checking `ok` learned only that the
+  request completed. `publicationRefusal` reads it, and is the default `analyse`
+  for the publication path.
+
+- **`LockCapability.lock` and `Profiler.read` classified caller errors as
+  connection failures.** A missing name and a view the family does not have are
+  the caller's mistake and throw before any request. The first full run against
+  a system found the same shape across `AdtUtils`: an empty object name, a
+  missing SQL query, a type with no source resource — every low-level guard
+  threw inside the request `answering` runs, so it came back as
+  `origin: 'connection'`. They are raised in the contract members now.
+
+- **`rawDocument` answered `[object Object]` for every JSON endpoint.** The
+  transport parses `application/json` on the way in, so `answer.data` is an
+  object by the time a reading sees it; it is re-serialised rather than
+  stringified. The DSFI source read is the member this was visible on.
+
+- **Twenty-two low-level `delete` functions replaced the server's document**
+  with `{ success: true, …, message: 'X deleted successfully' }` — a sentence
+  this library wrote about a call it had not read. They hand the response on.
+
+- **Every successful package delete was reported as a refusal.** `AdtPackage`
+  used `deletionRefusal` for the delete step as well as the check, but a check
+  answers `del:isDeletable` and a deletion answers `del:isDeleted` — so the
+  check parser found no flag and defaulted to refusing. `packageDeletionRefusal`
+  reads the deletion result, and treats an empty body as nothing said.
+
+### Added
+
+- **`src/index.readings.ts`** — the injection surface. The strategy
+  implementations (`rawDocument`, `nothing`, `wireItself`), one `IXxxResults`
+  interface and `<type>Documents` default per object type, the shapes those
+  readings build, and the two error strategies a caller's own `analyse` can defer
+  to (`activationRefusal`, `deletionRefusal`). Without it the seam the contracts
+  name is unreachable from outside the package.
+
+- **`chain`'s `onFailure`** — a rollback that runs only when the chain fails.
+  One member uses `chain` now (`AdtMessageClassMessage.writeClass`); the helper
+  stays exported because a consumer composing its own sequence wants the same
+  unwind, including the visibility of a rollback that could not complete.
+
+- **`parseCreatedTransport`** — the reading of a transport create response.
+
+### Documentation
+
+- **[`docs/usage/OBJECT_LIFECYCLE.md`](docs/usage/OBJECT_LIFECYCLE.md)** — the
+  flow **you** compose: create → lock → update → unlock → activate. What
+  `create()` does and does not do (it makes the object shell, and nothing else),
+  that `update()` is the write with the lock window around it as a `try/finally`
+  of your own, that `delete()` takes no lock and stands beside `checkDeletion()`,
+  and the places the flow does not hold — a service binding, which is published
+  rather than edited, and a transport request, which is not a locked object.
+
+- **`README.md`, `CLAUDE.md`, `docs/README.md`,
+  [`STATEFUL_SESSION_GUIDE.md`](docs/usage/STATEFUL_SESSION_GUIDE.md),
+  [`CLIENT_API_REFERENCE.md`](docs/usage/CLIENT_API_REFERENCE.md) and
+  `TROUBLESHOOTING.md` (since merged into [`ERRATA.md`](docs/usage/ERRATA.md))** — every example that
+  passed an option to run a step now makes the call. The session guide states
+  the invariant that replaces the old automatic handling: only `lock` and
+  `unlock` change the session type.
+
+### Migration
+
+1. Narrow on `ok` at every call site. `answer.getResult()` does not exist on the
+   failure half and `answer.getError()` does not exist on the success half, so
+   the compiler finds them all for you — **in typed code**. It does not find
+   them in JavaScript, or anywhere a value is held as `any`: there,
+   `if (result !== undefined)` still compiles and is now always true, because a
+   member always answers an object. This package's own JavaScript test harness
+   broke exactly that way and reported creating objects it never created, so
+   search for `!== undefined` and `if (result)` around calls you migrate.
+2. Replace `state.errors` checks with `!answer.ok`, and `state.xxxResult` reads
+   with `answer.getResult().value`.
+3. Replace `try/catch` around a refusal with the failure half. Keep a `catch` for
+   `AdtParseError` — an answer this library could not read still throws.
+4. Move result-shape imports from `@mcp-abap-adt/interfaces` to
+   `@mcp-abap-adt/adt-clients`; the shapes themselves are unchanged.
+5. Replace a `parse` argument with a result set passed to the factory.
+6. If you branched on `origin === 'parse'`, catch `AdtParseError` instead.
+7. **Write the sequence a chain used to run for you.** A create that must end
+   active is now `create` → `lock` → `update` → `unlock` → `activate`, and each
+   one answers. Drop `activateOnCreate` / `activateOnUpdate` and call
+   `activate()`; drop `deleteOnFailure` and, if your own sequence can stop after
+   the POST, call `delete()` on that path yourself.
+8. **Pass `lockHandle` to every `update` and `delete` that needs one.** The
+   member no longer takes a lock, and it no longer refuses when none was given:
+   a write without a handle goes to ADT, and ADT decides. If your calls start
+   coming back with lock refusals from the server, that is the missing step.
+9. **Call `checkDeletion()` before `delete()`** where you relied on the delete
+   refusing an object something still points at.
+10. **Rename `read`/`update` to `readMetadata`/`updateMetadata` on the eight
+    document-only types**, and check the two whose `update` changed which
+    resource it writes (`getFunctionInclude()`, `getFeatureToggle()`). The
+    compiler finds the first group for you; it cannot find the second, because
+    the call still type-checks and writes somewhere else.
+11. **Replace `delete()` with `update()` on the seven types that do not delete**
+    — the four class includes, a message-class message, and the two unit-test
+    handlers. Writing empty content is what removing them has always meant, and
+    the contract now says so.
 
 ## [17.0.0] - 2026-09-02
 

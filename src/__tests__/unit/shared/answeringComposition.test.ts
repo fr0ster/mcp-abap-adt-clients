@@ -11,8 +11,9 @@
  * a library that failed everything would pass it.
  */
 
-import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtParseError, AdtSAPError } from '../../../utils/adtErrors';
 import { answering } from '../../../utils/adtResponse';
 import { rawDocument } from '../../../utils/resultStrategy';
@@ -153,12 +154,12 @@ describe('answering', () => {
     // library cannot read is its own failure, not the server's.
     await expect(
       answering(async () => {
-        throw new AdtParseError('could not read the response');
+        throw new AdtParseError('adtcore:objectReferences', '<html/>');
       }, rawDocument),
     ).resolves.toMatchObject({ ok: false });
 
     const answer = await answering(async () => {
-      throw new AdtParseError('could not read the response');
+      throw new AdtParseError('adtcore:objectReferences', '<html/>');
     }, rawDocument);
     if (answer.ok) throw new Error('expected a failure');
     // It is reported as what it is at the transport boundary — never 'parse',

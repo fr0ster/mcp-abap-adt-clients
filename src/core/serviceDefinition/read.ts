@@ -5,15 +5,19 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
   CT_SERVICE_DEFINITION,
 } from '../../constants/contentTypes';
+import {
+  SERVICE_DEFINITION,
+  sourceUri,
+  transportUri,
+} from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -27,7 +31,6 @@ export async function getServiceDefinition(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
     queryParams.push(`version=${version}`);
@@ -36,7 +39,7 @@ export async function getServiceDefinition(
     queryParams.push('withLongPolling=true');
   }
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}${query}`;
+  const url = `${SERVICE_DEFINITION.uri(serviceDefinitionName)}${query}`;
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -62,7 +65,6 @@ export async function getServiceDefinitionSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
     queryParams.push(`version=${version}`);
@@ -71,7 +73,7 @@ export async function getServiceDefinitionSource(
     queryParams.push('withLongPolling=true');
   }
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/source/main${query}`;
+  const url = `${sourceUri(SERVICE_DEFINITION.uri(serviceDefinitionName))}${query}`;
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -98,9 +100,8 @@ export async function getServiceDefinitionTransport(
   serviceDefinitionName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/transport${query}`;
+  const url = `${transportUri(SERVICE_DEFINITION.uri(serviceDefinitionName))}${query}`;
 
   return connection.makeAdtRequest({
     url,

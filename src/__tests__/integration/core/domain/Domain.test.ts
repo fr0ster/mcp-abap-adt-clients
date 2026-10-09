@@ -12,17 +12,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDomainConfig, IDomainState } from '../../../../core/domain';
+import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -70,7 +69,7 @@ describe('Domain (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IDomainConfig, IDomainState>;
+  let tester: BaseTester<IDomainConfig>;
 
   beforeAll(async () => {
     try {
@@ -89,10 +88,7 @@ describe('Domain (using AdtClient)', () => {
       tester = new BaseTester(
         // getDomain() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
-        client.getDomain() as unknown as IAdtObject<
-          IDomainConfig,
-          IDomainState
-        >,
+        client.getDomain(),
         'Domain',
         'create_domain',
         'adt_domain',
@@ -119,14 +115,8 @@ describe('Domain (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            datatype: params.datatype || 'CHAR',
             length: params.length || 10,
             decimals: params.decimals,
-            conversion_exit: params.conversion_exit,
-            lowercase: params.lowercase,
-            sign_exists: params.sign_exists,
-            value_table: params.value_table,
-            fixed_values: params.fixed_values,
           };
         },
         ensureObjectReady: async (domainName: string) => {
@@ -179,13 +169,16 @@ describe('Domain (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
+          updateTakesDocument: (current) =>
+            patchXmlAttribute(
+              current,
+              'adtcore:description',
+              `${config.description || ''} (updated)`.slice(0, 60),
+            ),
           updateConfig: {
             domainName: config.domainName,
             packageName: config.packageName,
             description: config.description || '',
-            datatype: config.datatype,
-            length: config.length,
-            decimals: config.decimals,
           },
         });
       },
@@ -236,8 +229,8 @@ describe('Domain (using AdtClient)', () => {
           const resultState = await tester.readTest({
             domainName: standardDomainName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const domainConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const domainConfig = resultState;
           if (
             domainConfig &&
             typeof domainConfig === 'object' &&

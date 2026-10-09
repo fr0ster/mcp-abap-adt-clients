@@ -76,9 +76,9 @@ the wire an on-prem system is reached over is now an argument, because that is
 what it always was.
 
 ```typescript
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   AdtOnPremConnector,
-  BasicAuthProvider,
   RfcTransport,
   rfcConversationFrom,
 } from '@mcp-abap-adt/connection';
@@ -132,7 +132,7 @@ This is handled automatically by `createAdtClient()` which returns either `AdtCl
 Non-unicode legacy systems require `text/plain` (without `charset=utf-8`) as the source artifact content type in checkRun XML payloads. Set `SAP_UNICODE=false` in `.env` to configure this:
 
 ```env
-SAP_UNICODE=false   # Non-unicode legacy system (e.g., E77)
+SAP_UNICODE=false   # Non-unicode legacy system
 ```
 
 If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setting this incorrectly causes checkRun to return `notProcessed` with `"Dirty Source: Wrong content type"`.
@@ -183,14 +183,8 @@ Some endpoints via RFC don't support specific Accept content types. The library 
 
 RFC returns base64 lock handles that may contain spaces, `+`, `=`. All lock handles are encoded with `encodeURIComponent()` when placed in URL query parameters.
 
-## Known limitation: package update
+## Packages: one save per ABAP session
 
-`AdtPackage.update()` does not work over RFC. Everything else on a package does
-— create, lock, unlock, delete — and every other object type updates normally.
-The save is refused with `400 ExceptionResourceAlreadyExists`, `PAK/058`, and
-the cause sits below the ADT lock, in the package framework's own state rather
-than in the lock handle this library sends.
-
-The evidence and the four endpoint answers that place it are in
-[`docs/development/RFC_TESTING.md`](../development/RFC_TESTING.md#known-limitation-package-update).
-Use HTTP for package changes on a system that supports it.
+A package can be saved only once per ABAP session: the next update or delete
+from that session is refused with `PAK/058`. Over RFC every call shares one
+session, so an update straight after a create is already refused.

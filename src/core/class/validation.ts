@@ -5,8 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
+import { CLASS } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -19,8 +20,7 @@ import { getTimeout } from '../../utils/timeouts';
  * Returns raw response from ADT - consumer decides how to interpret it
  */
 /**
- * `packageName` is required by the endpoint, not optional. Measured on E19
- * (`RFCSAPRL 816`) 2026-08-28: without `packagename` it answers **400,
+ * `packageName` is required by the endpoint, not optional. Measured * 2026-08-28: without `packagename` it answers **400,
  * "Parameter packagename could not be found."** — see
  * `docs/evidence/2026-08-28-validation-required-params.md`.
  */
@@ -46,7 +46,7 @@ export async function validateClassName(
     params.append('superClass', superClass);
   }
 
-  const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
+  const url = `${CLASS.validation}?${params.toString()}`;
   const headers = {
     Accept: ACCEPT_VALIDATION_CLASS_NAME,
   };
@@ -71,7 +71,6 @@ export async function validateClassName(
  * @param version - 'active' (default) or 'inactive' - version context for validation
  * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
- * @throws Error if validation finds syntax errors
  */
 export async function validateClassSource(
   connection: IAbapConnection,
@@ -79,8 +78,9 @@ export async function validateClassSource(
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',
 ): Promise<IAdtWireResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
-    await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource } = await import(
+    '../../utils/checkRun'
+  );
 
   let response: IAdtWireResponse;
 
@@ -103,12 +103,6 @@ export async function validateClassSource(
       version,
       'abapCheckRun',
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (!checkResult.success || checkResult.has_errors) {
-    throw new Error(`Source validation failed: ${checkResult.message}`);
   }
 
   return response;

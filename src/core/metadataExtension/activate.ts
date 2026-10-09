@@ -7,9 +7,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { METADATA_EXTENSION } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate a metadata extension
@@ -30,8 +30,7 @@ export async function activateMetadataExtension(
   name: string,
   preaudit: boolean = true,
 ): Promise<IAdtWireResponse> {
-  const lowerName = encodeSapObjectName(name).toLowerCase();
-  const objectUri = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
+  const objectUri = `${METADATA_EXTENSION.uri(name)}`;
 
   return activateObjectInSession(
     connection,

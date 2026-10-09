@@ -1,8 +1,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { STRUCTURE } from '../../endpoints/objects';
 import { getTimeout } from '../../utils/timeouts';
 
 export async function validateAppendStructureName(
@@ -13,7 +14,7 @@ export async function validateAppendStructureName(
   const queryParams = new URLSearchParams({ objtype: 'tablds', objname: name });
   if (description) queryParams.append('description', description);
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/ddic/structures/validation?${queryParams.toString()}`,
+    url: `${STRUCTURE.validation}?${queryParams.toString()}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_VALIDATION },
