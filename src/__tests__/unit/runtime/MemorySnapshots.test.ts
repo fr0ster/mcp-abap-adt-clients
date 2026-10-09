@@ -91,7 +91,7 @@ describe('MemorySnapshots', () => {
     const connection = createConnectionMock();
     const snapshots = new MemorySnapshots(connection, createLogger());
 
-    await snapshots.getDeltaOverview('uri1', 'uri2');
+    await snapshots.getDeltaOverview('SNAP1', 'SNAP2');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -101,5 +101,38 @@ describe('MemorySnapshots', () => {
         method: 'GET',
       }),
     );
+  });
+
+  it('a snapshot that does not exist comes back as a failure carrying the answer', async () => {
+    const connection = {
+      makeAdtRequest: jest.fn().mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 404'), {
+          response: {
+            status: 404,
+            headers: {},
+            data: '<exc:exception><type id="ExceptionMemoryAnalysisNotFound"/></exc:exception>',
+          },
+        }),
+      ),
+    } as unknown as IAbapConnection;
+    const answer = await new MemorySnapshots(connection).getById('MISSING');
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) {
+      expect(String(answer.getError().response?.data)).toContain(
+        'ExceptionMemoryAnalysisNotFound',
+      );
+    }
+  });
+
+  it('answers the document as it arrived by default', async () => {
+    const connection = {
+      makeAdtRequest: jest.fn().mockResolvedValue({
+        status: 200,
+        headers: {},
+        data: '<mi:overview/>',
+      }),
+    } as unknown as IAbapConnection;
+    const answer = await new MemorySnapshots(connection).getOverview('S');
+    expect(answer.ok && answer.getResult().value).toBe('<mi:overview/>');
   });
 });

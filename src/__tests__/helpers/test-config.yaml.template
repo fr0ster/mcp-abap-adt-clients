@@ -2340,6 +2340,23 @@ runtime_debugger:
         package_name: ""              # "" → environment.default_package; a local package needs no transport
         transport_request: ""
         keep_probe: false
+
+    - name: "adt_memory_debugger"
+      enabled: true
+      available_in: ["onprem", "cloud"]   # measured on both (2026-10-09)
+      description: "Memory under the debugger: memory sizes and memory snapshots at two stops"
+      params:
+        class_name: "ZAC_DBG_MEM"     # created, run under the debugger, deleted
+        package_name: ""              # "" → environment.default_package
+        transport_request: ""
+        keep_probe: false
+
+    - name: "adt_memory_snapshots"
+      enabled: true
+      available_in: ["cloud"]   # on premise the snapshots never reached the list (BASIS 816, 2026-10-09)
+      description: "Memory snapshots read back: list, snapshot, overview, ranking list, children, references, deltas"
+      params:
+        list_wait_seconds: 900        # a written snapshot reaches the list minutes later
 runtime_dumps:
   test_cases:
     - name: "adt_runtime_dumps"

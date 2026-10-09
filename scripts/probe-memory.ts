@@ -159,7 +159,21 @@ async function main(): Promise<void> {
   })) as Connection;
   let session: Connection | undefined;
 
-  const user = String(process.env.SAP_USERNAME ?? '').toUpperCase();
+  // Basic authentication names the user; with a token (the cloud) the system is asked.
+  let user = String(process.env.SAP_USERNAME ?? '').toUpperCase();
+  if (!user) {
+    const info = await listener.makeAdtRequest({
+      url: '/sap/bc/adt/core/http/systeminformation',
+      method: 'GET',
+      timeout: 30_000,
+      headers: {
+        Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+      },
+    });
+    const data =
+      typeof info.data === 'string' ? JSON.parse(info.data) : info.data;
+    user = String(data.userName ?? '').toUpperCase();
+  }
   const id = (part: string) =>
     createHash('sha256')
       .update(`${process.env.SAP_URL}:${user}:${part}`)
@@ -178,7 +192,11 @@ async function main(): Promise<void> {
     ...transport,
   };
   const cls = new AdtClient(listener, quiet).getClass();
-  const onListener = new AbapDebugger(listener, quiet, abapDebuggerDocuments);
+  // --take-over: displace another debugger of the user (an IDE kept open to
+  // watch the snapshots).
+  const onListener = new AbapDebugger(listener, quiet, abapDebuggerDocuments, {
+    onConflict: process.argv.includes('--take-over') ? 'takeOver' : 'refuse',
+  });
   const armed: string[] = [];
 
   try {
@@ -255,6 +273,26 @@ async function main(): Promise<void> {
         'application/xml',
       );
       if (stop === 'before') await onSession.step('stepContinue');
+    }
+    // PROBE_HOLD=<seconds>: keep the debuggee suspended — and its debug
+    // session open — while the snapshots are looked for elsewhere.
+    const hold = Number(process.env.PROBE_HOLD ?? '0');
+    for (let left = hold; left > 0; left -= 30) {
+      out(`holding the debuggee: ${left} s left`);
+      // Asked from another session, and from the debug session itself.
+      for (const [label, from] of [
+        ['list (other session)', listener],
+        ['list (debug session)', session],
+      ] as const) {
+        await raw(
+          from,
+          label,
+          'GET',
+          `/sap/bc/adt/runtime/memory/snapshots?user=${user}`,
+          'application/vnd.sap.adt.runtime.memory.snapshots.v1+xml',
+        );
+      }
+      await new Promise((r) => setTimeout(r, Math.min(30, left) * 1000));
     }
     await onSession.step('stepContinue');
     const ran = await run;

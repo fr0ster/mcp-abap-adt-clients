@@ -76,14 +76,14 @@ describe('runtime/memory/snapshots', () => {
   it('getSnapshotDeltaRankingList builds URL', async () => {
     const connection = createConnectionMock();
 
-    await getSnapshotDeltaRankingList(connection, '/snap/1', '/snap/2', {
+    await getSnapshotDeltaRankingList(connection, 'SNAP1', 'SNAP2', {
       maxNumberOfObjects: 10,
       sortAscending: false,
     });
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/memory/snapdelta/rankinglist?uri1=%2Fsnap%2F1&uri2=%2Fsnap%2F2&maxNumberOfObjects=10&sortAscending=false',
+        url: '/sap/bc/adt/runtime/memory/snapdelta/rankinglist?uri1=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP1&uri2=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP2&maxNumberOfObjects=10&sortAscending=false',
       }),
     );
   });
@@ -97,7 +97,7 @@ describe('runtime/memory/snapshots', () => {
       sortByColumnName: 'name',
     });
 
-    await getSnapshotDeltaChildren(connection, '/s1', '/s2', 'NODE1', {
+    await getSnapshotDeltaChildren(connection, 'SNAP1', 'SNAP2', 'NODE1', {
       maxNumberOfObjects: 7,
       sortAscending: false,
       sortByColumnName: 'size',
@@ -112,7 +112,7 @@ describe('runtime/memory/snapshots', () => {
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/memory/snapdelta/children?uri1=%2Fs1&uri2=%2Fs2&parentKey=NODE1&maxNumberOfObjects=7&sortAscending=false&sortByColumnName=size',
+        url: '/sap/bc/adt/runtime/memory/snapdelta/children?uri1=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP1&uri2=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP2&parentKey=NODE1&maxNumberOfObjects=7&sortAscending=false&sortByColumnName=size',
       }),
     );
   });
@@ -124,7 +124,7 @@ describe('runtime/memory/snapshots', () => {
       maxNumberOfReferences: 42,
     });
 
-    await getSnapshotDeltaReferences(connection, '/s1', '/s2', 'OBJ1', {
+    await getSnapshotDeltaReferences(connection, 'SNAP1', 'SNAP2', 'OBJ1', {
       maxNumberOfReferences: 11,
     });
 
@@ -137,7 +137,7 @@ describe('runtime/memory/snapshots', () => {
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/memory/snapdelta/references?uri1=%2Fs1&uri2=%2Fs2&objectKey=OBJ1&maxNumberOfReferences=11',
+        url: '/sap/bc/adt/runtime/memory/snapdelta/references?uri1=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP1&uri2=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP2&objectKey=OBJ1&maxNumberOfReferences=11',
       }),
     );
   });
@@ -147,7 +147,7 @@ describe('runtime/memory/snapshots', () => {
 
     await getSnapshotOverview(connection, 'SNAP1');
 
-    await getSnapshotDeltaOverview(connection, '/s1', '/s2');
+    await getSnapshotDeltaOverview(connection, 'SNAP1', 'SNAP2');
 
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       1,
@@ -158,7 +158,47 @@ describe('runtime/memory/snapshots', () => {
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/memory/snapdelta/overview?uri1=%2Fs1&uri2=%2Fs2',
+        url: '/sap/bc/adt/runtime/memory/snapdelta/overview?uri1=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP1&uri2=%2Fsap%2Fbc%2Fadt%2Fruntime%2Fmemory%2Fsnapshots%2FSNAP2',
+      }),
+    );
+  });
+
+  // Each view answers 406 to application/xml and names the one type it serves
+  // (measured on the cloud, 2026-10-09).
+  it.each([
+    ['list', () => listSnapshots, [], 'snapshots'],
+    ['snapshot', () => getSnapshot, ['S'], 'snapshot'],
+    ['overview', () => getSnapshotOverview, ['S'], 'overview'],
+    ['rankingList', () => getSnapshotRankingList, ['S'], 'rankinglist'],
+    ['children', () => getSnapshotChildren, ['S', 'K'], 'children'],
+    ['references', () => getSnapshotReferences, ['S', 'K'], 'references'],
+    ['delta overview', () => getSnapshotDeltaOverview, ['A', 'B'], 'overview'],
+    [
+      'delta ranking',
+      () => getSnapshotDeltaRankingList,
+      ['A', 'B'],
+      'rankinglist',
+    ],
+    [
+      'delta children',
+      () => getSnapshotDeltaChildren,
+      ['A', 'B', 'K'],
+      'children',
+    ],
+    [
+      'delta references',
+      () => getSnapshotDeltaReferences,
+      ['A', 'B', 'K'],
+      'references',
+    ],
+  ] as const)('%s asks for its own type', async (_label, fn, args, type) => {
+    const connection = createConnectionMock();
+    await (fn() as any)(connection, ...args);
+    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: {
+          Accept: `application/vnd.sap.adt.runtime.memory.${type}.v1+xml`,
+        },
       }),
     );
   });

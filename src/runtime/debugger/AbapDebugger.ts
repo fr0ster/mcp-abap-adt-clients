@@ -18,10 +18,12 @@ import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   attach,
+  createMemorySnapshot,
   createWatchpoint,
   deleteBreakpoint,
   deleteWatchpoint,
   getChildVariables,
+  getMemorySizes,
   getStack,
   getVariables,
   type IDebuggerListenerConflict,
@@ -52,6 +54,8 @@ export interface IAbapDebuggerResults {
   /** Answers with nothing to read: deletes, the cursor move, termination. */
   readonly done: IResultStrategy<unknown>;
   readonly watchpoints: IResultStrategy<unknown>;
+  /** The memory sizes and the snapshot's confirmation. */
+  readonly memory: IResultStrategy<unknown>;
 }
 
 /**
@@ -69,6 +73,7 @@ export const abapDebuggerDocuments = {
   step: rawDocument,
   done: nothing,
   watchpoints: rawDocument,
+  memory: rawDocument,
 } satisfies IAbapDebuggerResults;
 
 /** How this implementation behaves, fixed when it is constructed. */
@@ -98,7 +103,8 @@ export class AbapDebugger<
       Of<R, 'variables'>,
       Of<R, 'step'>,
       Of<R, 'done'>,
-      Of<R, 'watchpoints'>
+      Of<R, 'watchpoints'>,
+      Of<R, 'memory'>
     >
 {
   readonly kind = 'abapDebugger' as const;
@@ -302,6 +308,26 @@ export class AbapDebugger<
     return answering(
       () => deleteWatchpoint(this.connection, watchpointId),
       this.reading('done'),
+      options?.analyse,
+    );
+  }
+
+  async getMemorySizes<E extends IAdtError = IAdtError>(
+    options?: { includeAbap?: boolean } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'memory'>, E>> {
+    return answering(
+      () => getMemorySizes(this.connection, options?.includeAbap),
+      this.reading('memory'),
+      options?.analyse,
+    );
+  }
+
+  async createMemorySnapshot<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'memory'>, E>> {
+    return answering(
+      () => createMemorySnapshot(this.connection),
+      this.reading('memory'),
       options?.analyse,
     );
   }

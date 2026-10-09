@@ -125,6 +125,7 @@ export interface IAbapDebugger<
   TStep = unknown,
   TDone = unknown,
   TWatchpoints = unknown,
+  TMemory = unknown,
 > extends IRuntimeAnalysisObject<'abapDebugger'> {
   setBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
@@ -194,6 +195,18 @@ export interface IAbapDebugger<
     watchpointId: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TDone, E>>;
+
+  /** The debuggee's memory at the current stop. */
+  getMemorySizes<E extends IAdtError = IAdtError>(
+    options?: { includeAbap?: boolean } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TMemory, E>>;
+  /**
+   * A memory snapshot of the debuggee at the current stop, read later through
+   * {@link IMemorySnapshots} once it is listed there.
+   */
+  createMemorySnapshot<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TMemory, E>>;
 }
 
 /**

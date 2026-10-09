@@ -257,6 +257,32 @@ describe('AbapDebugger', () => {
     });
   });
 
+  it('getMemorySizes asks for the memory sizes in their own type', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.getMemorySizes();
+    expect(sent()).toMatchObject({
+      url: '/sap/bc/adt/debugger/memorysizes?includeAbap=true',
+      method: 'GET',
+      headers: {
+        Accept: 'application/vnd.sap.adt.debugger.memory.sizes.v1+xml',
+      },
+    });
+  });
+
+  it('createMemorySnapshot posts the memorySnapshot action', async () => {
+    const { debugger_, sent } = setup({
+      status: 200,
+      headers: {},
+      data: '<snapshot/>',
+    });
+    const answer = await debugger_.createMemorySnapshot();
+    expect(sent()).toMatchObject({
+      url: '/sap/bc/adt/debugger/actions?action=memorySnapshot',
+      method: 'POST',
+    });
+    expect(answer.ok && answer.getResult().value).toBe('<snapshot/>');
+  });
+
   it('answers the document by default and nothing for a delete', async () => {
     const stack = setup({ status: 200, data: '<dbg:stack/>', headers: {} });
     const answer = await stack.debugger_.getStack();

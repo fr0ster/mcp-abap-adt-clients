@@ -421,6 +421,50 @@ export async function terminateDebuggee(
   });
 }
 
+// --- memory ----------------------------------------------------------------------
+
+export const DEBUGGER_MEMORY_SIZES_ACCEPT =
+  'application/vnd.sap.adt.debugger.memory.sizes.v1+xml';
+
+/**
+ * The debuggee's memory at the current stop — what Eclipse's "ABAP Memory
+ * (Debugger)" view shows. Answered 406 to `application/xml`. Measured on
+ * premise and on the cloud (2026-10-09): filling 100 000 strings between two
+ * stops moved the dynamic memory objects from 233 KB to 23 MB.
+ */
+export async function getMemorySizes(
+  connection: IAbapConnection,
+  includeAbap = true,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}/memorysizes?${query({ includeAbap })}`,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: DEBUGGER_MEMORY_SIZES_ACCEPT },
+  });
+}
+
+/**
+ * Write a memory snapshot of the debuggee at the current stop. The answer is
+ * a `dbg:action` whose `data` is `<server>,<file>` and whose `isError` says
+ * whether it was written — a 200 either way. It names the file, not an id:
+ * the list below gives each snapshot its `fileName`, and the snapshot reaches
+ * `/runtime/memory/snapshots` — where an id is learnt — only later, and on
+ * the cloud after a few minutes (measured 2026-10-09). On premise
+ * (BASIS 816, the same day) the file was written and the snapshot never
+ * appeared in that list, from this call or from Eclipse.
+ */
+export async function createMemorySnapshot(
+  connection: IAbapConnection,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}/actions?action=memorySnapshot`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
 // --- watchpoints -----------------------------------------------------------------
 
 /** Watch a variable at the current stop; the answer echoes only the new row. */

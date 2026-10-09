@@ -2,12 +2,11 @@
  * Runtime Memory Analysis - Exports
  */
 
-export { MemorySnapshots } from './MemorySnapshots';
-export type {
-  ISnapshotChildrenOptions,
-  ISnapshotRankingListOptions,
-  ISnapshotReferencesOptions,
-} from './snapshots';
+export {
+  type IMemorySnapshotsResults,
+  MemorySnapshots,
+  memorySnapshotsDocuments,
+} from './MemorySnapshots';
 export {
   getSnapshot,
   getSnapshotChildren,
@@ -19,4 +18,6 @@ export {
   getSnapshotRankingList,
   getSnapshotReferences,
   listSnapshots,
+  MEMORY_SNAPSHOT_ACCEPT,
+  snapshotUri,
 } from './snapshots';
