@@ -3,7 +3,6 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IMemorySnapshots } from './IMemorySnapshots';
 import type { IRuntimeAnalysisObject } from './types';
 
