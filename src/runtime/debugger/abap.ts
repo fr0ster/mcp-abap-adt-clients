@@ -170,18 +170,20 @@ export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
  * (`DEBUGGEE_ID`, `DBGEE_KIND`, where it stands). The client waits a minute
  * longer than the server holds.
  *
- * One listener per SAP user holds the user's breakpoints, and `onConflict`
- * says what to do when another one — an Eclipse, another agent — already
- * does. Measured on premise (2026-10-09) with Eclipse listening for the same
- * user:
+ * One IDE per SAP user holds the user's debugging, and `onConflict` says
+ * what to do when another one — an Eclipse, another agent — already listens.
+ * The server tells IDEs apart by `ideId`: two listeners with the same IDE id
+ * and different terminal ids do not conflict. Measured on premise
+ * (2026-10-09), against Eclipse and against a second listener of our own with
+ * an IDE id of its own:
  *
  * - `refuse` sends `checkConflict=true&isNotifiedOnConflict=true`, as Eclipse
  *   does: the answer is 409 `conflictDetected` (T100 `SY 530`, "Another
  *   session … exists with global debugging scope") and the other listener is
- *   left alone;
- * - `takeOver` sends neither: the server accepts this listener and the other
- *   one is gone — its holder only gets a notice (Eclipse shows one and stops
- *   listening).
+ *   left alone — whatever parameters that one registered with;
+ * - `takeOver` sends neither: the server accepts this listener, and the
+ *   other one's long poll returns at once with 409 `conflictNotification` —
+ *   the notice Eclipse shows before it stops listening.
  *
  * There is no default. Which of the two is right depends on whose debugger is
  * displaced, and only the caller knows that.
@@ -224,6 +226,12 @@ export async function stopListener(
  * The answer carries `debugSessionId`, `debuggeeSessionId`, the breakpoints
  * reached and `isSteppingPossible`. From here on the debuggee belongs to the
  * session that attached.
+ *
+ * **One debug session per connection.** A connection that has attached once
+ * cannot attach again: measured on premise (2026-10-09), the second attach is
+ * answered 500 `AdiFailed` "Debuggee already attached", even after the first
+ * debuggee ran to its end. A new debug session needs a new connection; the
+ * breakpoints are the user's and stay armed across it.
  */
 export async function attach(
   connection: IAbapConnection,
@@ -370,7 +378,14 @@ export async function setVariableValue(
   });
 }
 
-/** End the debuggee where it stands. */
+/**
+ * End the debuggee where it stands.
+ *
+ * Success is answered 500 `AdiFailed` with the subtype `terminateDebuggee`
+ * (measured on premise, 2026-10-09: the debuggee was gone, a stack read after
+ * it failed, and the program's run returned). A caller reading that as a
+ * failure passes an `analyse` that lets the subtype through.
+ */
 export async function terminateDebuggee(
   connection: IAbapConnection,
 ): Promise<IAdtWireResponse> {

@@ -2315,6 +2315,21 @@ sql_query:
         # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
 
 # Runtime dumps read operations (AdtRuntimeClient)
+runtime_debugger:
+  test_cases:
+    - name: "adt_abap_debugger"
+      enabled: true
+      available_in: ["onprem"]   # measured on premise only; the cloud is not yet
+      description: "ABAP debugger: breakpoints, listener, attach, stack, variables, steps, watchpoints, set value, terminate, listener conflict"
+      params:
+        class_name: "ZAC_DBG_PROBE"   # created, run under the debugger, deleted
+        package_name: ""              # "" → environment.default_package; a local package needs no transport
+        transport_request: ""         # "" → environment.default_transport (ignored for a local package)
+        keep_probe: false             # true leaves the class in place after the run
+      # Nothing else may listen for the same SAP user while this runs: an IDE
+      # with a breakpoint set holds the user's debugging, and the listeners
+      # here refuse to displace it.
+
 runtime_dumps:
   test_cases:
     - name: "adt_runtime_dumps"
