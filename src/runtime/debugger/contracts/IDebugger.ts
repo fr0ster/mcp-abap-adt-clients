@@ -60,10 +60,23 @@ export type IDebuggerStepMethod =
 // --- AMDP Debugger option types ---
 
 export interface IStartAmdpDebuggerOptions {
+  /** End a debug session the user already has. Eclipse sends `false`. */
   stopExisting?: boolean;
-  requestUser?: string;
+  /** Eclipse sends `NONE`. */
   cascadeMode?: string;
 }
+
+/**
+ * An AMDP breakpoint: the AMDP class's source URI with `#start=<line>` of a
+ * SQLScript statement, and an id of the caller's choosing that the events
+ * name it by.
+ */
+export interface IAmdpBreakpoint {
+  uri: string;
+  clientId: string;
+}
+
+export type IAmdpStepMethod = 'over' | 'continue';
 
 export interface IGetAmdpDataPreviewOptions {
   rowNumber?: number;
@@ -182,38 +195,51 @@ export interface IAbapDebugger<
   ): Promise<IAdtResponse<TDone, E>>;
 }
 
-export interface IAmdpDebugger extends IRuntimeAnalysisObject<'amdpDebugger'> {
-  start(options?: IStartAmdpDebuggerOptions): Promise<IAdtWireResponse>;
-  resume(mainId: string): Promise<IAdtWireResponse>;
-  terminate(mainId: string, hardStop?: boolean): Promise<IAdtWireResponse>;
-  getDebuggee(mainId: string, debuggeeId: string): Promise<IAdtWireResponse>;
-  getVariable(
+/**
+ * The AMDP debugger, one member per request. Two sessions: `start` and
+ * `getEvents` on one stateful connection, the commands on another; see
+ * `runtime/debugger/amdp.ts`.
+ */
+export interface IAmdpDebugger<
+  TStarted = unknown,
+  TEvents = unknown,
+  TCommand = unknown,
+  TPreview = unknown,
+> extends IRuntimeAnalysisObject<'amdpDebugger'> {
+  start<E extends IAdtError = IAdtError>(
+    requestUser: string,
+    options?: IStartAmdpDebuggerOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TStarted, E>>;
+  syncBreakpoints<E extends IAdtError = IAdtError>(
+    mainId: string,
+    breakpoints: readonly IAmdpBreakpoint[],
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TCommand, E>>;
+  getEvents<E extends IAdtError = IAdtError>(
+    mainId: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TEvents, E>>;
+  step<E extends IAdtError = IAdtError>(
     mainId: string,
     debuggeeId: string,
-    varname: string,
-    offset?: number,
-    length?: number,
-  ): Promise<IAdtWireResponse>;
-  setVariable(
+    step: IAmdpStepMethod,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TCommand, E>>;
+  deleteDebuggee<E extends IAdtError = IAdtError>(
     mainId: string,
     debuggeeId: string,
-    varname: string,
-    setNull?: boolean,
-  ): Promise<IAdtWireResponse>;
-  lookup(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TCommand, E>>;
+  stop<E extends IAdtError = IAdtError>(
     mainId: string,
-    debuggeeId: string,
-    name?: string,
-  ): Promise<IAdtWireResponse>;
-  stepOver(mainId: string, debuggeeId: string): Promise<IAdtWireResponse>;
-  stepContinue(mainId: string, debuggeeId: string): Promise<IAdtWireResponse>;
-  getBreakpoints(mainId: string): Promise<IAdtWireResponse>;
-  getBreakpointsLlang(mainId: string): Promise<IAdtWireResponse>;
-  getBreakpointsTableFunctions(mainId: string): Promise<IAdtWireResponse>;
-  getDataPreview(
-    options?: IGetAmdpDataPreviewOptions,
-  ): Promise<IAdtWireResponse>;
-  getCellSubstring(
-    options?: IGetAmdpCellSubstringOptions,
-  ): Promise<IAdtWireResponse>;
+    options?: { hardStop?: boolean } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TCommand, E>>;
+  /** A table variable's rows. Not yet measured. */
+  getDataPreview<E extends IAdtError = IAdtError>(
+    options?: IGetAmdpDataPreviewOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TPreview, E>>;
+  /** Part of one long cell of a table variable. Not yet measured. */
+  getCellSubstring<E extends IAdtError = IAdtError>(
+    options?: IGetAmdpCellSubstringOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<TPreview, E>>;
 }

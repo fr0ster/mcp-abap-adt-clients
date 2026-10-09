@@ -1,13 +1,31 @@
 /**
- * AMDP Debugger for ADT
+ * AMDP debugger: one function per request, as measured.
  *
- * Provides functions for managing AMDP (ABAP Managed Database Procedures) debugger sessions:
- * - Debugger session management (start, resume, terminate)
- * - Debuggee operations
- * - Variable operations (get, set)
- * - Lookup operations
- * - Step operations (step over, continue)
- * - Breakpoint operations
+ * Read from Eclipse ADT's Communication Log and repeated on premise (S/4HANA,
+ * 2026-10-09) by `scripts/probe-amdp-debugger.ts`. The AMDP debugger shares
+ * nothing with the ABAP one — no listener, no attach, nothing on
+ * `/sap/bc/adt/debugger`:
+ *
+ * - **two sessions.** {@link startAmdpDebugger} opens the debug session on a
+ *   stateful connection, and {@link getAmdpEvents} must be read on that same
+ *   connection. The commands — {@link syncAmdpBreakpoints},
+ *   {@link stepAmdpDebuggee}, {@link deleteAmdpDebuggee},
+ *   {@link stopAmdpDebugger} — go from another one: the events read holds
+ *   its session until there is something to say;
+ * - **commands are answered at once, with `Location: {requestId}` only.**
+ *   What they did arrives later as an event carrying that request id;
+ * - **events:** `SYNC_BREAKPOINTS` (state `PENDING`), `ON_TOGGLE_BREAKPOINTS`
+ *   (`VALID`, once the database reaches the method), `ON_BREAK` (the ABAP
+ *   source position and the database one, every scalar variable with scope,
+ *   type and value, the call stack), `ON_WARNING`, `ON_EXECUTION_END` (an
+ *   AMDP method finished), `STOP`. Each entry into an AMDP method is a
+ *   debuggee of its own.
+ *
+ * **A stop does not release a debuggee standing on a breakpoint.** With
+ * `hardStop=true` the stop is refused 500 and the debuggee stays suspended;
+ * with `false` it stays suspended too. Let it finish — a FULL sync with no
+ * breakpoints, then `continue` — or cancel it with
+ * {@link deleteAmdpDebuggee}, and stop after.
  */
 
 import type {
@@ -15,361 +33,161 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
+import type {
+  IAmdpBreakpoint,
+  IAmdpStepMethod,
+  IStartAmdpDebuggerOptions,
+} from './contracts';
 
-/**
- * Start AMDP debugger
- *
- * @param connection - ABAP connection
- * @param options - Debugger start options
- * @returns Axios response with debugger session
- */
-export interface IStartAmdpDebuggerOptions {
-  stopExisting?: boolean;
-  requestUser?: string;
-  cascadeMode?: string;
+const MAIN = '/sap/bc/adt/amdp/debugger/main';
+const NAMESPACE = 'xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"';
+
+/** The server holds an events read this long when nothing happens. */
+export const AMDP_EVENTS_HOLD_MS = 200_000;
+
+/** Every version of the events document Eclipse accepts, newest first. */
+export const AMDP_EVENTS_ACCEPT = [4, 3, 2, 1]
+  .map((v) => `application/vnd.sap.adt.amdp.dbg.main.v${v}+xml`)
+  .join(', ');
+
+export const AMDP_BREAKPOINTS_CONTENT_TYPE =
+  'application/vnd.sap.adt.amdp.dbg.bpsync.v1+xml';
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
+/**
+ * Start a debug session for a user's AMDP calls.
+ *
+ * Answered 200 with `Location: …/main/{mainId}` and `startParameters` naming
+ * the database session (`HANA_SESSION_ID`). The connection must be stateful,
+ * and the events are read on it.
+ */
 export async function startAmdpDebugger(
   connection: IAbapConnection,
-  options?: IStartAmdpDebuggerOptions,
+  requestUser: string,
+  options: IStartAmdpDebuggerOptions = {},
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main`;
-  const params: Record<string, string | number | boolean> = {};
-
-  if (options?.stopExisting !== undefined)
-    params.stopExisting = options.stopExisting;
-  if (options?.requestUser) params.requestUser = options.requestUser;
-  if (options?.cascadeMode) params.cascadeMode = options.cascadeMode;
-
+  const query = new URLSearchParams({
+    stopExisting: String(options.stopExisting ?? false),
+    requestUser,
+    cascadeMode: options.cascadeMode ?? 'NONE',
+  });
   return connection.makeAdtRequest({
-    url,
-    method: 'GET',
+    url: `${MAIN}?${query}`,
+    method: 'POST',
     timeout: getTimeout('default'),
-    params,
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/start',
-    },
+    headers: { Accept: 'application/vnd.sap.adt.amdp.dbg.startmain.v1+xml' },
+  });
+}
+
+/** The body of a breakpoint sync. A FULL sync with none clears them. */
+export function buildAmdpBreakpointsXml(
+  breakpoints: readonly IAmdpBreakpoint[],
+  syncMode: 'FULL' = 'FULL',
+): string {
+  const rows = breakpoints
+    .map(
+      (bp) =>
+        `    <amdpdbg:breakpoint xmlns:adtcore="http://www.sap.com/adt/core" amdpdbg:clientId="${escapeXml(bp.clientId)}" adtcore:uri="${escapeXml(bp.uri)}"/>`,
+    )
+    .join('\n');
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?><amdpdbg:breakpointsSyncRequest ${NAMESPACE} amdpdbg:syncMode="${syncMode}" amdpdbg:clearCache="false">\n` +
+    (rows
+      ? `  <amdpdbg:breakpoints>\n${rows}\n  </amdpdbg:breakpoints>\n`
+      : '  <amdpdbg:breakpoints/>\n') +
+    '</amdpdbg:breakpointsSyncRequest>'
+  );
+}
+
+/**
+ * Replace the session's breakpoints with these. A breakpoint is the AMDP
+ * class's source URI with `#start=<line>` of a SQLScript statement, and an id
+ * of the caller's choosing. The answer is the request id; the outcome comes
+ * as a `SYNC_BREAKPOINTS` event, then `ON_TOGGLE_BREAKPOINTS` per breakpoint.
+ */
+export async function syncAmdpBreakpoints(
+  connection: IAbapConnection,
+  mainId: string,
+  breakpoints: readonly IAmdpBreakpoint[],
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${MAIN}/${encodeURIComponent(mainId)}/breakpoints`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: buildAmdpBreakpointsXml(breakpoints),
+    headers: { 'Content-Type': AMDP_BREAKPOINTS_CONTENT_TYPE },
   });
 }
 
 /**
- * Resume AMDP debugger
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @returns Axios response with debugger session
+ * The next events of the session: held until there is one, or answered with
+ * none after {@link AMDP_EVENTS_HOLD_MS}. Read on the connection that started
+ * the session. The client waits a minute longer than the server holds.
  */
-export async function resumeAmdpDebugger(
+export async function getAmdpEvents(
   connection: IAbapConnection,
   mainId: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
-
   return connection.makeAdtRequest({
-    url,
+    url: `${MAIN}/${encodeURIComponent(mainId)}`,
     method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/resume',
-    },
+    timeout: getTimeout(AMDP_EVENTS_HOLD_MS + 60_000),
+    headers: { Accept: AMDP_EVENTS_ACCEPT },
   });
 }
 
-/**
- * Terminate AMDP debugger
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param hardStop - Whether to perform hard stop
- * @returns Axios response
- */
-export async function terminateAmdpDebugger(
+/** Move a debuggee: over a statement, or on to the next breakpoint or its end. */
+export async function stepAmdpDebuggee(
   connection: IAbapConnection,
   mainId: string,
-  hardStop?: boolean,
+  debuggeeId: string,
+  step: IAmdpStepMethod,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
-  const params: Record<string, string | number | boolean> = {};
-
-  if (hardStop !== undefined) params.hardStop = hardStop;
-
   return connection.makeAdtRequest({
-    url,
-    method: 'GET',
+    url: `${MAIN}/${encodeURIComponent(mainId)}/debuggees/${encodeURIComponent(debuggeeId)}?step=${step}`,
+    method: 'POST',
     timeout: getTimeout('default'),
-    params,
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/terminate',
-    },
   });
 }
 
 /**
- * Get debuggee information
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param debuggeeId - Debuggee ID
- * @returns Axios response with debuggee information
+ * Cancel a debuggee where it stands — the `deleteDebuggee` link of its
+ * `ON_BREAK`. The execution is cancelled (`ON_WARNING` "execution has been
+ * canceled", then `ON_EXECUTION_END`), and the ABAP program that called the
+ * method fails.
  */
-export async function getAmdpDebuggee(
+export async function deleteAmdpDebuggee(
   connection: IAbapConnection,
   mainId: string,
   debuggeeId: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
-
   return connection.makeAdtRequest({
-    url,
-    method: 'GET',
+    url: `${MAIN}/${encodeURIComponent(mainId)}/debuggees/${encodeURIComponent(debuggeeId)}`,
+    method: 'DELETE',
     timeout: getTimeout('default'),
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/debuggee',
-    },
   });
 }
 
 /**
- * Get variable value
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param debuggeeId - Debuggee ID
- * @param varname - Variable name
- * @param offset - Offset for variable value
- * @param length - Length of variable value to retrieve
- * @returns Axios response with variable value
+ * End the debug session. `hardStop` defaults to `false`, as Eclipse sends it;
+ * neither value releases a debuggee standing on a breakpoint (see the module
+ * comment).
  */
-export async function getAmdpVariable(
+export async function stopAmdpDebugger(
   connection: IAbapConnection,
   mainId: string,
-  debuggeeId: string,
-  varname: string,
-  offset?: number,
-  length?: number,
+  hardStop = false,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
-  const params: Record<string, string | number | boolean> = {};
-
-  if (offset !== undefined) params.offset = offset;
-  if (length !== undefined) params.length = length;
-
   return connection.makeAdtRequest({
-    url,
-    method: 'GET',
+    url: `${MAIN}/${encodeURIComponent(mainId)}?hardStop=${hardStop}`,
+    method: 'DELETE',
     timeout: getTimeout('default'),
-    params,
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/vars',
-    },
-  });
-}
-
-/**
- * Set variable value
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param debuggeeId - Debuggee ID
- * @param varname - Variable name
- * @param setNull - Whether to set variable to null
- * @returns Axios response
- */
-export async function setAmdpVariable(
-  connection: IAbapConnection,
-  mainId: string,
-  debuggeeId: string,
-  varname: string,
-  setNull?: boolean,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
-  const params: Record<string, string | number | boolean> = {};
-
-  if (setNull !== undefined) params.setNull = setNull;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    params,
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/setvars',
-    },
-  });
-}
-
-/**
- * Lookup objects/variables
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param debuggeeId - Debuggee ID
- * @param name - Name to lookup
- * @returns Axios response with lookup results
- */
-export async function lookupAmdp(
-  connection: IAbapConnection,
-  mainId: string,
-  debuggeeId: string,
-  name?: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/lookup`;
-  const params: Record<string, string | number | boolean> = {};
-
-  if (name) params.name = name;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    params,
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/lookup',
-    },
-  });
-}
-
-/**
- * Step over in AMDP debugger
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param debuggeeId - Debuggee ID
- * @returns Axios response
- */
-export async function stepOverAmdp(
-  connection: IAbapConnection,
-  mainId: string,
-  debuggeeId: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    params: { step: 'over' },
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/step/over',
-    },
-  });
-}
-
-/**
- * Continue execution in AMDP debugger
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @param debuggeeId - Debuggee ID
- * @returns Axios response
- */
-export async function stepContinueAmdp(
-  connection: IAbapConnection,
-  mainId: string,
-  debuggeeId: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    params: { step: 'continue' },
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/step/continue',
-    },
-  });
-}
-
-/**
- * Get breakpoints
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @returns Axios response with breakpoints
- */
-export async function getAmdpBreakpoints(
-  connection: IAbapConnection,
-  mainId: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/breakpoints',
-    },
-  });
-}
-
-/**
- * Get breakpoints for LLang
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @returns Axios response with LLang breakpoints
- */
-export async function getAmdpBreakpointsLlang(
-  connection: IAbapConnection,
-  mainId: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/breakpoints/llang',
-    },
-  });
-}
-
-/**
- * Get breakpoints for table functions
- *
- * @param connection - ABAP connection
- * @param mainId - Main debugger session ID
- * @returns Axios response with table function breakpoints
- */
-export async function getAmdpBreakpointsTableFunctions(
-  connection: IAbapConnection,
-  mainId: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/amdp/debugger/relations/breakpoints/tablefunctions',
-    },
   });
 }

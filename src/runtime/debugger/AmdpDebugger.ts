@@ -1,141 +1,181 @@
+/**
+ * AmdpDebugger - Domain object for the AMDP debugger
+ *
+ * One member per request of the measured protocol in `./amdp.ts`. The two
+ * sessions — `start` and `getEvents` on one stateful connection, the commands
+ * on another — are the caller's: a consumer constructs one AmdpDebugger per
+ * connection.
+ */
+
 import type {
-  IAbapConnection,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+  IAdtAnalyseOptions,
+  IAdtError,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument, wireItself } from '../../utils/resultStrategy';
 import {
-  getAmdpBreakpoints,
-  getAmdpBreakpointsLlang,
-  getAmdpBreakpointsTableFunctions,
-  getAmdpDebuggee,
-  getAmdpVariable,
-  lookupAmdp,
-  resumeAmdpDebugger,
-  setAmdpVariable,
+  deleteAmdpDebuggee,
+  getAmdpEvents,
   startAmdpDebugger,
-  stepContinueAmdp,
-  stepOverAmdp,
-  terminateAmdpDebugger,
+  stepAmdpDebuggee,
+  stopAmdpDebugger,
+  syncAmdpBreakpoints,
 } from './amdp';
 import { getAmdpCellSubstring, getAmdpDataPreview } from './amdpDataPreview';
 import type {
+  IAmdpBreakpoint,
   IAmdpDebugger,
+  IAmdpStepMethod,
   IGetAmdpCellSubstringOptions,
   IGetAmdpDataPreviewOptions,
   IStartAmdpDebuggerOptions,
 } from './contracts';
 
+/** One strategy per kind of answer the AMDP debugger gives. */
+export interface IAmdpDebuggerResults {
+  /** The start: `Location` names the session, the body the database session. */
+  readonly started: IResultStrategy<unknown>;
+  /** The events document. */
+  readonly events: IResultStrategy<unknown>;
+  /** A command's answer: `Location` carries its request id, the body is empty. */
+  readonly command: IResultStrategy<unknown>;
+  readonly preview: IResultStrategy<unknown>;
+}
+
 /**
- * @experimental
- * AMDP debugger domain object — wraps all AMDP debugger and data preview operations.
+ * The shipped default: the start and the commands answered whole — what
+ * they say is in a header — and the documents as they arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
  */
-export class AmdpDebugger implements IAmdpDebugger {
+export const amdpDebuggerDocuments = {
+  started: wireItself,
+  events: rawDocument,
+  command: wireItself,
+  preview: rawDocument,
+} satisfies IAmdpDebuggerResults;
+
+type Of<
+  R extends IAmdpDebuggerResults,
+  K extends keyof IAmdpDebuggerResults,
+> = ReturnType<R[K]>;
+
+export class AmdpDebugger<
+  R extends IAmdpDebuggerResults = typeof amdpDebuggerDocuments,
+> implements
+    IAmdpDebugger<
+      Of<R, 'started'>,
+      Of<R, 'events'>,
+      Of<R, 'command'>,
+      Of<R, 'preview'>
+    >
+{
   readonly kind = 'amdpDebugger' as const;
 
   constructor(
     private readonly connection: IAbapConnection,
     _logger?: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = amdpDebuggerDocuments as unknown as R,
   ) {}
 
-  async start(options?: IStartAmdpDebuggerOptions): Promise<IAdtWireResponse> {
-    return startAmdpDebugger(this.connection, options);
+  private reading<K extends keyof IAmdpDebuggerResults>(
+    key: K,
+  ): IResultStrategy<Of<R, K>> {
+    return this.results[key] as IResultStrategy<Of<R, K>>;
   }
 
-  async resume(mainId: string): Promise<IAdtWireResponse> {
-    return resumeAmdpDebugger(this.connection, mainId);
-  }
-
-  async terminate(
-    mainId: string,
-    hardStop?: boolean,
-  ): Promise<IAdtWireResponse> {
-    return terminateAmdpDebugger(this.connection, mainId, hardStop);
-  }
-
-  async getDebuggee(
-    mainId: string,
-    debuggeeId: string,
-  ): Promise<IAdtWireResponse> {
-    return getAmdpDebuggee(this.connection, mainId, debuggeeId);
-  }
-
-  async getVariable(
-    mainId: string,
-    debuggeeId: string,
-    varname: string,
-    offset?: number,
-    length?: number,
-  ): Promise<IAdtWireResponse> {
-    return getAmdpVariable(
-      this.connection,
-      mainId,
-      debuggeeId,
-      varname,
-      offset,
-      length,
+  async start<E extends IAdtError = IAdtError>(
+    requestUser: string,
+    options?: IStartAmdpDebuggerOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'started'>, E>> {
+    return answering(
+      () => startAmdpDebugger(this.connection, requestUser, options),
+      this.reading('started'),
+      options?.analyse,
     );
   }
 
-  async setVariable(
+  async syncBreakpoints<E extends IAdtError = IAdtError>(
     mainId: string,
-    debuggeeId: string,
-    varname: string,
-    setNull?: boolean,
-  ): Promise<IAdtWireResponse> {
-    return setAmdpVariable(
-      this.connection,
-      mainId,
-      debuggeeId,
-      varname,
-      setNull,
+    breakpoints: readonly IAmdpBreakpoint[],
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+    return answering(
+      () => syncAmdpBreakpoints(this.connection, mainId, breakpoints),
+      this.reading('command'),
+      options?.analyse,
     );
   }
 
-  async lookup(
+  async getEvents<E extends IAdtError = IAdtError>(
+    mainId: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'events'>, E>> {
+    return answering(
+      () => getAmdpEvents(this.connection, mainId),
+      this.reading('events'),
+      options?.analyse,
+    );
+  }
+
+  async step<E extends IAdtError = IAdtError>(
     mainId: string,
     debuggeeId: string,
-    name?: string,
-  ): Promise<IAdtWireResponse> {
-    return lookupAmdp(this.connection, mainId, debuggeeId, name);
+    step: IAmdpStepMethod,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+    return answering(
+      () => stepAmdpDebuggee(this.connection, mainId, debuggeeId, step),
+      this.reading('command'),
+      options?.analyse,
+    );
   }
 
-  async stepOver(
+  async deleteDebuggee<E extends IAdtError = IAdtError>(
     mainId: string,
     debuggeeId: string,
-  ): Promise<IAdtWireResponse> {
-    return stepOverAmdp(this.connection, mainId, debuggeeId);
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+    return answering(
+      () => deleteAmdpDebuggee(this.connection, mainId, debuggeeId),
+      this.reading('command'),
+      options?.analyse,
+    );
   }
 
-  async stepContinue(
+  async stop<E extends IAdtError = IAdtError>(
     mainId: string,
-    debuggeeId: string,
-  ): Promise<IAdtWireResponse> {
-    return stepContinueAmdp(this.connection, mainId, debuggeeId);
+    options?: { hardStop?: boolean } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+    return answering(
+      () => stopAmdpDebugger(this.connection, mainId, options?.hardStop),
+      this.reading('command'),
+      options?.analyse,
+    );
   }
 
-  async getBreakpoints(mainId: string): Promise<IAdtWireResponse> {
-    return getAmdpBreakpoints(this.connection, mainId);
+  async getDataPreview<E extends IAdtError = IAdtError>(
+    options?: IGetAmdpDataPreviewOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'preview'>, E>> {
+    return answering(
+      () => getAmdpDataPreview(this.connection, options),
+      this.reading('preview'),
+      options?.analyse,
+    );
   }
 
-  async getBreakpointsLlang(mainId: string): Promise<IAdtWireResponse> {
-    return getAmdpBreakpointsLlang(this.connection, mainId);
-  }
-
-  async getBreakpointsTableFunctions(
-    mainId: string,
-  ): Promise<IAdtWireResponse> {
-    return getAmdpBreakpointsTableFunctions(this.connection, mainId);
-  }
-
-  async getDataPreview(
-    options?: IGetAmdpDataPreviewOptions,
-  ): Promise<IAdtWireResponse> {
-    return getAmdpDataPreview(this.connection, options);
-  }
-
-  async getCellSubstring(
-    options?: IGetAmdpCellSubstringOptions,
-  ): Promise<IAdtWireResponse> {
-    return getAmdpCellSubstring(this.connection, options);
+  async getCellSubstring<E extends IAdtError = IAdtError>(
+    options?: IGetAmdpCellSubstringOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'preview'>, E>> {
+    return answering(
+      () => getAmdpCellSubstring(this.connection, options),
+      this.reading('preview'),
+      options?.analyse,
+    );
   }
 }

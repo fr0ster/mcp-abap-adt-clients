@@ -8,7 +8,11 @@ export {
   type IAbapDebuggerOptions,
   type IAbapDebuggerResults,
 } from './AbapDebugger';
-export { AmdpDebugger } from './AmdpDebugger';
+export {
+  AmdpDebugger,
+  amdpDebuggerDocuments,
+  type IAmdpDebuggerResults,
+} from './AmdpDebugger';
 export type {
   IDebuggerBatchPayload,
   IDebuggerListenerConflict,
@@ -37,5 +41,17 @@ export {
   stopListener,
   terminateDebuggee,
 } from './abap';
+export {
+  AMDP_BREAKPOINTS_CONTENT_TYPE,
+  AMDP_EVENTS_ACCEPT,
+  AMDP_EVENTS_HOLD_MS,
+  buildAmdpBreakpointsXml,
+  deleteAmdpDebuggee,
+  getAmdpEvents,
+  startAmdpDebugger,
+  stepAmdpDebuggee,
+  stopAmdpDebugger,
+  syncAmdpBreakpoints,
+} from './amdp';
 export type * from './contracts';
 export { Debugger } from './Debugger';
