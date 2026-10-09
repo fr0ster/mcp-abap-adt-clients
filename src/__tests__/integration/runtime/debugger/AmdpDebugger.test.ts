@@ -12,8 +12,10 @@
  * its events on one stateful connection, the commands go from another, and
  * the class runs on a third.
  *
- * Nothing else may debug AMDP for the same SAP user while this runs (an IDE
- * with an AMDP breakpoint set).
+ * Nothing else may debug for the same SAP user while this runs. Measured on
+ * the cloud (2026-10-09): with Eclipse connected and debugging, the
+ * breakpoint sync answered INVALID for lines that answered PENDING with
+ * Eclipse closed — 32/32 with both debugger tests then.
  *
  * Run: npm test -- src/__tests__/integration/runtime/debugger/AmdpDebugger.test.ts
  */
