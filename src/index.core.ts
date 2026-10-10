@@ -21,7 +21,6 @@ export { AdtScalarFunction } from './core/scalarFunction';
 export { AdtScalarFunctionImplementation } from './core/scalarFunctionImplementation';
 
 export {
-  AdtService,
   AdtServiceBinding,
   resolveBindingVariant,
 } from './core/service';

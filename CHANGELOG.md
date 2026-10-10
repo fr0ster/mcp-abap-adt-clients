@@ -64,6 +64,15 @@ every method its class has. See [MIGRATION-27.md](docs/usage/MIGRATION-27.md).
   its `IClassifyServiceBindingParams` and the `classification` result slot go
   with it. It returns once the request Eclipse sends has been recorded.
 - **`AdtClient.getService()`**, the deprecated alias of `getServiceBinding()`.
+- **`AdtService`**, the empty subclass of `AdtServiceBinding` kept "for
+  existing imports" since 0.3.18: import `AdtServiceBinding`.
+- **The deprecated low-level reads** `getClass`, `getProgram`, `getInterface`,
+  `getFunction`, `getTable`, `getStructure`, `getTableType` and `getDdl` in
+  `core/*/read.ts`, deprecated since 2025 — each was one line calling its
+  `get…Source` sibling, which stays. None was exported from the package; four
+  integration tests called them and call the sources now.
+- Deprecated aliases live a couple of releases at most from now on; these had
+  lived far longer.
 
 ### Fixed
 

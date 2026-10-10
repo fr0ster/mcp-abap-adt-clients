@@ -43,17 +43,6 @@ export async function getDdlSource(
 }
 
 /**
- * Get ABAP view (source code by default for backward compatibility)
- * @deprecated Use getDdlSource() or getDdlMetadata() instead
- */
-export async function getDdl(
-  connection: IAbapConnection,
-  ddlName: string,
-): Promise<IAdtWireResponse> {
-  return getDdlSource(connection, ddlName);
-}
-
-/**
  * Get transport request for ABAP view
  * @param connection - SAP connection
  * @param ddlName - View name

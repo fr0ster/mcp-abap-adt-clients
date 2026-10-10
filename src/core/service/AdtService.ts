@@ -981,6 +981,3 @@ export class AdtServiceBinding<
     });
   }
 }
-
-// Backward compatibility for existing imports.
-export class AdtService extends AdtServiceBinding {}

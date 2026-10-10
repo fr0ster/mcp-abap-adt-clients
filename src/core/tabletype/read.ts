@@ -106,17 +106,6 @@ export async function getTableTypeSource(
 }
 
 /**
- * Get ABAP table type (source code by default for backward compatibility)
- * @deprecated Use getTableTypeSource() or getTableTypeMetadata() instead
- */
-export async function getTableType(
-  connection: IAbapConnection,
-  tableTypeName: string,
-): Promise<IAdtWireResponse> {
-  return getTableTypeSource(connection, tableTypeName);
-}
-
-/**
  * Get transport request for ABAP table type
  * @param connection - SAP connection
  * @param tableTypeName - Table type name

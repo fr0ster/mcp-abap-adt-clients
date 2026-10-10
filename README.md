@@ -814,7 +814,7 @@ hold yourself:
 
 <!-- surface:begin -->
 `AdtAppendStructure`, `AdtMessageClass`, `AdtMessageClassMessage`,
-`AdtScalarFunction`, `AdtScalarFunctionImplementation`, `AdtService`.
+`AdtScalarFunction`, `AdtScalarFunctionImplementation`, `AdtServiceBinding`.
 <!-- surface:end -->
 
 ### System-capability helpers

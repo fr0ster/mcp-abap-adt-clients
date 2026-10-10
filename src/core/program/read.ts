@@ -49,17 +49,6 @@ export async function getProgramSource(
 }
 
 /**
- * Get ABAP program (source code by default for backward compatibility)
- * @deprecated Use getProgramSource() or getProgramMetadata() instead
- */
-export async function getProgram(
-  connection: IAbapConnection,
-  programName: string,
-): Promise<IAdtWireResponse> {
-  return getProgramSource(connection, programName);
-}
-
-/**
  * Get transport request for ABAP program
  * @param connection - SAP connection
  * @param programName - Program name

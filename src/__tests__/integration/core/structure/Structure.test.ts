@@ -17,7 +17,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IStructureConfig } from '../../../../core/structure';
-import { getStructure } from '../../../../core/structure/read';
+import { getStructureSource } from '../../../../core/structure/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
@@ -118,7 +118,7 @@ describe('Structure (using AdtClient)', () => {
         ensureObjectReady: async (structureName: string) => {
           if (!connection) return { success: true };
           try {
-            await getStructure(connection, structureName);
+            await getStructureSource(connection, structureName);
             return {
               success: false,
               objectExists: true,

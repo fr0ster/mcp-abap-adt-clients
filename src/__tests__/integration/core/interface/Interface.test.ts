@@ -17,7 +17,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IInterfaceConfig } from '../../../../core/interface';
-import { getInterface } from '../../../../core/interface/read';
+import { getInterfaceSource } from '../../../../core/interface/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
@@ -118,7 +118,7 @@ describe('Interface (using AdtClient)', () => {
         ensureObjectReady: async (interfaceName: string) => {
           if (!connection) return { success: true };
           try {
-            await getInterface(connection, interfaceName);
+            await getInterfaceSource(connection, interfaceName);
             return {
               success: false,
               objectExists: true,

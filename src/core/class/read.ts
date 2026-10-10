@@ -54,21 +54,6 @@ export async function getClassSource(
 }
 
 /**
- * Get ABAP class (source code by default for backward compatibility)
- * @param connection - SAP connection
- * @param className - Class name
- * @param version - 'active' (default) or 'inactive' to read modified but not activated version
- * @deprecated Use getClassSource() or getClassMetadata() instead
- */
-export async function getClass(
-  connection: IAbapConnection,
-  className: string,
-  version: 'active' | 'inactive' = 'active',
-): Promise<IAdtWireResponse> {
-  return getClassSource(connection, className, version);
-}
-
-/**
  * Get transport request for ABAP class
  * @param connection - SAP connection
  * @param className - Class name
