@@ -24,6 +24,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [26.1.0] - 2026-10-10
+
+### Added
+
+- **`AdtAtc.listCheckVariants(name, { maxItemCount? })`** — the check variants
+  whose name matches a pattern, one `GET /atc/variants`. `name` is required:
+  without it the list is empty, not complete. `*` lists every variant, the
+  match ignores case, a name without `*` matches exactly. The limit is exact on
+  premise but not on the cloud (3 answered 6), and `totalItemCount` counts what
+  was returned. Measured on SAP_BASIS 758 (#205, by @CoVeles), 816 and SAP BTP
+  ABAP Environment.
+
 ## [26.0.1] - 2026-10-10
 
 ### Fixed

@@ -38,6 +38,7 @@ import {
   getAtcCustomizing,
   getAtcRunStatus,
   getAtcWorklist,
+  listAtcCheckVariants,
   startAtcRun,
 } from './run';
 
@@ -48,6 +49,8 @@ const DEFAULT_MAXIMUM_VERDICTS = 100;
 export interface IAtcResults {
   /** `/atc/customizing` — `resolveCheckVariant`. */
   readonly checkVariant: IResultStrategy<unknown>;
+  /** `/atc/variants`, `nameditem:namedItemList` — `listCheckVariants`. */
+  readonly checkVariants: IResultStrategy<unknown>;
   /** `/atc/worklists` POST, a bare id in `text/plain` — `createWorklist`. */
   readonly worklist: IResultStrategy<unknown>;
   /**
@@ -71,6 +74,7 @@ export interface IAtcResults {
  */
 export const atcDocuments = {
   checkVariant: rawDocument,
+  checkVariants: rawDocument,
   worklist: rawDocument,
   startedRun: rawDocument,
   waitingRun: rawDocument,
@@ -193,6 +197,26 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
       () => getAtcCustomizing(this.connection),
       this.results.checkVariant as IResultStrategy<
         ReturnType<R['checkVariant']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The check variants whose name matches the pattern — `/atc/variants`.
+   *
+   * One request. `name` is required because the list is empty without it;
+   * `*` lists every variant. See `listAtcCheckVariants` for what the limit and
+   * the answer's count do and do not say.
+   */
+  async listCheckVariants<E extends IAdtError = IAdtError>(
+    name: string,
+    options?: { maxItemCount?: number } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['checkVariants']>, E>> {
+    return answering(
+      () => listAtcCheckVariants(this.connection, name, options?.maxItemCount),
+      this.results.checkVariants as IResultStrategy<
+        ReturnType<R['checkVariants']>
       >,
       options?.analyse,
     );
