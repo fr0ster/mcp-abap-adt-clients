@@ -85,7 +85,8 @@ misses the first of them silently and reports a taken name as free.
 `analyseCdsTestDoubles` — `analyseAny`, which dispatches on the root element
 when the form is not known in advance, and four built for one question:
 `analyseMessageClassMessage(msgno)`, `analyseUnitTestStart`,
-`analysePublicationLock` and `analyseUnsupportedStatus(statuses, what)`.
+`analysePublicationLock`, `analyseDebuggeeEnd` and
+`analyseUnsupportedStatus(statuses, what)`.
 
 Each answers an `IAdtMessageFailure`: the contract's `IAdtError` plus every
 message in the document, normalised. SAP spells severity three ways and carries
@@ -113,12 +114,14 @@ a `403` on a service binding's LOCK that is to be ignored
 | `analyseException` | `<exc:exception>`, wherever it arrives |
 | `analysePublication` | a service binding's publication job: `<SEVERITY>` inside a `200` |
 | `analysePublicationLock` | a service binding's LOCK before a publish or unpublish: a `403` (an editor holds the binding) is no failure, the lock comes back without a handle; every other refusal as `analyseException`. A caller who wants the `403` to stop them passes `analyseException` instead |
+| `analyseDebuggeeEnd` | an ABAP debugger step or termination: `500 AdiFailed` subtype `debuggeeEnded` or `terminateDebuggee` is the debuggee ending as asked, no failure — the result is the document naming the subtype; every other refusal as `analyseException` |
 | `analyseCdsTestDoubles` | the CDS test-doubles check |
 | `analyseMessageClassMessage(msgno)` | the class answering is not the message existing |
 | `analyseUnitTestStart` | a started run whose answer names no run id |
 | `analyseUnsupportedStatus(statuses, what)` | renames a `404`/`405`/`501`… as `UNSUPPORTED_OPERATION` — a system without the resource, told apart from a refusal |
 | `analyseAny` | dispatches on the root element when the form is not known in advance |
 | `readActivationRefusal`, `readCheckRunRefusal`, `readDeletionRefusal`, `readValidationRefusal`, `readUnitTestRefusal`, `readExceptionRefusal`, `readPublicationRefusal`, `readCdsTestDoublesRefusal`, `readMessageClassMessageAbsence`, `readAdtRefusal` | the readings underneath — pure functions over a document, answering `AdtRefusal` or `null` |
+| `readExceptionSubType` | the subtype an `exc:exception` names (`com.sap.adt.communicationFramework.subType`), or `undefined` |
 | `isIndeterminateWalkAnswer` | says an empty node structure cannot be read: an empty package and one that does not exist answer identically |
 | `AdtMessage`, `AdtRefusal`, `IAdtMessageFailure` | the shapes those produce |
 

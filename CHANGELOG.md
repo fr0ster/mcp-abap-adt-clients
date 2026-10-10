@@ -24,6 +24,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+The ABAP debugger, the AMDP debugger and memory snapshots, measured on premise
+(SAP_BASIS 758 and 816, HTTP and RFC) and on SAP BTP ABAP Environment, against
+the contracts `@mcp-abap-adt/interfaces-adt` 13.1.0 brought back. Breaking for a
+consumer through its dependencies only: see
+[MIGRATION-26.md](docs/usage/MIGRATION-26.md).
+
+### Added
+
+- **`AbapDebugger`** (`IAbapDebugger`): breakpoints of four kinds with
+  conditions, the listener, attach, stack, variables, `step` and `stepToLine`,
+  the stack position, a value set, termination, watchpoints, and the debuggee's
+  memory (`getMemorySizes`, `createMemorySnapshot`). The listener holds one
+  stateful session; each debuggee caught is attached on a new one, routed to its
+  application server by `saplb` (`attach`'s `server`). A listener conflict is a
+  constructor option: `onConflict: 'refuse'` (the default) or `'takeOver'`.
+- **`AmdpDebugger`** (`IAmdpDebugger`): session, breakpoints, events, steps,
+  ending a debuggee, stop, and a table variable's rows (`getDataPreview`).
+- **`MemorySnapshots`** (`IMemorySnapshots`): the list, a snapshot, its
+  overview, ranking list, children and references, and the same views as a
+  delta between two snapshots. Each view asks for the one type it serves.
+- All three, with their default result sets, exported from `./runtime` and the
+  root. `AdtRuntimeClient` does not hand them out: each needs sessions only the
+  caller can open.
+- **The debugger corpus**: 148 recorded exchanges on SAP_BASIS 758 contributed
+  with #207 by @CoVeles, and a termination and two snapshot lists recorded on
+  816; `docs/research/debugger-endpoints.md` says where the releases differ.
+- **`docs/usage/CLIENT_API_REFERENCE.md#debugging`**, and an `ERRATA.md` entry:
+  the debuggee ending is answered as a failure (`analyseDebuggeeEnd` in
+  `@mcp-abap-adt/adt-strategies` 0.8.0).
+
+### Changed (breaking)
+
+- **`@mcp-abap-adt/interfaces-adt` `^13.1.0` and
+  `@mcp-abap-adt/interfaces-adt-connection` `^2.0.0`.** An untyped answer's
+  `data` is `unknown` now, not `any`.
+
+### Removed
+
+- **The WebSocket debugger session client**, never published from this
+  package and never run: it spoke an envelope to a backend nobody built.
+  `AdtClientsWS` stays.
+
+### Fixed
+
+- `docs/usage/RFC_CONNECTION.md` called `setSessionType()` a no-op over RFC;
+  stateful requests share one conversation and the rest do not, so it matters
+  there as over HTTP (from #207).
+
 ## [25.0.1] - 2026-10-03
 
 Every create carries the responsible person and the master system the client

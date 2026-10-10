@@ -15,6 +15,24 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+### Added
+
+- **`analyseDebuggeeEnd`** — for an ABAP debugger step or termination where the
+  debuggee ending is the outcome asked for. SAP answers a step that lets the
+  program finish with `500 AdiFailed` subtype `debuggeeEnded`, and
+  `terminateDebuggee` on premise with `500` subtype `terminateDebuggee`; both
+  are the request having worked. This answers them as no failure, the result
+  being the document that names the subtype; every other refusal is read as
+  `analyseException` reads it. Tested on recorded pairs (SAP_BASIS 758 and 816).
+- **`readExceptionSubType`** — the subtype an `exc:exception` names, the reading
+  underneath.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^13.1.0` and
+  `@mcp-abap-adt/interfaces-adt-connection` `^2.0.0`**, as `adt-clients`
+  declares them — one copy of each contract.
+
 ## [0.7.0] - 2026-10-02
 
 ### Changed
