@@ -30,14 +30,16 @@ const notProcessed = report(`
 const respondingWith = (body: string) => {
   const calls: string[] = [];
   const connection: Partial<IAbapConnection> = {
-    makeAdtRequest: async (request: { url: string }) => {
+    makeAdtRequest: async <T = unknown, D = unknown>(request: {
+      url: string;
+    }): Promise<IAdtWireResponse<T, D>> => {
       calls.push(request.url);
       return {
         status: 200,
         statusText: 'OK',
         headers: {},
         data: body,
-      } as IAdtWireResponse;
+      } as IAdtWireResponse<T, D>;
     },
   };
   return { connection: connection as IAbapConnection, calls };

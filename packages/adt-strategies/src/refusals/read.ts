@@ -176,6 +176,25 @@ function parseXml(document: unknown): Record<string, any> | null {
 // ---------------------------------------------------------------------------
 
 /**
+ * The subtype an `exc:exception` names, under
+ * `com.sap.adt.communicationFramework.subType` — what tells one `500 AdiFailed`
+ * from another. `undefined` when the document is not an exception or names
+ * none.
+ *
+ * Fixtures: `debugger-run-to-line--08-stepcontinue` (`debuggeeEnded`),
+ * `debugger-terminate--01-terminate-debuggee` (`terminateDebuggee`).
+ */
+export function readExceptionSubType(document: unknown): string | undefined {
+  const root = parseXml(document)?.exception;
+  if (!root) return undefined;
+  for (const entry of asArray(root.properties?.entry)) {
+    if (entry?.['@key'] === 'com.sap.adt.communicationFramework.subType')
+      return textOf(entry) || undefined;
+  }
+  return undefined;
+}
+
+/**
  * `exc:exception`, the document behind every non-2xx ADT refusal.
  *
  * Fixtures: `refusal-object-not-found` (404), `refusal-package-not-found-tree`
