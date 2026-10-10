@@ -12,11 +12,14 @@ import type {
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
+  IAdtServiceBindingTypes,
+  IAdtServiceGroupReadable,
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
   IResultStrategy,
+  IServiceGroupParams,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -50,15 +53,12 @@ import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
   ICheckServiceBindingParams,
-  IClassifyServiceBindingParams,
   ICreateServiceBindingParams,
   IDeleteServiceBindingParams,
-  IGenerateServiceBindingParams,
   IReadServiceBindingParams,
   IServiceBindingConfig,
   IServiceBindingPublicationConfig,
   IServiceBindingPublicationParams,
-  IServiceGroupParams,
   IServiceResults,
   ITransportCheckServiceBindingParams,
 } from './types';
@@ -80,7 +80,9 @@ export class AdtServiceBinding<
     IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,
     IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>>,
     IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>,
-    IAdtLockable<IServiceBindingConfig>
+    IAdtLockable<IServiceBindingConfig>,
+    IAdtServiceBindingTypes<ReturnType<R['bindingTypes']>>,
+    IAdtServiceGroupReadable<ReturnType<R['odata']>>
 {
   // The list above is the whole of it. `IAdtServiceBinding` used to sit in the
   // contracts package declaring `publishODataV2` and `unpublishODataV2` — two
@@ -309,11 +311,13 @@ export class AdtServiceBinding<
   }
 
   /**
-   * Create the binding, and activate and generate its service.
+   * Create the binding — one `POST` to the bindings collection, and nothing
+   * after it.
    *
-   * The answer is the create's own. What the chain does after it — the check,
-   * the activation, the generation — is this implementation's business and
-   * reaches a caller only if it fails.
+   * It does not activate the binding and does not publish or generate its
+   * service: those are `activate` and `update`, called by the caller in the
+   * order they choose. (Until 27.0.0 this comment described a chain that had
+   * already gone, and a consumer built on that reading.)
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IServiceBindingConfig, 'source'> & { source?: never },
@@ -931,43 +935,6 @@ export class AdtServiceBinding<
     });
   }
 
-  /** Generate the service the binding exposes. */
-  async generateServiceBinding<E extends IAdtError = IAdtError>(
-    params: IGenerateServiceBindingParams,
-    options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['generation']>, E>> {
-    return answering(
-      () => this.generateRequest(this.connection, params),
-      this.results.generation as IResultStrategy<ReturnType<R['generation']>>,
-      options?.analyse,
-    );
-  }
-
-  private async generateRequest(
-    connection: IAbapConnection,
-    params: IGenerateServiceBindingParams,
-  ): Promise<IAdtWireResponse> {
-    const path = params.serviceType === 'odatav2' ? 'odatav2' : 'odatav4';
-    const accept =
-      params.serviceType === 'odatav2'
-        ? 'application/vnd.sap.adt.businessservices.odatav2.v2+xml, application/vnd.sap.adt.businessservices.odatav2.v3+xml'
-        : 'application/vnd.sap.adt.businessservices.odatav4.v1+xml, application/vnd.sap.adt.businessservices.odatav4.v2+xml';
-
-    const genQs = buildQueryString({
-      servicename: params.serviceName.toUpperCase(),
-      serviceversion: params.serviceVersion,
-      srvdname: params.serviceDefinitionName.toUpperCase(),
-    });
-    return connection.makeAdtRequest({
-      url: `${SERVICE_BINDING.odataService(path, params.bindingName.toUpperCase())}?${genQs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: accept,
-      },
-    });
-  }
-
   /**
    * The OData service group this binding publishes.
    *
@@ -1010,40 +977,6 @@ export class AdtServiceBinding<
         Accept:
           `application/vnd.sap.adt.businessservices.${params.serviceType}.v1+xml, ` +
           `application/vnd.sap.adt.businessservices.${params.serviceType}.v2+xml`,
-      },
-    });
-  }
-
-  async classifyServiceBinding<E extends IAdtError = IAdtError>(
-    params: IClassifyServiceBindingParams,
-    options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['classification']>, E>> {
-    return answering(
-      () => this.classifyRequest(this.connection, params),
-      this.results.classification as IResultStrategy<
-        ReturnType<R['classification']>
-      >,
-      options?.analyse,
-    );
-  }
-
-  private async classifyRequest(
-    connection: IAbapConnection,
-    params: IClassifyServiceBindingParams,
-  ): Promise<IAdtWireResponse> {
-    const classifyQs = buildQueryString({
-      objectname: params.objectname,
-      bindtype: params.bindtype,
-      bindtypeversion: params.bindtypeversion,
-      repositoryid: params.repositoryid,
-      servicename: params.servicename,
-    });
-    return connection.makeAdtRequest({
-      url: `${SERVICE_BINDING.release}?${classifyQs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'application/xml, application/json, text/plain',
       },
     });
   }

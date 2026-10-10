@@ -1,6 +1,6 @@
 /**
- * The two factories that answered their concrete class until #109 — `getUtils`
- * and `getFeatureToggle` — answer a composition of contracts now. That is only
+ * The three factories that answered their concrete class until #109 —
+ * `getUtils`, `getFeatureToggle` and `getServiceBinding` — answer a composition of contracts now. That is only
  * honest while the composition holds every public member of the class: a
  * member outside it would be on the object and unreachable through the type,
  * the very gap the concrete return was kept for.
@@ -12,10 +12,13 @@
 
 import type {
   IFeatureToggleContract,
+  IServiceBindingContract,
   IUtilsContract,
 } from '../../../clients/AdtClient';
 import type { AdtFeatureToggle } from '../../../core/featureToggle';
 import type { featureToggleDocuments } from '../../../core/featureToggle/types';
+import type { AdtServiceBinding } from '../../../core/service/AdtService';
+import type { serviceDocuments } from '../../../core/service/types';
 import type { AdtUtils } from '../../../core/shared/AdtUtils';
 import type { utilDocuments } from '../../../core/shared/utilResultSet';
 
@@ -42,6 +45,17 @@ export type _FeatureToggleCovered = Assert<
     Uncovered<
       AdtFeatureToggle,
       IFeatureToggleContract<typeof featureToggleDocuments>
+    >,
+  ] extends [never]
+    ? true
+    : false
+>;
+
+export type _ServiceBindingCovered = Assert<
+  [
+    Uncovered<
+      AdtServiceBinding,
+      IServiceBindingContract<typeof serviceDocuments>
     >,
   ] extends [never]
     ? true

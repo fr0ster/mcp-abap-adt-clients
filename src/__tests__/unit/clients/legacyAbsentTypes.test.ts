@@ -37,7 +37,6 @@ const absent = [
   'getAccessControl',
   'getServiceDefinition',
   'getServiceBinding',
-  'getService',
   'getBehaviorDefinition',
   'getBehaviorImplementation',
   'getMetadataExtension',

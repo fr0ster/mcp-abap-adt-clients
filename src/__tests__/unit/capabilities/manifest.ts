@@ -755,60 +755,6 @@ export const HANDLERS = {
     },
     capabilities: FULL,
   },
-  service: {
-    factory: (c: AdtClient) => c.getService(),
-    subject: '/sap/bc/adt/businessservices/bindings/ZGUARD_SRVB',
-    config: {
-      bindingName: 'ZGUARD_SRVB',
-      serviceDefinitionName: 'ZGUARD_SRVD',
-      serviceName: 'ZGUARD_SRV',
-      // Lowercase, because `GeneratedServiceType` is `'odatav2' | 'odatav4'`
-      // and it goes straight into the job's URL.
-      serviceType: 'odatav4',
-      serviceVersion: '0001',
-      bindingVariant: 'ODATA_V4_UI',
-      desiredPublicationState: 'published',
-      packageName: '$TMP',
-      description: 'guard',
-    },
-    requests: {
-      create: '/sap/bc/adt/businessservices/bindings',
-      // One POST to a job endpoint, and nothing before it: a binding's
-      // update *is* its publication.
-      update: {
-        method: 'POST',
-        path: '/sap/bc/adt/businessservices/odatav4/publishjobs',
-      },
-      read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
-      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
-      validate: '/sap/bc/adt/cts/transportchecks',
-      check: '/sap/bc/adt/checkruns',
-      activate: '/sap/bc/adt/activation',
-      readTransport: '/sap/bc/adt/cts/transportchecks',
-      lock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      unlock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-    },
-    capabilities: [
-      'creatable',
-      'readable',
-      'metadataReadable',
-      'updatable',
-      'deletable',
-      'validatable',
-      'checkable',
-      'activatable',
-      'transportAware',
-      'lockable',
-    ],
-    why:
-      'getService() hands out a service binding, so it has the binding’s set: ' +
-      'no versions resource, and the binding’s lock. Caught by the guard ' +
-      '2026-08-14 — this entry claimed the full set; and again 2026-09-05, ' +
-      'when the binding gained the lock Eclipse was measured taking.',
-  },
-
   // ── Objects with no version history ──────────────────────────────────────
   domain: {
     factory: (c: AdtClient) => c.getDomain(),

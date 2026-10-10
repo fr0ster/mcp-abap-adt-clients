@@ -31,6 +31,8 @@ import type {
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
+  IAdtServiceBindingTypes,
+  IAdtServiceGroupReadable,
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtTransportObjectActions,
@@ -41,6 +43,7 @@ import type {
   ICdsTestDoubleCheckable,
   IFeatureToggleObject,
   IIncludeConfig,
+  IServiceBindingConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -191,6 +194,7 @@ import {
 } from '../core/scalarFunctionImplementation';
 import {
   AdtServiceBinding,
+  type IServiceBindingPublicationConfig,
   type IServiceResults,
   serviceDocuments,
 } from '../core/service';
@@ -729,6 +733,32 @@ export type IUtilsContract<R extends IUtilResults> = IAdtInformationSystem<
     ReturnType<R['metadata']>,
     ReturnType<R['include']>
   >;
+
+/**
+ * A service binding's operations: its lifecycle atoms, and the two reads beyond
+ * them — the binding types the system offers and the service group a binding
+ * publishes (interfaces-adt 13.2.0) — every method `AdtServiceBinding` has
+ * (#109). `getServiceBinding()` answers this, not the class.
+ */
+export type IServiceBindingContract<R extends IServiceResults> = IAdtCreatable<
+  IServiceBindingConfig,
+  ReturnType<R['created']>
+> &
+  IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>> &
+  IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>> &
+  IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<
+    IServiceBindingConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['deletionCheck']>
+  > &
+  IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>> &
+  IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>> &
+  IAdtLockable<IServiceBindingConfig> &
+  IAdtServiceBindingTypes<ReturnType<R['bindingTypes']>> &
+  IAdtServiceGroupReadable<ReturnType<R['odata']>>;
 
 /**
  * A feature toggle's operations: the lifecycle atoms and the toggle's own
@@ -1842,10 +1872,13 @@ export class AdtClient {
    * Get high-level operations for ServiceBinding objects
    * @returns a ServiceBinding handler — CRUD and lifecycle, as the atoms
    */
-  getServiceBinding(): AdtServiceBinding;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class (#109): the lifecycle atoms and the binding's two
+  // reads, which is every method the class has.
+  getServiceBinding(): IServiceBindingContract<typeof serviceDocuments>;
   getServiceBinding<R extends IServiceResults>(
     results: R,
-  ): AdtServiceBinding<R>;
+  ): IServiceBindingContract<R>;
   getServiceBinding<R extends IServiceResults = typeof serviceDocuments>(
     results: R = serviceDocuments as unknown as R,
   ): AdtServiceBinding<R> {
@@ -1856,13 +1889,6 @@ export class AdtClient {
       this.systemContext,
       results,
     );
-  }
-
-  /**
-   * @deprecated Use getServiceBinding() instead.
-   */
-  getService(): AdtServiceBinding {
-    return this.getServiceBinding();
   }
 
   /**
