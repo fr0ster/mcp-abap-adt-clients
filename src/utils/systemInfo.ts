@@ -71,12 +71,14 @@ export async function getSystemInformation(
     }
 
     if (data && typeof data === 'object') {
+      // The service's JSON, read for the five fields it is asked for.
+      const info = data as Record<string, string | undefined>;
       return {
-        systemID: data.systemID,
-        userName: data.userName,
-        userFullName: data.userFullName,
-        client: data.client,
-        language: data.language,
+        systemID: info.systemID,
+        userName: info.userName,
+        userFullName: info.userFullName,
+        client: info.client,
+        language: info.language,
       };
     }
 
