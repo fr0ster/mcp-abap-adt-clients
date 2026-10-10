@@ -24,6 +24,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- **`getUtils()` and `getFeatureToggle()` answer their contracts, not the
+  concrete class** (#109). The overload taking a result set already did; the
+  one without now answers the same composition, named `IUtilsContract` and
+  `IFeatureToggleContract`. Each holds every public method its class has — a
+  compile-time check (`capabilities/factoryReturnsCoverClass.ts`) fails naming
+  any method a class gains outside it — so no call a consumer makes is lost.
+  The comment that kept the concrete returns pointed at package walkers removed
+  since, and at toggle members the contract has carried since interfaces-adt
+  11. **Migrating:** a variable typed `AdtUtils` or `AdtFeatureToggle` that holds
+  a factory's answer takes `IUtilsContract<typeof utilDocuments>` or
+  `IFeatureToggleContract<typeof featureToggleDocuments>` instead, or no
+  annotation.
+
 ## [26.1.0] - 2026-10-10
 
 ### Added
