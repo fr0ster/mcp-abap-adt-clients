@@ -57,8 +57,12 @@ consumer through its dependencies only: see
 ### Changed (breaking)
 
 - **`@mcp-abap-adt/interfaces-adt` `^13.1.0` and
-  `@mcp-abap-adt/interfaces-adt-connection` `^2.0.0`.** An untyped answer's
-  `data` is `unknown` now, not `any`.
+  `@mcp-abap-adt/interfaces-adt-connection` `^2.0.0`**, moved together with
+  `@mcp-abap-adt/adt-strategies` 0.8.0, which declares the same ranges. An
+  untyped answer's `data` is `unknown` now, not `any`: `getSystemInformation`
+  reads its fields off a typed record, and three unit-test stubs of
+  `makeAdtRequest` are generic — the eight edits the connection package's
+  2.0.0 migration note predicts.
 
 ### Removed
 

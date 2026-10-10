@@ -23,6 +23,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAdtRunnable,
@@ -742,9 +743,12 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(toCatch.ok).toBe(true);
       expect((await topFrame()).line).toBe(LINE.catch);
 
-      const toEnd = await debuggerApi.step('stepContinue');
-      expect(toEnd.ok).toBe(false);
-      expect(statusOf(toEnd)).toBe(500);
+      // SAP answers the end 500 debuggeeEnded; analyseDebuggeeEnd reads it as
+      // the step having worked, the result naming the subtype (ERRATA.md).
+      const toEnd = await debuggerApi.step('stepContinue', {
+        analyse: analyseDebuggeeEnd,
+      });
+      expect(toEnd.ok).toBe(true);
       expect(subtypeOf(toEnd)).toBe('debuggeeEnded');
       attached = false;
 
@@ -792,15 +796,12 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(jumped.ok).toBe(true);
       expect((await topFrame()).line).toBe(LINE.after);
 
-      const terminated = await debuggerApi.terminateDebuggee();
-      // abapsmith records a 500 with the subtype terminateDebuggee as the
-      // success shape; whichever answer comes, the debuggee must be gone.
-      testsLogger.info?.(
-        `terminateDebuggee answered ${statusOf(terminated)} ${subtypeOf(terminated) ?? ''}`,
-      );
-      expect(
-        terminated.ok || subtypeOf(terminated) === 'terminateDebuggee',
-      ).toBe(true);
+      // On premise 500 subtype terminateDebuggee, on the cloud 200: either is
+      // the debuggee ended as asked, and analyseDebuggeeEnd reads both so.
+      const terminated = await debuggerApi.terminateDebuggee({
+        analyse: analyseDebuggeeEnd,
+      });
+      expect(terminated.ok).toBe(true);
       attached = false;
 
       const afterwards = await debuggerApi.getStack();

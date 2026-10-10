@@ -1,3 +1,4 @@
+import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
@@ -326,6 +327,29 @@ describe('AbapDebugger', () => {
       expect(String(answer.getError().response?.data)).toContain(
         'debuggeeEnded',
       );
+    }
+  });
+
+  it('the same end, read by analyseDebuggeeEnd, is the step having worked', async () => {
+    const connection = {
+      makeAdtRequest: jest.fn().mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 500'), {
+          response: {
+            status: 500,
+            headers: {},
+            data: '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="AdiFailed"/><properties><entry key="com.sap.adt.communicationFramework.subType">debuggeeEnded</entry></properties></exc:exception>',
+          },
+        }),
+      ),
+    } as unknown as IAbapConnection;
+    const debugger_ = new AbapDebugger(connection, {} as never);
+
+    const answer = await debugger_.step('stepContinue', {
+      analyse: analyseDebuggeeEnd,
+    });
+    expect(answer.ok).toBe(true);
+    if (answer.ok) {
+      expect(String(answer.getResult().value)).toContain('debuggeeEnded');
     }
   });
 });

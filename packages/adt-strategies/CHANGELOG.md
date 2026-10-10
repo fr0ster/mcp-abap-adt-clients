@@ -15,6 +15,8 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-10
+
 ### Added
 
 - **`analyseDebuggeeEnd`** — for an ABAP debugger step or termination where the

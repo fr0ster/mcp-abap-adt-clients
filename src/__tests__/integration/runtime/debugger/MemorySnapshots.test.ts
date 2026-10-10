@@ -24,6 +24,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IDebuggerIdentity,
@@ -374,10 +375,12 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     async () => {
       if (skipped()) return;
       needs(run, 'the run');
-      // Continuing to the end is answered 500 debuggeeEnded (see
-      // AbapDebugger.test.ts): a failure to the default analyse, the end here.
-      const toEnd = await debuggerApi.step('stepContinue');
-      expect(toEnd.ok).toBe(false);
+      // Continuing to the end is answered 500 debuggeeEnded; analyseDebuggeeEnd
+      // reads it as the step having worked (ERRATA.md).
+      const toEnd = await debuggerApi.step('stepContinue', {
+        analyse: analyseDebuggeeEnd,
+      });
+      expect(toEnd.ok).toBe(true);
       expect(documentOf(toEnd)).toContain('debuggeeEnded');
       attached = false;
       const ran = await run;

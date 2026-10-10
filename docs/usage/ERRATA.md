@@ -23,8 +23,8 @@ after a termination), and the next request on the debug session answers
 2026-10-08/10.
 
 **Why the library has a strategy for it.** `analyseDebuggeeEnd` from
-`@mcp-abap-adt/adt-strategies`, passed to `step`, `stepToLine` or
-`terminateDebuggee`, answers those two subtypes as no failure; the result is
+`@mcp-abap-adt/adt-strategies` (0.8.0), passed to a debugger step or to the
+termination, answers those two subtypes as no failure; the result is
 the document that names the subtype, so the caller still sees that the
 debuggee is gone. Every other refusal stays a refusal — including
 `noSessionAttached` on a request sent after the end. A caller who wants the end
