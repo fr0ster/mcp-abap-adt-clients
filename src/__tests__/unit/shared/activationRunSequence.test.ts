@@ -26,7 +26,9 @@ const RUN_ID = 'ACT0000000042';
 const recording = () => {
   const urls: string[] = [];
   const connection: Partial<IAbapConnection> = {
-    makeAdtRequest: async (request: { url: string }) => {
+    makeAdtRequest: async <T = unknown, D = unknown>(request: {
+      url: string;
+    }): Promise<IAdtWireResponse<T, D>> => {
       urls.push(request.url);
 
       if (request.url.startsWith('/sap/bc/adt/activation/runs?')) {
@@ -35,7 +37,7 @@ const recording = () => {
           statusText: 'Accepted',
           headers: { location: `/sap/bc/adt/activation/runs/${RUN_ID}` },
           data: '',
-        } as unknown as IAdtWireResponse;
+        } as unknown as IAdtWireResponse<T, D>;
       }
 
       return {
@@ -43,7 +45,7 @@ const recording = () => {
         statusText: 'OK',
         headers: {},
         data: `<runs:run xmlns:runs="http://www.sap.com/adt/runs" runs:status="finished"/>`,
-      } as unknown as IAdtWireResponse;
+      } as unknown as IAdtWireResponse<T, D>;
     },
   };
   return { connection: connection as IAbapConnection, urls };

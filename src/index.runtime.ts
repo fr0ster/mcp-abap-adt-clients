@@ -24,6 +24,21 @@ export {
   ddicActivationDocuments,
   type IDdicActivationResults,
 } from './runtime/ddic/DdicActivation';
+// The debuggers and memory snapshots. Each needs sessions of its own — see
+// their class docs — so they are constructed on connections the caller opens,
+// not handed out by AdtRuntimeClient.
+export {
+  AbapDebugger,
+  abapDebuggerDocuments,
+  type IAbapDebuggerOptions,
+  type IAbapDebuggerResults,
+} from './runtime/debugger/AbapDebugger';
+export {
+  AmdpDebugger,
+  amdpDebuggerDocuments,
+  type IAmdpDebuggerResults,
+} from './runtime/debugger/AmdpDebugger';
+export type { IDebuggerListenerConflict } from './runtime/debugger/abap';
 // Keep low-level dump types/functions (may be used by consumers)
 export {
   buildDumpIdPrefix,
@@ -39,12 +54,16 @@ export {
   feedDocuments,
   type IFeedResults,
 } from './runtime/feeds/FeedRepository';
-
 export {
   GatewayErrorLog,
   gatewayErrorLogDocuments,
   type IGatewayErrorLogResults,
 } from './runtime/gatewayErrorLog/GatewayErrorLog';
+export {
+  type IMemorySnapshotsResults,
+  MemorySnapshots,
+  memorySnapshotsDocuments,
+} from './runtime/memory/MemorySnapshots';
 
 // The class is still exported for backward compatibility
 export {

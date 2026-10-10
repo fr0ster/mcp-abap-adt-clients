@@ -50,3 +50,24 @@ export function stepsOf(caseName: string): IAdtWireResponse[] {
 /** The one step a single-step case has. */
 export const answerFor = (caseName: string): IAdtWireResponse =>
   stepsOf(caseName)[0];
+
+/** One step of a recorded case, by the tag it was recorded under. */
+export function stepTagged(caseName: string, tag: string): IAdtWireResponse {
+  const file = readdirSync(CORPUS).find(
+    (f) => f.startsWith(`${caseName}--`) && f.endsWith(`-${tag}.json`),
+  );
+  if (!file) {
+    throw new Error(`no step "${tag}" in the recorded case "${caseName}"`);
+  }
+  const meta = JSON.parse(
+    readFileSync(join(CORPUS, file), 'utf-8'),
+  ) as ISidecar;
+  const body = meta.response.bodyFile
+    ? readFileSync(join(CORPUS, meta.response.bodyFile), 'utf-8')
+    : '';
+  return {
+    data: body,
+    status: meta.response.status,
+    headers: meta.response.headers ?? {},
+  } as IAdtWireResponse;
+}
