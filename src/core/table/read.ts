@@ -43,17 +43,6 @@ export async function getTableSource(
 }
 
 /**
- * Get ABAP table (source code by default for backward compatibility)
- * @deprecated Use getTableSource() or getTableMetadata() instead
- */
-export async function getTable(
-  connection: IAbapConnection,
-  tableName: string,
-): Promise<IAdtWireResponse> {
-  return getTableSource(connection, tableName);
-}
-
-/**
  * Get transport request for ABAP table
  * @param connection - SAP connection
  * @param tableName - Table name

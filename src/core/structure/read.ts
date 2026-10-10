@@ -49,17 +49,6 @@ export async function getStructureSource(
 }
 
 /**
- * Get ABAP structure (source code by default for backward compatibility)
- * @deprecated Use getStructureSource() or getStructureMetadata() instead
- */
-export async function getStructure(
-  connection: IAbapConnection,
-  structureName: string,
-): Promise<IAdtWireResponse> {
-  return getStructureSource(connection, structureName);
-}
-
-/**
  * Get transport request for ABAP structure
  * @param connection - SAP connection
  * @param structureName - Structure name

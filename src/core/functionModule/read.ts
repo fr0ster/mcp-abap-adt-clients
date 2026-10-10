@@ -55,19 +55,6 @@ export async function getFunctionSource(
 }
 
 /**
- * Get ABAP function module (source code by default for backward compatibility)
- * @deprecated Use getFunctionSource() or getFunctionMetadata() instead
- */
-export async function getFunction(
-  connection: IAbapConnection,
-  functionName: string,
-  functionGroup: string,
-  version: 'active' | 'inactive' = 'active',
-): Promise<IAdtWireResponse> {
-  return getFunctionSource(connection, functionName, functionGroup, version);
-}
-
-/**
  * Get transport request for ABAP function module
  * @param connection - SAP connection
  * @param functionName - Function module name

@@ -65,7 +65,6 @@ export {
   memorySnapshotsDocuments,
 } from './runtime/memory/MemorySnapshots';
 
-// The class is still exported for backward compatibility
 export {
   type ISystemMessagesResults,
   SystemMessages,

@@ -82,7 +82,6 @@ const RUNTIME_EXPORTS = [
   'AdtSAPError',
   'AdtScalarFunction',
   'AdtScalarFunctionImplementation',
-  'AdtService',
   'AdtServiceBinding',
   'AmdpDebugger',
   'ApplicationLog',

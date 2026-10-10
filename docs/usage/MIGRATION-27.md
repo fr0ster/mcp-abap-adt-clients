@@ -37,6 +37,7 @@ two service binding atoms and `IServiceGroupParams`. If your package imports
 | `generateServiceBinding(params)` | `getServiceGroup({ objectname, serviceType, servicename, serviceversion, srvdname })` — the same request; it never generated anything |
 | `classifyServiceBinding(params)` | nothing — the request it sent was answered `405`; it returns once Eclipse's request is recorded |
 | `getService()` | `getServiceBinding()` |
+| `AdtService` (the class) | `AdtServiceBinding` |
 
 The types `IGenerateServiceBindingParams` and `IClassifyServiceBindingParams`
 and the result slots `generation` and `classification` are gone with them. A

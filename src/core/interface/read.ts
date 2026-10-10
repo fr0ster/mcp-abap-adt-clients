@@ -50,17 +50,6 @@ export async function getInterfaceSource(
 }
 
 /**
- * Get ABAP interface (source code by default for backward compatibility)
- * @deprecated Use getInterfaceSource() or getInterfaceMetadata() instead
- */
-export async function getInterface(
-  connection: IAbapConnection,
-  interfaceName: string,
-): Promise<IAdtWireResponse> {
-  return getInterfaceSource(connection, interfaceName);
-}
-
-/**
  * Get transport request for ABAP interface
  * @param connection - SAP connection
  * @param interfaceName - Interface name

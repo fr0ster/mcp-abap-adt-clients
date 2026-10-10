@@ -17,7 +17,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { ITableTypeConfig } from '../../../../core/tabletype';
-import { getTableType } from '../../../../core/tabletype/read';
+import { getTableTypeSource } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -120,7 +120,7 @@ describe('TableType (using AdtClient)', () => {
         ensureObjectReady: async (tableTypeName: string) => {
           if (!connection) return { success: true };
           try {
-            await getTableType(connection, tableTypeName);
+            await getTableTypeSource(connection, tableTypeName);
             return {
               success: false,
               objectExists: true,
