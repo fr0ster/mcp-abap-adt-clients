@@ -6,6 +6,10 @@ import {
   abapDebuggerDocuments,
   type IAbapDebuggerOptions,
 } from '../../../runtime/debugger/AbapDebugger';
+import {
+  buildDebuggerBatchPayload,
+  executeBatchRequest,
+} from '../../../runtime/debugger/abap';
 
 /**
  * Each member sends the request the measured sequence sends
@@ -351,5 +355,37 @@ describe('AbapDebugger', () => {
     if (answer.ok) {
       expect(String(answer.getResult().value)).toContain('debuggeeEnded');
     }
+  });
+
+  it('a batch is multipart: the parts kept as given, the boundary in the content type', async () => {
+    const payload = buildDebuggerBatchPayload(
+      [
+        'GET /sap/bc/adt/discovery HTTP/1.1\r\nAccept:application/atomsvc+xml\r\n\r\n',
+        '',
+      ],
+      'b1',
+    );
+    expect(payload.body).toBe(
+      '--b1\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/discovery HTTP/1.1\r\nAccept:application/atomsvc+xml\r\n\r\n' +
+        '--b1\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\n' +
+        '\r\n--b1--\r\n',
+    );
+    const connection = {
+      makeAdtRequest: jest
+        .fn()
+        .mockResolvedValue({ status: 200, data: '', headers: {} }),
+    } as unknown as IAbapConnection;
+    await executeBatchRequest(connection, payload);
+    expect(
+      (connection.makeAdtRequest as jest.Mock).mock.calls[0][0],
+    ).toMatchObject({
+      url: '/sap/bc/adt/debugger/batch',
+      method: 'POST',
+      data: payload.body,
+      headers: {
+        'Content-Type': 'multipart/mixed; boundary=b1',
+        Accept: 'multipart/mixed',
+      },
+    });
   });
 });

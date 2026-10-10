@@ -22,7 +22,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import {
   buildDebuggerBatchPayload,
-  type IDebuggerBatchPayload,
+  executeBatchRequest,
 } from '../../../../runtime/debugger/abap';
 import {
   createTestConnection,
@@ -44,34 +44,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const { getTimeout } = require('../../../helpers/test-helper');
-
-/**
- * Build batch payload preserving empty line after headers.
- * Unlike buildDebuggerBatchPayload which trims inner requests,
- * this ensures each inner request ends with \r\n (empty line after headers).
- */
-function buildBatchPayloadWithEmptyLine(
-  requests: string[],
-): IDebuggerBatchPayload {
-  const boundary = `batch_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-
-  const parts = requests
-    .map((request) => {
-      return [
-        `--${boundary}`,
-        'Content-Type: application/http',
-        'content-transfer-encoding: binary',
-        '',
-        request,
-      ].join('\r\n');
-    })
-    .join('');
-
-  return {
-    boundary,
-    body: `${parts}\r\n--${boundary}--\r\n`,
-  };
-}
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -127,7 +99,7 @@ describe('Debugger Batch Endpoint Scope', () => {
           '',
         ].join('\r\n');
 
-        const payload = buildBatchPayloadWithEmptyLine([discoveryRequest]);
+        const payload = buildDebuggerBatchPayload([discoveryRequest]);
 
         if (process.env.DEBUG_ADT_TESTS === 'true') {
           logTestStep(
@@ -140,16 +112,8 @@ describe('Debugger Batch Endpoint Scope', () => {
           testsLogger,
         );
 
-        const response = await connection.makeAdtRequest({
-          url: '/sap/bc/adt/debugger/batch',
-          method: 'POST',
-          timeout: 30000,
-          data: payload.body,
-          headers: {
-            'Content-Type': `multipart/mixed; boundary=${payload.boundary}`,
-            Accept: 'multipart/mixed',
-          },
-        });
+        // The shipped atoms, so this run measures what the package sends.
+        const response = await executeBatchRequest(connection, payload);
 
         logTestStep(`response status: ${response.status}`, testsLogger);
 
@@ -239,7 +203,7 @@ describe('Debugger Batch Endpoint Scope', () => {
           '',
         ].join('\r\n');
 
-        const payload = buildBatchPayloadWithEmptyLine([
+        const payload = buildDebuggerBatchPayload([
           classReadRequest,
           programReadRequest,
         ]);
@@ -255,16 +219,8 @@ describe('Debugger Batch Endpoint Scope', () => {
           testsLogger,
         );
 
-        const response = await connection.makeAdtRequest({
-          url: '/sap/bc/adt/debugger/batch',
-          method: 'POST',
-          timeout: 30000,
-          data: payload.body,
-          headers: {
-            'Content-Type': `multipart/mixed; boundary=${payload.boundary}`,
-            Accept: 'multipart/mixed',
-          },
-        });
+        // The shipped atoms, so this run measures what the package sends.
+        const response = await executeBatchRequest(connection, payload);
 
         logTestStep(`response status: ${response.status}`, testsLogger);
 

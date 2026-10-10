@@ -534,49 +534,51 @@ export interface IDebuggerBatchPayload {
 }
 
 /**
- * `POST /debugger/batch` with a multipart body. Measured on premise
- * (2026-10-09) as a general router: inner requests outside the debugger are
- * answered too.
+ * `POST /debugger/batch` with a multipart body, built by
+ * {@link buildDebuggerBatchPayload}. The content type names the payload's
+ * boundary, or the server cannot find the parts. Measured on premise and on
+ * the cloud (2026-10-09) as a general router: inner requests outside the
+ * debugger are answered too, each part in the multipart answer.
  */
 export async function executeBatchRequest(
   connection: IAbapConnection,
-  requests: string,
+  payload: IDebuggerBatchPayload,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/batch`,
     method: 'POST',
     timeout: getTimeout('default'),
-    data: requests,
+    data: payload.body,
     headers: {
-      'Content-Type': 'application/xml',
-      Accept: 'application/xml',
+      'Content-Type': `multipart/mixed; boundary=${payload.boundary}`,
+      Accept: 'multipart/mixed',
     },
   });
 }
 
+/**
+ * The multipart body of a batch: each request as an `application/http` part,
+ * kept as given — an inner request ends with its own empty line
+ * (`…\r\n\r\n`), and trimming it breaks the part.
+ */
 export function buildDebuggerBatchPayload(
-  requests: string[],
+  requests: readonly string[],
   boundary = createBatchBoundary(),
 ): IDebuggerBatchPayload {
   const parts = requests
-    .map((request) => {
-      if (!request.trim()) {
-        throw new Error('Batch request part must not be empty');
-      }
-      // Do NOT trim — inner requests must preserve trailing \r\n\r\n
-      return [
+    .map((request) =>
+      [
         `--${boundary}`,
         'Content-Type: application/http',
         'content-transfer-encoding: binary',
         '',
         request,
-        '',
-      ].join('\r\n');
-    })
+      ].join('\r\n'),
+    )
     .join('');
 
   return {
     boundary,
-    body: `${parts}--${boundary}--\r\n`,
+    body: `${parts}\r\n--${boundary}--\r\n`,
   };
 }
