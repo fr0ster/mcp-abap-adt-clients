@@ -13,6 +13,28 @@ Project → Properties → ABAP Development → Debug → **Breakpoint activatio
 
 Sources: [SAP tutorial](https://developers.sap.com/tutorials/abap-environment-custom-entity-debug/), [SAP Help, external breakpoints](https://help.sap.com/saphelp_em92/helpdata/en/78/2fad99556043b2bf219b5d227ba0e6/content.htm), [ADT debugger troubleshooting](https://blogs.sap.com/2020/04/21/adt-abap-debugger-what-to-do-if-your-program-does-not-stop-at-breakpoints/), [software-heroes](https://software-heroes.com/en/blog/abap-tools-wirk-with-eclipse-breakpoint), [Abapinho](https://abapinho.com/en/2014/05/request-based-debugging/).
 
+## Eclipse ADT debugger settings, and what each may map to
+
+The list below summarises SAP Help pages, as a reviewer collected them (2026-10-10). The pages are "Setting ABAP Debugging Preferences", "Setting ABAP Project-Specific Debug Settings", "AMDP Debugger Settings", "Debugging ABAP Code" and "Comparing ABAP Debugging in SAP GUI and ADT". The summary was not checked against the pages here. The protocol column is our reading: **known** means captured or advertised by the discovery; **likely** means it comes from abap-adt-api's requests; **unknown** means nothing yet.
+
+| Level | Setting | What it does | Protocol |
+|---|---|---|---|
+| Global (Window → Preferences → ABAP Development → Debug) | Enable debugging of system programs | Steps into programs with status SYSTEM and stops at breakpoints there; when off, system code is stepped over and its breakpoints do not fire | likely: `systemDebugging` on `<dbg:breakpoints>` and in `setDebuggerSettings` |
+| Global | Always create exception object | Creates the exception object even where `CATCH` has no `INTO` (older ADT) | likely: `createExceptionObject` in `setDebuggerSettings` |
+| Project (Configure Project Specific Settings) | Breakpoint validity: This project only | Only requests started from this project; external HTTP/RFC requests are not caught | unknown; perhaps the `ideId` scoping seen in the measurement |
+| Project | Breakpoint validity: Logon user (default) | Requests running under the logon user | known: `debuggingMode=user`, `requestUser` = the logon user |
+| Project | Breakpoint validity: User | Requests running under another user (HTTP/RFC) | likely: `debuggingMode=user`, `requestUser` = that user |
+| Project | Breakpoint validity: Terminal ID | Requests carrying that terminal id | likely: `debuggingMode=terminal`, `terminalId` |
+| Project → Advanced | Allow debugging of tool requests | Lets ADT's own requests be debugged (for developing ADT tools) | unknown; of interest to any client of the ADT API, this one included |
+| Breakpoints view | Line, conditional, exception, statement breakpoints; watchpoints; enable/disable | Kinds and states of a breakpoint; in ADT the validity scope decides what is caught, there is no separate "external" kind | known: `kind`, `condition`, `/watchpoints`; likely: `deactivated` (breakpoint set) and `skipCount` |
+| Active session (debugger actions) | System debugging, Update debugging, Normal debugging | Switched during a session; update debugging is turned on at a stop before `COMMIT WORK` | known: `/debugger/actions{?action,value}` (discovery) and the `actions` in attach/step answers; likely: `setDebuggerSettings` (`updateDebugging`, `backgroundRFC`, `sharedObjectDebugging`) |
+| Background jobs | Debug a job | From ABAP Platform 2020 (SAP_BASIS 7.55) a job can be debugged through SM37, given the authorisation | unknown in ADT |
+| AMDP (Project → AMDP) | Debug mode: only procedures containing breakpoints / all called procedures | Which SQLScript procedures are compiled in debug mode: faster start or fewer optimisation side effects | likely: `cascadeMode` on `/sap/bc/adt/amdp/debugger/main{?stopExisting,requestUser,cascadeMode}` (discovery) |
+
+For the SAP BTP ABAP environment, the settings that matter most are Logon user/User (which user an OData request runs under), This project only (whether an external HTTP request is caught), system debugging (given the authorisation) and tool-request debugging. A setting being offered in Eclipse does not mean that the backend allows that mode: that depends on the platform, the release and the authorisations.
+
+What still needs research is how each "unknown" and "likely" row is carried on the wire. That means a capture of Eclipse with the setting changed, read against the discovery templates above.
+
 ## What abap-adt-api sends
 
 [abap-adt-api](https://github.com/marcellourbani/abap-adt-api) 8.4.3 (`build/api/debugger.*`) is the client behind vscode_abap_remote_fs. Its requests are the same resources as ours, with these differences.
