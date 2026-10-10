@@ -695,6 +695,74 @@ export type IScalarFunctionImplementationContract<
     ReturnType<R['versions']>,
     ReturnType<R['versionSource']>
   >;
+/**
+ * The cross-cutting operations, as the nine atoms `AdtUtils` implements —
+ * every member it has (#109). `getUtils()` answers this, not the class.
+ */
+export type IUtilsContract<R extends IUtilResults> = IAdtInformationSystem<
+  ReturnType<R['search']>,
+  ReturnType<R['whereUsed']>,
+  ReturnType<R['whereUsedScope']>,
+  ReturnType<R['folders']>,
+  ReturnType<R['types']>
+> &
+  IAdtRepositoryStructure<
+    ReturnType<R['node']>,
+    ReturnType<R['objectStructure']>
+  > &
+  IAdtGroupLifecycle<
+    ReturnType<R['inactive']>,
+    ReturnType<R['activation']>,
+    ReturnType<R['run']>,
+    ReturnType<R['results']>,
+    ReturnType<R['deletionCheck']>,
+    ReturnType<R['deletion']>
+  > &
+  IAdtDataPreview<
+    ReturnType<R['query']>,
+    ReturnType<R['columns']>,
+    ReturnType<R['contents']>
+  > &
+  IAdtDiscovery<ReturnType<R['discovery']>> &
+  IAdtObjectAccess<
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>,
+    ReturnType<R['include']>
+  >;
+
+/**
+ * A feature toggle's operations: the lifecycle atoms and the toggle's own
+ * members (`IFeatureToggleObject`) — every member `AdtFeatureToggle` has
+ * (#109). `getFeatureToggle()` answers this, not the class.
+ */
+export type IFeatureToggleContract<R extends IFeatureToggleResults> =
+  IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>> &
+    IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<Partial<IFeatureToggleConfig>, ReturnType<R['updated']>> &
+    IAdtMetadataUpdatable<
+      Partial<IFeatureToggleConfig>,
+      ReturnType<R['metadataUpdated']>
+    > &
+    IAdtDeletable<
+      IFeatureToggleConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFeatureToggleConfig> &
+    // interfaces-adt 11 gives each of the toggle's answers its own result slot
+    // (`IFeatureToggleObjectResults`), so the factory can promise the domain
+    // members too — each typed by the strategy the caller passed for it.
+    IFeatureToggleObject<{
+      switched: ReturnType<R['switched']>;
+      runtimeState: ReturnType<R['runtimeState']>;
+      checkState: ReturnType<R['checkState']>;
+      source: ReturnType<R['sourceDocument']>;
+    }>;
+
 export type IAppendStructureContract<R extends IAppendStructureResults> =
   IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
     IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>> &
@@ -1933,41 +2001,13 @@ export class AdtClient {
    * Get high-level operations for FeatureToggle objects
    * @returns IFeatureToggleObject instance for FeatureToggle operations
    */
-  // **These two still answer the concrete class, and that is a finding rather
-  // than an omission.** Their declared contracts are narrower than the classes
-  // offer — `getPackageHierarchy`, `getPackageContentsList`, and the feature
-  // toggle's own members are not in them — so composing them would take away
-  // members this package's own tests and scripts call. What is incomplete is
-  // the contract; widening it is issue #109's subject, not this change's.
-  getFeatureToggle(): AdtFeatureToggle;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class (#109): the composition is every member the class
+  // has, so nothing a caller uses is lost.
+  getFeatureToggle(): IFeatureToggleContract<typeof featureToggleDocuments>;
   getFeatureToggle<R extends IFeatureToggleResults>(
     results: R,
-  ): IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>> &
-    IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>> &
-    IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<Partial<IFeatureToggleConfig>, ReturnType<R['updated']>> &
-    IAdtMetadataUpdatable<
-      Partial<IFeatureToggleConfig>,
-      ReturnType<R['metadataUpdated']>
-    > &
-    IAdtDeletable<
-      IFeatureToggleConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    > &
-    IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IFeatureToggleConfig> &
-    // interfaces-adt 11 gives each of the toggle's answers its own result slot
-    // (`IFeatureToggleObjectResults`), so the factory can promise the domain
-    // members too — each typed by the strategy the caller passed for it.
-    IFeatureToggleObject<{
-      switched: ReturnType<R['switched']>;
-      runtimeState: ReturnType<R['runtimeState']>;
-      checkState: ReturnType<R['checkState']>;
-      source: ReturnType<R['sourceDocument']>;
-    }>;
+  ): IFeatureToggleContract<R>;
   getFeatureToggle<
     R extends IFeatureToggleResults = typeof featureToggleDocuments,
   >(results: R = featureToggleDocuments as unknown as R): AdtFeatureToggle<R> {
@@ -2056,45 +2096,11 @@ export class AdtClient {
    *
    * @returns The cross-cutting operations, as contracts
    */
-  // **These two still answer the concrete class, and that is a finding rather
-  // than an omission.** Their declared contracts are narrower than the classes
-  // offer — `getPackageHierarchy`, `getPackageContentsList`, and the feature
-  // toggle's own members are not in them — so composing them would take away
-  // members this package's own tests and scripts call. What is incomplete is
-  // the contract; widening it is issue #109's subject, not this change's.
-  getUtils(): AdtUtils;
-  getUtils<R extends IUtilResults>(
-    results: R,
-  ): IAdtInformationSystem<
-    ReturnType<R['search']>,
-    ReturnType<R['whereUsed']>,
-    ReturnType<R['whereUsedScope']>,
-    ReturnType<R['folders']>,
-    ReturnType<R['types']>
-  > &
-    IAdtRepositoryStructure<
-      ReturnType<R['node']>,
-      ReturnType<R['objectStructure']>
-    > &
-    IAdtGroupLifecycle<
-      ReturnType<R['inactive']>,
-      ReturnType<R['activation']>,
-      ReturnType<R['run']>,
-      ReturnType<R['results']>,
-      ReturnType<R['deletionCheck']>,
-      ReturnType<R['deletion']>
-    > &
-    IAdtDataPreview<
-      ReturnType<R['query']>,
-      ReturnType<R['columns']>,
-      ReturnType<R['contents']>
-    > &
-    IAdtDiscovery<ReturnType<R['discovery']>> &
-    IAdtObjectAccess<
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>,
-      ReturnType<R['include']>
-    >;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class (#109): the composition is every member the class
+  // has, so nothing a caller uses is lost.
+  getUtils(): IUtilsContract<typeof utilDocuments>;
+  getUtils<R extends IUtilResults>(results: R): IUtilsContract<R>;
   getUtils<R extends IUtilResults = typeof utilDocuments>(
     results: R = utilDocuments as unknown as R,
   ): AdtUtils<R> {
