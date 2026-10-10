@@ -68,13 +68,11 @@ export interface IServiceResults {
   /** The binding types this system offers. */
   readonly bindingTypes: IResultStrategy<unknown>;
   /** What generating the service answers. */
-  readonly generation: IResultStrategy<unknown>;
   /** What an OData v2 or v4 read of the binding answers. */
   readonly odata: IResultStrategy<unknown>;
   /** What publishing or withdrawing answers. */
   readonly publication: IResultStrategy<unknown>;
   /** What classifying the binding answers. */
-  readonly classification: IResultStrategy<unknown>;
 }
 
 /**
@@ -93,10 +91,8 @@ export const serviceDocuments = {
   updated: rawDocument,
   transport: rawDocument,
   bindingTypes: rawDocument,
-  generation: rawDocument,
   odata: rawDocument,
   publication: rawDocument,
-  classification: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IServiceResults;
 
@@ -208,28 +204,6 @@ export interface IServiceBindingPublicationV4Params
 }
 
 /**
- * What identifies the OData service group a binding publishes.
- *
- * Declared here for the same reason as
- * {@link IServiceBindingPublicationParams}: the shape is being settled against
- * measured traffic before it moves to `@mcp-abap-adt/interfaces`.
- *
- * The difference from `IGetServiceBindingODataParams` there is `serviceType`.
- * The contract has none, so the protocol had to live in the method name —
- * `getODataV2ServiceBinding` and `getODataV4ServiceBinding`, one endpoint under
- * two names differing by a value they could have taken as an argument.
- */
-export interface IServiceGroupParams {
-  /** The binding, as the URL addresses it. */
-  objectname: string;
-  /** Which protocol's service group to read. */
-  serviceType: GeneratedServiceType;
-  servicename?: string;
-  serviceversion?: string;
-  srvdname?: string;
-}
-
-/**
  * The shapes below describe the argument of the request builders in this
  * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
  * outside this package ever accepted them — no parameter, field or return
@@ -250,26 +224,9 @@ export interface ICheckServiceBindingParams {
   version?: 'active' | 'inactive';
 }
 
-export interface IClassifyServiceBindingParams {
-  objectname: string;
-  bindtype?: string;
-  bindtypeversion?: string;
-  repositoryid?: string;
-  servicename?: string;
-  serviceversion?: string;
-}
-
 export interface IDeleteServiceBindingParams {
   bindingName: string;
   transportRequest?: string;
-}
-
-export interface IGenerateServiceBindingParams {
-  serviceType: GeneratedServiceType;
-  bindingName: string;
-  serviceName: string;
-  serviceVersion: string;
-  serviceDefinitionName: string;
 }
 
 export interface IGetServiceBindingODataParams {

@@ -24,7 +24,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [27.0.0] - 2026-10-10
+
+Every factory of `AdtClient` now answers a contract (#109): the last three
+that answered their concrete class — `getUtils`, `getFeatureToggle` and
+`getServiceBinding` — answer a named composition of contracts, each holding
+every method its class has. See [MIGRATION-27.md](docs/usage/MIGRATION-27.md).
+
 ### Changed (breaking)
+
+- **`getServiceBinding()` answers `IServiceBindingContract`**, not
+  `AdtServiceBinding`: the lifecycle atoms plus `IAdtServiceBindingTypes` and
+  `IAdtServiceGroupReadable` from `@mcp-abap-adt/interfaces-adt` 13.2.0, now
+  `^13.2.0` here and in `adt-strategies`. `IServiceGroupParams` comes from there
+  too; the local copy is gone.
 
 - **`getUtils()` and `getFeatureToggle()` answer their contracts, not the
   concrete class** (#109). The overload taking a result set already did; the
@@ -38,6 +51,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   a factory's answer takes `IUtilsContract<typeof utilDocuments>` or
   `IFeatureToggleContract<typeof featureToggleDocuments>` instead, or no
   annotation.
+
+### Removed
+
+- **`AdtServiceBinding.generateServiceBinding`** — it sent the request
+  `getServiceGroup` sends, a `GET` of the service group, and generated nothing;
+  its `IGenerateServiceBindingParams` and the `generation` result slot go with
+  it. Call `getServiceGroup`.
+- **`AdtServiceBinding.classifyServiceBinding`** — a `GET` to
+  `/businessservices/release`, answered `405` on premise and on the cloud
+  (2026-10-10), called by nobody and implemented by no other ADT client found;
+  its `IClassifyServiceBindingParams` and the `classification` result slot go
+  with it. It returns once the request Eclipse sends has been recorded.
+- **`AdtClient.getService()`**, the deprecated alias of `getServiceBinding()`.
+
+### Fixed
+
+- `AdtServiceBinding.create`'s doc described a chain — create, activate,
+  generate — that had already gone; it is one `POST`, and says so.
 
 ## [26.1.0] - 2026-10-10
 

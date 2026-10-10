@@ -107,7 +107,7 @@ describe('AdtClient connect guard', () => {
 
     // A floor, so that a refactor renaming the factories into oblivion cannot
     // turn this into a test that asserts nothing.
-    expect(factories.length).toBeGreaterThanOrEqual(36);
+    expect(factories.length).toBeGreaterThanOrEqual(35);
 
     const unguarded: string[] = [];
     for (const name of factories) {

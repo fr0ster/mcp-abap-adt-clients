@@ -15,6 +15,14 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-10
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^13.2.0`**, as `adt-clients` 27.0.0
+  declares it — one copy of the contract. Nothing in this package's code
+  changed.
+
 ## [0.8.0] - 2026-10-10
 
 ### Added

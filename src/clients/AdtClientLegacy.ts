@@ -426,9 +426,4 @@ export class AdtClientLegacy extends AdtClient {
       FEATURE_TOGGLE.collection,
     );
   }
-
-  /** @deprecated Use getServiceBinding(). */
-  override getService(): AdtServiceBinding {
-    return this.getServiceBinding();
-  }
 }

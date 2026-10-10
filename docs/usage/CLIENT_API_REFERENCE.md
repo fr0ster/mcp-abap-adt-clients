@@ -1169,6 +1169,24 @@ That is a read of the OData service group — its URL prefix, its collections,
 its deployment state — which carries `published` among them. It is not a
 job-status endpoint, and polling it is the consumer's to write.
 
+**What `getServiceBinding()` answers (27.0.0): `IServiceBindingContract`.** The
+lifecycle atoms — create, read, metadata, update (the publication), delete and
+its check, validate, check, activate, transport, lock — and the binding's two
+reads beyond them, `getServiceBindingTypes()` (the catalogue of binding types
+the system offers) and `getServiceGroup(params)`, both atoms of
+`@mcp-abap-adt/interfaces-adt` 13.2.0. That is every method the class has, and
+a compile-time check keeps it so. Each is one request; measured on premise and
+on the cloud.
+
+Gone in 27.0.0, with what to call instead:
+- `generateServiceBinding(params)` sent the very request `getServiceGroup` sends
+  — a `GET` of the service group — and generated nothing. Call
+  `getServiceGroup({ objectname, serviceType, servicename, serviceversion,
+  srvdname })`.
+- `classifyServiceBinding(params)` sent a `GET` to `/businessservices/release`,
+  answered `405` on premise and on the cloud. No measured request replaces it.
+- `getService()`, the deprecated alias: call `getServiceBinding()`.
+
 ### Message class (MSAG) and its messages
 
 Message classes and their individual messages are two separate handlers.
