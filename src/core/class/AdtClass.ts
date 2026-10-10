@@ -173,7 +173,8 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
             create_protected: config.createProtected,
             master_system:
               config.masterSystem ?? this.systemContext.masterSystem,
-            responsible: config.responsible ?? this.systemContext.responsible,
+            // config.responsible is not sent: see create.ts — SAP would record
+            // it as the creator, not as the responsible person.
             masterLanguage:
               config.masterLanguage ?? this.systemContext.masterLanguage,
             template_xml: config.classTemplate,

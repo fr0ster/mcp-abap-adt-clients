@@ -531,6 +531,16 @@ write**, and a service definition is created with an empty source (a create
 that sends no responsible person is refused — a different thing).
 `getVersions()` answers `ok` in every one of those states.
 
+## A class create cannot set the responsible person
+
+On a class create, SAP reads `adtcore:responsible` as the class's **creator**
+(`createdBy`) and records the logon user as **responsible** whatever is sent;
+a later metadata `PUT` does not change it either. So `getClass().create()`
+(and a behavior implementation create) sends no `adtcore:responsible` — the
+`responsible` in the config or the system context is not used for a class.
+Measured on-premise, 2026-10-04. The responsible person of a class is changed
+outside ADT (the object directory entry, SE03 / SE80).
+
 ## The name is taken from the POST onward, and `validate()` may not say so
 
 Whatever the create leaves behind, it holds the name. A second create is refused

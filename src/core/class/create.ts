@@ -36,7 +36,6 @@ export async function create(
   const url = `${CLASS.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const masterSystem = args.master_system || '';
-  const username = args.responsible || '';
 
   const finalAttr = args.final ? 'true' : 'false';
   const visibilityAttr = args.create_protected ? 'protected' : 'public';
@@ -48,7 +47,11 @@ export async function create(
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+  // No adtcore:responsible: a class create stores that attribute as the
+  // class's creator (createdBy), while the responsible person is always the
+  // logon user. Measured on-premise (2026-10-04): a create sending another
+  // user as responsible left responsible = logon user, createdBy = that user;
+  // no ADT request changes it afterwards (the metadata PUT ignores it).
   const abapSourceNamespace = args.template_xml
     ? ' xmlns:abapsource="http://www.sap.com/adt/abapsource"'
     : '';
@@ -56,7 +59,7 @@ export async function create(
     ? `\n\n  ${args.template_xml}\n\n`
     : '\n\n';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
 
 
 

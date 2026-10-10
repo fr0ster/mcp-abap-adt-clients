@@ -106,8 +106,33 @@ describe.each([
   });
 });
 
+// A class create sends no adtcore:responsible: SAP stores that attribute as
+// the class's creator (createdBy) and records the logon user as responsible
+// whatever is sent. Measured on-premise 2026-10-04.
+describe('class create', () => {
+  const config = { className: 'ZCL_X', packageName: 'ZPKG', description: 'd' };
+
+  it('sends no responsible from the system context', async () => {
+    const { conn, bodies } = recorder();
+    await new AdtClient(conn, undefined, { ...CTX } as never)
+      .getClass()
+      .create(config as never);
+    expect(bodies[0]).not.toContain('adtcore:responsible');
+    expect(bodies[0]).toContain('adtcore:masterSystem="SID"');
+  });
+
+  it('sends no responsible from the config', async () => {
+    const { conn, bodies } = recorder();
+    await new AdtClient(conn, undefined, { ...CTX } as never)
+      .getClass()
+      .create({ ...config, responsible: 'OTHER' } as never);
+    expect(bodies[0]).not.toContain('adtcore:responsible');
+    expect(bodies[0]).not.toContain('OTHER');
+  });
+});
+
 describe('behavior implementation create through the client', () => {
-  it('carries the client system context like a class create', async () => {
+  it('carries the client master system like a class create', async () => {
     const { conn, bodies } = recorder();
     const client = new AdtClient(conn, undefined, {
       ...CTX,
@@ -117,7 +142,7 @@ describe('behavior implementation create through the client', () => {
       packageName: 'ZPKG',
       description: 'd',
     } as never);
-    expect(bodies[0]).toContain('adtcore:responsible="DEVELOPER"');
+    expect(bodies[0]).not.toContain('adtcore:responsible');
     expect(bodies[0]).toContain('adtcore:masterSystem="SID"');
   });
 
