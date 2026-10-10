@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [26.0.0] - 2026-10-10
+
 The ABAP debugger, the AMDP debugger and memory snapshots, measured on premise
 (SAP_BASIS 758 and 816, HTTP and RFC) and on SAP BTP ABAP Environment, against
 the contracts `@mcp-abap-adt/interfaces-adt` 13.1.0 brought back. Breaking for a
