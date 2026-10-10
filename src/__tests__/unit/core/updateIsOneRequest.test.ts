@@ -20,7 +20,10 @@ const recording = () => {
   const methods: string[] = [];
   const bodies: unknown[] = [];
   const connection: Partial<IAbapConnection> = {
-    makeAdtRequest: async (request: { method?: string; data?: unknown }) => {
+    makeAdtRequest: async <T = unknown, D = unknown>(request: {
+      method?: string;
+      data?: unknown;
+    }): Promise<IAdtWireResponse<T, D>> => {
       methods.push(request.method ?? 'GET');
       bodies.push(request.data);
       return {
@@ -28,7 +31,7 @@ const recording = () => {
         statusText: 'OK',
         headers: {},
         data: '',
-      } as IAdtWireResponse;
+      } as IAdtWireResponse<T, D>;
     },
   };
   return { connection: connection as IAbapConnection, methods, bodies };

@@ -11,7 +11,12 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAmdpBreakpoint,
+  IAmdpDebugger,
+  IAmdpStepMethod,
+  IGetAmdpDataPreviewOptions,
   IResultStrategy,
+  IStartAmdpDebuggerOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -25,15 +30,7 @@ import {
   stopAmdpDebugger,
   syncAmdpBreakpoints,
 } from './amdp';
-import { getAmdpCellSubstring, getAmdpDataPreview } from './amdpDataPreview';
-import type {
-  IAmdpBreakpoint,
-  IAmdpDebugger,
-  IAmdpStepMethod,
-  IGetAmdpCellSubstringOptions,
-  IGetAmdpDataPreviewOptions,
-  IStartAmdpDebuggerOptions,
-} from './contracts';
+import { getAmdpDataPreview } from './amdpDataPreview';
 
 /** One strategy per kind of answer the AMDP debugger gives. */
 export interface IAmdpDebuggerResults {
@@ -160,22 +157,12 @@ export class AmdpDebugger<
   }
 
   async getDataPreview<E extends IAdtError = IAdtError>(
-    options?: IGetAmdpDataPreviewOptions & IAdtAnalyseOptions<E>,
+    options: IGetAmdpDataPreviewOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'preview'>, E>> {
     return answering(
       () => getAmdpDataPreview(this.connection, options),
       this.reading('preview'),
-      options?.analyse,
-    );
-  }
-
-  async getCellSubstring<E extends IAdtError = IAdtError>(
-    options?: IGetAmdpCellSubstringOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'preview'>, E>> {
-    return answering(
-      () => getAmdpCellSubstring(this.connection, options),
-      this.reading('preview'),
-      options?.analyse,
+      options.analyse,
     );
   }
 }

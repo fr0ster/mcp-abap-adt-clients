@@ -2,6 +2,7 @@
  * Runtime Debugger - Exports
  */
 
+export type * from '@mcp-abap-adt/interfaces-adt';
 export {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -41,6 +42,7 @@ export {
   setStackPosition,
   setVariableValue,
   step,
+  stepToLine,
   stopListener,
   terminateDebuggee,
 } from './abap';
@@ -56,5 +58,3 @@ export {
   stopAmdpDebugger,
   syncAmdpBreakpoints,
 } from './amdp';
-export type * from './contracts';
-export { Debugger } from './Debugger';

@@ -29,15 +29,15 @@
  */
 
 import type {
+  IAmdpBreakpoint,
+  IAmdpStepMethod,
+  IStartAmdpDebuggerOptions,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
-import type {
-  IAmdpBreakpoint,
-  IAmdpStepMethod,
-  IStartAmdpDebuggerOptions,
-} from './contracts';
 
 const MAIN = '/sap/bc/adt/amdp/debugger/main';
 const NAMESPACE = 'xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"';

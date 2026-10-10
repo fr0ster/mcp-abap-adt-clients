@@ -1,10 +1,10 @@
+import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
   type IAbapDebuggerOptions,
 } from '../../../runtime/debugger/AbapDebugger';
-import type { IDebuggerIdentity } from '../../../runtime/debugger/contracts';
 
 /**
  * Each member sends the request the measured sequence sends
@@ -200,15 +200,27 @@ describe('AbapDebugger', () => {
     );
   });
 
-  it('step posts the step method, with a target line when given', async () => {
+  it('step posts the step method alone', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.step('stepRunToLine', {
-      uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=18',
-    });
+    await debugger_.step('stepOver');
     expect(sent()).toMatchObject({
       method: 'POST',
-      url: '/sap/bc/adt/debugger?method=stepRunToLine&uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2Fzcl_probe%2Fsource%2Fmain%23start%3D18',
+      url: '/sap/bc/adt/debugger?method=stepOver',
     });
+  });
+
+  it('stepToLine posts the method with the line it names', async () => {
+    for (const method of ['stepRunToLine', 'stepJumpToLine'] as const) {
+      const { debugger_, sent } = setup();
+      await debugger_.stepToLine(
+        method,
+        '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=18',
+      );
+      expect(sent()).toMatchObject({
+        method: 'POST',
+        url: `/sap/bc/adt/debugger?method=${method}&uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2Fzcl_probe%2Fsource%2Fmain%23start%3D18`,
+      });
+    }
   });
 
   it('setStackPosition, setVariableValue and terminateDebuggee use the dispatcher', async () => {

@@ -26,16 +26,17 @@
  */
 
 import type {
+  IDebuggerBreakpoint,
+  IDebuggerIdentity,
+  IDebuggerStepMethod,
+  IDebuggerStepToLineMethod,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 import { createBatchBoundary } from './batchPayload';
-import type {
-  IDebuggerBreakpoint,
-  IDebuggerIdentity,
-  IDebuggerStepMethod,
-} from './contracts';
 
 const DEBUGGER = '/sap/bc/adt/debugger';
 const ADT_NAMESPACES =
@@ -352,8 +353,7 @@ export async function getVariables(
 }
 
 /**
- * Move the debuggee: into, over, out of a call, on to the next stop, or to a
- * line (`uri` is the line's source URI with `#start=<line>`).
+ * Move the debuggee: into, over, out of a call, or on to the next stop.
  *
  * When the program runs to its end the answer is 500 `AdiFailed` with the
  * subtype `debuggeeEnded` — the measured end of a debug session, not a fault.
@@ -361,10 +361,31 @@ export async function getVariables(
 export async function step(
   connection: IAbapConnection,
   method: IDebuggerStepMethod,
-  uri?: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${DEBUGGER}?${query(uri ? { method, uri } : { method })}`,
+    url: `${DEBUGGER}?${query({ method })}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+/**
+ * Run to, or jump to, the line `uri` names (`<source uri>#start=<line>`).
+ *
+ * The line is an argument: without it SAP answers 400 "Parameter uri could not
+ * be found" — and on SAP_BASIS 758 let the program run to its end in the same
+ * moment, losing the stop (816 and the cloud kept the debuggee, 2026-10-10).
+ * A jump moves the debuggee without running what lies between: measured on
+ * 816 and on the cloud, a fill loop skipped.
+ */
+export async function stepToLine(
+  connection: IAbapConnection,
+  method: IDebuggerStepToLineMethod,
+  uri: string,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({ method, uri })}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: 'application/xml' },

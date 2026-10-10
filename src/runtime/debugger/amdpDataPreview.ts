@@ -1,33 +1,13 @@
 /**
- * AMDP Debugger Data Preview
- *
- * Provides functions for data preview during AMDP debugging:
- * - Data preview for variables
- * - Cell substring retrieval
+ * AMDP debugger data preview: a table variable's rows at the current stop.
  */
 
+import type { IGetAmdpDataPreviewOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
-
-/**
- * Get data preview options
- */
-export interface IGetAmdpDataPreviewOptions {
-  rowNumber?: number;
-  colNumber?: number;
-  sessionId?: string;
-  debuggerId?: string;
-  debuggeeId?: string;
-  variableName?: string;
-  schema?: string;
-  provideRowId?: boolean;
-  action?: string;
-  /** The SELECT over the variable, sent as the body. */
-  query?: string;
-}
 
 /**
  * A table variable's rows at the current stop.
@@ -48,21 +28,18 @@ export interface IGetAmdpDataPreviewOptions {
  */
 export async function getAmdpDataPreview(
   connection: IAbapConnection,
-  options?: IGetAmdpDataPreviewOptions,
+  options: IGetAmdpDataPreviewOptions,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/datapreview/amdpdebugger`;
   const params: Record<string, string | number | boolean> = {};
 
-  if (options?.rowNumber !== undefined) params.rowNumber = options.rowNumber;
-  if (options?.colNumber !== undefined) params.colNumber = options.colNumber;
-  if (options?.sessionId) params.sessionId = options.sessionId;
-  if (options?.debuggerId) params.debuggerId = options.debuggerId;
-  if (options?.debuggeeId) params.debuggeeId = options.debuggeeId;
-  if (options?.variableName) params.variableName = options.variableName;
-  if (options?.schema) params.schema = options.schema;
-  if (options?.provideRowId !== undefined)
+  if (options.rowNumber !== undefined) params.rowNumber = options.rowNumber;
+  params.sessionId = options.sessionId;
+  params.debuggerId = options.debuggerId;
+  params.debuggeeId = options.debuggeeId;
+  params.variableName = options.variableName;
+  if (options.provideRowId !== undefined)
     params.provideRowId = options.provideRowId;
-  if (options?.action) params.action = options.action;
 
   const query = new URLSearchParams(
     Object.entries(params).map(([key, value]) => [key, String(value)]),
@@ -73,67 +50,11 @@ export async function getAmdpDataPreview(
     timeout: getTimeout('default'),
     // The server refuses a request without a content type, the empty one too
     // (400 "Content type missing"); no SELECT is an empty body.
-    data: options?.query ?? '',
+    data: options.query ?? '',
     headers: {
       Accept:
         'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
       'Content-Type': 'text/plain',
-    },
-  });
-}
-
-/**
- * Get cell substring options
- */
-export interface IGetAmdpCellSubstringOptions {
-  rowNumber?: number;
-  columnName?: string;
-  sessionId?: string;
-  debuggerId?: string;
-  debuggeeId?: string;
-  variableName?: string;
-  valueOffset?: number;
-  valueLength?: number;
-  schema?: string;
-  action?: string;
-}
-
-/**
- * Get cell substring from AMDP debugger data preview
- *
- * @param connection - ABAP connection
- * @param options - Cell substring options
- * @returns Axios response with cell substring
- */
-export async function getAmdpCellSubstring(
-  connection: IAbapConnection,
-  options?: IGetAmdpCellSubstringOptions,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/datapreview/amdpdebugger/cellsubstring`;
-  const params: Record<string, string | number | boolean> = {};
-
-  if (options?.rowNumber !== undefined) params.rowNumber = options.rowNumber;
-  if (options?.columnName) params.columnName = options.columnName;
-  if (options?.sessionId) params.sessionId = options.sessionId;
-  if (options?.debuggerId) params.debuggerId = options.debuggerId;
-  if (options?.debuggeeId) params.debuggeeId = options.debuggeeId;
-  if (options?.variableName) params.variableName = options.variableName;
-  if (options?.valueOffset !== undefined)
-    params.valueOffset = options.valueOffset;
-  if (options?.valueLength !== undefined)
-    params.valueLength = options.valueLength;
-  if (options?.schema) params.schema = options.schema;
-  if (options?.action) params.action = options.action;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    params,
-    headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/categories/datapreview/amdpdebugger/cellsubstring',
     },
   });
 }

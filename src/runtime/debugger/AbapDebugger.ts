@@ -7,9 +7,14 @@
  */
 
 import type {
+  IAbapDebugger,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IDebuggerBreakpoint,
+  IDebuggerIdentity,
+  IDebuggerStepMethod,
+  IDebuggerStepToLineMethod,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -33,15 +38,10 @@ import {
   setStackPosition,
   setVariableValue,
   step,
+  stepToLine,
   stopListener,
   terminateDebuggee,
 } from './abap';
-import type {
-  IAbapDebugger,
-  IDebuggerBreakpoint,
-  IDebuggerIdentity,
-  IDebuggerStepMethod,
-} from './contracts';
 
 /** One strategy per kind of answer the debugger gives. */
 export interface IAbapDebuggerResults {
@@ -238,10 +238,22 @@ export class AbapDebugger<
 
   async step<E extends IAdtError = IAdtError>(
     method: IDebuggerStepMethod,
-    options?: { uri?: string } & IAdtAnalyseOptions<E>,
+    options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'step'>, E>> {
     return answering(
-      () => step(this.connection, method, options?.uri),
+      () => step(this.connection, method),
+      this.reading('step'),
+      options?.analyse,
+    );
+  }
+
+  async stepToLine<E extends IAdtError = IAdtError>(
+    method: IDebuggerStepToLineMethod,
+    uri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'step'>, E>> {
+    return answering(
+      () => stepToLine(this.connection, method, uri),
       this.reading('step'),
       options?.analyse,
     );

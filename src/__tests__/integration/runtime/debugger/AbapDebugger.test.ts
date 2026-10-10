@@ -23,7 +23,12 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtResponse, IAdtRunnable } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtResponse,
+  IAdtRunnable,
+  IDebuggerBreakpoint,
+  IDebuggerIdentity,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -36,10 +41,6 @@ import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
-import type {
-  IDebuggerBreakpoint,
-  IDebuggerIdentity,
-} from '../../../../runtime/debugger/contracts';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -680,18 +681,20 @@ describe('ABAP debugger (AbapDebugger)', () => {
       if (skipped()) return;
       needs(attached, 'an attached debuggee');
       // The loop breakpoint is in the way on the last iteration; out of it first.
-      const ran = await debuggerApi.step('stepRunToLine', {
-        uri: `${SOURCE_URI}#start=${LINE.after}`,
-      });
+      const ran = await debuggerApi.stepToLine(
+        'stepRunToLine',
+        `${SOURCE_URI}#start=${LINE.after}`,
+      );
       expect(ran.ok).toBe(true);
       const top = await topFrame();
       expect([LINE.loop, LINE.after]).toContain(top.line);
       if (top.line === LINE.loop) {
         expect(
           (
-            await debuggerApi.step('stepRunToLine', {
-              uri: `${SOURCE_URI}#start=${LINE.after}`,
-            })
+            await debuggerApi.stepToLine(
+              'stepRunToLine',
+              `${SOURCE_URI}#start=${LINE.after}`,
+            )
           ).ok,
         ).toBe(true);
         expect((await topFrame()).line).toBe(LINE.after);
@@ -757,7 +760,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
   // --- run 2: terminated where it stands -------------------------------------------
 
   it(
-    'terminates a debuggee where it stands, and the run returns',
+    'jumps a debuggee to a line, terminates it where it stands, and the run returns',
     async () => {
       if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
@@ -780,6 +783,14 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(second.ok).toBe(true);
       attached = true;
       expect((await topFrame()).line).toBe(LINE.loop);
+
+      // A jump moves the debuggee without running what lies between.
+      const jumped = await debuggerApi.stepToLine(
+        'stepJumpToLine',
+        `${SOURCE_URI}#start=${LINE.after}`,
+      );
+      expect(jumped.ok).toBe(true);
+      expect((await topFrame()).line).toBe(LINE.after);
 
       const terminated = await debuggerApi.terminateDebuggee();
       // abapsmith records a 500 with the subtype terminateDebuggee as the

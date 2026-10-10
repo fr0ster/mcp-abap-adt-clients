@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -30,7 +31,6 @@ import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../src/runtime/debugger/AbapDebugger';
-import type { IDebuggerIdentity } from '../src/runtime/debugger/contracts';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {

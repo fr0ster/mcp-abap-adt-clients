@@ -117,6 +117,9 @@ describe('AmdpDebugger', () => {
 
     const select = setup({ status: 200, data: '', headers: {} });
     await select.debugger_.getDataPreview({
+      sessionId: 'dbhost:30103:263414',
+      debuggerId: MAIN_ID,
+      debuggeeId: DEBUGGEE,
       variableName: 'LT_ROWS',
       query: 'SELECT ":LT_ROWS"."N" AS "N" FROM ":LT_ROWS"',
     });

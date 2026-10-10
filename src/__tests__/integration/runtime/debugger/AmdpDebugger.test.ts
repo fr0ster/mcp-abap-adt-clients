@@ -23,7 +23,10 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtResponse,
+  IAmdpBreakpoint,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -36,7 +39,6 @@ import { AdtUtils } from '../../../../core/shared/AdtUtils';
 import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
-import type { IAmdpBreakpoint } from '../../../../runtime/debugger/contracts';
 import { wireItself } from '../../../../utils/resultStrategy';
 import {
   closeOwnTestConnection,

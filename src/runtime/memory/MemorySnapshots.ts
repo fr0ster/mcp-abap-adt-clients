@@ -10,19 +10,17 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IMemorySnapshots,
+  IMemorySnapshotsListOptions,
   IResultStrategy,
+  ISnapshotChildrenOptions,
+  ISnapshotRankingListOptions,
+  ISnapshotReferencesOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
-import type {
-  IMemorySnapshots,
-  IMemorySnapshotsListOptions,
-  ISnapshotChildrenOptions,
-  ISnapshotRankingListOptions,
-  ISnapshotReferencesOptions,
-} from '../debugger/contracts';
 import {
   getSnapshot,
   getSnapshotChildren,

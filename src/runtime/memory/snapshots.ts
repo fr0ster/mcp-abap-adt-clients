@@ -18,15 +18,15 @@
  */
 
 import type {
+  ISnapshotChildrenOptions,
+  ISnapshotRankingListOptions,
+  ISnapshotReferencesOptions,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
-import type {
-  ISnapshotChildrenOptions,
-  ISnapshotRankingListOptions,
-  ISnapshotReferencesOptions,
-} from '../debugger/contracts';
 
 const MEMORY = '/sap/bc/adt/runtime/memory';
 const TYPE = 'application/vnd.sap.adt.runtime.memory';
