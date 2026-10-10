@@ -2411,6 +2411,11 @@ runtime_gateway_errors:
 #   2. set enabled: true
 atc_run:
   test_cases:
+    - name: "adt_atc_check_variants"
+      enabled: true
+      description: "List ATC check variants: every one, the system variant by name, a limit"
+      # Read-only; no object needed. Measured on premise and on the cloud.
+
     - name: "adt_atc_run"
       enabled: false                # ← CHANGE: true once check_variant is set
       description: "Run ATC over the deliberately dirty shared class and read the worklist"

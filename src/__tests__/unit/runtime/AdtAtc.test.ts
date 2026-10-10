@@ -476,3 +476,36 @@ describe('AdtAtc — the confirmed URI templates', () => {
     );
   });
 });
+
+describe('AdtAtc.listCheckVariants', () => {
+  // The shape SAP answers with (on premise and cloud, 2026-10-10).
+  const VARIANTS = `<?xml version="1.0" encoding="utf-8"?><nameditem:namedItemList xmlns:nameditem="http://www.sap.com/adt/nameditem"><nameditem:totalItemCount>1</nameditem:totalItemCount><nameditem:namedItem><nameditem:name>DEFAULT</nameditem:name><nameditem:description/><nameditem:data/></nameditem:namedItem></nameditem:namedItemList>`;
+
+  const listing = () => {
+    const connection = {
+      makeAdtRequest: jest
+        .fn()
+        .mockResolvedValue({ status: 200, data: VARIANTS, headers: {} }),
+    };
+    const atc = new AdtAtc(connection as never, logger() as never);
+    const sent = () => connection.makeAdtRequest.mock.calls[0][0];
+    return { atc, sent };
+  };
+
+  it('sends the pattern as name, in one GET, answered as XML', async () => {
+    const { atc, sent } = listing();
+    const answer = await atc.listCheckVariants('*');
+    expect(sent()).toMatchObject({
+      url: '/sap/bc/adt/atc/variants?name=*',
+      method: 'GET',
+      headers: { Accept: 'application/xml' },
+    });
+    expect(expectResult(answer, 'variants')).toBe(VARIANTS);
+  });
+
+  it('adds the limit only when one is given', async () => {
+    const { atc, sent } = listing();
+    await atc.listCheckVariants('Z*', { maxItemCount: 3 });
+    expect(sent().url).toBe('/sap/bc/adt/atc/variants?name=Z*&maxItemCount=3');
+  });
+});

@@ -1598,6 +1598,22 @@ A system's nominated check variant may not run. On one on-premise system it
 answered `TOOL_FAILURE` "ATC check run aborted, due to missing prerequisites",
 while `DEFAULT` ran. In that case pass a variant to `createWorklist` yourself.
 
+**Which variants exist: `listCheckVariants(name, { maxItemCount? })`** — one
+`GET /atc/variants`, answering a `nameditem:namedItemList`. `name` is a pattern
+and it is required, because without it the list is empty rather than complete:
+`*` lists every variant, the match ignores case, and a name without `*` matches
+exactly (`DEF` does not find `DEFAULT`). `maxItemCount` limits the answer, but
+not exactly everywhere — on SAP BTP ABAP Environment a limit of 3 answered 6 —
+and the answer's `totalItemCount` counts what came back, not what exists, so a
+limited list cannot say it was cut. Measured on SAP_BASIS 758 and 816 and on the
+cloud (2026-10-06/10); the variants differ by system (`DEFAULT` exists on
+premise, not on the cloud).
+
+```typescript
+const variants = await atc.listCheckVariants('*');            // every one
+const cloud = await atc.listCheckVariants('abap_cloud*');      // any case
+```
+
 Every member answers the document as it arrived — `createWorklist` and
 `resolveCheckVariant` included, which answer `IAdtResponse` like the rest since
 23.0.0. The readings are in `@mcp-abap-adt/adt-strategies`:
@@ -1621,9 +1637,8 @@ const atc = runtime.getAtc({
   runStatus: atcRunStatus,
 });
 
-// The system's variant — or name one yourself and skip this request. On a
-// system whose variant list comes back empty, customizing is the only source
-// of a usable one.
+// The system's variant — or name one yourself (listCheckVariants lists them)
+// and skip this request.
 const variant = await atc.resolveCheckVariant();
 if (!variant.ok || !variant.getResult().value) throw new Error('no check variant');
 

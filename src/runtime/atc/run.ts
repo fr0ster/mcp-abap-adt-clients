@@ -116,6 +116,36 @@ export async function getAtcCustomizing(
 }
 
 /**
+ * The check variants whose name matches `name` — `/atc/variants`.
+ *
+ * `name` is a pattern: `*` is a wildcard, the match ignores case, and without
+ * a `*` it matches one name exactly (`DEF` finds no `DEFAULT`). It is the
+ * argument because the list is empty without it, not complete — a system with
+ * every variant looks like one with none. `maxItemCount` limits what comes
+ * back; `0` or none is no limit. On SAP_BASIS 758 and 816 the limit was exact;
+ * on SAP BTP ABAP Environment a limit of 3 answered 6 (2026-10-10). The
+ * answer's `totalItemCount` counts what was returned, not what exists, so a
+ * truncated list does not say so. `data`, the other parameter the discovery
+ * template names, filtered every name out on all three, and is left out.
+ * Answered as `application/xml` (or `…nameditems.v1+xml`); JSON is 406.
+ */
+export async function listAtcCheckVariants(
+  connection: IAbapConnection,
+  name: string,
+  maxItemCount?: number,
+): Promise<IAdtWireResponse> {
+  const query = new URLSearchParams({ name });
+  if (maxItemCount !== undefined)
+    query.set('maxItemCount', String(maxItemCount));
+  return connection.makeAdtRequest({
+    url: `${ATC}/variants?${query}`,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+/**
  * Create the worklist a run writes its findings into.
  *
  * The id this returns is **not** a run id: `GET /atc/runs/{worklistId}` answers
