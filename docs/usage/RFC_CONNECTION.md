@@ -144,14 +144,20 @@ If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setti
    fails at `connect()` with a message naming what to install
 2. Each `makeAdtRequest()` call invokes `SADT_REST_RFC_ENDPOINT` FM
 3. The FM proxies HTTP-like requests internally within the ABAP system
-4. The RFC session is inherently stateful — lock handles persist across calls
-5. `setSessionType()` is a no-op — RFC connections are always stateful
+4. **Stateful requests share one persistent conversation**, which is one ABAP session for the
+   wire's lifetime. A request is stateful when the connection is set stateful
+   (`setSessionType('stateful')`) or carries `x-sap-adt-sessiontype: stateful`. The lock window
+   is stateful, so lock handles persist across its calls
+5. **Every other request runs in a conversation of its own**: a kept one that is reset after
+   each call, or a throwaway one. `setSessionType()` is therefore not a no-op over RFC. Work that
+   must stay in one ABAP session — a lock window, a debugger conversation — needs it, exactly as
+   over HTTP
 
 ## Differences from HTTP
 
 | Aspect | HTTP | RFC |
 |--------|------|-----|
-| Session | Toggle stateful/stateless | Always stateful |
+| Session | Toggle stateful/stateless | Stateful requests: one persistent conversation; the rest: reset or throwaway ones |
 | Lock handles | May be lost on legacy systems | Always preserved |
 | Content negotiation | Standard HTTP Accept | Some endpoints only accept `*/*` |
 | sap-client | Added to URL query | Not needed (set in RFC params) |

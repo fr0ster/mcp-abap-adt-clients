@@ -3,6 +3,7 @@ import {
   analyseActivation,
   analyseAny,
   analyseCheck,
+  analyseDebuggeeEnd,
   analyseDeletion,
   analyseException,
   analysePublicationLock,
@@ -11,7 +12,7 @@ import {
   type IAdtMessageFailure,
 } from '../refusals/analyse';
 import { asItCame } from '../result';
-import { answerFor, stepsOf } from './corpus';
+import { answerFor, stepsOf, stepTagged } from './corpus';
 
 /**
  * Every assertion is a pair: the recorded refusal, and the recorded success it
@@ -311,5 +312,57 @@ describe('analysePublicationLock', () => {
         undefined,
       ),
     );
+  });
+});
+
+describe('analyseDebuggeeEnd', () => {
+  const libraryVerdict = (status: number): IAdtError => ({
+    origin: 'connection',
+    message: `Request failed with status code ${status}`,
+  });
+
+  it('lets a step that ran the program to its end through', () => {
+    expect(
+      analyseDebuggeeEnd(
+        libraryVerdict(500),
+        stepTagged('debugger-run-to-line', 'stepcontinue'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('lets a termination through', () => {
+    expect(
+      analyseDebuggeeEnd(
+        libraryVerdict(500),
+        stepTagged('debugger-terminate', 'terminate-debuggee'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('passes a step that stopped as it came', () => {
+    expect(
+      analyseDebuggeeEnd(
+        ADT_NO_FAILURE,
+        stepTagged('debugger-conversation', 'stepover'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('keeps a request after the end a refusal', () => {
+    expect(
+      analyseDebuggeeEnd(
+        libraryVerdict(400),
+        stepTagged('debugger-conversation', 'stepcontinue'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
+  });
+
+  it('keeps run to a line without the line a refusal', () => {
+    expect(
+      analyseDebuggeeEnd(
+        libraryVerdict(400),
+        stepTagged('debugger-conversation', 'stepruntoline-no-uri'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
   });
 });

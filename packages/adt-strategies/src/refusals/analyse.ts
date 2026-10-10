@@ -13,6 +13,7 @@ import {
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
+  readExceptionSubType,
   readMessageClassMessageAbsence,
   readPublicationRefusal,
   readUnitTestRefusal,
@@ -171,6 +172,34 @@ export const analyseException = analyser(readExceptionRefusal);
  * `null` here means "not a failure".
  */
 export const analyseAny = analyser(readAdtRefusal);
+
+/** The subtypes with which the ABAP debugger says its debuggee is gone. */
+const DEBUGGEE_END = new Set(['debuggeeEnded', 'terminateDebuggee']);
+
+/**
+ * A step or a termination of the ABAP debugger, where the debuggee ending is
+ * the outcome asked for.
+ *
+ * SAP answers both as a failure: a step that lets the program finish with
+ * `500 AdiFailed` subtype `debuggeeEnded`, and `terminateDebuggee` on premise
+ * with `500 AdiFailed` subtype `terminateDebuggee` (on the cloud `200`). Both
+ * are the request having worked. This strategy answers them as no failure, so
+ * the result is the document that names the subtype; every other refusal is
+ * read as {@link analyseException} reads it.
+ *
+ * Measured on premise (SAP_BASIS 758 and 816) and on the cloud, 2026-10-08/10.
+ * A caller who wants the end of the program to stop them passes
+ * `analyseException` instead.
+ */
+export const analyseDebuggeeEnd: IAnalyse<IAdtMessageFailure> = (
+  verdict,
+  answer,
+) => {
+  if (verdict === ADT_NO_FAILURE) return verdict;
+  const subType = readExceptionSubType(answer?.data);
+  if (subType && DEBUGGEE_END.has(subType)) return ADT_NO_FAILURE;
+  return analyseException(verdict, answer);
+};
 
 /** A service binding's publication — `SEVERITY` other than `OK` refuses. */
 export const analysePublication = analyser(readPublicationRefusal);
