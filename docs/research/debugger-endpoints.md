@@ -299,3 +299,7 @@ how `RfcTransport` works:
   keeps it from stopping.
 - The debugger batch as Eclipse uses it — a step answered with the stack in
   one round trip.
+
+## See also
+
+[`debugger-modes.md`](debugger-modes.md) — activation modes (user, terminal, project), what abap-adt-api sends, the discovery templates, and the ids measured under both conflict modes.
