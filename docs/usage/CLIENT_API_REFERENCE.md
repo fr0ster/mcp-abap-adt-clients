@@ -3,7 +3,8 @@
 This project exposes the following client classes:
 
 - `AdtClient` - high-level CRUD operations for ADT objects.
-- `AdtRuntimeClient` - runtime operations (ABAP debugger, traces, dumps, logs, feeds, ATC check runs, etc.).
+- `AdtRuntimeClient` - runtime operations (traces, dumps, logs, feeds, ATC check runs, etc.).
+- `AbapDebugger`, `AmdpDebugger`, `MemorySnapshots` - the debuggers and memory snapshots, constructed on the caller's connections ([Debugging](#debugging)).
 
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
 
@@ -1814,3 +1815,111 @@ const gwLog = runtime.getGatewayErrorLog();
 const list = await gwLog.list();
 const entry = await gwLog.getById(type, id);
 ```
+
+## Debugging
+
+The ABAP debugger, the AMDP debugger and memory snapshots are three classes,
+exported from `@mcp-abap-adt/adt-clients/runtime` (and the root). Each member
+is one request; the contracts are `IAbapDebugger`, `IAmdpDebugger` and
+`IMemorySnapshots` in `@mcp-abap-adt/interfaces-adt`. None is handed out by
+`AdtRuntimeClient`, because each needs sessions of its own that only the caller
+can open. Measured on premise (SAP_BASIS 758 and 816, HTTP and RFC) and on SAP
+BTP ABAP Environment; the research behind it is
+[`docs/research/debugger-endpoints.md`](../research/debugger-endpoints.md).
+
+### The ABAP debugger
+
+Two stateful sessions: the **listener's**, and **one per debuggee caught**,
+opened for the attach. On a system with more than one application server an
+attach on the listener's session is refused whenever the debuggee runs
+elsewhere, and a session that has attached once cannot attach again — so the
+attach names the debuggee's server (`INSTANCE_NAME` in the listener's answer),
+which this package sends as the `saplb` header.
+
+```typescript
+import { AbapDebugger, AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+
+// terminalId and ideId: 32 upper-case hex characters, kept for the session.
+const identity = { requestUser, terminalId, ideId };
+
+listenerConnection.setSessionType('stateful');
+const listener = new AbapDebugger(listenerConnection, logger);
+await listener.setBreakpoints(identity, [
+  { kind: 'line', uri: `${sourceUri}#start=12` },
+]);
+
+const caught = listener.listen(identity, { holdSeconds: 60 });
+// The program runs on a third connection; anything IAdtRunnable will do.
+const run = new AdtExecutor(triggerConnection, logger)
+  .getClassExecutor()
+  .run({ className });
+const answer = await caught;          // 200 + empty body: nobody stopped in time
+const doc = answer.ok ? String(answer.getResult().value) : '';
+const debuggeeId = /<DEBUGGEE_ID>([^<]*)</.exec(doc)?.[1];
+const server = /<INSTANCE_NAME>([^<]*)</.exec(doc)?.[1];
+
+debugConnection.setSessionType('stateful');   // a new connection, for this debuggee
+const session = new AbapDebugger(debugConnection, logger);
+await session.attach(requestUser, debuggeeId!, { server });
+await session.getStack();
+await session.getChildVariables(['@ROOT']);
+await session.step('stepOver');
+await session.stepToLine('stepRunToLine', `${sourceUri}#start=20`);
+// The program finishing is answered 500 debuggeeEnded; analyseDebuggeeEnd
+// reads it as the step having worked (see ERRATA.md).
+await session.step('stepContinue', { analyse: analyseDebuggeeEnd });
+await run;
+```
+
+- **A listener conflict** is decided by `ideId`: the same `ideId` never
+  conflicts. Another one — an Eclipse debugging the same user — refuses the
+  newcomer with `409` by default; construct with `{ onConflict: 'takeOver' }`
+  to displace it instead. A consumer that wants both constructs two.
+- **`stepToLine` takes the line as an argument.** Without it SAP answers 400,
+  and on SAP_BASIS 758 also let the program run to its end. `stepJumpToLine`
+  moves the debuggee without running what lies between.
+- **An exception breakpoint** stops only where a handler exists up the stack,
+  and the stack shows the `CATCH` line.
+- **The breakpoints answer** is not in the order sent, and a refused
+  breakpoint carries neither `id` nor `uri`: match the refusals by content.
+  `GET` on the breakpoints is not an operation SAP offers — keep the set you
+  sent.
+- **`terminateDebuggee`** answers `500` subtype `terminateDebuggee` on premise
+  and `200` on the cloud; `analyseDebuggeeEnd` takes both.
+- **Memory at a stop:** `getMemorySizes()` and `createMemorySnapshot()`. The
+  snapshot's answer names a file on the application server, not an id.
+
+### The AMDP debugger
+
+A protocol of its own. `start` and `getEvents` go on one stateful session;
+every command — breakpoints, steps, ending a debuggee, stop — on another, and
+is answered with the request it became, not with its outcome: the outcome is
+the next event (`ON_BREAK`, `ON_EXECUTION_END`, …).
+
+- **A stop never releases a suspended debuggee** (`hardStop=true` answers 500
+  and leaves it suspended). Release it by an empty `syncBreakpoints` and a
+  `step(…, 'continue')` to let it finish, or `deleteDebuggee` to cancel it.
+- **An interrupted session keeps the user locked** (`DEBUGGEE_CONTEXT_LOCKED_BY_ME`);
+  `start(user, { stopExisting: true })` takes it over.
+- **A table variable's rows:** `getDataPreview({ sessionId, debuggerId,
+  debuggeeId, variableName })` — without `query` the server selects every
+  column; with one, the SELECT is yours. The answer is by column.
+- On ABAP Cloud an AMDP method needs `AMDP OPTIONS READ-ONLY CLIENT
+  INDEPENDENT`, or the class stays inactive and its breakpoints never arm.
+
+### Memory snapshots
+
+`MemorySnapshots` reads what the system lists under `/runtime/memory`: the
+list, a snapshot, its overview, ranking list, children and references, and
+the same views as a delta between two snapshots (`fromId` → `toId`).
+
+- **A snapshot reaches the list later** than it was written — seconds on
+  premise, up to minutes on the cloud. Match it by `fileName` against the
+  file `createMemorySnapshot` named.
+- **Reading snapshots needs the authorization object `S_MEM_SNAP`.** Without
+  it the list is answered `200` and empty, with no error — check the
+  authorization before concluding there are none.
+- **The ranking list and children take `maxNumberOfObjects`, references
+  `maxNumberOfReferences`, as required.** Without them they answer 400.
+

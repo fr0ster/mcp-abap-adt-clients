@@ -2315,6 +2315,48 @@ sql_query:
         # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
 
 # Runtime dumps read operations (AdtRuntimeClient)
+runtime_debugger:
+  test_cases:
+    - name: "adt_abap_debugger"
+      enabled: true
+      available_in: ["onprem", "cloud"]   # measured on both (2026-10-09)
+      description: "ABAP debugger: breakpoints, listener, attach, stack, variables, steps, watchpoints, set value, terminate, listener conflict"
+      params:
+        class_name: "ZAC_DBG_PROBE"   # created, run under the debugger, deleted
+        package_name: ""              # "" → environment.default_package; a local package needs no transport (the cloud has none)
+        transport_request: ""         # "" → environment.default_transport (ignored for a local package)
+        keep_probe: false             # true leaves the class in place after the run
+      # Nothing else may listen for the same SAP user while this runs: an IDE
+      # with a breakpoint set holds the user's debugging, and the listeners
+      # here refuse to displace it.
+
+    - name: "adt_amdp_debugger"
+      enabled: true
+      available_in: ["onprem", "cloud"]   # SAP HANA only; measured on both (2026-10-09)
+      description: "AMDP debugger: session, breakpoints, events, steps, table variables, finish, cancel, stop"
+      params:
+        class_name: "ZAC_DBG_AMDP2"   # created with its table function, run under the debugger, deleted
+        ddl_name: "ZAC_DBG_TF2"
+        package_name: ""              # "" → environment.default_package; a local package needs no transport
+        transport_request: ""
+        keep_probe: false
+
+    - name: "adt_memory_debugger"
+      enabled: true
+      available_in: ["onprem", "cloud"]   # measured on both (2026-10-09)
+      description: "Memory under the debugger: memory sizes and memory snapshots at two stops"
+      params:
+        class_name: "ZAC_DBG_MEM"     # created, run under the debugger, deleted
+        package_name: ""              # "" → environment.default_package
+        transport_request: ""
+        keep_probe: false
+
+    - name: "adt_memory_snapshots"
+      enabled: true
+      available_in: ["onprem", "cloud"]   # needs S_MEM_SNAP in a role; without it the list is answered 200 and empty
+      description: "Memory snapshots read back: list, snapshot, overview, ranking list, children, references, deltas"
+      params:
+        list_wait_seconds: 900        # a written snapshot reaches the list minutes later
 runtime_dumps:
   test_cases:
     - name: "adt_runtime_dumps"

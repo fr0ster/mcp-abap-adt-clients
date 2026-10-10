@@ -21,7 +21,8 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API; one member, one ADT request
   - `AdtExecutor` – execution API via `IExecutor` contracts (class/program, with profiling)
-  - `AdtRuntimeClient` – runtime operations (ABAP debugger, traces, logs, dumps, ATC check runs)
+  - `AdtRuntimeClient` – runtime operations (traces, logs, dumps, ATC check runs)
+  - `AbapDebugger`, `AmdpDebugger`, `MemorySnapshots` – the ABAP and AMDP debuggers and memory snapshots, each on connections the caller opens
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
   - `AdtAbapGitClient` – standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+)
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
@@ -134,7 +135,7 @@ npm install @mcp-abap-adt/adt-clients
    - Example: `await client.getClass().create({...})` — the POST, and nothing else
 
 2. **AdtRuntimeClient**
-   - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, ATC check runs, and more
+   - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
    - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
    - Each takes an optional result set (`getProfiler({ ...profilerDocuments, list: profilerTraceEntries })`) and builds a fresh implementation per call — nothing is cached, so one caller's readings never become another's
    - `getAtc()` runs ATC checks; `getAtcLog()` reads the execution and check-failure logs. Same subject, different resources — see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs)
@@ -157,8 +158,13 @@ npm install @mcp-abap-adt/adt-clients
 
 5. **AdtClientsWS**
    - Realtime request/event facade over `IWebSocketTransport`
-   - Includes debugger-session facade: listen, attach, step, stack, variables
-   - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
+   - Example: `await wsClient.request('<operation>', { … })` against a backend that speaks its envelope
+
+6. **AbapDebugger, AmdpDebugger, MemorySnapshots**
+   - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `new AbapDebugger(connection, logger, results?, { onConflict? })`
+   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt`
+   - **Two sessions.** The ABAP listener holds one stateful connection; each debuggee caught is attached on a new one, routed to its application server. The AMDP debugger answers events on one session and takes commands on another
+   - See [Debugging](docs/usage/CLIENT_API_REFERENCE.md#debugging)
 
 ## Supported Object Types
 
@@ -317,8 +323,7 @@ const wsClient = new AdtClientsWS(transport, console, {
 
 await wsClient.connect('wss://your-realtime-endpoint');
 
-await debuggerSession.listen({ timeoutSeconds: 60 });
-await debuggerSession.step({ action: 'step_over' });
+const answer = await wsClient.request('<operation>', { /* payload */ });
 ```
 
 ### Using AdtExecutor (Execution API)
@@ -925,7 +930,8 @@ configure the client at all, so they belong with everything else a consumer impo
 the library. They now live in `@mcp-abap-adt/interfaces-adt`, alongside `IAdtContentTypes` /
 `IAdtHeaders` (the header-provider contract — `AdtContentTypesBase` and
 `AdtContentTypesModern`, the two shipped implementations, stay here), the three `IBatch*`
-shapes, the twelve abapGit types, the ten executor types, and the five debugger types. This
+shapes, the twelve abapGit types, the ten executor types, and the debugger and memory-snapshot
+contracts (`IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots`, 13.1.0). This
 package no longer declares or exports any contract type — every contract name it uses is
 sourced from the contract packages.
 
