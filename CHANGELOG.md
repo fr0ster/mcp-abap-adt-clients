@@ -38,6 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [26.0.1] - 2026-10-10
 
+Tagged, not published to npm: its fix ships in 26.1.0.
+
 ### Fixed
 
 - A class create no longer sends `adtcore:responsible`. SAP stores that
