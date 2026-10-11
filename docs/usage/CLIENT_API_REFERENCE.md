@@ -2053,8 +2053,10 @@ const settings = await session.setDebuggerSettings({ systemDebugging: true });
 
 - **`syncBreakpoints` replaces, and so does `setBreakpoints`.** What
   `syncBreakpoints` adds is the name, `full` with `[]`, and `partial`. Both
-  reach every IDE that shares the identity's key (user mode: IDE user plus
-  request user; terminal mode: IDE user plus terminal id). `partial` takes line
+  reach every IDE of the same SAP user: the server source keys the set by IDE
+  user plus request user (user mode) or plus terminal id (terminal mode), but
+  measured on premise (2026-10-12), BASIS 816, an arming under other terminal
+  and IDE ids of the same user replaced the set too, in both modes. `partial` takes line
   breakpoints only; a line breakpoint outside the objects' programs comes back
   as a refused row whose message names the wrong kinds (measured on premise
   (2026-10-11), BASIS 816). An object that maps to no program is passed over
