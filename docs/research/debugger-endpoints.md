@@ -72,15 +72,22 @@ client-side does not end it on the server.
 | Member | Request | Accept |
 |---|---|---|
 | `setBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` | `*/*` |
-| `getBreakpoints` | `GET /debugger/breakpoints?debuggingMode&requestUser&terminalId&ideId&scope=external` | `*/*` |
-| `listen` | `POST /debugger/listeners?debuggingMode&requestUser&terminalId&ideId&timeout=N` | `application/vnd.sap.as+xml` |
-| `stopListener` | `DELETE /debugger/listeners?debuggingMode&requestUser` | `*/*` |
+| `getBreakpoints` | `GET /debugger/breakpoints?debuggingMode[&requestUser]&terminalId&ideId&scope=external` | `*/*` |
+| `deleteBreakpoint` | `DELETE /debugger/breakpoints/<id>?scope=external&debuggingMode&requestUser&terminalId&ideId`; `requestUser` is required in every mode, sent empty (`requestUser=`) in terminal mode | `*/*` |
+| `listen` | `POST /debugger/listeners?debuggingMode[&requestUser]&terminalId&ideId&timeout=N` | `application/vnd.sap.as+xml` |
+| `stopListener` | `DELETE /debugger/listeners?debuggingMode[&requestUser]` | `*/*` |
 | `attach` | `POST /debugger?method=attach&debuggeeId&dynproDebugging=true&debuggingMode[&requestUser]` | `*/*` |
 | `syncBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` with `<syncScope mode="full"/>` or `mode="partial"` and one `adtcore:objectReference` per object | `*/*` |
-| `checkListener` | `GET /debugger/listeners?debuggingMode&requestUser&terminalId&ideId&checkConflict=true` | `*/*` |
+| `checkListener` | `GET /debugger/listeners?debuggingMode[&requestUser]&terminalId&ideId&checkConflict=true` | `*/*` |
 | `detachDebugger` | `POST /debugger?method=detachDebugger[&debuggeeId]` | `*/*` |
 | `terminateDebugger` | `POST /debugger?method=terminateDebugger` | `*/*` |
 | `setDebuggerSettings` | `POST /debugger?method=setDebuggerSettings`, body `dbg:settings` | `application/xml` |
+| `getStack` | `GET /debugger/stack?method=getStack&emode=_&semanticURIs=true` | `*/*` |
+| `goToFrame` | `PUT <stackUri from the stack>` | `*/*` |
+| `getVariables` | `POST /debugger?method=getVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
+| `getChildVariables` | `POST /debugger?method=getChildVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
+| `stepInto` / `stepOver` / `stepReturn` / `stepContinue` | `POST /debugger?method=<step>` | `*/*` |
+| `stepRunToLine` | `POST /debugger?method=stepRunToLine&uri=<source uri>#start=N` | `*/*` |
 
 **The mode.** `debuggingMode` is `user` or `terminal`, taken from the
 identity. `requestUser` goes out in `user` mode only. The one exception is the
@@ -90,12 +97,8 @@ identity sends `requestUser=` empty (measured on premise (2026-10-11), BASIS
 `debuggingMode`, `requestUser` in user mode only, and `dynproDebugging`; the
 server attaches by `debuggeeId` and does not read the ids. A catch in terminal
 mode is unmeasured.
-| `getStack` | `GET /debugger/stack?method=getStack&emode=_&semanticURIs=true` | `*/*` |
-| `goToFrame` | `PUT <stackUri from the stack>` | `*/*` |
-| `getVariables` | `POST /debugger?method=getVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
-| `getChildVariables` | `POST /debugger?method=getChildVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
-| `stepInto` / `stepOver` / `stepReturn` / `stepContinue` | `POST /debugger?method=<step>` | `*/*` |
-| `stepRunToLine` | `POST /debugger?method=stepRunToLine&uri=<source uri>#start=N` | `*/*` |
+
+Brackets mark a parameter sent in `user` mode only.
 
 **Accept.** On 758, ADT matched a resource on its URI and on the media type
 it can produce, and a concrete Accept it could not produce was answered `404 No
