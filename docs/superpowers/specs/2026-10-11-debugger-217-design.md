@@ -15,9 +15,10 @@ own run, belongs to mcp-abap-adt and comes after this release.
 
 ## Out of scope (left for research, a separate issue)
 
-- Terminal mode end to end. The protocol is known from the server source, but no catch was measured. Eclipse's own runs
-  are not caught under Terminal ID (measured 2026-10-11). Another client reports 0 of 7. A run from SAP GUI for Windows is untested.
-  The identity therefore stays user-mode here. The union identity (`user` | `terminal`) comes with the research that proves it.
+- Measuring a catch in terminal mode. The mode ships (below) with its parameters as the discovery and the server source
+  describe them, but no catch was measured. Eclipse's own runs are not caught under Terminal ID (measured 2026-10-11), and
+  another client reports 0 of 7. A run from SAP GUI for Windows is untested. A user whose system catches in this mode
+  confirms it; one whose system does not files an issue with the wire log, and that data drives the research.
 - "This project only", meaning how an IDE id reaches a request's passport (the kernel reads it; no ABAP code sets it).
 - `/debugger/actions` (update debugging, commit/rollback, memory snapshot, step size), `getDebuggeeSessions`,
   `notifyDebuggeeToStop`, job-step debugging routed to ADT, SM50/SM04 from a session without SAP GUI.
@@ -61,7 +62,20 @@ own run, belongs to mcp-abap-adt and comes after this release.
 
 ## Contract (interfaces-adt 14.0.0 — major)
 
+**The identity becomes a union by mode.** The parameters are those of the discovery template
+`/debugger/listeners{?debuggingMode,requestUser,terminalId,ideId,…}` and the server source:
+
+- **`user` mode** takes `requestUser`, the user whose requests are caught.
+- **`terminal` mode** catches the requests that carry `terminalId`. For SAP GUI that is its terminal id, which its settings
+  show. The server reads no `requestUser` there, so the type has none.
+- **`ideId`** names the catching IDE in both modes. A `terminalId` equal to `ideId` means that IDE's own requests only
+  (server source; "This project only" in Eclipse is an inference).
+
 ```ts
+export type IDebuggerIdentity =
+  | { debuggingMode: 'user'; requestUser: string; terminalId: string; ideId: string }
+  | { debuggingMode: 'terminal'; terminalId: string; ideId: string };
+
 interface IBreakpointCommon {
   /** Hits to pass before the breakpoint stops (which hit stops is measured, see Testing). */
   skipCount?: number;
@@ -103,6 +117,10 @@ export interface IDebuggerSettings {
 
 New `IAbapDebugger` members. Each has the usual pair: `(…, options: WithAnalyse<E, O>)` and `(…, options?: WithoutAnalyse<O>)`.
 
+Changed member: `attach(identity, debuggeeId, options?)` replaces `attach(requestUser, debuggeeId, options?)`. The attach
+query carries the identity's mode and ids, as listeners and breakpoints do. Every other member that takes an identity
+keeps its signature and sends the mode the identity names.
+
 | Member | Request | Answer |
 |---|---|---|
 | `syncBreakpoints(identity, sync, options?)` | `POST /debugger/breakpoints` with `<syncScope mode>` and, for `partial`, its object references | `TBreakpoints` |
@@ -133,6 +151,9 @@ New `IAbapDebugger` members. Each has the usual pair: `(…, options: WithAnalys
 
 Why this is a major. List all of these in the migration note:
 
+- **`IDebuggerIdentity` needs `debuggingMode`.** It is required, with no default, so every caller states the mode, and
+  `requestUser` exists only in `user` mode.
+- **`attach` takes the identity** instead of `requestUser`.
 - **`condition` leaves the non-line kinds.** A caller that sets it on one no longer compiles. That is the point.
 - **`IAbapDebugger` gains a type parameter, `TSettings`.**
 - **`IAbapDebugger` gains five required members.** Third-party implementations and mocks of the interface must add them.
@@ -146,6 +167,10 @@ What it does with the other kinds is unclear, so they do not compile.
 
 ## adt-clients 28.0.0 (major, after interfaces-adt is published)
 
+- **The identity.** `identityQuery` and the breakpoints body emit `debuggingMode` from the identity, and `requestUser` only
+  in `user` mode. `attach` takes the identity. The JSDoc says terminal mode follows the discovery and the server source,
+  that its catch is unmeasured, and what to send in an issue if it does not catch: the identity's mode, whether the
+  terminal id is SAP GUI's, how the program was started, and the wire log (`DEBUG_HTTP_WIRE`).
 - **The four requests in `abap.ts`.** Add the requests with their JSDoc, the evidence above in short.
   - **`buildBreakpointsXml`** gains `skipCount`. It emits `condition` only for a line breakpoint, and also refuses it on
     another kind at run time (a cast can get past the type).
@@ -168,10 +193,12 @@ What it does with the other kinds is unclear, so they do not compile.
   - **Builders.** The sync body (`full`, `partial` with several objects, an empty set), the breakpoint body (`skipCount`, and
     `condition` on a line breakpoint only, plus the run-time refusal), and the settings body (`true`, `false` and left out,
     for mandatory and conditional attributes alike).
-  - **Query strings.** `checkListener`, and `detachDebugger` with and without `debuggeeId`.
+  - **Query strings.** `checkListener`, and `detachDebugger` with and without `debuggeeId`. The identity in both modes, for
+    listen, stop, check, attach and both breakpoint bodies: `terminal` sends no `requestUser`.
   - **The conflict reader.** On a recorded, sanitised `409`, and its negatives: no response, an empty body, a malformed
     body, `403`, and a `409` without `conflictText`.
-  - **Type tests.** A literal and a pre-typed variable of an exception breakpoint carrying `condition` both fail to compile.
+  - **Type tests.** A `terminal` identity with `requestUser` fails to compile, and so does a `user` identity without it.
+    A literal and a pre-typed variable of an exception breakpoint carrying `condition` both fail to compile.
     `partial` with a statement breakpoint fails to compile.
 - **Integration on premise.** These run as our own user, automated, and clean up after themselves. Each one is measured
   during implementation, and its date and platform go into the JSDoc.
@@ -188,6 +215,8 @@ What it does with the other kinds is unclear, so they do not compile.
   - **`terminateDebugger`.** The run finishes.
   - **`setDebuggerSettings`.** It is called with a field set, then with that field left out, and the answer keeps the value.
     `false` clears. The first call after an attach with `systemDebugging=false` is recorded.
+  - **Terminal mode, what can be measured without SAP GUI.** A terminal-mode listener starts, `checkListener` answers, and
+    the listener stops. Breakpoints are set and deleted under a terminal identity. No catch is asserted.
   - **`checkListener`.** It answers `200` empty when free, and `409` with both fields when another of our listeners holds
     the user.
 - **Another user.** One integration test with a second user's connection, skipped unless the test config names one.
@@ -202,11 +231,14 @@ What it does with the other kinds is unclear, so they do not compile.
   - **The new members.** Describe them.
   - **Another user.** Debugging another user's requests is `requestUser` plus the `S_DEVELOP` DEBUG authorization with
     ACTVT 90 on that user, and SAP's `403` otherwise.
+  - **Terminal mode.** Its parameters, and where SAP GUI shows its terminal id. Say that a catch in this mode is not
+    measured, and what an issue should carry when it does not catch.
   - **What ADT cannot do.** It cannot attach to a running process or request (SM50 in SAP GUI is the human route).
 - **`README.md`.** Its debugger construction guidance and the version pairing text (contract 14 with clients 28).
 - **A sweep of `docs/`** for the debugger contract, examples included.
-- **The migration note** for 28.0.0. It covers every item under "Why this is a major" above, with examples: a custom results
-  object, an implementation or mock of `IAbapDebugger`, and `condition` on a non-line breakpoint.
+- **The migration note** for 28.0.0. It covers every item under "Why this is a major" above, with examples: an identity
+  gaining `debuggingMode: 'user'`, `attach` taking the identity, a custom results object, an implementation or mock of
+  `IAbapDebugger`, and `condition` on a non-line breakpoint.
 - **`CHANGELOG.md`.**
 
 ## Order
