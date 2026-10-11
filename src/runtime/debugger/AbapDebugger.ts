@@ -30,6 +30,7 @@ import {
   createWatchpoint,
   deleteBreakpoint,
   deleteWatchpoint,
+  detachDebugger,
   getChildVariables,
   getMemorySizes,
   getStack,
@@ -45,6 +46,7 @@ import {
   stopListener,
   syncBreakpoints,
   terminateDebuggee,
+  terminateDebugger,
 } from './abap';
 
 /** One strategy per kind of answer the debugger gives. */
@@ -375,19 +377,27 @@ export class AbapDebugger<
     );
   }
 
-  // Stubs: Tasks 5-6 of the #217 plan replace them.
   async detachDebugger<E extends IAdtError = IAdtError>(
-    _options?: { debuggeeId?: string } & IAdtAnalyseOptions<E>,
+    options?: { debuggeeId?: string } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
-    throw new Error('not implemented: detachDebugger');
+    return answering(
+      () => detachDebugger(this.connection, options?.debuggeeId),
+      this.reading('done'),
+      options?.analyse,
+    );
   }
 
   async terminateDebugger<E extends IAdtError = IAdtError>(
-    _options?: IAdtAnalyseOptions<E>,
+    options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
-    throw new Error('not implemented: terminateDebugger');
+    return answering(
+      () => terminateDebugger(this.connection),
+      this.reading('done'),
+      options?.analyse,
+    );
   }
 
+  // Stub: Task 6 of the #217 plan replaces it.
   async setDebuggerSettings<E extends IAdtError = IAdtError>(
     _settings: IDebuggerSettings,
     _options?: IAdtAnalyseOptions<E>,

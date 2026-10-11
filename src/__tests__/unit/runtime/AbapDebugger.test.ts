@@ -385,6 +385,26 @@ describe('AbapDebugger', () => {
     );
   });
 
+  it('detachDebugger posts the method, with the debuggee id only when given, encoded once', async () => {
+    const bare = setup();
+    await bare.debugger_.detachDebugger();
+    expect(bare.sent().url).toBe('/sap/bc/adt/debugger?method=detachDebugger');
+    const byId = setup();
+    await byId.debugger_.detachDebugger({ debuggeeId: 'A&B=C/D' });
+    expect(byId.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=detachDebugger&debuggeeId=A%26B%3DC%2FD',
+    );
+  });
+
+  it('terminateDebugger posts the method alone', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.terminateDebugger();
+    expect(sent()).toMatchObject({
+      url: '/sap/bc/adt/debugger?method=terminateDebugger',
+      method: 'POST',
+    });
+  });
+
   it('watchpoints: create, list and delete', async () => {
     const create = setup();
     await create.debugger_.createWatchpoint('LV_TOTAL', {

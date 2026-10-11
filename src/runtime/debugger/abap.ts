@@ -573,12 +573,57 @@ export async function setVariableValue(
  * (measured on premise, 2026-10-09: the debuggee was gone, a stack read after
  * it failed, and the program's run returned). A caller reading that as a
  * failure passes an `analyse` that lets the subtype through.
+ *
+ * Three ways to let go, which differ in what happens to the program:
+ * - `terminateDebuggee` ends the debuggee: the program does not finish;
+ * - `detachDebugger` leaves the debuggee: the debugger goes, the program runs on;
+ * - `terminateDebugger` frees the debugger: the program runs on.
  */
 export async function terminateDebuggee(
   connection: IAbapConnection,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?method=terminateDebuggee`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+/**
+ * Leave the debuggee; the program runs on.
+ *
+ * Without an id it addresses the debuggee attached on this session: the
+ * debugger leaves and the program runs on. With an id the server tries to
+ * attach that caught debuggee, and if that fails it deletes its activation and
+ * still answers success, so success does not prove attach and release. A
+ * session breakpoint brings the debugger back. Server source, BASIS 816, read
+ * 2026-10-11.
+ */
+export async function detachDebugger(
+  connection: IAbapConnection,
+  debuggeeId?: string,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({
+      method: 'detachDebugger',
+      ...(debuggeeId ? { debuggeeId } : {}),
+    })}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+/**
+ * Free the debugger; the program runs on. Server source, BASIS 816, read
+ * 2026-10-11.
+ */
+export async function terminateDebugger(
+  connection: IAbapConnection,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({ method: 'terminateDebugger' })}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: 'application/xml' },

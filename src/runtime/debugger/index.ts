@@ -31,6 +31,7 @@ export {
   DEBUGGER_VARIABLES_CONTENT_TYPE,
   deleteBreakpoint,
   deleteWatchpoint,
+  detachDebugger,
   executeBatchRequest,
   getChildVariables,
   getMemorySizes,
@@ -45,6 +46,7 @@ export {
   stepToLine,
   stopListener,
   terminateDebuggee,
+  terminateDebugger,
 } from './abap';
 export {
   AMDP_BREAKPOINTS_CONTENT_TYPE,
