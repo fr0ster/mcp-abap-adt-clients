@@ -246,4 +246,12 @@ What it does with the other kinds is unclear, so they do not compile.
 1. interfaces-adt 14.0.0: its own PR in the interfaces repo, plus the facade package, published by the user.
 2. This PR: adt-clients 28.0.0 against the published contract.
 3. mcp-abap-adt: a session that waits for another user's run, and the new members where its tools need them, with its own
-   brainstorming and spec.
+   brainstorming and spec. It also carries terminal mode through:
+   - **The terminal id is configurable.** Today both ids are random per instance. The host passes a terminal id to the debug
+     owner's constructor (from its configuration, for example SAP GUI's terminal id), and a debug session can be started in
+     terminal mode with it.
+   - **Why it ships now.** A user whose system is set up for terminal debugging can run it as shipped, and either confirm a
+     catch or file an issue with the wire log.
+
+   In this library nothing more is needed: the identity is an argument of every call, so the caller chooses its
+   `terminalId` per call.
