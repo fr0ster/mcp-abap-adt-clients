@@ -63,7 +63,7 @@ own run, belongs to mcp-abap-adt and comes after this release.
 
 ```ts
 interface IBreakpointCommon {
-  /** Hits to pass before the breakpoint stops. */
+  /** Hits to pass before the breakpoint stops (which hit stops is measured, see Testing). */
   skipCount?: number;
 }
 export type IDebuggerLineBreakpoint = IBreakpointCommon & {
@@ -72,17 +72,25 @@ export type IDebuggerLineBreakpoint = IBreakpointCommon & {
   /** An ABAP condition; only a line breakpoint takes one. */
   condition?: string;
 };
+/** `condition?: never` makes a pre-typed value carrying a condition fail too, not only a fresh literal. */
+type NoCondition = { condition?: never };
 export type IDebuggerBreakpoint =
   | IDebuggerLineBreakpoint
-  | (IBreakpointCommon & { kind: 'exception'; exceptionClass: string })
-  | (IBreakpointCommon & { kind: 'statement'; statement: string })
-  | (IBreakpointCommon & { kind: 'message'; msgId: string; msgNo: string; msgTy: string });
+  | (IBreakpointCommon & NoCondition & { kind: 'exception'; exceptionClass: string })
+  | (IBreakpointCommon & NoCondition & { kind: 'statement'; statement: string })
+  | (IBreakpointCommon & NoCondition & { kind: 'message'; msgId: string; msgNo: string; msgTy: string });
 
-/** Replace breakpoints instead of adding them. Both scopes touch every IDE of the same user. */
+/**
+ * Replace breakpoints instead of adding them. Both scopes touch every IDE of the same IDE user + request user pair.
+ * `partial` replaces the line breakpoints of the MAIN PROGRAMS its objects map to (two objects of one class pool are one
+ * program); an empty `breakpoints` clears that scope. An object that maps to no program leaves the body's line
+ * breakpoints unset (server source); the integration test records what the answer says then.
+ */
 export type IDebuggerBreakpointSync =
   | { scope: 'full'; breakpoints: readonly IDebuggerBreakpoint[] }
   | { scope: 'partial'; objects: readonly string[]; breakpoints: readonly IDebuggerLineBreakpoint[] };
 
+/** What to change; a field left out keeps its current value. */
 export interface IDebuggerSettings {
   systemDebugging?: boolean;
   updateDebugging?: boolean;
@@ -93,21 +101,44 @@ export interface IDebuggerSettings {
 }
 ```
 
-New `IAbapDebugger` members, each with the usual `WithAnalyse` / `WithoutAnalyse` overload pair:
+New `IAbapDebugger` members. Each has the usual pair: `(…, options: WithAnalyse<E, O>)` and `(…, options?: WithoutAnalyse<O>)`.
 
 | Member | Request | Answer |
 |---|---|---|
-| `syncBreakpoints(identity, sync)` | `POST /debugger/breakpoints` with `<syncScope mode>` and, for `partial`, its object references | `TBreakpoints` |
-| `checkListener(identity)` | `GET /debugger/listeners?…&checkConflict=true` | `TDone`. A conflict is the `409` failure |
-| `detachDebugger(debuggeeId?)` | `POST /debugger?method=detachDebugger` | `TDone` |
-| `terminateDebugger()` | `POST /debugger?method=terminateDebugger` | `TDone` |
-| `setDebuggerSettings(settings)` | `POST /debugger?method=setDebuggerSettings` with the settings body | new `TSettings` |
+| `syncBreakpoints(identity, sync, options?)` | `POST /debugger/breakpoints` with `<syncScope mode>` and, for `partial`, its object references | `TBreakpoints` |
+| `checkListener(identity, options?)` | `GET /debugger/listeners?debuggingMode&requestUser&terminalId&ideId&checkConflict=true` | `TDone`. A conflict is the `409` failure |
+| `detachDebugger(options?: { debuggeeId?: string } & …)` | `POST /debugger?method=detachDebugger[&debuggeeId=]` | `TDone` |
+| `terminateDebugger(options?)` | `POST /debugger?method=terminateDebugger` | `TDone` |
+| `setDebuggerSettings(settings, options?)` | `POST /debugger?method=setDebuggerSettings`, body `<dbg:settings>` (below) | `TSettings` |
 
-Why this is a major:
+`debuggeeId` sits in the options rather than in a position, so a caller passes `analyse` without one.
 
-- `condition` leaves the non-line kinds, so a caller that sets it on one no longer compiles. That is the point.
-- `IAbapDebugger` gains a type parameter, `TSettings`.
-- `deactivated` is not added at all.
+`detachDebugger` has two paths in the server source:
+
+- **Without `debuggeeId`.** It addresses the debuggee attached on this session: the debugger leaves and the program runs on.
+- **With `debuggeeId`.** It names a debuggee that was caught but not attached. The server tries to attach it. If that
+  fails, it deletes the debuggee's activation and still answers success. This may be how to release an unattached catch
+  at once instead of after the ~30 s hold. The tests measure it.
+
+**The settings body.** It follows the server's transformation:
+
+- `<dbg:settings xmlns:dbg="http://www.sap.com/adt/debugger" …/>`.
+- **Mandatory attributes.** `systemDebugging`, `createExceptionObject`, `backgroundRFC` and `sharedObjectDebugging` are not
+  conditional in the transformation, so the builder always emits them: `"true"` or `"false"` when the caller set them, and
+  an empty value when the caller left them out.
+- **What an empty value means.** The server maps a value that is neither true nor false to "keep" (`move_corresponding_no_initial`
+  with a `-` remainder). The tests confirm this.
+- **Conditional attributes.** `updateDebugging` and `showDataAging` are emitted only when set.
+- **The first call after an attach** ignores `systemDebugging=false`. That is documented and tested.
+
+Why this is a major. List all of these in the migration note:
+
+- **`condition` leaves the non-line kinds.** A caller that sets it on one no longer compiles. That is the point.
+- **`IAbapDebugger` gains a type parameter, `TSettings`.**
+- **`IAbapDebugger` gains five required members.** Third-party implementations and mocks of the interface must add them.
+- **`IAbapDebuggerResults` gains a required `settings` strategy.** A caller passing a complete custom results object must
+  add one. The default is the raw document, like the other strategies.
+- **`deactivated` is not added at all.** That alone breaks nobody.
 
 Replacing a set is a member of its own, not an option on `setBreakpoints`. The name says it is destructive, and
 `setBreakpoints` keeps its add-only promise. `partial` takes only line breakpoints because that is all the server replaces.
@@ -115,32 +146,50 @@ What it does with the other kinds is unclear, so they do not compile.
 
 ## adt-clients 28.0.0 (major, after interfaces-adt is published)
 
-- **The four requests in `abap.ts`.** Add the requests with their JSDoc, the evidence above in short. `buildBreakpointsXml` gains
-  `skipCount`, and `condition` is emitted only for a line breakpoint, as the types now force.
-  - **`syncScope` without a scope.** The body builder for `full` emits `<syncScope mode="full"/>`.
-  - **`syncScope` with objects.** For `partial` it emits `<syncScope mode="partial">` with one
-    `<adtcore:objectReference adtcore:uri>` per object.
+- **The four requests in `abap.ts`.** Add the requests with their JSDoc, the evidence above in short.
+  - **`buildBreakpointsXml`** gains `skipCount`. It emits `condition` only for a line breakpoint, and also refuses it on
+    another kind at run time (a cast can get past the type).
+  - **`full`.** The sync body builder emits `<syncScope mode="full"/>`.
+  - **`partial`.** It emits `<syncScope mode="partial">` with one `<adtcore:objectReference adtcore:uri>` per object.
+  - **Settings.** The settings builder follows the rule above.
   - **The stale comment.** Fix the comment that says any `syncScope` replaces the whole set.
-- **The members on `AbapDebugger`.** Add each member, each with its result strategy.
-- **Reading a listener conflict.** Add `readListenerConflict(error)`. It reads `conflictText` and `ideUser` from a `409` answer's
-  properties (the `checkListener` answer and the refusing `listen`), and answers `undefined` for anything else. It is a reading,
-  not a field on `IAdtError`.
+- **The members on `AbapDebugger`.** Add the members, the `settings` result strategy and the default results object.
+- **The conflict reader.**
+  - **Signature.** `readListenerConflict(error: IAdtError): { conflictText: string; ideUser?: string } | undefined`.
+  - **What it reads.** It parses the `<properties><entry key>` of `error.response?.data`.
+  - **What it answers.** It answers `undefined` when there is no response, no body, a malformed body, a status other than `409`,
+    or no `conflictText`.
+  - **Export.** It is exported from the runtime entry point beside `AbapDebugger`. It is a reading, not a field on `IAdtError`.
 - **The `terminateDebuggee` comment.** Its comment gains the comparison with `detachDebugger` and `terminateDebugger`.
 
 ## Testing
 
-- **Unit.** Body builders (`full`, `partial`, `skipCount`, `condition` on a line breakpoint only), query strings,
-  `readListenerConflict` on a recorded `409` (sanitised), and type tests.
-  - **Type tests.** `condition` on an exception breakpoint does not compile. `partial` with a statement breakpoint does not compile.
-- **Integration on premise (own user, automated, everything cleaned up).** Each check is measured during implementation, and its
-  date and platform go into the JSDoc.
-  - **`syncBreakpoints full`.** It replaces the pair's set.
-  - **`partial`.** It replaces only the scoped object's line breakpoints and keeps another object's.
-  - **`skipCount`.** `skipCount: 2` — the measurement settles which hit stops (the source does not say).
-  - **`detachDebugger`.** The run finishes, and a breakpoint still armed stops it again.
+- **Unit:**
+  - **Builders.** The sync body (`full`, `partial` with several objects, an empty set), the breakpoint body (`skipCount`, and
+    `condition` on a line breakpoint only, plus the run-time refusal), and the settings body (`true`, `false` and left out,
+    for mandatory and conditional attributes alike).
+  - **Query strings.** `checkListener`, and `detachDebugger` with and without `debuggeeId`.
+  - **The conflict reader.** On a recorded, sanitised `409`, and its negatives: no response, an empty body, a malformed
+    body, `403`, and a `409` without `conflictText`.
+  - **Type tests.** A literal and a pre-typed variable of an exception breakpoint carrying `condition` both fail to compile.
+    `partial` with a statement breakpoint fails to compile.
+- **Integration on premise.** These run as our own user, automated, and clean up after themselves. Each one is measured
+  during implementation, and its date and platform go into the JSDoc.
+  - **`full`.** It removes a breakpoint left out of the set and inserts a new one. An empty set clears everything for the pair.
+  - **`partial`.** The fixtures are two classes, so two distinct main programs. A sync of class A replaces A's line
+    breakpoints and keeps B's line breakpoints and an exception breakpoint. A line breakpoint in B sent within A's scope is
+    refused. An empty set clears A's line breakpoints only. An object that maps to no program is recorded as answered.
+  - **`skipCount`.** With `skipCount: 2` on a loop, the stop's loop counter is recorded, and the JSDoc states which hit stops.
+  - **`detachDebugger` without id.** The run finishes. Separately: does a session breakpoint (`scope="debugger"`), set
+    before the detach, bring the debugger back? Does an external breakpoint catch the same run again through the listener?
+    Both are recorded.
+  - **`detachDebugger` with the id of a caught, unattached debuggee.** The answer, and whether the run goes on at once rather
+    than after the ~30 s hold.
   - **`terminateDebugger`.** The run finishes.
-  - **`setDebuggerSettings`.** The answer echoes the merge.
-  - **`checkListener`.** It answers `200` empty when free, and `409` with both fields when another listener holds the user.
+  - **`setDebuggerSettings`.** It is called with a field set, then with that field left out, and the answer keeps the value.
+    `false` clears. The first call after an attach with `systemDebugging=false` is recorded.
+  - **`checkListener`.** It answers `200` empty when free, and `409` with both fields when another of our listeners holds
+    the user.
 - **Another user.** One integration test with a second user's connection, skipped unless the test config names one.
 
 ## Documentation
@@ -154,7 +203,10 @@ What it does with the other kinds is unclear, so they do not compile.
   - **Another user.** Debugging another user's requests is `requestUser` plus the `S_DEVELOP` DEBUG authorization with
     ACTVT 90 on that user, and SAP's `403` otherwise.
   - **What ADT cannot do.** It cannot attach to a running process or request (SM50 in SAP GUI is the human route).
-- **The migration note** for 28.0.0: `condition` on non-line kinds, `TSettings`.
+- **`README.md`.** Its debugger construction guidance and the version pairing text (contract 14 with clients 28).
+- **A sweep of `docs/`** for the debugger contract, examples included.
+- **The migration note** for 28.0.0. It covers every item under "Why this is a major" above, with examples: a custom results
+  object, an implementation or mock of `IAbapDebugger`, and `condition` on a non-line breakpoint.
 - **`CHANGELOG.md`.**
 
 ## Order
