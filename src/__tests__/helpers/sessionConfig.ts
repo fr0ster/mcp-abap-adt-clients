@@ -241,7 +241,7 @@ export async function resolveSystemContext(
     masterSystem: envConfig.default_master_system,
     // On-prem the responsible person is simply the logged-on user — cloud is the
     // one that gets it from the system. Upper-cased because the user master
-    // record stores it that way and ADT validates against it: E19 answered a
+    // record stores it that way and ADT validates against it: the on-premise system answered a
     // package create with `400 Enter a valid user, not okyslytsia, as the person
     // responsible`, on the same credential it had just authenticated.
     responsible: process.env.SAP_USERNAME?.split('#')[0].trim().toUpperCase(),
@@ -403,7 +403,7 @@ export async function createTestConnection(
   //
   // A session that dies mid-run takes down whichever test is running, and SAP's
   // `Session Timed Out or Not Found` names the test rather than the cause — so
-  // it reads as that test being broken. Measured on E19: two full runs in seven
+  // it reads as that test being broken. Measured on premise (BASIS 816): two full runs in seven
   // lost the session once, with the run continuously busy, the session 3m35s
   // old, no logoff from this side and no network event. Whatever the cause, the
   // swap itself should not be silent.
@@ -472,7 +472,7 @@ export async function closeOwnTestConnection(
  * the first file to reach `afterAll` took the session away from every file
  * after it.
  *
- * Measured on E19: `discovery` and `search` each pass alone; run together, the
+ * Measured on premise (BASIS 816): `discovery` and `search` each pass alone; run together, the
  * second one fails `ADT_NOT_CONNECTED` — whichever of the two that is. Remove
  * both `disconnect()` calls and both pass. Across the full suite it cost 38 red
  * suites, and worse, some green ones: a dead session sends

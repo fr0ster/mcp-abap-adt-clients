@@ -12,7 +12,7 @@
  * URLs — `class` and `interface` post to `/oo/validation/objectname`, not
  * `/oo/validation`, so the `404`s it produced said nothing about parameters —
  * and roughly fifty authenticated one-off requests each left a server session
- * behind, which emptied E19's pool and stopped the next test run dead.
+ * behind, which emptied the on-premise system's pool and stopped the next test run dead.
  *
  * **Every case below takes its URL, Accept and parameter names from the module
  * that builds them**, not from a convention. Where a module hardcodes `objtype`

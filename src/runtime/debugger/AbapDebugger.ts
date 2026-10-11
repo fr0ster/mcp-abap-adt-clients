@@ -12,7 +12,9 @@ import type {
   IAdtError,
   IAdtResponse,
   IDebuggerBreakpoint,
+  IDebuggerBreakpointSync,
   IDebuggerIdentity,
+  IDebuggerSettings,
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
   IResultStrategy,
@@ -23,10 +25,12 @@ import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   attach,
+  checkListener,
   createMemorySnapshot,
   createWatchpoint,
   deleteBreakpoint,
   deleteWatchpoint,
+  detachDebugger,
   getChildVariables,
   getMemorySizes,
   getStack,
@@ -35,12 +39,15 @@ import {
   listen,
   listWatchpoints,
   setBreakpoints,
+  setDebuggerSettings,
   setStackPosition,
   setVariableValue,
   step,
   stepToLine,
   stopListener,
+  syncBreakpoints,
   terminateDebuggee,
+  terminateDebugger,
 } from './abap';
 
 /** One strategy per kind of answer the debugger gives. */
@@ -56,6 +63,8 @@ export interface IAbapDebuggerResults {
   readonly watchpoints: IResultStrategy<unknown>;
   /** The memory sizes and the snapshot's confirmation. */
   readonly memory: IResultStrategy<unknown>;
+  /** The debugger settings' confirmation. */
+  readonly settings: IResultStrategy<unknown>;
 }
 
 /**
@@ -74,6 +83,7 @@ export const abapDebuggerDocuments = {
   done: nothing,
   watchpoints: rawDocument,
   memory: rawDocument,
+  settings: rawDocument,
 } satisfies IAbapDebuggerResults;
 
 /** How this implementation behaves, fixed when it is constructed. */
@@ -92,6 +102,19 @@ type Of<
   K extends keyof IAbapDebuggerResults,
 > = ReturnType<R[K]>;
 
+/**
+ * The ABAP debugger on one connection, with the settings it was constructed
+ * with (`onConflict`).
+ *
+ * **One debug session per identity.** The server binds the listener context -
+ * request user and IDE id - to the ABAP session the connection carries (see
+ * `listen` in `abap.ts`), so one debugger serves one identity. Another
+ * identity - another request user, another mode, another `ideId` - needs
+ * another debug session: a new `AbapDebugger` on a connection of its own,
+ * with its own settings. The library does not guard this; a call naming an
+ * identity other than the one the session was bound to is answered by the
+ * server as it is.
+ */
 export class AbapDebugger<
   R extends IAbapDebuggerResults = typeof abapDebuggerDocuments,
 > implements
@@ -104,7 +127,8 @@ export class AbapDebugger<
       Of<R, 'step'>,
       Of<R, 'done'>,
       Of<R, 'watchpoints'>,
-      Of<R, 'memory'>
+      Of<R, 'memory'>,
+      Of<R, 'settings'>
     >
 {
   readonly kind = 'abapDebugger' as const;
@@ -123,6 +147,15 @@ export class AbapDebugger<
     return this.results[key] as IResultStrategy<Of<R, K>>;
   }
 
+  /**
+   * Arm breakpoints under the identity's key, replacing what the key held -
+   * a `validationOnly` request too (see `setBreakpoints` in `abap.ts`).
+   *
+   * `skipCount` greater than 0 is still in the 14.x contract's type but is
+   * answered `ok: false` here without a request: the server ignores it on an
+   * external breakpoint (measured on premise (2026-10-11), BASIS 816), and it
+   * is to leave the contract in its next major. `0` is accepted.
+   */
   async setBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     breakpoints: readonly IDebuggerBreakpoint[],
@@ -153,6 +186,14 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Start a listener for the identity, with the conflict behaviour this
+   * debugger was constructed with (`onConflict`).
+   *
+   * The listener belongs to the identity's debug session: a listener for
+   * another identity needs a new `AbapDebugger` on a connection of its own
+   * (see the class and `listen` in `abap.ts`).
+   */
   async listen<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
@@ -170,6 +211,12 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Release the listener - and delete the key's breakpoints with it, whether
+   * or not a listener was running (see `stopListener` in `abap.ts`). Stop the
+   * listener last, or arm again before the next listen. It acts for the
+   * identity's debug session; another identity needs a debugger of its own.
+   */
   async stopListener<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: IAdtAnalyseOptions<E>,
@@ -181,8 +228,14 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Attach to the debuggee a listener caught. The attach, and everything after
+   * it, goes on a debugger with a connection opened for this debuggee, never
+   * the listener's (see `attach` in `abap.ts`); the identity is the one the
+   * session was bound to - another identity needs a debugger of its own.
+   */
   async attach<E extends IAdtError = IAdtError>(
-    requestUser: string,
+    identity: IDebuggerIdentity,
     debuggeeId: string,
     options?: {
       dynproDebugging?: boolean;
@@ -194,7 +247,7 @@ export class AbapDebugger<
       () =>
         attach(
           this.connection,
-          requestUser,
+          identity,
           debuggeeId,
           options?.dynproDebugging,
           options?.server,
@@ -340,6 +393,82 @@ export class AbapDebugger<
     return answering(
       () => createMemorySnapshot(this.connection),
       this.reading('memory'),
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Replace the key's breakpoints, `full` or by object with `partial` (see
+   * `syncBreakpoints` in `abap.ts`).
+   *
+   * `skipCount` greater than 0 is still in the 14.x contract's type but is
+   * answered `ok: false` here without a request: the server ignores it on an
+   * external breakpoint (measured on premise (2026-10-11), BASIS 816), and it
+   * is to leave the contract in its next major. `0` is accepted.
+   */
+  async syncBreakpoints<E extends IAdtError = IAdtError>(
+    identity: IDebuggerIdentity,
+    sync: IDebuggerBreakpointSync,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
+    return answering(
+      () => syncBreakpoints(this.connection, identity, sync),
+      this.reading('breakpoints'),
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Ask whether a listener for the identity would conflict; starts nothing.
+   * The answer is read in the identity's debug session: for another identity,
+   * use a debugger on a connection of its own (see the class).
+   */
+  async checkListener<E extends IAdtError = IAdtError>(
+    identity: IDebuggerIdentity,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+    return answering(
+      () => checkListener(this.connection, identity),
+      this.reading('done'),
+      options?.analyse,
+    );
+  }
+
+  async detachDebugger<E extends IAdtError = IAdtError>(
+    options?: { debuggeeId?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+    return answering(
+      () => detachDebugger(this.connection, options?.debuggeeId),
+      this.reading('done'),
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Free the debugger; the program runs on. SAP answers it with a plain ICF
+   * `500` (no ADT exception document) when it worked: pass
+   * `analyseDebuggerFreed` from `@mcp-abap-adt/adt-strategies` (0.9.0) to take
+   * that `500` as no failure, or `analyseException` to let it stop you. See
+   * the errata entry "The debugger freeing its session is answered as an ICF
+   * 500" and `terminateDebugger` in `abap.ts`.
+   */
+  async terminateDebugger<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+    return answering(
+      () => terminateDebugger(this.connection),
+      this.reading('done'),
+      options?.analyse,
+    );
+  }
+
+  async setDebuggerSettings<E extends IAdtError = IAdtError>(
+    settings: IDebuggerSettings,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'settings'>, E>> {
+    return answering(
+      () => setDebuggerSettings(this.connection, settings),
+      this.reading('settings'),
       options?.analyse,
     );
   }

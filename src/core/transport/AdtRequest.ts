@@ -348,12 +348,12 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    *
    * ```typescript
    * const request = client.getRequest();
-   * await request.removeObject('E19K905942', {
+   * await request.removeObject('DEVK905942', {
    *   name: 'ZMCP_BLD_FGR_H1',
    *   type: 'FUGR',
    *   position: '000025',
    * });
-   * const log = await request.readActionLog('E19K905942');
+   * const log = await request.readActionLog('DEVK905942');
    * ```
    *
    * **`position` is required, and it is what makes the call do anything.**

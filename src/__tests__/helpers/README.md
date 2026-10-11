@@ -29,7 +29,7 @@ system throttle you long before it refuses.
 
 So a test file must **not** call `connection.disconnect()`. On on-prem that is
 the platform logoff: it ends the session for everyone, and the first file to
-reach `afterAll` takes it away from every file after it. Measured on E19,
+reach `afterAll` takes it away from every file after it. Measured on premise (BASIS 816),
 `discovery` and `search` each pass alone and the second one fails
 `ADT_NOT_CONNECTED` when run together; across the suite it cost 38 red suites —
 and some false green ones, because a dead session made `isModernAdtSystem()`

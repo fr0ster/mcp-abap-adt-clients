@@ -202,7 +202,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         }
         // 400 is no longer skipped. It meant one thing and the comment here
         // named it correctly — the missing `category` — and skipping on it left
-        // the method broken and the note unread. Measured on E19: without a
+        // the method broken and the note unread. Measured on premise (BASIS 816): without a
         // category the endpoint answers 400 SADT_RESOURCE/017, with one it
         // answers 200. If a 400 comes back now, it is news.
         logTestError(testsLogger, testName, error);

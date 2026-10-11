@@ -7,7 +7,7 @@
  * `activate` builds its reference by hand. Where the two disagree, the group
  * sends an address SAP resolves to nothing and answers
  * `activationExecuted="false"` with no message — a success to anyone reading
- * the messages. Issue #173 measured it for `BDEF/BDO` on E19: the group left a
+ * the messages. Issue #173 measured it for `BDEF/BDO` on premise (BASIS 816): the group left a
  * behavior definition inactive while its own `activate` worked. The issue asked
  * for every case to be checked the same way, and this is that check: the
  * address is taken from the request the family's own function actually sends.

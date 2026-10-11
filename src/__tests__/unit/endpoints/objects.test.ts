@@ -118,8 +118,8 @@ describe('records', () => {
   it('a transport request number keeps its case', () => {
     // The request number as given answers 200, lowercased 404, on an
     // on-premise and a cloud system alike (2026-10-01).
-    expect(TRANSPORT_REQUEST.uri('E19K900001')).toBe(
-      '/sap/bc/adt/cts/transportrequests/E19K900001',
+    expect(TRANSPORT_REQUEST.uri('DEVK900001')).toBe(
+      '/sap/bc/adt/cts/transportrequests/DEVK900001',
     );
   });
   it('transport request has a legacy address of its own', () => {

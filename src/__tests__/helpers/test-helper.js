@@ -2844,7 +2844,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           {
             domainName: name,
             // The update needs the package as much as the create did: measured on
-            // E19, the first-ever setup of a shared domain failed with `Package
+            // on premise (BASIS 816), the first-ever setup of a shared domain failed with `Package
             // name is required for update` and the next run passed, because by
             // then the object existed and the reconcile branch — which does pass
             // it — took over. A defect only a fresh system ever sees.

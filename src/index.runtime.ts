@@ -38,7 +38,10 @@ export {
   amdpDebuggerDocuments,
   type IAmdpDebuggerResults,
 } from './runtime/debugger/AmdpDebugger';
-export type { IDebuggerListenerConflict } from './runtime/debugger/abap';
+export {
+  type IDebuggerListenerConflict,
+  readListenerConflict,
+} from './runtime/debugger/abap';
 // Keep low-level dump types/functions (may be used by consumers)
 export {
   buildDumpIdPrefix,

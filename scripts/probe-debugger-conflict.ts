@@ -20,6 +20,9 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
+
+type IUserIdentity = Extract<IDebuggerIdentity, { debuggingMode: 'user' }>;
+
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -51,7 +54,7 @@ function out(line = ''): void {
   process.stdout.write(`${line}\n`);
 }
 
-function identityFor(): IDebuggerIdentity {
+function identityFor(): IUserIdentity {
   const requestUser = String(process.env.SAP_USERNAME ?? '').toUpperCase();
   const seed = `${process.env.SAP_URL}:${requestUser}`;
   const id = (suffix: string): string =>
@@ -60,7 +63,12 @@ function identityFor(): IDebuggerIdentity {
       .digest('hex')
       .slice(0, 32)
       .toUpperCase();
-  return { requestUser, terminalId: id('terminalId'), ideId: id('ideId') };
+  return {
+    debuggingMode: 'user',
+    requestUser,
+    terminalId: id('terminalId'),
+    ideId: id('ideId'),
+  };
 }
 
 function clip(text: string): string {
@@ -91,7 +99,7 @@ function report(
 
 async function variantA(
   debuggerApi: AbapDebugger,
-  identity: IDebuggerIdentity,
+  identity: IUserIdentity,
 ): Promise<number | undefined> {
   const t0 = Date.now();
   const answer = await debuggerApi.listen(identity, {
@@ -115,7 +123,7 @@ async function variantA(
 
 async function variantB(
   connection: IAbapConnection,
-  identity: IDebuggerIdentity,
+  identity: IUserIdentity,
 ): Promise<number | undefined> {
   const query = new URLSearchParams({
     debuggingMode: 'user',

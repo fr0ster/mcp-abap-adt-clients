@@ -184,6 +184,7 @@ async function main(): Promise<void> {
       .slice(0, 32)
       .toUpperCase();
   const identity: IDebuggerIdentity = {
+    debuggingMode: 'user',
     requestUser: user,
     terminalId: id('terminalId'),
     ideId: id('ideId'),
@@ -255,7 +256,7 @@ async function main(): Promise<void> {
     session.setSessionType('stateful');
     const onSession = new AbapDebugger(session, quiet, abapDebuggerDocuments);
     const server = /<INSTANCE_NAME>([^<]*)</.exec(caught)?.[1];
-    const attached = await onSession.attach(user, debuggeeId, { server });
+    const attached = await onSession.attach(identity, debuggeeId, { server });
     out(`attach: ${attached.ok ? 'ok' : documentOf(attached).slice(0, 300)}`);
 
     for (const stop of ['before', 'after'] as const) {

@@ -306,7 +306,7 @@ describe('a deletion answer naming several objects', () => {
 /**
  * Several `del:message` elements inside one object — issue #172.
  *
- * The answers are E19's, 2026-09-26, as the consumer recorded them in
+ * The answers are the on-premise system's, 2026-09-26, as the consumer recorded them in
  * fr0ster/mcp-abap-adt#230 (`src/__tests__/unit/deletionRefusal.test.ts`):
  * **trimmed to the elements a reading looks at**, so they are held here rather
  * than in the corpus, which keeps answers as the system sent them.
@@ -329,7 +329,7 @@ describe('a deletion answer carrying several messages per object', () => {
   const TABL_DELETE_TWO_OBJECTS =
     `<?xml version="1.0" encoding="utf-8"?><del:deletionResult ${NS}>` +
     '<del:object del:isDeleted="true" adtcore:type="TABT/DTT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="S"><del:text/></del:message></del:object>' +
-    '<del:object del:isDeleted="false" adtcore:type="TABL/DT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="W"><del:text>Release transport E19K905876 to remove the object directory entry</del:text></del:message></del:object>' +
+    '<del:object del:isDeleted="false" adtcore:type="TABL/DT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="W"><del:text>Release transport DEVK905876 to remove the object directory entry</del:text></del:message></del:object>' +
     '</del:deletionResult>';
 
   /** Delete of a behavior definition refused with SWB_TOOL 029. */
@@ -369,7 +369,7 @@ describe('a deletion answer carrying several messages per object', () => {
     expect(found?.messages).toEqual([
       {
         type: 'W',
-        text: 'ZMCP_BLD_TAB_H1: Release transport E19K905876 to remove the object directory entry',
+        text: 'ZMCP_BLD_TAB_H1: Release transport DEVK905876 to remove the object directory entry',
         t100: undefined,
       },
     ]);
@@ -416,7 +416,7 @@ describe('a deletion answer carrying several messages per object', () => {
   });
 
   it('an untyped placeholder message does not overturn isDeleted="true"', () => {
-    // E19, 2026-09-26: a CDS source deleted, and the object was gone on the
+    // On premise, 2026-09-26: a CDS source deleted, and the object was gone on the
     // next read. The one message has `del:type=""`, the text `S::000` and a
     // long-text link with an empty message class — a placeholder, not a
     // verdict. Read as an `E`, it turned every DDLS delete into a refusal.

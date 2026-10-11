@@ -26,8 +26,11 @@
  */
 
 import type {
+  IAdtError,
   IDebuggerBreakpoint,
+  IDebuggerBreakpointSync,
   IDebuggerIdentity,
+  IDebuggerSettings,
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -35,6 +38,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
 import { createBatchBoundary } from './batchPayload';
 
@@ -64,24 +68,42 @@ function query(params: Record<string, string | number | boolean>): string {
   ).toString();
 }
 
-/** The four parameters SAP keys a user-mode listener and its breakpoints on. */
-function identityQuery(identity: IDebuggerIdentity): Record<string, string> {
+/**
+ * The parameters SAP keys a listener and its breakpoints on, by mode. `terminal` mode sends no `requestUser` — the
+ * server reads none there — except on a breakpoint DELETE, which requires the parameter in every mode: left out it
+ * answers 400 `ExceptionParameterNotFound`, empty it answers 200 (on premise, 2026-10-11).
+ */
+function identityQuery(
+  identity: IDebuggerIdentity,
+  purpose?: 'delete',
+): Record<string, string> {
+  if (identity.debuggingMode === 'user') {
+    return {
+      debuggingMode: 'user',
+      requestUser: identity.requestUser,
+      terminalId: identity.terminalId,
+      ideId: identity.ideId,
+    };
+  }
   return {
-    debuggingMode: 'user',
-    requestUser: identity.requestUser,
+    debuggingMode: 'terminal',
+    ...(purpose === 'delete' ? { requestUser: '' } : {}),
     terminalId: identity.terminalId,
     ideId: identity.ideId,
   };
 }
 
+/** The identity's attributes on a breakpoints body, by mode. */
+function identityAttributes(identity: IDebuggerIdentity): string {
+  const user =
+    identity.debuggingMode === 'user'
+      ? ` requestUser="${escapeXml(identity.requestUser)}"`
+      : '';
+  return `debuggingMode="${identity.debuggingMode}" scope="external"${user} terminalId="${escapeXml(identity.terminalId)}" ideId="${escapeXml(identity.ideId)}"`;
+}
+
 // --- breakpoints ---------------------------------------------------------------
 
-/**
- * The body of `POST /debugger/breakpoints`.
- *
- * No `syncScope`: with it, the server replaces the user's whole external set,
- * Eclipse's breakpoints included. Without it the request only adds.
- */
 /** What names the place a breakpoint of each kind stops at. */
 function breakpointTarget(bp: IDebuggerBreakpoint): string {
   switch (bp.kind) {
@@ -96,24 +118,66 @@ function breakpointTarget(bp: IDebuggerBreakpoint): string {
   }
 }
 
+/** One `<breakpoint>` row; `only` is the validation attribute, or empty. */
+function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
+  const condition = (bp as { condition?: string }).condition;
+  if (condition !== undefined && bp.kind !== 'line') {
+    // The type forbids it; a cast can still get here. The server ignores a
+    // condition on other kinds, so sending it would arm a breakpoint that stops
+    // unconditionally - refuse instead.
+    throw new Error(
+      `condition is accepted on a line breakpoint only, not on kind "${bp.kind}"`,
+    );
+  }
+  if (bp.skipCount !== undefined && bp.skipCount > 0) {
+    // Still in the 14.x contract's type, refused here, and to leave the
+    // contract in its next major. Every breakpoint this module sends is
+    // external (`scope="external"`), and the server accepts a skip count there
+    // and drops it: it is not echoed, and the first hit stops - measured on
+    // premise (2026-10-11), BASIS 816, `skipCount="2"` on a loop line stopped
+    // on pass 1. The stored form of an external breakpoint has no field for it
+    // (server source, BASIS 816, read 2026-10-11). Sending it would arm a
+    // breakpoint that stops on every hit - refuse. `0` means "no skip", which
+    // is what the server does anyway, so it is accepted and sends nothing.
+    throw new Error(
+      `skipCount ${bp.skipCount} is not applied to an external breakpoint (kind "${bp.kind}"): the server ignores it`,
+    );
+  }
+  const cond = condition ? ` condition="${escapeXml(condition)}"` : '';
+  return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${cond}${only}/>`;
+}
+
+/**
+ * The body of `POST /debugger/breakpoints`, without a `syncScope`. Without one
+ * the request still replaces what the key holds - see {@link setBreakpoints}.
+ */
 export function buildBreakpointsXml(
   identity: IDebuggerIdentity,
   breakpoints: readonly IDebuggerBreakpoint[],
   validationOnly = false,
 ): string {
   const only = validationOnly ? ' validationOnly="true"' : '';
-  const rows = breakpoints
-    .map((bp) => {
-      const condition = bp.condition
-        ? ` condition="${escapeXml(bp.condition)}"`
-        : '';
-      return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${condition}${only}/>`;
-    })
-    .join('\n');
+  const rows = breakpoints.map((bp) => breakpointRow(bp, only)).join('\n');
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    `<dbg:breakpoints ${ADT_NAMESPACES} debuggingMode="user" scope="external" requestUser="${escapeXml(identity.requestUser)}" terminalId="${identity.terminalId}" ideId="${identity.ideId}">\n` +
+    `<dbg:breakpoints ${ADT_NAMESPACES} ${identityAttributes(identity)}>\n` +
     `${rows}\n</dbg:breakpoints>`
+  );
+}
+
+/** The body of a replacing `POST /debugger/breakpoints`: a `syncScope` and the set. */
+export function buildSyncBreakpointsXml(
+  identity: IDebuggerIdentity,
+  sync: IDebuggerBreakpointSync,
+): string {
+  const scope =
+    sync.scope === 'full'
+      ? '<syncScope mode="full"/>'
+      : `<syncScope mode="partial">${sync.objects.map((uri) => `<adtcore:objectReference adtcore:uri="${escapeXml(uri)}"/>`).join('')}</syncScope>`;
+  const rows = sync.breakpoints.map((bp) => breakpointRow(bp, '')).join('\n');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    `<dbg:breakpoints ${ADT_NAMESPACES} ${identityAttributes(identity)}>\n  ${scope}\n${rows ? `${rows}\n` : ''}</dbg:breakpoints>`
   );
 }
 
@@ -121,10 +185,27 @@ export function buildBreakpointsXml(
  * Arm breakpoints, or with `validationOnly` only ask the server whether it
  * would.
  *
+ * **It replaces, it does not add.** The request first deletes every external
+ * breakpoint under the identity's key, then arms the ones it carries - and a
+ * `validationOnly` request, which arms nothing, deletes them all the same.
+ * Measured on premise (2026-10-11), BASIS 816: with B's line breakpoint armed,
+ * a second request carrying only A's, or a validation of an exception
+ * breakpoint, left a run of B uncaught. Server source, BASIS 816, read
+ * 2026-10-11: without a sync scope the request reaches
+ * `set_multiple_extd_breakpoints` with no scopes, which deletes all of the
+ * key's breakpoints first. To arm several, send them in one request; to keep
+ * some, send them again, or replace by object with {@link syncBreakpoints}.
+ *
  * A breakpoint the server refuses comes back in the 200 answer with an
  * `errorMessage` and no id. A line breakpoint comes back renumbered into the
  * include it falls in (`#start=16` in a class became `LINE_NR=5` of the method
  * include), so its id cannot be predicted.
+ *
+ * **`skipCount` greater than 0 is refused** (`ok: false`, nothing sent). It is
+ * still in the 14.x contract's type, but the server ignores it on an external
+ * breakpoint - the first hit stops (measured on premise (2026-10-11), BASIS
+ * 816) - and it is to leave the contract in its next major. `0` is accepted
+ * and sends nothing.
  */
 export async function setBreakpoints(
   connection: IAbapConnection,
@@ -141,6 +222,59 @@ export async function setBreakpoints(
   });
 }
 
+/**
+ * Replace the breakpoints the server holds under the identity's key.
+ *
+ * {@link setBreakpoints} replaces as well; what this adds is an explicit name
+ * for it, `full` with `[]` to clear the key, and `partial` to replace one
+ * object's line breakpoints and keep the rest.
+ *
+ * **`skipCount` greater than 0 is refused** (`ok: false`, nothing sent). It is
+ * still in the 14.x contract's type, but the server ignores it on an external
+ * breakpoint - the first hit stops (measured on premise (2026-10-11), BASIS
+ * 816) - and it is to leave the contract in its next major. `0` is accepted
+ * and sends nothing.
+ *
+ * Measured on premise (2026-10-11), BASIS 816, with two classes (two main
+ * programs) and a caught exception:
+ * - `full` with one line breakpoint answers that one with its id, and a run of
+ *   a program whose breakpoint was left out is not caught; `full` with `[]`
+ *   answers an empty `<dbg:breakpoints/>` and nothing is caught;
+ * - `partial` with class A replaces A's line breakpoints and keeps B's line
+ *   breakpoint and the exception breakpoint: a run of B stops at the exception,
+ *   then at B's line; `partial` A with `[]` clears A's only;
+ * - a line breakpoint in B sent within A's scope comes back as a row with no
+ *   id, `errorKind="error"` and the server's one text for "outside the scope",
+ *   which names the wrong kinds: "Message, statement, and exception breakpoints
+ *   cannot be restricted to a program/include." (logon language EN);
+ * - `partial` naming only an object that maps to no program answered the body's
+ *   line breakpoint as that same refused row; named beside class A, it was
+ *   passed over and A's breakpoint was armed.
+ *
+ * Server source, BASIS 816, read 2026-10-11:
+ * - the key is the IDE user plus, in user mode, `requestUser`, or in terminal
+ *   mode, `terminalId`; a `terminalId` equal to `ideId` keys on the IDE id
+ *   alone; at most 30 breakpoints per key;
+ * - `full` replaces everything under the key, and an empty set clears it;
+ * - `partial` works by main program, refuses line breakpoints outside its
+ *   scope, and an object it cannot map leaves the body's line breakpoints
+ *   unset;
+ * - the set belongs to the key, so it reaches every IDE that shares the key.
+ */
+export async function syncBreakpoints(
+  connection: IAbapConnection,
+  identity: IDebuggerIdentity,
+  sync: IDebuggerBreakpointSync,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}/breakpoints`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: buildSyncBreakpointsXml(identity, sync),
+    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+  });
+}
+
 /** Remove one breakpoint by the id {@link setBreakpoints} answered. */
 export async function deleteBreakpoint(
   connection: IAbapConnection,
@@ -148,7 +282,7 @@ export async function deleteBreakpoint(
   breakpointId: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${DEBUGGER}/breakpoints/${encodeURIComponent(breakpointId)}?${query({ scope: 'external', ...identityQuery(identity) })}`,
+    url: `${DEBUGGER}/breakpoints/${encodeURIComponent(breakpointId)}?${query({ scope: 'external', ...identityQuery(identity, 'delete') })}`,
     method: 'DELETE',
     timeout: getTimeout('default'),
   });
@@ -187,6 +321,25 @@ export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
  *   other one's long poll returns at once with 409 `conflictNotification` —
  *   the notice Eclipse shows before it stops listening.
  *
+ * The identity's mode decides the parameters: `terminal` mode sends no `requestUser`.
+ *
+ * **One debug session per identity.** The listener context belongs to the ABAP
+ * session of the connection, so a listener, a check and an attach for another
+ * identity - another request user, another mode, another IDE id - are made on
+ * a connection of their own (an `AbapDebugger` constructed on it), not on this
+ * one. The library adds no guard.
+ *
+ * **One ABAP session listens for one user.** In user mode the server binds
+ * the listener context - request user and IDE id - to the ABAP session on the
+ * first request that needs it (listen, check, stop or attach), and every
+ * later listen, check or attach on that session, and the wake-up of a stop,
+ * use it whatever identity they name (server source, BASIS 816, read
+ * 2026-10-11: `CL_TPDAPI_SERVICE` caches the instance once per session).
+ * Measured on premise (2026-10-11), BASIS 816: on a session that had listened
+ * for one user, a take-over listener for another user answered 200 empty after
+ * its hold and that user's run went through uncaught; on a new session it was
+ * caught. A listener for another identity needs a session of its own.
+ *
  * There is no default. Which of the two is right depends on whose debugger is
  * displaced, and only the caller knows that.
  */
@@ -208,7 +361,84 @@ export async function listen(
   });
 }
 
-/** Release the listener. */
+/**
+ * Ask whether a listener for the identity would conflict. Starts nothing: 200
+ * with an empty body is "free"; a conflict is 409 `conflictDetected`; a missing
+ * authorization (`user` mode) is 403, checked first. It reads in the ABAP
+ * session of the connection: one debug session per identity (see {@link listen}).
+ *
+ * Measured on premise (2026-10-11), BASIS 816: free answered 200 with an empty
+ * body, in user and in terminal mode; with a listener of the same user under
+ * another IDE id running, 409 `conflictDetected`, whose `conflictText` and
+ * `ideUser` {@link readListenerConflict} reads.
+ */
+export async function checkListener(
+  connection: IAbapConnection,
+  identity: IDebuggerIdentity,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}/listeners?${query({ ...identityQuery(identity), checkConflict: true })}`,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+const conflictParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  parseTagValue: false,
+  trimValues: true,
+  removeNSPrefix: true,
+});
+
+/**
+ * Who holds the user's debugging, read from a 409 answer of a listener request
+ * (measured on premise, 2026-10-11); `undefined` for anything else.
+ */
+export function readListenerConflict(
+  error: IAdtError,
+): { conflictText: string; ideUser?: string } | undefined {
+  const response = error.response;
+  if (
+    !response ||
+    response.status !== 409 ||
+    typeof response.data !== 'string' ||
+    !response.data
+  ) {
+    return undefined;
+  }
+  let entries: unknown;
+  try {
+    entries = conflictParser.parse(response.data)?.exception?.properties?.entry;
+  } catch {
+    return undefined;
+  }
+  const list = (
+    Array.isArray(entries) ? entries : entries ? [entries] : []
+  ) as Array<{ key?: string; '#text'?: string }>;
+  const value = (key: string) => list.find((e) => e.key === key)?.['#text'];
+  const conflictText = value('conflictText');
+  if (!conflictText) return undefined;
+  const ideUser = value('ideUser');
+  return ideUser ? { conflictText, ideUser } : { conflictText };
+}
+
+/**
+ * Release the listener.
+ *
+ * **It also deletes the key's breakpoints.** In user mode the server deletes
+ * every external breakpoint of the IDE user for the request user this call
+ * names, and the debugging activation with them - whether or not a listener
+ * was running. Only the wake-up of a running listener goes through the
+ * session's cached listener context (see {@link listen}); the deletion uses
+ * the identity named here. Measured on premise (2026-10-11), BASIS 816: with a
+ * line breakpoint armed and no listener running, a stop answered 200 and the
+ * next run went uncaught. Server source, BASIS 816, read 2026-10-11:
+ * `stop_listener_for_user` deletes from `abdbg_extdbps` for the IDE user and
+ * the named request user. Stop the listener last, or arm again before the next
+ * listen.
+ */
 export async function stopListener(
   connection: IAbapConnection,
   identity: IDebuggerIdentity,
@@ -254,13 +484,18 @@ export async function stopListener(
  */
 export async function attach(
   connection: IAbapConnection,
-  requestUser: string,
+  identity: IDebuggerIdentity,
   debuggeeId: string,
   dynproDebugging = true,
   server?: string,
 ): Promise<IAdtWireResponse> {
+  // The server attaches by debuggeeId; it reads debuggingMode, and requestUser only in user mode.
+  const who: Record<string, string> =
+    identity.debuggingMode === 'user'
+      ? { debuggingMode: 'user', requestUser: identity.requestUser }
+      : { debuggingMode: 'terminal' };
   return connection.makeAdtRequest({
-    url: `${DEBUGGER}?${query({ method: 'attach', debuggeeId, debuggingMode: 'user', requestUser, dynproDebugging })}`,
+    url: `${DEBUGGER}?${query({ method: 'attach', debuggeeId, ...who, dynproDebugging })}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
@@ -430,12 +665,85 @@ export async function setVariableValue(
  * (measured on premise, 2026-10-09: the debuggee was gone, a stack read after
  * it failed, and the program's run returned). A caller reading that as a
  * failure passes an `analyse` that lets the subtype through.
+ *
+ * Three ways to let go, which differ in what happens to the program:
+ * - `terminateDebuggee` ends the debuggee: the program does not finish;
+ * - `detachDebugger` leaves the debuggee: the debugger goes, the program runs on;
+ * - `terminateDebugger` frees the debugger: the program runs on.
  */
 export async function terminateDebuggee(
   connection: IAbapConnection,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?method=terminateDebuggee`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+/**
+ * Leave the debuggee; the program runs on.
+ *
+ * Without an id it addresses the debuggee attached on this session: the
+ * debugger leaves and the program runs on. With an id the server tries to
+ * attach that caught debuggee, and if that fails it deletes its activation and
+ * still answers success, so success does not prove attach and release. In
+ * particular a success with the id of a debuggee attached on another session
+ * does not release that attachment (measured: that session could still step).
+ * Server source, BASIS 816, read 2026-10-11.
+ *
+ * Measured on premise (2026-10-11), BASIS 816:
+ * - without an id, on the attached session: 200 with an empty body, and the
+ *   program ran on - into the next pass over the same external line
+ *   breakpoint, where a listener standing at the time caught the same run again;
+ * - with the id of a caught debuggee nobody attached, from another session:
+ *   200 with an empty body, and the run returned about 1 s later - at once, not
+ *   after the hold a caught, unattached debuggee otherwise waits out;
+ * - with the id of a debuggee another session had attached: 200 with an empty
+ *   body all the same, and the attaching session still stepped it.
+ *
+ * Whether a session breakpoint (`scope="debugger"`) brings the debugger back
+ * was not measured: this module sends external breakpoints only.
+ */
+export async function detachDebugger(
+  connection: IAbapConnection,
+  debuggeeId?: string,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({
+      method: 'detachDebugger',
+      ...(debuggeeId ? { debuggeeId } : {}),
+    })}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+/**
+ * Free the debugger; the program runs on.
+ *
+ * **The debugger's session ends with it.** The server stops the debugger and
+ * frees the ABAP session the request runs in (`SYSTEM-CALL FREE MODE 0`; server
+ * source, BASIS 816, read 2026-10-11). Measured on premise (2026-10-11), BASIS
+ * 816: the answer is a plain
+ * ICF `500 Internal Server Error` (`text/plain`, no ADT exception document,
+ * so no subtype), the program ran on and returned its output, and the next
+ * request on that session was answered `400` "Session Timed Out or Not Found".
+ * A `500` here is therefore the expected end, not proof of failure; open a new
+ * session for the next attach.
+ *
+ * Pass `analyseDebuggerFreed` from `@mcp-abap-adt/adt-strategies` (0.9.0) to
+ * take that `500` as no failure; `analyseException` lets it stop you. See
+ * `docs/usage/ERRATA.md`, "The debugger freeing its session is answered as an
+ * ICF 500".
+ */
+export async function terminateDebugger(
+  connection: IAbapConnection,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({ method: 'terminateDebugger' })}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: 'application/xml' },
@@ -581,4 +889,55 @@ export function buildDebuggerBatchPayload(
     boundary,
     body: `${parts}\r\n--${boundary}--\r\n`,
   };
+}
+
+const boolOrKeep = (value: boolean | undefined) =>
+  value === undefined ? '' : String(value);
+
+/**
+ * The settings body (server source, BASIS 816, read 2026-10-11). Four
+ * attributes are not conditional in the server's transformation, so they are
+ * always sent; empty means "keep" (the server maps a value that is neither
+ * true nor false to no change). `updateDebugging` and `showDataAging` are sent
+ * only when set; `showDataAging` does not merge - left out, it is off.
+ */
+export function buildDebuggerSettingsXml(settings: IDebuggerSettings): string {
+  const conditional = [
+    settings.updateDebugging === undefined
+      ? ''
+      : ` updateDebugging="${settings.updateDebugging}"`,
+    settings.showDataAging === undefined
+      ? ''
+      : ` showDataAging="${settings.showDataAging}"`,
+  ].join('');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    `<dbg:settings xmlns:dbg="http://www.sap.com/adt/debugger" systemDebugging="${boolOrKeep(settings.systemDebugging)}" createExceptionObject="${boolOrKeep(settings.createExceptionObject)}" backgroundRFC="${boolOrKeep(settings.backgroundRFC)}" sharedObjectDebugging="${boolOrKeep(settings.sharedObjectDebugging)}"${conditional}/>`
+  );
+}
+
+/**
+ * Set the debugger settings of the session. A setting left out is sent empty
+ * and the server keeps it (server source, BASIS 816, read 2026-10-11); the
+ * first call after an attach ignores `systemDebugging=false` (server source, BASIS 816, read 2026-10-11).
+ *
+ * Measured on premise (2026-10-11), BASIS 816, at a stop: the answer is the
+ * whole `<dbg:settings>` with all six attributes; `systemDebugging: true`
+ * answered `"true"`, `{}` then kept `"true"`, `false` answered `"false"`;
+ * `showDataAging: true` answered `"true"` and `{}` then answered `"false"`. A
+ * variables read after each call answered as before. The first call after the
+ * attach, with `systemDebugging: false`, answered `"false"` - which cannot tell
+ * "ignored" from "applied", since the debugger starts with it off.
+ */
+export async function setDebuggerSettings(
+  connection: IAbapConnection,
+  settings: IDebuggerSettings,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({ method: 'setDebuggerSettings' })}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: buildDebuggerSettingsXml(settings),
+    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+  });
 }

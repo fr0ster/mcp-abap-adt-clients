@@ -13,16 +13,22 @@ import {
   transportSearchConfigurations,
   transportTree,
 } from '@mcp-abap-adt/adt-strategies';
-import {
-  type ITransportResults,
-  transportDocuments,
-} from '../../core/transport/types';
+import { transportDocuments } from '../../core/transport/types';
 
-export const transportParsing = {
+export const transportParsing: Omit<
+  typeof transportDocuments,
+  'created' | 'createdTask' | 'list' | 'searchConfigurations' | 'objects'
+> & {
+  created: typeof transportCreated;
+  createdTask: typeof transportCreated;
+  list: typeof transportTree;
+  searchConfigurations: typeof transportSearchConfigurations;
+  objects: typeof transportObjectEntries;
+} = {
   ...transportDocuments,
   created: transportCreated,
   createdTask: transportCreated,
   list: transportTree,
   searchConfigurations: transportSearchConfigurations,
   objects: transportObjectEntries,
-} satisfies ITransportResults;
+};

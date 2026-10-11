@@ -65,7 +65,7 @@ describe('parseTransportTree reads both captured shapes', () => {
   it('keeps the root attributes — the only record of whose list this is', () => {
     const tree = parseTransportTree(fixture('transportTree.noTargets.xml'));
 
-    expect(tree.attributes['adtcore:name']).toBe('CB9900000000');
+    expect(tree.attributes['adtcore:name']).toBe('SAPUSER01');
     expect(tree.attributes['adtcore:changedAt']).toBeDefined();
     expect(
       Object.keys(tree.attributes).some((k) => k.startsWith('xmlns')),
@@ -112,11 +112,11 @@ describe('parseTransportTree reads both captured shapes', () => {
   it('still says whose list it is when the list is empty', () => {
     const tree = parseTransportTree(
       '<?xml version="1.0"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" ' +
-        'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="CB9900000000"/>',
+        'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="SAPUSER01"/>',
     );
 
     expect(tree.requests).toEqual([]);
-    expect(tree.attributes['adtcore:name']).toBe('CB9900000000');
+    expect(tree.attributes['adtcore:name']).toBe('SAPUSER01');
   });
 
   it('throws on a body it does not recognise, carrying the payload', () => {

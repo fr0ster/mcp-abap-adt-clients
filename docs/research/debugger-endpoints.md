@@ -72,16 +72,33 @@ client-side does not end it on the server.
 | Member | Request | Accept |
 |---|---|---|
 | `setBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` | `*/*` |
-| `getBreakpoints` | `GET /debugger/breakpoints?debuggingMode=user&requestUser&terminalId&ideId&scope=external` | `*/*` |
-| `listen` | `POST /debugger/listeners?debuggingMode=user&requestUser&terminalId&ideId&timeout=N` | `application/vnd.sap.as+xml` |
-| `stopListener` | `DELETE /debugger/listeners?debuggingMode=user&requestUser` | `*/*` |
-| `attach` | `POST /debugger?method=attach&debuggeeId&dynproDebugging=true&debuggingMode=user&requestUser` | `*/*` |
+| `getBreakpoints` | `GET /debugger/breakpoints?debuggingMode[&requestUser]&terminalId&ideId&scope=external` | `*/*` |
+| `deleteBreakpoint` | `DELETE /debugger/breakpoints/<id>?scope=external&debuggingMode&requestUser&terminalId&ideId`; `requestUser` is required in every mode, sent empty (`requestUser=`) in terminal mode | `*/*` |
+| `listen` | `POST /debugger/listeners?debuggingMode[&requestUser]&terminalId&ideId&timeout=N` | `application/vnd.sap.as+xml` |
+| `stopListener` | `DELETE /debugger/listeners?debuggingMode[&requestUser]` | `*/*` |
+| `attach` | `POST /debugger?method=attach&debuggeeId&dynproDebugging=true&debuggingMode[&requestUser]` | `*/*` |
+| `syncBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` with `<syncScope mode="full"/>` or `mode="partial"` and one `adtcore:objectReference` per object | `*/*` |
+| `checkListener` | `GET /debugger/listeners?debuggingMode[&requestUser]&terminalId&ideId&checkConflict=true` | `application/xml` |
+| `detachDebugger` | `POST /debugger?method=detachDebugger[&debuggeeId]` | `*/*` |
+| `terminateDebugger` | `POST /debugger?method=terminateDebugger` | `*/*` |
+| `setDebuggerSettings` | `POST /debugger?method=setDebuggerSettings`, body `dbg:settings` | `application/xml` |
 | `getStack` | `GET /debugger/stack?method=getStack&emode=_&semanticURIs=true` | `*/*` |
 | `goToFrame` | `PUT <stackUri from the stack>` | `*/*` |
 | `getVariables` | `POST /debugger?method=getVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
 | `getChildVariables` | `POST /debugger?method=getChildVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
 | `stepInto` / `stepOver` / `stepReturn` / `stepContinue` | `POST /debugger?method=<step>` | `*/*` |
 | `stepRunToLine` | `POST /debugger?method=stepRunToLine&uri=<source uri>#start=N` | `*/*` |
+
+**The mode.** `debuggingMode` is `user` or `terminal`, taken from the
+identity. `requestUser` goes out in `user` mode only. The one exception is the
+breakpoint `DELETE`, which requires the parameter in every mode: a terminal
+identity sends `requestUser=` empty (measured on premise (2026-10-11), BASIS
+816: left out `400`, empty `200`). `attach` carries `method`, `debuggeeId`,
+`debuggingMode`, `requestUser` in user mode only, and `dynproDebugging`; the
+server attaches by `debuggeeId` and does not read the ids. A catch in terminal
+mode is unmeasured.
+
+Brackets mark a parameter sent in `user` mode only.
 
 **Accept.** On 758, ADT matched a resource on its URI and on the media type
 it can produce, and a concrete Accept it could not produce was answered `404 No
@@ -93,7 +110,9 @@ The members `AbapDebugger` ships are `setBreakpoints`, `deleteBreakpoint`,
 `listen`, `stopListener`, `attach`, `getStack`, `setStackPosition` (rather than
 the `PUT <stackUri>` above, which is the same move), `getVariables`,
 `getChildVariables`, `setVariableValue`, `step`, `stepToLine`,
-`terminateDebuggee`, the watchpoints and the memory members. There is no
+`terminateDebuggee`, `syncBreakpoints`, `checkListener`, `detachDebugger`,
+`terminateDebugger`, `setDebuggerSettings`, the watchpoints and the memory
+members. There is no
 `getBreakpoints`: the answer is always empty (below).
 
 ## What SAP answers
@@ -210,13 +229,16 @@ the `PUT <stackUri>` above, which is the same move), `getVariables`,
 - `getVariables`: `500 AdiFailed`.
 - `stepContinue`: `400 ExceptionInvalidData`, subtype `noSessionAttached`.
 
-**There is no detach.** `POST /debugger?method=detach` answers `400
-ExceptionInvalidData "Unknown method ''"`. A debuggee is released by
-`stepContinue`.
+**Detach.** `POST /debugger?method=detach` answers `400
+ExceptionInvalidData "Unknown method ''"`; the method is `detachDebugger`, which
+lets the debugger leave while the program runs on (measured on premise
+(2026-10-11), BASIS 816). `stepContinue` also releases a debuggee.
 
 **Stop the listener.**
 - `DELETE /debugger/listeners?debuggingMode=user&requestUser=…` answers `200`
-  with an empty body. On 758 it also removed the user's external breakpoints.
+  with an empty body. It also removes the key's external breakpoints, with or
+  without a listener running: measured on 758, and on premise (2026-10-11),
+  BASIS 816.
 - vibing-steampunk found that a DELETE naming the client's `terminalId` and
   `ideId` matched nothing. On 816 and on the cloud (2026-10-10) it did: a
   listen waiting on one session ended 3–4 s after that DELETE from another,
@@ -299,3 +321,7 @@ how `RfcTransport` works:
   keeps it from stopping.
 - The debugger batch as Eclipse uses it — a step answered with the stack in
   one round trip.
+
+## See also
+
+[`debugger-modes.md`](debugger-modes.md) — activation modes (user, terminal, project), what abap-adt-api sends, the discovery templates, and the ids measured under both conflict modes.

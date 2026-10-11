@@ -66,7 +66,7 @@ describe('LockCapability conformance across handlers', () => {
     // and stateless again after it. This used to assert the opposite — that
     // the session is "left stateful (the lock is held)" — which made every
     // write in the window run inside the session. Eclipse holds its stateful
-    // session for LOCK and UNLOCK alone; measured on E19, its source PUT is
+    // session for LOCK and UNLOCK alone; measured on premise (BASIS 816), its source PUT is
     // stateless and carries only `lockHandle` and `corrNr`. What a request
     // takes while it runs inside the session stays with that session, which
     // is how an activation left `E_ABAP_GENPH` behind for hours.

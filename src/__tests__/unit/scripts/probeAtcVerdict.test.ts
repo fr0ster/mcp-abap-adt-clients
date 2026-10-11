@@ -62,7 +62,7 @@ describe('probe-atc — what counts as proof of cloud', () => {
 
   it.each([
     // A modern on-prem, which is what makes the endpoint fallback unusable.
-    ['https://e19.corp.example:44300', 'on-prem host'],
+    ['https://system.corp.example:44300', 'on-prem host'],
     ['http://sap-dev:8000', 'on-prem host with a port'],
     // A host that merely *contains* a cloud domain. `includes` would pass it.
     ['https://hana.ondemand.com.attacker.example', 'suffix only as substring'],

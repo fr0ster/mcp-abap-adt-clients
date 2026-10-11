@@ -70,7 +70,7 @@ environment:
   system: "onprem"              # Which system. Stated, never inferred
   connection_type: "rfc"        # Use RFC transport instead of HTTP
   default_package: "$TMP"
-  default_master_system: "E19"
+  default_master_system: "SID"
 ```
 
 When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.
@@ -82,7 +82,7 @@ the connection from both.
 
 ### .env Files
 
-System-specific `.env` files (e.g., `e19.env`, `e77.env`) contain SAP credentials:
+System-specific `.env` files (e.g., `<system>.env`, `<other-system>.env`) contain SAP credentials:
 
 ```env
 SAP_URL=http://saphost:8000
@@ -97,7 +97,7 @@ SAP_UNICODE=false          # Set to false for non-unicode legacy systems
 
 Controls the `chkrun:contentType` attribute in checkRun XML payloads for class includes and source artifacts:
 
-- `SAP_UNICODE=false` — uses `text/plain` (required for non-unicode legacy systems like E77)
+- `SAP_UNICODE=false` — uses `text/plain` (required for non-unicode legacy systems like a BASIS 7.40 system)
 - `SAP_UNICODE=true` or omitted — uses `text/plain; charset=utf-8` (default for modern/unicode systems)
 
 If this is set incorrectly, checkRun returns `notProcessed` with `"Dirty Source: Wrong content type"`.
@@ -105,7 +105,7 @@ The value is read in `resolveSystemContext()` and passed to `AdtContentTypesBase
 
 Copy the appropriate file to `.env` before running tests:
 ```bash
-cp e19.env .env
+cp <system>.env .env
 ```
 
 Or pass variables inline:

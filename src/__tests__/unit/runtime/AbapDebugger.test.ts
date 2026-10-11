@@ -1,5 +1,11 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
-import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IDebuggerBreakpoint,
+  IDebuggerIdentity,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   AbapDebugger,
@@ -9,6 +15,7 @@ import {
 import {
   buildDebuggerBatchPayload,
   executeBatchRequest,
+  readListenerConflict,
 } from '../../../runtime/debugger/abap';
 
 /**
@@ -17,6 +24,7 @@ import {
  */
 describe('AbapDebugger', () => {
   const identity: IDebuggerIdentity = {
+    debuggingMode: 'user',
     requestUser: 'SAPUSER01',
     terminalId: 'EC80D3662BADB8CD21C70406E0E96D4C',
     ideId: '7194D729E68FDAF6E185C7E5124CC900',
@@ -50,10 +58,126 @@ describe('AbapDebugger', () => {
         headers?: Record<string, string>;
         timeout: number;
       };
-    return { debugger_, sent };
+    return { debugger_, sent, connection };
   }
 
-  it('setBreakpoints posts the user-mode set, adding without syncScope', async () => {
+  it('a line breakpoint carries its condition', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3', condition: 'lv_i > 2' },
+      { kind: 'exception', exceptionClass: 'CX_X' },
+    ]);
+    expect(sent().data).toContain(
+      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3" condition="lv_i &gt; 2"/>',
+    );
+    expect(sent().data).toContain(
+      '<breakpoint kind="exception" exceptionClass="CX_X"/>',
+    );
+  });
+
+  it('skipCount 0 means "no skip": accepted, and nothing is sent for it', async () => {
+    const { debugger_, sent } = setup();
+    const answer = await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3', skipCount: 0 },
+    ]);
+    expect(answer.ok).toBe(true);
+    expect(sent().data).toContain(
+      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3"/>',
+    );
+    expect(sent().data).not.toContain('skipCount');
+  });
+
+  it('a skip count above 0 is refused before the wire: the server ignores it on an external breakpoint', async () => {
+    const { debugger_, connection } = setup();
+    const line = await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3', skipCount: 2 },
+    ]);
+    expect(line.ok).toBe(false);
+    if (!line.ok) expect(line.getError().message).toMatch(/skipCount/);
+    const synced = await debugger_.syncBreakpoints(identity, {
+      scope: 'full',
+      breakpoints: [
+        { kind: 'exception', exceptionClass: 'CX_X', skipCount: 1 },
+      ],
+    });
+    expect(synced.ok).toBe(false);
+    if (!synced.ok) expect(synced.getError().message).toMatch(/skipCount/);
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+  });
+
+  it('a condition smuggled onto another kind by a cast is refused before the wire', async () => {
+    const { debugger_, connection } = setup();
+    const smuggled = {
+      kind: 'exception',
+      exceptionClass: 'CX_X',
+      condition: 'a = 1',
+    } as unknown as IDebuggerBreakpoint;
+    const answer = await debugger_.setBreakpoints(identity, [smuggled]);
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) {
+      expect(answer.getError().message).toMatch(/condition/);
+    }
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+  });
+
+  it('a condition smuggled through syncBreakpoints is refused before the wire', async () => {
+    const { debugger_, connection } = setup();
+    const smuggled = {
+      kind: 'exception',
+      exceptionClass: 'CX_X',
+      condition: 'a = 1',
+    } as unknown as IDebuggerBreakpoint;
+    const answer = await debugger_.syncBreakpoints(identity, {
+      scope: 'full',
+      breakpoints: [smuggled],
+    });
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) {
+      expect(answer.getError().message).toMatch(/condition/);
+    }
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+  });
+
+  it('syncBreakpoints full replaces the set; an empty set clears it', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.syncBreakpoints(identity, {
+      scope: 'full',
+      breakpoints: [],
+    });
+    expect(sent().url).toBe('/sap/bc/adt/debugger/breakpoints');
+    expect(sent().method).toBe('POST');
+    expect(sent().data).toContain('<syncScope mode="full"/>');
+    expect(sent().data).not.toContain('<breakpoint ');
+  });
+
+  it('syncBreakpoints partial names each object', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.syncBreakpoints(identity, {
+      scope: 'partial',
+      objects: ['/sap/bc/adt/oo/classes/zcl_a', '/sap/bc/adt/oo/classes/zcl_b'],
+      breakpoints: [
+        {
+          kind: 'line',
+          uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=3',
+        },
+      ],
+    });
+    expect(sent().data).toContain(
+      '<syncScope mode="partial"><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_a"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_b"/></syncScope>',
+    );
+  });
+
+  it('setBreakpoints escapes the ids it writes into attributes', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(
+      { ...identity, terminalId: 'T"&1', ideId: 'I<"2' },
+      [{ kind: 'statement', statement: 'RAISE' }],
+    );
+    expect(sent().data).toContain('terminalId="T&quot;&amp;1"');
+    expect(sent().data).toContain('ideId="I&lt;&quot;2"');
+  });
+
+  it('setBreakpoints posts the user-mode set without a syncScope', async () => {
     const { debugger_, sent } = setup();
     await debugger_.setBreakpoints(identity, [
       {
@@ -144,17 +268,67 @@ describe('AbapDebugger', () => {
 
   it('attach goes through the dispatcher with the debuggee id', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.attach('SAPUSER01', '0CC47A1E68C11FE1B0F9C08CD46015CB');
+    await debugger_.attach(identity, '0CC47A1E68C11FE1B0F9C08CD46015CB');
     expect(sent()).toMatchObject({
       method: 'POST',
       url: '/sap/bc/adt/debugger?method=attach&debuggeeId=0CC47A1E68C11FE1B0F9C08CD46015CB&debuggingMode=user&requestUser=SAPUSER01&dynproDebugging=true',
     });
   });
 
+  const terminal: IDebuggerIdentity = {
+    debuggingMode: 'terminal',
+    terminalId: 'EC80D3662BADB8CD21C70406E0E96D4C',
+    ideId: '7194D729E68FDAF6E185C7E5124CC900',
+  };
+
+  it('a terminal identity keys the listener on its ids and sends no requestUser', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.listen(terminal);
+    expect(sent().url).toContain(
+      'debuggingMode=terminal&terminalId=EC80D3662BADB8CD21C70406E0E96D4C&ideId=7194D729E68FDAF6E185C7E5124CC900',
+    );
+    expect(sent().url).not.toContain('requestUser');
+  });
+
+  it('a terminal identity arms breakpoints without requestUser', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(terminal, [
+      {
+        kind: 'line',
+        uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
+      },
+    ]);
+    expect(sent().data).toContain(
+      'debuggingMode="terminal" scope="external" terminalId="EC80D3662BADB8CD21C70406E0E96D4C" ideId="7194D729E68FDAF6E185C7E5124CC900"',
+    );
+    expect(sent().data).not.toContain('requestUser');
+  });
+
+  it('deleting a terminal-mode breakpoint sends requestUser empty, as the server requires it', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.deleteBreakpoint(terminal, 'KIND=0.SOURCETYPE=ABAP');
+    expect(sent().url).toBe(
+      '/sap/bc/adt/debugger/breakpoints/KIND%3D0.SOURCETYPE%3DABAP?scope=external&debuggingMode=terminal&requestUser=&terminalId=EC80D3662BADB8CD21C70406E0E96D4C&ideId=7194D729E68FDAF6E185C7E5124CC900',
+    );
+  });
+
+  it('attach sends the mode, and requestUser only in user mode', async () => {
+    const user = setup();
+    await user.debugger_.attach(identity, 'DBG1');
+    expect(user.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=attach&debuggeeId=DBG1&debuggingMode=user&requestUser=SAPUSER01&dynproDebugging=true',
+    );
+    const term = setup();
+    await term.debugger_.attach(terminal, 'DBG1');
+    expect(term.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=attach&debuggeeId=DBG1&debuggingMode=terminal&dynproDebugging=true',
+    );
+  });
+
   it('attach routed to a server sends the saplb header, and none otherwise', async () => {
     const routed = setup();
     await routed.debugger_.attach(
-      'SAPUSER01',
+      identity,
       '0CC47A1E68C11FE1B0F9C08CD46015CB',
       {
         server: 'appserver-a1b2c',
@@ -163,10 +337,7 @@ describe('AbapDebugger', () => {
     expect(routed.sent().headers?.saplb).toBe('appserver-a1b2c');
 
     const plain = setup();
-    await plain.debugger_.attach(
-      'SAPUSER01',
-      '0CC47A1E68C11FE1B0F9C08CD46015CB',
-    );
+    await plain.debugger_.attach(identity, '0CC47A1E68C11FE1B0F9C08CD46015CB');
     expect(plain.sent().headers?.saplb).toBeUndefined();
   });
 
@@ -249,6 +420,26 @@ describe('AbapDebugger', () => {
     );
   });
 
+  it('detachDebugger posts the method, with the debuggee id only when given, encoded once', async () => {
+    const bare = setup();
+    await bare.debugger_.detachDebugger();
+    expect(bare.sent().url).toBe('/sap/bc/adt/debugger?method=detachDebugger');
+    const byId = setup();
+    await byId.debugger_.detachDebugger({ debuggeeId: 'A&B=C/D' });
+    expect(byId.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=detachDebugger&debuggeeId=A%26B%3DC%2FD',
+    );
+  });
+
+  it('terminateDebugger posts the method alone', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.terminateDebugger();
+    expect(sent()).toMatchObject({
+      url: '/sap/bc/adt/debugger?method=terminateDebugger',
+      method: 'POST',
+    });
+  });
+
   it('watchpoints: create, list and delete', async () => {
     const create = setup();
     await create.debugger_.createWatchpoint('LV_TOTAL', {
@@ -298,6 +489,46 @@ describe('AbapDebugger', () => {
       method: 'POST',
     });
     expect(answer.ok && answer.getResult().value).toBe('<snapshot/>');
+  });
+
+  it('settings left out are sent empty, so the server keeps them; the conditional ones are left out', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setDebuggerSettings({});
+    expect(sent().url).toBe('/sap/bc/adt/debugger?method=setDebuggerSettings');
+    expect(sent().headers).toMatchObject({
+      'Content-Type': 'application/xml',
+      Accept: 'application/xml',
+    });
+    expect(sent().data).toContain(
+      '<dbg:settings xmlns:dbg="http://www.sap.com/adt/debugger" systemDebugging="" createExceptionObject="" backgroundRFC="" sharedObjectDebugging=""/>',
+    );
+  });
+
+  it('true and false are sent as given, the conditional ones only when set', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setDebuggerSettings({
+      systemDebugging: true,
+      createExceptionObject: false,
+      updateDebugging: true,
+      showDataAging: false,
+    });
+    expect(sent().data).toContain(
+      'systemDebugging="true" createExceptionObject="false" backgroundRFC="" sharedObjectDebugging="" updateDebugging="true" showDataAging="false"',
+    );
+  });
+
+  it('the settings answer goes through its own strategy', async () => {
+    const { debugger_ } = setup({
+      status: 200,
+      data: '<dbg:settings systemDebugging="true"/>',
+      headers: {},
+    });
+    const answer = await debugger_.setDebuggerSettings({
+      systemDebugging: true,
+    });
+    expect(answer.ok && answer.getResult().value).toBe(
+      '<dbg:settings systemDebugging="true"/>',
+    );
   });
 
   it('answers the document by default and nothing for a delete', async () => {
@@ -386,6 +617,54 @@ describe('AbapDebugger', () => {
         'Content-Type': 'multipart/mixed; boundary=b1',
         Accept: 'multipart/mixed',
       },
+    });
+  });
+
+  describe('checkListener and readListenerConflict', () => {
+    const conflictBody = fs.readFileSync(
+      path.join(__dirname, '../../fixtures/debugger/listener-conflict-409.xml'),
+      'utf8',
+    );
+    const errorWith = (status: number | undefined, data: unknown) =>
+      ({
+        origin: 'server',
+        message: 'x',
+        ...(status === undefined
+          ? {}
+          : { response: { status, data, headers: {} } }),
+      }) as unknown as IAdtError;
+
+    it('checkListener asks without starting a listener', async () => {
+      const { debugger_, sent } = setup();
+      await debugger_.checkListener(identity);
+      expect(sent().method).toBe('GET');
+      expect(sent().url).toBe(
+        `/sap/bc/adt/debugger/listeners?${identityQuery}&checkConflict=true`,
+      );
+    });
+
+    it('readListenerConflict reads who holds the listener from a 409', () => {
+      expect(readListenerConflict(errorWith(409, conflictBody))).toEqual({
+        conflictText:
+          'Another session (user SAPUSER02) exists with global debugging scope for user SAPUSER02',
+        ideUser: 'SAPUSER02',
+      });
+    });
+
+    it.each([
+      ['no response', errorWith(undefined, undefined)],
+      ['an empty body', errorWith(409, '')],
+      ['a malformed body', errorWith(409, '<exc:exception><properties>')],
+      ['a 403', errorWith(403, conflictBody)],
+      [
+        'a 409 without conflictText',
+        errorWith(
+          409,
+          conflictBody.replace(/<entry key="conflictText">[^<]*<\/entry>/, ''),
+        ),
+      ],
+    ])('readListenerConflict answers undefined for %s', (_label, error) => {
+      expect(readListenerConflict(error)).toBeUndefined();
     });
   });
 });

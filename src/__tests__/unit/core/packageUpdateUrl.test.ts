@@ -20,7 +20,7 @@ function capturingConnection(): {
  * The package PUT builds its query like every other write.
  *
  * It used to interpolate `encodeURIComponent(lockHandle)` unconditionally, so
- * a caller with no handle sent `?lockHandle=undefined`. Measured on E19
+ * a caller with no handle sent `?lockHandle=undefined`. Measured on premise (BASIS 816)
  * 2026-09-26: SAP answered 423 `SADT_RESOURCE/026`, "invalid lock handle:
  * undefined" — a refusal about a handle nobody passed, where the endpoint's
  * own answer to a missing handle is a different message.
@@ -28,14 +28,14 @@ function capturingConnection(): {
 describe('updatePackage URL', () => {
   const params = {
     package_name: 'ZAC_PKG',
-    transport_request: 'E19K900001',
+    transport_request: 'DEVK900001',
   } as never;
 
   it('carries the handle and the transport when both are given', async () => {
     const { connection, urls } = capturingConnection();
     await updatePackage(connection, params, '<pak:package/>', 'ABC123');
     expect(urls).toEqual([
-      '/sap/bc/adt/packages/zac_pkg?lockHandle=ABC123&corrNr=E19K900001',
+      '/sap/bc/adt/packages/zac_pkg?lockHandle=ABC123&corrNr=DEVK900001',
     ]);
   });
 
@@ -47,6 +47,6 @@ describe('updatePackage URL', () => {
       '<pak:package/>',
       undefined as unknown as string,
     );
-    expect(urls).toEqual(['/sap/bc/adt/packages/zac_pkg?corrNr=E19K900001']);
+    expect(urls).toEqual(['/sap/bc/adt/packages/zac_pkg?corrNr=DEVK900001']);
   });
 });

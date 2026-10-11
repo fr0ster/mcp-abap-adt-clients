@@ -497,7 +497,7 @@ const request = client.getRequest({
 });
 
 // What the task holds, each entry with the position the removal needs.
-const listed = await request.readObjects('E19K905942');
+const listed = await request.readObjects('DEVK905942');
 const entry = listed.ok
   ? listed.getResult().value.find((o) => o.name === 'ZMCP_BLD_FGR_H1')
   : undefined;
@@ -507,20 +507,20 @@ const entry = listed.ok
 // it cannot be removed, and the compiler asks rather than sending an empty
 // value that would remove nothing while answering 200.
 if (entry?.position)
-  await request.removeObject('E19K905942', { ...entry, position: entry.position });
+  await request.removeObject('DEVK905942', { ...entry, position: entry.position });
 
 // Confirm it: the action's own answer only echoes what it was asked.
-const log = await request.readActionLog('E19K905942');
-// → "OKYSLYTSIA deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"
+const log = await request.readActionLog('DEVK905942');
+// → "SAPUSER01 deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"
 
 // A task of your own under a shared request, to work in without touching it.
-const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' });
+const task = await request.createTask('DEVK905941', { targetUser: 'SAPUSER01' });
 
 // And the other direction.
-await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
+await request.addObject('DEVK907073', { name: 'Z_CL_000001', type: 'CLAS' });
 
 // A task is created without a type; this is how one is given.
-await request.changeTaskType('E19K907073', 'S'); // Development/Correction
+await request.changeTaskType('DEVK907073', 'S'); // Development/Correction
 ```
 
 Four things worth knowing before the first call, three of them measured
@@ -1874,7 +1874,8 @@ import { AbapDebugger, AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 
 // terminalId and ideId: 32 upper-case hex characters, kept for the session.
-const identity = { requestUser, terminalId, ideId };
+// The mode is stated, never defaulted; see "Identity by mode" below.
+const identity = { debuggingMode: 'user', requestUser, terminalId, ideId } as const;
 
 listenerConnection.setSessionType('stateful');
 const listener = new AbapDebugger(listenerConnection, logger);
@@ -1894,7 +1895,7 @@ const server = /<INSTANCE_NAME>([^<]*)</.exec(doc)?.[1];
 
 debugConnection.setSessionType('stateful');   // a new connection, for this debuggee
 const session = new AbapDebugger(debugConnection, logger);
-await session.attach(requestUser, debuggeeId!, { server });
+await session.attach(identity, debuggeeId!, { server });
 await session.getStack();
 await session.getChildVariables(['@ROOT']);
 await session.step('stepOver');
@@ -1918,10 +1919,156 @@ await run;
   breakpoint carries neither `id` nor `uri`: match the refusals by content.
   `GET` on the breakpoints is not an operation SAP offers — keep the set you
   sent.
+- **`setBreakpoints` replaces what the key holds; it does not add to it.**
+  Each request first deletes every external breakpoint under the identity's
+  key, and so does a `validationOnly` request, even though it arms nothing.
+  Send the whole set in one request, or use `syncBreakpoints` with `partial`
+  to replace one object's line breakpoints and keep the others. Measured on
+  premise (2026-10-11), SAP_BASIS 816; the server source (SAP_BASIS 816, read
+  2026-10-11) deletes all of the key's breakpoints first.
+- **`stopListener` deletes the key's breakpoints** in user mode, for the
+  request user it names, whether or not a listener was running. Stop the
+  listener last. Measured on premise (2026-10-11), SAP_BASIS 816; server
+  source, SAP_BASIS 816, read 2026-10-11.
+- **One debug session per identity.** In user mode the server binds an
+  ABAP session to the first identity that a listen, check, stop or attach used
+  on it, so a listener for another request user needs a session of its own.
+  An `AbapDebugger` is constructed on one connection with its settings
+  (`onConflict`): another identity - another request user, another mode,
+  another `ideId` - needs another debug session, that is a new `AbapDebugger`
+  on a connection of its own. The library adds no guard.
+  Measured on premise (2026-10-11), SAP_BASIS 816; the caching is in the server
+  source, SAP_BASIS 816, read 2026-10-11.
+- **`skipCount` is typed but refused.** It is still in the 14.x contract's
+  type, but a value above 0 is answered `ok: false` without a request, because
+  the server accepts it on an external breakpoint and ignores it: the first hit
+  stops. Measured on premise (2026-10-11), SAP_BASIS 816. `0` is accepted, and
+  the field is to leave the contract in its next major.
+- **`terminateDebugger`** ends the debugger's own session, and the answer is a
+  plain `500` with no ADT document. The program runs on and returns its
+  output, and the session cannot be used afterwards. Pass
+  `analyseDebuggerFreed` from `@mcp-abap-adt/adt-strategies` (0.9.0) to take
+  that `500` as no failure (`analyseException` lets it stop you); see the
+  [errata](ERRATA.md). Measured on premise
+  (2026-10-11), SAP_BASIS 816; the session is freed in the server source
+  (SAP_BASIS 816, read 2026-10-11).
 - **`terminateDebuggee`** answers `500` subtype `terminateDebuggee` on premise
   and `200` on the cloud; `analyseDebuggeeEnd` takes both.
 - **Memory at a stop:** `getMemorySizes()` and `createMemorySnapshot()`. The
   snapshot's answer names a file on the application server, not an id.
+
+#### Identity by mode
+
+The identity is a union on `debuggingMode`, which is required:
+
+```typescript
+// user: the requests of one user. requestUser is the user whose requests are caught.
+const user = { debuggingMode: 'user', requestUser, terminalId, ideId } as const;
+// terminal: the requests that carry terminalId. The server reads no requestUser.
+const terminal = { debuggingMode: 'terminal', terminalId, ideId } as const;
+```
+
+- **`user` mode** sends `requestUser`; **`terminal` mode** sends none, and the
+  type refuses one. Deleting a terminal-mode breakpoint is the one place SAP
+  wants the parameter anyway: the library sends it empty there (measured on
+  premise (2026-10-11), BASIS 816: left out, `400`; empty, `200`).
+- **Where SAP GUI shows its terminal id.** In its debugging settings; the
+  Windows client keeps one per logon, and a further window or a browser joins
+  it. A `terminalId` equal to `ideId` means that IDE's own requests only
+  (server source, BASIS 816, read 2026-10-11).
+- **A catch in terminal mode is unmeasured.** The mode follows the discovery and
+  the server source: the listener, the check, the breakpoints and their
+  deletion answer `200` on premise (2026-10-11), BASIS 816, but Eclipse's own
+  runs under Terminal ID were not caught there. If it does not catch for you,
+  file an issue with: the identity's mode; whether the terminal id is the one
+  SAP GUI shows; how the program was started (SAP GUI, browser, RFC, job); and
+  the wire log of the request (`WIRE_LOG=<file>` in this repository's tests;
+  `DEBUG_HTTP_WIRE=true` in the MCP server).
+
+#### Another user
+
+Debugging another user's requests needs nothing beyond `requestUser`: it names
+whose requests a breakpoint and a listener catch. The catching user needs the
+`S_DEVELOP` authorization with `DEBUG` and `ACTVT` 90 on that user, and SAP
+answers `403` otherwise. Measured end to end on premise (2026-10-11), BASIS 816:
+the other user's run was caught within about a second, attached, stepped and
+finished. Only a request that starts after the breakpoint and the listener are
+in place is caught.
+
+#### Replacing, detaching, settings and the listener check
+
+```typescript
+// Replace the key's whole set; [] clears it without arming anything.
+await listener.syncBreakpoints(identity, {
+  scope: 'full',
+  breakpoints: [
+    { kind: 'line', uri: `${sourceUri}#start=12` },
+    { kind: 'exception', exceptionClass },
+  ],
+});
+
+// Replace the line breakpoints of the main programs these objects map to;
+// the other programs' breakpoints and every other kind stay.
+await listener.syncBreakpoints(identity, {
+  scope: 'partial',
+  objects: [classUri],
+  breakpoints: [{ kind: 'line', uri: `${classUri}/source/main#start=20` }],
+});
+
+// Ask whether another listener holds the user, starting nothing:
+// 200 and an empty body when free, 409 when held.
+import { readListenerConflict } from '@mcp-abap-adt/adt-clients';
+const check = await listener.checkListener(identity);
+if (!check.ok) {
+  const held = readListenerConflict(check.getError()); // { conflictText, ideUser? } or undefined
+}
+
+// Let the debuggee go without ending it.
+await session.detachDebugger();
+// Release a debuggee that was caught and never attached, at once.
+await listener.detachDebugger({ debuggeeId });
+// Free the debugger's own session (see below); the program runs on.
+await session.terminateDebugger();
+
+// Settings: a field left out keeps its value, false clears.
+const settings = await session.setDebuggerSettings({ systemDebugging: true });
+```
+
+- **`syncBreakpoints` replaces, and so does `setBreakpoints`.** What
+  `syncBreakpoints` adds is the name, `full` with `[]`, and `partial`. Both
+  reach every IDE that shares the identity's key (user mode: IDE user plus
+  request user; terminal mode: IDE user plus terminal id). `partial` takes line
+  breakpoints only; a line breakpoint outside the objects' programs comes back
+  as a refused row whose message names the wrong kinds (measured on premise
+  (2026-10-11), BASIS 816). An object that maps to no program is passed over
+  when another maps, and refused alone (measured on premise (2026-10-11),
+  BASIS 816).
+- **`detachDebugger()` without an id** lets the debugger leave and the program
+  run on; a listener standing at the time can catch the same run again at the
+  next pass of an armed line. With the id of a caught, unattached debuggee it
+  answers `200` and the run goes on at once, not after the hold of about 30 s.
+  With the id of a debuggee another session attached it answers `200` and
+  leaves that session's attachment alone.
+- **`terminateDebuggee` ends the program, `detachDebugger` and
+  `terminateDebugger` do not.** `terminateDebugger` also frees the ABAP session
+  it ran in, which is why the answer is a plain `500`.
+- **`setDebuggerSettings`** answers the settings now in force. `showDataAging`
+  is the exception to "left out keeps it": left out, it is off. The first call
+  after an attach ignores `systemDebugging: false`, and its answer cannot tell
+  that from an applied one.
+- **`checkListener` is not a poll.** The authorization check runs first and
+  answers `403`.
+- **Results.** `AbapDebugger` takes a `settings` strategy beside the others,
+  the raw document by default.
+
+#### What ADT cannot do
+
+It cannot attach to a running process or request. A request is enabled for
+catching when it starts: a loop already running when the breakpoint and the
+listener are armed is never caught (measured on premise (2026-10-11), BASIS 816,
+for 45 s). SM50 and SM04 attach a work process through the kernel and open the
+debugger in the requester's SAP GUI; no key routes that stop to an ADT listener
+(server source, BASIS 816, read 2026-10-11). SM50 in SAP GUI is the human route.
 
 ### The AMDP debugger
 

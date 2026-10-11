@@ -15,6 +15,24 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-11
+
+### Added
+
+- **`analyseDebuggerFreed`** — for `terminateDebugger`, where the debugger
+  freeing its own session is the outcome asked for. SAP answers that with a
+  plain ICF `500` when it worked; this answers as no failure a `500` served as
+  `text/plain` or with an empty body, with no ADT exception document. Anything
+  else - a `500` with an exception document or served as another type, any
+  other status, a connection failure, a body that is not a string - is read as
+  `analyseException` reads it. See `docs/usage/ERRATA.md` in
+  `adt-clients`.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^14.0.0`**, as `adt-clients` 28.0.0
+  declares it — one copy of the contract. Nothing else in this package changed.
+
 ## [0.8.1] - 2026-10-10
 
 ### Changed
@@ -151,7 +169,7 @@ each.
   (#172). The reading took `object.message` as one element; with two messages
   fast-xml-parser gives an array, so the type and text read `undefined`, SAP's
   reason was replaced by the reference counts, and an `E` on a permitted object
-  was missed. Measured on E19: a service-binding check answering a `W` and an
+  was missed. Measured on premise (BASIS 816): a service-binding check answering a `W` and an
   `E` came back as "0 strong and 0 weak external references". Now every
   message with text is kept, in order, each with its own severity, and the T100
   key and `msgv1..4` are read from the long-text link — the one part of a
@@ -160,7 +178,7 @@ each.
   `E`; the counts stand in only when SAP said nothing. An untyped message does
   not overturn an explicit `"true"`: a DDLS delete answers `isDeleted="true"`
   with one `del:type=""` message, text `S::000`, and the object is gone —
-  measured on E19 and on the trial. Read as an `E`, it turned every CDS source
+  measured on premise (BASIS 816) and on the trial. Read as an `E`, it turned every CDS source
   delete into a refusal.
 - **`readCheckRunRefusal` reads every `checkReport`.** Several read as a check
   that never ran. Defensive: no several-object capture exists yet.

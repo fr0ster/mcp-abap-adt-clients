@@ -226,7 +226,7 @@ export class BaseTester<TConfig, TState = unknown> {
    * a leftover object that would not delete, most often. Routed through
    * `skipReason` it printed SKIP and jest counted it green, so a suite that
    * tested nothing was indistinguishable from one that passed — measured on
-   * E19, where a package left behind by a failed delete made the next run
+   * on premise (BASIS 816), where a package left behind by a failed delete made the next run
    * report success having executed neither create nor update.
    */
   private setupError: string | null = null;
@@ -376,7 +376,7 @@ export class BaseTester<TConfig, TState = unknown> {
    * delete stopped throwing when failures became the other half of the answer,
    * so the `catch` blocks around these calls — written for a throw, and
    * carrying a deliberate policy about what to do with a failed cleanup — never
-   * fired again. Measured twice: TEST_INNER_PKG02 on E19, and ZAC_INNER_PKG04
+   * fired again. Measured twice: TEST_INNER_PKG02 on premise (BASIS 816), and ZAC_INNER_PKG04
    * on the trial, where the suite passed three runs in a row and left the
    * package behind every time.
    */
@@ -810,7 +810,7 @@ export class BaseTester<TConfig, TState = unknown> {
     /**
      * Which version the post-create read asks for.
      *
-     * Measured on E19: for an include the versionless read answered nothing and
+     * Measured on premise (BASIS 816): for an include the versionless read answered nothing and
      * the flow died with "Read undefined failed: no response". Classes and
      * interfaces skip this read entirely for the same underlying reason — a
      * freshly created object has no ACTIVE version — while the other suites
@@ -1161,7 +1161,7 @@ export class BaseTester<TConfig, TState = unknown> {
           // The UPDATE content, not the create content. Every handler resolves
           // `options.source ?? config.source` with options winning, so
           // passing the create source here overwrote the object with what it
-          // already held and the update became a no-op — measured on E19 with
+          // already held and the update became a no-op — measured on premise (BASIS 816) with
           // the include suite, where the stored source stayed 52 characters
           // while `update_source_code` was 62.
           // A document write and a source write take the same channel: the
@@ -1371,7 +1371,7 @@ export class BaseTester<TConfig, TState = unknown> {
           // then ignored on this path — only the pre-existing-object cleanup
           // used it — which left a type whose delete needs something extra
           // (a package needs a fresh session: the PAK lock belongs to the ABAP
-          // session, measured on E19) with no way to say so.
+          // session, measured on premise (BASIS 816)) with no way to say so.
           if (this.cleanupObjectFn) {
             await this.cleanupObjectFn(config);
           } else {
@@ -1404,7 +1404,7 @@ export class BaseTester<TConfig, TState = unknown> {
           // The test body passed, so this is the only failure in the run — and
           // swallowing it is how a suite came to report success while leaving
           // its object behind, which then made the NEXT run skip its own
-          // workflow and report success too. Measured on E19 2026-08-31 with
+          // workflow and report success too. Measured on premise (BASIS 816) 2026-08-31 with
           // TEST_INNER_PKG02. A cleanup that fails is a red test.
           throw new Error(
             `Test body passed but cleanup failed: ${detail}. ` +

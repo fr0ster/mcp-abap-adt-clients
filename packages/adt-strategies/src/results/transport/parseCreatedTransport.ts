@@ -62,8 +62,8 @@ export function parseCreatedTransport(document: unknown): ICreatedTransport {
    * itself, which has no `tm:request` at all:
    *
    * ```xml
-   * <tm:root … tm:useraction="tasks" tm:number="E19K907073"
-   *            tm:uri="/sap/bc/adt/cts/transportrequests/E19K907073"/>
+   * <tm:root … tm:useraction="tasks" tm:number="DEVK907073"
+   *            tm:uri="/sap/bc/adt/cts/transportrequests/DEVK907073"/>
    * ```
    *
    * Read from `tm:request` alone this answered `transportNumber: ''` for

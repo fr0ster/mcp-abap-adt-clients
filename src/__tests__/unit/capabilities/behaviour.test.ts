@@ -636,7 +636,7 @@ describe('capability guard — behaviour', () => {
  * and it is the one that knows whether those three belong to the same session.
  * A member that flipped the connection to stateful and back would take that
  * decision away — and worse, would reset it under a *different* handler that
- * happens to hold a lock on the same connection. That was the E19 incident, and
+ * happens to hold a lock on the same connection. That was the the on-premise system incident, and
  * this is the assertion that keeps its cause from coming back.
  *
  * `lock` and `unlock` are exempt on purpose: they are the session, not a
@@ -756,7 +756,7 @@ describe('capability guard — a failed lock window restores the session', () =>
  * which requests carry the context cookie by the session mode at the moment
  * of the request: since `@mcp-abap-adt/connection` 9.3.1 a stateless request
  * goes without it, so a stateless `UNLOCK` runs in a fresh context, answers
- * 200, and releases nothing. Measured on E19, 2026-09-27: twenty-four unlocks
+ * 200, and releases nothing. Measured on premise (BASIS 816), 2026-09-27: twenty-four unlocks
  * here were sent stateless — `lock` went back to stateless as soon as its own
  * request answered — and the include suite's activation then answered 403
  * `EU/510` "currently editing", with its cleanup delete refused the same way.

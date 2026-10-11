@@ -1,9 +1,11 @@
 import { ADT_NO_FAILURE, type IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   analyseActivation,
   analyseAny,
   analyseCheck,
   analyseDebuggeeEnd,
+  analyseDebuggerFreed,
   analyseDeletion,
   analyseException,
   analysePublicationLock,
@@ -362,6 +364,97 @@ describe('analyseDebuggeeEnd', () => {
       analyseDebuggeeEnd(
         libraryVerdict(400),
         stepTagged('debugger-conversation', 'stepruntoline-no-uri'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
+  });
+});
+
+describe('analyseDebuggerFreed', () => {
+  const answer = (
+    status: number,
+    data: unknown,
+    contentType?: string,
+  ): IAdtWireResponse =>
+    ({
+      status,
+      data,
+      headers: contentType ? { 'Content-Type': contentType } : {},
+    }) as unknown as IAdtWireResponse;
+  const verdictFor = (status: number): IAdtError => ({
+    origin: 'connection',
+    message: `Request failed with status code ${status}`,
+    response: { status } as IAdtError['response'],
+  });
+  const document = (prefix: string | null) => {
+    const tag = prefix ? `${prefix}:exception` : 'exception';
+    const ns = prefix ? `xmlns:${prefix}` : 'xmlns';
+    return `\uFEFF\n<?xml version="1.0"?><${tag} ${ns}="http://www.sap.com/abapxml/types/communicationframework"><type id="AdiFailed"/><message>x</message></${tag}>`;
+  };
+
+  it('answers a text/plain 500 as no failure', () => {
+    expect(
+      analyseDebuggerFreed(
+        verdictFor(500),
+        answer(500, 'Internal Server Error', 'text/plain; charset=utf-8'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('answers an empty-body 500 as no failure', () => {
+    expect(
+      analyseDebuggerFreed(verdictFor(500), answer(500, '', 'text/html')),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('keeps a 500 with an exception document a refusal, whatever the prefix', () => {
+    for (const prefix of ['exc', 'ns0', null]) {
+      expect(
+        analyseDebuggerFreed(
+          verdictFor(500),
+          answer(500, document(prefix), 'text/plain'),
+        ),
+      ).not.toBe(ADT_NO_FAILURE);
+    }
+  });
+
+  it('keeps a text/html 500 a failure', () => {
+    expect(
+      analyseDebuggerFreed(
+        verdictFor(500),
+        answer(500, '<html>Bad gateway</html>', 'text/html'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
+  });
+
+  it('keeps a body that is not a string a failure', () => {
+    for (const body of [Buffer.from('boom'), { a: 1 }, undefined]) {
+      expect(
+        analyseDebuggerFreed(verdictFor(500), answer(500, body, 'text/plain')),
+      ).not.toBe(ADT_NO_FAILURE);
+    }
+  });
+
+  it('keeps a 400 a refusal', () => {
+    expect(
+      analyseDebuggerFreed(
+        verdictFor(400),
+        answer(400, 'Session no longer exists', 'text/plain'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
+  });
+
+  it('reads the status from the answer when the verdict carries none', () => {
+    const bare: IAdtError = { origin: 'connection', message: 'failed' };
+    expect(analyseDebuggerFreed(bare, answer(500, 'x', 'TEXT/PLAIN'))).toBe(
+      ADT_NO_FAILURE,
+    );
+  });
+
+  it('keeps a failure without a response a failure', () => {
+    expect(
+      analyseDebuggerFreed(
+        { origin: 'connection', message: 'ECONNRESET' },
+        undefined,
       ),
     ).not.toBe(ADT_NO_FAILURE);
   });

@@ -102,11 +102,11 @@ more, not less. Set in `src/__tests__/helpers/test-config.yaml`:
 | field | value |
 |---|---|
 | `system` | `"onprem"` — this picks the connector, and it is stated, never inferred from `SAP_URL` |
-| `default_master_system` | the system ID, e.g. `E19` |
-| `transport_layer` | e.g. `ZE19` — on-prem package tests need it |
+| `default_master_system` | the system ID, e.g. `SID` |
+| `transport_layer` | e.g. `ZSID` — on-prem package tests need it |
 | `default_package`, `default_transport` | yours; the package must exist already |
 
-Then `cp e19.env .env` and run as above. A legacy system (BASIS < 7.50) needs
+Then `cp <system>.env .env` and run as above. A legacy system (BASIS < 7.50) needs
 the RFC transport instead — see [RFC_TESTING.md](RFC_TESTING.md), and note that
 `SAPNWRFC_HOME` and `LD_LIBRARY_PATH` must be passed at launch because `dotenv`
 does not expand `PATH`.

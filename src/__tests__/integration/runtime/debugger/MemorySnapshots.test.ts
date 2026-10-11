@@ -202,7 +202,12 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         .digest('hex')
         .slice(0, 32)
         .toUpperCase();
-    identity = { requestUser: user, terminalId: id('t'), ideId: id('i') };
+    identity = {
+      debuggingMode: 'user',
+      requestUser: user,
+      terminalId: id('t'),
+      ideId: id('i'),
+    };
     listenerApi = new AbapDebugger(
       listenerConnection,
       connectionLogger,
@@ -316,11 +321,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         connectionLogger,
         abapDebuggerDocuments,
       );
-      const attach = await debuggerApi.attach(
-        identity.requestUser,
-        debuggeeId as string,
-        { server: tag(caught, 'INSTANCE_NAME') },
-      );
+      const attach = await debuggerApi.attach(identity, debuggeeId as string, {
+        server: tag(caught, 'INSTANCE_NAME'),
+      });
       expect(attach.ok).toBe(true);
       attached = attach.ok;
       const stack = documentOf(await debuggerApi.getStack());

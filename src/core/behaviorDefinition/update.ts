@@ -43,7 +43,7 @@ import type { IUpdateBehaviorDefinitionParams } from './types';
  *   name: 'Z_MY_BDEF',
  *   sourceCode: source,
  *   lockHandle,
- *   transportRequest: 'E19K905635'
+ *   transportRequest: 'DEVK905635'
  * });
  * await unlock(connection, 'Z_MY_BDEF', lockHandle, sessionId);
  * ```

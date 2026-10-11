@@ -47,7 +47,7 @@ VERIFY_LOCK_RELEASED=false npm test 2>&1 | tee test-run.log   # Skip the second-
 # Ask SAP directly: one request to several systems, every answer printed whole
 # (status, headers, body). Targets are session files under ~/.config/mcp-abap-adt/sessions/;
 # the system kind is stated (:onprem|:cloud|:legacy or SAP_SYSTEM_TYPE), never inferred.
-npx ts-node scripts/adt-nc.ts --to e19-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
+npx ts-node scripts/adt-nc.ts --to <system>-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
 
 # Type-check tests without running
 npm run test:check              # All test tsconfigs
@@ -131,7 +131,7 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 
 - All tests are integration tests against real SAP systems (no mocks); unit tests exist but are minimal (`src/__tests__/unit/`)
 - Tests require `.env` with SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) and `src/__tests__/helpers/test-config.yaml` with object names and parameters. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
-- **Where credentials come from**: `~/Documents/mcp-abap-adt/sessions/<system>.env` (`e19.env`, `e77.env`, …) is the one source; copy what a run needs into the repo's `.env` before it starts. There are no per-system `*.env` copies in the repo root any more — they went stale as passwords rotated and produced 401s. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`. `.env` must still end up with `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`
+- **Where credentials come from**: `~/Documents/mcp-abap-adt/sessions/<system>.env` (`<system>.env`, `<other-system>.env`, …) is the one source; copy what a run needs into the repo's `.env` before it starts. There are no per-system `*.env` copies in the repo root any more — they went stale as passwords rotated and produced 401s. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`. `.env` must still end up with `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`
 - **Test config setup**: `npm run test:init` (or `cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml`). Template works out of the box — edit only lines marked `# ← CHANGE`: `system` (`"onprem"` or `"cloud"` — this is what picks the connector, and it is stated, never inferred from `SAP_URL` or the auth type), `default_package`, `default_transport`, `default_master_system`, `shared_dependencies.super_package`. On-prem package tests also need `transport_layer`.
 - **Root package prerequisite**: The package specified in `default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do not create this package — they only create objects inside it.
 - `TestConfigResolver` resolves params with priority: `testCase.params` > `environment.default_*` > `SAP_*` env vars
@@ -144,7 +144,7 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 
 ### Running Tests with RFC (Legacy Systems)
 
-RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions don't work. Example: E77 system.
+RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions don't work. Example: a legacy system.
 
 **Prerequisites:**
 1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
@@ -180,14 +180,14 @@ RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP st
 ```yaml
 environment:
   connection_type: "rfc"        # Use RFC transport instead of HTTP
-  default_master_system: "E77"  # Match target system
+  default_master_system: "SID"  # Match target system
 ```
 
 **Run tests — pass `SAPNWRFC_HOME` and `PATH`/`LD_LIBRARY_PATH` inline:**
 
 These vars CANNOT be in `.env` — `dotenv` doesn't expand `PATH`. Pass them at launch.
 
-Put the target system's credentials into `.env` first — from `~/Documents/mcp-abap-adt/sessions/e77.env` (see "Where credentials come from" above).
+Put the target system's credentials into `.env` first — from `~/Documents/mcp-abap-adt/sessions/<other-system>.env` (see "Where credentials come from" above).
 
 Windows (Git Bash):
 ```bash

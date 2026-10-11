@@ -400,7 +400,7 @@ function parseArgs(argv: string[]) {
      * worklist only lists objects that produced findings — so on a system whose
      * nominated variant finds nothing, or aborts, every candidate reads
      * "finished → [nothing]" and the type question cannot be settled at all.
-     * Measured on E19, 2026-08-28: `Z_ATC_TEST` aborts every run with
+     * Measured on premise (BASIS 816), 2026-08-28: `Z_ATC_TEST` aborts every run with
      * `TOOL_FAILURE: ATC check run aborted, due to missing prerequisites`.
      */
     variant: get('variant'),

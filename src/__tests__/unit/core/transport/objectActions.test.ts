@@ -25,7 +25,7 @@ import { transportParsing } from '../../../helpers/transportParsing';
 
 const REMOVED =
   '<?xml version="1.0" encoding="UTF-8"?>' +
-  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="removeobject" tm:number="E19K905942">' +
+  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="removeobject" tm:number="DEVK905942">' +
   '<tm:request tm:parent="" tm:desc="" tm:target="" tm:target_desc="">' +
   '<tm:long_desc/>' +
   '<tm:abap_object tm:pgmid="R3TR" tm:type="FUGR" tm:name="ZMCP_BLD_FGR_H1" ' +
@@ -37,20 +37,20 @@ const LOCKED_ELSEWHERE =
   '<?xml version="1.0" encoding="UTF-8"?>' +
   '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
   '<namespace id="com.sap.adt.tm"/><type id="ADT_TM_COMMON_EXCEPTION"/>' +
-  '<message lang="EN">Z_CL_000001 is locked in request/task E19K906817</message>' +
+  '<message lang="EN">Z_CL_000001 is locked in request/task DEVK906817</message>' +
   '<properties><entry key="T100KEY-ID">SCTS_ADT_MSG</entry>' +
   '<entry key="T100KEY-NO">009</entry></properties></exc:exception>';
 
 const NEW_TASK =
   '<?xml version="1.0" encoding="UTF-8"?>' +
-  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:targetuser="OKYSLYTSIA" ' +
-  'tm:useraction="tasks" tm:number="E19K907073" ' +
-  'tm:uri="/sap/bc/adt/cts/transportrequests/E19K907073"/>';
+  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:targetuser="SAPUSER01" ' +
+  'tm:useraction="tasks" tm:number="DEVK907073" ' +
+  'tm:uri="/sap/bc/adt/cts/transportrequests/DEVK907073"/>';
 
 const ACTION_LOG =
   '<?xml version="1.0" encoding="UTF-8"?>' +
   '<log:log xmlns:log="http://www.sap.com/adt/logs">' +
-  '<log:entry log:text="OKYSLYTSIA deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"/>' +
+  '<log:entry log:text="SAPUSER01 deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"/>' +
   '</log:log>';
 
 /**
@@ -64,9 +64,9 @@ const ACTION_LOG =
  */
 const OBJECT_LIST =
   '<?xml version="1.0" encoding="UTF-8"?>' +
-  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="E19K905942">' +
+  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="DEVK905942">' +
   '<tm:request tm:desc="a request" tm:target="">' +
-  '<tm:task tm:number="E19K905943" tm:owner="OKYSLYTSIA">' +
+  '<tm:task tm:number="DEVK905943" tm:owner="SAPUSER01">' +
   '<tm:abap_object tm:pgmid="R3TR" tm:type="FUGR" tm:name="ZMCP_BLD_FGR_H1" ' +
   'tm:obj_desc="Function Group" tm:position="000025" tm:lock_status="" tm:img_activity=""/>' +
   '<tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_X" ' +
@@ -97,7 +97,7 @@ const answering = (body: string, status = 200) =>
     statusText: status === 201 ? 'Created' : 'OK',
     headers:
       status === 201
-        ? { location: '/sap/bc/adt/cts/transportrequests/E19K907073' }
+        ? { location: '/sap/bc/adt/cts/transportrequests/DEVK907073' }
         : {},
   }) as unknown as IAdtWireResponse;
 
@@ -105,7 +105,7 @@ describe('removeObject', () => {
   it('sends the useraction document the server was sent', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    const answer = await new AdtRequest(connection).removeObject('E19K905942', {
+    const answer = await new AdtRequest(connection).removeObject('DEVK905942', {
       name: 'ZMCP_BLD_FGR_H1',
       type: 'FUGR',
       description: 'Function Group',
@@ -116,11 +116,11 @@ describe('removeObject', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('PUT');
     // The task, not the request above it: objects live on tasks.
-    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/E19K905942');
+    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/DEVK905942');
 
     const body = String(calls[0].data);
     expect(body).toContain('tm:useraction="removeobject"');
-    expect(body).toContain('tm:number="E19K905942"');
+    expect(body).toContain('tm:number="DEVK905942"');
     expect(body).toContain('tm:pgmid="R3TR"');
     expect(body).toContain('tm:type="FUGR"');
     expect(body).toContain('tm:name="ZMCP_BLD_FGR_H1"');
@@ -135,7 +135,7 @@ describe('removeObject', () => {
   it('sends the headers the capture carried, odd as they look', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).removeObject('E19K905942', {
+    await new AdtRequest(connection).removeObject('DEVK905942', {
       name: 'ZCL_X',
       type: 'CLAS',
       position: '000001',
@@ -149,7 +149,7 @@ describe('removeObject', () => {
 
   /**
    * **`tm:position` is what makes the call do anything, so it always goes
-   * out.** Measured on E19, 2026-09-21, against task `E19K901046`: 22 objects
+   * out.** Measured on premise (BASIS 816), 2026-09-21, against task `DEVK901046`: 22 objects
    * asked for by `type` and `name` alone each answered `200` with the usual
    * echo document, and re-reading the task found all 22 still on it. The same
    * documents carrying `tm:position` — and nothing else added — removed every
@@ -160,7 +160,7 @@ describe('removeObject', () => {
   it('always writes the position, since without it the server no-ops', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).removeObject('E19K905942', {
+    await new AdtRequest(connection).removeObject('DEVK905942', {
       name: 'ZCL_X',
       type: 'CLAS',
       position: '000007',
@@ -176,7 +176,7 @@ describe('removeObject', () => {
   it('escapes what would otherwise break the document', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).removeObject('E19K905942', {
+    await new AdtRequest(connection).removeObject('DEVK905942', {
       name: 'ZCL_X',
       type: 'CLAS',
       position: '000001',
@@ -194,7 +194,7 @@ describe('addObject', () => {
   it('sends the same shape with the other useraction', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).addObject('E19K907073', {
+    await new AdtRequest(connection).addObject('DEVK907073', {
       name: 'Z_CL_000001',
       type: 'CLAS',
     });
@@ -220,7 +220,7 @@ describe('addObject', () => {
       throw error;
     });
 
-    const answer = await new AdtRequest(connection).addObject('E19K907073', {
+    const answer = await new AdtRequest(connection).addObject('DEVK907073', {
       name: 'Z_CL_000001',
       type: 'CLAS',
     });
@@ -235,18 +235,18 @@ describe('createTask', () => {
       answering(NEW_TASK, 201),
     );
 
-    const answer = await new AdtRequest(connection).createTask('E19K905941', {
-      targetUser: 'OKYSLYTSIA',
+    const answer = await new AdtRequest(connection).createTask('DEVK905941', {
+      targetUser: 'SAPUSER01',
     });
 
     expect(answer.ok).toBe(true);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe(
-      '/sap/bc/adt/cts/transportrequests/E19K905941/tasks',
+      '/sap/bc/adt/cts/transportrequests/DEVK905941/tasks',
     );
     const body = String(calls[0].data);
     expect(body).toContain('tm:useraction="newtask"');
-    expect(body).toContain('tm:targetuser="OKYSLYTSIA"');
+    expect(body).toContain('tm:targetuser="SAPUSER01"');
   });
 
   /**
@@ -264,21 +264,21 @@ describe('createTask', () => {
       undefined,
       undefined,
       transportParsing,
-    ).createTask('E19K905941', { targetUser: 'OKYSLYTSIA' });
+    ).createTask('DEVK905941', { targetUser: 'SAPUSER01' });
 
     if (!answer.ok) throw new Error('expected the task');
     const created = answer.getResult().value as {
       transportNumber: string;
       uri?: string;
     };
-    expect(created.transportNumber).toBe('E19K907073');
-    expect(created.uri).toBe('/sap/bc/adt/cts/transportrequests/E19K907073');
+    expect(created.transportNumber).toBe('DEVK907073');
+    expect(created.uri).toBe('/sap/bc/adt/cts/transportrequests/DEVK907073');
   });
 
   /**
    * **The attribute always goes out, because the server will not fill it in.**
    * This test asserted the opposite — that omitting `tm:targetuser` left the
-   * choice to the server — and an on-premise run (E19, 2026-09-21) measured
+   * choice to the server — and an on-premise run (on premise, 2026-09-21) measured
    * what that actually costs:
    *
    * ```
@@ -295,11 +295,11 @@ describe('createTask', () => {
       answering(NEW_TASK, 200),
     );
 
-    await new AdtRequest(connection).createTask('E19K905941', {
-      targetUser: 'OKYSLYTSIA',
+    await new AdtRequest(connection).createTask('DEVK905941', {
+      targetUser: 'SAPUSER01',
     });
 
-    expect(String(calls[0].data)).toContain('tm:targetuser="OKYSLYTSIA"');
+    expect(String(calls[0].data)).toContain('tm:targetuser="SAPUSER01"');
   });
 });
 
@@ -307,12 +307,12 @@ describe('readActionLog', () => {
   it('reads the log with the media type that answers it', async () => {
     const { connection, calls } = connectionOver(() => answering(ACTION_LOG));
 
-    const answer = await new AdtRequest(connection).readActionLog('E19K905942');
+    const answer = await new AdtRequest(connection).readActionLog('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the log');
     expect(calls[0].method).toBe('GET');
     expect(calls[0].url).toBe(
-      '/sap/bc/adt/cts/transportrequests/E19K905942/actionlogs',
+      '/sap/bc/adt/cts/transportrequests/DEVK905942/actionlogs',
     );
     expect(calls[0].headers?.Accept).toBe('application/vnd.sap.adt.logs+xml');
     expect(String(answer.getResult().value)).toContain(
@@ -331,11 +331,11 @@ describe('readObjects', () => {
   it('asks for the representation that carries the list', async () => {
     const { connection, calls } = connectionOver(() => answering(OBJECT_LIST));
 
-    await new AdtRequest(connection).readObjects('E19K905942');
+    await new AdtRequest(connection).readObjects('DEVK905942');
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('GET');
-    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/E19K905942');
+    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/DEVK905942');
     // **The whole reason this is not `readMetadata`.** That reader sends no
     // `Accept`, and what the server picks for a request naming none carries
     // no `tm:abap_object` at all — measured on an on-premise system,
@@ -353,7 +353,7 @@ describe('readObjects', () => {
       undefined,
       undefined,
       transportParsing,
-    ).readObjects('E19K905942');
+    ).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
@@ -392,7 +392,7 @@ describe('readObjects', () => {
       undefined,
       undefined,
       transportParsing,
-    ).readObjects('E19K905942');
+    ).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     expect(answer.getResult().value[0].position).toBe('000025');
@@ -414,8 +414,8 @@ describe('readObjects', () => {
     const { connection } = connectionOver(() =>
       answering(
         '<?xml version="1.0" encoding="UTF-8"?>' +
-          '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="E19K905942">' +
-          '<tm:request><tm:task tm:number="E19K905943">' +
+          '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="DEVK905942">' +
+          '<tm:request><tm:task tm:number="DEVK905943">' +
           '<tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_NO_POS"/>' +
           '</tm:task></tm:request></tm:root>',
       ),
@@ -426,7 +426,7 @@ describe('readObjects', () => {
       undefined,
       undefined,
       transportParsing,
-    ).readObjects('E19K905942');
+    ).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const [entry] = answer.getResult().value;
@@ -441,7 +441,7 @@ describe('readObjects', () => {
     const { connection } = connectionOver(() =>
       answering(
         '<?xml version="1.0" encoding="UTF-8"?>' +
-          '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="E19K905942">' +
+          '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="DEVK905942">' +
           '<tm:request tm:desc="empty"><tm:long_desc/></tm:request></tm:root>',
       ),
     );
@@ -451,7 +451,7 @@ describe('readObjects', () => {
       undefined,
       undefined,
       transportParsing,
-    ).readObjects('E19K905942');
+    ).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     expect(answer.getResult().value).toEqual([]);
@@ -471,7 +471,7 @@ describe('readObjects', () => {
       undefined,
       undefined,
       transportParsing,
-    ).readObjects('E19K905942');
+    ).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
@@ -499,7 +499,7 @@ describe('changeTaskType', () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
     await new AdtRequest(connection).changeTaskType(
-      'E19K905943',
+      'DEVK905943',
       ADT_TASK_TYPE.developmentCorrection,
     );
 
@@ -507,11 +507,11 @@ describe('changeTaskType', () => {
     expect(calls[0].method).toBe('PUT');
     // The TASK's own URL: that is where the listing puts the
     // `changetasktype` link, never on the request above it.
-    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/E19K905943');
+    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/DEVK905943');
 
     const body = String(calls[0].data);
     expect(body).toContain('tm:useraction="changetasktype"');
-    expect(body).toContain('<tm:task tm:number="E19K905943" tm:type="S"/>');
+    expect(body).toContain('<tm:task tm:number="DEVK905943" tm:type="S"/>');
     // The shape that was refused six times over.
     expect(body).not.toMatch(/<tm:root[^>]*tm:type=/);
   });
@@ -520,7 +520,7 @@ describe('changeTaskType', () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
     await new AdtRequest(connection).changeTaskType(
-      'E19K905943',
+      'DEVK905943',
       ADT_TASK_TYPE.repair,
     );
 
@@ -538,7 +538,7 @@ describe('changeTaskType', () => {
   ] as const)('sends %s as the server spells it', async (type) => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).changeTaskType('E19K905943', type);
+    await new AdtRequest(connection).changeTaskType('DEVK905943', type);
 
     expect(String(calls[0].data)).toContain(`tm:type="${type}"`);
   });
@@ -551,7 +551,7 @@ describe('readObjects and createTask by default', () => {
   it('answers the object list as it arrived', async () => {
     const { connection } = connectionOver(() => answering(OBJECT_LIST));
 
-    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+    const answer = await new AdtRequest(connection).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the document');
     expect(answer.getResult().value).toBe(OBJECT_LIST);
@@ -560,8 +560,8 @@ describe('readObjects and createTask by default', () => {
   it('answers the created task as it arrived', async () => {
     const { connection } = connectionOver(() => answering(NEW_TASK, 201));
 
-    const answer = await new AdtRequest(connection).createTask('E19K905941', {
-      targetUser: 'OKYSLYTSIA',
+    const answer = await new AdtRequest(connection).createTask('DEVK905941', {
+      targetUser: 'SAPUSER01',
     });
 
     if (!answer.ok) throw new Error('expected the document');
@@ -587,17 +587,17 @@ describe('the contract a consumer actually holds', () => {
 
     expect(
       (
-        await request.removeObject('E19K905942', {
+        await request.removeObject('DEVK905942', {
           ...object,
           position: '000001',
         })
       ).ok,
     ).toBe(true);
-    expect((await request.addObject('E19K905942', object)).ok).toBe(true);
+    expect((await request.addObject('DEVK905942', object)).ok).toBe(true);
     expect(
-      (await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' })).ok,
+      (await request.createTask('DEVK905941', { targetUser: 'SAPUSER01' })).ok,
     ).toBe(true);
-    expect((await request.readActionLog('E19K905942')).ok).toBe(true);
+    expect((await request.readActionLog('DEVK905942')).ok).toBe(true);
     expect(calls).toHaveLength(4);
   });
 });

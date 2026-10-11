@@ -147,6 +147,7 @@ const RUNTIME_EXPORTS = [
   'programExecutorDocuments',
   'programTestRunnerDocuments',
   'rawDocument',
+  'readListenerConflict',
   'resolveBindingVariant',
   'resolveContentTypes',
   'runtimeDumpsDocuments',

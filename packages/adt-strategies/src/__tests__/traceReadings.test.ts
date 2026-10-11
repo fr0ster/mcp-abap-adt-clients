@@ -40,16 +40,16 @@ const TRACE_ID = 'ABCDEF0123456789ABCD';
 
 describe('trace document mapping', () => {
   describe('the trace feed', () => {
-    /** One entry exactly as E19 sends it, field for field. */
+    /** One entry exactly as the on-premise system sends it, field for field. */
     const REAL_ENTRY =
-      `<atom:entry><atom:author><atom:name>OKYSLYTSIA</atom:name></atom:author>` +
+      `<atom:entry><atom:author><atom:name>SAPUSER01</atom:name></atom:author>` +
       `<atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id>` +
       `<atom:published>2026-08-28T10:00:00Z</atom:published>` +
       `<trc:extendedData><trc:host>somehost</trc:host><trc:size>8</trc:size>` +
       `<trc:runtime>554</trc:runtime><trc:runtimeABAP>553</trc:runtimeABAP>` +
       `<trc:runtimeSystem>1</trc:runtimeSystem><trc:runtimeDatabase>0</trc:runtimeDatabase>` +
       `<trc:expiration>2026-09-24T06:09:50Z</trc:expiration><trc:system>ABC</trc:system>` +
-      `<trc:client>100</trc:client><trc:user>OKYSLYTSIA</trc:user>` +
+      `<trc:client>100</trc:client><trc:user>SAPUSER01</trc:user>` +
       `<trc:isAggregated>false</trc:isAggregated>` +
       `<trc:objectName>ZAC_SHR_RUN01=================CP</trc:objectName>` +
       `<trc:state value="R" text="Finished"/><trc:amdpFileSize>0</trc:amdpFileSize>` +
@@ -64,7 +64,7 @@ describe('trace document mapping', () => {
           id: TRACE_ID,
           recordedAt: '2026-08-28T10:00:00Z',
           uri: `/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}`,
-          user: 'OKYSLYTSIA',
+          user: 'SAPUSER01',
           objectName: 'ZAC_SHR_RUN01=================CP',
           state: { value: 'R', text: 'Finished' },
           expiresAt: '2026-09-24T06:09:50Z',

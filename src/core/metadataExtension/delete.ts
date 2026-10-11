@@ -22,7 +22,7 @@ import { getTimeout } from '../../utils/timeouts';
  *
  * @example
  * ```typescript
- * await deleteMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', 'TRLK900123', sessionId);
+ * await deleteMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', 'DEVK900123', sessionId);
  * ```
  */
 export async function deleteMetadataExtension(

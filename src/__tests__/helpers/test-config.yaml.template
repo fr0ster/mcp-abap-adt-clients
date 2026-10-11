@@ -94,7 +94,7 @@ session_config:
   # session arrives addressed to the new one". The old session survives to its
   # 30-minute idle timeout.
   #
-  # Measured on E19, 2026-09-07: with this on, a new session every 1-2 seconds
+  # Measured on premise (BASIS 816), 2026-09-07: with this on, a new session every 1-2 seconds
   # for the length of the run, none released; turned off, one session for the
   # whole run, and the same suites pass — 7 suites / 14 tests green.
   #
@@ -134,7 +134,7 @@ environment:
   default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
   # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
-  # is_legacy: true         # Uncomment for BASIS < 7.50 systems (e.g. E77). Also set SAP_UNICODE=false in .env for non-unicode systems.
+  # is_legacy: true         # Uncomment for BASIS < 7.50 systems (for example a legacy system). Also set SAP_UNICODE=false in .env for non-unicode systems.
 
 # Shared dependencies — persistent Lego library for integration tests
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
@@ -528,7 +528,7 @@ shared_dependencies:
     #
     # LSVIMTOP is a function-group include by name (`L<fugr>TOP`), and it was
     # queried anyway because the naming rule turns out not to decide this:
-    # measured on E19, `GET /sap/bc/adt/programs/includes/lsvimtop` answers
+    # measured on premise (BASIS 816), `GET /sap/bc/adt/programs/includes/lsvimtop` answers
     # `include:abapInclude` with `adtcore:type="PROG/I"`. So FUGR and PROG
     # includes differ in where they are CREATED and what contains them, not in
     # the type code a read returns — which is why this fixture serves a shape
@@ -1567,7 +1567,7 @@ create_service_binding:
         # nothing ever created it — shared:setup makes ZAC_SHR_SRVD01 and
         # ZAC_SHR_SRVD02 — so the publish failed with "Service Definition
         # ZAC_SRVD01 not yet active", which reads like a timing problem and is
-        # an absent object. Measured on E19: a ZAC_* search returns both shared
+        # an absent object. Measured on premise (BASIS 816): a ZAC_* search returns both shared
         # definitions and no ZAC_SRVD01.
         #
         # SRVD01 is the free one on purpose: the shared binding ZAC_SHR_SRVB01
@@ -2329,6 +2329,19 @@ runtime_debugger:
       # Nothing else may listen for the same SAP user while this runs: an IDE
       # with a breakpoint set holds the user's debugging, and the listeners
       # here refuse to displace it.
+
+    - name: "adt_abap_debugger_modes"
+      enabled: true
+      available_in: ["onprem"]
+      description: "ABAP debugger modes: syncBreakpoints full/partial, skipCount, detachDebugger, terminateDebugger, setDebuggerSettings, checkListener, terminal mode, another user"
+      params:
+        class_name: "ZAC_DBG_MODES_A"     # probe A: a loop and an end line; created, run under the debugger, deleted
+        class_name_b: "ZAC_DBG_MODES_B"   # probe B: one marked line, a second main program
+        package_name: ""                  # "" → environment.default_package; use a local package (no transport)
+        transport_request: ""             # "" → environment.default_transport (ignored for a local package)
+        second_user_env: ""               # path of a .env file of a second user; "" skips the other-user case
+      # Close the IDE of the test user, and make sure the second user's IDE
+      # holds no listener, before running this.
 
     - name: "adt_amdp_debugger"
       enabled: true

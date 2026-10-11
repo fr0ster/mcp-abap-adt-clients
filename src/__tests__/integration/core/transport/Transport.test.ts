@@ -377,7 +377,7 @@ describe('AdtRequest', () => {
      * The request's document *shows* its tasks' entries, which is why this
      * block once read one there and addressed `removeObject` at the request.
      * The server refused, and said exactly why: *"Entry R3TR DOMA … does not
-     * exist in request/task E19K9071xx"* — `SCTS_ADT_MSG 009`, for an entry
+     * exist in request/task DEVK9071xx"* — `SCTS_ADT_MSG 009`, for an entry
      * plainly visible in the document it was just read from. It belongs to
      * the task, and only the task can detach it.
      */
@@ -557,7 +557,7 @@ describe('AdtRequest', () => {
           // that is what poisoned the name: every run registered
           // `ZAC_TRQ_DOMA01` in a fresh request, and the first run whose
           // cleanup did not finish left the name locked in a dead one —
-          // `CTS_WBO_API 020`, "already locked in request E19K9071xx", on
+          // `CTS_WBO_API 020`, "already locked in request DEVK9071xx", on
           // every run after it, with no request left that anyone would think
           // to look in.
           //

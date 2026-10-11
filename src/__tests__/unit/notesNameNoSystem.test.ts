@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
  * `docs/superpowers/` is excluded because a plan is not documentation.
  */
 const FORBIDDEN =
-  /\bE19\b|\bE77\b|RFCSAPRL|trial system|on the trial|against the trial|ZOK_MESSAGE_0002|ZAC_INCL01|ZAC_CDSUT_CLS/i;
+  /\bE1[9]\b|\bE7[7]\b|RFCSAPRL|trial system|on the trial|against the trial|ZOK_MESSAGE_0002|ZAC_INCL01|ZAC_CDSUT_CLS/i;
 
 describe('notes', () => {
   const files = execSync('git ls-files src docs', { encoding: 'utf8' })

@@ -354,7 +354,12 @@ function identityFor(): IDebuggerIdentity {
       .digest('hex')
       .slice(0, 32)
       .toUpperCase();
-  return { requestUser, terminalId: id('terminalId'), ideId: id('ideId') };
+  return {
+    debuggingMode: 'user',
+    requestUser,
+    terminalId: id('terminalId'),
+    ideId: id('ideId'),
+  };
 }
 
 /**
@@ -545,7 +550,7 @@ async function main(): Promise<void> {
         `${c.green(tag(caught.body, 'DBGEE_KIND') ?? '')} ${c.gray(debuggeeId)} at line ${c.yellow(/#start=(\d+)/.exec(tag(caught.body, 'URI') ?? '')?.[1] ?? '?')}`,
       );
       const attach = await call('attach', 'to the debuggee', () =>
-        debuggerApi.attach(identity.requestUser, debuggeeId),
+        debuggerApi.attach(identity, debuggeeId),
       );
       attached = attach.ok;
     } else if (caught.ok) {

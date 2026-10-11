@@ -162,6 +162,7 @@ async function main(): Promise<void> {
       .slice(0, 32)
       .toUpperCase();
   const identity: IDebuggerIdentity = {
+    debuggingMode: 'user',
     requestUser: user,
     terminalId: id('terminalId'),
     ideId: id('ideId'),
@@ -236,9 +237,11 @@ async function main(): Promise<void> {
         const onA = new AbapDebugger(A, quiet, abapDebuggerDocuments);
         // Routed to the debuggee's server, as Eclipse does (saplb).
         const instance = tag(doc, 'INSTANCE_NAME');
-        const viaA = await onA.attach(user, debuggeeId, { server: instance });
+        const viaA = await onA.attach(identity, debuggeeId, {
+          server: instance,
+        });
         let viaL: IAdtResponse<unknown> | undefined;
-        if (!viaA.ok) viaL = await onL.attach(user, debuggeeId);
+        if (!viaA.ok) viaL = await onL.attach(identity, debuggeeId);
 
         const bucket = same ? tally.same : tally.other;
         bucket.n++;

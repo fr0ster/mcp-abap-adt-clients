@@ -13,7 +13,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 
-const ITEM_URL = '/sap/bc/adt/cts/transportrequests/TRLK900438';
+const ITEM_URL = '/sap/bc/adt/cts/transportrequests/DEVK900438';
 
 // A realistic single-item GET body — same attribute set and nesting the
 // collection returns for one <tm:request> (captured shape, see
@@ -25,23 +25,23 @@ const TRANSPORT_ITEM_XML =
   '<tm:request xmlns:tm="http://www.sap.com/cts/adt/tm" ' +
   'xmlns:adtcore="http://www.sap.com/adt/core" ' +
   'xmlns:atom="http://www.w3.org/2005/Atom" ' +
-  'tm:number="TRLK900438" tm:parent="" tm:owner="CB9900000000" ' +
+  'tm:number="DEVK900438" tm:parent="" tm:owner="SAPUSER01" ' +
   'tm:desc="Original description" tm:type="K" tm:status="D" tm:target="" ' +
   'tm:target_desc="" tm:cts_project="" tm:cts_project_desc="" ' +
   'tm:lastchanged_timestamp="20260811064450" ' +
-  'tm:uri="/sap/bc/adt/vit/wb/object_type/%20%20%20%20rq/object_name/TRLK900438">' +
+  'tm:uri="/sap/bc/adt/vit/wb/object_type/%20%20%20%20rq/object_name/DEVK900438">' +
   '<tm:long_desc/>' +
-  '<atom:link href="/sap/bc/adt/cts/transportrequests/TRLK900438" ' +
+  '<atom:link href="/sap/bc/adt/cts/transportrequests/DEVK900438" ' +
   'rel="http://www.sap.com/cts/relations/adturi" ' +
   'type="application/vnd.sap.adt.transportrequests.v1+xml" ' +
   'title="Transport Organizer ADT URI"/>' +
-  '<tm:task tm:number="TRLK900439" tm:parent="TRLK900438" ' +
-  'tm:owner="CB9900000000" tm:desc="Test" tm:type="Unclassified" ' +
+  '<tm:task tm:number="DEVK900439" tm:parent="DEVK900438" ' +
+  'tm:owner="SAPUSER01" tm:desc="Test" tm:type="Unclassified" ' +
   'tm:status="D" tm:target="" tm:target_desc="" tm:cts_project="" ' +
   'tm:cts_project_desc="" tm:lastchanged_timestamp="20260811064451" ' +
-  'tm:uri="/sap/bc/adt/vit/wb/object_type/%20%20%20%20rq/object_name/TRLK900439">' +
+  'tm:uri="/sap/bc/adt/vit/wb/object_type/%20%20%20%20rq/object_name/DEVK900439">' +
   '<tm:long_desc/>' +
-  '<atom:link href="/sap/bc/adt/cts/transportrequests/TRLK900439" ' +
+  '<atom:link href="/sap/bc/adt/cts/transportrequests/DEVK900439" ' +
   'rel="http://www.sap.com/cts/relations/adturi" ' +
   'type="application/vnd.sap.adt.transportrequests.v1+xml" ' +
   'title="Transport Organizer ADT URI"/>' +
@@ -82,7 +82,7 @@ describe('AdtRequest.update()', () => {
 
     // The body goes in the options, where the contract puts it.
     await new AdtRequest(connection).updateMetadata(
-      { transportNumber: 'TRLK900438' },
+      { transportNumber: 'DEVK900438' },
       { source: edited },
     );
 
@@ -91,8 +91,8 @@ describe('AdtRequest.update()', () => {
     expect(calls[0].url).toBe(ITEM_URL);
     expect(String(calls[0].data)).toContain('tm:desc="New description"');
     // Everything else the caller kept is still there — because they kept it.
-    expect(String(calls[0].data)).toContain('tm:owner="CB9900000000"');
-    expect(String(calls[0].data)).toContain('tm:number="TRLK900438"');
+    expect(String(calls[0].data)).toContain('tm:owner="SAPUSER01"');
+    expect(String(calls[0].data)).toContain('tm:number="DEVK900438"');
   });
 
   /**
@@ -116,7 +116,7 @@ describe('AdtRequest.update()', () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
     await new AdtRequest(connection).updateMetadata({
-      transportNumber: 'TRLK900438',
+      transportNumber: 'DEVK900438',
       description: 'New description',
     });
 
@@ -133,7 +133,7 @@ describe('AdtRequest.update()', () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
     await new AdtRequest(connection).updateMetadata({
-      transportNumber: 'TRLK900438',
+      transportNumber: 'DEVK900438',
     });
 
     expect(calls).toHaveLength(1);
@@ -145,7 +145,7 @@ describe('AdtRequest.delete()', () => {
   it('issues exactly one DELETE to the item URL', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete({ transportNumber: 'TRLK900438' });
+    await new AdtRequest(connection).delete({ transportNumber: 'DEVK900438' });
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('DELETE');
@@ -155,7 +155,7 @@ describe('AdtRequest.delete()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete({ transportNumber: 'TRLK900438' });
+    await new AdtRequest(connection).delete({ transportNumber: 'DEVK900438' });
 
     for (const call of calls) {
       expect(call.url).not.toBe('/sap/bc/adt/cts/transportrequests');
