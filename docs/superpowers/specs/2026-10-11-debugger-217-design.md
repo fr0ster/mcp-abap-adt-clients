@@ -27,9 +27,15 @@ own run, belongs to mcp-abap-adt and comes after this release.
 
 **Server source** (on premise, BASIS 816, read 2026-10-11; class and line in the research note):
 
-- **Breakpoint ownership.** Breakpoints belong to the pair IDE user + request user, at most 30 per pair.
+- **Breakpoint ownership, by mode.** At most 30 breakpoints per key.
+  - In `user` mode the key is IDE user + request user.
+  - In `terminal` mode it is IDE user + terminal id.
+  - A terminal id equal to the IDE id selects the IDE-id-only key.
+
+  A replacement reaches every IDE that shares the key. In `user` mode that is any IDE of the same IDE user debugging the same
+  request user. In `terminal` mode it is any IDE of the same IDE user with the same terminal id.
 - **Without `syncScope`**, a POST only adds.
-  - `syncScope mode="full"` replaces every breakpoint of the pair.
+  - `syncScope mode="full"` replaces every breakpoint of the key.
   - `syncScope mode="partial"` replaces only the line breakpoints in the main programs its object references map to.
     A line breakpoint outside that scope is refused.
 - **`deactivated`** is parsed but has no effect on this release. **`skipCount`** applies to every kind.
@@ -74,7 +80,7 @@ own run, belongs to mcp-abap-adt and comes after this release.
 ```ts
 export type IDebuggerIdentity =
   | { debuggingMode: 'user'; requestUser: string; terminalId: string; ideId: string }
-  | { debuggingMode: 'terminal'; terminalId: string; ideId: string };
+  | { debuggingMode: 'terminal'; terminalId: string; ideId: string; requestUser?: never };
 
 interface IBreakpointCommon {
   /** Hits to pass before the breakpoint stops (which hit stops is measured, see Testing). */
@@ -95,14 +101,14 @@ export type IDebuggerBreakpoint =
   | (IBreakpointCommon & NoCondition & { kind: 'message'; msgId: string; msgNo: string; msgTy: string });
 
 /**
- * Replace breakpoints instead of adding them. Both scopes touch every IDE of the same IDE user + request user pair.
+ * Replace breakpoints instead of adding them. Both scopes touch every IDE that shares the identity's key (see the evidence).
  * `partial` replaces the line breakpoints of the MAIN PROGRAMS its objects map to (two objects of one class pool are one
  * program); an empty `breakpoints` clears that scope. An object that maps to no program leaves the body's line
  * breakpoints unset (server source); the integration test records what the answer says then.
  */
 export type IDebuggerBreakpointSync =
   | { scope: 'full'; breakpoints: readonly IDebuggerBreakpoint[] }
-  | { scope: 'partial'; objects: readonly string[]; breakpoints: readonly IDebuggerLineBreakpoint[] };
+  | { scope: 'partial'; objects: readonly [string, ...string[]]; breakpoints: readonly IDebuggerLineBreakpoint[] };
 
 /** What to change; a field left out keeps its current value. */
 export interface IDebuggerSettings {
@@ -117,9 +123,23 @@ export interface IDebuggerSettings {
 
 New `IAbapDebugger` members. Each has the usual pair: `(…, options: WithAnalyse<E, O>)` and `(…, options?: WithoutAnalyse<O>)`.
 
-Changed member: `attach(identity, debuggeeId, options?)` replaces `attach(requestUser, debuggeeId, options?)`. The attach
-query carries the identity's mode and ids, as listeners and breakpoints do. Every other member that takes an identity
-keeps its signature and sends the mode the identity names.
+Changed member: `attach(identity, debuggeeId, options?)` replaces `attach(requestUser, debuggeeId, options?)`.
+
+- **What attach sends.** The server reads `debuggingMode`, and reads `requestUser` only in `user` mode. It attaches by
+  `debuggeeId` and does not read the ids. So the query is `method`, `debuggeeId`, `debuggingMode`, `requestUser` (`user`
+  mode only) and `dynproDebugging`.
+- **Other members.** Every other member that takes an identity keeps its signature and sends the mode the identity names.
+- **Deleting a breakpoint in `terminal` mode.** The DELETE query requires a `requestUser` parameter in every mode. Measured
+  on premise, 2026-10-11, on a terminal-mode breakpoint:
+  - left out, it answers `400 ExceptionParameterNotFound`;
+  - empty, it answers `200`;
+  - the logon user also answers `200`.
+
+  So a terminal identity sends `requestUser=` empty there.
+
+The generic list becomes
+`IAbapDebugger<TBreakpoints, TListener, TAttach, TStack, TVariables, TStep, TDone, TWatchpoints, TMemory, TSettings>`, with
+`TSettings` appended last. `AbapDebugger`'s results gain `settings` in the same position.
 
 | Member | Request | Answer |
 |---|---|---|
@@ -147,6 +167,10 @@ keeps its signature and sends the mode the identity names.
 - **What an empty value means.** The server maps a value that is neither true nor false to "keep" (`move_corresponding_no_initial`
   with a `-` remainder). The tests confirm this.
 - **Conditional attributes.** `updateDebugging` and `showDataAging` are emitted only when set.
+- **`showDataAging` does not merge.** The server keeps it apart from the session settings and takes it from each request.
+  Leaving it out turns it off, and the answer reports it off. It only steers how the variables node presents data aging.
+  `IDebuggerSettings` documents this exception.
+- **Headers.** `Content-Type: application/xml` and `Accept: application/xml`. The integration test confirms the server takes them.
 - **The first call after an attach** ignores `systemDebugging=false`. That is documented and tested.
 
 Why this is a major. List all of these in the migration note:
@@ -197,26 +221,31 @@ What it does with the other kinds is unclear, so they do not compile.
     listen, stop, check, attach and both breakpoint bodies: `terminal` sends no `requestUser`.
   - **The conflict reader.** On a recorded, sanitised `409`, and its negatives: no response, an empty body, a malformed
     body, `403`, and a `409` without `conflictText`.
-  - **Type tests.** A `terminal` identity with `requestUser` fails to compile, and so does a `user` identity without it.
+  - **Type tests.** A `terminal` identity with `requestUser` fails to compile, whether it is a literal or a pre-typed value.
+    So does a `user` identity without it. A `partial` sync with an empty `objects` list fails to compile.
     A literal and a pre-typed variable of an exception breakpoint carrying `condition` both fail to compile.
     `partial` with a statement breakpoint fails to compile.
 - **Integration on premise.** These run as our own user, automated, and clean up after themselves. Each one is measured
   during implementation, and its date and platform go into the JSDoc.
-  - **`full`.** It removes a breakpoint left out of the set and inserts a new one. An empty set clears everything for the pair.
+  - **`full`.** It removes a breakpoint left out of the set and inserts a new one. An empty set clears everything for the key.
   - **`partial`.** The fixtures are two classes, so two distinct main programs. A sync of class A replaces A's line
     breakpoints and keeps B's line breakpoints and an exception breakpoint. A line breakpoint in B sent within A's scope is
-    refused. An empty set clears A's line breakpoints only. An object that maps to no program is recorded as answered.
+    refused. An empty set clears A's line breakpoints only. An object that maps to no program, alone and mixed with one that maps, is recorded as answered. An empty `objects` list does
+    not compile.
   - **`skipCount`.** With `skipCount: 2` on a loop, the stop's loop counter is recorded, and the JSDoc states which hit stops.
   - **`detachDebugger` without id.** The run finishes. Separately: does a session breakpoint (`scope="debugger"`), set
     before the detach, bring the debugger back? Does an external breakpoint catch the same run again through the listener?
     Both are recorded.
   - **`detachDebugger` with the id of a caught, unattached debuggee.** The answer, and whether the run goes on at once rather
     than after the ~30 s hold.
+  - **`detachDebugger` with an id whose attach must fail.** The id is that of a debuggee another session has already
+    attached. Expected from the source: success all the same, and that debuggee's activation removed. Both are recorded.
   - **`terminateDebugger`.** The run finishes.
   - **`setDebuggerSettings`.** It is called with a field set, then with that field left out, and the answer keeps the value.
-    `false` clears. The first call after an attach with `systemDebugging=false` is recorded.
+    `false` clears. The first call after an attach with `systemDebugging=false` is recorded. `showDataAging`:
+    `true`, then left out, then the answer reports it off. A variables read after each call shows the change.
   - **Terminal mode, what can be measured without SAP GUI.** A terminal-mode listener starts, `checkListener` answers, and
-    the listener stops. Breakpoints are set and deleted under a terminal identity. No catch is asserted.
+    the listener stops. Breakpoints are set and deleted under a terminal identity; the deletion sends `requestUser=` empty. No catch is asserted.
   - **`checkListener`.** It answers `200` empty when free, and `409` with both fields when another of our listeners holds
     the user.
 - **Another user.** One integration test with a second user's connection, skipped unless the test config names one.
