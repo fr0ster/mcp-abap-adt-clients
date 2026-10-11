@@ -171,6 +171,11 @@ Server source: on premise, BASIS 816, read 2026-10-11, paraphrased and never quo
 
 ## Contract follow-ups
 
-`skipCount` left the contract and `syncBreakpoints` was reworded in `interfaces-adt` 15 / `adt-clients` 29. Still open:
+Done in `interfaces-adt` 15 / `adt-clients` 29:
 
-- **Fix "only adds" wording.** Any wording in the contract that says `setBreakpoints` only adds goes the same way.
+- `skipCount` left the contract.
+- `syncBreakpoints` was reworded.
+- `setBreakpoints` is described as replacing the key's set, not adding to it.
+- `clientId` was added.
+
+Nothing is open.
