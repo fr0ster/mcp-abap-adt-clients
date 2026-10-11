@@ -1930,9 +1930,13 @@ await run;
   request user it names, whether or not a listener was running. Stop the
   listener last. Measured on premise (2026-10-11), SAP_BASIS 816; server
   source, SAP_BASIS 816, read 2026-10-11.
-- **One listener session per identity.** In user mode the server binds an
+- **One debug session per identity.** In user mode the server binds an
   ABAP session to the first identity that a listen, check, stop or attach used
   on it, so a listener for another request user needs a session of its own.
+  An `AbapDebugger` is constructed on one connection with its settings
+  (`onConflict`): another identity - another request user, another mode,
+  another `ideId` - needs another debug session, that is a new `AbapDebugger`
+  on a connection of its own. The library adds no guard.
   Measured on premise (2026-10-11), SAP_BASIS 816; the caching is in the server
   source, SAP_BASIS 816, read 2026-10-11.
 - **`skipCount` is typed but refused.** It is still in the 14.x contract's
@@ -1942,7 +1946,10 @@ await run;
   the field is to leave the contract in its next major.
 - **`terminateDebugger`** ends the debugger's own session, and the answer is a
   plain `500` with no ADT document. The program runs on and returns its
-  output, and the session cannot be used afterwards. Measured on premise
+  output, and the session cannot be used afterwards. Pass
+  `analyseDebuggerFreed` from `@mcp-abap-adt/adt-strategies` (0.9.0) to take
+  that `500` as no failure (`analyseException` lets it stop you); see the
+  [errata](ERRATA.md). Measured on premise
   (2026-10-11), SAP_BASIS 816; the session is freed in the server source
   (SAP_BASIS 816, read 2026-10-11).
 - **`terminateDebuggee`** answers `500` subtype `terminateDebuggee` on premise

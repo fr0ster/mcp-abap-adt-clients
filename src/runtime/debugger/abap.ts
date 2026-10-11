@@ -323,6 +323,12 @@ export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
  *
  * The identity's mode decides the parameters: `terminal` mode sends no `requestUser`.
  *
+ * **One debug session per identity.** The listener context belongs to the ABAP
+ * session of the connection, so a listener, a check and an attach for another
+ * identity - another request user, another mode, another IDE id - are made on
+ * a connection of their own (an `AbapDebugger` constructed on it), not on this
+ * one. The library adds no guard.
+ *
  * **One ABAP session listens for one user.** In user mode the server binds
  * the listener context - request user and IDE id - to the ABAP session on the
  * first request that needs it (listen, check, stop or attach), and every
@@ -358,7 +364,8 @@ export async function listen(
 /**
  * Ask whether a listener for the identity would conflict. Starts nothing: 200
  * with an empty body is "free"; a conflict is 409 `conflictDetected`; a missing
- * authorization (`user` mode) is 403, checked first.
+ * authorization (`user` mode) is 403, checked first. It reads in the ABAP
+ * session of the connection: one debug session per identity (see {@link listen}).
  *
  * Measured on premise (2026-10-11), BASIS 816: free answered 200 with an empty
  * body, in user and in terminal mode; with a listener of the same user under
@@ -726,6 +733,11 @@ export async function detachDebugger(
  * request on that session was answered `400` "Session Timed Out or Not Found".
  * A `500` here is therefore the expected end, not proof of failure; open a new
  * session for the next attach.
+ *
+ * Pass `analyseDebuggerFreed` from `@mcp-abap-adt/adt-strategies` (0.9.0) to
+ * take that `500` as no failure; `analyseException` lets it stop you. See
+ * `docs/usage/ERRATA.md`, "The debugger freeing its session is answered as an
+ * ICF 500".
  */
 export async function terminateDebugger(
   connection: IAbapConnection,

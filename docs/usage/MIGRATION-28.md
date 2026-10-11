@@ -107,5 +107,10 @@ says the same.
   `interfaces-adt` 14 and leaves the contract in its next major; if you pass it,
   drop it and count hits yourself.
 - **One ABAP session listens for one user.** The server binds a session to the
-  first identity a listen, check, stop or attach used on it. A listener for
-  another request user needs a session of its own.
+  first identity a listen, check, stop or attach used on it. Another identity
+  - another request user, another mode, another `ideId` - needs another debug
+  session: a new `AbapDebugger` on a connection of its own.
+- **`terminateDebugger` answers a plain `500`** when it worked: the server frees
+  the debugger's own session. Pass `analyseDebuggerFreed` from
+  `@mcp-abap-adt/adt-strategies` (0.9.0) to take it as no failure, or
+  `analyseException` to let it stop you (see [ERRATA](ERRATA.md)).

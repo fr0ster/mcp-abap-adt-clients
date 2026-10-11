@@ -102,6 +102,19 @@ type Of<
   K extends keyof IAbapDebuggerResults,
 > = ReturnType<R[K]>;
 
+/**
+ * The ABAP debugger on one connection, with the settings it was constructed
+ * with (`onConflict`).
+ *
+ * **One debug session per identity.** The server binds the listener context -
+ * request user and IDE id - to the ABAP session the connection carries (see
+ * `listen` in `abap.ts`), so one debugger serves one identity. Another
+ * identity - another request user, another mode, another `ideId` - needs
+ * another debug session: a new `AbapDebugger` on a connection of its own,
+ * with its own settings. The library does not guard this; a call naming an
+ * identity other than the one the session was bound to is answered by the
+ * server as it is.
+ */
 export class AbapDebugger<
   R extends IAbapDebuggerResults = typeof abapDebuggerDocuments,
 > implements
@@ -173,6 +186,14 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Start a listener for the identity, with the conflict behaviour this
+   * debugger was constructed with (`onConflict`).
+   *
+   * The listener belongs to the identity's debug session: a listener for
+   * another identity needs a new `AbapDebugger` on a connection of its own
+   * (see the class and `listen` in `abap.ts`).
+   */
   async listen<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
@@ -190,6 +211,12 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Release the listener - and delete the key's breakpoints with it, whether
+   * or not a listener was running (see `stopListener` in `abap.ts`). Stop the
+   * listener last, or arm again before the next listen. It acts for the
+   * identity's debug session; another identity needs a debugger of its own.
+   */
   async stopListener<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: IAdtAnalyseOptions<E>,
@@ -201,6 +228,12 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Attach to the debuggee a listener caught. The attach, and everything after
+   * it, goes on a debugger with a connection opened for this debuggee, never
+   * the listener's (see `attach` in `abap.ts`); the identity is the one the
+   * session was bound to - another identity needs a debugger of its own.
+   */
   async attach<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     debuggeeId: string,
@@ -385,6 +418,11 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Ask whether a listener for the identity would conflict; starts nothing.
+   * The answer is read in the identity's debug session: for another identity,
+   * use a debugger on a connection of its own (see the class).
+   */
   async checkListener<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: IAdtAnalyseOptions<E>,
@@ -406,6 +444,14 @@ export class AbapDebugger<
     );
   }
 
+  /**
+   * Free the debugger; the program runs on. SAP answers it with a plain ICF
+   * `500` (no ADT exception document) when it worked: pass
+   * `analyseDebuggerFreed` from `@mcp-abap-adt/adt-strategies` (0.9.0) to take
+   * that `500` as no failure, or `analyseException` to let it stop you. See
+   * the errata entry "The debugger freeing its session is answered as an ICF
+   * 500" and `terminateDebugger` in `abap.ts`.
+   */
   async terminateDebugger<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'done'>, E>> {

@@ -70,10 +70,13 @@ On premise (2026-10-11), BASIS 816; the server source was read the same day.
   **`stopListener` deletes it**. The old text said the request only adds.
 - **`skipCount` is ignored** on an external breakpoint: the first hit stops.
 - **`terminateDebugger`** answers a plain `500` and frees the debugger's own
-  session; the program runs on. **`detachDebugger`** with the id of a caught,
+  session; the program runs on. `analyseDebuggerFreed` from
+  `@mcp-abap-adt/adt-strategies` 0.9.0 takes that `500` as no failure (errata
+  entry in `docs/usage/ERRATA.md`). **`detachDebugger`** with the id of a caught,
   unattached debuggee releases the run at once.
 - **One ABAP session listens for one user**: the listener context is bound by
-  the first identity a listen, check, stop or attach used.
+  the first identity a listen, check, stop or attach used. Another identity
+  needs another debug session: a new `AbapDebugger` on a connection of its own.
 - **Another user's run is caught end to end** with `requestUser`, given
   `S_DEVELOP` `DEBUG` ACTVT 90; a request already running is never caught.
 - **Terminal mode**: check, listen, stop, set and delete answer `200`; deleting
