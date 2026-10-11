@@ -72,10 +72,24 @@ client-side does not end it on the server.
 | Member | Request | Accept |
 |---|---|---|
 | `setBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` | `*/*` |
-| `getBreakpoints` | `GET /debugger/breakpoints?debuggingMode=user&requestUser&terminalId&ideId&scope=external` | `*/*` |
-| `listen` | `POST /debugger/listeners?debuggingMode=user&requestUser&terminalId&ideId&timeout=N` | `application/vnd.sap.as+xml` |
-| `stopListener` | `DELETE /debugger/listeners?debuggingMode=user&requestUser` | `*/*` |
-| `attach` | `POST /debugger?method=attach&debuggeeId&dynproDebugging=true&debuggingMode=user&requestUser` | `*/*` |
+| `getBreakpoints` | `GET /debugger/breakpoints?debuggingMode&requestUser&terminalId&ideId&scope=external` | `*/*` |
+| `listen` | `POST /debugger/listeners?debuggingMode&requestUser&terminalId&ideId&timeout=N` | `application/vnd.sap.as+xml` |
+| `stopListener` | `DELETE /debugger/listeners?debuggingMode&requestUser` | `*/*` |
+| `attach` | `POST /debugger?method=attach&debuggeeId&dynproDebugging=true&debuggingMode[&requestUser]` | `*/*` |
+| `syncBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` with `<syncScope mode="full"/>` or `mode="partial"` and one `adtcore:objectReference` per object | `*/*` |
+| `checkListener` | `GET /debugger/listeners?debuggingMode&requestUser&terminalId&ideId&checkConflict=true` | `*/*` |
+| `detachDebugger` | `POST /debugger?method=detachDebugger[&debuggeeId]` | `*/*` |
+| `terminateDebugger` | `POST /debugger?method=terminateDebugger` | `*/*` |
+| `setDebuggerSettings` | `POST /debugger?method=setDebuggerSettings`, body `dbg:settings` | `application/xml` |
+
+**The mode.** `debuggingMode` is `user` or `terminal`, taken from the
+identity. `requestUser` goes out in `user` mode only. The one exception is the
+breakpoint `DELETE`, which requires the parameter in every mode: a terminal
+identity sends `requestUser=` empty (measured on premise (2026-10-11), BASIS
+816: left out `400`, empty `200`). `attach` carries `method`, `debuggeeId`,
+`debuggingMode`, `requestUser` in user mode only, and `dynproDebugging`; the
+server attaches by `debuggeeId` and does not read the ids. A catch in terminal
+mode is unmeasured.
 | `getStack` | `GET /debugger/stack?method=getStack&emode=_&semanticURIs=true` | `*/*` |
 | `goToFrame` | `PUT <stackUri from the stack>` | `*/*` |
 | `getVariables` | `POST /debugger?method=getVariables`, body `asx:abap` | `application/vnd.sap.as+xml` |
@@ -93,7 +107,9 @@ The members `AbapDebugger` ships are `setBreakpoints`, `deleteBreakpoint`,
 `listen`, `stopListener`, `attach`, `getStack`, `setStackPosition` (rather than
 the `PUT <stackUri>` above, which is the same move), `getVariables`,
 `getChildVariables`, `setVariableValue`, `step`, `stepToLine`,
-`terminateDebuggee`, the watchpoints and the memory members. There is no
+`terminateDebuggee`, `syncBreakpoints`, `checkListener`, `detachDebugger`,
+`terminateDebugger`, `setDebuggerSettings`, the watchpoints and the memory
+members. There is no
 `getBreakpoints`: the answer is always empty (below).
 
 ## What SAP answers
@@ -210,13 +226,16 @@ the `PUT <stackUri>` above, which is the same move), `getVariables`,
 - `getVariables`: `500 AdiFailed`.
 - `stepContinue`: `400 ExceptionInvalidData`, subtype `noSessionAttached`.
 
-**There is no detach.** `POST /debugger?method=detach` answers `400
-ExceptionInvalidData "Unknown method ''"`. A debuggee is released by
-`stepContinue`.
+**Detach.** `POST /debugger?method=detach` answers `400
+ExceptionInvalidData "Unknown method ''"`; the method is `detachDebugger`, which
+lets the debugger leave while the program runs on (measured on premise
+(2026-10-11), BASIS 816). `stepContinue` also releases a debuggee.
 
 **Stop the listener.**
 - `DELETE /debugger/listeners?debuggingMode=user&requestUser=…` answers `200`
-  with an empty body. On 758 it also removed the user's external breakpoints.
+  with an empty body. It also removes the key's external breakpoints, with or
+  without a listener running: measured on 758, and on premise (2026-10-11),
+  BASIS 816.
 - vibing-steampunk found that a DELETE naming the client's `terminalId` and
   `ideId` matched nothing. On 816 and on the cloud (2026-10-10) it did: a
   listen waiting on one session ended 3–4 s after that DELETE from another,

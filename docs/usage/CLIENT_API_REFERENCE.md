@@ -1906,7 +1906,6 @@ await session.step('stepContinue', { analyse: analyseDebuggeeEnd });
 await run;
 ```
 
-- **Identity by mode.** See [Identity by mode](#identity-by-mode) below.
 - **A listener conflict** is decided by `ideId`: the same `ideId` never
   conflicts. Another one — an Eclipse debugging the same user — refuses the
   newcomer with `409` by default; construct with `{ onConflict: 'takeOver' }`
@@ -2033,9 +2032,10 @@ const settings = await session.setDebuggerSettings({ systemDebugging: true });
   reach every IDE that shares the identity's key (user mode: IDE user plus
   request user; terminal mode: IDE user plus terminal id). `partial` takes line
   breakpoints only; a line breakpoint outside the objects' programs comes back
-  as a refused row whose message names the wrong kinds. An object that maps to
-  no program is passed over when another maps, and refused alone. Measured on
-  premise (2026-10-11), BASIS 816.
+  as a refused row whose message names the wrong kinds (measured on premise
+  (2026-10-11), BASIS 816). An object that maps to no program is passed over
+  when another maps, and refused alone (measured on premise (2026-10-11),
+  BASIS 816).
 - **`detachDebugger()` without an id** lets the debugger leave and the program
   run on; a listener standing at the time can catch the same run again at the
   next pass of an armed line. With the id of a caught, unattached debuggee it
