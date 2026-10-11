@@ -21,10 +21,11 @@ and fires its release workflow.
 
 - **`analyseDebuggerFreed`** — for `terminateDebugger`, where the debugger
   freeing its own session is the outcome asked for. SAP answers that with a
-  plain ICF `500` (`text/plain` or empty, no ADT exception document) when it
-  worked; this answers exactly that `500` as no failure. A `500` carrying an
-  ADT exception document, any other status and a connection failure are read
-  as `analyseException` reads them. See `docs/usage/ERRATA.md` in
+  plain ICF `500` when it worked; this answers as no failure a `500` served as
+  `text/plain` or with an empty body, with no ADT exception document. Anything
+  else - a `500` with an exception document or served as another type, any
+  other status, a connection failure, a body that is not a string - is read as
+  `analyseException` reads it. See `docs/usage/ERRATA.md` in
   `adt-clients`.
 
 ### Changed

@@ -115,7 +115,7 @@ a `403` on a service binding's LOCK that is to be ignored
 | `analysePublication` | a service binding's publication job: `<SEVERITY>` inside a `200` |
 | `analysePublicationLock` | a service binding's LOCK before a publish or unpublish: a `403` (an editor holds the binding) is no failure, the lock comes back without a handle; every other refusal as `analyseException`. A caller who wants the `403` to stop them passes `analyseException` instead |
 | `analyseDebuggeeEnd` | an ABAP debugger step or termination: `500 AdiFailed` subtype `debuggeeEnded` or `terminateDebuggee` is the debuggee ending as asked, no failure — the result is the document naming the subtype; every other refusal as `analyseException` |
-| `analyseDebuggerFreed` | `terminateDebugger`: a plain `500` (no ADT exception document) is the debugger freeing its own session, no failure; a `500` with an ADT exception document, any other status and a connection failure as `analyseException` |
+| `analyseDebuggerFreed` | `terminateDebugger`: a `500` served as `text/plain` or with an empty body, with no ADT exception document, is the debugger freeing its own session, no failure; everything else (a `500` with an exception document or served as anything else, other statuses, a connection failure, a body that is not a string) as `analyseException` |
 | `analyseCdsTestDoubles` | the CDS test-doubles check |
 | `analyseMessageClassMessage(msgno)` | the class answering is not the message existing |
 | `analyseUnitTestStart` | a started run whose answer names no run id |

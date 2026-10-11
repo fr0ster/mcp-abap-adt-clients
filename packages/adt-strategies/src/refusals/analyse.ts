@@ -201,17 +201,34 @@ export const analyseDebuggeeEnd: IAnalyse<IAdtMessageFailure> = (
   return analyseException(verdict, answer);
 };
 
+/** A header's value, found by name without regard to case. */
+function headerOf(
+  answer: IAdtWireResponse | undefined,
+  name: string,
+): string | undefined {
+  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
+  const key = Object.keys(headers).find((k) => k.toLowerCase() === name);
+  const value = key ? headers[key] : undefined;
+  const first = Array.isArray(value) ? value[0] : value;
+  return typeof first === 'string' ? first : undefined;
+}
+
 /**
  * `terminateDebugger`, where the debugger freeing its own session is the
  * outcome asked for.
  *
- * SAP answers it with a plain ICF `500 Internal Server Error` — `text/plain`
- * or empty, no ADT exception document — when it worked: the server frees the
- * debugger's own ABAP session, the program runs on, and the next request on
- * that session answers `400` "Session no longer exists". This strategy answers
- * exactly that `500` as no failure. A `500` that carries an ADT exception
- * document stays a refusal, and so does any other status or a connection
- * failure: all of them are read as {@link analyseException} reads them.
+ * SAP answers it with a plain ICF `500 Internal Server Error` when it worked:
+ * the server frees the debugger's own ABAP session, the program runs on, and
+ * the next request on that session answers `400` "Session no longer exists".
+ * This strategy answers as no failure exactly that shape: status `500`, a body
+ * that is a string and is either empty or served as `text/plain`, and no ADT
+ * exception document in it (as {@link readExceptionRefusal} reads one, so any
+ * prefix or a default namespace counts as a document).
+ *
+ * Everything else stays as {@link analyseException} reads it: a `500` carrying
+ * an ADT exception document, a `500` served as anything but `text/plain` (an
+ * error page of a gateway, say), any other status, and a connection failure. A
+ * body the connection did not hand over as a string is not read as "freed".
  *
  * Measured on premise (SAP_BASIS 816), 2026-10-11. A caller who wants that
  * `500` to stop them passes `analyseException` instead.
@@ -222,9 +239,11 @@ export const analyseDebuggerFreed: IAnalyse<IAdtMessageFailure> = (
 ) => {
   if (verdict === ADT_NO_FAILURE) return verdict;
   const status = verdict.response?.status ?? answer?.status;
-  const body = typeof answer?.data === 'string' ? answer.data : '';
-  if (status === 500 && !body.includes('<exc:exception')) {
-    return ADT_NO_FAILURE;
+  const body = answer?.data;
+  if (status === 500 && typeof body === 'string') {
+    const type = headerOf(answer, 'content-type')?.trim().toLowerCase();
+    const plain = body.trim() === '' || !!type?.startsWith('text/plain');
+    if (plain && readExceptionRefusal(body) === null) return ADT_NO_FAILURE;
   }
   return analyseException(verdict, answer);
 };

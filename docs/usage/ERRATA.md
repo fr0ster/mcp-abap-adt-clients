@@ -33,8 +33,8 @@ of the program to stop them passes `analyseException` instead.
 ## The debugger freeing its session is answered as an ICF 500
 
 **Symptom.** `POST /sap/bc/adt/debugger?method=terminateDebugger` answers a
-plain ICF `500 Internal Server Error`: `text/plain`, no ADT exception document
-(no `exc:exception`, no type, no message).
+plain ICF `500 Internal Server Error`, served as `text/plain` or with an empty
+body, with no ADT exception document (no `exc:exception`, no type, no message).
 
 **What actually happened.** The request worked. The server frees the
 debugger's own ABAP session, the program runs on and returns its output, and
@@ -46,9 +46,10 @@ inside the request, and nothing in it writes an ADT answer after that.
 
 **Why the library has a strategy for it.** `analyseDebuggerFreed` from
 `@mcp-abap-adt/adt-strategies` (0.9.0), passed to `terminateDebugger`, answers
-exactly that `500` as no failure. A `500` that carries an ADT exception
-document, any other status and a connection failure are read as
-`analyseException` reads them. A caller who wants that `500` to stop them
+a `500` served as `text/plain` or with an empty body, with no ADT exception
+document, as no failure. A `500` with an exception document or served as
+another type, any other status, a connection failure and a body that is not a
+string are read as `analyseException` reads them. A caller who wants that `500` to stop them
 passes `analyseException` instead.
 
 ## A service binding is locked to publish it
