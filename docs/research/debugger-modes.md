@@ -21,10 +21,10 @@ The list below summarises SAP Help pages, as a reviewer collected them (2026-10-
 |---|---|---|---|
 | Global (Window → Preferences → ABAP Development → Debug) | Enable debugging of system programs | Steps into programs with status SYSTEM and stops at breakpoints there; when off, system code is stepped over and its breakpoints do not fire | known: `systemDebugging` in `setDebuggerSettings`; the first call after an attach ignores `false` (server source, BASIS 816, read 2026-10-11) |
 | Global | Always create exception object | Creates the exception object even where `CATCH` has no `INTO` (older ADT) | known: `createExceptionObject` in `setDebuggerSettings` |
-| Project (Configure Project Specific Settings) | Breakpoint validity: This project only | Only requests started from this project; external HTTP/RFC requests are not caught | settled in part: a `terminalId` equal to `ideId` selects the breakpoint key of that IDE alone (server source, BASIS 816, read 2026-10-11), so the request must carry that id; how the id reaches a request's passport is open |
+| Project (Configure Project Specific Settings) | Breakpoint validity: This project only | Only requests started from this project; external HTTP/RFC requests are not caught | settled in part: a `terminalId` equal to `ideId` selects the breakpoint key of that IDE alone (server source, BASIS 816, read 2026-10-11), so the request must carry that id; it travels in the request's `SAP-PASSPORT` (measured 2026-10-12, see "Measured: terminal mode and the passport") |
 | Project | Breakpoint validity: Logon user (default) | Requests running under the logon user | known: `debuggingMode=user`, `requestUser` = the logon user |
 | Project | Breakpoint validity: User | Requests running under another user (HTTP/RFC) | known: `debuggingMode=user`, `requestUser` = that user; measured end to end on premise (2026-10-11), see below |
-| Project | Breakpoint validity: Terminal ID | Requests carrying that terminal id | known: `debuggingMode=terminal`, `terminalId`, no `requestUser` (discovery and server source, BASIS 816, read 2026-10-11); listener, check, breakpoints and delete answer `200` on premise (2026-10-11); a catch is unmeasured, and Eclipse's own runs were not caught under it |
+| Project | Breakpoint validity: Terminal ID | Requests carrying that terminal id | known: `debuggingMode=terminal`, `terminalId`, no `requestUser` (discovery and server source, BASIS 816, read 2026-10-11); listener, check, breakpoints and delete answer `200` on premise (2026-10-11); a run carrying the ids in its `SAP-PASSPORT` is caught (measured 2026-10-12, see "Measured: terminal mode and the passport") |
 | Project → Advanced | Allow debugging of tool requests | Lets ADT's own requests be debugged (for developing ADT tools) | unknown; of interest to any client of the ADT API, this one included |
 | Breakpoints view | Line, conditional, exception, statement breakpoints; watchpoints; enable/disable | Kinds and states of a breakpoint; in ADT the validity scope decides what is caught, there is no separate "external" kind | known: `kind`, `condition` (line breakpoints only), `/watchpoints`; `deactivated` is parsed and has no effect (server source, BASIS 816, read 2026-10-11); `skipCount` is accepted on an external breakpoint and ignored, the first hit stops (measured on premise, 2026-10-11, BASIS 816) |
 | Active session (debugger actions) | System debugging, Update debugging, Normal debugging | Switched during a session; update debugging is turned on at a stop before `COMMIT WORK` | known: `/debugger/actions{?action,value}` (discovery) and the `actions` in attach/step answers; known: `setDebuggerSettings` (`systemDebugging`, `updateDebugging`, `createExceptionObject`, `backgroundRFC`, `sharedObjectDebugging`, `showDataAging`), measured on premise (2026-10-11), see below |
@@ -139,12 +139,32 @@ On premise and on the cloud (2026-10-11), through the MCP server's debugger buil
   - a caller that is not debug-compiled has `isDebugCompiled="false"` and native line `0`, and its `#start=` points at the caller's METHOD line, not at its CALL;
   - `cascadeMode NONE` was enough to stop in the nested procedure.
 
+## Measured: terminal mode and the passport
+
+On premise (2026-10-12), BASIS 816, one SAP user, several connections through this library.
+
+**How a request carries the ids.** The ADT client puts them in the request's `SAP-PASSPORT` header: a DSR passport, version 3, system type 10, a random root context id and transaction id, and two system variable items, (2, 1) the terminal id and (2, 2) the IDE id, 16 bytes each. A run URL has no parameter for them (discovery: `classrun` and `programrun` take only `profilerId`). This library builds the same passport (`src/runtime/debugger/passport.ts`); its output was compared byte for byte with SAP's passport library on the same fields.
+
+| Run | Listener in terminal mode | Caught |
+|---|---|---|
+| class run, no passport | ids T, I | no |
+| class run, passport with T, I (T ≠ I) | ids T, I | yes, attach, stack and continue answered |
+| class run, passport with T, T | ids T, T | yes |
+| class run, passport with zero root context id and transaction id | ids T, I | yes |
+
+**Two IDEs of one user in terminal mode.** A (ids Ta, Ia) arms line 12 and listens; B (ids Tb, Ib) checks, arms line 10 and listens.
+
+- **The check and the listen disagree.** B's `checkListener` answered `409`, but B's listen was accepted and both listened. Without B's own arming first, B's listen answered `409`.
+- **Each run is caught by its own listener only.** A run with B's passport was caught by B, at B's line.
+- **The breakpoints are still the user's.** After B armed, a run with A's passport was caught by nobody; after A armed again, a run with A's passport was caught by A and a run with B's by nobody. The last arming replaced the other's set, whatever the ids.
+- **A stopListener under B's ids left A listening** in terminal mode; in user mode the same call ended A's listener.
+
 ## Server source and measurements, 2026-10-11
 
 Server source: on premise, BASIS 816, read 2026-10-11, paraphrased and never quoted. Measurements: on premise (2026-10-11), BASIS 816, two users on two connections, through this library.
 
 **Server source**
-- **Breakpoint ownership.** At most 30 breakpoints per key. In user mode the key is the IDE user plus the request user; in terminal mode it is the IDE user plus the terminal id; a terminal id equal to the IDE id selects the IDE-id-only key. A replacement reaches every IDE that shares the key.
+- **Breakpoint ownership.** At most 30 breakpoints per key. In user mode the key is the IDE user plus the request user; in terminal mode it is the IDE user plus the terminal id; a terminal id equal to the IDE id selects the IDE-id-only key. A replacement reaches every IDE that shares the key. Measured 2026-10-12, the terminal-mode part does not hold as read: a replacement under other terminal and IDE ids of the same user replaced the set too (see "Measured: terminal mode and the passport").
 - **Replacing.** A breakpoints request without `syncScope` first deletes every external breakpoint of the key, even when it is `validationOnly`. `syncScope mode="full"` replaces the key's set. `mode="partial"` replaces only the line breakpoints of the main programs its object references map to; a line breakpoint outside that scope is refused, with a message that names the wrong kinds.
 - **Fields.** `deactivated` is parsed and has no effect. `skipCount` has no place in the stored form of an external breakpoint. `condition` applies to line breakpoints only.
 - **Detach and terminate.** `detachDebugger` without an id lets the debugger leave and the program run on. With the id of a caught but unattached debuggee it tries to attach it, and when that fails removes the activation and still answers success. `terminateDebugger` frees the ABAP session the request runs in, so the answer is a plain `500`; `terminateDebuggee` ends the program.

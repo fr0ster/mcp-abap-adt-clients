@@ -2,10 +2,12 @@
  * Class run operations - execute ABAP classes that implement if_oo_adt_classrun
  */
 
+import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { debuggeePassport } from '../../runtime/debugger/passport';
 import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 
@@ -57,6 +59,7 @@ export async function runClass(
   className: string,
   runnable: boolean = true,
   _sessionId?: string,
+  debuggee?: IDebuggeeIds,
 ): Promise<IAdtWireResponse> {
   if (!runnable) {
     throw new Error(
@@ -66,8 +69,9 @@ export async function runClass(
 
   const url = `/sap/bc/adt/oo/classrun/${className}`;
 
-  const headers = {
+  const headers: Record<string, string> = {
     Accept: ACCEPT_SOURCE,
+    ...(debuggee && { 'SAP-PASSPORT': debuggeePassport(debuggee) }),
   };
 
   return connection.makeAdtRequest({

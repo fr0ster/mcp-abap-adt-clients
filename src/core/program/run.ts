@@ -2,11 +2,13 @@
  * Program run operations - execute ABAP executable programs
  */
 
+import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
+import { debuggeePassport } from '../../runtime/debugger/passport';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -19,6 +21,7 @@ export async function runProgram(
   connection: IAbapConnection,
   programName: string,
   _sessionId?: string,
+  debuggee?: IDebuggeeIds,
 ): Promise<IAdtWireResponse> {
   const normalizedName = encodeSapObjectName(programName).toUpperCase();
 
@@ -29,6 +32,7 @@ export async function runProgram(
     headers: {
       Accept: ACCEPT_SOURCE,
       'X-sap-adt-profiling': 'server-time',
+      ...(debuggee && { 'SAP-PASSPORT': debuggeePassport(debuggee) }),
     },
   });
 }
