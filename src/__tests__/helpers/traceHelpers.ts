@@ -49,7 +49,15 @@ import { expectResult } from './contract';
  * timestamps and rows, so they build their own. Imported from the strategies
  * package source until its index exports them.
  */
-export const profilerReading = {
+export const profilerReading: Omit<
+  typeof profilerDocuments,
+  'list' | 'hitlist' | 'statements' | 'dbAccesses'
+> & {
+  list: typeof profilerTraceEntries;
+  hitlist: typeof profilerHitList;
+  statements: typeof profilerStatements;
+  dbAccesses: typeof profilerDbAccesses;
+} = {
   ...profilerDocuments,
   list: profilerTraceEntries,
   hitlist: profilerHitList,
@@ -137,16 +145,24 @@ export async function waitForNewTrace(
  * out of `Location` — which the default, reading the empty body, answers as
  * `''`.
  */
-export const schedulingReading = {
+export const schedulingReading: {
+  types: typeof traceSchedulingTypes;
+  requests: typeof traceSchedulingRequests;
+  scheduled: typeof traceSchedulingProfilerId;
+} = {
   types: traceSchedulingTypes,
   requests: traceSchedulingRequests,
   scheduled: traceSchedulingProfilerId,
 };
 
+/** An executor's documents with the scheduling readings laid over theirs. */
+export type ReadingResults<D> = Omit<D, keyof typeof schedulingReading> &
+  typeof schedulingReading;
+
 export function readingClassExecutor(
   connection: IAbapConnection,
   logger: ILogger,
-) {
+): ClassExecutor<ReadingResults<typeof classExecutorDocuments>> {
   return new ClassExecutor(connection, logger, {
     ...classExecutorDocuments,
     ...schedulingReading,
@@ -156,7 +172,7 @@ export function readingClassExecutor(
 export function readingProgramExecutor(
   connection: IAbapConnection,
   logger: ILogger,
-) {
+): ProgramExecutor<ReadingResults<typeof programExecutorDocuments>> {
   return new ProgramExecutor(connection, logger, {
     ...programExecutorDocuments,
     ...schedulingReading,

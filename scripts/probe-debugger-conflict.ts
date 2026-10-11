@@ -20,6 +20,9 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
+
+type IUserIdentity = Extract<IDebuggerIdentity, { debuggingMode: 'user' }>;
+
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -51,7 +54,7 @@ function out(line = ''): void {
   process.stdout.write(`${line}\n`);
 }
 
-function identityFor(): IDebuggerIdentity {
+function identityFor(): IUserIdentity {
   const requestUser = String(process.env.SAP_USERNAME ?? '').toUpperCase();
   const seed = `${process.env.SAP_URL}:${requestUser}`;
   const id = (suffix: string): string =>
@@ -96,7 +99,7 @@ function report(
 
 async function variantA(
   debuggerApi: AbapDebugger,
-  identity: IDebuggerIdentity,
+  identity: IUserIdentity,
 ): Promise<number | undefined> {
   const t0 = Date.now();
   const answer = await debuggerApi.listen(identity, {
@@ -120,11 +123,11 @@ async function variantA(
 
 async function variantB(
   connection: IAbapConnection,
-  identity: IDebuggerIdentity,
+  identity: IUserIdentity,
 ): Promise<number | undefined> {
   const query = new URLSearchParams({
     debuggingMode: 'user',
-    requestUser: identity.debuggingMode === 'user' ? identity.requestUser : '',
+    requestUser: identity.requestUser,
     terminalId: identity.terminalId,
     ideId: identity.ideId,
     timeout: String(HOLD_SECONDS),
