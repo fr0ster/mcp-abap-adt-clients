@@ -167,3 +167,11 @@ Server source: on premise, BASIS 816, read 2026-10-11, paraphrased and never quo
 - **`terminateDebugger`.** A plain `500`; the program returned its output at the same moment; the next request on that session answered `400` (session gone).
 - **Settings.** The answer is the six attributes in force. `true`, then `{}`, keeps `true`; `false` clears; `showDataAging` `true`, then `{}`, answers `false`. The first call after an attach with `systemDebugging=false` answered `false`, which cannot tell "ignored" from "applied".
 - **The listener context.** A listener for a second request user started on a session that had served another identity waited for the first identity and caught nothing; on a session of its own it caught.
+
+## Contract follow-ups for the next interfaces-adt major
+
+These were left from #217 (adt-clients 28.0.0). Interfaces-adt 14.x keeps the old wording until then.
+
+- **Remove `skipCount`.** The server ignores it on an external breakpoint, measured on premise (2026-10-11), BASIS 816. This library refuses a value above 0.
+- **Reword `syncBreakpoints`.** The contract says it replaces "instead of adding", on `IDebuggerBreakpointSync` and on the member. But `setBreakpoints` replaces too, so the text should name what `syncBreakpoints` adds: the explicit name, `full` with `[]`, and `partial`.
+- **Fix "only adds" wording.** Any wording in the contract that says `setBreakpoints` only adds goes the same way.
