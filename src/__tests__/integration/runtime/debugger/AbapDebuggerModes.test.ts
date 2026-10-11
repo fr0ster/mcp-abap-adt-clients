@@ -12,10 +12,10 @@
  * `finally`, deletes its breakpoints, stops its listeners, ends what it attached
  * and waits for its runs.
  *
- * **Recorded, not yet asserted.** Where the outcome is a measurement still to
- * be made, the case prints a line starting with `RECORDED case <n>:` and asserts
- * only what is certain. After the run those lines are written into the JSDoc of
- * `src/runtime/debugger/abap.ts` and turned into assertions here.
+ * **Measured.** Each case prints what the server answered on lines starting
+ * `RECORDED case <n>:`. The outcomes were measured on premise (2026-10-11),
+ * BASIS 816, written into the JSDoc of `src/runtime/debugger/abap.ts`, and are
+ * asserted here; what could not be measured says so where it is skipped.
  *
  * Nothing else may listen for the same SAP user while this runs (close the
  * IDE), and the second user's IDE must not hold a listener either.
@@ -119,7 +119,11 @@ CLASS ${CLASS_A.toLowerCase()} IMPLEMENTATION.
 ENDCLASS.
 `;
 
-/** Probe B: one marked line. */
+/**
+ * Probe B: a caught division by zero, so an exception breakpoint stops it at
+ * the CATCH line (measured 2026-10-09: the stop is reported there, not at the
+ * raising statement), and the marked end line.
+ */
 const SOURCE_B = `CLASS ${CLASS_B.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     INTERFACES if_oo_adt_classrun.
@@ -128,6 +132,12 @@ ENDCLASS.
 CLASS ${CLASS_B.toLowerCase()} IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
     DATA lv_text TYPE string VALUE 'probe b'.
+    DATA lv_zero TYPE i.
+    TRY.
+        lv_zero = 1 / lv_zero. "BP:RAISE
+      CATCH cx_sy_zerodivide.
+        lv_text = 'probe b'.
+    ENDTRY.
     out->write( lv_text ). "BP:END
   ENDMETHOD.
 ENDCLASS.
@@ -272,6 +282,11 @@ function otherIde(of: IDebuggerIdentity, label: string): IDebuggerIdentity {
 async function abapUserOf(connection: IAbapConnection): Promise<string> {
   const configured = process.env.SAP_USERNAME?.split('#')[0].trim();
   if (configured) return configured;
+  return systemUserOf(connection);
+}
+
+/** The ABAP user the system says the session runs as. */
+async function systemUserOf(connection: IAbapConnection): Promise<string> {
   const answer = await connection.makeAdtRequest({
     url: '/sap/bc/adt/core/http/systeminformation',
     method: 'GET',
@@ -550,6 +565,21 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     return documentOf(output).trim();
   }
 
+  /**
+   * A run of B with the exception breakpoint and B's END breakpoint armed:
+   * caught at the CATCH line, then at END, then to the end.
+   */
+  async function expectBStopsTwice(scope: Scope): Promise<void> {
+    const runB = await listenAndRun(scope, CLASS_B);
+    needs(runB.caught, 'B caught');
+    const session = await attachOn(scope, runB.caught as ICaught);
+    expect(await stopLine(session.api)).toBe(LINE_B.RAISE + 1);
+    const next = await session.api.step('stepContinue');
+    expect(next.ok).toBe(true);
+    expect(await stopLine(session.api)).toBe(LINE_B.END);
+    expect(await continueToEnd(scope, session.api, runB.run)).toBe(OUTPUT_B);
+  }
+
   async function deployProbe(className: string, source: string): Promise<void> {
     const cls = new AdtClient(
       listenerConnection as Connection,
@@ -742,14 +772,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         ).toBeGreaterThanOrEqual(1);
         record(2, `partial [A] with [A:END] answered ${summary(synced)}`);
 
-        // B's breakpoint is out of the scope: kept.
-        const runB = await listenAndRun(scope, CLASS_B);
-        needs(runB.caught, 'B caught on its kept breakpoint');
-        const sessionB = await attachOn(scope, runB.caught as ICaught);
-        expect(await stopLine(sessionB.api)).toBe(LINE_B.END);
-        expect(await continueToEnd(scope, sessionB.api, runB.run)).toBe(
-          OUTPUT_B,
-        );
+        // B's line breakpoint and the exception breakpoint are out of the
+        // scope: both kept. B stops on the exception first, then at END.
+        await expectBStopsTwice(scope);
 
         // A's LOOP was replaced by END.
         const runA = await listenAndRun(scope, CLASS_A);
@@ -760,19 +785,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           OUTPUT_A,
         );
 
-        // The exception breakpoint: a validation that arms nothing still answers it.
-        const validated = await listenerApi.setBreakpoints(
-          identity,
-          [zeroDivide],
-          { validationOnly: true },
-        );
-        expect(validated.ok).toBe(true);
-        record(
-          2,
-          `validation of the exception breakpoint after partial answered ${summary(validated)}`,
-        );
-
-        // A line breakpoint in B sent within A's scope is refused.
+        // A line breakpoint in B sent within A's scope is refused. The text
+        // is the server's (logon language EN), and names the wrong kinds: it
+        // is the one message for "outside the scope".
         const outside = await listenerApi.syncBreakpoints(identity, {
           scope: 'partial',
           objects: [CLASS_URI_A],
@@ -783,6 +798,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         expect(outside.ok).toBe(true);
         const outsideRows = breakpointRows(documentOf(outside));
         expect(outsideRows).toHaveLength(1);
+        expect(attr(outsideRows[0], 'errorKind')).toBe('error');
         expect(attr(outsideRows[0], 'errorMessage')).toBeTruthy();
         expect(attr(outsideRows[0], 'id')).toBeFalsy();
 
@@ -793,7 +809,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           breakpoints: [],
         });
         expect(emptied.ok).toBe(true);
-        record(2, `partial [A] with [] answered ${summary(emptied)}`);
+        expect(breakpointRows(documentOf(emptied))).toHaveLength(0);
         const runA2 = await listenAndRun(scope, CLASS_A, {
           holdSeconds: SHORT_HOLD_SECONDS,
         });
@@ -801,15 +817,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const outputA2 = await runA2.run;
         expect(outputA2.ok).toBe(true);
         expect(documentOf(outputA2).trim()).toBe(OUTPUT_A);
-        const runB2 = await listenAndRun(scope, CLASS_B);
-        needs(runB2.caught, 'B still caught');
-        const sessionB2 = await attachOn(scope, runB2.caught as ICaught);
-        expect(await stopLine(sessionB2.api)).toBe(LINE_B.END);
-        expect(await continueToEnd(scope, sessionB2.api, runB2.run)).toBe(
-          OUTPUT_B,
-        );
+        await expectBStopsTwice(scope);
 
-        // RECORDED: an object that maps to no program, alone and with A.
+        // An object that maps to no program, alone and with A.
         const alone = await listenerApi.syncBreakpoints(identity, {
           scope: 'partial',
           objects: [CLASS_URI_NONE],
@@ -820,6 +830,12 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           2,
           `partial [no program] with [A:LOOP] answered ${summary(alone)}`,
         );
+        // Measured: refused, with the same "outside the scope" row.
+        expect(alone.ok).toBe(true);
+        const aloneRows = breakpointRows(documentOf(alone));
+        expect(aloneRows).toHaveLength(1);
+        expect(attr(aloneRows[0], 'errorKind')).toBe('error');
+        expect(attr(aloneRows[0], 'id')).toBeFalsy();
         const mixed = await listenerApi.syncBreakpoints(identity, {
           scope: 'partial',
           objects: [CLASS_URI_A, CLASS_URI_NONE],
@@ -830,6 +846,73 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           2,
           `partial [A, no program] with [A:LOOP] answered ${summary(mixed)}`,
         );
+        // Measured: the object that maps scopes the request; the other is
+        // passed over, and A's breakpoint is armed.
+        expect(mixed.ok).toBe(true);
+        expect(breakpointIds(documentOf(mixed))).toHaveLength(1);
+      });
+    },
+    STEP_TIMEOUT,
+  );
+
+  // --- 12. what a plain setBreakpoints and a stopped listener leave ---------------
+
+  it(
+    'setBreakpoints and stopListener: what each leaves of the breakpoints under the key',
+    async () => {
+      if (skipped()) return;
+      await inScope(async (scope) => {
+        /** Arm B:END, do `then`, and answer whether a run of B is still caught. */
+        const bAfter = async (
+          label: string,
+          then: () => Promise<IAdtResponse<unknown>>,
+        ): Promise<boolean> => {
+          const armed = await listenerApi.setBreakpoints(identity, [lineB()]);
+          expect(armed.ok).toBe(true);
+          scope.arm(listenerApi, identity, armed);
+          const answer = await then();
+          record(12, `${label} answered ${summary(answer)}`);
+          const runB = await listenAndRun(scope, CLASS_B, {
+            holdSeconds: SHORT_HOLD_SECONDS,
+          });
+          const caught = !!runB.caught;
+          record(12, `after ${label}, a run of B was caught: ${caught}`);
+          if (runB.caught) {
+            const session = await attachOn(scope, runB.caught);
+            await continueToEnd(scope, session.api, runB.run);
+          } else {
+            await runB.run;
+          }
+          return caught;
+        };
+
+        // The control: nothing in between, and B is caught.
+        expect(
+          await bAfter('nothing (control)', () =>
+            listenerApi.checkListener(identity),
+          ),
+        ).toBe(true);
+        // Measured: a request without a sync scope replaces everything the
+        // key holds - even a validation that arms nothing.
+        expect(
+          await bAfter('setBreakpoints [A:END]', () =>
+            listenerApi.setBreakpoints(identity, [lineA('END')]),
+          ),
+        ).toBe(false);
+        expect(
+          await bAfter('setBreakpoints [exception] validationOnly', () =>
+            listenerApi.setBreakpoints(identity, [zeroDivide], {
+              validationOnly: true,
+            }),
+          ),
+        ).toBe(false);
+        // Measured: stopping the listener deletes the key's breakpoints, even
+        // when no listener is running.
+        expect(
+          await bAfter('stopListener with no listener running', () =>
+            listenerApi.stopListener(identity),
+          ),
+        ).toBe(false);
       });
     },
     STEP_TIMEOUT,
@@ -838,16 +921,37 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   // --- 3. skipCount ----------------------------------------------------------------
 
   it(
-    'skipCount: records which pass over the loop line stops',
+    'skipCount: the server ignores it on an external line breakpoint, the first hit stops',
     async () => {
       if (skipped()) return;
       await inScope(async (scope) => {
-        const armed = await listenerApi.setBreakpoints(identity, [
-          lineA('LOOP', { skipCount: 2 }),
-        ]);
-        expect(armed.ok).toBe(true);
-        record(3, `skipCount 2 armed: ${summary(armed)}`);
-        expect(scope.arm(listenerApi, identity, armed)).toHaveLength(1);
+        // Sent by hand: the library refuses skipCount, because the server
+        // ignores it on an external breakpoint - which this measures.
+        const raw = await (listenerConnection as Connection).makeAdtRequest({
+          url: '/sap/bc/adt/debugger/breakpoints',
+          method: 'POST',
+          timeout: 60_000,
+          data:
+            '<?xml version="1.0" encoding="UTF-8"?>\n' +
+            '<dbg:breakpoints xmlns:dbg="http://www.sap.com/adt/debugger" xmlns:adtcore="http://www.sap.com/adt/core"' +
+            ` debuggingMode="user" scope="external" requestUser="${identity.debuggingMode === 'user' ? identity.requestUser : ''}"` +
+            ` terminalId="${identity.terminalId}" ideId="${identity.ideId}">\n` +
+            `  <breakpoint kind="line" adtcore:uri="${lineA('LOOP').uri}" skipCount="2"/>\n` +
+            '</dbg:breakpoints>',
+          headers: {
+            'Content-Type': 'application/xml',
+            Accept: 'application/xml',
+          },
+        });
+        const rawBody = String(raw.data ?? '');
+        record(3, `skipCount 2 armed: ${raw.status} body="${rawBody}"`);
+        expect(raw.status).toBe(200);
+        // The answer does not echo the skip count.
+        expect(rawBody).not.toContain('skipCount');
+        const ids = breakpointIds(rawBody);
+        expect(ids).toHaveLength(1);
+        scope.armed.push({ api: listenerApi, identity, id: ids[0] });
+        scope.keys.push({ api: listenerApi, identity });
 
         const runA = await listenAndRun(scope, CLASS_A);
         needs(runA.caught, 'A caught');
@@ -856,14 +960,13 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const read = await session.api.getVariables(['LV_I']);
         expect(read.ok).toBe(true);
         const lvI = values(documentOf(read)).get('LV_I');
-        // RECORDED: LV_I counts the passes already made, so the hit is LV_I + 1;
-        // "skip 2 hits" stops on hit 3, with LV_I = 2.
+        // LV_I counts the passes already made, so the hit is LV_I + 1.
+        // Measured: the first hit stops - the skip count is not applied.
         record(
           3,
           `skipCount 2 stopped with LV_I=${lvI} (hit ${Number(lvI) + 1})`,
         );
-        expect(Number(lvI)).toBeGreaterThanOrEqual(0);
-        expect(Number(lvI)).toBeLessThanOrEqual(4);
+        expect(lvI).toBe('0');
         expect(await continueToEnd(scope, session.api, runA.run)).toBe(
           OUTPUT_A,
         );
@@ -901,37 +1004,28 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const detached = await session.api.detachDebugger();
         record(4, `detachDebugger() answered ${summary(detached)}`);
         expect(detached.ok).toBe(true);
+        expect(documentOf(detached)).toBe('');
         scope.released(session.api);
 
         const second = await relisten;
         const secondId = tag(documentOf(second), 'DEBUGGEE_ID');
-        if (secondId) {
-          const again = await attachOn(scope, {
-            debuggeeId: secondId,
-            server: tag(documentOf(second), 'INSTANCE_NAME'),
-          });
-          const line = await stopLine(again.api);
-          // RECORDED: the external breakpoint caught the same run again.
-          record(
-            4,
-            `after the detach the same run was caught again through the listener, at line ${line} (LOOP=${LINE_A.LOOP}, END=${LINE_A.END})`,
-          );
-          expect(await continueToEnd(scope, again.api, runA.run)).toBe(
-            OUTPUT_A,
-          );
-        } else {
-          // RECORDED: the run was not caught again.
-          record(
-            4,
-            `after the detach the same run was NOT caught again (listener: ${summary(second)})`,
-          );
-          const output = await runA.run;
-          expect(output.ok).toBe(true);
-          expect(documentOf(output).trim()).toBe(OUTPUT_A);
-        }
+        // Measured: the external breakpoint catches the same run again, at
+        // the next pass over the loop line.
+        expect(secondId).toBeTruthy();
+        const again = await attachOn(scope, {
+          debuggeeId: secondId as string,
+          server: tag(documentOf(second), 'INSTANCE_NAME'),
+        });
+        const line = await stopLine(again.api);
+        expect(line).toBe(LINE_A.LOOP);
+        record(
+          4,
+          `after the detach the same run was caught again through the listener, at line ${line} (LOOP=${LINE_A.LOOP}, END=${LINE_A.END})`,
+        );
+        expect(await continueToEnd(scope, again.api, runA.run)).toBe(OUTPUT_A);
 
-        // RECORDED: a session breakpoint (scope="debugger") is not offered —
-        // setBreakpoints sends scope="external" only — so that half is skipped.
+        // Not measured: a session breakpoint (scope="debugger") is not offered -
+        // setBreakpoints sends scope="external" only - so that half is skipped.
         record(
           4,
           'session breakpoint (scope="debugger") bringing the debugger back: not offered, skipped',
@@ -965,14 +1059,22 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           5,
           `detachDebugger({ debuggeeId }) answered ${summary(detached)}`,
         );
+        expect(statusOf(detached)).toBe(200);
+        expect(documentOf(detached)).toBe('');
         const output = await within(runA.run, 90_000);
         const elapsed = Date.now() - started;
-        // RECORDED: at once, or after the ~30 s hold.
+
         record(
           5,
           `the run ${output ? `returned ${output.ok ? 'ok' : 'failed'} "${documentOf(output).trim()}"` : 'had not returned'} ${elapsed} ms after the detach`,
         );
         expect(output).toBeDefined();
+        expect((output as IAdtResponse<unknown>).ok).toBe(true);
+        expect(documentOf(output as IAdtResponse<unknown>).trim()).toBe(
+          OUTPUT_A,
+        );
+        // Measured ~1 s: at once, not after the ~30 s hold.
+        expect(elapsed).toBeLessThan(15_000);
       });
     },
     STEP_TIMEOUT,
@@ -1000,13 +1102,14 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const detached = await s2.api.detachDebugger({
           debuggeeId: (runA.caught as ICaught).debuggeeId,
         });
-        // RECORDED: expected from the source — success all the same.
+
         record(
           6,
           `detachDebugger({ debuggeeId }) on a second session answered ${summary(detached)}`,
         );
+        // As the source says: success all the same.
+        expect(statusOf(detached)).toBe(200);
 
-        // RECORDED: can the first session still step?
         const stepped = await s1.api.step('stepOver', {
           analyse: analyseDebuggeeEnd,
         });
@@ -1014,6 +1117,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           6,
           `the attached session's stepOver answered ${summary(stepped)}`,
         );
+        // Measured: the attached session keeps the debuggee and steps on.
+        expect(stepped.ok).toBe(true);
+        expect(attr(documentOf(stepped), 'isSteppingPossible')).toBe('true');
         if (stepped.ok && subtypeOf(stepped) !== 'debuggeeEnded') {
           expect(await continueToEnd(scope, s1.api, runA.run)).toBe(OUTPUT_A);
         } else {
@@ -1049,7 +1155,11 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const terminated = await session.api.terminateDebugger();
         record(7, `terminateDebugger() answered ${summary(terminated)}`);
-        expect(terminated.ok).toBe(true);
+        // Measured: the server frees the debugger's own ABAP session
+        // (SYSTEM-CALL FREE MODE 0), so the request ends in a plain ICF 500 -
+        // no ADT exception document - and the session is gone afterwards.
+        expect(statusOf(terminated)).toBe(500);
+        expect(subtypeOf(terminated)).toBeUndefined();
         scope.released(session.api);
 
         const output = await within(runA.run, 60_000);
@@ -1058,6 +1168,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         expect(documentOf(output as IAdtResponse<unknown>).trim()).toBe(
           OUTPUT_A,
         );
+
+        const after = await session.api.getStack();
+        record(7, `a stack read on that session afterwards: ${summary(after)}`);
+        expect(statusOf(after)).toBe(400);
       });
     },
     STEP_TIMEOUT,
@@ -1087,14 +1201,20 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             8,
             `variables after ${label}: ${statusOf(read)} LV_I=${values(documentOf(read)).get('LV_I')}`,
           );
+          expect(read.ok).toBe(true);
+          expect(values(documentOf(read)).get('LV_I')).toBe('5');
         };
 
-        // RECORDED: the first call after the attach, with systemDebugging=false.
+        // The first call after the attach, with systemDebugging=false.
         const first = await api.setDebuggerSettings({ systemDebugging: false });
         record(
           8,
           `first call after the attach, { systemDebugging: false }, answered ${summary(first)}`,
         );
+        // The debugger starts with system debugging off, so this cannot tell
+        // "ignored" from "applied": it answers false either way.
+        expect(first.ok).toBe(true);
+        expect(attr(documentOf(first), 'systemDebugging')).toBe('false');
         await readBack('the first call');
 
         const on = await api.setDebuggerSettings({ systemDebugging: true });
@@ -1165,7 +1285,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           : readListenerConflict(busy.getError());
         record(9, `readListenerConflict: ${JSON.stringify(conflict)}`);
         expect(conflict?.conflictText).toBeTruthy();
-        expect(conflict?.ideUser).toBeTruthy();
+        // The holder is a listener of our own user under another IDE id.
+        expect(conflict?.ideUser).toBe(
+          identity.debuggingMode === 'user' ? identity.requestUser : undefined,
+        );
 
         await holding;
       });
@@ -1276,6 +1399,14 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
       await inScope(async (scope) => {
         const otherConnection = await connectionAs(env);
         scope.sessions.push(otherConnection);
+        // The run must come from the second user, or nothing is measured.
+        // Compared, never printed.
+        const runsAs = (await systemUserOf(otherConnection)).toUpperCase();
+        record(
+          11,
+          `the second connection runs as the second user: ${runsAs === otherUser}; as the first user: ${runsAs === (identity.debuggingMode === 'user' ? identity.requestUser : '')}`,
+        );
+        expect(runsAs === otherUser).toBe(true);
 
         const forOther = otherIde(
           {
@@ -1284,7 +1415,13 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           } as IDebuggerIdentity,
           'other-user',
         );
-        const taker = debuggerOn(listenerConnection as Connection, 'takeOver');
+        // A listener session of its own. The server keeps, per ABAP session,
+        // the listener context of the first user-mode listener request
+        // (CL_TPDAPI_SERVICE caches it): on the session that has listened for
+        // our own user, a listener for the second user waits for ours, and the
+        // second user's run goes through uncaught (measured).
+        const takerSession = await scope.openSession();
+        const taker = debuggerOn(takerSession.connection, 'takeOver');
         const armed = await taker.setBreakpoints(forOther, [lineA('LOOP')]);
         expect(armed.ok).toBe(true);
         expect(scope.arm(taker, forOther, armed)).toHaveLength(1);
