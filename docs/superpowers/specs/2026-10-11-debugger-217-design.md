@@ -249,7 +249,7 @@ What it does with the other kinds is unclear, so they do not compile.
    brainstorming and spec. It also carries terminal mode through:
    - **The terminal id is configurable.** Today both ids are random per instance. The host passes a terminal id to the debug
      owner's constructor (from its configuration, for example SAP GUI's terminal id), and a debug session can be started in
-     terminal mode with it.
+     terminal mode with it. When the host passes none, the id stays random per instance, as now.
    - **Why it ships now.** A user whose system is set up for terminal debugging can run it as shipped, and either confirm a
      catch or file an issue with the wire log.
 
