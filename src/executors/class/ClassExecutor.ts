@@ -3,6 +3,7 @@ import type {
   IAdtError,
   IAdtResponse,
   IAdtRunnable,
+  IClassExecuteOptions,
   IClassExecuteWithProfilerOptions,
   IClassExecutionTarget,
   IProfilerTraceParameters,
@@ -119,10 +120,17 @@ export class ClassExecutor<
 
   async run<E extends IAdtError = IAdtError>(
     target: IClassExecutionTarget,
-    options?: IAdtAnalyseOptions<E>,
+    options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     return answering(
-      () => runClass(this.connection, target.className, true),
+      () =>
+        runClass(
+          this.connection,
+          target.className,
+          true,
+          undefined,
+          options?.debuggee,
+        ),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
       options?.analyse,
     );

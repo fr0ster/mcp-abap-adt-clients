@@ -1980,14 +1980,27 @@ const terminal = { debuggingMode: 'terminal', terminalId, ideId } as const;
   Windows client keeps one per logon, and a further window or a browser joins
   it. A `terminalId` equal to `ideId` means that IDE's own requests only
   (server source, BASIS 816, read 2026-10-11).
-- **A catch in terminal mode is unmeasured.** The mode follows the discovery and
-  the server source: the listener, the check, the breakpoints and their
-  deletion answer `200` on premise (2026-10-11), BASIS 816, but Eclipse's own
-  runs under Terminal ID were not caught there. If it does not catch for you,
-  file an issue with: the identity's mode; whether the terminal id is the one
-  SAP GUI shows; how the program was started (SAP GUI, browser, RFC, job); and
-  the wire log of the request (`WIRE_LOG=<file>` in this repository's tests;
-  `DEBUG_HTTP_WIRE=true` in the MCP server).
+- **A catch in terminal mode needs the ids on the request.** A terminal-mode
+  listener catches a request by the terminal id and IDE id the request carries
+  in its `SAP-PASSPORT` header, the way the ADT client sends them; a run URL has
+  no parameter for them. Give the run the identity's ids and it carries them:
+
+  ```typescript
+  await new AdtExecutor(triggerConnection, logger)
+    .getClassExecutor()
+    .run({ className }, { debuggee: { terminalId, ideId } });
+  ```
+
+  Measured on premise (2026-10-12), BASIS 816: a class run with the ids was
+  caught by the listener with those ids and by no other, with `terminalId`
+  equal to `ideId` or not; without them no terminal-mode listener caught it.
+  A program run takes the same option. A request this library does not start
+  (SAP GUI, a browser) carries what its own client puts there.
+- **The ids do not separate the breakpoints.** Two listeners of one SAP user in
+  terminal mode, with other terminal and IDE ids, both listened, and each run
+  was caught only by the listener whose ids it carried, but `setBreakpoints`
+  under one identity replaced the set the other had armed (measured the same
+  day). The server source reads otherwise (below); the measurement stands.
 
 #### Another user
 

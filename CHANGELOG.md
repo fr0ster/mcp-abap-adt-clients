@@ -24,6 +24,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [29.1.0] - 2026-10-12
+
+### Added
+
+- **A run can carry the debuggee's ids.** `ClassExecutor.run` and
+  `ProgramExecutor.run` take `debuggee: { terminalId, ideId }`
+  (`@mcp-abap-adt/interfaces-adt` 15.1.0) and send them in `SAP-PASSPORT`, the
+  way the ADT client does, so the terminal-mode listener with those ids catches
+  the run. Measured on premise (2026-10-12, BASIS 816): caught with the ids,
+  not without; the passport matches SAP's own passport library byte for byte.
+  The ids do not separate the breakpoints: `setBreakpoints` under other ids of
+  the same user replaced the set.
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` is `^15.1.0`.
+
 ## [29.0.0] - 2026-10-11
 
 Breakpoints on `@mcp-abap-adt/interfaces-adt` 15: `skipCount` is gone and every

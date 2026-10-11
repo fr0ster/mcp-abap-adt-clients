@@ -4,6 +4,7 @@ import type {
   IAdtResponse,
   IAdtRunnable,
   IProfilerTraceParameters,
+  IProgramExecuteOptions,
   IProgramExecuteWithProfilerOptions,
   IProgramExecutionTarget,
   IResultStrategy,
@@ -118,10 +119,16 @@ export class ProgramExecutor<
 
   async run<E extends IAdtError = IAdtError>(
     target: IProgramExecutionTarget,
-    options?: IAdtAnalyseOptions<E>,
+    options?: IProgramExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     return answering(
-      () => runProgram(this.connection, target.programName),
+      () =>
+        runProgram(
+          this.connection,
+          target.programName,
+          undefined,
+          options?.debuggee,
+        ),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
       options?.analyse,
     );
