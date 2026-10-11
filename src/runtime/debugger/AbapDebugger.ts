@@ -39,6 +39,7 @@ import {
   listen,
   listWatchpoints,
   setBreakpoints,
+  setDebuggerSettings,
   setStackPosition,
   setVariableValue,
   step,
@@ -397,11 +398,14 @@ export class AbapDebugger<
     );
   }
 
-  // Stub: Task 6 of the #217 plan replaces it.
   async setDebuggerSettings<E extends IAdtError = IAdtError>(
-    _settings: IDebuggerSettings,
-    _options?: IAdtAnalyseOptions<E>,
+    settings: IDebuggerSettings,
+    options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'settings'>, E>> {
-    throw new Error('not implemented: setDebuggerSettings');
+    return answering(
+      () => setDebuggerSettings(this.connection, settings),
+      this.reading('settings'),
+      options?.analyse,
+    );
   }
 }

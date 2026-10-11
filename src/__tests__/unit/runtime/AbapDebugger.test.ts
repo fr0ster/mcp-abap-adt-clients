@@ -456,6 +456,46 @@ describe('AbapDebugger', () => {
     expect(answer.ok && answer.getResult().value).toBe('<snapshot/>');
   });
 
+  it('settings left out are sent empty, so the server keeps them; the conditional ones are left out', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setDebuggerSettings({});
+    expect(sent().url).toBe('/sap/bc/adt/debugger?method=setDebuggerSettings');
+    expect(sent().headers).toMatchObject({
+      'Content-Type': 'application/xml',
+      Accept: 'application/xml',
+    });
+    expect(sent().data).toContain(
+      '<dbg:settings xmlns:dbg="http://www.sap.com/adt/debugger" systemDebugging="" createExceptionObject="" backgroundRFC="" sharedObjectDebugging=""/>',
+    );
+  });
+
+  it('true and false are sent as given, the conditional ones only when set', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setDebuggerSettings({
+      systemDebugging: true,
+      createExceptionObject: false,
+      updateDebugging: true,
+      showDataAging: false,
+    });
+    expect(sent().data).toContain(
+      'systemDebugging="true" createExceptionObject="false" backgroundRFC="" sharedObjectDebugging="" updateDebugging="true" showDataAging="false"',
+    );
+  });
+
+  it('the settings answer goes through its own strategy', async () => {
+    const { debugger_ } = setup({
+      status: 200,
+      data: '<dbg:settings systemDebugging="true"/>',
+      headers: {},
+    });
+    const answer = await debugger_.setDebuggerSettings({
+      systemDebugging: true,
+    });
+    expect(answer.ok && answer.getResult().value).toBe(
+      '<dbg:settings systemDebugging="true"/>',
+    );
+  });
+
   it('answers the document by default and nothing for a delete', async () => {
     const stack = setup({ status: 200, data: '<dbg:stack/>', headers: {} });
     const answer = await stack.debugger_.getStack();

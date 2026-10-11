@@ -30,6 +30,7 @@ import type {
   IDebuggerBreakpoint,
   IDebuggerBreakpointSync,
   IDebuggerIdentity,
+  IDebuggerSettings,
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -769,4 +770,47 @@ export function buildDebuggerBatchPayload(
     boundary,
     body: `${parts}\r\n--${boundary}--\r\n`,
   };
+}
+
+const boolOrKeep = (value: boolean | undefined) =>
+  value === undefined ? '' : String(value);
+
+/**
+ * The settings body (server source, BASIS 816, read 2026-10-11). Four
+ * attributes are not conditional in the server's transformation, so they are
+ * always sent; empty means "keep" (the server maps a value that is neither
+ * true nor false to no change). `updateDebugging` and `showDataAging` are sent
+ * only when set; `showDataAging` does not merge - left out, it is off.
+ */
+export function buildDebuggerSettingsXml(settings: IDebuggerSettings): string {
+  const conditional = [
+    settings.updateDebugging === undefined
+      ? ''
+      : ` updateDebugging="${settings.updateDebugging}"`,
+    settings.showDataAging === undefined
+      ? ''
+      : ` showDataAging="${settings.showDataAging}"`,
+  ].join('');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    `<dbg:settings xmlns:dbg="http://www.sap.com/adt/debugger" systemDebugging="${boolOrKeep(settings.systemDebugging)}" createExceptionObject="${boolOrKeep(settings.createExceptionObject)}" backgroundRFC="${boolOrKeep(settings.backgroundRFC)}" sharedObjectDebugging="${boolOrKeep(settings.sharedObjectDebugging)}"${conditional}/>`
+  );
+}
+
+/**
+ * Set the debugger settings of the session. A setting left out is sent empty
+ * and the server keeps it (server source, BASIS 816, read 2026-10-11); the
+ * first call after an attach ignores `systemDebugging=false` (same source).
+ */
+export async function setDebuggerSettings(
+  connection: IAbapConnection,
+  settings: IDebuggerSettings,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}?${query({ method: 'setDebuggerSettings' })}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: buildDebuggerSettingsXml(settings),
+    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+  });
 }
