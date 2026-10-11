@@ -96,7 +96,8 @@ identity sends `requestUser=` empty (measured on premise (2026-10-11), BASIS
 816: left out `400`, empty `200`). `attach` carries `method`, `debuggeeId`,
 `debuggingMode`, `requestUser` in user mode only, and `dynproDebugging`; the
 server attaches by `debuggeeId` and does not read the ids. A catch in terminal
-mode is unmeasured.
+mode needs the ids on the request, in its `SAP-PASSPORT`: see "Measured:
+terminal mode and the passport" in [debugger-modes.md](debugger-modes.md).
 
 Brackets mark a parameter sent in `user` mode only.
 
@@ -118,8 +119,11 @@ members. There is no
 ## What SAP answers
 
 **Breakpoints.**
-- The set is keyed by `requestUser`, `terminalId` and `ideId`. A `POST`
-  **replaces** the whole set; an empty set clears it and answers
+- The request names `requestUser`, `terminalId` and `ideId`, but the set is
+  the SAP user's: measured on premise (2026-10-12), BASIS 816, a `POST` under
+  other terminal and IDE ids of the same user replaced the set armed under the
+  first ones, in user and terminal mode (see [debugger-modes.md](debugger-modes.md)).
+  A `POST` **replaces** the whole set; an empty set clears it and answers
   `<dbg:breakpoints/>`.
 - `GET` answers `200` with an **empty body**. The set that was sent is the
   caller's to keep.
