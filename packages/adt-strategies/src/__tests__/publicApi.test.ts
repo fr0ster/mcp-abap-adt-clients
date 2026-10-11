@@ -21,6 +21,7 @@ describe('the published surface', () => {
       'analyseCdsTestDoubles',
       'analyseCheck',
       'analyseDebuggeeEnd',
+      'analyseDebuggerFreed',
       'analyseDeletion',
       'analyseException',
       'analyseMessageClassMessage',

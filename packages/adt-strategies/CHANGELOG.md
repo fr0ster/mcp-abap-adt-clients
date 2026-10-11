@@ -17,6 +17,16 @@ and fires its release workflow.
 
 ## [0.9.0] - 2026-10-11
 
+### Added
+
+- **`analyseDebuggerFreed`** — for `terminateDebugger`, where the debugger
+  freeing its own session is the outcome asked for. SAP answers that with a
+  plain ICF `500` (`text/plain` or empty, no ADT exception document) when it
+  worked; this answers exactly that `500` as no failure. A `500` carrying an
+  ADT exception document, any other status and a connection failure are read
+  as `analyseException` reads them. See `docs/usage/ERRATA.md` in
+  `adt-clients`.
+
 ### Changed
 
 - **`@mcp-abap-adt/interfaces-adt` is `^14.0.0`**, as `adt-clients` 28.0.0

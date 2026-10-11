@@ -31,6 +31,7 @@ export {
   analyseCdsTestDoubles,
   analyseCheck,
   analyseDebuggeeEnd,
+  analyseDebuggerFreed,
   analyseDeletion,
   analyseException,
   analyseMessageClassMessage,

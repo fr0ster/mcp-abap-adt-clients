@@ -201,6 +201,34 @@ export const analyseDebuggeeEnd: IAnalyse<IAdtMessageFailure> = (
   return analyseException(verdict, answer);
 };
 
+/**
+ * `terminateDebugger`, where the debugger freeing its own session is the
+ * outcome asked for.
+ *
+ * SAP answers it with a plain ICF `500 Internal Server Error` — `text/plain`
+ * or empty, no ADT exception document — when it worked: the server frees the
+ * debugger's own ABAP session, the program runs on, and the next request on
+ * that session answers `400` "Session no longer exists". This strategy answers
+ * exactly that `500` as no failure. A `500` that carries an ADT exception
+ * document stays a refusal, and so does any other status or a connection
+ * failure: all of them are read as {@link analyseException} reads them.
+ *
+ * Measured on premise (SAP_BASIS 816), 2026-10-11. A caller who wants that
+ * `500` to stop them passes `analyseException` instead.
+ */
+export const analyseDebuggerFreed: IAnalyse<IAdtMessageFailure> = (
+  verdict,
+  answer,
+) => {
+  if (verdict === ADT_NO_FAILURE) return verdict;
+  const status = verdict.response?.status ?? answer?.status;
+  const body = typeof answer?.data === 'string' ? answer.data : '';
+  if (status === 500 && !body.includes('<exc:exception')) {
+    return ADT_NO_FAILURE;
+  }
+  return analyseException(verdict, answer);
+};
+
 /** A service binding's publication — `SEVERITY` other than `OK` refuses. */
 export const analysePublication = analyser(readPublicationRefusal);
 

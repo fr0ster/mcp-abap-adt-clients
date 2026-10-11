@@ -1,9 +1,11 @@
 import { ADT_NO_FAILURE, type IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   analyseActivation,
   analyseAny,
   analyseCheck,
   analyseDebuggeeEnd,
+  analyseDebuggerFreed,
   analyseDeletion,
   analyseException,
   analysePublicationLock,
@@ -362,6 +364,54 @@ describe('analyseDebuggeeEnd', () => {
       analyseDebuggeeEnd(
         libraryVerdict(400),
         stepTagged('debugger-conversation', 'stepruntoline-no-uri'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
+  });
+});
+
+describe('analyseDebuggerFreed', () => {
+  const answer = (status: number, data: unknown): IAdtWireResponse =>
+    ({ status, data, headers: {} }) as unknown as IAdtWireResponse;
+  const verdictFor = (status: number): IAdtError => ({
+    origin: 'connection',
+    message: `Request failed with status code ${status}`,
+    response: { status } as IAdtError['response'],
+  });
+
+  it('answers a plain 500 as no failure', () => {
+    expect(
+      analyseDebuggerFreed(
+        verdictFor(500),
+        answer(500, 'Internal Server Error'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+    expect(analyseDebuggerFreed(verdictFor(500), answer(500, ''))).toBe(
+      ADT_NO_FAILURE,
+    );
+  });
+
+  it('keeps a 500 with an ADT exception document a refusal', () => {
+    const doc =
+      '<?xml version="1.0"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="AdiFailed"/><message>x</message></exc:exception>';
+    expect(analyseDebuggerFreed(verdictFor(500), answer(500, doc))).not.toBe(
+      ADT_NO_FAILURE,
+    );
+  });
+
+  it('keeps a 400 a refusal', () => {
+    expect(
+      analyseDebuggerFreed(
+        verdictFor(400),
+        answer(400, 'Session no longer exists'),
+      ),
+    ).not.toBe(ADT_NO_FAILURE);
+  });
+
+  it('keeps a failure without a response a failure', () => {
+    expect(
+      analyseDebuggerFreed(
+        { origin: 'connection', message: 'ECONNRESET' },
+        undefined,
       ),
     ).not.toBe(ADT_NO_FAILURE);
   });
