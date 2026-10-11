@@ -25,6 +25,7 @@ import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   attach,
+  checkListener,
   createMemorySnapshot,
   createWatchpoint,
   deleteBreakpoint,
@@ -363,14 +364,18 @@ export class AbapDebugger<
     );
   }
 
-  // Stubs: Tasks 4-6 of the #217 plan replace them.
   async checkListener<E extends IAdtError = IAdtError>(
-    _identity: IDebuggerIdentity,
-    _options?: IAdtAnalyseOptions<E>,
+    identity: IDebuggerIdentity,
+    options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
-    throw new Error('not implemented: checkListener');
+    return answering(
+      () => checkListener(this.connection, identity),
+      this.reading('done'),
+      options?.analyse,
+    );
   }
 
+  // Stubs: Tasks 5-6 of the #217 plan replace them.
   async detachDebugger<E extends IAdtError = IAdtError>(
     _options?: { debuggeeId?: string } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'done'>, E>> {

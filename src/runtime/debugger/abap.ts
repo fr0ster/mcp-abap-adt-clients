@@ -26,6 +26,7 @@
  */
 
 import type {
+  IAdtError,
   IDebuggerBreakpoint,
   IDebuggerBreakpointSync,
   IDebuggerIdentity,
@@ -36,6 +37,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
 import { createBatchBoundary } from './batchPayload';
 
@@ -285,6 +287,63 @@ export async function listen(
     timeout: getTimeout((holdSeconds + 60) * 1000),
     headers: { Accept: 'application/vnd.sap.as+xml' },
   });
+}
+
+/**
+ * Ask whether a listener for the identity would conflict. Starts nothing: 200
+ * with an empty body is "free"; a conflict is 409 `conflictDetected`; a missing
+ * authorization (`user` mode) is 403, checked first.
+ */
+export async function checkListener(
+  connection: IAbapConnection,
+  identity: IDebuggerIdentity,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}/listeners?${query({ ...identityQuery(identity), checkConflict: true })}`,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/xml' },
+  });
+}
+
+const conflictParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  parseTagValue: false,
+  trimValues: true,
+  removeNSPrefix: true,
+});
+
+/**
+ * Who holds the user's debugging, read from a 409 answer of a listener request
+ * (measured on premise, 2026-10-11); `undefined` for anything else.
+ */
+export function readListenerConflict(
+  error: IAdtError,
+): { conflictText: string; ideUser?: string } | undefined {
+  const response = error.response;
+  if (
+    !response ||
+    response.status !== 409 ||
+    typeof response.data !== 'string' ||
+    !response.data
+  ) {
+    return undefined;
+  }
+  let entries: unknown;
+  try {
+    entries = conflictParser.parse(response.data)?.exception?.properties?.entry;
+  } catch {
+    return undefined;
+  }
+  const list = (
+    Array.isArray(entries) ? entries : entries ? [entries] : []
+  ) as Array<{ key?: string; '#text'?: string }>;
+  const value = (key: string) => list.find((e) => e.key === key)?.['#text'];
+  const conflictText = value('conflictText');
+  if (!conflictText) return undefined;
+  const ideUser = value('ideUser');
+  return ideUser ? { conflictText, ideUser } : { conflictText };
 }
 
 /** Release the listener. */

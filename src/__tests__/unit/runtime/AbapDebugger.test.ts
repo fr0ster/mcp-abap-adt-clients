@@ -1,5 +1,8 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type {
+  IAdtError,
   IDebuggerBreakpoint,
   IDebuggerIdentity,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -12,6 +15,7 @@ import {
 import {
   buildDebuggerBatchPayload,
   executeBatchRequest,
+  readListenerConflict,
 } from '../../../runtime/debugger/abap';
 
 /**
@@ -518,6 +522,54 @@ describe('AbapDebugger', () => {
         'Content-Type': 'multipart/mixed; boundary=b1',
         Accept: 'multipart/mixed',
       },
+    });
+  });
+
+  describe('checkListener and readListenerConflict', () => {
+    const conflictBody = fs.readFileSync(
+      path.join(__dirname, '../../fixtures/debugger/listener-conflict-409.xml'),
+      'utf8',
+    );
+    const errorWith = (status: number | undefined, data: unknown) =>
+      ({
+        origin: 'server',
+        message: 'x',
+        ...(status === undefined
+          ? {}
+          : { response: { status, data, headers: {} } }),
+      }) as unknown as IAdtError;
+
+    it('checkListener asks without starting a listener', async () => {
+      const { debugger_, sent } = setup();
+      await debugger_.checkListener(identity);
+      expect(sent().method).toBe('GET');
+      expect(sent().url).toBe(
+        `/sap/bc/adt/debugger/listeners?${identityQuery}&checkConflict=true`,
+      );
+    });
+
+    it('readListenerConflict reads who holds the listener from a 409', () => {
+      expect(readListenerConflict(errorWith(409, conflictBody))).toEqual({
+        conflictText:
+          'Another session (user SAPUSER02) exists with global debugging scope for user SAPUSER02',
+        ideUser: 'SAPUSER02',
+      });
+    });
+
+    it.each([
+      ['no response', errorWith(undefined, undefined)],
+      ['an empty body', errorWith(409, '')],
+      ['a malformed body', errorWith(409, '<exc:exception><properties>')],
+      ['a 403', errorWith(403, conflictBody)],
+      [
+        'a 409 without conflictText',
+        errorWith(
+          409,
+          conflictBody.replace(/<entry key="conflictText">[^<]*<\/entry>/, ''),
+        ),
+      ],
+    ])('readListenerConflict answers undefined for %s', (_label, error) => {
+      expect(readListenerConflict(error)).toBeUndefined();
     });
   });
 });
