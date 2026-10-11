@@ -42,6 +42,7 @@ import {
   step,
   stepToLine,
   stopListener,
+  syncBreakpoints,
   terminateDebuggee,
 } from './abap';
 
@@ -352,11 +353,15 @@ export class AbapDebugger<
 
   // Stubs: Tasks 3-6 of the #217 plan replace them.
   async syncBreakpoints<E extends IAdtError = IAdtError>(
-    _identity: IDebuggerIdentity,
-    _sync: IDebuggerBreakpointSync,
-    _options?: IAdtAnalyseOptions<E>,
+    identity: IDebuggerIdentity,
+    sync: IDebuggerBreakpointSync,
+    options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
-    throw new Error('not implemented: syncBreakpoints');
+    return answering(
+      () => syncBreakpoints(this.connection, identity, sync),
+      this.reading('breakpoints'),
+      options?.analyse,
+    );
   }
 
   async checkListener<E extends IAdtError = IAdtError>(

@@ -27,6 +27,7 @@
 
 import type {
   IDebuggerBreakpoint,
+  IDebuggerBreakpointSync,
   IDebuggerIdentity,
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
@@ -103,8 +104,7 @@ function identityAttributes(identity: IDebuggerIdentity): string {
 /**
  * The body of `POST /debugger/breakpoints`.
  *
- * No `syncScope`: with it, the server replaces the user's whole external set,
- * Eclipse's breakpoints included. Without it the request only adds.
+ * No `syncScope`: the request only adds. Replacing is {@link syncBreakpoints}.
  */
 /** What names the place a breakpoint of each kind stops at. */
 function breakpointTarget(bp: IDebuggerBreakpoint): string {
@@ -120,24 +120,49 @@ function breakpointTarget(bp: IDebuggerBreakpoint): string {
   }
 }
 
+/** One `<breakpoint>` row; `only` is the validation attribute, or empty. */
+function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
+  const condition = (bp as { condition?: string }).condition;
+  if (condition !== undefined && bp.kind !== 'line') {
+    // The type forbids it; a cast can still get here. The server ignores a
+    // condition on other kinds, so sending it would arm a breakpoint that stops
+    // unconditionally - refuse instead.
+    throw new Error(
+      `condition is accepted on a line breakpoint only, not on kind "${bp.kind}"`,
+    );
+  }
+  const cond = condition ? ` condition="${escapeXml(condition)}"` : '';
+  const skip = bp.skipCount !== undefined ? ` skipCount="${bp.skipCount}"` : '';
+  return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${cond}${skip}${only}/>`;
+}
+
 export function buildBreakpointsXml(
   identity: IDebuggerIdentity,
   breakpoints: readonly IDebuggerBreakpoint[],
   validationOnly = false,
 ): string {
   const only = validationOnly ? ' validationOnly="true"' : '';
-  const rows = breakpoints
-    .map((bp) => {
-      const condition = bp.condition
-        ? ` condition="${escapeXml(bp.condition)}"`
-        : '';
-      return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${condition}${only}/>`;
-    })
-    .join('\n');
+  const rows = breakpoints.map((bp) => breakpointRow(bp, only)).join('\n');
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     `<dbg:breakpoints ${ADT_NAMESPACES} ${identityAttributes(identity)}>\n` +
     `${rows}\n</dbg:breakpoints>`
+  );
+}
+
+/** The body of a replacing `POST /debugger/breakpoints`: a `syncScope` and the set. */
+export function buildSyncBreakpointsXml(
+  identity: IDebuggerIdentity,
+  sync: IDebuggerBreakpointSync,
+): string {
+  const scope =
+    sync.scope === 'full'
+      ? '<syncScope mode="full"/>'
+      : `<syncScope mode="partial">${sync.objects.map((uri) => `<adtcore:objectReference adtcore:uri="${escapeXml(uri)}"/>`).join('')}</syncScope>`;
+  const rows = sync.breakpoints.map((bp) => breakpointRow(bp, '')).join('\n');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    `<dbg:breakpoints ${ADT_NAMESPACES} ${identityAttributes(identity)}>\n  ${scope}\n${rows ? `${rows}\n` : ''}</dbg:breakpoints>`
   );
 }
 
@@ -161,6 +186,33 @@ export async function setBreakpoints(
     method: 'POST',
     timeout: getTimeout('default'),
     data: buildBreakpointsXml(identity, breakpoints, validationOnly),
+    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+  });
+}
+
+/**
+ * Replace the breakpoints the server holds under the identity's key.
+ *
+ * Evidence is server source, BASIS 816, read 2026-10-11 - reading, not
+ * measurement:
+ * - the key is chosen by the identity's mode (the user's external set, or the
+ *   terminal's);
+ * - `full` replaces everything under the key, and an empty set clears it;
+ * - `partial` works by main program, refuses line breakpoints outside its
+ *   scope, and an object it cannot map leaves the body's line breakpoints
+ *   unset;
+ * - the set belongs to the user, so it reaches the user's other IDEs too.
+ */
+export async function syncBreakpoints(
+  connection: IAbapConnection,
+  identity: IDebuggerIdentity,
+  sync: IDebuggerBreakpointSync,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${DEBUGGER}/breakpoints`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: buildSyncBreakpointsXml(identity, sync),
     headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
   });
 }

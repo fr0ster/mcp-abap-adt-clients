@@ -1,5 +1,8 @@
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
-import type { IDebuggerIdentity } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IDebuggerBreakpoint,
+  IDebuggerIdentity,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   AbapDebugger,
@@ -51,8 +54,71 @@ describe('AbapDebugger', () => {
         headers?: Record<string, string>;
         timeout: number;
       };
-    return { debugger_, sent };
+    return { debugger_, sent, connection };
   }
+
+  it('a breakpoint carries skipCount, and condition only on a line', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(identity, [
+      {
+        kind: 'line',
+        uri: '/x/source/main#start=3',
+        condition: 'lv_i > 2',
+        skipCount: 2,
+      },
+      { kind: 'exception', exceptionClass: 'CX_X', skipCount: 1 },
+    ]);
+    expect(sent().data).toContain(
+      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3" condition="lv_i &gt; 2" skipCount="2"/>',
+    );
+    expect(sent().data).toContain(
+      '<breakpoint kind="exception" exceptionClass="CX_X" skipCount="1"/>',
+    );
+  });
+
+  it('a condition smuggled onto another kind by a cast is refused before the wire', async () => {
+    const { debugger_, connection } = setup();
+    const smuggled = {
+      kind: 'exception',
+      exceptionClass: 'CX_X',
+      condition: 'a = 1',
+    } as unknown as IDebuggerBreakpoint;
+    const answer = await debugger_.setBreakpoints(identity, [smuggled]);
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) {
+      expect(answer.getError().message).toMatch(/condition/);
+    }
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+  });
+
+  it('syncBreakpoints full replaces the set; an empty set clears it', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.syncBreakpoints(identity, {
+      scope: 'full',
+      breakpoints: [],
+    });
+    expect(sent().url).toBe('/sap/bc/adt/debugger/breakpoints');
+    expect(sent().method).toBe('POST');
+    expect(sent().data).toContain('<syncScope mode="full"/>');
+    expect(sent().data).not.toContain('<breakpoint ');
+  });
+
+  it('syncBreakpoints partial names each object', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.syncBreakpoints(identity, {
+      scope: 'partial',
+      objects: ['/sap/bc/adt/oo/classes/zcl_a', '/sap/bc/adt/oo/classes/zcl_b'],
+      breakpoints: [
+        {
+          kind: 'line',
+          uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=3',
+        },
+      ],
+    });
+    expect(sent().data).toContain(
+      '<syncScope mode="partial"><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_a"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_b"/></syncScope>',
+    );
+  });
 
   it('setBreakpoints posts the user-mode set, adding without syncScope', async () => {
     const { debugger_, sent } = setup();
