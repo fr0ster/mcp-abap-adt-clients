@@ -61,23 +61,36 @@ describe('AbapDebugger', () => {
     return { debugger_, sent, connection };
   }
 
-  it('a breakpoint carries skipCount, and condition only on a line', async () => {
+  it('a line breakpoint carries its condition', async () => {
     const { debugger_, sent } = setup();
     await debugger_.setBreakpoints(identity, [
-      {
-        kind: 'line',
-        uri: '/x/source/main#start=3',
-        condition: 'lv_i > 2',
-        skipCount: 2,
-      },
-      { kind: 'exception', exceptionClass: 'CX_X', skipCount: 1 },
+      { kind: 'line', uri: '/x/source/main#start=3', condition: 'lv_i > 2' },
+      { kind: 'exception', exceptionClass: 'CX_X' },
     ]);
     expect(sent().data).toContain(
-      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3" condition="lv_i &gt; 2" skipCount="2"/>',
+      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3" condition="lv_i &gt; 2"/>',
     );
     expect(sent().data).toContain(
-      '<breakpoint kind="exception" exceptionClass="CX_X" skipCount="1"/>',
+      '<breakpoint kind="exception" exceptionClass="CX_X"/>',
     );
+  });
+
+  it('a skip count is refused before the wire: the server ignores it on an external breakpoint', async () => {
+    const { debugger_, connection } = setup();
+    const line = await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3', skipCount: 2 },
+    ]);
+    expect(line.ok).toBe(false);
+    if (!line.ok) expect(line.getError().message).toMatch(/skipCount/);
+    const synced = await debugger_.syncBreakpoints(identity, {
+      scope: 'full',
+      breakpoints: [
+        { kind: 'exception', exceptionClass: 'CX_X', skipCount: 1 },
+      ],
+    });
+    expect(synced.ok).toBe(false);
+    if (!synced.ok) expect(synced.getError().message).toMatch(/skipCount/);
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
   });
 
   it('a condition smuggled onto another kind by a cast is refused before the wire', async () => {

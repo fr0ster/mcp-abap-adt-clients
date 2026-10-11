@@ -34,11 +34,14 @@ own run, belongs to mcp-abap-adt and comes after this release.
 
   A replacement reaches every IDE that shares the key. In `user` mode that is any IDE of the same IDE user debugging the same
   request user. In `terminal` mode it is any IDE of the same IDE user with the same terminal id.
-- **Without `syncScope`**, a POST only adds.
+- **Without `syncScope`**, a POST replaces everything the key holds, even when it is `validationOnly`: the server
+  deletes all of the key's external breakpoints first (measured on premise 2026-10-11, BASIS 816; this corrects an
+  earlier reading that it only adds).
   - `syncScope mode="full"` replaces every breakpoint of the key.
   - `syncScope mode="partial"` replaces only the line breakpoints in the main programs its object references map to.
     A line breakpoint outside that scope is refused.
-- **`deactivated`** is parsed but has no effect on this release. **`skipCount`** applies to every kind.
+- **`deactivated`** is parsed but has no effect on this release. **`skipCount`** is accepted on an external breakpoint and ignored (measured 2026-10-11: the first hit stops), so
+  the builder refuses it.
   **`condition`** applies to line breakpoints only, and the other kinds have it commented out.
 - **`detachDebugger`** takes an optional `debuggeeId`. The debugger leaves and the program runs on, and a session breakpoint
   brings the debugger back.
@@ -186,7 +189,7 @@ Why this is a major. List all of these in the migration note:
 - **`deactivated` is not added at all.** That alone breaks nobody.
 
 Replacing a set is a member of its own, not an option on `setBreakpoints`. The name says it is destructive, and
-`setBreakpoints` keeps its add-only promise. `partial` takes only line breakpoints because that is all the server replaces.
+`setBreakpoints` replaces as well (measured 2026-10-11), which its JSDoc now states. `partial` takes only line breakpoints because that is all the server replaces.
 What it does with the other kinds is unclear, so they do not compile.
 
 ## adt-clients 28.0.0 (major, after interfaces-adt is published)

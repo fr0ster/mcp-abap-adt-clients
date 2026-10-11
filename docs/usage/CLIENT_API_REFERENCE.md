@@ -1918,6 +1918,22 @@ await run;
   breakpoint carries neither `id` nor `uri`: match the refusals by content.
   `GET` on the breakpoints is not an operation SAP offers — keep the set you
   sent.
+- **`setBreakpoints` replaces what the key holds; it does not add to it.**
+  Each request first deletes every external breakpoint under the identity's
+  key, and so does a `validationOnly` request, even though it arms nothing.
+  Send the whole set in one request, or use `syncBreakpoints` with `partial`
+  to replace one object's line breakpoints and keep the others. Measured on
+  premise (2026-10-11), SAP_BASIS 816.
+- **`stopListener` deletes the key's breakpoints** in user mode, whether or not
+  a listener was running. Stop the listener last.
+- **One listener session per identity.** In user mode the server binds an
+  ABAP session to the first identity that listened on it, so a listener for
+  another request user needs a session of its own.
+- **`skipCount` is refused before the wire.** The server accepts it on an
+  external breakpoint and ignores it: the first hit stops.
+- **`terminateDebugger`** ends the debugger's own session, and the answer is a
+  plain `500` with no ADT document. The program runs on and returns its
+  output, and the session cannot be used afterwards.
 - **`terminateDebuggee`** answers `500` subtype `terminateDebuggee` on premise
   and `200` on the cloud; `analyseDebuggeeEnd` takes both.
 - **Memory at a stop:** `getMemorySizes()` and `createMemorySnapshot()`. The
