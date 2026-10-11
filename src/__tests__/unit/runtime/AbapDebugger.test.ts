@@ -75,7 +75,19 @@ describe('AbapDebugger', () => {
     );
   });
 
-  it('a skip count is refused before the wire: the server ignores it on an external breakpoint', async () => {
+  it('skipCount 0 means "no skip": accepted, and nothing is sent for it', async () => {
+    const { debugger_, sent } = setup();
+    const answer = await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3', skipCount: 0 },
+    ]);
+    expect(answer.ok).toBe(true);
+    expect(sent().data).toContain(
+      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3"/>',
+    );
+    expect(sent().data).not.toContain('skipCount');
+  });
+
+  it('a skip count above 0 is refused before the wire: the server ignores it on an external breakpoint', async () => {
     const { debugger_, connection } = setup();
     const line = await debugger_.setBreakpoints(identity, [
       { kind: 'line', uri: '/x/source/main#start=3', skipCount: 2 },

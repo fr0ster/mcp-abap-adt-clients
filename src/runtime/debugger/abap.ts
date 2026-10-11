@@ -129,15 +129,18 @@ function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
       `condition is accepted on a line breakpoint only, not on kind "${bp.kind}"`,
     );
   }
-  if (bp.skipCount !== undefined) {
-    // Every breakpoint this module sends is external (`scope="external"`), and
-    // the server accepts a skip count there and drops it: it is not echoed,
-    // and the first hit stops (measured on premise (2026-10-11), BASIS 816,
-    // `skipCount="2"` on a loop line stopped on pass 1). The stored form of an
-    // external breakpoint has no field for it (server source, same release).
-    // Sending it would arm a breakpoint that stops on every hit - refuse.
+  if (bp.skipCount !== undefined && bp.skipCount > 0) {
+    // Still in the 14.x contract's type, refused here, and to leave the
+    // contract in its next major. Every breakpoint this module sends is
+    // external (`scope="external"`), and the server accepts a skip count there
+    // and drops it: it is not echoed, and the first hit stops - measured on
+    // premise (2026-10-11), BASIS 816, `skipCount="2"` on a loop line stopped
+    // on pass 1. The stored form of an external breakpoint has no field for it
+    // (server source, BASIS 816, read 2026-10-11). Sending it would arm a
+    // breakpoint that stops on every hit - refuse. `0` means "no skip", which
+    // is what the server does anyway, so it is accepted and sends nothing.
     throw new Error(
-      `skipCount is not applied to an external breakpoint (kind "${bp.kind}"): the server ignores it`,
+      `skipCount ${bp.skipCount} is not applied to an external breakpoint (kind "${bp.kind}"): the server ignores it`,
     );
   }
   const cond = condition ? ` condition="${escapeXml(condition)}"` : '';
@@ -187,8 +190,8 @@ export function buildSyncBreakpointsXml(
  * `validationOnly` request, which arms nothing, deletes them all the same.
  * Measured on premise (2026-10-11), BASIS 816: with B's line breakpoint armed,
  * a second request carrying only A's, or a validation of an exception
- * breakpoint, left a run of B uncaught. The server source of the same release
- * agrees: without a sync scope the request reaches
+ * breakpoint, left a run of B uncaught. Server source, BASIS 816, read
+ * 2026-10-11: without a sync scope the request reaches
  * `set_multiple_extd_breakpoints` with no scopes, which deletes all of the
  * key's breakpoints first. To arm several, send them in one request; to keep
  * some, send them again, or replace by object with {@link syncBreakpoints}.
@@ -197,6 +200,12 @@ export function buildSyncBreakpointsXml(
  * `errorMessage` and no id. A line breakpoint comes back renumbered into the
  * include it falls in (`#start=16` in a class became `LINE_NR=5` of the method
  * include), so its id cannot be predicted.
+ *
+ * **`skipCount` greater than 0 is refused** (`ok: false`, nothing sent). It is
+ * still in the 14.x contract's type, but the server ignores it on an external
+ * breakpoint - the first hit stops (measured on premise (2026-10-11), BASIS
+ * 816) - and it is to leave the contract in its next major. `0` is accepted
+ * and sends nothing.
  */
 export async function setBreakpoints(
   connection: IAbapConnection,
@@ -216,6 +225,16 @@ export async function setBreakpoints(
 /**
  * Replace the breakpoints the server holds under the identity's key.
  *
+ * {@link setBreakpoints} replaces as well; what this adds is an explicit name
+ * for it, `full` with `[]` to clear the key, and `partial` to replace one
+ * object's line breakpoints and keep the rest.
+ *
+ * **`skipCount` greater than 0 is refused** (`ok: false`, nothing sent). It is
+ * still in the 14.x contract's type, but the server ignores it on an external
+ * breakpoint - the first hit stops (measured on premise (2026-10-11), BASIS
+ * 816) - and it is to leave the contract in its next major. `0` is accepted
+ * and sends nothing.
+ *
  * Measured on premise (2026-10-11), BASIS 816, with two classes (two main
  * programs) and a caught exception:
  * - `full` with one line breakpoint answers that one with its id, and a run of
@@ -232,7 +251,7 @@ export async function setBreakpoints(
  *   line breakpoint as that same refused row; named beside class A, it was
  *   passed over and A's breakpoint was armed.
  *
- * Server source of the same release, read 2026-10-11:
+ * Server source, BASIS 816, read 2026-10-11:
  * - the key is the IDE user plus, in user mode, `requestUser`, or in terminal
  *   mode, `terminalId`; a `terminalId` equal to `ideId` keys on the IDE id
  *   alone; at most 30 breakpoints per key;
@@ -304,15 +323,16 @@ export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
  *
  * The identity's mode decides the parameters: `terminal` mode sends no `requestUser`.
  *
- * **One ABAP session listens for one user.** In user mode the server keeps
- * the listener context of the first listener request on the ABAP session -
- * request user and IDE id - and every later listen, check or stop on that
- * session uses it, whatever identity it names (server source, BASIS 816:
- * `CL_TPDAPI_SERVICE` caches it). Measured on premise (2026-10-11): on a
- * session that had listened for one user, a take-over listener for another
- * user answered 200 empty after its hold and that user's run went through
- * uncaught; on a new session it was caught. A listener for another identity
- * needs a session of its own.
+ * **One ABAP session listens for one user.** In user mode the server binds
+ * the listener context - request user and IDE id - to the ABAP session on the
+ * first request that needs it (listen, check, stop or attach), and every
+ * later listen, check or attach on that session, and the wake-up of a stop,
+ * use it whatever identity they name (server source, BASIS 816, read
+ * 2026-10-11: `CL_TPDAPI_SERVICE` caches the instance once per session).
+ * Measured on premise (2026-10-11), BASIS 816: on a session that had listened
+ * for one user, a take-over listener for another user answered 200 empty after
+ * its hold and that user's run went through uncaught; on a new session it was
+ * caught. A listener for another identity needs a session of its own.
  *
  * There is no default. Which of the two is right depends on whose debugger is
  * displaced, and only the caller knows that.
@@ -401,13 +421,16 @@ export function readListenerConflict(
  * Release the listener.
  *
  * **It also deletes the key's breakpoints.** In user mode the server deletes
- * every external breakpoint of the IDE user for the request user, and the
- * debugging activation with them - whether or not a listener was running.
- * Measured on premise (2026-10-11), BASIS 816: with a line breakpoint armed and
- * no listener running, a stop answered 200 and the next run went uncaught.
- * Server source, same release: `stop_listener_for_user` deletes from
- * `abdbg_extdbps` for the IDE user and request user. Stop the listener last, or
- * arm again before the next listen.
+ * every external breakpoint of the IDE user for the request user this call
+ * names, and the debugging activation with them - whether or not a listener
+ * was running. Only the wake-up of a running listener goes through the
+ * session's cached listener context (see {@link listen}); the deletion uses
+ * the identity named here. Measured on premise (2026-10-11), BASIS 816: with a
+ * line breakpoint armed and no listener running, a stop answered 200 and the
+ * next run went uncaught. Server source, BASIS 816, read 2026-10-11:
+ * `stop_listener_for_user` deletes from `abdbg_extdbps` for the IDE user and
+ * the named request user. Stop the listener last, or arm again before the next
+ * listen.
  */
 export async function stopListener(
   connection: IAbapConnection,
@@ -693,8 +716,9 @@ export async function detachDebugger(
  * Free the debugger; the program runs on.
  *
  * **The debugger's session ends with it.** The server stops the debugger and
- * frees the ABAP session the request runs in (`SYSTEM-CALL FREE MODE 0`, server
- * source, BASIS 816). Measured on premise (2026-10-11): the answer is a plain
+ * frees the ABAP session the request runs in (`SYSTEM-CALL FREE MODE 0`; server
+ * source, BASIS 816, read 2026-10-11). Measured on premise (2026-10-11), BASIS
+ * 816: the answer is a plain
  * ICF `500 Internal Server Error` (`text/plain`, no ADT exception document,
  * so no subtype), the program ran on and returned its output, and the next
  * request on that session was answered `400` "Session Timed Out or Not Found".
@@ -881,7 +905,7 @@ export function buildDebuggerSettingsXml(settings: IDebuggerSettings): string {
 /**
  * Set the debugger settings of the session. A setting left out is sent empty
  * and the server keeps it (server source, BASIS 816, read 2026-10-11); the
- * first call after an attach ignores `systemDebugging=false` (same source).
+ * first call after an attach ignores `systemDebugging=false` (server source, BASIS 816, read 2026-10-11).
  *
  * Measured on premise (2026-10-11), BASIS 816, at a stop: the answer is the
  * whole `<dbg:settings>` with all six attributes; `systemDebugging: true`

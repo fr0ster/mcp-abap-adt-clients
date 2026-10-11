@@ -1923,17 +1923,27 @@ await run;
   key, and so does a `validationOnly` request, even though it arms nothing.
   Send the whole set in one request, or use `syncBreakpoints` with `partial`
   to replace one object's line breakpoints and keep the others. Measured on
-  premise (2026-10-11), SAP_BASIS 816.
-- **`stopListener` deletes the key's breakpoints** in user mode, whether or not
-  a listener was running. Stop the listener last.
+  premise (2026-10-11), SAP_BASIS 816; the server source (SAP_BASIS 816, read
+  2026-10-11) deletes all of the key's breakpoints first.
+- **`stopListener` deletes the key's breakpoints** in user mode, for the
+  request user it names, whether or not a listener was running. Stop the
+  listener last. Measured on premise (2026-10-11), SAP_BASIS 816; server
+  source, SAP_BASIS 816, read 2026-10-11.
 - **One listener session per identity.** In user mode the server binds an
-  ABAP session to the first identity that listened on it, so a listener for
-  another request user needs a session of its own.
-- **`skipCount` is refused before the wire.** The server accepts it on an
-  external breakpoint and ignores it: the first hit stops.
+  ABAP session to the first identity that a listen, check, stop or attach used
+  on it, so a listener for another request user needs a session of its own.
+  Measured on premise (2026-10-11), SAP_BASIS 816; the caching is in the server
+  source, SAP_BASIS 816, read 2026-10-11.
+- **`skipCount` is typed but refused.** It is still in the 14.x contract's
+  type, but a value above 0 is answered `ok: false` without a request, because
+  the server accepts it on an external breakpoint and ignores it: the first hit
+  stops. Measured on premise (2026-10-11), SAP_BASIS 816. `0` is accepted, and
+  the field is to leave the contract in its next major.
 - **`terminateDebugger`** ends the debugger's own session, and the answer is a
   plain `500` with no ADT document. The program runs on and returns its
-  output, and the session cannot be used afterwards.
+  output, and the session cannot be used afterwards. Measured on premise
+  (2026-10-11), SAP_BASIS 816; the session is freed in the server source
+  (SAP_BASIS 816, read 2026-10-11).
 - **`terminateDebuggee`** answers `500` subtype `terminateDebuggee` on premise
   and `200` on the cloud; `analyseDebuggeeEnd` takes both.
 - **Memory at a stop:** `getMemorySizes()` and `createMemorySnapshot()`. The

@@ -913,6 +913,13 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             listenerApi.stopListener(identity),
           ),
         ).toBe(false);
+        // The closing control: armed again, B is caught - so a run that went
+        // bad on the way cannot pass the "not caught" answers above.
+        expect(
+          await bAfter('nothing (closing control)', () =>
+            listenerApi.checkListener(identity),
+          ),
+        ).toBe(true);
       });
     },
     STEP_TIMEOUT,
@@ -1180,7 +1187,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   // --- 8. setDebuggerSettings ------------------------------------------------------
 
   it(
-    'setDebuggerSettings: a field left out keeps its value, false clears it',
+    'setDebuggerSettings: a mandatory field left out keeps its value; showDataAging does not',
     async () => {
       if (skipped()) return;
       await inScope(async (scope) => {

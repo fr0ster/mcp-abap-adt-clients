@@ -5,7 +5,7 @@ Issue #217, draft PR #218. Research behind it: `docs/research/debugger-modes.md`
 ## Goal
 
 Give the ABAP debugger the requests a consumer still lacks for debugging a user's program the way Eclipse does: replacing a
-breakpoint set instead of only adding to it, skip counts, the two ways of letting a debuggee go without ending it,
+breakpoint set by name, all of it or one object's, the two ways of letting a debuggee go without ending it,
 the debugger settings, and a listener check that starts nothing. Write down, with measurements, what ADT cannot do:
 attaching to a running process or request.
 
@@ -40,15 +40,18 @@ own run, belongs to mcp-abap-adt and comes after this release.
   - `syncScope mode="full"` replaces every breakpoint of the key.
   - `syncScope mode="partial"` replaces only the line breakpoints in the main programs its object references map to.
     A line breakpoint outside that scope is refused.
-- **`deactivated`** is parsed but has no effect on this release. **`skipCount`** is accepted on an external breakpoint and ignored (measured 2026-10-11: the first hit stops), so
-  the builder refuses it.
+- **`deactivated`** is parsed but has no effect on this release.
+  **`skipCount`** is accepted on an external breakpoint and ignored: the first hit stops (measured on premise
+  2026-10-11, BASIS 816). The builder refuses a value above 0, and accepts `0`, which sends nothing.
   **`condition`** applies to line breakpoints only, and the other kinds have it commented out.
 - **`detachDebugger`** takes an optional `debuggeeId`. The debugger leaves and the program runs on, and a session breakpoint
   brings the debugger back.
   **`terminateDebugger`** frees the debugger and the program runs on. **`terminateDebuggee`** ends the program.
 - **`setDebuggerSettings`** covers `systemDebugging`, `updateDebugging`, `createExceptionObject`, `backgroundRFC`,
   `sharedObjectDebugging` and `showDataAging`.
-  - It merges: `true` sets a setting, `false` clears it, and an absent field keeps it.
+  - It merges for the four mandatory attributes: `true` sets a setting, `false` clears it, and an absent field keeps it.
+    `showDataAging` does not merge: left out, it is off (measured on premise 2026-10-11, BASIS 816: `true`, then `{}`,
+    answered `false`).
   - The answer is the settings now in force.
   - The first call after an attach ignores `systemDebugging=false`.
 - **`GET /listeners?checkConflict=true`** starts nothing. The authorization check runs first and answers `403`.
@@ -104,7 +107,8 @@ export type IDebuggerBreakpoint =
   | (IBreakpointCommon & NoCondition & { kind: 'message'; msgId: string; msgNo: string; msgTy: string });
 
 /**
- * Replace breakpoints instead of adding them. Both scopes touch every IDE that shares the identity's key (see the evidence).
+ * Replace breakpoints by name: all of the key's (`full`, `[]` clears it) or one object's line breakpoints (`partial`).
+ * `setBreakpoints` replaces as well (measured 2026-10-11). Both scopes touch every IDE that shares the identity's key.
  * `partial` replaces the line breakpoints of the MAIN PROGRAMS its objects map to (two objects of one class pool are one
  * program); an empty `breakpoints` clears that scope. An object that maps to no program leaves the body's line
  * breakpoints unset (server source); the integration test records what the answer says then.
@@ -188,9 +192,11 @@ Why this is a major. List all of these in the migration note:
   add one. The default is the raw document, like the other strategies.
 - **`deactivated` is not added at all.** That alone breaks nobody.
 
-Replacing a set is a member of its own, not an option on `setBreakpoints`. The name says it is destructive, and
-`setBreakpoints` replaces as well (measured 2026-10-11), which its JSDoc now states. `partial` takes only line breakpoints because that is all the server replaces.
-What it does with the other kinds is unclear, so they do not compile.
+Replacing a set is a member of its own, not an option on `setBreakpoints`. Both replace (measured on premise 2026-10-11,
+BASIS 816), so what `syncBreakpoints` adds over `setBreakpoints` is three things. It has a name that says it replaces.
+`full` with `[]` clears the key without arming anything. `partial` replaces one object's line breakpoints and keeps
+the rest. `partial` takes only line breakpoints because that is all the server replaces. What it does with the other
+kinds is unclear, so they do not compile.
 
 ## adt-clients 28.0.0 (major, after interfaces-adt is published)
 
@@ -199,8 +205,9 @@ What it does with the other kinds is unclear, so they do not compile.
   that its catch is unmeasured, and what to send in an issue if it does not catch: the identity's mode, whether the
   terminal id is SAP GUI's, how the program was started, and the wire log (`DEBUG_HTTP_WIRE`).
 - **The four requests in `abap.ts`.** Add the requests with their JSDoc, the evidence above in short.
-  - **`buildBreakpointsXml`** gains `skipCount`. It emits `condition` only for a line breakpoint, and also refuses it on
-    another kind at run time (a cast can get past the type).
+  - **`buildBreakpointsXml`** refuses `skipCount` above 0 and sends nothing for `0` (measured: the server ignores it).
+    It emits `condition` only for a line breakpoint, and also refuses it on another kind at run time (a cast can get
+    past the type).
   - **`full`.** The sync body builder emits `<syncScope mode="full"/>`.
   - **`partial`.** It emits `<syncScope mode="partial">` with one `<adtcore:objectReference adtcore:uri>` per object.
   - **Settings.** The settings builder follows the rule above.
@@ -217,8 +224,8 @@ What it does with the other kinds is unclear, so they do not compile.
 ## Testing
 
 - **Unit:**
-  - **Builders.** The sync body (`full`, `partial` with several objects, an empty set), the breakpoint body (`skipCount`, and
-    `condition` on a line breakpoint only, plus the run-time refusal), and the settings body (`true`, `false` and left out,
+  - **Builders.** The sync body (`full`, `partial` with several objects, an empty set), the breakpoint body (`skipCount` 0
+    sends nothing and above 0 is refused; `condition` on a line breakpoint only, plus the run-time refusal), and the settings body (`true`, `false` and left out,
     for mandatory and conditional attributes alike).
   - **Query strings.** `checkListener`, and `detachDebugger` with and without `debuggeeId`. The identity in both modes, for
     listen, stop, check, attach and both breakpoint bodies: `terminal` sends no `requestUser`.
@@ -287,3 +294,12 @@ What it does with the other kinds is unclear, so they do not compile.
 
    In this library nothing more is needed: the identity is an argument of every call, so the caller chooses its
    `terminalId` per call.
+
+## Contract follow-ups for the next interfaces-adt major
+
+Measured on premise (2026-10-11), BASIS 816. The 14.x contract keeps the old wording until then.
+
+- **Remove `skipCount`.** The server ignores it on an external breakpoint, and this library refuses a value above 0.
+- **Reword `syncBreakpoints`.** `IAbapDebugger.d.ts` says it replaces "instead of adding" (around line 76, on `IDebuggerBreakpointSync`, and line 192). `setBreakpoints`
+  replaces too, so the text should name what `syncBreakpoints` adds: the name, `full` with `[]`, and `partial`.
+- **Any "only adds" wording** about `setBreakpoints` in the contract goes the same way.
