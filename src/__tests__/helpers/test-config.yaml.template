@@ -2330,6 +2330,19 @@ runtime_debugger:
       # with a breakpoint set holds the user's debugging, and the listeners
       # here refuse to displace it.
 
+    - name: "adt_abap_debugger_modes"
+      enabled: true
+      available_in: ["onprem"]
+      description: "ABAP debugger modes: syncBreakpoints full/partial, skipCount, detachDebugger, terminateDebugger, setDebuggerSettings, checkListener, terminal mode, another user"
+      params:
+        class_name: "ZAC_DBG_MODES_A"     # probe A: a loop and an end line; created, run under the debugger, deleted
+        class_name_b: "ZAC_DBG_MODES_B"   # probe B: one marked line, a second main program
+        package_name: ""                  # "" → environment.default_package; use a local package (no transport)
+        transport_request: ""             # "" → environment.default_transport (ignored for a local package)
+        second_user_env: ""               # path of a .env file of a second user; "" skips the other-user case
+      # Close the IDE of the test user, and make sure the second user's IDE
+      # holds no listener, before running this.
+
     - name: "adt_amdp_debugger"
       enabled: true
       available_in: ["onprem", "cloud"]   # SAP HANA only; measured on both (2026-10-09)
