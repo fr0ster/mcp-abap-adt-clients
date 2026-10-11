@@ -24,6 +24,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [28.0.0] - 2026-10-11
+
+The ABAP debugger on `@mcp-abap-adt/interfaces-adt` 14 (#217): the identity
+states its mode, breakpoints can be replaced by name, a debuggee can be let go
+without ending it, the debugger settings and a listener check that starts
+nothing are new, and what ADT cannot do is written down with its measurements.
+See [MIGRATION-28.md](docs/usage/MIGRATION-28.md).
+
+### Changed (breaking)
+
+- **`IDebuggerIdentity` is a union on `debuggingMode`**, required with no
+  default: `{ debuggingMode: 'user', requestUser, terminalId, ideId }` or
+  `{ debuggingMode: 'terminal', terminalId, ideId }`. Every request sends the
+  mode the identity names, and `requestUser` only in `user` mode. A catch in
+  terminal mode is unmeasured.
+- **`attach(identity, debuggeeId, options?)`** replaces
+  `attach(requestUser, debuggeeId, options?)`.
+- **`condition` is typed on a line breakpoint only**, and refused at run time on
+  another kind.
+- **`IAbapDebugger` gains `TSettings` and five members**, and
+  **`IAbapDebuggerResults` gains `settings`** (the raw document by default).
+  `@mcp-abap-adt/interfaces-adt` is `^14.0.0`.
+- **`skipCount` above 0 is refused**, answered `ok: false` without a request:
+  the server accepts it on an external breakpoint and ignores it. `0` sends
+  nothing. The field leaves the contract in its next major.
+
+### Added
+
+- **`syncBreakpoints(identity, sync)`**: `scope: 'full'` replaces the key's set
+  (`[]` clears it), `scope: 'partial'` replaces the line breakpoints of the main
+  programs its objects map to and keeps the rest.
+- **`checkListener(identity)`**, a `GET` that starts nothing, and
+  **`readListenerConflict(error)`**, which reads `conflictText` and `ideUser`
+  from the `409` of a held user.
+- **`detachDebugger({ debuggeeId? })`** and **`terminateDebugger()`**.
+- **`setDebuggerSettings(settings)`**, answering the settings in force.
+- Request builders `buildSyncBreakpointsXml` and `buildDebuggerSettingsXml`.
+
+### Measured
+
+On premise (2026-10-11), BASIS 816; the server source was read the same day.
+
+- **`setBreakpoints` replaces the key's set**, `validationOnly` included, and
+  **`stopListener` deletes it**. The old text said the request only adds.
+- **`skipCount` is ignored** on an external breakpoint: the first hit stops.
+- **`terminateDebugger`** answers a plain `500` and frees the debugger's own
+  session; the program runs on. **`detachDebugger`** with the id of a caught,
+  unattached debuggee releases the run at once.
+- **One ABAP session listens for one user**: the listener context is bound by
+  the first identity a listen, check, stop or attach used.
+- **Another user's run is caught end to end** with `requestUser`, given
+  `S_DEVELOP` `DEBUG` ACTVT 90; a request already running is never caught.
+- **Terminal mode**: check, listen, stop, set and delete answer `200`; deleting
+  needs `requestUser=` empty. A catch is unmeasured.
+- **`showDataAging` does not merge** in `setDebuggerSettings`; the other
+  settings do.
+- The research note and `CLIENT_API_REFERENCE.md` carry the details.
+
 ## [27.0.0] - 2026-10-10
 
 Every factory of `AdtClient` now answers a contract (#109): the last three
