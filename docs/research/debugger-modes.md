@@ -122,4 +122,19 @@ On premise (2026-10-10), one SAP user, `debuggingMode=user`. S1 arms a line brea
 - **Breakpoints belong to the user.** Under take-over, a listener of another IDE caught a breakpoint only the first one had set.
 - **A run without `checkConflict` showed no conflict at all.** A probe of this must send the mode explicitly.
 
-The same probe tried to show whether an "empty" breakpoint set from S2 removes S1's breakpoints. It is not evidence: the request carried no `syncScope`, so it added nothing and removed nothing. Separately, S1's breakpoint caught nothing on a second run, even with S1 listening alone. That is still unexplained.
+The same probe tried to show whether an "empty" breakpoint set from S2 removes S1's breakpoints. It is not evidence: the request carried no `syncScope`, so it added nothing and removed nothing.
+
+In the same probe, S1's breakpoint caught nothing on a second run. A later, cleaner measurement does not repeat it (below): there, one listener that kept polling caught the same breakpoint again on the next run, without re-arming. The first probe terminated each debuggee and restarted its listeners between runs. That is the likely difference, but it was not isolated.
+
+## Measured later: a second catch, a catch around a stop, the AMDP stack
+
+On premise and on the cloud (2026-10-11), through the MCP server's debugger built on this library: `debuggingMode=user`, random ids, refuse mode.
+
+- **A breakpoint catches again.** One listener caught a line breakpoint, continued the debuggee to its end, and kept polling. The next run of the program was caught at the same breakpoint, with no re-arm. Measured on both platforms.
+- **Attach after the listener stopped.** A poll caught a debuggee, and then the listener was stopped (`DELETE /debugger/listeners`). Attaching that debuggee still answered `200`. `stepContinue` then answered `500` `debuggeeEnded`, the same as when the listener was stopped after the release, and the program finished at once with its output.
+- **A catch nobody attaches.** The listener was stopped and the debuggee was not attached. The system held it about 30 s (30.2 s in two runs) and then let it run to its end, with complete output. After that, a fresh listener under the same ids caught nothing in 20 s. Attaching the old debuggee id answered `500` `AdiFailed`, subType `invalidDebuggee` (SY/530). Whether a listener started within the 30 s catches it again was not measured.
+- **The AMDP call stack** (`<amdpdbg:callstack>` in an `ON_BREAK`), with three nested procedures and a breakpoint in the innermost:
+  - the first `callstackEntry` is the innermost frame, where it stopped;
+  - `index` counts from 1 at the outermost, so the top has the highest index;
+  - a caller that is not debug-compiled has `isDebugCompiled="false"` and native line `0`, and its `#start=` points at the caller's METHOD line, not at its CALL;
+  - `cascadeMode NONE` was enough to stop in the nested procedure.
