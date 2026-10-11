@@ -24,6 +24,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [29.0.0] - 2026-10-11
+
+Breakpoints on `@mcp-abap-adt/interfaces-adt` 15: `skipCount` is gone and every
+kind can carry a `clientId`. See [MIGRATION-29.md](docs/usage/MIGRATION-29.md).
+
+### Changed (breaking)
+
+- **`skipCount` leaves the breakpoint type**, and the refusal of a value above 0
+  goes with it. The server ignored it on an external breakpoint: the first hit
+  stops (measured on premise (2026-10-11), BASIS 816).
+- **`@mcp-abap-adt/interfaces-adt` is `^15.0.0`**; `adt-strategies` 0.10.0
+  declares the same range.
+
+### Added
+
+- **`clientId` on a breakpoint of any kind**, sent as the row's `clientId`
+  (escaped). The server echoes it on every row of the answer, placed and
+  refused, and answers the rows out of the request's order, refused first - so
+  the tag is what pairs an answer row with its request row. Measured on premise
+  (2026-10-11), BASIS 816.
+- A sanitised recording of that answer as a unit fixture.
+
 ## [28.0.0] - 2026-10-11
 
 The ABAP debugger on `@mcp-abap-adt/interfaces-adt` 14 (#217): the identity

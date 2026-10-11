@@ -2333,7 +2333,7 @@ runtime_debugger:
     - name: "adt_abap_debugger_modes"
       enabled: true
       available_in: ["onprem"]
-      description: "ABAP debugger modes: syncBreakpoints full/partial, skipCount, detachDebugger, terminateDebugger, setDebuggerSettings, checkListener, terminal mode, another user"
+      description: "ABAP debugger modes: syncBreakpoints full/partial, skipCount (raw measurement), detachDebugger, terminateDebugger, setDebuggerSettings, checkListener, terminal mode, another user"
       params:
         class_name: "ZAC_DBG_MODES_A"     # probe A: a loop and an end line; created, run under the debugger, deleted
         class_name_b: "ZAC_DBG_MODES_B"   # probe B: one marked line, a second main program

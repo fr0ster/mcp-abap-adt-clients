@@ -939,7 +939,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     async () => {
       if (skipped()) return;
       await inScope(async (scope) => {
-        // Sent by hand: the library refuses skipCount, because the server
+        // Sent by hand: the contract has no skipCount any more, because the server
         // ignores it on an external breakpoint - which this measures.
         const raw = await (listenerConnection as Connection).makeAdtRequest({
           url: '/sap/bc/adt/debugger/breakpoints',

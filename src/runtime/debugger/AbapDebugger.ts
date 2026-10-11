@@ -151,10 +151,9 @@ export class AbapDebugger<
    * Arm breakpoints under the identity's key, replacing what the key held -
    * a `validationOnly` request too (see `setBreakpoints` in `abap.ts`).
    *
-   * `skipCount` greater than 0 is still in the 14.x contract's type but is
-   * answered `ok: false` here without a request: the server ignores it on an
-   * external breakpoint (measured on premise (2026-10-11), BASIS 816), and it
-   * is to leave the contract in its next major. `0` is accepted.
+   * `clientId` on a breakpoint tags it; the server echoes it on every answer
+   * row, placed and refused, in an order of its own (see `setBreakpoints` in
+   * `abap.ts`).
    */
   async setBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
@@ -401,10 +400,9 @@ export class AbapDebugger<
    * Replace the key's breakpoints, `full` or by object with `partial` (see
    * `syncBreakpoints` in `abap.ts`).
    *
-   * `skipCount` greater than 0 is still in the 14.x contract's type but is
-   * answered `ok: false` here without a request: the server ignores it on an
-   * external breakpoint (measured on premise (2026-10-11), BASIS 816), and it
-   * is to leave the contract in its next major. `0` is accepted.
+   * `clientId` on a breakpoint tags it; the server echoes it on every answer
+   * row, placed and refused, in an order of its own (see `setBreakpoints` in
+   * `abap.ts`).
    */
   async syncBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
