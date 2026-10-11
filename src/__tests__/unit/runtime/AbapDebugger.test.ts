@@ -91,6 +91,24 @@ describe('AbapDebugger', () => {
     expect(connection.makeAdtRequest).not.toHaveBeenCalled();
   });
 
+  it('a condition smuggled through syncBreakpoints is refused before the wire', async () => {
+    const { debugger_, connection } = setup();
+    const smuggled = {
+      kind: 'exception',
+      exceptionClass: 'CX_X',
+      condition: 'a = 1',
+    } as unknown as IDebuggerBreakpoint;
+    const answer = await debugger_.syncBreakpoints(identity, {
+      scope: 'full',
+      breakpoints: [smuggled],
+    });
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) {
+      expect(answer.getError().message).toMatch(/condition/);
+    }
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+  });
+
   it('syncBreakpoints full replaces the set; an empty set clears it', async () => {
     const { debugger_, sent } = setup();
     await debugger_.syncBreakpoints(identity, {

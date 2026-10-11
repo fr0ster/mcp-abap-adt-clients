@@ -101,11 +101,6 @@ function identityAttributes(identity: IDebuggerIdentity): string {
 
 // --- breakpoints ---------------------------------------------------------------
 
-/**
- * The body of `POST /debugger/breakpoints`.
- *
- * No `syncScope`: the request only adds. Replacing is {@link syncBreakpoints}.
- */
 /** What names the place a breakpoint of each kind stops at. */
 function breakpointTarget(bp: IDebuggerBreakpoint): string {
   switch (bp.kind) {
@@ -136,6 +131,11 @@ function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
   return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${cond}${skip}${only}/>`;
 }
 
+/**
+ * The body of `POST /debugger/breakpoints`.
+ *
+ * No `syncScope`: the request only adds. Replacing is {@link syncBreakpoints}.
+ */
 export function buildBreakpointsXml(
   identity: IDebuggerIdentity,
   breakpoints: readonly IDebuggerBreakpoint[],
@@ -195,13 +195,14 @@ export async function setBreakpoints(
  *
  * Evidence is server source, BASIS 816, read 2026-10-11 - reading, not
  * measurement:
- * - the key is chosen by the identity's mode (the user's external set, or the
- *   terminal's);
+ * - the key is the IDE user plus, in user mode, `requestUser`, or in terminal
+ *   mode, `terminalId`; a `terminalId` equal to `ideId` keys on the IDE id
+ *   alone; at most 30 breakpoints per key;
  * - `full` replaces everything under the key, and an empty set clears it;
  * - `partial` works by main program, refuses line breakpoints outside its
  *   scope, and an object it cannot map leaves the body's line breakpoints
  *   unset;
- * - the set belongs to the user, so it reaches the user's other IDEs too.
+ * - the set belongs to the key, so it reaches every IDE that shares the key.
  */
 export async function syncBreakpoints(
   connection: IAbapConnection,

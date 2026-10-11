@@ -351,7 +351,6 @@ export class AbapDebugger<
     );
   }
 
-  // Stubs: Tasks 3-6 of the #217 plan replace them.
   async syncBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     sync: IDebuggerBreakpointSync,
@@ -364,6 +363,7 @@ export class AbapDebugger<
     );
   }
 
+  // Stubs: Tasks 4-6 of the #217 plan replace them.
   async checkListener<E extends IAdtError = IAdtError>(
     _identity: IDebuggerIdentity,
     _options?: IAdtAnalyseOptions<E>,
