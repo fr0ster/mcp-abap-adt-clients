@@ -20,7 +20,7 @@ function capturingConnection(): {
  * The package PUT builds its query like every other write.
  *
  * It used to interpolate `encodeURIComponent(lockHandle)` unconditionally, so
- * a caller with no handle sent `?lockHandle=undefined`. Measured on E19
+ * a caller with no handle sent `?lockHandle=undefined`. Measured on premise (BASIS 816)
  * 2026-09-26: SAP answered 423 `SADT_RESOURCE/026`, "invalid lock handle:
  * undefined" — a refusal about a handle nobody passed, where the endpoint's
  * own answer to a missing handle is a different message.

@@ -198,7 +198,7 @@ describe('ProgramExecutor (integration)', () => {
    * the class side. Building a throwaway REPORT here tested program creation,
    * which `integration/core/program` covers, and paid for it twice a run: a
    * program generated and dropped, and an `E_ABAP_GENPH` lock left in SM12 on
-   * the generated parts, on E19 measured 2026-08-30. Two suites doing that
+   * the generated parts, on premise (BASIS 816) measured 2026-08-30. Two suites doing that
    * against one system also race each other for those locks.
    *
    * Shared objects are read-only by contract, so this touches nothing.
@@ -365,7 +365,7 @@ describe('ProgramExecutor (integration)', () => {
 
         // The finished trace lives in the TRACES collection, not in the trace
         // REQUESTS one. A request is what schedules the measurement and it is
-        // consumed by the run: measured on E19 straight after a profiled run,
+        // consumed by the run: measured on premise (BASIS 816) straight after a profiled run,
         // `/runtime/traces/abaptraces/requests` answered 200 with an empty feed
         // of 345 bytes while `/runtime/traces/abaptraces` held 95KB of entries
         // owned by this very user — the profiling had worked all along and the
@@ -375,7 +375,7 @@ describe('ProgramExecutor (integration)', () => {
         // trace may not exist the instant the run returns — and a test that
         // takes whatever the feed offers passes on someone else's trace. This
         // one did: four consecutive runs resolved the SAME id while each was
-        // creating a new trace of its own. Measured on E19, the difference
+        // creating a new trace of its own. Measured on premise (BASIS 816), the difference
         // shows up on the first or second attempt.
         logTestStep('poll for the trace this run produced', testsLogger);
         const traceId = await waitForNewTrace(profiler, tracesBefore, {

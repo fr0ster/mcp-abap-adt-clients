@@ -11,7 +11,7 @@
  *  - The HTTP session (cookies) and the ABAP session on the server are different
  *    things: `SAP_SESSIONID_<SID>_<CLNT>` is the cookie that carries the stateful
  *    ABAP session, while `sap-adt-connection-id` identifies the conversation. A
- *    live cookie is not proof of a live ABAP session — E19 answered 400 "Session
+ *    live cookie is not proof of a live ABAP session — the on-premise system answered 400 "Session
  *    not found" with the cookie present.
  *
  * What these tests pin: the connector's own housekeeping requests (CSRF fetch,

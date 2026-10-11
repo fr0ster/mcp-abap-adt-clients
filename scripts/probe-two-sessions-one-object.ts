@@ -5,7 +5,7 @@
  * and the second starts only once the first has finished. The question is
  * whether anything the first session left behind gets in the second one's way:
  * an `E_ABAP_GENPH` on the generated program outlives the request that took it
- * and, measured on E19, outlives the run by about an hour. Whether it *blocks*
+ * and, measured on premise (BASIS 816), outlives the run by about an hour. Whether it *blocks*
  * anything has been assumed rather than tested.
  *
  * Both sessions are opened here rather than reusing one, because that is the
@@ -71,7 +71,7 @@ ENDCLASS.`;
  * they cannot see yet. SM12 rows carry a time, so the answer is to stamp ours
  * and let the two be matched afterwards.
  *
- * The stamp is server-local, which on E19 is UTC+3, because that is the clock
+ * The stamp is server-local, which on premise (BASIS 816) is UTC+3, because that is the clock
  * SM12 prints. Comparing against the machine clock cost an hour of confusion
  * earlier in this investigation.
  */

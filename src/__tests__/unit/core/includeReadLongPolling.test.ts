@@ -4,7 +4,7 @@
  * implementation's. A caller could set the option and nothing reached the wire.
  *
  * The integration suites cannot catch this: 47 class-include reads went over
- * the wire on E19 in one run and not one of them asked for long polling,
+ * the wire on premise (BASIS 816) in one run and not one of them asked for long polling,
  * because no caller sets it. So the guard has to be here.
  *
  * What each case pins is the *separator*. These URLs already carry

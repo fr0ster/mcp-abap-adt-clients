@@ -25,7 +25,7 @@
  *
  * Usage:
  *   npx ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
- *   MCP_ENV_PATH=./e77.env npx ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
+ *   MCP_ENV_PATH=./<other-system>.env npx ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
  *
  * Flags:
  *   --class=NAME  the class carrying the tests. It must already exist with its

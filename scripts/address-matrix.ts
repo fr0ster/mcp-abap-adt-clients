@@ -4,7 +4,7 @@
  * (as written), and say whether the two answers agree.
  *
  *   npx ts-node scripts/address-matrix.ts --objects <file.json> \
- *     --to e19-tunnel --to trial:cloud --out address-matrix.md
+ *     --to <system>-tunnel --to trial:cloud --out address-matrix.md
  *
  * The objects file names real objects on concrete systems, so it lives outside
  * the repository.

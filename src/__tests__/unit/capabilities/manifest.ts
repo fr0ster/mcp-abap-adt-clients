@@ -204,7 +204,7 @@ export const HANDLERS = {
       // a lock is what an *update* needs, and an existing one blocks a delete.
       // The endpoint answered `400 Parameter lockHandle could not be found` to
       // every cleanup, because nothing locks an object in order to remove it.
-      // Measured on E19, no lock taken and no stateful session:
+      // Measured on premise (BASIS 816), no lock taken and no stateful session:
       // `POST /deletion/check` → `del:isDeletable="true" adtcore:type="PROG/I"`,
       // then `POST /deletion/delete` → `del:isDeleted="true"`. Same service as
       // every other type, so the entry now says what they say.
@@ -1013,7 +1013,7 @@ export const HANDLERS = {
       checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       // The collection answers a GET with 400 "URI-Mapping cannot be
       // performed"; discovery advertises this sub-resource for validation, and
-      // it answers a POST with CHECK_RESULT. Measured on E19 2026-08-31.
+      // it answers a POST with CHECK_RESULT. Measured on premise (BASIS 816) 2026-08-31.
       validate: '/sap/bc/adt/sfw/featuretoggles/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',

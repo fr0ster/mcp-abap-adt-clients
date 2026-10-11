@@ -618,7 +618,7 @@ context on the `LOCK` and the `UNLOCK` — see `STATEFUL_SESSION_GUIDE.md`.
   `encodeURIComponent(lockHandle)` unconditionally, so a call with no handle
   asked SAP to check a handle literally named `undefined`, and the refusal
   (423 `SADT_RESOURCE/026`, "invalid lock handle: undefined", measured on
-  E19) named a handle nobody passed. The PUT now builds its query with
+  on premise, BASIS 816) named a handle nobody passed. The PUT now builds its query with
   `writeQuery`, like every other write: an absent handle or transport is left
   out. No change for a caller that passes both.
 
@@ -636,7 +636,7 @@ context on the `LOCK` and the `UNLOCK` — see `STATEFUL_SESSION_GUIDE.md`.
 - **PAK/058 now states the rule for both transports.** A package can be saved
   only once per ABAP session: over RFC from the create onward, over HTTP every
   stateful lock → update → unlock counts (the stateless create does not), and
-  a delete from a session that saved the package is refused. Measured on E19
+  a delete from a session that saved the package is refused. Measured on premise (BASIS 816)
   over HTTP and RFC (#176). It is `CL_PACKAGE`'s session buffer, not state lost
   between RFC contexts.
 - **The guides point to it instead of repeating it.** `RFC_TESTING.md`,
@@ -789,7 +789,7 @@ code for every item below**; the section numbers in brackets point into it.
 - **Group activation and group deletion address eleven types the way each
   type's own activation does** (#173). Where the two disagreed, SAP resolved the
   address to nothing and answered `activationExecuted="false"` with no message,
-  which reads as success — measured on E19 for `BDEF/BDO`, which the group left
+  which reads as success — measured on premise (BASIS 816) for `BDEF/BDO`, which the group left
   inactive. `BDEF/BDO`, `PROG/I`, `FUGR/I`, `XSLT/VT`, `AUTH`, `FTG2/FT` and the
   enhancement types now get their real addresses; a bare `ENHO`/`ENHS` without
   its subtype, or a `FUGR/I` without its group, is thrown naming what is
@@ -1921,7 +1921,7 @@ the sequence around a write handed back to the consumer.
   order to remove it. `Include - Full workflow` failed that way on both
   transports.
 
-  Measured on E19 against a leftover the broken suite had left behind — no lock
+  Measured on premise (BASIS 816) against a leftover the broken suite had left behind — no lock
   taken, no stateful session:
 
   ```
@@ -1962,7 +1962,7 @@ the sequence around a write handed back to the consumer.
   Pinned by ten unit tests asserting the whole URL, not merely that the
   parameter appears in it — a second `?` is silently wrong, since SAP reads the
   query up to it and ignores the rest. Unit coverage was necessary because the
-  integration suites cannot catch this: one full E19 run put 47 class-include
+  integration suites cannot catch this: one full the on-premise system run put 47 class-include
   reads on the wire and not one asked for long polling, because no caller sets
   it.
 
@@ -2620,7 +2620,7 @@ skipped, or a comment that named the wrong cause, keeping it green.
 
   `LOCK_MSG` answers 403 "user is currently editing" there. The chain asked for
   it first and treated the refusal as fatal, without trying the other two locks
-  the endpoint offers. Measured on E19: in exactly that situation
+  the endpoint offers. Measured on premise (BASIS 816): in exactly that situation
   `?_action=LOCK&msgNo=…&onSave=X` is granted, and a save carrying its handle as
   `mc:lockhandle` answers 200. `lockMessageIfGranted` now swallows 403 there —
   and only 403 — and the class-for-message handle stands in. The full lifecycle
@@ -2642,7 +2642,7 @@ skipped, or a comment that named the wrong cause, keeping it green.
   in that namespace with `System expected the element
   '{http://www.sap.com/iam/auth}auth'`. The namespace and every attribute were
   already correct, so the fix is the local name alone, in the one builder that
-  create and update share. Confirmed on E19 over both http and rfc; the same
+  create and update share. Confirmed on premise (BASIS 816) over both http and rfc; the same
   POST with only the root changed goes from 500 to 201.
 
 - `FeedRepository.variants()` never worked: `/sap/bc/adt/feeds/variants` requires
@@ -3733,7 +3733,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 
 ### Added
 
-- **authorizationField** core module: SUSO / AUTH type handler with full CRUD + lifecycle. New `AdtClient.getAuthorizationField()` factory. Endpoint `/sap/bc/adt/aps/iam/auth/{name}`. Available on modern on-prem (E19+) and cloud MDD; absent on legacy systems. (#19)
+- **authorizationField** core module: SUSO / AUTH type handler with full CRUD + lifecycle. New `AdtClient.getAuthorizationField()` factory. Endpoint `/sap/bc/adt/aps/iam/auth/{name}`. Available on modern on-prem (BASIS 816+) and cloud MDD; absent on legacy systems. (#19)
 - **functionInclude** core module: FUGR/I source-bearing handler with full CRUD + lifecycle and dedicated `readSource()`. New `AdtClient.getFunctionInclude()` factory. Endpoint `/sap/bc/adt/functions/groups/{groupName}/includes/{includeName}`. Available on all systems (legacy, modern on-prem, cloud). (#19)
 
 ### Documentation
@@ -4070,7 +4070,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 ## [3.5.0] - 2026-03-07
 
 ### Fixed
-- **Class includes check on legacy**: Pass `artifactContentType` through to `checkClassDefinitions`, `checkClassLocalTypes`, `checkClassLocalTestClass`, `checkClassMacros` — fixes "Dirty Source: Wrong content type" errors on non-unicode legacy systems (e.g., E77).
+- **Class includes check on legacy**: Pass `artifactContentType` through to `checkClassDefinitions`, `checkClassLocalTypes`, `checkClassLocalTestClass`, `checkClassMacros` — fixes "Dirty Source: Wrong content type" errors on non-unicode legacy systems.
 - **checkClassLocalTestClass refactored**: Deduplicated into shared `checkClassInclude` function (was a standalone copy-paste).
 - **Macros test config**: Remove stray `CLASS ZADT_BLD_CLS01 IMPLEMENTATION` from `macrosCode_update` (copy-paste error).
 

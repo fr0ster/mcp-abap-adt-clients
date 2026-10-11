@@ -205,7 +205,7 @@ describe('ClassExecutor (integration)', () => {
    * profiler suite already uses it. Building a throwaway class here tested
    * class creation, which `integration/core/class` covers, and paid for it
    * twice a run: a class pool generated and dropped, and an `E_ABAP_GENPH`
-   * lock left in SM12 on the generated parts, on E19 measured 2026-08-30.
+   * lock left in SM12 on the generated parts, on premise (BASIS 816) measured 2026-08-30.
    *
    * Shared objects are read-only by contract, so this touches nothing.
    */

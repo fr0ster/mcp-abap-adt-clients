@@ -106,7 +106,7 @@ describe('Master language on create (#105)', () => {
       const cls = client.getClass();
 
       // **Every answer is read.** The delete, the create and the cleanup used
-      // to be awaited and dropped. On E19 a create without a transport made
+      // to be awaited and dropped. On premise (BASIS 816) a create without a transport made
       // SAP generate a request of its own (DEVK907127, 2026-09-21) and record
       // the class there; from then on every delete was refused with
       // CTS_WBO_API 019 "already locked in request", every create answered

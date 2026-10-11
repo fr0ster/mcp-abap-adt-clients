@@ -40,7 +40,7 @@ const TRACE_ID = 'ABCDEF0123456789ABCD';
 
 describe('trace document mapping', () => {
   describe('the trace feed', () => {
-    /** One entry exactly as E19 sends it, field for field. */
+    /** One entry exactly as the on-premise system sends it, field for field. */
     const REAL_ENTRY =
       `<atom:entry><atom:author><atom:name>SAPUSER01</atom:name></atom:author>` +
       `<atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id>` +

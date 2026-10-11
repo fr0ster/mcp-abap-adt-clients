@@ -106,7 +106,7 @@ more, not less. Set in `src/__tests__/helpers/test-config.yaml`:
 | `transport_layer` | e.g. `ZSID` — on-prem package tests need it |
 | `default_package`, `default_transport` | yours; the package must exist already |
 
-Then `cp e19.env .env` and run as above. A legacy system (BASIS < 7.50) needs
+Then `cp <system>.env .env` and run as above. A legacy system (BASIS < 7.50) needs
 the RFC transport instead — see [RFC_TESTING.md](RFC_TESTING.md), and note that
 `SAPNWRFC_HOME` and `LD_LIBRARY_PATH` must be passed at launch because `dotenv`
 does not expand `PATH`.

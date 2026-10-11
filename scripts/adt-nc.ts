@@ -6,11 +6,11 @@
  * status was. Nothing is read, judged or retried: this is for finding out what
  * SAP says, before anything in the library decides what it means.
  *
- *   npx ts-node scripts/adt-nc.ts --to e19-tunnel --to trial:cloud \
+ *   npx ts-node scripts/adt-nc.ts --to <system>-tunnel --to trial:cloud \
  *     GET '/sap/bc/adt/programs/includes/ZINCL?version=active' \
  *     -H 'Accept: application/vnd.sap.adt.programs.includes.v2+xml'
  *
- *   npx ts-node scripts/adt-nc.ts --to e19-tunnel POST /sap/bc/adt/atc/runs \
+ *   npx ts-node scripts/adt-nc.ts --to <system>-tunnel POST /sap/bc/adt/atc/runs \
  *     -H 'Content-Type: application/xml' -d @atc-run.xml --out ./probe
  *
  * `--to <name>[:onprem|cloud|legacy]` — a session file

@@ -82,7 +82,7 @@ const testsLogger: ILogger = createTestsLogger();
 /**
  * The system's own refusal to create feature toggles.
  *
- * E19 answers `403 "It is not allowed to create/update feature toggles in this
+ * the on-premise system answers `403 "It is not allowed to create/update feature toggles in this
  * system."` — a policy, not a defect and not something a test can arrange
  * around. Recognised so the suite can say that instead of failing, and
  * recognised narrowly: any other 403 is a real failure and still is one.

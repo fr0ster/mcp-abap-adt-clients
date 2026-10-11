@@ -149,7 +149,7 @@ describe('removeObject', () => {
 
   /**
    * **`tm:position` is what makes the call do anything, so it always goes
-   * out.** Measured on E19, 2026-09-21, against task `DEVK901046`: 22 objects
+   * out.** Measured on premise (BASIS 816), 2026-09-21, against task `DEVK901046`: 22 objects
    * asked for by `type` and `name` alone each answered `200` with the usual
    * echo document, and re-reading the task found all 22 still on it. The same
    * documents carrying `tm:position` — and nothing else added — removed every
@@ -278,7 +278,7 @@ describe('createTask', () => {
   /**
    * **The attribute always goes out, because the server will not fill it in.**
    * This test asserted the opposite — that omitting `tm:targetuser` left the
-   * choice to the server — and an on-premise run (E19, 2026-09-21) measured
+   * choice to the server — and an on-premise run (on premise, 2026-09-21) measured
    * what that actually costs:
    *
    * ```

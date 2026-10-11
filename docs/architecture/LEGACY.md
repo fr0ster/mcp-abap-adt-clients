@@ -225,8 +225,8 @@ system, the other marking them present — and neither was checkable without the
 raw document and a live request. So a hit from `fetchDiscoveryEndpoints` means
 the system says it has the resource; a miss is the stronger signal.
 
-This section previously pointed at `scripts/endpoints_e77.txt` and
-`scripts/endpoints_e19.txt` with "~100" and "~500+". Neither file has ever
+This section previously pointed at `scripts/endpoints_<legacy-system>.txt` and
+`scripts/endpoints_<system>.txt` with "~100" and "~500+". Neither file has ever
 existed at that path and neither figure was right.
 
 The raw catalogues are not kept in the tree — 1.4 MB of four systems' endpoint

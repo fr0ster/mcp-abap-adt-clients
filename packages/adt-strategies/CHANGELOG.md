@@ -158,7 +158,7 @@ each.
   (#172). The reading took `object.message` as one element; with two messages
   fast-xml-parser gives an array, so the type and text read `undefined`, SAP's
   reason was replaced by the reference counts, and an `E` on a permitted object
-  was missed. Measured on E19: a service-binding check answering a `W` and an
+  was missed. Measured on premise (BASIS 816): a service-binding check answering a `W` and an
   `E` came back as "0 strong and 0 weak external references". Now every
   message with text is kept, in order, each with its own severity, and the T100
   key and `msgv1..4` are read from the long-text link — the one part of a
@@ -167,7 +167,7 @@ each.
   `E`; the counts stand in only when SAP said nothing. An untyped message does
   not overturn an explicit `"true"`: a DDLS delete answers `isDeleted="true"`
   with one `del:type=""` message, text `S::000`, and the object is gone —
-  measured on E19 and on the trial. Read as an `E`, it turned every CDS source
+  measured on premise (BASIS 816) and on the trial. Read as an `E`, it turned every CDS source
   delete into a refusal.
 - **`readCheckRunRefusal` reads every `checkReport`.** Several read as a check
   that never ran. Defensive: no several-object capture exists yet.

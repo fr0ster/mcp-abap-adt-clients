@@ -148,7 +148,7 @@ describe('Package (using AdtClient)', () => {
           // `set_changeable` refuses: `isDeleted="false"` with PAK/058,
           // "already locked", inside a 200. No ADT call resets the buffer, so
           // the only way out is a session that has not saved the package.
-          // Measured on E19 2026-09-26 over HTTP and RFC alike: delete right
+          // Measured on premise (BASIS 816) 2026-09-26 over HTTP and RFC alike: delete right
           // after an update is refused from the updating session and succeeds
           // from a new one.
           //

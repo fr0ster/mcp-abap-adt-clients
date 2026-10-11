@@ -138,7 +138,7 @@ export function readSessionMaterial(): ISessionMaterial | null {
  * `releaseTestConnection()` then deliberately does NOT end it — the run owns
  * it. A script going through both would take somebody's session and give
  * nothing back. Probes exhausting a system's pool is not hypothetical: two runs
- * of the ATC probe did it to E19, and the next four test runs died in
+ * of the ATC probe did it to the on-premise system, and the next four test runs died in
  * globalSetup with no session available.
  *
  * The two cases the file cannot tell apart are both named in the message,

@@ -21,7 +21,7 @@
  * if the locks appear anyway, the write takes them; if they do not, activation
  * does.
  *
- * Times are stamped in the server's clock — UTC+3 on E19, `SERVER_UTC_OFFSET`
+ * Times are stamped in the server's clock — UTC+3 on premise (BASIS 816), `SERVER_UTC_OFFSET`
  * to change — because SM12 prints that one, and matching the two is the point.
  */
 

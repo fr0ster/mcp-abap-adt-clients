@@ -25,7 +25,7 @@ const TRANSPORT_ITEM_XML =
   '<tm:request xmlns:tm="http://www.sap.com/cts/adt/tm" ' +
   'xmlns:adtcore="http://www.sap.com/adt/core" ' +
   'xmlns:atom="http://www.w3.org/2005/Atom" ' +
-  'tm:number="DEVK900438" tm:parent="" tm:owner="CB9900000000" ' +
+  'tm:number="DEVK900438" tm:parent="" tm:owner="SAPUSER01" ' +
   'tm:desc="Original description" tm:type="K" tm:status="D" tm:target="" ' +
   'tm:target_desc="" tm:cts_project="" tm:cts_project_desc="" ' +
   'tm:lastchanged_timestamp="20260811064450" ' +
@@ -36,7 +36,7 @@ const TRANSPORT_ITEM_XML =
   'type="application/vnd.sap.adt.transportrequests.v1+xml" ' +
   'title="Transport Organizer ADT URI"/>' +
   '<tm:task tm:number="DEVK900439" tm:parent="DEVK900438" ' +
-  'tm:owner="CB9900000000" tm:desc="Test" tm:type="Unclassified" ' +
+  'tm:owner="SAPUSER01" tm:desc="Test" tm:type="Unclassified" ' +
   'tm:status="D" tm:target="" tm:target_desc="" tm:cts_project="" ' +
   'tm:cts_project_desc="" tm:lastchanged_timestamp="20260811064451" ' +
   'tm:uri="/sap/bc/adt/vit/wb/object_type/%20%20%20%20rq/object_name/DEVK900439">' +
@@ -91,7 +91,7 @@ describe('AdtRequest.update()', () => {
     expect(calls[0].url).toBe(ITEM_URL);
     expect(String(calls[0].data)).toContain('tm:desc="New description"');
     // Everything else the caller kept is still there — because they kept it.
-    expect(String(calls[0].data)).toContain('tm:owner="CB9900000000"');
+    expect(String(calls[0].data)).toContain('tm:owner="SAPUSER01"');
     expect(String(calls[0].data)).toContain('tm:number="DEVK900438"');
   });
 

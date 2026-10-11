@@ -19,7 +19,7 @@
  *
  *   npx ts-node scripts/probe-activation-contention.ts
  *
- * The object is left in place. Times are in the server's clock (UTC+3 on E19,
+ * The object is left in place. Times are in the server's clock (UTC+3 on premise (BASIS 816),
  * `SERVER_UTC_OFFSET` to change) so SM12 rows can be matched afterwards.
  */
 
