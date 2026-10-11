@@ -3588,7 +3588,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 ## [7.2.0] - 2026-06-30
 
 ### Added
-- **Version history now surfaces the transport request.** `getVersions` (`parseVersionsFeed`) reads each version entry's transport-request `<atom:link>` and populates the new optional `IObjectVersion.transportRequest` (e.g. `'DS4K901917'`) and `transportDescription` (its short text). An entry may carry two such links (sapgui + adt) with the same request — the first wins; versions without a transport leave both undefined. Requires `@mcp-abap-adt/interfaces@^9.1.0`.
+- **Version history now surfaces the transport request.** `getVersions` (`parseVersionsFeed`) reads each version entry's transport-request `<atom:link>` and populates the new optional `IObjectVersion.transportRequest` (e.g. `'DEVK901917'`) and `transportDescription` (its short text). An entry may carry two such links (sapgui + adt) with the same request — the first wins; versions without a transport leave both undefined. Requires `@mcp-abap-adt/interfaces@^9.1.0`.
 
 ## [7.1.0] - 2026-06-28
 

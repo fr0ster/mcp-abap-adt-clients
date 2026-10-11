@@ -22,27 +22,27 @@ import { transportParsing } from '../../helpers/transportParsing';
 
   // @ts-expect-error createTask needs targetUser: without it the server
   // resolves the owner to an empty name and refuses.
-  c.getRequest().createTask('E19K905941');
+  c.getRequest().createTask('DEVK905941');
 
   // @ts-expect-error and naming the options without the user is no better.
-  c.getRequest().createTask('E19K905941', {});
+  c.getRequest().createTask('DEVK905941', {});
 
   // @ts-expect-error removeObject needs the position: without it the server
   // answers 200 and removes nothing.
-  c.getRequest().removeObject('E19K905942', { name: 'ZCL_X', type: 'CLAS' });
+  c.getRequest().removeObject('DEVK905942', { name: 'ZCL_X', type: 'CLAS' });
 
   // What a caller writes instead — the reading that produces the position,
   // and the removal that consumes it. No error expected on either.
-  c.getRequest().readObjects('E19K905942');
-  c.getRequest().removeObject('E19K905942', {
+  c.getRequest().readObjects('DEVK905942');
+  c.getRequest().removeObject('DEVK905942', {
     name: 'ZCL_X',
     type: 'CLAS',
     position: '000025',
   });
-  c.getRequest().createTask('E19K905941', { targetUser: 'DEVELOPER' });
+  c.getRequest().createTask('DEVK905941', { targetUser: 'DEVELOPER' });
 
   // An entry being added does not exist yet, so it has no position to give.
-  c.getRequest().addObject('E19K905942', { name: 'ZCL_X', type: 'CLAS' });
+  c.getRequest().addObject('DEVK905942', { name: 'ZCL_X', type: 'CLAS' });
 
   // **A listed entry is not removable on sight.** `readObjects` answers
   // `position?: string`, because an entry the server described without one
@@ -53,17 +53,17 @@ import { transportParsing } from '../../helpers/transportParsing';
   void (async () => {
     const listed = await c
       .getRequest(transportParsing)
-      .readObjects('E19K905942');
+      .readObjects('DEVK905942');
     if (!listed.ok) return;
     const [entry] = listed.getResult().value;
     // @ts-expect-error position is optional on a listed entry, required here
-    await c.getRequest().removeObject('E19K905942', { ...entry });
+    await c.getRequest().removeObject('DEVK905942', { ...entry });
 
     // Narrowed, it compiles — and that narrowing is the point.
     if (entry.position !== undefined)
       await c
         .getRequest()
-        .removeObject('E19K905942', { ...entry, position: entry.position });
+        .removeObject('DEVK905942', { ...entry, position: entry.position });
   })();
 };
 

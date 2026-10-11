@@ -20,9 +20,9 @@
  *
  * Usage:
  *
- *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG E19K906816
- *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG E19K906816 --update-request=E19K906818
- *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG E19K906816 --clean
+ *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK906816
+ *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK906816 --update-request=DEVK906818
+ *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK906816 --clean
  *
  * Idempotent: an object that already exists is updated rather than created, so
  * a re-run is a second development cycle on the same five objects.
@@ -246,10 +246,10 @@ CLASS zcl_ac_loan_demo IMPLEMENTATION.
     DATA(lv_issued) = CONV d( '20260901' ).
 
     DATA(lo_first) = lo_register->issue( iv_book     = 'ABAP to the Future'
-                                         iv_borrower = 'OKYSLYTSIA'
+                                         iv_borrower = 'SAPUSER01'
                                          iv_on       = lv_issued ).
     DATA(lo_second) = lo_register->issue( iv_book     = 'Clean ABAP'
-                                          iv_borrower = 'OKYSLYTSIA'
+                                          iv_borrower = 'SAPUSER01'
                                           iv_on       = lv_issued ).
 
     out->write( |open after issuing: { lo_register->open_count( ) }| ).

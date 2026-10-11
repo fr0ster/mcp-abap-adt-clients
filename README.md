@@ -536,7 +536,7 @@ await client.getBehaviorImplementation().create(
     packageName: 'ZOK_TEST_PKG_01',
     behaviorDefinition: 'ZOK_I_CDS_TEST',
     description: 'Behavior Implementation for ZOK_I_CDS_TEST',
-    transportRequest: 'E19K900001'
+    transportRequest: 'DEVK900001'
   }
 );
 // The class shell exists. Its `source/main` — the generated binding to the

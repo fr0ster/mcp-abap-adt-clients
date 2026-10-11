@@ -99,7 +99,7 @@ function identityAttributes(identity: IDebuggerIdentity): string {
     identity.debuggingMode === 'user'
       ? ` requestUser="${escapeXml(identity.requestUser)}"`
       : '';
-  return `debuggingMode="${identity.debuggingMode}" scope="external"${user} terminalId="${identity.terminalId}" ideId="${identity.ideId}"`;
+  return `debuggingMode="${identity.debuggingMode}" scope="external"${user} terminalId="${escapeXml(identity.terminalId)}" ideId="${escapeXml(identity.ideId)}"`;
 }
 
 // --- breakpoints ---------------------------------------------------------------
@@ -681,8 +681,10 @@ export async function terminateDebuggee(
  * Without an id it addresses the debuggee attached on this session: the
  * debugger leaves and the program runs on. With an id the server tries to
  * attach that caught debuggee, and if that fails it deletes its activation and
- * still answers success, so success does not prove attach and release. Server
- * source, BASIS 816, read 2026-10-11.
+ * still answers success, so success does not prove attach and release. In
+ * particular a success with the id of a debuggee attached on another session
+ * does not release that attachment (measured: that session could still step).
+ * Server source, BASIS 816, read 2026-10-11.
  *
  * Measured on premise (2026-10-11), BASIS 816:
  * - without an id, on the attached session: 200 with an empty body, and the

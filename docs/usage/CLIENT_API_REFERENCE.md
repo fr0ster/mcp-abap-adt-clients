@@ -497,7 +497,7 @@ const request = client.getRequest({
 });
 
 // What the task holds, each entry with the position the removal needs.
-const listed = await request.readObjects('E19K905942');
+const listed = await request.readObjects('DEVK905942');
 const entry = listed.ok
   ? listed.getResult().value.find((o) => o.name === 'ZMCP_BLD_FGR_H1')
   : undefined;
@@ -507,20 +507,20 @@ const entry = listed.ok
 // it cannot be removed, and the compiler asks rather than sending an empty
 // value that would remove nothing while answering 200.
 if (entry?.position)
-  await request.removeObject('E19K905942', { ...entry, position: entry.position });
+  await request.removeObject('DEVK905942', { ...entry, position: entry.position });
 
 // Confirm it: the action's own answer only echoes what it was asked.
-const log = await request.readActionLog('E19K905942');
-// → "OKYSLYTSIA deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"
+const log = await request.readActionLog('DEVK905942');
+// → "SAPUSER01 deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"
 
 // A task of your own under a shared request, to work in without touching it.
-const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' });
+const task = await request.createTask('DEVK905941', { targetUser: 'SAPUSER01' });
 
 // And the other direction.
-await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
+await request.addObject('DEVK907073', { name: 'Z_CL_000001', type: 'CLAS' });
 
 // A task is created without a type; this is how one is given.
-await request.changeTaskType('E19K907073', 'S'); // Development/Correction
+await request.changeTaskType('DEVK907073', 'S'); // Development/Correction
 ```
 
 Four things worth knowing before the first call, three of them measured

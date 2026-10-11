@@ -167,7 +167,17 @@ describe('AbapDebugger', () => {
     );
   });
 
-  it('setBreakpoints posts the user-mode set, adding without syncScope', async () => {
+  it('setBreakpoints escapes the ids it writes into attributes', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(
+      { ...identity, terminalId: 'T"&1', ideId: 'I<"2' },
+      [{ kind: 'statement', statement: 'RAISE' }],
+    );
+    expect(sent().data).toContain('terminalId="T&quot;&amp;1"');
+    expect(sent().data).toContain('ideId="I&lt;&quot;2"');
+  });
+
+  it('setBreakpoints posts the user-mode set without a syncScope', async () => {
     const { debugger_, sent } = setup();
     await debugger_.setBreakpoints(identity, [
       {

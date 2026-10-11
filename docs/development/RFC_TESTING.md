@@ -70,7 +70,7 @@ environment:
   system: "onprem"              # Which system. Stated, never inferred
   connection_type: "rfc"        # Use RFC transport instead of HTTP
   default_package: "$TMP"
-  default_master_system: "E19"
+  default_master_system: "SID"
 ```
 
 When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.

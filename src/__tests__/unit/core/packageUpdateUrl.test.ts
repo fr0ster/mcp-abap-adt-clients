@@ -28,14 +28,14 @@ function capturingConnection(): {
 describe('updatePackage URL', () => {
   const params = {
     package_name: 'ZAC_PKG',
-    transport_request: 'E19K900001',
+    transport_request: 'DEVK900001',
   } as never;
 
   it('carries the handle and the transport when both are given', async () => {
     const { connection, urls } = capturingConnection();
     await updatePackage(connection, params, '<pak:package/>', 'ABC123');
     expect(urls).toEqual([
-      '/sap/bc/adt/packages/zac_pkg?lockHandle=ABC123&corrNr=E19K900001',
+      '/sap/bc/adt/packages/zac_pkg?lockHandle=ABC123&corrNr=DEVK900001',
     ]);
   });
 
@@ -47,6 +47,6 @@ describe('updatePackage URL', () => {
       '<pak:package/>',
       undefined as unknown as string,
     );
-    expect(urls).toEqual(['/sap/bc/adt/packages/zac_pkg?corrNr=E19K900001']);
+    expect(urls).toEqual(['/sap/bc/adt/packages/zac_pkg?corrNr=DEVK900001']);
   });
 });

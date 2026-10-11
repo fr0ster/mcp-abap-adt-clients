@@ -78,7 +78,7 @@ client-side does not end it on the server.
 | `stopListener` | `DELETE /debugger/listeners?debuggingMode[&requestUser]` | `*/*` |
 | `attach` | `POST /debugger?method=attach&debuggeeId&dynproDebugging=true&debuggingMode[&requestUser]` | `*/*` |
 | `syncBreakpoints` | `POST /debugger/breakpoints`, body `dbg:breakpoints` with `<syncScope mode="full"/>` or `mode="partial"` and one `adtcore:objectReference` per object | `*/*` |
-| `checkListener` | `GET /debugger/listeners?debuggingMode[&requestUser]&terminalId&ideId&checkConflict=true` | `*/*` |
+| `checkListener` | `GET /debugger/listeners?debuggingMode[&requestUser]&terminalId&ideId&checkConflict=true` | `application/xml` |
 | `detachDebugger` | `POST /debugger?method=detachDebugger[&debuggeeId]` | `*/*` |
 | `terminateDebugger` | `POST /debugger?method=terminateDebugger` | `*/*` |
 | `setDebuggerSettings` | `POST /debugger?method=setDebuggerSettings`, body `dbg:settings` | `application/xml` |

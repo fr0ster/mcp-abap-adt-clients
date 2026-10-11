@@ -64,7 +64,7 @@ const REDACT = new Set(['authorization', 'x-csrf-token']);
  * session id — so the identity can be followed across a log without the value
  * ever appearing in it.
  *
- *   SAP_SESSIONID_E19_100=#3f9a1c4e; sap-usercontext=#b1d0e772
+ *   SAP_SESSIONID_SID_100=#3f9a1c4e; sap-usercontext=#b1d0e772
  */
 function fingerprintCookies(value: string): string {
   return value

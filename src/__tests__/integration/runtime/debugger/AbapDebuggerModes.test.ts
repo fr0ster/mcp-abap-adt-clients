@@ -592,9 +592,11 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
       ...(transportRequest ? { transportRequest } : {}),
     };
     const created = await cls.create(config);
-    if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
+    // An object that already exists is not ours: neither overwritten here nor
+    // deleted in afterAll, so the setup fails instead.
+    if (!created.ok) {
       throw new Error(
-        `probe ${className} create: ${created.getError().message}`,
+        `probe ${className} create: ${created.getError().message} (an existing object is never overwritten; remove it or pick another name)`,
       );
     }
     deployed.push(className);
@@ -872,6 +874,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           scope.arm(listenerApi, identity, armed);
           const answer = await then();
           record(12, `${label} answered ${summary(answer)}`);
+          expect(answer.ok).toBe(true);
           const runB = await listenAndRun(scope, CLASS_B, {
             holdSeconds: SHORT_HOLD_SECONDS,
           });
@@ -879,9 +882,13 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           record(12, `after ${label}, a run of B was caught: ${caught}`);
           if (runB.caught) {
             const session = await attachOn(scope, runB.caught);
-            await continueToEnd(scope, session.api, runB.run);
+            expect(await continueToEnd(scope, session.api, runB.run)).toBe(
+              OUTPUT_B,
+            );
           } else {
-            await runB.run;
+            const outputB = await runB.run;
+            expect(outputB.ok).toBe(true);
+            expect(documentOf(outputB).trim()).toBe(OUTPUT_B);
           }
           return caught;
         };
@@ -1245,6 +1252,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const aging = await api.setDebuggerSettings({ showDataAging: true });
         record(8, `{ showDataAging: true } answered ${summary(aging)}`);
         expect(aging.ok).toBe(true);
+        expect(attr(documentOf(aging), 'showDataAging')).toBe('true');
         await readBack('showDataAging true');
         const agingOff = await api.setDebuggerSettings({});
         record(8, `{} after showDataAging answered ${summary(agingOff)}`);

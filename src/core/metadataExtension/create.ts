@@ -28,7 +28,7 @@ import type { IMetadataExtensionCreateParams } from './types';
  *   name: 'ZDEMO_C_CDS_MDE',
  *   description: 'First metadata extension',
  *   packageName: 'ZDEMO_PKG',
- *   transportRequest: 'TRLK900123'
+ *   transportRequest: 'DEVK900123'
  * }, sessionId);
  * ```
  */

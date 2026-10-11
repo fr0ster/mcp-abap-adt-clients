@@ -14,7 +14,7 @@
  *
  *   npx ts-node scripts/probe-two-sessions-one-object.ts
  *   npx ts-node scripts/probe-two-sessions-one-object.ts --contend
- *   npx ts-node scripts/probe-two-sessions-one-object.ts ZAC_TR_PKG E19K906816
+ *   npx ts-node scripts/probe-two-sessions-one-object.ts ZAC_TR_PKG DEVK906816
  *
  * `--steps [seconds]` runs the cycle one step at a time, announcing each and
  * pausing, so SM12 can be watched between them. It exists because the lock this
