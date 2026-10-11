@@ -117,7 +117,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^13.2.0",
+    "@mcp-abap-adt/interfaces-adt": "^14.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^2.0.0",
     "@mcp-abap-adt/interfaces-network": "^2.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.0",

@@ -60,7 +60,12 @@ function identityFor(): IDebuggerIdentity {
       .digest('hex')
       .slice(0, 32)
       .toUpperCase();
-  return { requestUser, terminalId: id('terminalId'), ideId: id('ideId') };
+  return {
+    debuggingMode: 'user',
+    requestUser,
+    terminalId: id('terminalId'),
+    ideId: id('ideId'),
+  };
 }
 
 function clip(text: string): string {
@@ -119,7 +124,7 @@ async function variantB(
 ): Promise<number | undefined> {
   const query = new URLSearchParams({
     debuggingMode: 'user',
-    requestUser: identity.requestUser,
+    requestUser: identity.debuggingMode === 'user' ? identity.requestUser : '',
     terminalId: identity.terminalId,
     ideId: identity.ideId,
     timeout: String(HOLD_SECONDS),

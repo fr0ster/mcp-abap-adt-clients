@@ -2,6 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
+    // The published strategies package still carries its own interfaces-adt
+    // (13.x) until its 0.9.0 is out; declaration emit would have to name that
+    // nested copy (TS2742). This config only checks, so it emits nothing.
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
     "rootDir": ".",
     "typeRoots": ["./node_modules/@types"]
   },

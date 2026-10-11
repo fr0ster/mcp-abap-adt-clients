@@ -12,7 +12,9 @@ import type {
   IAdtError,
   IAdtResponse,
   IDebuggerBreakpoint,
+  IDebuggerBreakpointSync,
   IDebuggerIdentity,
+  IDebuggerSettings,
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
   IResultStrategy,
@@ -56,6 +58,8 @@ export interface IAbapDebuggerResults {
   readonly watchpoints: IResultStrategy<unknown>;
   /** The memory sizes and the snapshot's confirmation. */
   readonly memory: IResultStrategy<unknown>;
+  /** The debugger settings' confirmation. */
+  readonly settings: IResultStrategy<unknown>;
 }
 
 /**
@@ -74,6 +78,7 @@ export const abapDebuggerDocuments = {
   done: nothing,
   watchpoints: rawDocument,
   memory: rawDocument,
+  settings: rawDocument,
 } satisfies IAbapDebuggerResults;
 
 /** How this implementation behaves, fixed when it is constructed. */
@@ -104,7 +109,8 @@ export class AbapDebugger<
       Of<R, 'step'>,
       Of<R, 'done'>,
       Of<R, 'watchpoints'>,
-      Of<R, 'memory'>
+      Of<R, 'memory'>,
+      Of<R, 'settings'>
     >
 {
   readonly kind = 'abapDebugger' as const;
@@ -182,7 +188,7 @@ export class AbapDebugger<
   }
 
   async attach<E extends IAdtError = IAdtError>(
-    requestUser: string,
+    identity: IDebuggerIdentity,
     debuggeeId: string,
     options?: {
       dynproDebugging?: boolean;
@@ -194,7 +200,7 @@ export class AbapDebugger<
       () =>
         attach(
           this.connection,
-          requestUser,
+          identity,
           debuggeeId,
           options?.dynproDebugging,
           options?.server,
@@ -342,5 +348,40 @@ export class AbapDebugger<
       this.reading('memory'),
       options?.analyse,
     );
+  }
+
+  // Stubs: Tasks 3-6 of the #217 plan replace them.
+  async syncBreakpoints<E extends IAdtError = IAdtError>(
+    _identity: IDebuggerIdentity,
+    _sync: IDebuggerBreakpointSync,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
+    throw new Error('not implemented: syncBreakpoints');
+  }
+
+  async checkListener<E extends IAdtError = IAdtError>(
+    _identity: IDebuggerIdentity,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+    throw new Error('not implemented: checkListener');
+  }
+
+  async detachDebugger<E extends IAdtError = IAdtError>(
+    _options?: { debuggeeId?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+    throw new Error('not implemented: detachDebugger');
+  }
+
+  async terminateDebugger<E extends IAdtError = IAdtError>(
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+    throw new Error('not implemented: terminateDebugger');
+  }
+
+  async setDebuggerSettings<E extends IAdtError = IAdtError>(
+    _settings: IDebuggerSettings,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<Of<R, 'settings'>, E>> {
+    throw new Error('not implemented: setDebuggerSettings');
   }
 }

@@ -64,14 +64,38 @@ function query(params: Record<string, string | number | boolean>): string {
   ).toString();
 }
 
-/** The four parameters SAP keys a user-mode listener and its breakpoints on. */
-function identityQuery(identity: IDebuggerIdentity): Record<string, string> {
+/**
+ * The parameters SAP keys a listener and its breakpoints on, by mode. `terminal` mode sends no `requestUser` — the
+ * server reads none there — except on a breakpoint DELETE, which requires the parameter in every mode: left out it
+ * answers 400 `ExceptionParameterNotFound`, empty it answers 200 (on premise, 2026-10-11).
+ */
+function identityQuery(
+  identity: IDebuggerIdentity,
+  purpose?: 'delete',
+): Record<string, string> {
+  if (identity.debuggingMode === 'user') {
+    return {
+      debuggingMode: 'user',
+      requestUser: identity.requestUser,
+      terminalId: identity.terminalId,
+      ideId: identity.ideId,
+    };
+  }
   return {
-    debuggingMode: 'user',
-    requestUser: identity.requestUser,
+    debuggingMode: 'terminal',
+    ...(purpose === 'delete' ? { requestUser: '' } : {}),
     terminalId: identity.terminalId,
     ideId: identity.ideId,
   };
+}
+
+/** The identity's attributes on a breakpoints body, by mode. */
+function identityAttributes(identity: IDebuggerIdentity): string {
+  const user =
+    identity.debuggingMode === 'user'
+      ? ` requestUser="${escapeXml(identity.requestUser)}"`
+      : '';
+  return `debuggingMode="${identity.debuggingMode}" scope="external"${user} terminalId="${identity.terminalId}" ideId="${identity.ideId}"`;
 }
 
 // --- breakpoints ---------------------------------------------------------------
@@ -112,7 +136,7 @@ export function buildBreakpointsXml(
     .join('\n');
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    `<dbg:breakpoints ${ADT_NAMESPACES} debuggingMode="user" scope="external" requestUser="${escapeXml(identity.requestUser)}" terminalId="${identity.terminalId}" ideId="${identity.ideId}">\n` +
+    `<dbg:breakpoints ${ADT_NAMESPACES} ${identityAttributes(identity)}>\n` +
     `${rows}\n</dbg:breakpoints>`
   );
 }
@@ -148,7 +172,7 @@ export async function deleteBreakpoint(
   breakpointId: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${DEBUGGER}/breakpoints/${encodeURIComponent(breakpointId)}?${query({ scope: 'external', ...identityQuery(identity) })}`,
+    url: `${DEBUGGER}/breakpoints/${encodeURIComponent(breakpointId)}?${query({ scope: 'external', ...identityQuery(identity, 'delete') })}`,
     method: 'DELETE',
     timeout: getTimeout('default'),
   });
@@ -186,6 +210,8 @@ export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
  * - `takeOver` sends neither: the server accepts this listener, and the
  *   other one's long poll returns at once with 409 `conflictNotification` —
  *   the notice Eclipse shows before it stops listening.
+ *
+ * The identity's mode decides the parameters: `terminal` mode sends no `requestUser`.
  *
  * There is no default. Which of the two is right depends on whose debugger is
  * displaced, and only the caller knows that.
@@ -254,13 +280,18 @@ export async function stopListener(
  */
 export async function attach(
   connection: IAbapConnection,
-  requestUser: string,
+  identity: IDebuggerIdentity,
   debuggeeId: string,
   dynproDebugging = true,
   server?: string,
 ): Promise<IAdtWireResponse> {
+  // The server attaches by debuggeeId; it reads debuggingMode, and requestUser only in user mode.
+  const who: Record<string, string> =
+    identity.debuggingMode === 'user'
+      ? { debuggingMode: 'user', requestUser: identity.requestUser }
+      : { debuggingMode: 'terminal' };
   return connection.makeAdtRequest({
-    url: `${DEBUGGER}?${query({ method: 'attach', debuggeeId, debuggingMode: 'user', requestUser, dynproDebugging })}`,
+    url: `${DEBUGGER}?${query({ method: 'attach', debuggeeId, ...who, dynproDebugging })}`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {

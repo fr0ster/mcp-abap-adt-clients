@@ -17,6 +17,7 @@ import {
  */
 describe('AbapDebugger', () => {
   const identity: IDebuggerIdentity = {
+    debuggingMode: 'user',
     requestUser: 'SAPUSER01',
     terminalId: 'EC80D3662BADB8CD21C70406E0E96D4C',
     ideId: '7194D729E68FDAF6E185C7E5124CC900',
@@ -144,17 +145,67 @@ describe('AbapDebugger', () => {
 
   it('attach goes through the dispatcher with the debuggee id', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.attach('SAPUSER01', '0CC47A1E68C11FE1B0F9C08CD46015CB');
+    await debugger_.attach(identity, '0CC47A1E68C11FE1B0F9C08CD46015CB');
     expect(sent()).toMatchObject({
       method: 'POST',
       url: '/sap/bc/adt/debugger?method=attach&debuggeeId=0CC47A1E68C11FE1B0F9C08CD46015CB&debuggingMode=user&requestUser=SAPUSER01&dynproDebugging=true',
     });
   });
 
+  const terminal: IDebuggerIdentity = {
+    debuggingMode: 'terminal',
+    terminalId: 'EC80D3662BADB8CD21C70406E0E96D4C',
+    ideId: '7194D729E68FDAF6E185C7E5124CC900',
+  };
+
+  it('a terminal identity keys the listener on its ids and sends no requestUser', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.listen(terminal);
+    expect(sent().url).toContain(
+      'debuggingMode=terminal&terminalId=EC80D3662BADB8CD21C70406E0E96D4C&ideId=7194D729E68FDAF6E185C7E5124CC900',
+    );
+    expect(sent().url).not.toContain('requestUser');
+  });
+
+  it('a terminal identity arms breakpoints without requestUser', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(terminal, [
+      {
+        kind: 'line',
+        uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
+      },
+    ]);
+    expect(sent().data).toContain(
+      'debuggingMode="terminal" scope="external" terminalId="EC80D3662BADB8CD21C70406E0E96D4C" ideId="7194D729E68FDAF6E185C7E5124CC900"',
+    );
+    expect(sent().data).not.toContain('requestUser');
+  });
+
+  it('deleting a terminal-mode breakpoint sends requestUser empty, as the server requires it', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.deleteBreakpoint(terminal, 'KIND=0.SOURCETYPE=ABAP');
+    expect(sent().url).toBe(
+      '/sap/bc/adt/debugger/breakpoints/KIND%3D0.SOURCETYPE%3DABAP?scope=external&debuggingMode=terminal&requestUser=&terminalId=EC80D3662BADB8CD21C70406E0E96D4C&ideId=7194D729E68FDAF6E185C7E5124CC900',
+    );
+  });
+
+  it('attach sends the mode, and requestUser only in user mode', async () => {
+    const user = setup();
+    await user.debugger_.attach(identity, 'DBG1');
+    expect(user.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=attach&debuggeeId=DBG1&debuggingMode=user&requestUser=SAPUSER01&dynproDebugging=true',
+    );
+    const term = setup();
+    await term.debugger_.attach(terminal, 'DBG1');
+    expect(term.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=attach&debuggeeId=DBG1&debuggingMode=terminal&dynproDebugging=true',
+    );
+  });
+
   it('attach routed to a server sends the saplb header, and none otherwise', async () => {
     const routed = setup();
     await routed.debugger_.attach(
-      'SAPUSER01',
+      identity,
       '0CC47A1E68C11FE1B0F9C08CD46015CB',
       {
         server: 'appserver-a1b2c',
@@ -163,10 +214,7 @@ describe('AbapDebugger', () => {
     expect(routed.sent().headers?.saplb).toBe('appserver-a1b2c');
 
     const plain = setup();
-    await plain.debugger_.attach(
-      'SAPUSER01',
-      '0CC47A1E68C11FE1B0F9C08CD46015CB',
-    );
+    await plain.debugger_.attach(identity, '0CC47A1E68C11FE1B0F9C08CD46015CB');
     expect(plain.sent().headers?.saplb).toBeUndefined();
   });
 

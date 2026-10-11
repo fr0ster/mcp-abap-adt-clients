@@ -179,7 +179,12 @@ function identityFor(user: string): IDebuggerIdentity {
       .digest('hex')
       .slice(0, 32)
       .toUpperCase();
-  return { requestUser, terminalId: id('terminalId'), ideId: id('ideId') };
+  return {
+    debuggingMode: 'user',
+    requestUser,
+    terminalId: id('terminalId'),
+    ideId: id('ideId'),
+  };
 }
 
 /**
@@ -486,13 +491,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
         className: CLASS_NAME,
       });
       await openDebugSession();
-      const answer = await debuggerApi.attach(
-        identity.requestUser,
-        debuggeeId,
-        {
-          server,
-        },
-      );
+      const answer = await debuggerApi.attach(identity, debuggeeId, {
+        server,
+      });
       const document = documentOf(answer);
       if (!answer.ok) {
         process.stdout.write(
@@ -772,13 +773,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
         className: CLASS_NAME,
       });
       await openDebugSession();
-      const second = await debuggerApi.attach(
-        identity.requestUser,
-        debuggeeId,
-        {
-          server,
-        },
-      );
+      const second = await debuggerApi.attach(identity, debuggeeId, {
+        server,
+      });
       if (!second.ok) {
         process.stdout.write(
           `MEASURED attach refused: ${statusOf(second)} ${subtypeOf(second) ?? ''} ${documentOf(second).slice(0, 900)}\n`,
