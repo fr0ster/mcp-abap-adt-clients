@@ -53,7 +53,7 @@ What still needs research is how each remaining "unknown" and "likely" row is ca
 - `POST /debugger/breakpoints` carries `systemDebugging`, `deactivated` and a `syncScope`:
   - `<syncScope mode="full"/>` replaces the set of that identity;
   - `<syncScope mode="partial"><adtcore:objectReference adtcore:uri="…"/></syncScope>` replaces only the breakpoints of one object.
-- Each `<breakpoint>` carries `clientId` and `skipCount`, and optionally `condition`. The answer echoes `clientId` on each breakpoint, and on each error as well, with `errorMessage`.
+- Each `<breakpoint>` carries `clientId` and `skipCount`, and optionally `condition`. The answer echoes `clientId` on each breakpoint, and on each error as well, with `errorMessage`. Since `interfaces-adt` 15 / `adt-clients` 29 the library sends `clientId` (any kind) and no longer has `skipCount`.
 - `scope` is `external` or `debugger`.
 
 **The debuggee a listener catches** carries:
@@ -162,16 +162,20 @@ Server source: on premise, BASIS 816, read 2026-10-11, paraphrased and never quo
 - **Terminal DELETE.** Deleting a terminal-mode breakpoint requires the `requestUser` parameter: left out it answers `400 ExceptionParameterNotFound`, empty or the logon user it answers `200`. A terminal identity sends it empty.
 - **Terminal mode.** Check, listen, stop, set and delete answer `200`. A catch is unmeasured: Eclipse's own runs under Terminal ID were not caught, another client reports 0 of 7, a run from SAP GUI for Windows is untested.
 - **`setBreakpoints` replaces.** A run of a second program was caught with nothing in between, and not caught after `setBreakpoints` with another line, after a `validationOnly` request, or after `stopListener` (which deletes the key's breakpoints). `partial` keeps the other program's line breakpoints and an exception breakpoint.
+- **`clientId`.** The server echoes `clientId` on every row of the answer, placed and refused alike, and does not keep the request's order: with five rows sent (two line rows the server refuses with "Cannot create a breakpoint at this position", one line row placed, two exception rows placed) the two refused rows came first. A line breakpoint is also renumbered, so neither position nor id pairs an answer row with its request row; `clientId` does. The library sends it on any kind (`adt-clients` 29); a recorded answer is `src/__tests__/fixtures/debugger/breakpoints-answer-client-id.xml`, sanitised.
 - **`skipCount`.** A value of 2 on a loop stopped at the first pass, in three runs.
 - **Detach.** Without an id the run finishes, and a listener standing at the time caught the same run again at the next pass of the armed line. With the id of an unattached debuggee it answers `200` and the run returned about a second later, not after the ~30 s hold. With the id of a debuggee attached elsewhere it answers `200` and the attached session still steps it.
 - **`terminateDebugger`.** A plain `500`; the program returned its output at the same moment; the next request on that session answered `400` (session gone).
 - **Settings.** The answer is the six attributes in force. `true`, then `{}`, keeps `true`; `false` clears; `showDataAging` `true`, then `{}`, answers `false`. The first call after an attach with `systemDebugging=false` answered `false`, which cannot tell "ignored" from "applied".
 - **The listener context.** A listener for a second request user started on a session that had served another identity waited for the first identity and caught nothing; on a session of its own it caught.
 
-## Contract follow-ups for the next interfaces-adt major
+## Contract follow-ups
 
-These were left from #217 (adt-clients 28.0.0). Interfaces-adt 14.x keeps the old wording until then.
+Done in `interfaces-adt` 15 / `adt-clients` 29:
 
-- **Remove `skipCount`.** The server ignores it on an external breakpoint, measured on premise (2026-10-11), BASIS 816. This library refuses a value above 0.
-- **Reword `syncBreakpoints`.** The contract says it replaces "instead of adding", on `IDebuggerBreakpointSync` and on the member. But `setBreakpoints` replaces too, so the text should name what `syncBreakpoints` adds: the explicit name, `full` with `[]`, and `partial`.
-- **Fix "only adds" wording.** Any wording in the contract that says `setBreakpoints` only adds goes the same way.
+- `skipCount` left the contract.
+- `syncBreakpoints` was reworded.
+- `setBreakpoints` is described as replacing the key's set, not adding to it.
+- `clientId` was added.
+
+Nothing is open.

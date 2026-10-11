@@ -75,34 +75,76 @@ describe('AbapDebugger', () => {
     );
   });
 
-  it('skipCount 0 means "no skip": accepted, and nothing is sent for it', async () => {
+  it('clientId is sent on every kind and escaped', async () => {
     const { debugger_, sent } = setup();
-    const answer = await debugger_.setBreakpoints(identity, [
-      { kind: 'line', uri: '/x/source/main#start=3', skipCount: 0 },
+    await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3', clientId: 'a<1>' },
+      { kind: 'exception', exceptionClass: 'CX_X', clientId: 'b"2' },
+      { kind: 'statement', statement: 'COMMIT WORK', clientId: 'c&3' },
+      {
+        kind: 'message',
+        msgId: 'XX',
+        msgNo: '001',
+        msgTy: 'E',
+        clientId: 'd4',
+      },
     ]);
-    expect(answer.ok).toBe(true);
-    expect(sent().data).toContain(
-      '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3"/>',
-    );
-    expect(sent().data).not.toContain('skipCount');
+    const body = sent().data as string;
+    expect(body).toContain('clientId="a&lt;1&gt;"');
+    expect(body).toContain('clientId="b&quot;2"');
+    expect(body).toContain('clientId="c&amp;3"');
+    expect(body).toContain('clientId="d4"');
   });
 
-  it('a skip count above 0 is refused before the wire: the server ignores it on an external breakpoint', async () => {
-    const { debugger_, connection } = setup();
-    const line = await debugger_.setBreakpoints(identity, [
-      { kind: 'line', uri: '/x/source/main#start=3', skipCount: 2 },
-    ]);
-    expect(line.ok).toBe(false);
-    if (!line.ok) expect(line.getError().message).toMatch(/skipCount/);
-    const synced = await debugger_.syncBreakpoints(identity, {
+  it('clientId is sent through syncBreakpoints as well', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.syncBreakpoints(identity, {
       scope: 'full',
       breakpoints: [
-        { kind: 'exception', exceptionClass: 'CX_X', skipCount: 1 },
+        { kind: 'exception', exceptionClass: 'CX_X', clientId: 'k1' },
       ],
     });
-    expect(synced.ok).toBe(false);
-    if (!synced.ok) expect(synced.getError().message).toMatch(/skipCount/);
-    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+    expect(sent().data).toContain(
+      '<breakpoint kind="exception" exceptionClass="CX_X" clientId="k1"/>',
+    );
+  });
+
+  it('the answer keeps clientId on every row, refused first, in the server order', async () => {
+    // Sanitised recording (on premise, 2026-10-11, BASIS 816): the server echoes
+    // clientId on placed and refused rows alike and answers the refused first.
+    const recorded = fs.readFileSync(
+      path.join(
+        __dirname,
+        '../../fixtures/debugger/breakpoints-answer-client-id.xml',
+      ),
+      'utf8',
+    );
+    const { debugger_ } = setup({ status: 200, data: recorded, headers: {} });
+    const answer = await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=5', clientId: 'client-1' },
+    ]);
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) return;
+    const rows = [
+      ...String(answer.getResult().value).matchAll(/<breakpoint\b[^>]*>/g),
+    ].map((m) => m[0]);
+    expect(rows).toHaveLength(5);
+    expect(rows.map((r) => /clientId="([^"]*)"/.exec(r)?.[1])).toEqual([
+      'client-3',
+      'client-4',
+      'client-1',
+      'client-2',
+      'client-5',
+    ]);
+    expect(rows.filter((r) => r.includes('errorMessage'))).toHaveLength(2);
+  });
+
+  it('no clientId attribute when none is set', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(identity, [
+      { kind: 'line', uri: '/x/source/main#start=3' },
+    ]);
+    expect(sent().data).not.toContain('clientId');
   });
 
   it('a condition smuggled onto another kind by a cast is refused before the wire', async () => {

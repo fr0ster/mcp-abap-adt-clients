@@ -1879,8 +1879,11 @@ const identity = { debuggingMode: 'user', requestUser, terminalId, ideId } as co
 
 listenerConnection.setSessionType('stateful');
 const listener = new AbapDebugger(listenerConnection, logger);
+// clientId (any kind) is the caller's tag: the server echoes it on every row of
+// the answer, placed and refused, and does not keep the request's order, so it
+// is what pairs an answer row with the request row that made it.
 await listener.setBreakpoints(identity, [
-  { kind: 'line', uri: `${sourceUri}#start=12` },
+  { kind: 'line', uri: `${sourceUri}#start=12`, clientId: 'loop-line' },
 ]);
 
 const caught = listener.listen(identity, { holdSeconds: 60 });
@@ -1939,11 +1942,12 @@ await run;
   on a connection of its own. The library adds no guard.
   Measured on premise (2026-10-11), SAP_BASIS 816; the caching is in the server
   source, SAP_BASIS 816, read 2026-10-11.
-- **`skipCount` is typed but refused.** It is still in the 14.x contract's
-  type, but a value above 0 is answered `ok: false` without a request, because
-  the server accepts it on an external breakpoint and ignores it: the first hit
-  stops. Measured on premise (2026-10-11), SAP_BASIS 816. `0` is accepted, and
-  the field is to leave the contract in its next major.
+- **`clientId` tags a breakpoint of any kind.** The server echoes it on every
+  row of the answer - placed and refused - and answers the rows out of the
+  request's order, refused first; a line breakpoint is renumbered as well. Pair
+  by `clientId`. Measured on premise (2026-10-11), SAP_BASIS 816. There is no
+  `skipCount` (removed in `interfaces-adt` 15): the server ignored it on an
+  external breakpoint.
 - **`terminateDebugger`** ends the debugger's own session, and the answer is a
   plain `500` with no ADT document. The program runs on and returns its
   output, and the session cannot be used afterwards. Pass

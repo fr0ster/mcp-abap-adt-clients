@@ -91,7 +91,7 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^14.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^15.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
   | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^2.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.0` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.0` | `ILogger`, `LogLevel`, `XmlNode` |
@@ -162,7 +162,7 @@ npm install @mcp-abap-adt/adt-clients
 
 6. **AbapDebugger, AmdpDebugger, MemorySnapshots**
    - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `new AbapDebugger(connection, logger, results?, { onConflict? })`
-   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 14 pairs with clients 28)
+   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 15 pairs with clients 29)
    - **The identity states its mode.** `{ debuggingMode: 'user', requestUser, terminalId, ideId }`, or `{ debuggingMode: 'terminal', terminalId, ideId }`; `attach` takes the identity, not the user. A catch in terminal mode is unmeasured
    - **Breakpoints are replaced, not added to.** `setBreakpoints` and `syncBreakpoints` replace the identity's set, and `stopListener` deletes it: arm the whole set in one call
    - **Two sessions.** The ABAP listener holds one stateful connection; each debuggee caught is attached on a new one, routed to its application server. The AMDP debugger answers events on one session and takes commands on another
@@ -857,7 +857,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^14.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^2.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^15.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^2.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -937,7 +937,7 @@ contracts (`IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots`, 13.1.0). This
 package no longer declares or exports any contract type — every contract name it uses is
 sourced from the contract packages.
 
-> **Version pairing.** `adt-clients` 28 pairs with `interfaces-adt` 14 (the debugger identity by mode, `TSettings`), and `adt-strategies` 0.9.0 declares the same range. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
+> **Version pairing.** `adt-clients` 29 pairs with `interfaces-adt` 15 (breakpoints lose `skipCount` and gain `clientId`), and `adt-strategies` 0.10.0 declares the same range. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
 ### Naming Conventions
 

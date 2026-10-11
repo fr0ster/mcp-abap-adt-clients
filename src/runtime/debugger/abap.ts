@@ -129,22 +129,14 @@ function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
       `condition is accepted on a line breakpoint only, not on kind "${bp.kind}"`,
     );
   }
-  if (bp.skipCount !== undefined && bp.skipCount > 0) {
-    // Still in the 14.x contract's type, refused here, and to leave the
-    // contract in its next major. Every breakpoint this module sends is
-    // external (`scope="external"`), and the server accepts a skip count there
-    // and drops it: it is not echoed, and the first hit stops - measured on
-    // premise (2026-10-11), BASIS 816, `skipCount="2"` on a loop line stopped
-    // on pass 1. The stored form of an external breakpoint has no field for it
-    // (server source, BASIS 816, read 2026-10-11). Sending it would arm a
-    // breakpoint that stops on every hit - refuse. `0` means "no skip", which
-    // is what the server does anyway, so it is accepted and sends nothing.
-    throw new Error(
-      `skipCount ${bp.skipCount} is not applied to an external breakpoint (kind "${bp.kind}"): the server ignores it`,
-    );
-  }
   const cond = condition ? ` condition="${escapeXml(condition)}"` : '';
-  return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${cond}${only}/>`;
+  // The caller's tag, on any kind. The server echoes it on every row of the
+  // answer, placed and refused, and does not keep the request's order (refused
+  // rows first) - measured on premise (2026-10-11), BASIS 816 - so it is what
+  // pairs an answer row with the request row that made it.
+  const tag =
+    bp.clientId !== undefined ? ` clientId="${escapeXml(bp.clientId)}"` : '';
+  return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${cond}${tag}${only}/>`;
 }
 
 /**
@@ -201,11 +193,12 @@ export function buildSyncBreakpointsXml(
  * include it falls in (`#start=16` in a class became `LINE_NR=5` of the method
  * include), so its id cannot be predicted.
  *
- * **`skipCount` greater than 0 is refused** (`ok: false`, nothing sent). It is
- * still in the 14.x contract's type, but the server ignores it on an external
- * breakpoint - the first hit stops (measured on premise (2026-10-11), BASIS
- * 816) - and it is to leave the contract in its next major. `0` is accepted
- * and sends nothing.
+ * **`clientId`** on a breakpoint of any kind is the caller's tag, sent as the
+ * row's `clientId`. The server echoes it on every row of the answer - placed
+ * and refused - and does not keep the request's order: on premise (2026-10-11),
+ * BASIS 816, the refused rows came first. A line breakpoint is also renumbered,
+ * so neither the position nor the id pairs an answer row with its request row;
+ * the tag does.
  */
 export async function setBreakpoints(
   connection: IAbapConnection,
@@ -229,11 +222,12 @@ export async function setBreakpoints(
  * for it, `full` with `[]` to clear the key, and `partial` to replace one
  * object's line breakpoints and keep the rest.
  *
- * **`skipCount` greater than 0 is refused** (`ok: false`, nothing sent). It is
- * still in the 14.x contract's type, but the server ignores it on an external
- * breakpoint - the first hit stops (measured on premise (2026-10-11), BASIS
- * 816) - and it is to leave the contract in its next major. `0` is accepted
- * and sends nothing.
+ * **`clientId`** on a breakpoint of any kind is the caller's tag, sent as the
+ * row's `clientId`. The server echoes it on every row of the answer - placed
+ * and refused - and does not keep the request's order: on premise (2026-10-11),
+ * BASIS 816, the refused rows came first. A line breakpoint is also renumbered,
+ * so neither the position nor the id pairs an answer row with its request row;
+ * the tag does.
  *
  * Measured on premise (2026-10-11), BASIS 816, with two classes (two main
  * programs) and a caught exception:
