@@ -35,6 +35,7 @@ import type {
   IAdtServiceGroupReadable,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
   IAdtTransportSearchConfigurations,
   IAdtTransportSortAndCompress,
@@ -961,7 +962,8 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<NonNullable<R['objects']>>,
     ReturnType<NonNullable<R['taskTypeChanged']>>
   > &
-  IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>>;
+  IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>> &
+  IAdtTransportMoveObjects<ReturnType<R['movedObjects']>>;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,
   ReturnType<R['source']>

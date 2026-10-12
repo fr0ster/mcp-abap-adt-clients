@@ -35,6 +35,7 @@ import type {
   IAdtRequest,
   IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
   IAdtTransportSortAndCompress,
   IListTransportsOptions,
@@ -110,7 +111,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       ReturnType<R['objects']>,
       ReturnType<R['taskTypeChanged']>
     >,
-    IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>>
+    IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>>,
+    IAdtTransportMoveObjects<ReturnType<R['movedObjects']>>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

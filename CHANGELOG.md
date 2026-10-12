@@ -24,6 +24,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [30.0.0] - 2026-10-12
+
+**BREAKING:** `ITransportResults` has two more required slots,
+`sortedAndCompressed` and `movedObjects`. A result set that spreads
+`transportDocuments` is unaffected; a hand-written one names both (see
+*Migration* below and [MIGRATION-30.md](docs/usage/MIGRATION-30.md)).
+
 ### Added
 
 - **`getRequest().sortAndCompress(taskNumber)`** — the transport organizer's
@@ -43,11 +50,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   its `position` in the source. Measured on premise (2026-10-12, BASIS 816):
   one and two entries per call answered `200` echoing them, and both tasks read
   back with them moved. Its reading is the new `movedObjects` slot of
-  `ITransportResults`, `rawDocument` by default.
+  `ITransportResults`, `rawDocument` by default. `getRequest()`'s contract
+  carries it as `IAdtTransportMoveObjects`.
 
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` is `^15.2.0`.
+- `@mcp-abap-adt/interfaces-adt` is `^15.3.0`.
+
+### Migration
+
+A result set for `getRequest()` written slot by slot no longer compiles: add
+the two slots, with the shipped reading or your own —
+
+```typescript
+import { rawDocument, transportDocuments } from '@mcp-abap-adt/adt-clients';
+
+const results = {
+  ...transportDocuments, // already has both
+  // or, written out:
+  sortedAndCompressed: rawDocument,
+  movedObjects: rawDocument,
+};
+```
+
+Nothing else changed: no member answers differently, and a set that spreads
+`transportDocuments` compiles as it was.
 
 ## [29.1.0] - 2026-10-12
 

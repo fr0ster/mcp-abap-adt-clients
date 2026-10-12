@@ -15,9 +15,12 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-12
+
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` is `^15.2.0`, the range `adt-clients` declares.
+- **`@mcp-abap-adt/interfaces-adt` is `^15.3.0`**, as `adt-clients` 30.0.0
+  declares it. Nothing else in this package changed.
 
 ## [0.10.1] - 2026-10-12
 
