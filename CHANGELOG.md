@@ -31,7 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `…/transportrequests/<task>/sortandcompress` with no body. A task holding
   the same entry twice refuses `removeObject` with `SCTS_ADT_MSG 009`, long
   text TR292, until it has run. Measured on premise (2026-10-12, BASIS 816):
-  `200` with an empty body; a re-read showed each entry once. Its reading is
+  `200` with an empty body; a task of 161 entries with four held twice
+  re-read as 157, each once; an empty task answers the same `200`. Its reading is
   the new `sortedAndCompressed` slot of `ITransportResults`, `rawDocument` by
   default — a hand-written result set names it too, or spreads
   `transportDocuments`.

@@ -38,9 +38,15 @@ capture.
 
 ## What was measured
 
-On premise (BASIS 816), 2026-10-12, on tasks holding duplicated `R3TR TABL`
-entries: the `POST` answered `200` with an empty body; reading the object list
-again showed each entry once. A `removeObject` after it is not measured yet.
+On premise (BASIS 816), 2026-10-12, with `scripts/probe-sort-and-compress.ts`:
+
+- a task of 161 entries, four `R3TR TABL` held twice each: `200`,
+  `content-length: 0`, no body; the re-read listed 157 entries, each once;
+- three empty tasks: the same `200` with no body — an answer that does not say
+  whether anything was there to compress.
+
+The integration block on the object list sorts its task before `removeObject`
+and removes the entry by the position it re-reads afterwards.
 
 ## What is still to measure
 

@@ -722,20 +722,41 @@ describe('AdtRequest', () => {
             testsLogger,
           );
 
+          // **Sort and compress the task first, as a task holding the entry
+          // twice would need** (TR292). It answers `200` with an empty body,
+          // so the evidence is the list after it: the entry is still there,
+          // once, and a sort may renumber it — hence the second look-up,
+          // whose position the removal below uses.
+          logTestStep(
+            'sort and compress the task, then find the entry again',
+            testsLogger,
+          );
+          const sorted = await request.sortAndCompress(entry.task);
+          expect(sorted.ok).toBe(true);
+          const sortedList = await objectsOn(entry.task);
+          expect(
+            sortedList.filter(
+              (o) => o.name === domainName && o.type === 'DOMA',
+            ),
+          ).toHaveLength(1);
+          const resorted = await findEntry(sharedRequest, domainName);
+          expect(resorted).toBeDefined();
+          if (!resorted) return;
+
           // **The removal, and then the proof.** `ok` here means the document
           // was understood, not that an entry went away — the re-read is what
           // says so. Addressed at the TASK: the request above it shows the
           // entry and refuses to detach it, saying the entry "does not exist"
           // in itself.
           logTestStep('remove the entry, then re-read the task', testsLogger);
-          const removed = await request.removeObject(entry.task, {
+          const removed = await request.removeObject(resorted.task, {
             name: domainName,
             type: 'DOMA',
-            position: entry.position,
+            position: resorted.position,
           });
           expect(removed.ok).toBe(true);
 
-          const after = await objectsOn(entry.task);
+          const after = await objectsOn(resorted.task);
           expect(after.find((o) => o.name === domainName)).toBeUndefined();
 
           logTestSuccess(testsLogger, label);
