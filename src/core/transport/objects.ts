@@ -206,6 +206,28 @@ export async function readTransportActionLog(
 }
 
 /**
+ * Sort a task's object list and merge its duplicate entries — the transport
+ * organizer's *Sort and compress*, as Eclipse ADT sends it: a `POST` with no
+ * body.
+ *
+ * A task that holds the same entry twice refuses `removeobject` with
+ * `SCTS_ADT_MSG 009`, long text TR292, until this has run. Measured on
+ * premise (BASIS 816), 2026-10-12: `200` with an empty body, and a re-read of
+ * the task showed each entry once.
+ */
+export async function sortAndCompressTransport(
+  connection: IAbapConnection,
+  taskNumber: string,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${requestUrl(taskNumber)}/sortandcompress`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: { Accept: ACCEPT_TRANSPORT },
+  });
+}
+
+/**
  * The objects a request or task holds — the reading `removeObject` needs.
  *
  * **It exists for the parsing, not for the representation.**

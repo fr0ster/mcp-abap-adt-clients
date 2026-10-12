@@ -477,7 +477,7 @@ configuration's own attributes unrenamed — which is as much of the document as
 it takes to address one. A configuration's `uri` does not change between runs,
 so a caller who has found theirs can keep it and skip the first request.
 
-#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`
+#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`, `sortAndCompress()`
 
 Deleting an ABAP object does not free its name. The CTS object-directory entry
 stays on the request that carried it — SAP says so as it happens: *"Release
@@ -506,6 +506,10 @@ const entry = listed.ok
 // `position` is optional on a listed entry: one the server described without
 // it cannot be removed, and the compiler asks rather than sending an empty
 // value that would remove nothing while answering 200.
+// A task holding the same entry twice refuses the removal (TR292) until its
+// list is sorted and compressed; the answer is empty, so read the list again.
+await request.sortAndCompress('DEVK905942');
+
 if (entry?.position)
   await request.removeObject('DEVK905942', { ...entry, position: entry.position });
 
@@ -575,6 +579,13 @@ had:
   The type goes on a `tm:task` child of the document, not on its root — six
   spellings on the root were each answered `400 "Specified request type or
   task type  is unknown"`, with two spaces where the value belongs.
+- **A duplicated entry blocks its removal until the task is sorted and
+  compressed.** On premise (BASIS 816), 2026-10-12, a task holding the same
+  `R3TR TABL` twice refused `removeObject()` with `400 SCTS_ADT_MSG 009`, long
+  text TR292: *"Object entry exists more than once; sort and compress first"*.
+  `sortAndCompress()` sends what Eclipse sends for the organizer's *Sort and
+  compress* — a `POST` with no body — and was answered `200` with an empty
+  body; re-reading the task showed each entry once.
 - **Objects live on tasks, so address the task**, not the request above it.
   `createTask()` answers a number that is itself a request resource — it
   reads, writes and releases like one.

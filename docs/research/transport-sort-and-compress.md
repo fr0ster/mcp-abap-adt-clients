@@ -1,7 +1,6 @@
 # Sorting and compressing a task's object list
 
-**Status:** captured from Eclipse, not yet implemented. The member it calls for
-is planned on `AdtRequest` as `sortAndCompress(taskNumber, options?)`.
+**Status:** implemented as `AdtRequest.sortAndCompress(taskNumber, options?)`.
 
 ## Why it is needed
 
@@ -37,19 +36,23 @@ No body. The answer carried no content headers, only the profiling one
 (`X-sap-adt-profiling: server-time=…`); its status was not recorded in the
 capture.
 
+## What was measured
+
+On premise (BASIS 816), 2026-10-12, on tasks holding duplicated `R3TR TABL`
+entries: the `POST` answered `200` with an empty body; reading the object list
+again showed each entry once. A `removeObject` after it is not measured yet.
+
 ## What is still to measure
 
-- The status and body of the answer, on success and on a task that is not
-  modifiable, released, or owned by another user.
+- The answer on a task that is not modifiable, released, or owned by another
+  user.
 - Whether it takes a request number as well as a task number, and what it does
   to a request's tasks then.
-- Whether the duplicates are gone afterwards: read the object list
-  (`readObjects`) again — an accepted answer is not the result
-  (`docs/usage/ERRATA.md`, *acceptance is not completion*).
 - The same on the cloud.
 
-## The member, when it is written
+## The member
 
 One endpoint, one member: `AdtRequest.sortAndCompress(taskNumber, options?)`
-issues the one `POST`, its address added to `src/endpoints`, its verdict the
+issues the one `POST` on the task's address (`TRANSPORT_REQUEST` in
+`src/endpoints`), its verdict the
 caller's `options.analyse`. Nothing reads the list back for the caller.

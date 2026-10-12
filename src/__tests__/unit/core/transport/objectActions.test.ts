@@ -544,6 +544,46 @@ describe('changeTaskType', () => {
   });
 });
 
+describe('sortAndCompress', () => {
+  /**
+   * What Eclipse ADT 3.60.3 sent on premise (BASIS 816), 2026-10-12: a `POST`
+   * on the task's own address with no body, and the organizer's media type in
+   * `Accept`. The answer was `200` with an empty body.
+   */
+  it('posts to the task with no body, as Eclipse does', async () => {
+    const { connection, calls } = connectionOver(() => answering(''));
+
+    const answer = await new AdtRequest(connection).sortAndCompress(
+      'DEVK905943',
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe(
+      '/sap/bc/adt/cts/transportrequests/DEVK905943/sortandcompress',
+    );
+    expect(calls[0].data).toBeUndefined();
+    expect(calls[0].headers?.Accept).toBe(
+      'application/vnd.sap.adt.transportorganizer.v1+xml',
+    );
+    if (!answer.ok) throw new Error('expected the answer');
+    expect(answer.getResult().value).toBe('');
+  });
+
+  it('leaves the verdict to the strategy the caller passes', async () => {
+    const { connection } = connectionOver(() => answering(''));
+
+    const answer = await new AdtRequest(connection).sortAndCompress(
+      'DEVK905943',
+      {
+        analyse: () => ({ origin: 'refusal', message: 'not this time' }),
+      },
+    );
+
+    expect(answer.ok).toBe(false);
+  });
+});
+
 describe('readObjects and createTask by default', () => {
   // The library interprets nothing on its own: without a parsing strategy the
   // document comes back as it arrived, and `parseObjectEntries` /

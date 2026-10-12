@@ -56,6 +56,7 @@ import {
   readTransportActionLog,
   readTransportObjects,
   removeObjectFromTransport,
+  sortAndCompressTransport,
 } from './objects';
 import { getTransport } from './read';
 import {
@@ -382,6 +383,34 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       () => removeObjectFromTransport(connection, transportNumber, object),
       this.results.removedObject as IResultStrategy<
         ReturnType<R['removedObject']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Sort a task's object list and merge its duplicate entries — the
+   * organizer's *Sort and compress*.
+   *
+   * A task holding the same entry twice refuses {@link removeObject} with
+   * `SCTS_ADT_MSG 009`, long text TR292 (*"Object entry exists more than
+   * once; sort and compress first"*) until this has run.
+   *
+   * Measured on premise (BASIS 816), 2026-10-12: `200` with an empty body.
+   * The answer says nothing about the list, so {@link readObjects} is what
+   * shows each entry once again.
+   */
+  async sortAndCompress<E extends IAdtError = IAdtError>(
+    taskNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['sortedAndCompressed']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(`Sorting and compressing task ${taskNumber}`);
+    return answering(
+      () => sortAndCompressTransport(connection, taskNumber),
+      this.results.sortedAndCompressed as IResultStrategy<
+        ReturnType<R['sortedAndCompressed']>
       >,
       options?.analyse,
     );
