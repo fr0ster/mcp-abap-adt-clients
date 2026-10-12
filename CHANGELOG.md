@@ -37,6 +37,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   default — a hand-written result set names it too, or spreads
   `transportDocuments`.
   `getRequest()`'s contract carries it as `IAdtTransportSortAndCompress`.
+- **`getRequest().moveObjects(sourceTask, targetNumber, objects)`** — the
+  organizer's *Move Objects*, as Eclipse ADT sends it: a `POST` on the source
+  task's `moveobjects`, the target as the document's `tm:number`, each entry by
+  its `position` in the source. Measured on premise (2026-10-12, BASIS 816):
+  one and two entries per call answered `200` echoing them, and both tasks read
+  back with them moved. Its reading is the new `movedObjects` slot of
+  `ITransportResults`, `rawDocument` by default.
 
 ### Changed
 

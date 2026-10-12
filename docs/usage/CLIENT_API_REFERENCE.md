@@ -477,7 +477,7 @@ configuration's own attributes unrenamed — which is as much of the document as
 it takes to address one. A configuration's `uri` does not change between runs,
 so a caller who has found theirs can keep it and skip the first request.
 
-#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`, `sortAndCompress()`
+#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`, `sortAndCompress()`, `moveObjects()`
 
 Deleting an ABAP object does not free its name. The CTS object-directory entry
 stays on the request that carried it — SAP says so as it happens: *"Release
@@ -525,6 +525,13 @@ await request.addObject('DEVK907073', { name: 'Z_CL_000001', type: 'CLAS' });
 
 // A task is created without a type; this is how one is given.
 await request.changeTaskType('DEVK907073', 'S'); // Development/Correction
+
+// Move entries to another task: addressed at the source, each entry by its
+// position there. The answer echoes them; re-read both tasks.
+if (entry?.position)
+  await request.moveObjects('DEVK905942', 'DEVK907073', [
+    { ...entry, position: entry.position },
+  ]);
 ```
 
 Four things worth knowing before the first call, three of them measured
@@ -586,6 +593,11 @@ had:
   `sortAndCompress()` sends what Eclipse sends for the organizer's *Sort and
   compress* — a `POST` with no body — and was answered `200` with an empty
   body; re-reading the task showed each entry once.
+- **`moveObjects()` is addressed at the source task and names the target in
+  the document**, each entry by its `position` in the source. On premise (BASIS
+  816), 2026-10-12, one entry and two entries per call each answered `200`,
+  echoing the entries, and re-reading both tasks showed them moved; `pgmid`,
+  `type`, `name` and `position` were enough.
 - **Objects live on tasks, so address the task**, not the request above it.
   `createTask()` answers a number that is itself a request resource — it
   reads, writes and releases like one.

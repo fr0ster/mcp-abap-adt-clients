@@ -584,6 +584,60 @@ describe('sortAndCompress', () => {
   });
 });
 
+describe('moveObjects', () => {
+  /**
+   * What Eclipse ADT 3.60.3 sent on premise (BASIS 816), 2026-10-12: a `POST`
+   * on the SOURCE task's `moveobjects`, `text/plain`, and a document whose
+   * root `tm:number` is the TARGET — unlike `removeobject` and `addobject`,
+   * whose root repeats the address.
+   */
+  it('posts to the source and names the target in the document', async () => {
+    const { connection, calls } = connectionOver(() => answering(REMOVED));
+
+    await new AdtRequest(connection).moveObjects('DEVK905943', 'DEVK907073', [
+      {
+        pgmid: 'LIMU',
+        type: 'METH',
+        name: 'ZCL_X                         RUN',
+        position: '000005',
+      },
+    ]);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe(
+      '/sap/bc/adt/cts/transportrequests/DEVK905943/moveobjects',
+    );
+    expect(calls[0].headers?.['Content-Type']).toBe('text/plain');
+    expect(calls[0].headers?.Accept).toBe(
+      'application/vnd.sap.adt.transportorganizer.v1+xml',
+    );
+    const body = String(calls[0].data);
+    expect(body).toContain('tm:number="DEVK907073"');
+    expect(body).toContain('tm:useraction="moveobjects"');
+    // The name keeps its padding: a method entry is class and method in
+    // fixed columns, and that is how the server spells it.
+    expect(body).toContain(
+      'tm:pgmid="LIMU" tm:type="METH" tm:name="ZCL_X                         RUN" tm:position="000005"',
+    );
+  });
+
+  it('sends every entry it is given, each with its position', async () => {
+    const { connection, calls } = connectionOver(() => answering(REMOVED));
+
+    await new AdtRequest(connection).moveObjects('DEVK905943', 'DEVK907073', [
+      { type: 'TABL', name: 'ZT_A', position: '000001' },
+      { type: 'TABL', name: 'ZT_B', position: '000002' },
+    ]);
+
+    const entries = String(calls[0].data).match(/<tm:abap_object [^>]*\/>/g);
+    expect(entries).toEqual([
+      '<tm:abap_object tm:pgmid="R3TR" tm:type="TABL" tm:name="ZT_A" tm:position="000001"/>',
+      '<tm:abap_object tm:pgmid="R3TR" tm:type="TABL" tm:name="ZT_B" tm:position="000002"/>',
+    ]);
+  });
+});
+
 describe('readObjects and createTask by default', () => {
   // The library interprets nothing on its own: without a parsing strategy the
   // document comes back as it arrived, and `parseObjectEntries` /

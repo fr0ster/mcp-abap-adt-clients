@@ -54,31 +54,38 @@ const attribute = (value: string): string =>
     .replace(/"/g, '&quot;');
 
 /**
- * The `tm:root` both object actions send.
+ * The `tm:root` the object actions send.
  *
  * `tm:position` and `tm:obj_desc` are written only when given. `obj_desc` is
  * decoration; `tm:position` is not, and {@link removeObjectFromTransport} says
  * why it now insists on one.
+ *
+ * `number` is the root's `tm:number`. For `removeobject` and `addobject` it is
+ * the task the request is addressed at; for `moveobjects` it is the target,
+ * while the address is the source.
  */
 function userActionDocument(
   number: string,
-  action: 'removeobject' | 'addobject',
-  object: IAbapObjectEntry,
+  action: 'removeobject' | 'addobject' | 'moveobjects',
+  objects: readonly IAbapObjectEntry[],
 ): string {
-  const optional = [
-    object.description === undefined
-      ? ''
-      : ` tm:obj_desc="${attribute(object.description)}"`,
-    object.position === undefined
-      ? ''
-      : ` tm:position="${attribute(object.position)}"`,
-  ].join('');
+  const entry = (object: IAbapObjectEntry): string => {
+    const optional = [
+      object.description === undefined
+        ? ''
+        : ` tm:obj_desc="${attribute(object.description)}"`,
+      object.position === undefined
+        ? ''
+        : ` tm:position="${attribute(object.position)}"`,
+    ].join('');
+    return `    <tm:abap_object tm:pgmid="${attribute(object.pgmid ?? 'R3TR')}" tm:type="${attribute(object.type)}" tm:name="${attribute(object.name)}"${optional}/>\n`;
+  };
 
   return (
     '<?xml version="1.0" encoding="ASCII"?>\n' +
     `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(number)}" tm:useraction="${action}">\n` +
     '  <tm:request>\n' +
-    `    <tm:abap_object tm:pgmid="${attribute(object.pgmid ?? 'R3TR')}" tm:type="${attribute(object.type)}" tm:name="${attribute(object.name)}"${optional}/>\n` +
+    objects.map(entry).join('') +
     '  </tm:request>\n' +
     '</tm:root>'
   );
@@ -112,7 +119,33 @@ export async function removeObjectFromTransport(
     url: requestUrl(transportNumber),
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: userActionDocument(transportNumber, 'removeobject', object),
+    data: userActionDocument(transportNumber, 'removeobject', [object]),
+    headers: USER_ACTION_HEADERS,
+  });
+}
+
+/**
+ * Move entries from one task to another — `useraction="moveobjects"`, the
+ * organizer's *Move Objects*.
+ *
+ * Addressed at the **source** task; the document's `tm:number` names the
+ * **target**. That is how Eclipse ADT 3.60.3 sent it on premise (BASIS 816),
+ * 2026-10-12: `POST <source>/moveobjects`, `text/plain`, one
+ * `tm:abap_object` carrying the entry's `tm:position` in the source, and the
+ * answer echoed the entry under the source's number. Each entry is identified
+ * by its position, as for {@link removeObjectFromTransport}.
+ */
+export async function moveObjectsBetweenTransports(
+  connection: IAbapConnection,
+  sourceTask: string,
+  targetNumber: string,
+  objects: readonly (IAbapObjectEntry & { position: string })[],
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `${requestUrl(sourceTask)}/moveobjects`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: userActionDocument(targetNumber, 'moveobjects', objects),
     headers: USER_ACTION_HEADERS,
   });
 }
@@ -140,7 +173,7 @@ export async function addObjectToTransport(
     url: requestUrl(transportNumber),
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: userActionDocument(transportNumber, 'addobject', object),
+    data: userActionDocument(transportNumber, 'addobject', [object]),
     headers: USER_ACTION_HEADERS,
   });
 }
