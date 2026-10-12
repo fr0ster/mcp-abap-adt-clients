@@ -610,7 +610,7 @@ describe('readObjects and createTask by default', () => {
 });
 
 describe('the contract a consumer actually holds', () => {
-  it('reaches all four through client.getRequest()', async () => {
+  it('reaches all five through client.getRequest()', async () => {
     const { connection, calls } = connectionOver((options) =>
       answering(
         options.method === 'GET'
@@ -638,6 +638,7 @@ describe('the contract a consumer actually holds', () => {
       (await request.createTask('DEVK905941', { targetUser: 'SAPUSER01' })).ok,
     ).toBe(true);
     expect((await request.readActionLog('DEVK905942')).ok).toBe(true);
-    expect(calls).toHaveLength(4);
+    expect((await request.sortAndCompress('DEVK905943')).ok).toBe(true);
+    expect(calls).toHaveLength(5);
   });
 });

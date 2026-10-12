@@ -36,6 +36,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportObjectActions,
+  IAdtTransportSortAndCompress,
   IListTransportsOptions,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -107,7 +108,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       ReturnType<R['actionLog']>,
       ReturnType<R['objects']>,
       ReturnType<R['taskTypeChanged']>
-    >
+    >,
+    IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

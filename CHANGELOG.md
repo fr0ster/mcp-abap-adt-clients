@@ -35,6 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   the new `sortedAndCompressed` slot of `ITransportResults`, `rawDocument` by
   default — a hand-written result set names it too, or spreads
   `transportDocuments`.
+  `getRequest()`'s contract carries it as `IAdtTransportSortAndCompress`.
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` is `^15.2.0`.
 
 ## [29.1.0] - 2026-10-12
 
