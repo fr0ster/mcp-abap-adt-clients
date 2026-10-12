@@ -24,6 +24,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [30.0.0] - 2026-10-12
+
+**BREAKING:** `ITransportResults` has two more required slots,
+`sortedAndCompressed` and `movedObjects`. A result set that spreads
+`transportDocuments` is unaffected; a hand-written one names both (see
+*Migration* below and [MIGRATION-30.md](docs/usage/MIGRATION-30.md)).
+
+### Added
+
+- **`getRequest().sortAndCompress(taskNumber)`** — the transport organizer's
+  *Sort and compress* for a task, as Eclipse ADT sends it: a `POST` on
+  `…/transportrequests/<task>/sortandcompress` with no body. A task holding
+  the same entry twice refuses `removeObject` with `SCTS_ADT_MSG 009`, long
+  text TR292, until it has run. Measured on premise (2026-10-12, BASIS 816):
+  `200` with an empty body; a task of 161 entries with four held twice
+  re-read as 157, each once; an empty task answers the same `200`. Its reading is
+  the new `sortedAndCompressed` slot of `ITransportResults`, `rawDocument` by
+  default — a hand-written result set names it too, or spreads
+  `transportDocuments`.
+  `getRequest()`'s contract carries it as `IAdtTransportSortAndCompress`.
+- **`getRequest().moveObjects(sourceTask, targetNumber, objects)`** — the
+  organizer's *Move Objects*, as Eclipse ADT sends it: a `POST` on the source
+  task's `moveobjects`, the target as the document's `tm:number`, each entry by
+  its `position` in the source. Measured on premise (2026-10-12, BASIS 816):
+  one and two entries per call answered `200` echoing them, and both tasks read
+  back with them moved. Its reading is the new `movedObjects` slot of
+  `ITransportResults`, `rawDocument` by default. `getRequest()`'s contract
+  carries it as `IAdtTransportMoveObjects`.
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` is `^15.3.0`.
+
+### Migration
+
+A result set for `getRequest()` written slot by slot no longer compiles: add
+the two slots, with the shipped reading or your own —
+
+```typescript
+import { rawDocument, transportDocuments } from '@mcp-abap-adt/adt-clients';
+
+const results = {
+  ...transportDocuments, // already has both
+  // or, written out:
+  sortedAndCompressed: rawDocument,
+  movedObjects: rawDocument,
+};
+```
+
+Nothing else changed: no member answers differently, and a set that spreads
+`transportDocuments` compiles as it was.
+
 ## [29.1.0] - 2026-10-12
 
 ### Added

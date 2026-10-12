@@ -35,7 +35,9 @@ import type {
   IAdtRequest,
   IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
+  IAdtTransportSortAndCompress,
   IListTransportsOptions,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -53,9 +55,11 @@ import {
   addObjectToTransport,
   changeTransportTaskType,
   createTransportTask,
+  moveObjectsBetweenTransports,
   readTransportActionLog,
   readTransportObjects,
   removeObjectFromTransport,
+  sortAndCompressTransport,
 } from './objects';
 import { getTransport } from './read';
 import {
@@ -106,7 +110,9 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       ReturnType<R['actionLog']>,
       ReturnType<R['objects']>,
       ReturnType<R['taskTypeChanged']>
-    >
+    >,
+    IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>>,
+    IAdtTransportMoveObjects<ReturnType<R['movedObjects']>>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -382,6 +388,72 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       () => removeObjectFromTransport(connection, transportNumber, object),
       this.results.removedObject as IResultStrategy<
         ReturnType<R['removedObject']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Sort a task's object list and merge its duplicate entries — the
+   * organizer's *Sort and compress*.
+   *
+   * A task holding the same entry twice refuses {@link removeObject} with
+   * `SCTS_ADT_MSG 009`, long text TR292 (*"Object entry exists more than
+   * once; sort and compress first"*) until this has run.
+   *
+   * Measured on premise (BASIS 816), 2026-10-12: `200` with an empty body.
+   * The answer says nothing about the list, so {@link readObjects} is what
+   * shows each entry once again.
+   */
+  async sortAndCompress<E extends IAdtError = IAdtError>(
+    taskNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['sortedAndCompressed']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(`Sorting and compressing task ${taskNumber}`);
+    return answering(
+      () => sortAndCompressTransport(connection, taskNumber),
+      this.results.sortedAndCompressed as IResultStrategy<
+        ReturnType<R['sortedAndCompressed']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Move entries from one task to another — the organizer's *Move Objects*,
+   * ADT's `moveobjects`.
+   *
+   * Addressed at the **source** task, with the **target** named in the
+   * document; each entry is identified by its `position` in the source, read
+   * from {@link readObjects}, as for {@link removeObject}. Captured from
+   * Eclipse ADT 3.60.3 on premise (BASIS 816), 2026-10-12.
+   *
+   * The answer echoes the entries under the source's number, so a `200` is
+   * not evidence: re-read both tasks.
+   */
+  async moveObjects<E extends IAdtError = IAdtError>(
+    sourceTask: string,
+    targetNumber: string,
+    objects: readonly (IAbapObjectEntry & { position: string })[],
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['movedObjects']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      `Moving ${objects.length} object(s) from ${sourceTask} to ${targetNumber}`,
+    );
+    return answering(
+      () =>
+        moveObjectsBetweenTransports(
+          connection,
+          sourceTask,
+          targetNumber,
+          objects,
+        ),
+      this.results.movedObjects as IResultStrategy<
+        ReturnType<R['movedObjects']>
       >,
       options?.analyse,
     );

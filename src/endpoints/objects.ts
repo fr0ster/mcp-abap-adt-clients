@@ -256,6 +256,12 @@ export const TRANSPORT_REQUEST = {
    */
   uri: (number: string) =>
     `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}`,
+  /** The organizer's *Sort and compress*, on a task. */
+  sortAndCompress: (number: string) =>
+    `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}/sortandcompress`,
+  /** The organizer's *Move Objects*, on the source task. */
+  moveObjects: (number: string) =>
+    `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}/moveobjects`,
 } as const;
 
 /**

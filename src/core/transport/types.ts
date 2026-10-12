@@ -66,6 +66,17 @@ export interface ITransportResults {
    * `tm:abap_object` entries carry the `tm:position` `removeObject` needs.
    */
   readonly objects: IResultStrategy<unknown>;
+  /**
+   * What sorting and compressing a task answers. Measured on premise: `200`
+   * with an empty body, so a re-read of the task is what shows the result.
+   */
+  readonly sortedAndCompressed: IResultStrategy<unknown>;
+  /**
+   * What moving entries between tasks answers: the moved entries, echoed
+   * under the source's number. Like the removal's echo it is not evidence; a
+   * re-read of both tasks is.
+   */
+  readonly movedObjects: IResultStrategy<unknown>;
 }
 
 /**
@@ -93,6 +104,8 @@ export const transportDocuments = {
   actionLog: rawDocument,
   taskTypeChanged: rawDocument,
   objects: rawDocument,
+  sortedAndCompressed: rawDocument,
+  movedObjects: rawDocument,
 } satisfies ITransportResults;
 
 /**

@@ -122,6 +122,14 @@ describe('records', () => {
       '/sap/bc/adt/cts/transportrequests/DEVK900001',
     );
   });
+  it('a task has its sort-and-compress and move-objects addresses', () => {
+    expect(TRANSPORT_REQUEST.sortAndCompress('DEVK900001')).toBe(
+      '/sap/bc/adt/cts/transportrequests/DEVK900001/sortandcompress',
+    );
+    expect(TRANSPORT_REQUEST.moveObjects('DEVK900001')).toBe(
+      '/sap/bc/adt/cts/transportrequests/DEVK900001/moveobjects',
+    );
+  });
   it('transport request has a legacy address of its own', () => {
     expect(TRANSPORT_REQUEST.collection).toBe(
       '/sap/bc/adt/cts/transportrequests',
