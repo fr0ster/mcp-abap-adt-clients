@@ -974,6 +974,9 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[29.x → 30.0.0](docs/usage/MIGRATION-30.md)** — `getRequest()` gains
+  `sortAndCompress` and `moveObjects`; `ITransportResults` has two more
+  required slots, `sortedAndCompressed` and `movedObjects`.
 - **[22.x → 23.0.0](docs/usage/MIGRATION-23.md)** — readings and verdicts became
   strategies in `@mcp-abap-adt/adt-strategies`; the connection contract moved
   to `@mcp-abap-adt/interfaces-adt-connection`; `list` takes a `configUri`;

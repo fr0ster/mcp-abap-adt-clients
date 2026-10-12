@@ -142,7 +142,7 @@ export async function moveObjectsBetweenTransports(
   objects: readonly (IAbapObjectEntry & { position: string })[],
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${requestUrl(sourceTask)}/moveobjects`,
+    url: TRANSPORT_REQUEST.moveObjects(sourceTask),
     method: 'POST',
     timeout: getTimeout('default'),
     data: userActionDocument(targetNumber, 'moveobjects', objects),
@@ -253,7 +253,7 @@ export async function sortAndCompressTransport(
   taskNumber: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${requestUrl(taskNumber)}/sortandcompress`,
+    url: TRANSPORT_REQUEST.sortAndCompress(taskNumber),
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_TRANSPORT },

@@ -496,20 +496,20 @@ const request = client.getRequest({
   objects: transportObjectEntries,
 });
 
+// A task holding the same entry twice refuses its removal (TR292) until its
+// list is sorted and compressed. The answer is empty, and a sort may renumber
+// the entries, so read the list after it.
+await request.sortAndCompress('DEVK905942');
+
 // What the task holds, each entry with the position the removal needs.
 const listed = await request.readObjects('DEVK905942');
-const entry = listed.ok
-  ? listed.getResult().value.find((o) => o.name === 'ZMCP_BLD_FGR_H1')
-  : undefined;
+const entries = listed.ok ? listed.getResult().value : [];
+const entry = entries.find((o) => o.name === 'ZMCP_BLD_FGR_H1');
 
 // Free a name: detach the entry from the TASK that holds it.
 // `position` is optional on a listed entry: one the server described without
 // it cannot be removed, and the compiler asks rather than sending an empty
 // value that would remove nothing while answering 200.
-// A task holding the same entry twice refuses the removal (TR292) until its
-// list is sorted and compressed; the answer is empty, so read the list again.
-await request.sortAndCompress('DEVK905942');
-
 if (entry?.position)
   await request.removeObject('DEVK905942', { ...entry, position: entry.position });
 
@@ -527,10 +527,12 @@ await request.addObject('DEVK907073', { name: 'Z_CL_000001', type: 'CLAS' });
 await request.changeTaskType('DEVK907073', 'S'); // Development/Correction
 
 // Move entries to another task: addressed at the source, each entry by its
-// position there. The answer echoes them; re-read both tasks.
-if (entry?.position)
+// position there — from the same listing, read after the last change to the
+// source. The answer echoes them; re-read both tasks.
+const other = entries.find((o) => o.name === 'Z_CL_000002');
+if (other?.position)
   await request.moveObjects('DEVK905942', 'DEVK907073', [
-    { ...entry, position: entry.position },
+    { ...other, position: other.position },
   ]);
 ```
 
