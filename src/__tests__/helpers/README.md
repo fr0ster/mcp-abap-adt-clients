@@ -42,8 +42,10 @@ published any.
 
 One exception, and it replaces the session rather than adding one:
 
-`recycleTestSession(connection)` ends the session, opens the replacement on a
-new connection instance, publishes it so later files adopt the new one, and
+`recycleTestSession(connection)` ends the session, waits for SAP to answer its
+logoff (`flushGoodbye()`, unbounded — `disconnect()` returns once the logoff is
+written, and SAP may still hold the session until it answers), opens the
+replacement on a new connection instance, publishes it so later files adopt the new one, and
 returns that instance — since `@mcp-abap-adt/connection` 16 one instance is one
 SAP session, and a disconnected instance does not connect again. A tester calls
 `tester.recycleSession()`, which also rebuilds its client and handler over the

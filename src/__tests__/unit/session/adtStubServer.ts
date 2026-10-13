@@ -26,6 +26,11 @@ export interface AdtStub {
   requests: StubRequest[];
   /** Force a status for the next request whose URL contains `match`. */
   failNext(match: string, status: number): void;
+  /**
+   * Hold the answer to the next request whose URL contains `match` until the
+   * returned function is called. Records the request on arrival as usual.
+   */
+  holdNext(match: string): () => void;
   close(): Promise<void>;
   /** Requests whose URL contains `match`. */
   matching(match: string): StubRequest[];
@@ -41,6 +46,7 @@ export interface AdtStub {
 export async function startAdtStub(logger?: ILogger): Promise<AdtStub> {
   const requests: StubRequest[] = [];
   const failures: Array<{ match: string; status: number }> = [];
+  const holds: Array<{ match: string; until: Promise<void> }> = [];
   let sessionsOpened = 0;
 
   const server: Server = createServer((req, res) => {
@@ -52,6 +58,16 @@ export async function startAdtStub(logger?: ILogger): Promise<AdtStub> {
       headers: req.headers,
       stateful: req.headers['x-sap-adt-sessiontype'] === 'stateful',
     });
+
+    const holdIndex = holds.findIndex((h) => url.includes(h.match));
+    if (holdIndex !== -1) {
+      const [hold] = holds.splice(holdIndex, 1);
+      void hold.until.then(() => {
+        res.writeHead(200, { 'content-type': 'text/plain' });
+        res.end('');
+      });
+      return;
+    }
 
     const failureIndex = failures.findIndex((f) => url.includes(f.match));
     if (failureIndex !== -1) {
@@ -112,6 +128,14 @@ export async function startAdtStub(logger?: ILogger): Promise<AdtStub> {
     baseUrl: `http://127.0.0.1:${address.port}`,
     requests,
     failNext: (match, status) => failures.push({ match, status }),
+    holdNext: (match) => {
+      let release: () => void = () => {};
+      const until = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      holds.push({ match, until });
+      return release;
+    },
     matching: (match) => requests.filter((r) => r.url.includes(match)),
     sessionsOpened: () => sessionsOpened,
     close: () =>

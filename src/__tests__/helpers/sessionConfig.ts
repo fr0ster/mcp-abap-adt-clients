@@ -419,6 +419,7 @@ export interface IReleasableConnection {
   close?: () => Promise<unknown>;
   disconnect?: () => Promise<unknown>;
   isConnected?: () => boolean;
+  flushGoodbye?: () => Promise<unknown>;
 }
 
 /**
@@ -500,17 +501,31 @@ export async function releaseTestConnection(
  * session, so the instance given here is spent once its session ends and
  * `connect()` on it is refused. The caller works on the returned one from
  * here on — and so must anything built over the old one (a client, a handler).
+ *
+ * **The replacement is opened only once SAP has answered the old session's
+ * logoff.** `disconnect()` resolves when the logoff is written, not answered,
+ * and SAP may hold the old session — and its locks — until it answers. Opening
+ * the replacement before that would put a second session beside the first,
+ * which a recycle never does. So `flushGoodbye()` is awaited, with no bound.
+ *
+ * `open` builds the replacement; a unit test passes its own.
  */
 export async function recycleTestSession(
   connection: IReleasableConnection | IAbapConnection | undefined | null,
+  open: () => Promise<
+    IAbapConnection & ISessionLifecycleAware & ISessionSharing
+  > = () =>
+    // Its own session: the material on disk names the one just ended, and
+    // adopting it would land on a session that is gone.
+    createTestConnection(createConnectionLogger(), { ownSession: true }),
 ): Promise<IAbapConnection & ISessionLifecycleAware & ISessionSharing> {
   const wasShared = readSessionMaterial() !== null;
-  if (connection) await endSession(connection);
-  // Its own session: the material on disk names the one just ended, and
-  // adopting it would land on a session that is gone.
-  const fresh = await createTestConnection(createConnectionLogger(), {
-    ownSession: true,
-  });
+  if (connection) {
+    await endSession(connection);
+    const ended = connection as IReleasableConnection;
+    if (typeof ended.flushGoodbye === 'function') await ended.flushGoodbye();
+  }
+  const fresh = await open();
   if (wasShared) publishSessionMaterial(fresh.exportSession());
   return fresh;
 }
