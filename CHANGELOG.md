@@ -24,6 +24,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [31.0.0] - 2026-10-13
+
+**BREAKING:** the contract packages move a major —
+`@mcp-abap-adt/interfaces-adt` `^16.0.0` and
+`@mcp-abap-adt/interfaces-adt-connection` `^3.0.0`. Their types are this
+package's public API, so a consumer declares the same ranges (see *Migration*
+below and [MIGRATION-31.md](docs/usage/MIGRATION-31.md)).
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` is `^16.0.0` and
+  `@mcp-abap-adt/interfaces-adt-connection` is `^3.0.0`: the removal of the
+  per-request `signal`, `ADT_REQUEST_ERROR`, `IAdtClientOptions.signal` and
+  `IAdtError.refusal` (added in 15.4.0 / 2.1.0). This package used none of
+  them, and no member answers differently.
+- `@mcp-abap-adt/interfaces-network` is `^2.0.1`,
+  `@mcp-abap-adt/interfaces-utils` `^1.1.1`, `@mcp-abap-adt/logger` `^0.4.1`.
+- The SQL tools (`getSqlQuery`, `getTableContents`) no longer raise or default
+  a timeout: they sent `getTimeout('long')` (`SAP_TIMEOUT_LONG`, 120 s by
+  default) and now send `timeout: 0` — none; the caller's is used as given.
+- Dev: `@mcp-abap-adt/connection` `^16.0.0`, `@mcp-abap-adt/auth-providers`
+  `^6.0.2`, `@mcp-abap-adt/interfaces-auth` `^7.5.0`,
+  `@mcp-abap-adt/interfaces-auth-sap` `^3.3.0`. The test harness follows
+  connection 16 — one connection instance is one SAP session: it builds with
+  `createConnection`, a recycled session is a new instance, and no instance is
+  connected again after `disconnect()` or disconnected twice.
+
+### Migration
+
+Declare the new ranges if your package imports the contracts, so npm installs
+one copy of each (`npm ls @mcp-abap-adt/interfaces-adt` shows one version):
+
+```json
+"@mcp-abap-adt/interfaces-adt": "^16.0.0",
+"@mcp-abap-adt/interfaces-adt-connection": "^3.0.0"
+```
+
+Code written for 30.x — which declared `^15.3.0` / `^2.0.0` — compiles
+unchanged. Only code that took up 15.4.0 / 2.1.0 has more to do: drop `signal`
+from client and request options, and any read of `IAdtError.refusal` or match
+on `ADT_REQUEST_ERROR`. An `IAbapConnection` of your own drops the same.
+
 ## [30.0.0] - 2026-10-12
 
 **BREAKING:** `ITransportResults` has two more required slots,

@@ -91,12 +91,12 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^15.1.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
-  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^2.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR` |
-  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.0` | `IWebSocketTransport` and its four companions, `HttpError` |
-  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.0` | `ILogger`, `LogLevel`, `XmlNode` |
-  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) — **dev only** | `IAuthProvider`, for the test helpers that open a session |
-  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^1.0.0` — **dev only** | `ISapConfig`, to build a connector in one unit test |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^16.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR` |
+  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
+  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
+  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^7.5.0` — **dev only** | `IAuthProvider`, for the test helpers that open a session |
+  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^3.3.0` — **dev only** | `ISapConfig`, to build a connector in one unit test |
 
   Taking them by name is what keeps a consumer off one release rate for every contract: `interfaces-utils` has had two releases ever, and a package that needs only `ILogger` should move at that pace rather than at ADT's. The `@mcp-abap-adt/interfaces` facade is **deleted** — npm still serves 51.0.0 to anyone pinned to it and nothing further ships there.
 
@@ -162,7 +162,7 @@ npm install @mcp-abap-adt/adt-clients
 
 6. **AbapDebugger, AmdpDebugger, MemorySnapshots**
    - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `new AbapDebugger(connection, logger, results?, { onConflict? })`
-   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 15 pairs with clients 29)
+   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 16 pairs with clients 31)
    - **The identity states its mode.** `{ debuggingMode: 'user', requestUser, terminalId, ideId }`, or `{ debuggingMode: 'terminal', terminalId, ideId }`; `attach` takes the identity, not the user. A terminal-mode listener catches a run that carries its ids: `run(target, { debuggee: { terminalId, ideId } })` sends them in `SAP-PASSPORT` (since 29.1.0)
    - **Breakpoints are replaced, not added to.** `setBreakpoints` and `syncBreakpoints` replace the identity's set, and `stopListener` deletes it: arm the whole set in one call
    - **Two sessions.** The ABAP listener holds one stateful connection; each debuggee caught is attached on a new one, routed to its application server. The AMDP debugger answers events on one session and takes commands on another
@@ -217,8 +217,11 @@ const config = {
 
 // Three things, all stated by you: which system (the connector), which
 // credential (the provider), and which wire (the transport). Since
-// @mcp-abap-adt/connection 6.0.0 nothing is inferred and there is no factory —
-// for ABAP Cloud take AdtCloudConnector + CloudHttpTransport instead.
+// @mcp-abap-adt/connection 6.0.0 nothing is inferred — for ABAP Cloud take
+// AdtCloudConnector + CloudHttpTransport instead; connection 16's
+// createConnection({ system, transport, … }) states the same two facts. One
+// instance is one SAP session: after disconnect() a new session is a new
+// instance.
 const connection = new AdtOnPremConnector(
   config,
   new BasicAuthProvider(config.username, config.password),
@@ -857,7 +860,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^15.1.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^2.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^16.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -937,7 +940,7 @@ contracts (`IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots`, 13.1.0). This
 package no longer declares or exports any contract type — every contract name it uses is
 sourced from the contract packages.
 
-> **Version pairing.** `adt-clients` 29 pairs with `interfaces-adt` 15 (breakpoints lose `skipCount` and gain `clientId`), and `adt-strategies` 0.10.0 declares the same range. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
+> **Version pairing.** `adt-clients` 31 pairs with `interfaces-adt` 16 and `interfaces-adt-connection` 3 (the per-request `signal` and `ADT_REQUEST_ERROR` are gone), and `adt-strategies` 0.11.0 declares the same ranges. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
 ### Naming Conventions
 
@@ -974,6 +977,9 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[30.x → 31.0.0](docs/usage/MIGRATION-31.md)** — `interfaces-adt` 16 and
+  `interfaces-adt-connection` 3: the per-request `signal`, `ADT_REQUEST_ERROR`
+  and `IAdtError.refusal` are gone; code written for 30.x compiles unchanged.
 - **[29.x → 30.0.0](docs/usage/MIGRATION-30.md)** — `getRequest()` gains
   `sortAndCompress` and `moveObjects`; `ITransportResults` has two more
   required slots, `sortedAndCompressed` and `movedObjects`.
