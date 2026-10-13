@@ -154,8 +154,9 @@ the server yet.
   costs the session: the ICF layer is replaced while the ABAP layer beneath
   keeps the enqueue locks, whose handles died with the cookie.
 - **`options.timeout` now works.** In 17.x it was documented and ignored
-  everywhere but one member. If you want a deadline, pass it; if you want one
-  process-wide, set `SAP_TIMEOUT_DEFAULT`.
+  everywhere but one member. If you want a deadline, pass it. (18.x also read
+  `SAP_TIMEOUT_DEFAULT` for a process-wide one; since 31.1.0 no `SAP_TIMEOUT_*`
+  is read — pass `options.timeout` per call.)
 - **`stateful` covers the `LOCK` and the `UNLOCK` and nothing else.** The write
   between them goes out stateless, carrying `lockHandle` and `corrNr` —
   Eclipse's model. Anything the server takes during a request that runs *inside*

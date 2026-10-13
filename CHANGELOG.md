@@ -24,6 +24,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [31.1.0] - 2026-10-13
+
+### Changed
+
+- **No request carries a deadline of the library's.** A client deadline closes
+  the socket, and SAP then ends the synchronous request still running on it — a
+  write in it is lost. Every request now sends `timeout: 0` (none) and waits for
+  SAP's answer. Gone: the per-request default read through `getTimeout`, the
+  publication jobs' 120 s fallback (`AdtService` publish/unpublish now use only
+  the caller's `options.timeout`), the function group activation's fixed 30 s
+  and the include validation's fixed 45 s.
+- **`SAP_TIMEOUT_*` are no longer read** (`SAP_TIMEOUT_DEFAULT`,
+  `SAP_TIMEOUT_LONG`, `SAP_TIMEOUT_CSRF`). If you want a deadline, set
+  `options.timeout` per call; it still reaches every request of the operation.
+- `AdtClientsWS` has no default request deadline (it was 30 s): a request waits
+  for its correlated answer unless you pass `requestTimeoutMs` to the
+  constructor or `timeoutMs` to `request()`.
+- Unchanged: the protocol long-polls (the debugger listener and the AMDP event
+  wait) keep a deadline derived from the hold they ask SAP for.
+
 ## [31.0.0] - 2026-10-13
 
 **BREAKING:** the contract packages move a major —

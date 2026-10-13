@@ -92,7 +92,7 @@ This package interacts with external packages **ONLY through interfaces**:
   | package | what this package takes from it |
   |---|---|
   | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^16.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
-  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR` |
+  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
   | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^7.5.0` — **dev only** | `IAuthProvider`, for the test helpers that open a session |
@@ -322,9 +322,9 @@ import { AdtClientsWS } from '@mcp-abap-adt/adt-clients';
 import type { IWebSocketTransport } from '@mcp-abap-adt/interfaces-network';
 
 const transport: IWebSocketTransport = createYourTransport();
-const wsClient = new AdtClientsWS(transport, console, {
-  requestTimeoutMs: 30000,
-});
+// No deadline unless you set one: a request waits for its correlated answer.
+// `requestTimeoutMs` (client-wide) or `{ timeoutMs }` per request asks for one.
+const wsClient = new AdtClientsWS(transport, console);
 
 await wsClient.connect('wss://your-realtime-endpoint');
 
