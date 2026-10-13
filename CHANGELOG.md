@@ -40,7 +40,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `options.timeout` per call; it still reaches every request of the operation.
 - `AdtClientsWS` has no default request deadline (it was 30 s): a request waits
   for its correlated answer unless you pass `requestTimeoutMs` to the
-  constructor or `timeoutMs` to `request()`.
+  constructor or `timeoutMs` to `request()`; when the transport closes, or on
+  `disconnect()`, every waiting request is rejected at once ("connection closed
+  before the answer").
 - Unchanged: the protocol long-polls (the debugger listener and the AMDP event
   wait) keep a deadline derived from the hold they ask SAP for.
 

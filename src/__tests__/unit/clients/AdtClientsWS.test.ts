@@ -12,6 +12,8 @@ class MockWebSocketTransport implements IWebSocketTransport {
   private messageHandler?: IWebSocketMessageHandler<unknown>;
   private openHandler?: () => void | Promise<void>;
   private closeHandler?: (info: IWebSocketCloseInfo) => void | Promise<void>;
+  /** A transport whose disconnect() raises no close event of its own. */
+  silentDisconnect = false;
 
   readonly connect = jest.fn(
     async (_url: string, _options?: IWebSocketConnectOptions) => {
@@ -24,7 +26,7 @@ class MockWebSocketTransport implements IWebSocketTransport {
 
   readonly disconnect = jest.fn(async (code?: number, reason?: string) => {
     this.connected = false;
-    if (this.closeHandler) {
+    if (this.closeHandler && !this.silentDisconnect) {
       await this.closeHandler({ code: code ?? 1000, reason, wasClean: true });
     }
   });
@@ -49,6 +51,13 @@ class MockWebSocketTransport implements IWebSocketTransport {
 
   isConnected(): boolean {
     return this.connected;
+  }
+
+  async emitClose(): Promise<void> {
+    this.connected = false;
+    if (this.closeHandler) {
+      await this.closeHandler({ code: 1006, wasClean: false });
+    }
   }
 
   async emitMessage(
@@ -158,6 +167,45 @@ describe('AdtClientsWS', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('rejects a waiting request at once when the transport closes', async () => {
+    const transport = new MockWebSocketTransport();
+    const client = new AdtClientsWS(transport);
+
+    const pending = client.request('debugger.getStack', undefined, {
+      correlationId: 'req-closed',
+    });
+    const rejected = expect(pending).rejects.toThrow(
+      'AdtClientsWS connection closed before the answer',
+    );
+    await transport.emitClose();
+    await rejected;
+
+    // The map is empty: a late answer for it reaches the event handlers.
+    const handler = jest.fn();
+    client.onEvent(handler);
+    await transport.emitMessage({
+      kind: 'response',
+      correlationId: 'req-closed',
+      payload: {},
+    });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a waiting request on disconnect()', async () => {
+    const transport = new MockWebSocketTransport();
+    transport.silentDisconnect = true;
+    const client = new AdtClientsWS(transport);
+
+    const pending = client.request('debugger.getStack', undefined, {
+      correlationId: 'req-disconnect',
+    });
+    const rejected = expect(pending).rejects.toThrow(
+      'AdtClientsWS connection closed before the answer',
+    );
+    await client.disconnect(1000, 'done');
+    await rejected;
   });
 
   it("rejects a request on the caller's per-request timeout", async () => {

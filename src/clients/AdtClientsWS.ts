@@ -47,6 +47,7 @@ export class AdtClientsWS {
     };
     this.requestTimeoutMs = options?.requestTimeoutMs;
     this.transport.onMessage((message) => this.handleMessage(message));
+    this.transport.onClose(() => this.rejectPending());
   }
 
   async connect(
@@ -58,8 +59,28 @@ export class AdtClientsWS {
   }
 
   async disconnect(code?: number, reason?: string): Promise<void> {
-    await this.transport.disconnect(code, reason);
+    try {
+      await this.transport.disconnect(code, reason);
+    } finally {
+      this.rejectPending();
+    }
     this.logger.debug('AdtClientsWS disconnected', { code, reason });
+  }
+
+  /**
+   * A closed connection carries no answer: every request still waiting is
+   * rejected at once, since nothing else would ever settle it — there is no
+   * deadline unless the caller set one.
+   */
+  private rejectPending(): void {
+    const waiting = [...this.pending.values()];
+    this.pending.clear();
+    for (const request of waiting) {
+      clearTimeout(request.timeout);
+      request.reject(
+        new Error('AdtClientsWS connection closed before the answer'),
+      );
+    }
   }
 
   isConnected(): boolean {
