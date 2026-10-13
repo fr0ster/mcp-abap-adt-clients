@@ -24,7 +24,6 @@ import {
   createTestAdtClient,
   createTestConnection,
   getConfig,
-  recycleTestSession,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -152,11 +151,13 @@ describe('Package (using AdtClient)', () => {
           // after an update is refused from the updating session and succeeds
           // from a new one.
           //
-          // `recycleTestSession` replaces the run's one session — it never
-          // opens a second beside it. This is the consumer's workaround and
-          // lives here, in the test; the library's `delete` stays one request.
+          // `recycleSession` replaces the run's one session — it never opens a
+          // second beside it — on a new connection instance, since one
+          // instance is one session (connection 16); the client below is the
+          // one built over it. This is the consumer's workaround and lives
+          // here, in the test; the library's `delete` stays one request.
           if (connection) {
-            await recycleTestSession(connection);
+            ({ connection, client } = await tester.recycleSession());
           }
 
           // `isDeleted="false"` with PAK/058 arrives inside a 200, and the
@@ -234,7 +235,9 @@ describe('Package (using AdtClient)', () => {
           // anyway; over RFC every call shares one session, so without this
           // the update fails there. Replacing the session is what a consumer
           // has to do too — the library does not do it for them.
-          afterCreate: () => recycleTestSession(connection),
+          afterCreate: async () => {
+            ({ connection, client } = await tester.recycleSession());
+          },
           updateTakesDocument: (current) =>
             patchXmlAttribute(
               current,

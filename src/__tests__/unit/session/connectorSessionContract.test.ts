@@ -64,8 +64,11 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * config kills the process before anyone has to notice. Closing them makes the
    * run terminate on its own merits, and 2.0.0 is the release that finally
    * provides the means.
+   *
+   * Only the ones still connected: since connection 16 `disconnect()` is called
+   * once per instance, and a test that disconnected its own has already done it.
    */
-  const opened: Array<{ disconnect?: () => Promise<unknown> }> = [];
+  const opened: Array<IAbapConnection & ISessionLifecycleAware> = [];
 
   function connectionTo(
     baseUrl: string,
@@ -98,7 +101,9 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
 
   afterEach(async () => {
     // Before the stub, so a teardown still has a server to talk to.
-    await Promise.all(opened.map((c) => c.disconnect?.()));
+    await Promise.all(
+      opened.filter((c) => c.isConnected()).map((c) => c.disconnect()),
+    );
     opened.length = 0;
     await stub.close();
   });
@@ -157,7 +162,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
     }
   });
 
-  it('uses one connection id for the whole connector lifetime, including across disconnect()', async () => {
+  it('uses one connection id for the whole connector lifetime, and a spent instance does not connect again', async () => {
     const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
@@ -168,14 +173,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
       timeout: 5000,
       data: null,
     });
-    // disconnect() releases the session and drops the token, cookies and the
-    // axios instance — but the connection id must survive, otherwise every
-    // recovery would present the server with a different conversation.
-    await conn.disconnect();
-    // Reconnecting is required since 2.0.0, and is the point of the assertion
-    // below: a NEW session under the SAME conversation id. Previously the next
-    // request did this silently, which is what made a replacement invisible.
-    await conn.connect();
+    conn.setSessionType('stateless');
     await conn.makeAdtRequest({
       url: '/sap/bc/adt/ddic/domains/zstub',
       method: 'GET',
@@ -188,6 +186,17 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
     expect(ids.length).toBeGreaterThan(1);
     expect(new Set(ids).size).toBe(1);
     expect(ids[0]).toBe(conn.getSessionId());
+
+    // One instance is one SAP session (connection 16): after disconnect() the
+    // instance is spent and connect() is refused before anything is sent. A
+    // new session is a new instance — previously this reconnected the same
+    // one, under the same conversation id.
+    await conn.disconnect();
+    const sent = stub.requests.length;
+    await expect(conn.connect()).rejects.toMatchObject({
+      code: ADT_SESSION_ERROR.NOT_CONNECTED,
+    });
+    expect(stub.requests).toHaveLength(sent);
   });
 
   /**

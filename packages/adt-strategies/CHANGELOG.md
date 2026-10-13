@@ -15,6 +15,16 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-13
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^16.0.0` and
+  `@mcp-abap-adt/interfaces-adt-connection` is `^3.0.0`**, as `adt-clients`
+  31.0.0 declares them. They remove the per-request `signal`,
+  `ADT_REQUEST_ERROR`, `IAdtClientOptions.signal` and `IAdtError.refusal`; no
+  strategy here used them. Nothing else in this package changed.
+
 ## [0.10.2] - 2026-10-12
 
 ### Changed

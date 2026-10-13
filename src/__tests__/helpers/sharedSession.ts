@@ -20,21 +20,15 @@
  * the first one's cookies reports the SAME `SAP_SESSIONID` and answers `200`
  * over it.
  *
- * The seams used are `protected`, which is why the two subclasses exist: a
- * caller outside the class hierarchy cannot reach them, and a consumer of the
- * library should not need to. A test harness is the one place where sharing a
- * session is the point.
+ * The seams used are `protected`: a consumer of the library should not need
+ * them, and a test harness is the one place where sharing a session is the
+ * point. They are reached on the instance `createConnection` built, which is
+ * why this attaches to an instance rather than subclassing a connector — the
+ * factory builds the connectors itself (connection 16).
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {
-  AdtCloudConnector,
-  AdtOnPremConnector,
-  type ICloudTransport,
-  type IOnPremTransport,
-} from '@mcp-abap-adt/connection';
-import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 /**
  * A connection that can hand its session to another, and take one.
@@ -86,30 +80,21 @@ function adoptInto(
   if (material.id) conn.setSessionId(material.id);
 }
 
-export class SharedCloudConnector<
-  TCredential extends IAuthProvider = IAuthProvider,
-  TTransport extends ICloudTransport = ICloudTransport,
-> extends AdtCloudConnector<TCredential, TTransport> {
-  exportSession(): ISessionMaterial {
-    return exportFrom(this as unknown as ISessionSeams & typeof this);
-  }
-  adoptSession(material: ISessionMaterial): void {
-    adoptInto(this as unknown as ISessionSeams & typeof this, material);
-  }
-}
-
-// Generic over the wire, exactly as the base is: on-prem admits HTTP or RFC,
-// and a subclass that fixed the default would refuse the RFC one.
-export class SharedOnPremConnector<
-  TCredential extends IAuthProvider = IAuthProvider,
-  TTransport extends IOnPremTransport = IOnPremTransport,
-> extends AdtOnPremConnector<TCredential, TTransport> {
-  exportSession(): ISessionMaterial {
-    return exportFrom(this as unknown as ISessionSeams & typeof this);
-  }
-  adoptSession(material: ISessionMaterial): void {
-    adoptInto(this as unknown as ISessionSeams & typeof this, material);
-  }
+/**
+ * The same connection, able to hand its session to another and take one.
+ *
+ * `adoptSession` goes before the instance's one `connect()`: it lands that
+ * connect on the session that exists instead of opening a new one.
+ */
+export function withSessionSharing<
+  T extends { getSessionId(): string | null; setSessionId(id: string): void },
+>(connection: T): T & ISessionSharing {
+  const seams = connection as unknown as ISessionSeams & T;
+  return Object.assign(connection, {
+    exportSession: (): ISessionMaterial => exportFrom(seams),
+    adoptSession: (material: ISessionMaterial): void =>
+      adoptInto(seams, material),
+  });
 }
 
 export function publishSessionMaterial(material: ISessionMaterial): void {

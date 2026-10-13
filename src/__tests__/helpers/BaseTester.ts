@@ -56,8 +56,14 @@ import {
   type ILockWindow,
   lockReleaseCheckEnabled,
 } from './lockReleased';
-import { recycleTestSession, releaseTestConnection } from './sessionConfig';
+import {
+  createTestAdtClient,
+  recycleTestSession,
+  releaseTestConnection,
+  resolveSystemContext,
+} from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
+import { createLibraryLogger } from './testLogger';
 import {
   getHttpStatusText,
   logTestEnd,
@@ -193,7 +199,7 @@ function describeObject(config: unknown): string {
 }
 
 export class BaseTester<TConfig, TState = unknown> {
-  private readonly adtObject: TestableObject<TConfig>;
+  private adtObject: TestableObject<TConfig>;
   private readonly loggerPrefix: string;
   private readonly testCaseKey: string;
   private readonly testCaseName: string;
@@ -1365,7 +1371,7 @@ export class BaseTester<TConfig, TState = unknown> {
           // ending it without saying so leaves every later file adopting a
           // session that is gone.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
-            await recycleTestSession(this.connection);
+            await this.recycleSession();
           }
           // The suite's own removal, when it declared one. It was declared and
           // then ignored on this path — only the pre-existing-object cleanup
@@ -1437,7 +1443,7 @@ export class BaseTester<TConfig, TState = unknown> {
           // ending it without saying so leaves every later file adopting a
           // session that is gone.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
-            await recycleTestSession(this.connection);
+            await this.recycleSession();
           }
           logTestStep('delete (cleanup)', this.logger);
           await this.deleteOrRaise(config as Partial<TConfig>);
@@ -1485,21 +1491,42 @@ export class BaseTester<TConfig, TState = unknown> {
   }
 
   /**
-   * Ensure the connection is open, reconnecting if needed.
-   * RFC connections close on close()/disconnect() — reopen before the next test.
+   * End this tester's session and go on in a fresh one, on a new instance.
+   *
+   * Since connection 16 one connection instance is one SAP session: the
+   * instance whose session ended is spent, and so is everything built over it.
+   * So the tester takes the new connection, a client built over it the way a
+   * test builds one, and the same class of handler from that client — found
+   * by {@link factoryOf}, as the lock-release check finds it. Returns the
+   * connection and client, for a test file that holds its own references.
    */
-  private async ensureConnection(): Promise<void> {
-    if (!this.connection) return;
-    const conn = this.connection as any;
-    // RFC connections: rfcClient is set to null after close.
-    // Only reconnect if the connection is actually dead.
-    const isRfc = conn.rfcClient !== undefined || conn.rfcParams !== undefined;
-    if (isRfc) {
-      if (!conn.rfcClient?.alive) {
-        this.log(LogLevel.INFO, 'Reconnecting closed RFC connection');
-        await conn.connect();
-      }
+  async recycleSession(): Promise<{
+    connection: IAbapConnection;
+    client: any;
+  }> {
+    if (!this.connection) {
+      throw new Error(`${this.loggerPrefix}: no connection to recycle`);
     }
+    const connection = await recycleTestSession(this.connection);
+    this.connection = connection;
+    const { client } = await createTestAdtClient(
+      connection,
+      createLibraryLogger(),
+      await resolveSystemContext(connection, this.isCloudSystem),
+    );
+    const factory = factoryOf(client, this.adtObject);
+    if (!factory) {
+      throw new Error(
+        `${this.loggerPrefix}: no zero-argument factory on the client ` +
+          `builds a ${this.adtObject.constructor.name}, so the handler cannot ` +
+          'be rebuilt on the new session.',
+      );
+    }
+    this.adtObject = (
+      client as unknown as Record<string, () => TestableObject<TConfig>>
+    )[factory]();
+    this.client = client;
+    return { connection, client };
   }
 
   /**
@@ -1509,9 +1536,6 @@ export class BaseTester<TConfig, TState = unknown> {
     config: Partial<TConfig>,
     options?: IReadTestOptions,
   ): Promise<unknown> {
-    // Ensure connection is open (RFC connections may close after flowTest cleanup)
-    await this.ensureConnection();
-
     try {
       logTestStep('read', this.logger);
       // The value, or the test fails with what SAP said. An object that is not
@@ -1720,9 +1744,6 @@ export class BaseTester<TConfig, TState = unknown> {
         this.log(LogLevel.WARN, 'beforeEach: Skipping - No SAP configuration');
         return;
       }
-
-      // Ensure connection is open (RFC may have been closed by previous test cleanup)
-      await this.ensureConnection();
 
       const definition = this.getTestCaseDefinition();
       if (!definition) {
