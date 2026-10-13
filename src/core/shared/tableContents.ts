@@ -50,6 +50,11 @@ export async function getTableColumns(
  * statement the caller could not reach: not the column list, not an ordering,
  * not a `WHERE`. Read the columns with {@link getTableColumns} and write the
  * statement you want.
+ *
+ * **No deadline of the library's**, as for the freestyle query: the request
+ * carries `timeout: 0` — none — and how long to wait is the caller's, set on the
+ * connection it hands in. Until 31.0.0 this set `getTimeout('long')`
+ * (`SAP_TIMEOUT_LONG`, 120 s by default).
  */
 export async function getTableContents(
   connection: IAbapConnection,
@@ -61,7 +66,9 @@ export async function getTableContents(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/datapreview/ddic?rowNumber=${maxRows}&ddicEntityName=${encodeURIComponent(tableName)}`,
     method: 'POST',
-    timeout: getTimeout('long'),
+    // No deadline: the contract requires a number, and 0 is what the wires
+    // read as "do not abort". How long to wait is the caller's.
+    timeout: 0,
     data: params.sql_query,
     headers: {
       Accept: ACCEPT_HEADER,
