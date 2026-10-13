@@ -42,7 +42,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   for its correlated answer unless you pass `requestTimeoutMs` to the
   constructor or `timeoutMs` to `request()`; when the transport closes, or on
   `disconnect()`, every waiting request is rejected at once ("connection closed
-  before the answer").
+  before the answer"), and a request reusing a `correlationId` still in flight
+  is refused before it is sent (the first one is kept).
 - Unchanged: the protocol long-polls (the debugger listener and the AMDP event
   wait) keep a deadline derived from the hold they ask SAP for.
 

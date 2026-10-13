@@ -100,6 +100,17 @@ export class AdtClientsWS {
     const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
 
     return new Promise<TResponse>((resolve, reject) => {
+      // One waiting request per id: a second one would replace the first in
+      // the pending map and leave it unsettled for good, so it is refused
+      // before anything is sent; the first stays as it is.
+      if (this.pending.has(correlationId)) {
+        reject(
+          new Error(
+            'AdtClientsWS request refused: its correlationId is already in flight',
+          ),
+        );
+        return;
+      }
       const resolveTyped = (value: unknown) => resolve(value as TResponse);
       // No deadline unless the caller asked for one.
       const timeout =

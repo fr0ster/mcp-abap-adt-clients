@@ -208,6 +208,77 @@ describe('AdtClientsWS', () => {
     await rejected;
   });
 
+  it('refuses a request whose correlationId is in flight, without sending it', async () => {
+    const transport = new MockWebSocketTransport();
+    const client = new AdtClientsWS(transport);
+
+    const first = client.request('debugger.getStack', undefined, {
+      correlationId: 'req-dup',
+    });
+    const firstOutcome = first.then(
+      (value) => ({ settled: 'resolved', value }),
+      (error: Error) => ({ settled: 'rejected', value: error.message }),
+    );
+    await expect(
+      client.request('debugger.getStack', undefined, {
+        correlationId: 'req-dup',
+      }),
+    ).rejects.toThrow(
+      'AdtClientsWS request refused: its correlationId is already in flight',
+    );
+    expect(transport.send).toHaveBeenCalledTimes(1);
+
+    // The first stays as it was: its answer still reaches it.
+    await transport.emitMessage({
+      kind: 'response',
+      correlationId: 'req-dup',
+      payload: { ok: true },
+    });
+    await expect(firstOutcome).resolves.toEqual({
+      settled: 'resolved',
+      value: { ok: true },
+    });
+  });
+
+  for (const [how, end] of [
+    ['the transport closes', (t: MockWebSocketTransport) => t.emitClose()],
+    [
+      'disconnect()',
+      (t: MockWebSocketTransport, c: AdtClientsWS) => {
+        t.silentDisconnect = true;
+        return c.disconnect();
+      },
+    ],
+  ] as const) {
+    it(`after a refused duplicate id, every accepted request settles when ${how}`, async () => {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+
+      const settle = (p: Promise<unknown>) =>
+        p.then(
+          () => 'resolved',
+          (error: Error) => error.message,
+        );
+      const accepted = [
+        settle(client.request('a', undefined, { correlationId: 'req-x' })),
+        settle(client.request('b', undefined, { correlationId: 'req-y' })),
+      ];
+      const duplicate = settle(
+        client.request('c', undefined, { correlationId: 'req-x' }),
+      );
+
+      await end(transport, client);
+
+      await expect(Promise.all(accepted)).resolves.toEqual([
+        'AdtClientsWS connection closed before the answer',
+        'AdtClientsWS connection closed before the answer',
+      ]);
+      await expect(duplicate).resolves.toBe(
+        'AdtClientsWS request refused: its correlationId is already in flight',
+      );
+    });
+  }
+
   it("rejects a request on the caller's per-request timeout", async () => {
     jest.useFakeTimers();
     try {
