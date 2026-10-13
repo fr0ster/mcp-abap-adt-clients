@@ -279,6 +279,77 @@ describe('AdtClientsWS', () => {
     });
   }
 
+  describe('a late send failure of a settled request leaves its reuser alone', () => {
+    const CLOSED = 'AdtClientsWS connection closed before the answer';
+    const pendingSize = (client: AdtClientsWS) =>
+      (client as unknown as { pending: Map<string, unknown> }).pending.size;
+
+    /**
+     * A is sent on a held send and settled by a closed connection; B reuses
+     * its id and is sent; then A's send fails. B must still be the map's.
+     */
+    async function reuseAfterClosure() {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+      let failSendOfA: (error: Error) => void = () => {};
+      transport.send.mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            failSendOfA = reject;
+          }),
+      );
+
+      const a = client.request('a', undefined, { correlationId: 'req-reuse' });
+      const aRejected = expect(a).rejects.toThrow(CLOSED);
+      await transport.emitClose();
+      await aRejected;
+
+      let bSettled = false;
+      const b = client
+        .request<undefined, { ok: boolean }>('b', undefined, {
+          correlationId: 'req-reuse',
+        })
+        .finally(() => {
+          bSettled = true;
+        });
+      expect(transport.send).toHaveBeenCalledTimes(2);
+
+      failSendOfA(new Error('send of A failed'));
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(bSettled).toBe(false);
+      expect(pendingSize(client)).toBe(1);
+      return { transport, client, b };
+    }
+
+    it('B resolves on its answer', async () => {
+      const { transport, client, b } = await reuseAfterClosure();
+      await transport.emitMessage({
+        kind: 'response',
+        correlationId: 'req-reuse',
+        payload: { ok: true },
+      });
+      await expect(b).resolves.toEqual({ ok: true });
+      expect(pendingSize(client)).toBe(0);
+    });
+
+    it('B is rejected when the transport closes later', async () => {
+      const { transport, client, b } = await reuseAfterClosure();
+      const rejected = expect(b).rejects.toThrow(CLOSED);
+      await transport.emitClose();
+      await rejected;
+      expect(pendingSize(client)).toBe(0);
+    });
+
+    it('B is rejected on a later disconnect()', async () => {
+      const { transport, client, b } = await reuseAfterClosure();
+      transport.silentDisconnect = true;
+      const rejected = expect(b).rejects.toThrow(CLOSED);
+      await client.disconnect();
+      await rejected;
+      expect(pendingSize(client)).toBe(0);
+    });
+  });
+
   it("rejects a request on the caller's per-request timeout", async () => {
     jest.useFakeTimers();
     try {

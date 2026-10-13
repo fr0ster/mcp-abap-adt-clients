@@ -111,25 +111,27 @@ export class AdtClientsWS {
         );
         return;
       }
-      const resolveTyped = (value: unknown) => resolve(value as TResponse);
-      // No deadline unless the caller asked for one.
-      const timeout =
-        timeoutMs === undefined
-          ? undefined
-          : setTimeout(() => {
-              this.pending.delete(correlationId);
-              reject(
-                new Error(
-                  `AdtClientsWS request timeout for operation "${operation}" after ${timeoutMs}ms`,
-                ),
-              );
-            }, timeoutMs);
-
-      this.pending.set(correlationId, {
-        resolve: resolveTyped,
+      // This request's own entry: a cleanup removes it only while the map
+      // still holds it, never a later request that reused the id after this
+      // one was settled (by a closed connection, say).
+      const entry: PendingRequest = {
+        resolve: (value: unknown) => resolve(value as TResponse),
         reject,
-        timeout,
-      });
+        timeout: undefined,
+      };
+      // No deadline unless the caller asked for one.
+      if (timeoutMs !== undefined) {
+        entry.timeout = setTimeout(() => {
+          this.forget(correlationId, entry);
+          reject(
+            new Error(
+              `AdtClientsWS request timeout for operation "${operation}" after ${timeoutMs}ms`,
+            ),
+          );
+        }, timeoutMs);
+      }
+
+      this.pending.set(correlationId, entry);
 
       const message: IWebSocketMessageEnvelope<TPayload> = {
         kind: 'request',
@@ -140,8 +142,8 @@ export class AdtClientsWS {
       };
 
       this.transport.send(message).catch((error) => {
-        clearTimeout(timeout);
-        this.pending.delete(correlationId);
+        clearTimeout(entry.timeout);
+        this.forget(correlationId, entry);
         reject(error instanceof Error ? error : new Error(String(error)));
       });
     });
@@ -160,6 +162,13 @@ export class AdtClientsWS {
     await this.transport.send(message);
   }
 
+  /** Remove `entry` under `correlationId` only if the map still holds it. */
+  private forget(correlationId: string, entry: PendingRequest): void {
+    if (this.pending.get(correlationId) === entry) {
+      this.pending.delete(correlationId);
+    }
+  }
+
   private async handleMessage(
     message: IWebSocketMessageEnvelope<unknown>,
   ): Promise<void> {
@@ -170,7 +179,7 @@ export class AdtClientsWS {
         return;
       }
       clearTimeout(request.timeout);
-      this.pending.delete(correlationId);
+      this.forget(correlationId, request);
 
       if (message.kind === 'error') {
         const payloadMessage =
