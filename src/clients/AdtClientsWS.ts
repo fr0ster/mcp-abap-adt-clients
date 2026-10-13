@@ -13,18 +13,24 @@ export interface IAdtClientsWSRequestOptions {
 }
 
 export interface IAdtClientsWSOptions {
+  /**
+   * A deadline for every request, in milliseconds — the caller's choice.
+   * Absent, a request waits for its correlated answer: the library sets no
+   * deadline of its own. `IAdtClientsWSRequestOptions.timeoutMs` overrides it
+   * per request.
+   */
   requestTimeoutMs?: number;
 }
 
 type PendingRequest = {
   resolve: (payload: unknown) => void;
   reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout: ReturnType<typeof setTimeout> | undefined;
 };
 
 export class AdtClientsWS {
   private readonly logger: ILogger;
-  private readonly requestTimeoutMs: number;
+  private readonly requestTimeoutMs: number | undefined;
   private readonly pending = new Map<string, PendingRequest>();
   private readonly eventHandlers: Array<IWebSocketMessageHandler<unknown>> = [];
 
@@ -39,7 +45,7 @@ export class AdtClientsWS {
       warn: () => {},
       error: () => {},
     };
-    this.requestTimeoutMs = options?.requestTimeoutMs ?? 30_000;
+    this.requestTimeoutMs = options?.requestTimeoutMs;
     this.transport.onMessage((message) => this.handleMessage(message));
   }
 
@@ -74,14 +80,18 @@ export class AdtClientsWS {
 
     return new Promise<TResponse>((resolve, reject) => {
       const resolveTyped = (value: unknown) => resolve(value as TResponse);
-      const timeout = setTimeout(() => {
-        this.pending.delete(correlationId);
-        reject(
-          new Error(
-            `AdtClientsWS request timeout for operation "${operation}" after ${timeoutMs}ms`,
-          ),
-        );
-      }, timeoutMs);
+      // No deadline unless the caller asked for one.
+      const timeout =
+        timeoutMs === undefined
+          ? undefined
+          : setTimeout(() => {
+              this.pending.delete(correlationId);
+              reject(
+                new Error(
+                  `AdtClientsWS request timeout for operation "${operation}" after ${timeoutMs}ms`,
+                ),
+              );
+            }, timeoutMs);
 
       this.pending.set(correlationId, {
         resolve: resolveTyped,

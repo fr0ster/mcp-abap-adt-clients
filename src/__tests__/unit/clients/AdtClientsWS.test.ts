@@ -129,7 +129,57 @@ describe('AdtClientsWS', () => {
     );
   });
 
-  it('rejects request on timeout', async () => {
+  it('sets no deadline of its own: a request waits for its answer', async () => {
+    jest.useFakeTimers();
+    try {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+
+      let settled = false;
+      const pending = client
+        .request<undefined, { ok: boolean }>('debugger.getStack', undefined, {
+          correlationId: 'req-slow',
+        })
+        .finally(() => {
+          settled = true;
+        });
+      // An hour of silence ends nothing: only the answer, or a deadline the
+      // caller chose, does.
+      await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+      expect(settled).toBe(false);
+      expect(jest.getTimerCount()).toBe(0);
+
+      await transport.emitMessage({
+        kind: 'response',
+        correlationId: 'req-slow',
+        payload: { ok: true },
+      });
+      await expect(pending).resolves.toEqual({ ok: true });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("rejects a request on the caller's per-request timeout", async () => {
+    jest.useFakeTimers();
+    try {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+
+      const pending = client.request('debugger.getStack', undefined, {
+        timeoutMs: 20,
+      });
+      const assertion = expect(pending).rejects.toThrow(
+        'AdtClientsWS request timeout for operation "debugger.getStack" after 20ms',
+      );
+      await jest.advanceTimersByTimeAsync(25);
+      await assertion;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("rejects request on the caller's client-wide timeout", async () => {
     jest.useFakeTimers();
     try {
       const transport = new MockWebSocketTransport();
