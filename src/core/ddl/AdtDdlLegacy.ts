@@ -16,6 +16,7 @@ import type {
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { DDL_SOURCE } from '../../endpoints/objects';
 import { answering, failed } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtDdl } from './AdtDdl';
 import type { ddlDocuments, IDdlConfig, IDdlResults } from './types';
@@ -33,7 +34,7 @@ export class AdtDdlLegacy<
     return answering(
       () =>
         deleteObjectDirect(
-          this.connection,
+          withCallTimeout(this.connection, options?.timeout),
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

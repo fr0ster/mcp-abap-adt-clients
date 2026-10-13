@@ -152,7 +152,7 @@ export class AdtClientsWS {
       this.transport.send(message).catch((error) => {
         clearTimeout(entry.timeout);
         this.forget(correlationId, entry);
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject(sendFailure(error));
       });
     });
   }
@@ -220,5 +220,20 @@ function describeErrorPayload(payload: unknown): string {
     return String(JSON.stringify(payload || {}));
   } catch {
     return 'the error payload could not be serialised';
+  }
+}
+
+/**
+ * What a failed send rejects its request with, never throwing: an `Error` as
+ * it is, anything else as its text — and fixed words when even that cannot be
+ * read (`Object.create(null)`, a throwing `toString`), nothing of its own.
+ */
+function sendFailure(error: unknown): Error {
+  try {
+    return error instanceof Error ? error : new Error(String(error));
+  } catch {
+    return new Error(
+      'AdtClientsWS request failed: the send failure could not be described',
+    );
   }
 }

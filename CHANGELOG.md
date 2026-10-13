@@ -38,6 +38,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **`SAP_TIMEOUT_*` are no longer read** (`SAP_TIMEOUT_DEFAULT`,
   `SAP_TIMEOUT_LONG`, `SAP_TIMEOUT_CSRF`). If you want a deadline, set
   `options.timeout` per call; it still reaches every request of the operation.
+- The caller's `options.timeout` now reaches the legacy deletes too
+  (`AdtClientLegacy`: class, DDL, function group, function module, interface,
+  program), which dropped it.
 - `AdtClientsWS` has no default request deadline (it was 30 s): a request waits
   for its correlated answer unless you pass `requestTimeoutMs` to the
   constructor or `timeoutMs` to `request()`; when the transport closes, or on

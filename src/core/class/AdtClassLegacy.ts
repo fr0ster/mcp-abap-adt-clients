@@ -20,6 +20,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtClass } from './AdtClass';
 import type { classDocuments, IClassConfig, IClassResults } from './types';
@@ -58,7 +59,7 @@ export class AdtClassLegacy<
     return answering(
       () =>
         deleteObjectDirect(
-          this.connection,
+          withCallTimeout(this.connection, options?.timeout),
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

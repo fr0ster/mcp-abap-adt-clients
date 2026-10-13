@@ -392,6 +392,45 @@ describe('AdtClientsWS', () => {
       expect(pendingSize(client)).toBe(0);
     });
 
+    it.each([
+      ['Object.create(null)', () => Object.create(null)],
+      [
+        'a throwing toString',
+        () => ({
+          toString() {
+            throw new Error('secret text of the failure');
+          },
+        }),
+      ],
+    ])('a send rejected with %s rejects the request in fixed words', async (_name, value) => {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+      const unhandled: unknown[] = [];
+      const record = (reason: unknown) => unhandled.push(reason);
+      process.on('unhandledRejection', record);
+      try {
+        transport.send.mockImplementationOnce(() => Promise.reject(value()));
+
+        const outcome = client
+          .request('debugger.getStack', undefined, {
+            correlationId: 'req-send-failed',
+          })
+          .then(
+            () => 'resolved',
+            (error: Error) => error.message,
+          );
+
+        await expect(outcome).resolves.toBe(
+          'AdtClientsWS request failed: the send failure could not be described',
+        );
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(unhandled).toEqual([]);
+        expect(pendingSize(client)).toBe(0);
+      } finally {
+        process.off('unhandledRejection', record);
+      }
+    });
+
     it('refuses an empty correlationId before sending it', async () => {
       const transport = new MockWebSocketTransport();
       const client = new AdtClientsWS(transport);
