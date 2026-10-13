@@ -103,6 +103,14 @@ export class AdtClientsWS {
       // One waiting request per id: a second one would replace the first in
       // the pending map and leave it unsettled for good, so it is refused
       // before anything is sent; the first stays as it is.
+      // An empty id is sent but never matched by an answer, so the request
+      // could never settle: refused before anything is sent.
+      if (correlationId === '') {
+        reject(
+          new Error('AdtClientsWS request refused: its correlationId is empty'),
+        );
+        return;
+      }
       if (this.pending.has(correlationId)) {
         reject(
           new Error(
@@ -182,10 +190,7 @@ export class AdtClientsWS {
       this.forget(correlationId, request);
 
       if (message.kind === 'error') {
-        const payloadMessage =
-          typeof message.payload === 'string'
-            ? message.payload
-            : JSON.stringify(message.payload || {});
+        const payloadMessage = describeErrorPayload(message.payload);
         request.reject(
           new Error(
             `AdtClientsWS request failed for correlationId "${correlationId}": ${payloadMessage}`,
@@ -201,5 +206,19 @@ export class AdtClientsWS {
     for (const handler of this.eventHandlers) {
       await handler(message);
     }
+  }
+}
+
+/**
+ * The error payload as text, never throwing: the request it rejects must
+ * settle whatever the payload is. A payload that cannot be serialised gets
+ * fixed words, nothing of its own.
+ */
+function describeErrorPayload(payload: unknown): string {
+  if (typeof payload === 'string') return payload;
+  try {
+    return String(JSON.stringify(payload || {}));
+  } catch {
+    return 'the error payload could not be serialised';
   }
 }

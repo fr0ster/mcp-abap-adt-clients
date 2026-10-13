@@ -350,6 +350,62 @@ describe('AdtClientsWS', () => {
     });
   });
 
+  describe('every request settles, whatever its answer or id', () => {
+    const pendingSize = (client: AdtClientsWS) =>
+      (client as unknown as { pending: Map<string, unknown> }).pending.size;
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    it.each([
+      [
+        'a throwing toJSON',
+        {
+          toJSON() {
+            throw new Error('secret text of the payload');
+          },
+        },
+      ],
+      ['a BigInt', { n: BigInt(1) }],
+      ['a cycle', cyclic],
+    ])('an error answer whose payload has %s rejects it in fixed words', async (_name, payload) => {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+
+      const pending = client.request('debugger.attach', undefined, {
+        correlationId: 'req-unserialisable',
+      });
+      const outcome = pending.then(
+        () => 'resolved',
+        (error: Error) => error.message,
+      );
+      await transport
+        .emitMessage({
+          kind: 'error',
+          correlationId: 'req-unserialisable',
+          payload,
+        })
+        .catch(() => {});
+
+      await expect(outcome).resolves.toBe(
+        'AdtClientsWS request failed for correlationId "req-unserialisable": the error payload could not be serialised',
+      );
+      expect(pendingSize(client)).toBe(0);
+    });
+
+    it('refuses an empty correlationId before sending it', async () => {
+      const transport = new MockWebSocketTransport();
+      const client = new AdtClientsWS(transport);
+
+      await expect(
+        client.request('debugger.getStack', undefined, { correlationId: '' }),
+      ).rejects.toThrow(
+        'AdtClientsWS request refused: its correlationId is empty',
+      );
+      expect(transport.send).not.toHaveBeenCalled();
+      expect(pendingSize(client)).toBe(0);
+    });
+  });
+
   it("rejects a request on the caller's per-request timeout", async () => {
     jest.useFakeTimers();
     try {
