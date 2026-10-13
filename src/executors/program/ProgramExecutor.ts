@@ -17,7 +17,6 @@ import { runProgram } from '../../core/program/run';
 import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { rawDocument } from '../../utils/resultStrategy';
-import { getTimeout } from '../../utils/timeouts';
 import {
   type ITraceSchedulingResults,
   TraceScheduling,
@@ -147,7 +146,7 @@ export class ProgramExecutor<
         this.connection.makeAdtRequest({
           url: `/sap/bc/adt/programs/programrun/${normalizedProgramName}?profilerId=${encodedProfilerId}`,
           method: 'POST',
-          timeout: getTimeout('default'),
+          timeout: 0,
           headers: {
             Accept: 'text/plain',
             'X-sap-adt-profiling': 'server-time',

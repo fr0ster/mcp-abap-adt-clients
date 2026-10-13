@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { TABLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate table name
@@ -38,7 +37,7 @@ export async function validateTableName(
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },

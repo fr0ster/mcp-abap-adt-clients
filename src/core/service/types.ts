@@ -176,10 +176,8 @@ interface IServiceBindingPublicationCommon {
    * How long to wait for the publication job, in milliseconds.
    *
    * A publication is the slowest request this library makes — ~135s measured on
-   * a trial, and one unpublish still unsettled after eleven minutes — so the
-   * 120s `SAP_TIMEOUT_LONG` default is a floor. `IAdtOperationOptions.timeout`
-   * has carried this all along and `update` used to drop it, which left a
-   * caller no way to wait longer than the library had decided to.
+   * a trial, and one unpublish still unsettled after eleven minutes. Absent, the
+   * request carries no deadline: it waits for SAP's answer.
    */
   timeout?: number;
 }

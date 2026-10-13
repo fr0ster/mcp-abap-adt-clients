@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` — answered as it arrived.
@@ -40,7 +39,7 @@ export async function lock(
   return connection.makeAdtRequest({
     url: `${BEHAVIOR_DEFINITION.uri(name)}?_action=LOCK&accessMode=${accessMode}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: ACCEPT_LOCK,

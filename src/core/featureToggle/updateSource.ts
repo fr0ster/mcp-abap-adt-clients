@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_FEATURE_TOGGLE_SOURCE } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE, sourceUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IFeatureToggleSource } from './types';
 
 export async function uploadFeatureToggleSource(
@@ -23,7 +22,7 @@ export async function uploadFeatureToggleSource(
   return connection.makeAdtRequest({
     method: 'PUT',
     url: `${sourceUri(FEATURE_TOGGLE.uri(name))}`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       'Content-Type': CT_FEATURE_TOGGLE_SOURCE,
       // No `X-sap-adt-sessiontype` here. A write is stateless — Eclipse sends

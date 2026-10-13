@@ -28,7 +28,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 const bindingUri = (name: string): string => SERVICE_BINDING.uri(name);
 
@@ -44,7 +43,7 @@ export async function lockServiceBinding(
   return connection.makeAdtRequest({
     url: `${bindingUri(bindingName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_LOCK },
   });
 }
@@ -58,6 +57,6 @@ export async function unlockServiceBinding(
   return connection.makeAdtRequest({
     url: `${bindingUri(bindingName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

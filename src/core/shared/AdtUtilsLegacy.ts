@@ -22,7 +22,6 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
-import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from './AdtUtils';
 import type {
   IGetSqlQueryParams,
@@ -81,7 +80,7 @@ ${objectReferences}
         this.connection.makeAdtRequest({
           url,
           method: 'POST',
-          timeout: getTimeout('default'),
+          timeout: 0,
           data: xmlBody,
           headers: {
             Accept: 'application/xml',

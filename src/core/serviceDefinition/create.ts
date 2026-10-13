@@ -10,7 +10,6 @@ import type {
 import { CT_SERVICE_DEFINITION } from '../../constants/contentTypes';
 import { SERVICE_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateServiceDefinitionParams } from './types';
 
@@ -51,7 +50,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

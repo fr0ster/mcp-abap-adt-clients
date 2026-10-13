@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { STRUCTURE, transportUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
 
@@ -65,7 +64,7 @@ export async function getStructureTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },

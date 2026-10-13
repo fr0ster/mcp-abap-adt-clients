@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
 /**
@@ -32,7 +31,7 @@ export async function validatePackageBasic(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },
@@ -64,7 +63,7 @@ export async function validatePackageFull(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },

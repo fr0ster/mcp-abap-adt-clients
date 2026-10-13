@@ -12,7 +12,6 @@ import {
   CT_FEATURE_TOGGLE_METADATA,
 } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check feature toggle via /sap/bc/adt/checkruns?reporters=abapCheckRun.
@@ -52,7 +51,7 @@ export async function checkFeatureToggle(
   const response = await connection.makeAdtRequest({
     url: '/sap/bc/adt/checkruns?reporters=abapCheckRun',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: ACCEPT_CHECK_MESSAGES,

@@ -21,7 +21,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type { IListCrossTracesOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -47,7 +46,7 @@ export async function listCrossTraces(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     params,
     headers: {
       Accept: 'application/xml',
@@ -77,7 +76,7 @@ export async function getCrossTrace(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     params,
     headers: {
       Accept: 'application/xml',
@@ -101,7 +100,7 @@ export async function getCrossTraceRecords(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },
@@ -126,7 +125,7 @@ export async function getCrossTraceRecordContent(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },
@@ -147,7 +146,7 @@ export async function getCrossTraceActivations(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },

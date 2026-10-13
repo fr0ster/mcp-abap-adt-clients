@@ -10,7 +10,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_PACKAGE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { PACKAGE, transportUri } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -33,7 +32,7 @@ export async function getPackage(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_PACKAGE,
       },
@@ -59,7 +58,7 @@ export async function getPackageTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },

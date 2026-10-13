@@ -10,7 +10,6 @@ import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { getTimeout } from '../../utils/timeouts';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -34,7 +33,7 @@ export async function lockMessageClass(
   return connection.makeAdtRequest({
     url: `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });
@@ -55,7 +54,7 @@ export async function lockMessage(
   return connection.makeAdtRequest({
     url: `${BASE}/${encoded}/messages/${encodeURIComponent(no)}?_action=LOCK_MSG&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK_MSG },
   });
@@ -76,7 +75,7 @@ export async function lockClassForMessage(
   return connection.makeAdtRequest({
     url: `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY&msgNo=${encodeURIComponent(no)}&onSave=X`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });

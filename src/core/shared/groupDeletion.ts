@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';
 
 /**
@@ -71,7 +70,7 @@ ${objectElements}
   return connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });
@@ -144,7 +143,7 @@ ${objectElements}
   return connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

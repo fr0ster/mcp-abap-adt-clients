@@ -6,7 +6,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 import {
   type EnhancementType,
   getEnhancementUri,
@@ -74,7 +73,7 @@ export async function checkEnhancement(
   return connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

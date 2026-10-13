@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` on the function include — answered as it arrived.
@@ -27,6 +26,6 @@ export async function lockFunctionInclude(
     method: 'POST',
     url: `${FUNCTION_INCLUDE.uri(groupName, includeName)}?_action=LOCK&accessMode=MODIFY`,
     headers: { Accept: ACCEPT_LOCK },
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

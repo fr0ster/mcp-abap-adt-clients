@@ -15,7 +15,6 @@ import {
 } from '../../constants/contentTypes';
 import { sourceUri, TABLE_TYPE, transportUri } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -37,7 +36,7 @@ export async function getTableTypeMetadata(
       {
         url,
         method: 'GET',
-        timeout: getTimeout('default'),
+        timeout: 0,
         headers: {
           Accept: acceptHeader,
         },
@@ -96,7 +95,7 @@ export async function getTableTypeSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },
@@ -122,7 +121,7 @@ export async function getTableTypeTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },

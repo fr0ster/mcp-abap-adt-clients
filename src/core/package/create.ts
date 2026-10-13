@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
 /**
@@ -84,7 +83,7 @@ export async function createPackage(
   return connection.makeAdtRequest({
     url: fullUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: ACCEPT_PACKAGE,

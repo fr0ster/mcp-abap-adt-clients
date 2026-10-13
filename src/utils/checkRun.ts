@@ -29,7 +29,6 @@ import {
   TABLE,
   TRANSFORMATION,
 } from '../endpoints/objects';
-import { getTimeout } from './timeouts';
 
 /**
  * Get ADT URI for object type
@@ -201,7 +200,7 @@ export async function runCheckRun(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });
@@ -249,7 +248,7 @@ export async function runCheckRunWithSource(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

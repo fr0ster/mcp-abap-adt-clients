@@ -12,7 +12,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateFunctionGroupParams } from './types';
 
 /**
@@ -42,7 +41,7 @@ export async function updateFunctionGroup(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: document,
     headers: {
       'Content-Type':

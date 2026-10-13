@@ -8,7 +8,6 @@ import {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from '../core/shared/contentTypes';
-import { getTimeout } from './timeouts';
 
 /**
  * Whether a failure says the endpoint is not there — the one failure these
@@ -53,7 +52,7 @@ export async function getSystemInformation(
     const response = await connection.makeAdtRequest({
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers,
       params,
     });
@@ -141,7 +140,7 @@ export async function isModernAdtSystem(
     const response = await connection.makeAdtRequest({
       url: '/sap/bc/adt/core/discovery',
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: 'application/atomsvc+xml',
       },

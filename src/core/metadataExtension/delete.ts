@@ -9,7 +9,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { METADATA_EXTENSION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Delete a metadata extension
@@ -39,7 +38,7 @@ export async function deleteMetadataExtension(
   return connection.makeAdtRequest({
     method: 'DELETE',
     url,
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: undefined,
     headers,
   });

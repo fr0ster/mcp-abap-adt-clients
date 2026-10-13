@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Update class local types include (implementations)
@@ -142,7 +141,7 @@ async function updateClassInclude(
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: includeSource,
     headers,
   });

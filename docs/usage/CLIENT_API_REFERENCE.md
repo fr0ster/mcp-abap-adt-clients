@@ -258,13 +258,15 @@ Contract notes:
   write as given — including not at all,
   in which case ADT decides whether an unlocked write is allowed and says so in
   the answer.
-- **No deadline unless you set one.** Since 18.0.0 this library sends no
-  client-side timeout: `SAP_TIMEOUT_DEFAULT` defaults to `0`, and every request
-  waits for the server. Aborting a request mid-flight ends nothing on the server
-  — it ends what this side knows — and over HTTP it costs the session: the ICF
-  layer is replaced and the ABAP layer beneath it keeps the enqueue locks, whose
-  handles died with the cookie. Pass `options.timeout` when a deadline is worth
-  that risk, or set `SAP_TIMEOUT_DEFAULT` for a floor across the process.
+- **No deadline unless you set one.** No request carries a deadline of the
+  library's — every one waits for the server's answer — and since 31.1.0 no
+  environment variable sets one either (`SAP_TIMEOUT_*` are not read). A client
+  deadline closes the socket, and SAP then ends the synchronous request still
+  running on it, so a write in it is lost; over HTTP it also costs the session:
+  the ICF layer is replaced and the ABAP layer beneath it keeps the enqueue
+  locks, whose handles died with the cookie. Pass `options.timeout` per call
+  when a deadline is worth that risk. `AdtClientsWS` likewise waits for each
+  answer unless you pass `requestTimeoutMs` or a request's `timeoutMs`.
 - **An empty source is a source.** `source: ''` clears an include; only
   `undefined` means none was given. An empty include is a valid object, so
   emptiness must be expressible.

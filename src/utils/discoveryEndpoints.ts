@@ -20,7 +20,6 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DISCOVERY } from '../constants/contentTypes';
-import { getTimeout } from './timeouts';
 
 /**
  * Fetch /sap/bc/adt/discovery and extract all collection href paths.
@@ -36,7 +35,7 @@ export async function fetchDiscoveryEndpoints(
     const response = await connection.makeAdtRequest({
       url: '/sap/bc/adt/discovery',
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: ACCEPT_DISCOVERY,
       },

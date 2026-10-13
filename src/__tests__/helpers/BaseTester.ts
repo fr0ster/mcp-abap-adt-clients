@@ -48,7 +48,6 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
-import { getTimeout } from '../../utils/timeouts';
 import { expectResult } from './contract';
 import {
   expectLockReleased,
@@ -785,7 +784,7 @@ export class BaseTester<TConfig, TState = unknown> {
         const response = await this.connection.makeAdtRequest({
           url,
           method: 'GET',
-          timeout: getTimeout('default'),
+          timeout: 0,
           headers: {
             Accept:
               'application/vnd.sap.adt.repository.objproperties.result.v1+xml, application/vnd.sap.adt.objectproperties+xml, application/xml',

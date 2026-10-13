@@ -10,7 +10,6 @@ import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Upload ABAP Unit test classes for an existing class (low-level function).
@@ -38,7 +37,7 @@ export async function updateClassTestInclude(
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: testClassSource,
     headers,
   });

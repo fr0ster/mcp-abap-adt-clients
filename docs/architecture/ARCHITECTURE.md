@@ -14,7 +14,7 @@ Primary public entry points:
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^12`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^1`, since 23.0.0); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
+- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^12`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^1`, since 23.0.0); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
 - **The library interprets nothing.** Every member makes one ADT request. What the answer becomes is the result strategy the implementation was built with; whether it is a failure is the `analyse` the caller passes with the call. The shipped result sets answer documents as they arrived; the readings and verdicts are in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). Decision 15 in [DECISIONS.md](DECISIONS.md).
 
 ## Layered Structure
@@ -26,7 +26,7 @@ Consumer code  ── result sets (at construction), analyse (per call)
     -> core/* object modules + core/shared (AdtUtils)
     -> runtime/* endpoint functions
     -> executors/* (execution, trace scheduling)
-      -> utils/* cross-cutting helpers (answering, timeouts, accept negotiation, lock handle)
+      -> utils/* cross-cutting helpers (answering, the caller's timeout, accept negotiation, lock handle)
         -> IAbapConnection.makeAdtRequest(...) / IWebSocketTransport
           -> SAP ADT endpoints
 ```
@@ -90,7 +90,7 @@ src/
     acceptNegotiation.ts      # 406 recovery, state per connection
     activationUtils.ts        # buildObjectUri, shared by group activation, deletion, where-used
     systemInfo.ts, discoveryEndpoints.ts
-    requestTrace.ts, callTimeout.ts, timeouts.ts, ...
+    requestTrace.ts, callTimeout.ts, ...
 ```
 
 ## Object addresses
@@ -147,7 +147,7 @@ subject at different resources, and neither takes the other's identifier.
 ### 3) `AdtClientsWS`
 
 WebSocket abstraction around `IWebSocketTransport`:
-- request/response with correlation IDs and timeout-based pending map.
+- request/response with correlation IDs and a pending map; a request waits for its answer unless the caller set a deadline (`requestTimeoutMs`, or `timeoutMs` per request).
 - event dispatch for unsolicited messages.
 
 ### 4) `AdtExecutor`

@@ -8,7 +8,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DISCOVERY } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import type { IGetDiscoveryParams } from './types';
 
 /**
@@ -23,7 +22,7 @@ export async function getDiscovery(
   params: IGetDiscoveryParams = {},
 ): Promise<IAdtWireResponse> {
   const requestId = params.requestId ?? randomUUID().replace(/-/g, '');
-  const timeout = params.timeout ?? getTimeout('default');
+  const timeout = params.timeout ?? 0;
 
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/discovery',

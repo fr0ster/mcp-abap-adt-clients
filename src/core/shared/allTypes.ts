@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get all valid ADT object types
@@ -44,7 +43,7 @@ export async function getAllTypes(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },

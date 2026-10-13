@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { DDL_SOURCE, sourceUri } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Update view DDL source code
@@ -37,7 +36,7 @@ export async function updateDdl(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout(),
+    timeout: 0,
     data: ddlSource,
     headers,
   });

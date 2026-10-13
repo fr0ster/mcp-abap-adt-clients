@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check if behavior definition can be deleted
@@ -52,7 +51,7 @@ export async function checkDeletion(
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });
@@ -105,7 +104,7 @@ export async function deleteBehaviorDefinition(
   return await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

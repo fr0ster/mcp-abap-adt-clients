@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { PROGRAM, sourceUri, versionsUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IProgramConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -22,7 +21,7 @@ export async function getProgramVersions(
   return connection.makeAdtRequest({
     url: `${versionsUri(sourceUri(PROGRAM.uri(config.programName as string)))}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -35,7 +34,7 @@ export async function getProgramVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

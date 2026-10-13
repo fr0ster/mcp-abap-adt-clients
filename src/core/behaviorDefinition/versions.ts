@@ -7,7 +7,6 @@ import {
   sourceUri,
   versionsUri,
 } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -28,7 +27,7 @@ export async function getBehaviorDefinitionVersions(
   return connection.makeAdtRequest({
     url: `${versionsUri(sourceUri(BEHAVIOR_DEFINITION.uri(config.name as string)))}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -41,7 +40,7 @@ export async function getBehaviorDefinitionVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

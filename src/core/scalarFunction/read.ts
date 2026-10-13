@@ -14,7 +14,6 @@ import {
   transportUri,
 } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 function buildQuery(version?: string, options?: IReadOptions): string {
@@ -37,7 +36,7 @@ export async function getScalarFunction(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: { Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION },
     },
     { logger },
@@ -57,7 +56,7 @@ export async function getScalarFunctionSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: { Accept: options?.accept ?? ACCEPT_SOURCE },
     },
     { logger },
@@ -74,7 +73,7 @@ export async function getScalarFunctionTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: options?.accept ?? ACCEPT_TRANSPORT },
   });
 }

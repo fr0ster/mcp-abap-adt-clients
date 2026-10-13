@@ -12,7 +12,6 @@ import {
 } from '../../constants/contentTypes';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 import type {
   ICreateScalarFunctionImplementationParams,
@@ -75,7 +74,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: ACCEPT_SCALAR_FUNCTION_IMPL,

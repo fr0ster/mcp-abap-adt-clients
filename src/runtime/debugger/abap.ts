@@ -39,7 +39,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
-import { getTimeout } from '../../utils/timeouts';
 import { createBatchBoundary } from './batchPayload';
 
 const DEBUGGER = '/sap/bc/adt/debugger';
@@ -209,7 +208,7 @@ export async function setBreakpoints(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/breakpoints`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildBreakpointsXml(identity, breakpoints, validationOnly),
     headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
   });
@@ -263,7 +262,7 @@ export async function syncBreakpoints(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/breakpoints`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildSyncBreakpointsXml(identity, sync),
     headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
   });
@@ -278,7 +277,7 @@ export async function deleteBreakpoint(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/breakpoints/${encodeURIComponent(breakpointId)}?${query({ scope: 'external', ...identityQuery(identity, 'delete') })}`,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }
 
@@ -350,7 +349,7 @@ export async function listen(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/listeners?${query({ ...identityQuery(identity), timeout: holdSeconds, ...conflict })}`,
     method: 'POST',
-    timeout: getTimeout((holdSeconds + 60) * 1000),
+    timeout: (holdSeconds + 60) * 1000,
     headers: { Accept: 'application/vnd.sap.as+xml' },
   });
 }
@@ -373,7 +372,7 @@ export async function checkListener(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/listeners?${query({ ...identityQuery(identity), checkConflict: true })}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -440,7 +439,7 @@ export async function stopListener(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/listeners?${query(identityQuery(identity))}`,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }
 
@@ -491,7 +490,7 @@ export async function attach(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method: 'attach', debuggeeId, ...who, dynproDebugging })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
       // The load balancer's routing header: the attach — and the debug
@@ -508,7 +507,7 @@ export async function getStack(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/stack?${query({ emode: '_', semanticURIs: true })}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -540,7 +539,7 @@ export async function getChildVariables(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?method=getChildVariables`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildChildVariablesXml(parentIds),
     headers: {
       'Content-Type': DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
@@ -572,7 +571,7 @@ export async function getVariables(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?method=getVariables`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildVariablesXml(variableIds),
     headers: {
       'Content-Type': DEBUGGER_VARIABLES_CONTENT_TYPE,
@@ -594,7 +593,7 @@ export async function step(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -616,7 +615,7 @@ export async function stepToLine(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method, uri })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -629,7 +628,7 @@ export async function setStackPosition(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method: 'setStackPosition', position })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -646,7 +645,7 @@ export async function setVariableValue(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method: 'setVariableValue', variableName })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: value,
     headers: { Accept: 'application/xml' },
   });
@@ -671,7 +670,7 @@ export async function terminateDebuggee(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?method=terminateDebuggee`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -710,7 +709,7 @@ export async function detachDebugger(
       ...(debuggeeId ? { debuggeeId } : {}),
     })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -739,7 +738,7 @@ export async function terminateDebugger(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method: 'terminateDebugger' })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -762,7 +761,7 @@ export async function getMemorySizes(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/memorysizes?${query({ includeAbap })}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: DEBUGGER_MEMORY_SIZES_ACCEPT },
   });
 }
@@ -785,7 +784,7 @@ export async function createMemorySnapshot(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/actions?action=memorySnapshot`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -801,7 +800,7 @@ export async function createWatchpoint(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/watchpoints?${query(condition ? { variableName, condition } : { variableName })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -812,7 +811,7 @@ export async function listWatchpoints(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/watchpoints`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -824,7 +823,7 @@ export async function deleteWatchpoint(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/watchpoints/${encodeURIComponent(watchpointId)}`,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }
 
@@ -849,7 +848,7 @@ export async function executeBatchRequest(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}/batch`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: payload.body,
     headers: {
       'Content-Type': `multipart/mixed; boundary=${payload.boundary}`,
@@ -930,7 +929,7 @@ export async function setDebuggerSettings(
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method: 'setDebuggerSettings' })}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildDebuggerSettingsXml(settings),
     headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
   });

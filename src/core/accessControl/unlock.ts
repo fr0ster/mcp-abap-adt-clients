@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCESS_CONTROL } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock access control
@@ -19,6 +18,6 @@ export async function unlockAccessControl(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

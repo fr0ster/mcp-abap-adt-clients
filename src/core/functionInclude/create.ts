@@ -11,7 +11,6 @@ import {
   CT_FUNCTION_INCLUDE,
 } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionIncludeParams } from './types';
 import { buildFunctionIncludeXml } from './xmlBuilder';
 
@@ -35,7 +34,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

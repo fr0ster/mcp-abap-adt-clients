@@ -40,7 +40,6 @@ import { AdtClient } from '../src/clients/AdtClient';
 import type { AdtSourceObjectType } from '../src/core/shared/types';
 import { makeAdtRequestWithAcceptNegotiation } from '../src/utils/acceptNegotiation';
 import { orThrow } from '../src/utils/adtResponse';
-import { getTimeout } from '../src/utils/timeouts';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
 const resolveTransportRequest = testHelper.resolveTransportRequest;
@@ -218,7 +217,7 @@ async function readSource(
         {
           url,
           method: 'GET',
-          timeout: getTimeout('default'),
+          timeout: 0,
           headers: {
             Accept: 'text/plain',
           },

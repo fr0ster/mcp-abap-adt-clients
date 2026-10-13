@@ -7,7 +7,6 @@ import {
   sourceUri,
   versionsUri,
 } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IServiceDefinitionConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -30,7 +29,7 @@ export async function getServiceDefinitionVersions(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -43,7 +42,7 @@ export async function getServiceDefinitionVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

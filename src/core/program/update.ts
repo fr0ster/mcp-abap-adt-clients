@@ -5,7 +5,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { PROGRAM, sourceUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Upload program source code (low-level - uses existing lockHandle)
@@ -33,7 +32,7 @@ export async function uploadProgramSource(
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: sourceCode,
     headers,
   });

@@ -13,7 +13,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Delete an (empty) transport request.
@@ -29,7 +28,7 @@ export async function deleteTransport(
   return connection.makeAdtRequest({
     url,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_TRANSPORT },
   });
 }

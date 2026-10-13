@@ -14,7 +14,6 @@ import {
   encodeSapObjectName,
   longPollingQuery,
 } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
 
@@ -72,7 +71,7 @@ export async function getClassTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
@@ -103,7 +102,7 @@ export async function getClassDefinitionsInclude(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },
@@ -136,7 +135,7 @@ export async function getClassMacrosInclude(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },
@@ -169,7 +168,7 @@ export async function getClassTestClassesInclude(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },
@@ -202,7 +201,7 @@ export async function getClassImplementationsInclude(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },

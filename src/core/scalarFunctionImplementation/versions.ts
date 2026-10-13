@@ -7,7 +7,6 @@ import {
   sourceUri,
   versionsUri,
 } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IScalarFunctionImplementationConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -32,7 +31,7 @@ export async function getScalarFunctionImplementationVersions(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -45,7 +44,7 @@ export async function getScalarFunctionImplementationVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

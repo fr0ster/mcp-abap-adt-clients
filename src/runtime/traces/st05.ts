@@ -10,7 +10,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ST05 trace state
@@ -26,7 +25,7 @@ export async function getSt05TraceState(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },
@@ -47,7 +46,7 @@ export async function getSt05TraceDirectory(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },

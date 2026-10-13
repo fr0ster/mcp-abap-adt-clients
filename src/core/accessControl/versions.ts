@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCESS_CONTROL, versionsUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IAccessControlConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -26,7 +25,7 @@ export async function getAccessControlVersions(
     // suitable resource found" on an on-premise and a cloud system (2026-10-01).
     url: versionsUri(ACCESS_CONTROL.uri(config.accessControlName as string)),
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -39,7 +38,7 @@ export async function getAccessControlVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

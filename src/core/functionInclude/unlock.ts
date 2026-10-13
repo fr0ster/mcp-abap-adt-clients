@@ -8,7 +8,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock function include. Must use the same stateful session that owned
@@ -25,6 +24,6 @@ export async function unlockFunctionInclude(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

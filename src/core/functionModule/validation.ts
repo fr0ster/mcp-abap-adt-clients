@@ -8,7 +8,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate function module name
@@ -46,7 +45,7 @@ export async function validateFunctionModuleName(
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept:
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage',

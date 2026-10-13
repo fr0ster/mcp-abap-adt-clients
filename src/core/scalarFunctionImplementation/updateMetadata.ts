@@ -8,7 +8,6 @@ import {
 } from '../../constants/contentTypes';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateScalarFunctionImplementationParams } from './types';
 
 export async function updateScalarFunctionImplementationMetadata(
@@ -20,7 +19,7 @@ export async function updateScalarFunctionImplementationMetadata(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: args.source_code,
     headers: {
       Accept: ACCEPT_SCALAR_FUNCTION_IMPL,

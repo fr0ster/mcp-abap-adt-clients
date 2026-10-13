@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export async function unlockFeatureToggle(
   connection: IAbapConnection,
@@ -13,7 +12,7 @@ export async function unlockFeatureToggle(
   return connection.makeAdtRequest({
     method: 'POST',
     url: `${FEATURE_TOGGLE.uri(name)}`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     params: { _action: 'UNLOCK', lockHandle },
     // No `X-sap-adt-sessiontype` here: `setSessionType('stateful')` in the
     // handler is what puts it on this request, the same as every other type.

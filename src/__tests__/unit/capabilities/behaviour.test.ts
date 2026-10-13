@@ -819,15 +819,10 @@ describe('capability guard — LOCK and UNLOCK are the stateful requests', () =>
 /**
  * The caller's deadline reaches the wire.
  *
- * Since 18.0.0 this library sends no client-side timeout of its own —
- * `SAP_TIMEOUT_DEFAULT` defaults to `0` — and the CHANGELOG and the API
- * reference both tell a caller that `IAdtOperationOptions.timeout` is how they
- * ask for one. That was untrue for every member but the service binding's
- * publication: the low-level functions end in
- * `makeAdtRequest({ …, timeout: getTimeout('default') })` at 444 places, and
- * none of them could see the option. So a caller who wanted a deadline had a
- * documented parameter that did nothing, and the only real control was a
- * process-wide environment variable.
+ * This library sends no client-side deadline of its own — every request
+ * carries `timeout: 0` — and `IAdtOperationOptions.timeout` is how a caller
+ * asks for one. The low-level functions cannot see that option, so a member
+ * wraps its connection (`withCallTimeout`) and every request below carries it.
  *
  * This asserts the promise rather than the mechanism: whatever a member does
  * internally, a request it issues carries the number the caller passed.

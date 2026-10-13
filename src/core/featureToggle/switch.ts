@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_FEATURE_TOGGLE_TOGGLE_PARAMETERS } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IToggleFeatureToggleParams } from './types';
 
 export async function toggleFeatureToggle(
@@ -23,7 +22,7 @@ export async function toggleFeatureToggle(
   return connection.makeAdtRequest({
     method: 'POST',
     url: `${FEATURE_TOGGLE.uri(params.feature_toggle_name)}/toggle`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { 'Content-Type': CT_FEATURE_TOGGLE_TOGGLE_PARAMETERS },
     data: JSON.stringify(body),
   });

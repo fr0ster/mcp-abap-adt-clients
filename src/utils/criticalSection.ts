@@ -2,7 +2,7 @@
  * Run the lock window as an uninterruptible critical section.
  *
  * The connector raises the effective timeout while a critical section is open
- * (`Math.max(caller timeout, SAP_TIMEOUT_CRITICAL)`), which is the whole reason
+ * (`Math.max(caller timeout, its critical-section ceiling)`), which is the whole reason
  * the mechanism exists. This package never used it: every request went out with
  * the caller's plain 45s, including the ones between LOCK and UNLOCK.
  *

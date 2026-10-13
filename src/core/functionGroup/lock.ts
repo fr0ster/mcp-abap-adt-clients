@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` on the function group — answered as it arrived.
@@ -30,7 +29,7 @@ export async function lockFunctionGroup(
   return connection.makeAdtRequest({
     url: `${FUNCTION_GROUP.uri(functionGroupName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_LOCK },
   });
 }
@@ -55,6 +54,6 @@ export async function unlockFunctionGroup(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

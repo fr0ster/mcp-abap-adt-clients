@@ -11,7 +11,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { METADATA_EXTENSION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock a metadata extension after editing
@@ -37,6 +36,6 @@ export async function unlockMetadataExtension(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

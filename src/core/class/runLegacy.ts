@@ -11,7 +11,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CLASS } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 const CT_XML = 'application/xml';
 const ACCEPT_XML = 'application/xml';
@@ -74,7 +73,7 @@ ${objectRefs}
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/abapunit/testruns',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xml,
     headers: {
       'Content-Type': CT_XML,

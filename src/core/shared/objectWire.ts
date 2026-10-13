@@ -52,7 +52,6 @@ import {
   TABLE_TYPE,
 } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
@@ -81,7 +80,7 @@ export async function objectSourceWire(
     {
       url: uri,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: acceptHeader,
       },
@@ -124,7 +123,7 @@ export async function objectMetadataWire(
     {
       url: uri,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: acceptHeader,
       },

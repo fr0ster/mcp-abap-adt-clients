@@ -21,7 +21,6 @@ import {
 } from '../../constants/contentTypes';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -44,7 +43,7 @@ export async function checkDeletion(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/check',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION_CHECK,
@@ -79,7 +78,7 @@ export async function deleteMessageClass(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/delete',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION,

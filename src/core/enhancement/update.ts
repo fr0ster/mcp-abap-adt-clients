@@ -10,7 +10,6 @@ import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { safeStringify } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import {
   type EnhancementType,
   getEnhancementUri,
@@ -84,7 +83,7 @@ export async function update(
     const response = await connection.makeAdtRequest({
       url,
       method: 'PUT',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: args.source_code,
       headers,
     });

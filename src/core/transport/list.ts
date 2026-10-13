@@ -17,7 +17,6 @@ import {
   ACCEPT_TRANSPORT_LIST,
 } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * List ABAP transport requests for a saved search.
@@ -43,7 +42,7 @@ export async function listTransports(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_TRANSPORT_LIST },
   });
 }
@@ -65,7 +64,7 @@ export async function requestTransportSearchConfigurations(
   return connection.makeAdtRequest({
     url: TRANSPORT_SEARCH_CONFIGURATIONS_URL,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_TRANSPORT_CONFIGURATIONS },
   });
 }

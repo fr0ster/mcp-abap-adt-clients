@@ -37,7 +37,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 const MAIN = '/sap/bc/adt/amdp/debugger/main';
 const NAMESPACE = 'xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"';
@@ -81,7 +80,7 @@ export async function startAmdpDebugger(
   return connection.makeAdtRequest({
     url: `${MAIN}?${query}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/vnd.sap.adt.amdp.dbg.startmain.v1+xml' },
   });
 }
@@ -120,7 +119,7 @@ export async function syncAmdpBreakpoints(
   return connection.makeAdtRequest({
     url: `${MAIN}/${encodeURIComponent(mainId)}/breakpoints`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildAmdpBreakpointsXml(breakpoints),
     headers: { 'Content-Type': AMDP_BREAKPOINTS_CONTENT_TYPE },
   });
@@ -138,7 +137,7 @@ export async function getAmdpEvents(
   return connection.makeAdtRequest({
     url: `${MAIN}/${encodeURIComponent(mainId)}`,
     method: 'GET',
-    timeout: getTimeout(AMDP_EVENTS_HOLD_MS + 60_000),
+    timeout: AMDP_EVENTS_HOLD_MS + 60_000,
     headers: { Accept: AMDP_EVENTS_ACCEPT },
   });
 }
@@ -153,7 +152,7 @@ export async function stepAmdpDebuggee(
   return connection.makeAdtRequest({
     url: `${MAIN}/${encodeURIComponent(mainId)}/debuggees/${encodeURIComponent(debuggeeId)}?step=${step}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }
 
@@ -171,7 +170,7 @@ export async function deleteAmdpDebuggee(
   return connection.makeAdtRequest({
     url: `${MAIN}/${encodeURIComponent(mainId)}/debuggees/${encodeURIComponent(debuggeeId)}`,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }
 
@@ -188,6 +187,6 @@ export async function stopAmdpDebugger(
   return connection.makeAdtRequest({
     url: `${MAIN}/${encodeURIComponent(mainId)}?hardStop=${hardStop}`,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

@@ -18,7 +18,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateIncludeParams } from './types';
 
@@ -56,7 +55,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: metadataXml,
     headers: {
       // Eclipse sends no Accept here, only the content type; both were

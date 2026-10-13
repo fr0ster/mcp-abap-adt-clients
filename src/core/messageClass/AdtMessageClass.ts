@@ -31,7 +31,6 @@ import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
-import { getTimeout } from '../../utils/timeouts';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -130,7 +129,7 @@ export class AdtMessageClass<
         connection.makeAdtRequest({
           url: `${VALIDATE_BASE}?${params.toString()}`,
           method: 'POST',
-          timeout: getTimeout('default'),
+          timeout: 0,
         }),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
       options?.analyse,

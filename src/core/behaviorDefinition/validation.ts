@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionValidationParams } from './types';
 
 /**
@@ -55,7 +54,7 @@ export async function validate(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },

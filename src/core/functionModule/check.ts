@@ -13,7 +13,6 @@ import {
 } from '../../constants/contentTypes';
 import { FUNCTION_MODULE } from '../../endpoints/objects';
 import type { CheckRunVersion } from '../../utils/checkRun';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Build check run XML payload for function module
@@ -88,7 +87,7 @@ export async function checkFunctionModule(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

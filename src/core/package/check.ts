@@ -11,7 +11,6 @@ import {
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check package for errors
@@ -62,7 +61,7 @@ export async function checkPackage(
   return await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: ACCEPT_CHECK_MESSAGES,

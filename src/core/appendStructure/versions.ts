@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { STRUCTURE, sourceUri, versionsUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IAppendStructureConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -26,7 +25,7 @@ export async function getAppendStructureVersions(
       sourceUri(STRUCTURE.uri(config.appendStructureName as string)),
     ),
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -39,7 +38,7 @@ export async function getAppendStructureVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

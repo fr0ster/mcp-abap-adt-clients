@@ -12,7 +12,6 @@ import type {
 import { ACCEPT_DOMAIN } from '../../constants/contentTypes';
 import { DOMAIN } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateDomainParams } from './types';
 
 /**
@@ -42,7 +41,7 @@ export async function updateDomain(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: document,
     headers: {
       Accept: ACCEPT_DOMAIN,

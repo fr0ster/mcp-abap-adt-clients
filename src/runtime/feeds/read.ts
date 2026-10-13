@@ -11,7 +11,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get feeds
@@ -27,7 +26,7 @@ export async function getFeeds(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/atom+xml;type=feed',
     },
@@ -61,7 +60,7 @@ export async function getFeedVariants(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/atom+xml;type=feed',
     },
@@ -120,7 +119,7 @@ export async function fetchFeed(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/atom+xml;type=feed' },
   });
 }

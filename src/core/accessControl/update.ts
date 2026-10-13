@@ -5,7 +5,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { ACCESS_CONTROL, sourceUri } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateAccessControlParams } from './types';
 
 /**
@@ -31,7 +30,7 @@ export async function updateAccessControl(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: args.source_code,
     headers,
   });

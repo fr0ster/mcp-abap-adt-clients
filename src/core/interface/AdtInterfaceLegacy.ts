@@ -12,6 +12,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import { INTERFACE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtInterface } from './AdtInterface';
 import type {
@@ -33,7 +34,7 @@ export class AdtInterfaceLegacy<
     return answering(
       () =>
         deleteObjectDirect(
-          this.connection,
+          withCallTimeout(this.connection, options?.timeout),
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

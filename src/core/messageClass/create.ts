@@ -7,7 +7,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateMessageClassParams } from './types';
 import { buildMessageClassXml } from './xml';
 
@@ -45,7 +44,7 @@ export async function createMessageClass(
   return connection.makeAdtRequest({
     url: `${BASE}${corrNrParam}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       'Content-Type': 'application/xml',

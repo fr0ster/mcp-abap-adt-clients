@@ -15,7 +15,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DATA_PREVIEW } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IGetTableContentsParams } from './types';
 
 const ACCEPT_HEADER = ACCEPT_DATA_PREVIEW;
@@ -36,7 +35,7 @@ export async function getTableColumns(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/datapreview/ddic/${encodedName}/metadata`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_HEADER },
   });
 }
@@ -53,8 +52,8 @@ export async function getTableColumns(
  *
  * **No deadline of the library's**, as for the freestyle query: the request
  * carries `timeout: 0` — none — and how long to wait is the caller's, set on the
- * connection it hands in. Until 31.0.0 this set `getTimeout('long')`
- * (`SAP_TIMEOUT_LONG`, 120 s by default).
+ * connection it hands in. Until 31.0.0 this set the library's own long
+ * deadline (120 s by default).
  */
 export async function getTableContents(
   connection: IAbapConnection,

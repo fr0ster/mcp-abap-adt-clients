@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CLASS_INCLUDE, versionsUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 
@@ -30,7 +29,7 @@ export async function getClassIncludeVersions(
   return connection.makeAdtRequest({
     url: `${versionsUri(CLASS_INCLUDE.uri(className, includeType))}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -43,7 +42,7 @@ export async function getClassVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

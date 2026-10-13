@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_ABAPGIT_REPO_OBJECT_V2 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * A run's error log — one GET to the `log_link` `listRepos` reported.
@@ -19,7 +18,7 @@ export async function getErrorLog(
   return connection.makeAdtRequest({
     method: 'GET',
     url: logLink,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: CT_ABAPGIT_REPO_OBJECT_V2 },
   });
 }

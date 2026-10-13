@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { TRANSFORMATION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` — answered as it arrived. The handle is read by
@@ -21,6 +20,6 @@ export async function lockTransformation(
     method: 'POST',
     url,
     headers: { Accept: ACCEPT_LOCK },
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

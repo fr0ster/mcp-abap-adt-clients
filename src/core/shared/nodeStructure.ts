@@ -9,7 +9,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Fetch node structure from ADT repository
@@ -59,7 +58,7 @@ export async function fetchNodeStructure(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     params,
     data: xmlBody,
     headers: {

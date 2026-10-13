@@ -15,7 +15,6 @@ import {
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check function include via /sap/bc/adt/checkruns?reporters=abapCheckRun.
@@ -55,7 +54,7 @@ export async function checkFunctionInclude(
   const response = await connection.makeAdtRequest({
     url: '/sap/bc/adt/checkruns?reporters=abapCheckRun',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: ACCEPT_CHECK_MESSAGES,

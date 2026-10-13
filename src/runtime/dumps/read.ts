@@ -15,7 +15,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 // Declared once, in the contract; re-exported so importers here are unchanged.
@@ -100,7 +99,7 @@ export async function listRuntimeDumps(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/atom+xml;type=feed',
     },
@@ -143,7 +142,7 @@ export async function getRuntimeDumpById(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/runtime/dump/${normalized}${suffix}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: accept,
     },

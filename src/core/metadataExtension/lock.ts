@@ -10,7 +10,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { METADATA_EXTENSION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` — answered as it arrived.
@@ -26,7 +25,7 @@ export async function lockMetadataExtension(
   return connection.makeAdtRequest({
     method: 'POST',
     url: `${METADATA_EXTENSION.uri(name)}?_action=LOCK&accessMode=MODIFY`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: undefined,
     headers: { Accept: ACCEPT_LOCK },
   });

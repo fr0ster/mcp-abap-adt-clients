@@ -6,7 +6,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 import { includeUrl } from './lock';
 
 export async function unlockInclude(
@@ -17,7 +16,7 @@ export async function unlockInclude(
   return connection.makeAdtRequest({
     url: `${includeUrl(includeName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: {},
   });

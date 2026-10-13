@@ -7,7 +7,6 @@ import {
   CT_FEATURE_TOGGLE_CHECK_PARAMETERS,
 } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …/check` — the toggle's current state and what changing it would
@@ -28,7 +27,7 @@ export async function checkFeatureToggleState(
   return connection.makeAdtRequest({
     method: 'POST',
     url: `${FEATURE_TOGGLE.uri(name)}/check`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       'Content-Type': CT_FEATURE_TOGGLE_CHECK_PARAMETERS,
       Accept: ACCEPT_FEATURE_TOGGLE_CHECK_RESULT,

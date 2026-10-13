@@ -10,7 +10,6 @@ import type {
 import { CT_STRUCTURE } from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateStructureParams } from './types';
 
 /**
@@ -48,7 +47,7 @@ export async function create(
   return connection.makeAdtRequest({
     url: createUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: structureXml,
     headers,
   });

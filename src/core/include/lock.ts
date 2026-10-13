@@ -12,7 +12,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 function includeUrl(includeName: string): string {
   return `${PROGRAM_INCLUDE.uri(includeName)}`;
@@ -33,7 +32,7 @@ export async function lockInclude(
   return connection.makeAdtRequest({
     url: `${includeUrl(includeName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });

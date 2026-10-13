@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate structure name
@@ -39,7 +38,7 @@ export async function validateStructureName(
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },

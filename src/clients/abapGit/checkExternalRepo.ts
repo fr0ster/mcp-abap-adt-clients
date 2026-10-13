@@ -7,7 +7,6 @@ import {
   ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
   CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import { buildExternalRepoInfoBody } from './xmlBuilder';
 
 export async function checkExternalRepo(
@@ -20,7 +19,7 @@ export async function checkExternalRepo(
   return connection.makeAdtRequest({
     method: 'POST',
     url: '/sap/bc/adt/abapgit/externalrepoinfo',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       'Content-Type': CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
       Accept: ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,

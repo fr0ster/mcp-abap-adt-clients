@@ -10,7 +10,6 @@ import type {
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { debuggeePassport } from '../../runtime/debugger/passport';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Run an ABAP executable program.
@@ -28,7 +27,7 @@ export async function runProgram(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/programs/programrun/${normalizedName}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_SOURCE,
       'X-sap-adt-profiling': 'server-time',

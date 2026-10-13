@@ -11,7 +11,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type { IGetCheckFailureLogsOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -39,7 +38,7 @@ export async function getCheckFailureLogs(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     params,
     headers: {
       Accept: 'application/xml',
@@ -65,7 +64,7 @@ export async function getExecutionLog(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
       'X-sap-adt-relation': 'http://www.sap.com/adt/atc/relations/results/log',

@@ -11,7 +11,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 import { CT_INCLUDE } from './create';
 import { includeUrl } from './lock';
 
@@ -22,7 +21,7 @@ export async function getIncludeMetadata(
   return connection.makeAdtRequest({
     url: includeUrl(includeName),
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: CT_INCLUDE },
   });
 }
@@ -36,7 +35,7 @@ export async function getIncludeSource(
   return connection.makeAdtRequest({
     url: `${includeUrl(includeName)}/source/main${query}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

@@ -24,7 +24,6 @@ import {
   ACCEPT_UNIT_TEST_STATUS,
   CT_UNIT_TEST_RUN,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {
@@ -80,7 +79,7 @@ export async function startUnitTestRunByObject(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/abapunit/runs',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xml,
     headers: {
       'Content-Type': CT_UNIT_TEST_RUN,
@@ -98,7 +97,7 @@ export async function getUnitTestRunStatus(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/abapunit/runs/${runId}${query}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_UNIT_TEST_STATUS,
     },
@@ -123,7 +122,7 @@ export async function getUnitTestRunResult(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/abapunit/results/${runId}${query}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: accept,
     },

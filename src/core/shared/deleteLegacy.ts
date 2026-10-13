@@ -10,7 +10,6 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Delete an ADT object via direct DELETE request. No lock is needed.
@@ -31,7 +30,7 @@ export async function deleteObjectDirect(
   return connection.makeAdtRequest({
     url,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
   });
 }

@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { DDL_SOURCE, versionsUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IDdlConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -24,7 +23,7 @@ export async function getDdlVersions(
     // suitable resource found" on an on-premise and a cloud system (2026-10-01).
     url: versionsUri(DDL_SOURCE.uri(config.ddlName as string)),
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -37,7 +36,7 @@ export async function getDdlVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

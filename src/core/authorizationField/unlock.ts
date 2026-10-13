@@ -8,7 +8,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock authorization field. Must use the same stateful session that owned
@@ -24,6 +23,6 @@ export async function unlockAuthorizationField(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

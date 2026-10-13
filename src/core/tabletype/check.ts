@@ -12,7 +12,6 @@ import {
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
 import { TABLE_TYPE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Build check run XML payload
@@ -76,7 +75,7 @@ export async function runTableTypeCheckRun(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: payload,
     headers,
   });

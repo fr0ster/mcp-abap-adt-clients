@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { CLASS } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate behavior implementation class name
@@ -72,7 +71,7 @@ export async function validateBehaviorImplementationName(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers,
   });
 }

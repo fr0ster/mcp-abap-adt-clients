@@ -15,7 +15,6 @@ import {
 } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE, sourceUri } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Upload function include source code (low-level; uses an existing lockHandle).
@@ -42,7 +41,7 @@ export async function uploadFunctionIncludeSource(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: sourceCode,
     headers: {
       'Content-Type': contentType,

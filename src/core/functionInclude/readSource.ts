@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE, sourceUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Read function include source code.
@@ -24,7 +23,7 @@ export async function readFunctionIncludeSource(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_SOURCE,
     },

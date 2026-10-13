@@ -7,7 +7,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';
 
 /**
@@ -33,7 +32,7 @@ export async function getActivationRun(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/activation/runs/${runId}${query}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml, application/vnd.sap.adt.backgroundrun.v1+xml',
     },
@@ -52,7 +51,7 @@ export async function getActivationResults(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: 'application/xml',
     },
@@ -122,7 +121,7 @@ ${objectReferences}
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });
