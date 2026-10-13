@@ -27,7 +27,7 @@ export async function activateFunctionGroup(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: 30000, // 30 seconds for activation
+    timeout: 0,
     data: xmlPayload,
     headers: {
       'Content-Type': 'application/xml',

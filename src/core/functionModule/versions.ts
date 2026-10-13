@@ -7,7 +7,6 @@ import {
   sourceUri,
   versionsUri,
 } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IFunctionModuleConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -27,7 +26,7 @@ export async function getFunctionModuleVersions(
   return connection.makeAdtRequest({
     url: `${versionsUri(sourceUri(FUNCTION_MODULE.uri(config.functionGroupName as string, config.functionModuleName as string)))}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -40,7 +39,7 @@ export async function getFunctionModuleVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

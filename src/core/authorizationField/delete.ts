@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export interface IDeleteAuthorizationFieldParams {
   authorization_field_name: string;
@@ -41,7 +40,7 @@ export async function checkDeletion(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/check',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION_CHECK,
@@ -72,7 +71,7 @@ export async function deleteAuthorizationField(
   const response = await connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/delete',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION,

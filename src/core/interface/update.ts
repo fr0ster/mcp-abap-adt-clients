@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { INTERFACE, sourceUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Low-level: Upload interface source code (PUT)
@@ -35,7 +34,7 @@ export async function upload(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: sourceCode,
     headers: { 'Content-Type': contentType, Accept: ACCEPT_SOURCE },
   });

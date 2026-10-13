@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { DDL_SOURCE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteDdlParams } from './types';
 
 /**
@@ -42,7 +41,7 @@ export async function checkDeletion(
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });
@@ -84,7 +83,7 @@ export async function deleteDdl(
   const response = await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

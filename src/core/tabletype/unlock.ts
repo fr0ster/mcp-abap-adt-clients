@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { TABLE_TYPE } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock the table type after DDL content is added
@@ -24,7 +23,7 @@ export async function unlockTableType(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: {},
   });
@@ -42,7 +41,7 @@ export async function deleteTableTypeLock(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: '',
     headers: {},
   });

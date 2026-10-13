@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { CLASS } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` on the class — answered as it arrived.
@@ -26,7 +25,7 @@ export async function lockClass(
   return connection.makeAdtRequest({
     url: `${CLASS.uri(className)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });

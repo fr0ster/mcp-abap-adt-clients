@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export interface DeleteStructureParams {
   structure_name: string;
@@ -46,7 +45,7 @@ export async function checkDeletion(
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });
@@ -89,7 +88,7 @@ export async function deleteStructure(
   const response = await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

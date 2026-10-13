@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { TABLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` — answered as it arrived.
@@ -24,7 +23,7 @@ export async function lockTable(
   return connection.makeAdtRequest({
     url: `${TABLE.uri(tableName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });

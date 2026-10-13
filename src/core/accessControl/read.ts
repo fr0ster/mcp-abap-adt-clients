@@ -14,7 +14,6 @@ import {
   transportUri,
 } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -42,7 +41,7 @@ export async function getAccessControl(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? CT_ACCESS_CONTROL,
       },
@@ -76,7 +75,7 @@ export async function getAccessControlSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },
@@ -99,7 +98,7 @@ export async function getAccessControlTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },

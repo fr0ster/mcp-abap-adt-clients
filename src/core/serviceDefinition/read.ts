@@ -18,7 +18,6 @@ import {
   transportUri,
 } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -46,7 +45,7 @@ export async function getServiceDefinition(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? CT_SERVICE_DEFINITION,
       },
@@ -80,7 +79,7 @@ export async function getServiceDefinitionSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },
@@ -106,7 +105,7 @@ export async function getServiceDefinitionTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },

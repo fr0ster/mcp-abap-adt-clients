@@ -13,7 +13,6 @@ import {
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 import {
   type EnhancementType,
@@ -48,7 +47,7 @@ export async function getEnhancementMetadata(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_ENHANCEMENT,
       },
@@ -94,7 +93,7 @@ export async function getEnhancementSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE_UTF8,
       },
@@ -127,7 +126,7 @@ export async function getEnhancementTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },

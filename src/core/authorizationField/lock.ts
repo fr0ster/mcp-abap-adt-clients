@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` — answered as it arrived.
@@ -25,6 +24,6 @@ export async function lockAuthorizationField(
     method: 'POST',
     url: `${AUTHORIZATION_FIELD.uri(name)}?_action=LOCK&accessMode=MODIFY`,
     headers: { Accept: ACCEPT_LOCK },
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

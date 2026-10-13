@@ -5,7 +5,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { sourceUri, TRANSFORMATION } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateTransformationParams } from './types';
 
 /**
@@ -31,7 +30,7 @@ export async function updateTransformation(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: args.source_code,
     headers,
   });

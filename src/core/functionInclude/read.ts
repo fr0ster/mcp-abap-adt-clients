@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FUNCTION_INCLUDE } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract. The copy here carried only
 // `withLongPolling`, while `accept` is read in 54 places and `version` in 16 —
@@ -36,7 +35,7 @@ export async function readFunctionInclude(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_FUNCTION_INCLUDE,
     },

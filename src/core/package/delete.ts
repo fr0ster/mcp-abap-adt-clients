@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IDeletePackageParams } from './types';
 
 /**
@@ -44,7 +43,7 @@ export async function checkPackageDeletion(
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });
@@ -87,7 +86,7 @@ export async function deletePackage(
   const response = await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

@@ -12,7 +12,6 @@ import {
 } from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateAppendStructureParams } from './types';
 
@@ -55,7 +54,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: { Accept: ACCEPT_APPEND_STRUCTURE, 'Content-Type': CT_STRUCTURE },
   });

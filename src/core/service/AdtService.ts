@@ -47,7 +47,6 @@ import {
 } from '../../utils/internalUtils';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
-import { getTimeout } from '../../utils/timeouts';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
@@ -166,13 +165,11 @@ export class AdtServiceBinding<
   private async publishByServiceType(
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
-    // **The caller's, when they give one.** A publication job is the slowest
-    // thing this library asks for — measured at ~135s on a trial, and an
-    // unpublish once not settled after eleven minutes — so the 120s
-    // `SAP_TIMEOUT_LONG` default is a floor, not a ceiling. The contract has
-    // carried `IAdtOperationOptions.timeout` all along; this member used to
-    // drop it, which left a caller no way to wait longer than the library had
-    // decided to.
+    // **The caller's, when they give one — else none.** A publication job is
+    // the slowest thing this library asks for — measured at ~135s on a trial,
+    // and an unpublish once not settled after eleven minutes. The library sets
+    // no deadline of its own; `IAdtOperationOptions.timeout` is how a caller
+    // asks for one.
     timeout?: number,
     // **V2 only.** The job resolves the service by name and version, in the query
     // string; the body's `SCGR` reference is not enough for it. Absent for V4,
@@ -205,10 +202,9 @@ export class AdtServiceBinding<
           }
         : {}),
       method: 'POST',
-      // Measured at ~133s in both directions, so the 120s `SAP_TIMEOUT_LONG`
-      // default could never have been enough. A caller who knows their system
-      // passes their own.
-      timeout: timeout ?? getTimeout('long'),
+      // Measured at ~133s in both directions. No deadline unless the caller
+      // passed one: `0` is what the wires read as "do not abort".
+      timeout: timeout ?? 0,
       data: xml,
       headers: {
         Accept: ACCEPT_PUBLICATION_JOB,
@@ -225,13 +221,11 @@ export class AdtServiceBinding<
   private async unpublishByServiceType(
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
-    // **The caller's, when they give one.** A publication job is the slowest
-    // thing this library asks for — measured at ~135s on a trial, and an
-    // unpublish once not settled after eleven minutes — so the 120s
-    // `SAP_TIMEOUT_LONG` default is a floor, not a ceiling. The contract has
-    // carried `IAdtOperationOptions.timeout` all along; this member used to
-    // drop it, which left a caller no way to wait longer than the library had
-    // decided to.
+    // **The caller's, when they give one — else none.** A publication job is
+    // the slowest thing this library asks for — measured at ~135s on a trial,
+    // and an unpublish once not settled after eleven minutes. The library sets
+    // no deadline of its own; `IAdtOperationOptions.timeout` is how a caller
+    // asks for one.
     timeout?: number,
     // **V2 only.** The job resolves the service by name and version, in the query
     // string; the body's `SCGR` reference is not enough for it. Absent for V4,
@@ -263,10 +257,9 @@ export class AdtServiceBinding<
           }
         : {}),
       method: 'POST',
-      // Measured at ~133s in both directions, so the 120s `SAP_TIMEOUT_LONG`
-      // default could never have been enough. A caller who knows their system
-      // passes their own.
-      timeout: timeout ?? getTimeout('long'),
+      // Measured at ~133s in both directions. No deadline unless the caller
+      // passed one: `0` is what the wires read as "do not abort".
+      timeout: timeout ?? 0,
       data: xml,
       headers: {
         Accept: ACCEPT_PUBLICATION_JOB,
@@ -717,7 +710,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: SERVICE_BINDING.bindingTypes,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: 'application/vnd.sap.adt.nameditems.v1+xml, application/xml',
       },
@@ -732,7 +725,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: '/sap/bc/adt/deletion/check',
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${SERVICE_BINDING.uri(name)}"/>
@@ -751,7 +744,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: '/sap/bc/adt/cts/transportchecks',
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: this.buildTransportCheckXml(params),
       headers: {
         Accept: ACCEPT_TRANSPORT_CHECK,
@@ -784,7 +777,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: SERVICE_BINDING.collection,
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: this.buildServiceBindingCreateXml(createParams),
       headers: {
         Accept:
@@ -803,7 +796,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: SERVICE_BINDING.uri(params.bindingName),
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       params: params.version ? { version: params.version } : undefined,
       headers: {
         Accept:
@@ -885,7 +878,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: '/sap/bc/adt/deletion/delete',
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: this.buildDeletionXml(params),
       headers: {
         Accept: ACCEPT_DELETION,
@@ -905,7 +898,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: '/sap/bc/adt/checkruns',
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: xml,
       headers: {
         Accept: ACCEPT_CHECK_MESSAGES,
@@ -926,7 +919,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`,
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: xml,
       headers: {
         Accept: 'application/xml',
@@ -972,7 +965,7 @@ export class AdtServiceBinding<
     return connection.makeAdtRequest({
       url: `${SERVICE_BINDING.odataService(params.serviceType, params.objectname)}?${query}`,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept:
           `application/vnd.sap.adt.businessservices.${params.serviceType}.v1+xml, ` +

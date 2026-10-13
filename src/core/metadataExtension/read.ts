@@ -21,7 +21,6 @@ import {
   transportUri,
 } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -54,7 +53,7 @@ export async function readMetadataExtension(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers,
     },
     { logger },
@@ -99,7 +98,7 @@ export async function readMetadataExtensionSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers,
     },
     { logger },
@@ -127,7 +126,7 @@ export async function getMetadataExtensionTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers,
   });
 }

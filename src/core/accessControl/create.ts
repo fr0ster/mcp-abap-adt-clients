@@ -5,7 +5,6 @@ import type {
 import { CT_ACCESS_CONTROL } from '../../constants/contentTypes';
 import { ACCESS_CONTROL } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateAccessControlParams } from './types';
 
@@ -46,7 +45,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

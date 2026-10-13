@@ -18,9 +18,9 @@ import type { IGetSqlQueryParams } from './types';
  *
  * **No deadline of the library's.** The request carries `timeout: 0` — none:
  * a query over large tables runs as long as it runs, and how long to wait is
- * the caller's, set on the connection it hands in. Until 31.0.0 this set
- * `getTimeout('long')` (`SAP_TIMEOUT_LONG`, 120 s by default), which a caller
- * applying its own deadline only where the request had none never got to.
+ * the caller's, set on the connection it hands in. Until 31.0.0 this set the
+ * library's own long deadline (120 s by default), which a caller applying its
+ * own deadline only where the request had none never got to.
  *
  * @param connection - ABAP connection
  * @param params - SQL query parameters

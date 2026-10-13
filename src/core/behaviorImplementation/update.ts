@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Update behavior implementation class implementations include source code (low-level function)
@@ -38,7 +37,7 @@ export async function updateBehaviorImplementation(
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: sourceCode,
     headers,
   });

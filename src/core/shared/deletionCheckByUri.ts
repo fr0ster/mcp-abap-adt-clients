@@ -30,7 +30,6 @@ import {
   ACCEPT_DELETION_CHECK,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 
 export async function checkDeletionByUri(
   connection: IAbapConnection,
@@ -44,7 +43,7 @@ export async function checkDeletionByUri(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/check',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION_CHECK,

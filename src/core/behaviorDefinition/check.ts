@@ -12,7 +12,6 @@ import {
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION, sourceUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { CheckReporter } from './types';
 
 /**
@@ -77,7 +76,7 @@ export async function check(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

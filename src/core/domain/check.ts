@@ -13,7 +13,6 @@ import {
 } from '../../constants/contentTypes';
 import { DOMAIN } from '../../endpoints/objects';
 import { runCheckRun } from '../../utils/checkRun';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check domain syntax
@@ -62,7 +61,7 @@ export async function checkDomainSyntax(
     response = await connection.makeAdtRequest({
       url,
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: xmlBody,
       headers,
     });

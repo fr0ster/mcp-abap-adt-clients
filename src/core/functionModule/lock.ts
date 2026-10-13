@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { FUNCTION_MODULE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` on the function module — answered as it arrived.
@@ -25,7 +24,7 @@ export async function lockFunctionModule(
   return connection.makeAdtRequest({
     url: `${FUNCTION_MODULE.uri(functionGroupName, functionModuleName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_LOCK },
   });
 }

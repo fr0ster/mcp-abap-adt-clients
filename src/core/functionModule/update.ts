@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { FUNCTION_MODULE, sourceUri } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateFunctionModuleParams } from './types';
 
 /**
@@ -40,7 +39,7 @@ export async function update(
   const response = await connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: params.sourceCode,
     headers,
   });

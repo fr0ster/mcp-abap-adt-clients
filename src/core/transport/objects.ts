@@ -33,7 +33,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IAbapObjectEntry } from './types';
 
 /** `text/plain`, as the server is sent it. See the note above. */
@@ -118,7 +117,7 @@ export async function removeObjectFromTransport(
   return connection.makeAdtRequest({
     url: requestUrl(transportNumber),
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: userActionDocument(transportNumber, 'removeobject', [object]),
     headers: USER_ACTION_HEADERS,
   });
@@ -144,7 +143,7 @@ export async function moveObjectsBetweenTransports(
   return connection.makeAdtRequest({
     url: TRANSPORT_REQUEST.moveObjects(sourceTask),
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: userActionDocument(targetNumber, 'moveobjects', objects),
     headers: USER_ACTION_HEADERS,
   });
@@ -172,7 +171,7 @@ export async function addObjectToTransport(
   return connection.makeAdtRequest({
     url: requestUrl(transportNumber),
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: userActionDocument(transportNumber, 'addobject', [object]),
     headers: USER_ACTION_HEADERS,
   });
@@ -211,7 +210,7 @@ export async function createTransportTask(
   return connection.makeAdtRequest({
     url: `${requestUrl(transportNumber)}/tasks`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
       `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}" tm:targetuser="${attribute(targetUser)}" tm:useraction="newtask"/>`,
@@ -233,7 +232,7 @@ export async function readTransportActionLog(
   return connection.makeAdtRequest({
     url: `${requestUrl(transportNumber)}/actionlogs`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/vnd.sap.adt.logs+xml' },
   });
 }
@@ -255,7 +254,7 @@ export async function sortAndCompressTransport(
   return connection.makeAdtRequest({
     url: TRANSPORT_REQUEST.sortAndCompress(taskNumber),
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_TRANSPORT },
   });
 }
@@ -284,7 +283,7 @@ export async function readTransportObjects(
   return connection.makeAdtRequest({
     url: requestUrl(transportNumber),
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_TRANSPORT },
   });
 }
@@ -348,7 +347,7 @@ export async function changeTransportTaskType(
   return connection.makeAdtRequest({
     url: requestUrl(taskNumber),
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
       `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${number}" tm:useraction="changetasktype">` +

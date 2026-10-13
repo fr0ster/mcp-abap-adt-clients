@@ -9,7 +9,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get object structure from ADT repository
@@ -39,7 +38,7 @@ export async function getObjectStructure(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept:
         'application/vnd.sap.adt.projectexplorer.objectstructure+xml, application/xml',

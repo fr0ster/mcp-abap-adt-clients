@@ -7,7 +7,6 @@ import {
   CT_FEATURE_TOGGLE_METADATA,
 } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFeatureToggleParams } from './types';
 import { buildFeatureToggleXml } from './xmlBuilder';
 
@@ -21,7 +20,7 @@ export async function create(
   return connection.makeAdtRequest({
     method: 'POST',
     url: FEATURE_TOGGLE.collection,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       'Content-Type': CT_FEATURE_TOGGLE_METADATA,
       Accept: ACCEPT_FEATURE_TOGGLE_METADATA,

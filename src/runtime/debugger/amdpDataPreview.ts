@@ -7,7 +7,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * A table variable's rows at the current stop.
@@ -47,7 +46,7 @@ export async function getAmdpDataPreview(
   return connection.makeAdtRequest({
     url: `${url}?${query}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     // The server refuses a request without a content type, the empty one too
     // (400 "Content type missing"); no SELECT is an empty body.
     data: options.query ?? '',

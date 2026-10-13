@@ -12,7 +12,6 @@ import {
   encodeSapObjectName,
   limitDescription,
 } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionModuleParams } from './types';
 
 /**
@@ -43,7 +42,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       'Content-Type': CT_FUNCTION_MODULE,

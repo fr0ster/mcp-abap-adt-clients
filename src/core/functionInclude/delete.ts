@@ -13,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export interface IDeleteFunctionIncludeParams {
   function_group_name: string;
@@ -42,7 +41,7 @@ export async function checkDeletion(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/check',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION_CHECK,
@@ -80,7 +79,7 @@ export async function deleteFunctionInclude(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/delete',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION,

@@ -12,7 +12,6 @@ import {
   ACCEPT_VIRTUAL_FOLDERS,
   CT_VIRTUAL_FOLDERS,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import type { IGetVirtualFoldersContentsParams } from './types';
 
 const VIRTUAL_FOLDERS_NAMESPACE = 'http://www.sap.com/adt/ris/virtualFolders';
@@ -90,7 +89,7 @@ export async function getVirtualFoldersContents(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
     data: xmlBody,
     headers: {

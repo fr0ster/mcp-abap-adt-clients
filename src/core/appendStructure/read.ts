@@ -10,7 +10,6 @@ import {
 } from '../../constants/contentTypes';
 import { STRUCTURE, sourceUri, transportUri } from '../../endpoints/objects';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
 function buildQuery(version?: string, options?: IReadOptions): string {
@@ -33,7 +32,7 @@ export async function getAppendStructure(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: { Accept: options?.accept ?? ACCEPT_APPEND_STRUCTURE },
     },
     { logger },
@@ -53,7 +52,7 @@ export async function getAppendStructureSource(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: { Accept: options?.accept ?? ACCEPT_SOURCE },
     },
     { logger },
@@ -70,7 +69,7 @@ export async function getAppendStructureTransport(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: options?.accept ?? ACCEPT_TRANSPORT },
   });
 }

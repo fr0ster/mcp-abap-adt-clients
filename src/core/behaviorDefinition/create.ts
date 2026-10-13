@@ -9,7 +9,6 @@ import type {
 import { CT_BEHAVIOR_DEFINITION } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionCreateParams } from './types';
 
 /**
@@ -73,7 +72,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

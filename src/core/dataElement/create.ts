@@ -17,7 +17,6 @@ import {
 } from '../../constants/contentTypes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDataElementParams } from './types';
 
 /**
@@ -54,7 +53,7 @@ export async function create(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

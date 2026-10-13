@@ -9,7 +9,6 @@ import type {
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
 import { TABLE_TYPE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableTypeParams } from './types';
 
 /**
@@ -56,7 +55,7 @@ export async function createTableType(
   return connection.makeAdtRequest({
     url: createUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: tableTypeXml,
     headers,
   });

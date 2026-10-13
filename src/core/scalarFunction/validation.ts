@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { SCALAR_FUNCTION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export async function validateScalarFunctionName(
   connection: IAbapConnection,
@@ -19,7 +18,7 @@ export async function validateScalarFunctionName(
   return connection.makeAdtRequest({
     url: `${SCALAR_FUNCTION.validation}?${queryParams.toString()}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VALIDATION },
   });
 }

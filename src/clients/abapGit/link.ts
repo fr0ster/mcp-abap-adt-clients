@@ -7,7 +7,6 @@ import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import { buildLinkBody } from './xmlBuilder';
 
 export async function linkRepo(
@@ -20,7 +19,7 @@ export async function linkRepo(
   return connection.makeAdtRequest({
     method: 'POST',
     url: '/sap/bc/adt/abapgit/repos',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { 'Content-Type': ct, Accept: ct },
     data: buildLinkBody(args),
   });

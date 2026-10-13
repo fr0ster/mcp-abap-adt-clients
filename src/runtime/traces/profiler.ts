@@ -24,7 +24,6 @@ import {
   ACCEPT_TRACE_XML,
   CT_TRACE_PARAMETERS,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type {
@@ -157,7 +156,7 @@ export async function createTraceParameters(
     url,
     method: 'POST',
     data,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
       'Content-Type': CT_TRACE_PARAMETERS,
@@ -184,7 +183,7 @@ export async function deleteTrace(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/runtime/traces/abaptraces/${encodeURIComponent(traceId)}`,
     method: 'DELETE',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {},
   });
 }
@@ -204,7 +203,7 @@ export async function getTraceHitList(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -247,7 +246,7 @@ export async function getTraceStatements(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_CALLTREE,
     },
@@ -277,7 +276,7 @@ export async function getTraceDbAccesses(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -305,7 +304,7 @@ export async function listTraceFiles(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -326,7 +325,7 @@ export async function getTraceParameters(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -347,7 +346,7 @@ export async function getTraceParametersForCallstack(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -368,7 +367,7 @@ export async function getTraceParametersForAmdp(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -395,7 +394,7 @@ export async function listTraceRequests(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_FEED,
     },
@@ -418,7 +417,7 @@ export async function getTraceRequestsByUri(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_FEED,
     },
@@ -439,7 +438,7 @@ export async function listObjectTypes(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },
@@ -460,7 +459,7 @@ export async function listProcessTypes(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_TRACE_XML,
     },

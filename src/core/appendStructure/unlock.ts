@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { STRUCTURE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export async function unlockAppendStructure(
   connection: IAbapConnection,
@@ -14,6 +13,6 @@ export async function unlockAppendStructure(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

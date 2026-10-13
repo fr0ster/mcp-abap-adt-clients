@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdatePackageParams } from './types';
 
 /**
@@ -39,7 +38,7 @@ export async function updatePackage(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: document,
     headers: { 'Content-Type': CT_PACKAGE, Accept: ACCEPT_PACKAGE },
   });

@@ -7,7 +7,6 @@ import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,
 } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import { buildPullBody } from './xmlBuilder';
 
 /**
@@ -35,7 +34,7 @@ export async function pullRepo(
   return connection.makeAdtRequest({
     method: 'POST',
     url: args.pullLink,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { 'Content-Type': ct, Accept: ct },
     data: buildPullBody(args, args.branchName),
   });

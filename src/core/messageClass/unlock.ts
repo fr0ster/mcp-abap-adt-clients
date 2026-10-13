@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -28,7 +27,7 @@ export async function unlockMessageClass(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
   });
 }
@@ -48,7 +47,7 @@ export async function unlockAllMessages(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: `[${no}]`,
   });
 }

@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 function buildActivationXml(name: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -20,7 +19,7 @@ export async function activateScalarFunctionImplementation(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildActivationXml(name),
     headers: { Accept: 'application/xml', 'Content-Type': 'application/xml' },
   });

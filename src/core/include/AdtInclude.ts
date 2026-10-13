@@ -108,7 +108,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
         connection.makeAdtRequest({
           url: `${PROGRAM_INCLUDE.validation}?${params.toString()}`,
           method: 'POST',
-          timeout: 45000,
+          timeout: 0,
           headers: { Accept: 'application/vnd.sap.as+xml' },
         }),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,

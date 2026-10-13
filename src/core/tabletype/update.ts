@@ -13,7 +13,6 @@ import type {
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
 import { TABLE_TYPE } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateTableTypeParams } from './types';
 
 /**
@@ -40,7 +39,7 @@ export async function updateTableType(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: document,
     headers: { Accept: CT_TABLE_TYPE, 'Content-Type': CT_TABLE_TYPE },
   });

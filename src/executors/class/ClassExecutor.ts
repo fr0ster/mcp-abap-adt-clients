@@ -16,7 +16,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { runClass } from '../../core/class/run';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
-import { getTimeout } from '../../utils/timeouts';
 import {
   type ITraceSchedulingResults,
   TraceScheduling,
@@ -146,7 +145,7 @@ export class ClassExecutor<
         this.connection.makeAdtRequest({
           url: `/sap/bc/adt/oo/classrun/${target.className}?profilerId=${encodedProfilerId}`,
           method: 'POST',
-          timeout: getTimeout('default'),
+          timeout: 0,
           headers: {
             Accept: 'text/plain',
             'X-sap-adt-profiling': 'server-time',

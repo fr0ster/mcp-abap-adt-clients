@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_VIEW, CT_VIEW } from '../../constants/contentTypes';
 import { DDL_SOURCE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDdlParams } from './types';
 
 /**
@@ -49,7 +48,7 @@ async function createDDLSObject(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: metadataXml,
     headers,
   });

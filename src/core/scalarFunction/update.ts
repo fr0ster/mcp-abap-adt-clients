@@ -5,7 +5,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { SCALAR_FUNCTION, sourceUri } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateScalarFunctionParams } from './types';
 
 /** *
@@ -22,7 +21,7 @@ export async function updateScalarFunction(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: args.source_code,
     headers: { Accept: ACCEPT_SOURCE, 'Content-Type': CT_SOURCE },
   });

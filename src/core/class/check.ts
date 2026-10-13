@@ -206,7 +206,6 @@ async function checkClassInclude(
   includeName: string,
   artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<IAdtWireResponse> {
-  const { getTimeout } = await import('../../utils/timeouts');
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
 
   const objectUri = `${CLASS.uri(className)}`;
@@ -236,7 +235,7 @@ async function checkClassInclude(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

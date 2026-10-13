@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate a feature toggle name, package and description before creating it.
@@ -33,7 +32,7 @@ export async function validateFeatureToggleName(
   return connection.makeAdtRequest({
     method: 'POST',
     url: FEATURE_TOGGLE.validation,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_METADATA },
     params,
   });

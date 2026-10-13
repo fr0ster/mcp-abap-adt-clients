@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_AUTHORIZATION_FIELD } from '../../constants/contentTypes';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract — see core/functionInclude/read.ts.
 export type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -33,7 +32,7 @@ export async function readAuthorizationField(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_AUTHORIZATION_FIELD,
     },

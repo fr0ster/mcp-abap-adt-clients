@@ -10,7 +10,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type { IGetActivationGraphOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -36,7 +35,7 @@ export async function getActivationGraph(
   return connection.makeAdtRequest({
     url,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     params,
     headers: {
       Accept: 'application/xml',

@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 // NOTE: withLongPolling is intentionally not accepted here. The SFW feature-
 // toggle endpoint's support for it is unverified (on-prem only), so readiness
@@ -18,7 +17,7 @@ export async function readFeatureToggle(
   return connection.makeAdtRequest({
     method: 'GET',
     url: `${FEATURE_TOGGLE.uri(name)}`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     params: { version },
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_METADATA },
   });

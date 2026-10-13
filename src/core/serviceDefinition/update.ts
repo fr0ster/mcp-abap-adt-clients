@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { SERVICE_DEFINITION, sourceUri } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateServiceDefinitionParams } from './types';
 
 /**
@@ -35,7 +34,7 @@ export async function updateServiceDefinition(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: args.source_code,
     headers,
   });

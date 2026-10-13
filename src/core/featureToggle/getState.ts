@@ -4,7 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_STATES } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `GET …/states` — the toggle's runtime state, the JSON as it arrived.
@@ -20,7 +19,7 @@ export async function getFeatureToggleState(
   return connection.makeAdtRequest({
     method: 'GET',
     url: `${FEATURE_TOGGLE.uri(name)}/states`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_STATES },
   });
 }

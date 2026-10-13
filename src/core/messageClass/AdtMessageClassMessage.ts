@@ -45,7 +45,6 @@ import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import { chain } from '../shared/chain';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
@@ -299,7 +298,7 @@ export class AdtMessageClassMessage<
             connection.makeAdtRequest({
               url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}${corrNr}`,
               method: 'PUT',
-              timeout: getTimeout('default'),
+              timeout: 0,
               data: xmlBody,
               headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
             }),

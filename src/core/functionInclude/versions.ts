@@ -7,7 +7,6 @@ import {
   sourceUri,
   versionsUri,
 } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IFunctionIncludeConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -27,7 +26,7 @@ export async function getFunctionIncludeVersions(
   return connection.makeAdtRequest({
     url: `${versionsUri(sourceUri(FUNCTION_INCLUDE.uri(config.functionGroupName as string, (config.includeName as string).toUpperCase())))}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },
   });
 }
@@ -40,7 +39,7 @@ export async function getFunctionIncludeVersionSource(
   return connection.makeAdtRequest({
     url: contentUri,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'text/plain' },
   });
 }

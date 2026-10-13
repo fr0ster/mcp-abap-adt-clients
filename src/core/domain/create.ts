@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_DOMAIN, CT_DOMAIN } from '../../constants/contentTypes';
 import { DOMAIN } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDomainParams } from './types';
 
 /**
@@ -48,7 +47,7 @@ export async function create(
   return await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers,
   });

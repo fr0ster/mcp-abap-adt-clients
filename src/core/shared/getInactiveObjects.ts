@@ -6,7 +6,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get list of inactive objects (objects that are not yet activated)
@@ -39,7 +38,7 @@ export async function fetchInactiveObjects(
   return connection.makeAdtRequest({
     method: 'GET',
     url: `/sap/bc/adt/activation/inactiveobjects`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept:
         'application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8',

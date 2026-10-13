@@ -74,7 +74,6 @@ export async function getBehaviorImplementationImplementations(
   const { encodeSapObjectName, longPollingQuery } = await import(
     '../../utils/internalUtils'
   );
-  const { getTimeout } = await import('../../utils/timeouts');
 
   // The version query is conditional here, so the base arrives both with and
   // without a `?` — which is why appending is the helper's job, not a literal.
@@ -88,7 +87,7 @@ export async function getBehaviorImplementationImplementations(
     {
       url,
       method: 'GET',
-      timeout: getTimeout('default'),
+      timeout: 0,
       headers: {
         Accept: options?.accept ?? ACCEPT_SOURCE,
       },

@@ -13,7 +13,6 @@ import {
   CT_ENHANCEMENT,
 } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import {
   ENHANCEMENT_TYPE_CODES,
   getEnhancementBaseUrl,
@@ -106,7 +105,7 @@ export async function create(
     const response = await connection.makeAdtRequest({
       url,
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: metadataXml,
       headers,
     });

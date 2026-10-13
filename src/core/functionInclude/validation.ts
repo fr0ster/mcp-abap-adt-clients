@@ -11,7 +11,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 // Include both v3 (required on modern on-prem and cloud) and v2/v1 (older systems)
 // so a single probe works across environments. Accept-negotiation will trim if needed.
@@ -28,7 +27,7 @@ export async function validateFunctionIncludeName(
   return connection.makeAdtRequest({
     method: 'GET',
     url: `${FUNCTION_GROUP.uri(groupName)}`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_FUNCTION_GROUP_ANY_VERSION },
   });
 }

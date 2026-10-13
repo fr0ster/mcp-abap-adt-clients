@@ -9,7 +9,6 @@ import type {
 import { ACCEPT_DATA_ELEMENT } from '../../constants/contentTypes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateDataElementParams } from './types';
 
 /**
@@ -36,7 +35,7 @@ export async function updateDataElement(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: document,
     headers: {
       Accept: ACCEPT_DATA_ELEMENT,

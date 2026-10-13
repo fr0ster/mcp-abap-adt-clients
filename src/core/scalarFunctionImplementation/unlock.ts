@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 export async function unlockScalarFunctionImplementation(
   connection: IAbapConnection,
@@ -14,6 +13,6 @@ export async function unlockScalarFunctionImplementation(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
   });
 }

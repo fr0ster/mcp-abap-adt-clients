@@ -2638,8 +2638,8 @@ execute_program:
 #   3. set unpublish_service_binding.enabled: true (and publish back to false),
 #      run the same file again
 #
-# `timeout_ms` is passed to the member, not taken from SAP_TIMEOUT_LONG: since
-# 18.0.0 `update` honours `IAdtOperationOptions.timeout`, which it used to drop.
+# `timeout_ms` is passed to the member as `IAdtOperationOptions.timeout`; the
+# library sets no deadline of its own, so without it the job is waited for.
 publish_service_binding:
   test_cases:
     - name: "publish_binding"

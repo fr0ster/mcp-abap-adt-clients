@@ -26,7 +26,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 const MEMORY = '/sap/bc/adt/runtime/memory';
 const TYPE = 'application/vnd.sap.adt.runtime.memory';
@@ -56,7 +55,7 @@ function get(
   return connection.makeAdtRequest({
     url: `${MEMORY}/${path}${search ? `?${search}` : ''}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: accept },
   });
 }

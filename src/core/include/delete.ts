@@ -35,7 +35,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DELETION, CT_DELETION } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import { includeUrl } from './lock';
 
 export async function deleteInclude(
@@ -57,7 +56,7 @@ export async function deleteInclude(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/deletion/delete',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION,

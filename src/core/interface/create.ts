@@ -13,7 +13,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { CT_INTERFACE } from '../../constants/contentTypes';
 import { INTERFACE } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { ICreateInterfaceParams } from './types';
 
 /**
@@ -76,7 +75,7 @@ export async function create(
     const response = await connection.makeAdtRequest({
       url,
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: payload,
       headers,
     });

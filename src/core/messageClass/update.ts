@@ -9,7 +9,6 @@ import type {
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -39,7 +38,7 @@ export async function updateMessageClass(
   return connection.makeAdtRequest({
     url: `${BASE}/${encoded}${writeQuery(lockHandle, transportRequest?.trim())}`,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: document,
     headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
   });

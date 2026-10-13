@@ -9,7 +9,6 @@ import type {
 import { CT_SOURCE } from '../../constants/contentTypes';
 import { STRUCTURE, sourceUri } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateStructureParams } from './types';
 
 /**
@@ -32,7 +31,7 @@ export async function upload(
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: params.ddlCode,
     headers,
   });

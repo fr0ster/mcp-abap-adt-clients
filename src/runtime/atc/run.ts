@@ -42,7 +42,6 @@ import {
   PROGRAM_INCLUDE,
   TABLE,
 } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 const ATC = '/sap/bc/adt/atc';
 
@@ -110,7 +109,7 @@ export async function getAtcCustomizing(
   return connection.makeAdtRequest({
     url: `${ATC}/customizing`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_ATC_CUSTOMIZING },
   });
 }
@@ -140,7 +139,7 @@ export async function listAtcCheckVariants(
   return connection.makeAdtRequest({
     url: `${ATC}/variants?${query}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: 'application/xml' },
   });
 }
@@ -166,7 +165,7 @@ export async function createAtcWorklist(
   return connection.makeAdtRequest({
     url: `${ATC}/worklists?checkVariant=${encodeURIComponent(checkVariant)}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: '',
     headers: {
       'Content-Type': CT_ATC_WORKLIST_CREATE,
@@ -212,7 +211,7 @@ export async function startAtcRun(
   return connection.makeAdtRequest({
     url: `${ATC}/runs?worklistId=${encodeURIComponent(worklistId)}&clientWait=${wait}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: buildRunPayload(objectUris, maximumVerdicts),
     headers: { 'Content-Type': CT_ATC_RUN, Accept: ACCEPT_ATC_RUN_RESPONSE },
   });
@@ -226,7 +225,7 @@ export async function getAtcRunStatus(
   return connection.makeAdtRequest({
     url: `${ATC}/runs/${encodeURIComponent(runId)}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_ATC_RUN_STATUS },
   });
 }
@@ -246,7 +245,7 @@ export async function getAtcWorklist(
   return connection.makeAdtRequest({
     url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
   });
 }

@@ -12,7 +12,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check CDS view availability for unit test doubles
@@ -47,7 +46,7 @@ export async function checkCdsTestDoublesAvailability(
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept:
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage',

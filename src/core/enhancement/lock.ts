@@ -7,7 +7,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
-import { getTimeout } from '../../utils/timeouts';
 import { type EnhancementType, getEnhancementUri } from './types';
 
 /**
@@ -27,7 +26,7 @@ export async function lockEnhancement(
   return connection.makeAdtRequest({
     url: `${getEnhancementUri(enhancementType, enhancementName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });

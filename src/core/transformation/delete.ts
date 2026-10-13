@@ -9,7 +9,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { TRANSFORMATION } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteTransformationParams } from './types';
 
 /**
@@ -38,7 +37,7 @@ export async function checkDeletion(
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });
@@ -80,7 +79,7 @@ export async function deleteTransformation(
   const response = await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers,
   });

@@ -12,7 +12,6 @@ import {
 } from '../../constants/contentTypes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check data element syntax
@@ -62,7 +61,7 @@ export async function checkDataElement(
     response = await connection.makeAdtRequest({
       url,
       method: 'POST',
-      timeout: getTimeout('default'),
+      timeout: 0,
       data: xmlBody,
       headers,
     });

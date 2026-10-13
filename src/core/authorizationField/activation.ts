@@ -7,7 +7,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 function buildActivationXml(name: string): string {
   const upper = name.toUpperCase();
@@ -30,7 +29,7 @@ export async function activateAuthorizationField(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlBody,
     headers: {
       Accept: 'application/xml',

@@ -13,7 +13,6 @@ import {
   CT_WHERE_USED_SCOPE,
 } from '../../constants/contentTypes';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { getTimeout } from '../../utils/timeouts';
 import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
@@ -207,7 +206,7 @@ export async function getWhereUsedScope(
   return connection.makeAdtRequest({
     url: scopeUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: scopeRequestBody,
     headers: {
       'Content-Type': CT_WHERE_USED_SCOPE,
@@ -263,7 +262,7 @@ export async function getWhereUsed(
   return connection.makeAdtRequest({
     url: searchUrl,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: searchRequestBody,
     headers: {
       'Content-Type': CT_WHERE_USED_REQUEST,

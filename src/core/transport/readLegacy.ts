@@ -13,7 +13,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { TRANSPORT_REQUEST_LEGACY } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP transport request (legacy path)
@@ -32,7 +31,7 @@ export async function getTransportLegacy(
   return connection.makeAdtRequest({
     url: TRANSPORT_REQUEST_LEGACY.collection,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {},
   });
 }
@@ -48,7 +47,7 @@ export async function listTransportsLegacy(
   return connection.makeAdtRequest({
     url: TRANSPORT_REQUEST_LEGACY.collection,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {},
   });
 }

@@ -3,7 +3,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * `POST …?_action=LOCK` on the feature toggle — answered as it arrived.
@@ -19,7 +18,7 @@ export async function lockFeatureToggle(
   return connection.makeAdtRequest({
     method: 'POST',
     url: `${FEATURE_TOGGLE.uri(name)}`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     params: { _action: 'LOCK', accessMode: 'MODIFY' },
     headers: {
       // No `X-sap-adt-sessiontype` here: `setSessionType('stateful')` in the

@@ -9,7 +9,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 import type { IDeleteAppendStructureParams } from './types';
 
 function objectUri(name: string): string {
@@ -27,7 +26,7 @@ export async function checkDeletion(
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/deletion/check`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: {
       Accept: ACCEPT_DELETION_CHECK,
@@ -52,7 +51,7 @@ export async function deleteAppendStructure(
   const response = await connection.makeAdtRequest({
     url: `/sap/bc/adt/deletion/delete`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xmlPayload,
     headers: { Accept: ACCEPT_DELETION, 'Content-Type': CT_DELETION },
   });

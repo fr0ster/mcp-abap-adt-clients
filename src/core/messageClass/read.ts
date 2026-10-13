@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -34,7 +33,7 @@ export async function getMessageClassSource(
   return connection.makeAdtRequest({
     url: `${BASE}/${encoded}${query}`,
     method: 'GET',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: { Accept: ACCEPT_MESSAGE_CLASS },
   });
 }

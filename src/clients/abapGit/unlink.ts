@@ -3,7 +3,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Remove a repository link — `DELETE /abapgit/repos/{key}`, by the key
@@ -22,7 +21,7 @@ export async function unlinkRepo(
   return connection.makeAdtRequest({
     method: 'DELETE',
     url: `/sap/bc/adt/abapgit/repos/${encodeURIComponent(args.repositoryId)}`,
-    timeout: getTimeout('default'),
+    timeout: 0,
     params,
   });
 }

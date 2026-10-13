@@ -39,7 +39,6 @@ import {
   TABLE_TYPE,
   TRANSFORMATION,
 } from '../endpoints/objects';
-import { getTimeout } from './timeouts';
 
 /**
  * Build object URI from name and type
@@ -257,7 +256,7 @@ export async function activateObjectInSession(
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: activationXml,
     headers,
   });

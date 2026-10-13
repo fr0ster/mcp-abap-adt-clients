@@ -11,7 +11,6 @@ import type {
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate function group name
@@ -57,7 +56,7 @@ export async function validateFunctionGroupName(
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },

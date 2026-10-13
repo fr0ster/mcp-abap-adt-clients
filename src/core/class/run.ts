@@ -8,7 +8,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { debuggeePassport } from '../../runtime/debugger/passport';
-import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
 
 /**
@@ -77,7 +76,7 @@ export async function runClass(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     headers,
   });
 }
@@ -150,7 +149,7 @@ export async function startClassUnitTestRun(
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/abapunit/runs',
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 0,
     data: xml,
     headers: {
       'Content-Type': CT_UNIT_TEST_RUN,

@@ -7,7 +7,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { INTERFACE } from '../../endpoints/objects';
-import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock interface
@@ -28,7 +27,7 @@ export async function unlockInterface(
   return connection.makeAdtRequest({
     url: `${INTERFACE.uri(interfaceName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`,
     method: 'POST',
-    timeout: getTimeout(),
+    timeout: 0,
     data: '',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
