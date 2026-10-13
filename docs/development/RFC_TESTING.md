@@ -167,6 +167,7 @@ HTTP every stateful lock → update → unlock counts.
 
 The package lifecycle test works around it. `afterCreate` replaces the test's
 session before the update, and the cleanup replaces it again before the delete
-— `recycleTestSession()`, which ends the session and opens its replacement, never
-a second one beside it. The test runs over RFC as well as HTTP; it used to be
+— `tester.recycleSession()`, which ends the session and opens its replacement on
+a new connection instance (one instance is one SAP session since
+`@mcp-abap-adt/connection` 16), never a second one beside it. The test runs over RFC as well as HTTP; it used to be
 skipped over RFC.

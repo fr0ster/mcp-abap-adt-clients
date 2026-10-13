@@ -42,10 +42,13 @@ published any.
 
 One exception, and it replaces the session rather than adding one:
 
-`recycleTestSession(connection)` ends the session, connects again, and publishes
-the replacement so later files adopt the new one. One caller needs it —
-`cleanup_session_after_test`, which drops stuck locks by ending the session
-holding them.
+`recycleTestSession(connection)` ends the session, opens the replacement on a
+new connection instance, publishes it so later files adopt the new one, and
+returns that instance — since `@mcp-abap-adt/connection` 16 one instance is one
+SAP session, and a disconnected instance does not connect again. A tester calls
+`tester.recycleSession()`, which also rebuilds its client and handler over the
+new connection. One caller needs it — `cleanup_session_after_test`, which drops
+stuck locks by ending the session holding them.
 
 The package delete used to be a second caller, on the rule that a package cannot
 be deleted from the session that created it. Measured on the BTP trial, it can:

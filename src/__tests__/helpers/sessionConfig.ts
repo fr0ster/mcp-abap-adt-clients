@@ -9,11 +9,9 @@ import {
   TokenAuthProvider,
 } from '@mcp-abap-adt/auth-providers';
 import {
-  CloudHttpTransport,
-  LegacyOnPremHttpTransport,
-  OnPremHttpTransport,
-  RfcTransport,
-  rfcConversationFrom,
+  type ConnectionSpec,
+  type CreatedConnection,
+  createConnection,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -32,8 +30,7 @@ import {
   type ISessionSharing,
   publishSessionMaterial,
   readSessionMaterial,
-  SharedCloudConnector,
-  SharedOnPremConnector,
+  withSessionSharing,
 } from './sharedSession';
 import { createConnectionLogger, createRunIntegrityLogger } from './testLogger';
 import { withWireLog } from './wireLog';
@@ -338,30 +335,15 @@ export async function createTestConnection(
   const config = getConfig();
   const system = getTargetSystem();
   const credential = credentialFor(config);
-  // `client` is not decoration: SAP answers `sap-usercontext` with the system
-  // default rather than the client that was asked for, and later requests then
-  // route to a client nobody named.
-  const wire = { client: config.client, baseUrl: config.url };
 
-  const connection =
-    system === 'cloud'
-      ? new SharedCloudConnector(
-          config,
-          credential,
-          // Wrapped like the on-prem transports are. Without this `WIRE_LOG`
-          // was silently a no-op against a cloud system — the flag was set, the
-          // file stayed empty, and the run looked like it had nothing to say.
-          withWireLog(
-            new CloudHttpTransport((): AgentOptions => ({}), logger, wire),
-          ),
-          logger,
-        )
-      : new SharedOnPremConnector(
-          config,
-          credential,
-          onPremWire(config, logger, wire),
-          logger,
-        );
+  // One instance, one SAP session (connection 16): a new session is a new
+  // call to this, never a reconnect of an instance that was disconnected.
+  // The system and the wire are stated, as `createConnection` requires.
+  const connection = withSessionSharing(
+    withWireLogOn(
+      createConnection(connectionSpec(config, system, credential, logger)),
+    ),
+  );
 
   // Join the session globalSetup opened, rather than asking for another. The
   // trial grants two at a time, and a suite that took one per file was already
@@ -436,12 +418,21 @@ export async function createTestConnection(
 export interface IReleasableConnection {
   close?: () => Promise<unknown>;
   disconnect?: () => Promise<unknown>;
-  connect?: () => Promise<unknown>;
-  exportSession?: () => ISessionMaterial;
+  isConnected?: () => boolean;
 }
 
-/** close() first, because RFC has only that; disconnect() is the ADT one. */
-async function endSession(conn: IReleasableConnection): Promise<void> {
+/**
+ * close() first, because RFC has only that; disconnect() is the ADT one.
+ *
+ * Once per instance: since connection 16 a second `disconnect()` rejects, and
+ * an instance whose session already ended — disconnected, or lost — has
+ * nothing left to log off.
+ */
+async function endSession(
+  connection: IReleasableConnection | IAbapConnection,
+): Promise<void> {
+  const conn = connection as IReleasableConnection;
+  if (typeof conn.isConnected === 'function' && !conn.isConnected()) return;
   if (typeof conn.close === 'function') {
     await conn.close();
   } else if (typeof conn.disconnect === 'function') {
@@ -457,7 +448,7 @@ async function endSession(conn: IReleasableConnection): Promise<void> {
  * only it, and nobody else is on it. `close()` for RFC.
  */
 export async function closeOwnTestConnection(
-  connection: IReleasableConnection | undefined | null,
+  connection: IReleasableConnection | IAbapConnection | undefined | null,
 ): Promise<void> {
   if (!connection) return;
   await endSession(connection);
@@ -486,7 +477,7 @@ export async function closeOwnTestConnection(
  * until the server's idle timeout.
  */
 export async function releaseTestConnection(
-  connection: IReleasableConnection | undefined | null,
+  connection: IReleasableConnection | IAbapConnection | undefined | null,
 ): Promise<void> {
   if (!connection) return;
   // Material on disk means the run owns the session, and `globalTeardown` is
@@ -497,26 +488,31 @@ export async function releaseTestConnection(
 }
 
 /**
- * End the session mid-file and take a fresh one.
+ * End the session mid-file and take a fresh one, on a new instance.
  *
  * `cleanup_session_after_test` exists to drop locks a failed step left behind,
  * by ending the session holding them. On a shared session that is still a
  * logoff for everyone, so the replacement must be published — otherwise the
  * files that follow adopt the session this just ended, which is the same defect
  * one level down.
+ *
+ * Returns the new connection: since connection 16 one instance is one SAP
+ * session, so the instance given here is spent once its session ends and
+ * `connect()` on it is refused. The caller works on the returned one from
+ * here on — and so must anything built over the old one (a client, a handler).
  */
 export async function recycleTestSession(
-  connection: IReleasableConnection | undefined | null,
-): Promise<void> {
-  if (!connection) return;
+  connection: IReleasableConnection | IAbapConnection | undefined | null,
+): Promise<IAbapConnection & ISessionLifecycleAware & ISessionSharing> {
   const wasShared = readSessionMaterial() !== null;
-  await endSession(connection);
-  if (typeof connection.connect === 'function') {
-    await connection.connect();
-  }
-  if (wasShared && typeof connection.exportSession === 'function') {
-    publishSessionMaterial(connection.exportSession());
-  }
+  if (connection) await endSession(connection);
+  // Its own session: the material on disk names the one just ended, and
+  // adopting it would land on a session that is gone.
+  const fresh = await createTestConnection(createConnectionLogger(), {
+    ownSession: true,
+  });
+  if (wasShared) publishSessionMaterial(fresh.exportSession());
+  return fresh;
 }
 
 /**
@@ -540,29 +536,55 @@ function credentialFor(config: SapConfig): IAuthProvider {
 }
 
 /**
- * Which on-prem wire, from the configuration.
+ * The system and the wire, from the configuration.
  *
- * Three deployments, and the caller states which: ordinary HTTP, the legacy one
- * (BASIS < 7.50, where the session-type header sends locks to ABAP session
- * memory instead of the enqueue server — this was the `skipSessionType` flag),
- * and RFC, for a system where stateful HTTP sessions are not usable at all.
+ * Cloud has one wire. On-prem has three deployments, and the caller states
+ * which: ordinary HTTP, the legacy one (BASIS < 7.50, where the session-type
+ * header sends locks to ABAP session memory instead of the enqueue server —
+ * this was the `skipSessionType` flag), and RFC, for a system where stateful
+ * HTTP sessions are not usable at all.
+ *
+ * Agent settings only: the credential's TLS material reaches the wire at
+ * logon, through the provider's establish() (connection 10). `client` is not
+ * decoration: SAP answers `sap-usercontext` with the system default rather
+ * than the client that was asked for, and later requests then route to a
+ * client nobody named — `createConnection` takes it from `config.client`.
  */
-function onPremWire(
+function connectionSpec(
   config: SapConfig,
+  system: 'onprem' | 'cloud',
+  credential: IAuthProvider,
   logger: ILogger,
-  wire: { client?: string; baseUrl?: string },
-): OnPremHttpTransport | RfcTransport {
-  if (getConnectionType() === 'rfc') {
-    return withWireLog(new RfcTransport(rfcConversationFrom(config), logger));
+): ConnectionSpec {
+  const base = { config, credential, logger, wireLogger: logger };
+  const agentOptions = (): AgentOptions => ({});
+  if (system === 'cloud') {
+    return { ...base, system: 'cloud', transport: 'http', agentOptions };
   }
-  // Agent settings only: the credential's TLS material reaches the wire at
-  // logon, through the provider's establish() (connection 10).
-  const material = (): AgentOptions => ({});
-  return withWireLog(
-    isLegacyEnvironment()
-      ? new LegacyOnPremHttpTransport(material, logger, wire)
-      : new OnPremHttpTransport(material, logger, wire),
-  );
+  if (getConnectionType() === 'rfc') {
+    return { ...base, system: 'onprem', transport: 'rfc' };
+  }
+  return {
+    ...base,
+    system: 'onprem',
+    transport: isLegacyEnvironment() ? 'legacy-http' : 'http',
+    agentOptions,
+  };
+}
+
+/**
+ * `WIRE_LOG` on the wire `createConnection` built.
+ *
+ * The wire log wraps the transport (see `wireLog.ts` for why), and
+ * `createConnection` builds the transport itself, so the wrapper goes onto the
+ * connector's own `transport` field — the harness reaching a protected member,
+ * as it does for the session seams. Without it `WIRE_LOG` would be silently a
+ * no-op. With `WIRE_LOG` unset `withWireLog` returns the transport as it is.
+ */
+function withWireLogOn(connection: CreatedConnection): CreatedConnection {
+  const seam = connection as unknown as { transport: object };
+  seam.transport = withWireLog(seam.transport);
+  return connection;
 }
 
 /**
