@@ -64,6 +64,7 @@ describe('public API surface', () => {
  */
 const RUNTIME_EXPORTS = [
   'AbapDebugger',
+  'AdtBatchConnection',
   'AdtAbapGitClient',
   'AdtAppendStructure',
   'AdtAtc',

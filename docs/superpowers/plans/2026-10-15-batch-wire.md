@@ -101,6 +101,35 @@ The 2026-09 removal of the old batch clients ("mixed GET and POST from unrelated
 resources in one envelope is a server-side 500") was measured on
 `debugger/batch`; `communication/batch` takes mixed envelopes (above).
 
+### The recording client (AdtBatchConnection), 100 domains (E19, 2026-10-16)
+
+`AdtClient` on `AdtBatchConnection('communication')`: the members are recorded,
+`execute()` sends them in one envelope. `DomainsBatch.test.ts`, green:
+
+| step | through | time |
+|---|---|---|
+| record create + lock ×100, execute | batch client, 1 envelope | 7.8 s |
+| record updateMetadata + unlock ×100, execute | batch client, 1 envelope | 5.6 s |
+| group activation, until the run finished | plain connection, `activateObjectsGroup` + `getActivationRun` | 6.1 s |
+| read ×100 (all `active`, `CHAR`) | batch client | 1.6 s |
+| delete ×100, read (all 404) | batch client | 14.7 s + 0.8 s |
+
+create … activate: **19.5 s**, against 45.1 s (scripted envelopes, a hundred
+activations inside one) and 111.9 s (500 single requests).
+
+Found on the way:
+- `data: null` (lock, unlock) was serialised as a body `null`; fixed in
+  `src/batch/wire.ts`, unit-tested.
+- `activateObjectsGroup` is an asynchronous run: `POST /activation/runs` → 201,
+  empty body, run id in `Location` (`utilActivationRunId` reads it). Deleting
+  while the run holds the objects is refused per part: `isDeleted="false"`,
+  `type="E"` "You are already editing ZAC_BD_0001".
+- Deleting a name already deleted answers `isDeleted="false"` with
+  `type="W"` "Release transport E19K907111 to remove the object directory entry".
+- A proxy made with `Object.create(connection)` keeps `setSessionType` on
+  itself: every envelope went stateless and every PUT got 423 — a test
+  artefact, recorded so nobody repeats it.
+
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 
 ```

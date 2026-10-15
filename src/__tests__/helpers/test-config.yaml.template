@@ -2759,3 +2759,18 @@ debugger_batch:
     - name: "stack_children"
       enabled: false
       available_in: ["onprem", "cloud"]
+
+# Recording transport. Debugger case also uses runtime_debugger.adt_abap_debugger
+# params and the debugger_batch fixture above.
+batch:
+  test_cases:
+    - name: "domains"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        count: 100
+        name_prefix: "ZAC_BD_"
+        # package_name and transport_request fall back to environment defaults.
+    - name: "debugger_client"
+      enabled: false
+      available_in: ["onprem", "cloud"]

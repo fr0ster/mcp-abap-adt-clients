@@ -1115,3 +1115,21 @@ users can replace it with their own build.
 ## Author
 
 Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>
+
+### Recording batches
+
+`AdtBatchConnection` records calls from the existing clients. Start the member
+calls, execute the envelope, then await their results. Split create + lock and
+update + unlock into two envelopes so writes use the returned lock handles;
+activate all objects with one plain `activateObjectsGroup` call. At a debugger
+stop, record step + stack + variables on the attached stateful connection.
+See [domain and debugger examples](docs/usage/BATCH.md).
+
+```typescript
+import { AdtBatchConnection, AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const batch = new AdtBatchConnection(connection, { endpoint: 'communication' });
+const pending = new AdtClient(batch).getDomain().readMetadata({ domainName: 'Z_DOMAIN' });
+await batch.execute();
+const answer = await pending;
+```

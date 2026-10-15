@@ -16,6 +16,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { AdtBatchConnection } from '../../../../batch';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import {
@@ -574,6 +575,41 @@ describe('Debugger batch wire measurements', () => {
           DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
         ),
       ]);
+    },
+    STEP_TIMEOUT,
+  );
+  gate('batch', 'debugger_client')(
+    'recording client: step + stack + variables',
+    async () => {
+      if (skipped()) return;
+      await startAtBreakpoint();
+      const children = await debuggerApi.getChildVariables(['@LOCALS']);
+      const rows = [
+        ...documentOf(children).matchAll(
+          /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
+        ),
+      ];
+      const row = rows.find((row) => tag(row[1], 'NAME') === 'LV_TOTAL');
+      const id = row && tag(row[1], 'ID');
+      needs(children.ok && id, 'LV_TOTAL id from the stopped frame children');
+      const batch = new AdtBatchConnection(sessionConnection as Connection, {
+        endpoint: 'debugger',
+        logger: connectionLogger,
+      });
+      batch.setSessionType('stateful');
+      const api = new AbapDebugger(
+        batch,
+        connectionLogger,
+        abapDebuggerDocuments,
+      );
+      const pending = [
+        api.step('stepOver'),
+        api.getStack(),
+        api.getVariables([id as string]),
+      ];
+      await batch.execute();
+      for (const answer of await Promise.all(pending))
+        expect(answer.ok).toBe(true);
     },
     STEP_TIMEOUT,
   );
