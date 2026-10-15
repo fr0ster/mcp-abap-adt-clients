@@ -1,0 +1,580 @@
+/** Measurement only: whole exchanges survive Jest forceExit in the system temp directory. */
+import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
+import type {
+  IAdtResponse,
+  IAdtRunnable,
+  IDebuggerIdentity,
+  IDebuggerStepMethod,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../../clients/AdtClient';
+import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+} from '../../../../runtime/debugger/AbapDebugger';
+import {
+  buildChildVariablesXml,
+  buildDebuggerBatchPayload,
+  buildVariablesXml,
+  DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
+  DEBUGGER_VARIABLES_CONTENT_TYPE,
+  executeBatchRequest,
+} from '../../../../runtime/debugger/abap';
+import { createRequestId } from '../../../../runtime/debugger/batchPayload';
+import { configuredCase, gate } from '../../../helpers/caseGate';
+import {
+  closeOwnTestConnection,
+  createTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
+
+const { resolvePackageName, resolveTransportRequest } =
+  require('../../../helpers/test-helper');
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+const connectionLogger: ILogger = createConnectionLogger();
+const testsLogger: ILogger = createTestsLogger();
+
+const testCase = configuredCase('runtime_debugger', 'adt_abap_debugger');
+const CLASS_NAME: string = (
+  testCase?.params?.class_name ?? 'ZAC_DBG_PROBE'
+).toUpperCase();
+const HOLD_SECONDS = 30;
+const STEP_TIMEOUT = 120_000;
+
+/**
+ * The probe. `"BP:<name>` markers name the lines the test stops at; the work
+ * is deterministic, so every run stops at the same lines with the same values.
+ */
+const SOURCE = `CLASS ${CLASS_NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES if_oo_adt_classrun.
+  PRIVATE SECTION.
+    METHODS add
+      IMPORTING iv_a TYPE i
+                iv_b TYPE i
+      RETURNING VALUE(rv) TYPE i.
+ENDCLASS.
+
+CLASS ${CLASS_NAME.toLowerCase()} IMPLEMENTATION.
+  METHOD if_oo_adt_classrun~main.
+    DATA lv_total TYPE i.
+    DATA lv_text TYPE string VALUE 'start'.
+    DO 3 TIMES.
+      lv_total = add( iv_a = lv_total iv_b = sy-index ). "BP:loop
+    ENDDO.
+    lv_text = |total { lv_total }|. "BP:after
+    TRY.
+        DATA(lv_zero) = 0.
+        lv_total = lv_total / lv_zero. "BP:raise
+      CATCH cx_sy_zerodivide.
+        lv_text = 'caught'. "BP:catch
+    ENDTRY.
+    out->write( lv_text ).
+  ENDMETHOD.
+
+  METHOD add.
+    rv = iv_a + iv_b. "BP:add
+  ENDMETHOD.
+ENDCLASS.
+`;
+
+const LINE: Record<string, number> = {};
+SOURCE.split('\n').forEach((text, index) => {
+  const marker = /"BP:(\w+)/.exec(text);
+  if (marker) LINE[marker[1]] = index + 1;
+});
+const SOURCE_URI = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
+
+// --- reading the documents ------------------------------------------------------
+
+function attr(xml: string, name: string): string | undefined {
+  return new RegExp(`\\b${name}="([^"]*)"`).exec(xml)?.[1];
+}
+
+function tag(xml: string, name: string): string | undefined {
+  return new RegExp(`<${name}>([^<]*)</${name}>`).exec(xml)?.[1];
+}
+
+interface IFrame {
+  position: number;
+  program: string;
+  event: string;
+  line: number;
+}
+
+function frames(stackXml: string): IFrame[] {
+  return [...stackXml.matchAll(/<stackEntry\b[^>]*>/g)]
+    .map((m) => m[0])
+    .filter((e) => attr(e, 'stackType') === 'ABAP')
+    .map((e) => ({
+      position: Number(attr(e, 'stackPosition')),
+      program: attr(e, 'programName') ?? '',
+      event: attr(e, 'eventName') ?? '',
+      line: Number(attr(e, 'line')),
+    }));
+}
+
+/** The answer's document, whether the member succeeded or failed. */
+function documentOf(answer: IAdtResponse<unknown>): string {
+  return answer.ok
+    ? String(answer.getResult().value ?? '')
+    : String(answer.getError().response?.data ?? '');
+}
+
+function subtypeOf(answer: IAdtResponse<unknown>): string | undefined {
+  return /subType">([^<]*)</.exec(documentOf(answer))?.[1];
+}
+
+function statusOf(answer: IAdtResponse<unknown>): number | undefined {
+  return answer.ok ? 200 : answer.getError().response?.status;
+}
+
+function identityFor(user: string): IDebuggerIdentity {
+  const requestUser = user.toUpperCase();
+  const id = (suffix: string): string =>
+    createHash('sha256')
+      .update(`${process.env.SAP_URL}:${requestUser}:${suffix}`)
+      .digest('hex')
+      .slice(0, 32)
+      .toUpperCase();
+  return {
+    debuggingMode: 'user',
+    requestUser,
+    terminalId: id('terminalId'),
+    ideId: id('ideId'),
+  };
+}
+
+/**
+ * The ABAP user the session runs as — the one breakpoints and listeners are
+ * keyed on. Basic authentication names it; with a token (the cloud) the login
+ * is an e-mail and the ABAP user is another name, so the system is asked.
+ */
+async function abapUserOf(connection: IAbapConnection): Promise<string> {
+  const configured = process.env.SAP_USERNAME?.trim();
+  if (configured) return configured;
+  const answer = await connection.makeAdtRequest({
+    url: '/sap/bc/adt/core/http/systeminformation',
+    method: 'GET',
+    timeout: 30_000,
+    headers: {
+      Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+    },
+  });
+  const info =
+    typeof answer.data === 'string' ? JSON.parse(answer.data) : answer.data;
+  if (!info?.userName) throw new Error('the system named no ABAP user');
+  return String(info.userName);
+}
+
+// --- the test --------------------------------------------------------------------
+
+type Connection = IAbapConnection & ISessionLifecycleAware;
+
+/** The probe class runs through classrun. */
+const asClass = (connection: Connection) =>
+  new ClassExecutor(connection, connectionLogger);
+
+describe('Debugger batch wire measurements', () => {
+  let listenerConnection: Connection | undefined;
+  let triggerConnection: Connection | undefined;
+  /** Arms breakpoints and listens; never attaches. */
+  let listenerApi: AbapDebugger;
+  /** The debug session: a connection of its own, opened after each catch. */
+  let sessionConnection: Connection | undefined;
+  let debuggerApi: AbapDebugger;
+  let identity: IDebuggerIdentity;
+  let packageName = '';
+  let transportRequest: string | undefined;
+  let skipReason: string | undefined;
+
+  const armed: string[] = [];
+  let run: Promise<IAdtResponse<unknown>> | undefined;
+  let attached = false;
+
+  /** Fails the step naming what it waited on, instead of running blind. */
+  function needs(condition: unknown, what: string): void {
+    if (!condition) throw new Error(`not reached: ${what}`);
+  }
+
+  function skipped(): boolean {
+    if (skipReason) {
+      testsLogger.info?.(`skipped: ${skipReason}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Listen, start the program on the other session through any runnable — a
+   * class, a report, whatever implements IAdtRunnable — and answer what was
+   * caught.
+   */
+  async function catchRun<TTarget>(
+    runnable: (connection: Connection) => IAdtRunnable<TTarget, unknown>,
+    target: TTarget,
+  ): Promise<{ debuggeeId: string; server?: string }> {
+    const listener = listenerApi.listen(identity, {
+      holdSeconds: HOLD_SECONDS,
+    });
+    const early = await Promise.race([
+      listener,
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), 2000),
+      ),
+    ]);
+    if (early && !early.ok) {
+      throw new Error(
+        `the listener was refused (${statusOf(early)} ${subtypeOf(early) ?? ''}): another debugger holds ${identity.requestUser}'s debugging — close it and run again`,
+      );
+    }
+    const trigger = triggerConnection;
+    needs(trigger, 'the trigger connection');
+    run = runnable(trigger as Connection).run(target);
+    const caught = await listener;
+    const document = documentOf(caught);
+    expect(caught.ok).toBe(true);
+    const debuggeeId = tag(document, 'DEBUGGEE_ID');
+    needs(
+      debuggeeId,
+      `a debuggee in the listener's answer: ${document.slice(0, 300)}`,
+    );
+    expect(tag(document, 'DBGEE_KIND')).toBe('DEBUGGEE');
+    // The debuggee's application server, which the attach is routed to.
+    return {
+      debuggeeId: debuggeeId as string,
+      server: tag(document, 'INSTANCE_NAME'),
+    };
+  }
+
+  /**
+   * Open the debug session the next attach goes on: a new connection, never
+   * the listener's, and the attach routed to the debuggee's server. Measured
+   * (2026-10-09): on the cloud, an attach on the listener's connection is
+   * refused 500 invalidDebuggee whenever the debuggee runs on another
+   * application server; on a new connection routed by saplb it succeeded 10
+   * of 10, 5 of them across servers. On premise, a connection that has
+   * attached once cannot attach again (500 "Debuggee already attached").
+   */
+  async function openDebugSession(): Promise<void> {
+    const previous = sessionConnection;
+    sessionConnection = await createTestConnection(connectionLogger, {
+      ownSession: true,
+    });
+    sessionConnection.setSessionType('stateful');
+    debuggerApi = new AbapDebugger(
+      sessionConnection,
+      connectionLogger,
+      abapDebuggerDocuments,
+    );
+    if (previous) {
+      previous.setSessionType('stateless');
+      await closeOwnTestConnection(previous);
+    }
+  }
+
+  async function topFrame(): Promise<IFrame> {
+    const stack = await debuggerApi.getStack();
+    const top = frames(documentOf(stack))[0];
+    needs(stack.ok && top, 'a stack');
+    return top;
+  }
+
+  beforeAll(async () => {
+    for (const name of [
+      'stepInto',
+      'stepOver',
+      'stepReturn',
+      'stepContinue',
+      'step_stack_variables',
+      'stack_children',
+    ]) {
+      if (!configuredCase('debugger_batch', name)) {
+        throw new Error(`case debugger_batch/${name} not in test-config.yaml`);
+      }
+    }
+    if (!testCase) {
+      throw new Error('runtime_debugger.adt_abap_debugger params are required');
+    }
+    try {
+      listenerConnection = await createTestConnection(connectionLogger, {
+        ownSession: true,
+      });
+      triggerConnection = await createTestConnection(connectionLogger, {
+        ownSession: true,
+      });
+    } catch (error) {
+      skipUnlessConfigured(error, testsLogger);
+      skipReason = 'no SAP configuration';
+      return;
+    }
+    identity = identityFor(await abapUserOf(listenerConnection));
+    logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
+    listenerApi = new AbapDebugger(
+      listenerConnection,
+      connectionLogger,
+      abapDebuggerDocuments,
+    );
+    packageName = resolvePackageName(testCase.params?.package_name);
+    // A local package takes no transport.
+    transportRequest = packageName.startsWith('$')
+      ? undefined
+      : resolveTransportRequest(testCase.params?.transport_request) ||
+        undefined;
+
+    const cls = new AdtClient(listenerConnection, connectionLogger).getClass();
+    const config = {
+      className: CLASS_NAME,
+      packageName,
+      description: 'Debugger integration probe',
+      ...(transportRequest ? { transportRequest } : {}),
+    };
+    const created = await cls.create(config);
+    if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
+      throw new Error(`probe create: ${created.getError().message}`);
+    }
+    const lock = await cls.lock(config);
+    if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
+    const lockHandle = String(lock.getResult().value ?? '');
+    const written = await cls.update(config, { source: SOURCE, lockHandle });
+    await cls.unlock(config, lockHandle);
+    if (!written.ok)
+      throw new Error(`probe write: ${written.getError().message}`);
+    const activated = await cls.activate(config);
+    if (!activated.ok)
+      throw new Error(`probe activate: ${activated.getError().message}`);
+    logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
+
+    // Every debugger request needs the stateful session it attached on.
+    listenerConnection.setSessionType('stateful');
+    const breakpoints = await listenerApi.setBreakpoints(identity, [
+      { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
+      { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.add}` },
+    ]);
+    if (!breakpoints.ok) throw new Error('Could not arm probe breakpoints');
+    armed.push(
+      ...[
+        ...documentOf(breakpoints).matchAll(
+          /<breakpoint\b[^>]*\bid="([^"]*)"/g,
+        ),
+      ].map((m) => m[1]),
+    );
+  }, STEP_TIMEOUT);
+
+  afterAll(async () => {
+    if (!listenerConnection) return;
+    for (const id of armed) {
+      await listenerApi.deleteBreakpoint(identity, id);
+    }
+    if (attached) await debuggerApi.terminateDebuggee();
+    if (sessionConnection) {
+      sessionConnection.setSessionType('stateless');
+      await closeOwnTestConnection(sessionConnection);
+    }
+    await listenerApi.stopListener(identity);
+    if (run) {
+      await Promise.race([
+        run,
+        new Promise((resolve) => setTimeout(resolve, 15_000)),
+      ]);
+    }
+    listenerConnection.setSessionType('stateless');
+    if (!testCase?.params?.keep_probe) {
+      await new AdtClient(listenerConnection, connectionLogger)
+        .getClass()
+        .delete({
+          className: CLASS_NAME,
+          packageName,
+          ...(transportRequest ? { transportRequest } : {}),
+        });
+    }
+    await closeOwnTestConnection(triggerConnection);
+    await closeOwnTestConnection(listenerConnection);
+  }, STEP_TIMEOUT);
+
+  async function startAtBreakpoint(): Promise<void> {
+    const { debuggeeId, server } = await catchRun(asClass, {
+      className: CLASS_NAME,
+    });
+    await openDebugSession();
+    const answer = await debuggerApi.attach(identity, debuggeeId, { server });
+    if (!answer.ok) throw new Error(`attach: ${documentOf(answer)}`);
+    attached = true;
+    await topFrame();
+  }
+
+  afterEach(async () => {
+    if (attached) {
+      await debuggerApi.terminateDebuggee();
+      attached = false;
+    }
+    if (run) {
+      await Promise.race([
+        run,
+        new Promise((resolve) => setTimeout(resolve, 15_000)),
+      ]);
+      run = undefined;
+    }
+  }, STEP_TIMEOUT);
+
+  // Keep Eclipse's spelling, header spacing and closing empty line verbatim.
+  function inner(query: string, body?: string, contentType?: string): string {
+    return (
+      `POST /sap/bc/adt/debugger?${query} HTTP/1.1\r\n` +
+      `sap-adt-request-id:${createRequestId().padEnd(32, '0')}\r\n` +
+      // A body-carrying part asks for its own type back, as the member does:
+      // with application/xml SAP answers 406 "Accepted content types:
+      // application/vnd.sap.as+xml" (measured inside the batch on E19).
+      `Accept:${contentType ?? 'application/xml'}\r\n` +
+      (contentType ? `Content-Type:${contentType}\r\n` : '') +
+      `\r\n${body === undefined ? '' : `${body}\r\n\r\n`}`
+    );
+  }
+
+  const stackRequest = () => inner('emode=_&semanticURIs=true&method=getStack');
+  const exchangeDir = fs.mkdtempSync(
+    path.join(tmpdir(), 'adt-debugger-batch-'),
+  );
+
+  async function measure(label: string, requests: string[]): Promise<void> {
+    needs(
+      sessionConnection && attached,
+      'an attached stateful debug connection',
+    );
+    const payload = buildDebuggerBatchPayload(requests);
+    const file = path.join(exchangeDir, `${label}.txt`);
+    const request = `POST /sap/bc/adt/debugger/batch\r\nContent-Type: multipart/mixed; boundary=${payload.boundary}\r\nAccept: multipart/mixed\r\n\r\n${payload.body}`;
+    // Persist before sending too, so a transport failure still leaves the request.
+    fs.writeFileSync(file, request);
+    testsLogger.info?.(`Debugger batch exchange: ${file}`);
+    let response: IAdtWireResponse;
+    try {
+      response = await executeBatchRequest(
+        sessionConnection as Connection,
+        payload,
+      );
+    } catch (error) {
+      const failed = (error as { response?: IAdtWireResponse }).response;
+      fs.writeFileSync(
+        file,
+        `${request}\nRESPONSE\n${failed ? JSON.stringify({ status: failed.status, headers: failed.headers }) : String(error)}\n${String(failed?.data ?? '')}`,
+      );
+      throw error;
+    }
+    const body = String(response.data ?? '');
+    const contentType = String(
+      Object.entries(response.headers ?? {}).find(
+        ([key]) => key.toLowerCase() === 'content-type',
+      )?.[1] ?? '',
+    );
+    const boundary = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
+    const parts = boundary
+      ? body
+          .split(`--${boundary[1] ?? boundary[2]}`)
+          .slice(1)
+          .filter((part) => !part.startsWith('--'))
+      : [];
+    const statuses = parts.map(
+      (part) => /^HTTP\/[^\r\n]+/m.exec(part)?.[0] ?? '(no inner status line)',
+    );
+    fs.writeFileSync(
+      file,
+      `${request}\nRESPONSE\nStatus: ${response.status}\nHeaders: ${JSON.stringify(response.headers, null, 2)}\nInner statuses: ${JSON.stringify(statuses)}\n\n${body}`,
+    );
+    testsLogger.info?.(
+      `Debugger batch ${label}: ${statuses.join('; ')}; exchange: ${file}`,
+    );
+    expect(response.status).toBeGreaterThanOrEqual(200);
+    expect(response.status).toBeLessThan(300);
+    expect(parts).toHaveLength(requests.length);
+  }
+
+  const methods: IDebuggerStepMethod[] = [
+    'stepInto',
+    'stepOver',
+    'stepReturn',
+    'stepContinue',
+  ];
+  for (const method of methods) {
+    gate('debugger_batch', method)(
+      `${method} + getStack (Eclipse envelope)`,
+      async () => {
+        if (skipped()) return;
+        await startAtBreakpoint();
+        // stepReturn is measured inside add, so it has a caller to return to.
+        if (method === 'stepReturn') {
+          const entered = await debuggerApi.step('stepInto');
+          if (!entered.ok) throw new Error(`enter add: ${documentOf(entered)}`);
+          await topFrame();
+        }
+        await measure(method, [inner(`method=${method}`), stackRequest()]);
+      },
+      STEP_TIMEOUT,
+    );
+  }
+
+  gate('debugger_batch', 'step_stack_variables')(
+    'step + stack + body-carrying getVariables',
+    async () => {
+      if (skipped()) return;
+      await startAtBreakpoint();
+      const children = await debuggerApi.getChildVariables(['@LOCALS']);
+      const rows = [
+        ...documentOf(children).matchAll(
+          /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
+        ),
+      ];
+      const variable = rows.find((row) => tag(row[1], 'NAME') === 'LV_TOTAL');
+      const id = variable && tag(variable[1], 'ID');
+      needs(children.ok && id, 'LV_TOTAL id from the stopped frame children');
+      await measure('step-stack-variables', [
+        inner('method=stepOver'),
+        stackRequest(),
+        inner(
+          'method=getVariables',
+          buildVariablesXml([id as string]),
+          DEBUGGER_VARIABLES_CONTENT_TYPE,
+        ),
+      ]);
+    },
+    STEP_TIMEOUT,
+  );
+
+  gate('debugger_batch', 'stack_children')(
+    'getStack + getChildVariables without stepping',
+    async () => {
+      if (skipped()) return;
+      await startAtBreakpoint();
+      await measure('stack-children', [
+        stackRequest(),
+        inner(
+          'method=getChildVariables',
+          buildChildVariablesXml(['@LOCALS']),
+          DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
+        ),
+      ]);
+    },
+    STEP_TIMEOUT,
+  );
+});

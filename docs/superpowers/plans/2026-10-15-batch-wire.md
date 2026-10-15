@@ -74,12 +74,29 @@ Accept:application/xml
 ```
 
 With the debuggee already ended both parts answered `HTTP/1.1 500`
-`AdiFailed`, subType `debuggeeEnded` (`SY/530`). Not yet measured: the same on
-a live stop, each step method, and whether `getVariables` can join the envelope.
+`AdiFailed`, subType `debuggeeEnded` (`SY/530`).
+
+### Live, through the library's primitives (DebuggerBatch.test.ts), E19 and trial
+
+At a breakpoint stop, on the attached (stateful) debug connection, one
+envelope each — every part `HTTP/1.1 200` on **both** systems:
+
+| envelope | parts |
+|---|---|
+| stepInto + getStack (Eclipse's exact parts) | 200, 200 |
+| stepOver + getStack | 200, 200 |
+| stepReturn + getStack | 200, 200 |
+| stepContinue + getStack | 200, 200 |
+| step + getStack + **getVariables** (a body-carrying POST) | 200, 200, 200 |
+| getStack + **getChildVariables** (no step) | 200, 200 |
+
+A body-carrying part must ask for its own type back: with `Accept:application/xml`
+the variables parts answered **406** "Accepted content types:
+application/vnd.sap.as+xml"; with the member's own type
+(`application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.Variables`
+/ `…ChildVariables`) → 200.
 
 ## Still to measure
 
 - communication/batch: per-part authorization
   (`S_ADT_RES` on inner requests); limits (part count, size); RFC transport.
-- debugger/batch: live step + stack for stepInto / stepOver / stepReturn /
-  stepContinue; + getVariables; + getChildVariables.

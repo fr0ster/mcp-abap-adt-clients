@@ -2737,3 +2737,25 @@ enhancement:
       params:
         include_name: "LSVIMTOP" # ← CHANGE if absent; first measurement, not previously probed.
         main_program: "SAPLSVIM" # ← CHANGE together with include_name to its main program.
+
+# Batch measurements reuse runtime_debugger.adt_abap_debugger params above.
+debugger_batch:
+  test_cases:
+    - name: "stepInto"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stepOver"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stepReturn"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stepContinue"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "step_stack_variables"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stack_children"
+      enabled: false
+      available_in: ["onprem", "cloud"]
