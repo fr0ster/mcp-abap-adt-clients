@@ -114,7 +114,12 @@ resources in one envelope is a server-side 500") was measured on
 | read ×100 (all `active`, `CHAR`) | batch client | 1.6 s |
 | delete ×100, read (all 404) | batch client | 14.7 s + 0.8 s |
 
-create … activate: **19.5 s**, against 45.1 s (scripted envelopes, a hundred
+On the ABAP Cloud trial, same test, green: create+lock 15.4 s, update+unlock
+11.0 s, activation run 18.0 s (create … activate 44.4 s), read 4.0 s, delete
+32.9 s, all 404 afterwards; the debugger cases and the recording debugger
+client green there too.
+
+create … activate on premise: **19.5 s**, against 45.1 s (scripted envelopes, a hundred
 activations inside one) and 111.9 s (500 single requests).
 
 Found on the way:
