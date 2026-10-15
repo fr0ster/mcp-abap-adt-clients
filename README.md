@@ -1129,7 +1129,8 @@ See [domain and debugger examples](docs/usage/BATCH.md).
 including automatic 406/415 negotiation retries (up to 100 envelopes, then all
 remaining requests reject). Explicit session switches apply to the next recording;
 LOCK/UNLOCK run in stateful envelopes; other ordinary members run stateless.
-Consecutive same-mode runs become separate envelopes sent in queue order.
+Consecutive LOCKs, consecutive UNLOCKs, and consecutive stateless requests each
+form separate envelopes sent in queue order.
 Execution returns the last outer response. An envelope failure stops sending and
 rejects unsent requests with a clear library error; inner HTTP failures remain
 per-part failures. The wrapped session mode is restored after execution.

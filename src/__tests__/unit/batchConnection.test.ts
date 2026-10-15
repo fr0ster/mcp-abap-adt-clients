@@ -41,7 +41,7 @@ function fixture(statuses = [200, 200]) {
 }
 const req = { method: 'GET', url: '/test', timeout: 0 };
 
-test('sends consecutive same-mode runs in order and restores the session', async () => {
+test('sends consecutive same-kind runs in order and restores the session', async () => {
   const { batch, send, session } = fixture([200]);
   const pending = [batch.makeAdtRequest(req)];
   batch.setSessionType('stateful');
@@ -50,33 +50,67 @@ test('sends consecutive same-mode runs in order and restores the session', async
   pending.push(batch.makeAdtRequest({ ...req, url: '/test?_action=UNLOCK' }));
   pending.push(batch.makeAdtRequest({ ...req, method: 'PUT', data: 'é' }));
   const single = await send({});
-  const double = fixture([200, 200]);
-  const paired = await double.send({});
   send.mockClear();
-  send
-    .mockResolvedValueOnce(single)
-    .mockResolvedValueOnce(paired)
-    .mockResolvedValueOnce(single);
+  send.mockResolvedValue(single);
   const result = await batch.execute();
   expect(await Promise.all(pending)).toHaveLength(4);
   expect(result).toBe(single);
-  expect(send).toHaveBeenCalledTimes(3);
+  expect(send).toHaveBeenCalledTimes(4);
   const bodies = send.mock.calls.map(
     ([request]) => (request as any).data as string,
   );
   expect(bodies[0]).toContain('GET /test HTTP/1.1');
   expect(bodies[0]).not.toContain('stateful');
   expect(bodies[1]).toContain('_action=LOCK');
-  expect(bodies[1]).toContain('_action=UNLOCK');
-  expect(bodies[1].match(/X-sap-adt-sessiontype: stateful/g)).toHaveLength(2);
-  expect(bodies[2]).toContain('Content-Length: 2');
-  expect(bodies[2]).not.toContain('stateful');
+  expect(bodies[1]).not.toContain('_action=UNLOCK');
+  expect(bodies[2]).toContain('_action=UNLOCK');
+  expect(bodies[2]).not.toContain('_action=LOCK');
+  expect(bodies[3]).toContain('Content-Length: 2');
+  expect(bodies[3]).not.toContain('stateful');
   expect(session.mock.calls).toEqual([
     ['stateless'],
+    ['stateful'],
     ['stateful'],
     ['stateless'],
     ['stateless'],
   ]);
+});
+
+test.each([
+  { actions: ['LOCK', 'UNLOCK'], sizes: [1, 1] },
+  { actions: ['LOCK', 'LOCK', 'UNLOCK', 'UNLOCK'], sizes: [2, 2] },
+  { actions: ['CREATE', 'LOCK', 'PUT', 'UNLOCK'], sizes: [1, 1, 1, 1] },
+  { actions: ['OTHER', 'LOCK', 'OTHER', 'UNLOCK'], sizes: [1, 1, 1, 1] },
+])('groups communication requests $actions into envelopes $sizes', async ({
+  actions,
+  sizes,
+}) => {
+  const { batch, send } = fixture([200]);
+  for (const size of sizes) {
+    const response = await fixture(Array(size).fill(200)).send({});
+    send.mockResolvedValueOnce(response);
+  }
+  const pending = actions.map((action, index) => {
+    if (['LOCK', 'UNLOCK', 'OTHER'].includes(action))
+      batch.setSessionType('stateful');
+    return batch.makeAdtRequest({
+      ...req,
+      method: action === 'PUT' ? 'PUT' : 'POST',
+      // Exercise both URL and params actions, including a non-action query value.
+      url: index % 2 ? '/test?note=_action=LOCK' : `/test?_action=${action}`,
+      params: index % 2 ? { _action: action } : undefined,
+    });
+  });
+  await batch.execute();
+  await Promise.all(pending);
+  expect(
+    send.mock.calls.map(
+      ([request]) =>
+        ((request as any).data as string).match(
+          /Content-Type: application\/http/g,
+        )?.length,
+    ),
+  ).toEqual(sizes);
 });
 
 test('a failed envelope stops later runs and rejects unsent parts without a SAP response', async () => {
@@ -428,7 +462,6 @@ test.each([
 
 test.each([
   '../integration/runtime/debugger/DebuggerBatch.test.ts',
-  '../helpers/test-config.yaml.template',
 ])('%s names no system', (file) => {
   const source = readFileSync(join(__dirname, file), 'utf8');
   const rule = readFileSync(

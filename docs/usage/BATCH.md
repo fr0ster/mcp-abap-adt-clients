@@ -111,8 +111,12 @@ rejects execution and all remaining requests rather than looping forever.
 Envelope failures also reject queued follow-ups. Concurrent executes are rejected;
 calls made after execution resolves belong to the next execute.
 
-Each envelope contains one session mode. `execute()` partitions the queue into
-consecutive same-mode runs and sends them in order, without reordering requests.
+On communication/batch, `execute()` partitions the queue into consecutive runs
+of LOCKs, UNLOCKs, or stateless requests and sends them in order, without
+reordering requests. Stateful actions are parsed from the URL query or request
+`params`. Other stateful requests use a separate `stateful` group; no ordinary
+member currently records one besides LOCK/UNLOCK. Debugger requests retain their
+single stateful group.
 For ordinary client members, LOCK and UNLOCK run stateful; creates, writes, reads,
 and deletes run stateless. Group creates before locks, and writes before unlocks,
 to avoid one envelope per alternating request. One execute can send several

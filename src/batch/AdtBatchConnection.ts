@@ -86,6 +86,24 @@ export class AdtBatchConnection implements IAbapConnection {
       });
     }) as Promise<IAdtWireResponse<T, D>>;
   }
+  private envelopeKey(
+    part: Pending,
+  ): 'lock' | 'unlock' | 'stateless' | 'stateful' {
+    if (!part.stateful) return 'stateless';
+    if (this.options.endpoint === 'debugger') return 'stateful';
+    const action =
+      new URL(part.request.url, 'https://batch.invalid').searchParams.get(
+        '_action',
+      ) ??
+      new URLSearchParams(
+        part.request.params as Record<string, string> | undefined,
+      ).get('_action');
+    if (action === 'LOCK') return 'lock';
+    if (action === 'UNLOCK') return 'unlock';
+    // Communication members currently use stateful mode only for LOCK/UNLOCK.
+    // Keep any future other stateful requests in their own consecutive group.
+    return 'stateful';
+  }
   /** Empty queues return a synthetic 204, data '', without network traffic. */
   async execute(): Promise<IAdtWireResponse> {
     if (this.executing)
@@ -102,8 +120,9 @@ export class AdtBatchConnection implements IAbapConnection {
       for (let envelope = 0; ; envelope++) {
         if (envelope === 100)
           throw new Error('ADT batch exceeded 100 settlement envelopes');
+        const key = this.envelopeKey(pending[0]);
         const nextMode = pending.findIndex(
-          (part) => part.stateful !== pending[0].stateful,
+          (part) => this.envelopeKey(part) !== key,
         );
         active = pending.splice(0, nextMode < 0 ? pending.length : nextMode);
         const payload = buildBatchPayload(
