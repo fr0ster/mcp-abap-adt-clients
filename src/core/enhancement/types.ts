@@ -184,7 +184,7 @@ export interface ICreateEnhancementParams {
   enhancement_spot?: string;
   enhancedObject?: IEnhancementConfig['enhancedObject'];
   enhancementOption?: string;
-  enhancementMode?: 'S' | 'D';
+  enhancementMode?: IEnhancementConfig['enhancementMode'];
   masterSystem?: string;
   responsible?: string;
   masterLanguage?: string;

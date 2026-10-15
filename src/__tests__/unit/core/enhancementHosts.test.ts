@@ -1,4 +1,9 @@
-import type { IAdtEnhancementHost } from '@mcp-abap-adt/interfaces-adt';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type {
+  IAdtEnhancementHost,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
 
@@ -9,12 +14,25 @@ const hosts = [
   ['getInclude', 'includeName', '/sap/bc/adt/programs/includes'],
 ] as const;
 
-function fixture() {
+// Verbatim E19 responses recorded on 2026-10-15; keep whitespace and base64 intact.
+const recorded = (name: string) =>
+  readFileSync(
+    join(__dirname, '../../fixtures/enhancementHosts', name),
+    'utf8',
+  );
+const elements = recorded('elements-empty-class-200.xml');
+const options = recorded('options-zok_req_rep_test-200.xml');
+const elementsContentType =
+  'application/vnd.sap.adt.enhancements.v3+xml; charset=utf-8';
+const optionsContentType =
+  'application/vnd.sap.adt.enhancementoptions.v2+xml; charset=utf-8';
+
+function fixture(data = elements, contentType = elementsContentType) {
   const makeAdtRequest = jest.fn(async () => ({
     status: 200,
     statusText: 'OK',
-    headers: {},
-    data: '<enh:document/>',
+    headers: { 'content-type': contentType },
+    data,
   }));
   const setSessionType = jest.fn();
   const connection = {
@@ -43,7 +61,16 @@ for (const [factory, nameKey, base] of hosts) {
         ],
       ] as const) {
         it(`${member}: ${name} is one stateless GET with the document strategy`, async () => {
-          const { client, makeAdtRequest, setSessionType } = fixture();
+          const body =
+            member === 'readEnhancementElements' ? elements : options;
+          const contentType =
+            member === 'readEnhancementElements'
+              ? elementsContentType
+              : optionsContentType;
+          const { client, makeAdtRequest, setSessionType } = fixture(
+            body,
+            contentType,
+          );
           const answer = await (
             client[factory]() as IAdtEnhancementHost<
               Record<string, string>,
@@ -53,7 +80,7 @@ for (const [factory, nameKey, base] of hosts) {
           )[member]({ [nameKey]: name });
           expect(answer.ok).toBe(true);
           if (answer.ok) {
-            expect(answer.getResult().value).toBe('<enh:document/>');
+            expect(answer.getResult().value).toBe(body);
           }
           expect(makeAdtRequest).toHaveBeenCalledTimes(1);
           expect(makeAdtRequest).toHaveBeenCalledWith(
@@ -91,3 +118,66 @@ for (const [factory, nameKey, base] of hosts) {
     });
   });
 }
+
+describe('recorded enhancement-host answers', () => {
+  it('preserves SAPMV45A implementations and their base64 sources byte for byte', async () => {
+    const body = recorded('elements-sapmv45a-200.xml');
+    const { client } = fixture(body);
+    const answer = await client.getProgram().readEnhancementElements({
+      programName: 'SAPMV45A',
+    });
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) throw new Error('expected the recorded document');
+    expect(answer.getResult().value).toBe(body);
+  });
+
+  for (const withAnalyse of [true, false]) {
+    it(`answers the recorded 400 as a failure ${withAnalyse ? 'with' : 'without'} analyse`, async () => {
+      const body = recorded('elements-missing-class-400.xml');
+      const response = {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { 'content-type': 'application/xml' },
+        data: body,
+      };
+      const { client, makeAdtRequest, setSessionType } = fixture();
+      makeAdtRequest.mockRejectedValueOnce(
+        Object.assign(new Error('Request failed with status code 400'), {
+          response,
+        }),
+      );
+      const analyse = jest.fn<ReturnType<IAnalyse>, Parameters<IAnalyse>>(
+        (failure) => failure,
+      );
+      const answer = await client
+        .getClass()
+        .readEnhancementElements(
+          { className: 'ZCL_DOES_NOT_EXIST_X' },
+          withAnalyse ? { analyse } : undefined,
+        );
+      expect(answer.ok).toBe(false);
+      if (answer.ok) throw new Error('expected the recorded refusal');
+      expect(answer.getError().response).toBe(response);
+      expect(answer.getError().response?.data).toBe(body);
+      expect(body).toContain('<type id="EnhancementError"/>');
+      expect(body).toContain('<entry key="T100KEY-ID">SEEF_BASE</entry>');
+      expect(body).toContain('<entry key="T100KEY-NO">104</entry>');
+      if (withAnalyse) {
+        expect(analyse).toHaveBeenCalledTimes(1);
+        expect(analyse).toHaveBeenCalledWith(expect.anything(), response);
+        expect(analyse.mock.calls[0][1]).toBe(response);
+      } else {
+        expect(analyse).not.toHaveBeenCalled();
+      }
+      expect(makeAdtRequest).toHaveBeenCalledTimes(1);
+      expect(makeAdtRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: '/sap/bc/adt/oo/classes/zcl_does_not_exist_x/source/main/enhancements/elements',
+          method: 'GET',
+          headers: { Accept: 'application/vnd.sap.adt.enhancements.v3+xml' },
+        }),
+      );
+      expect(setSessionType).not.toHaveBeenCalled();
+    });
+  }
+});
