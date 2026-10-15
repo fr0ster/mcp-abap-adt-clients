@@ -133,6 +133,13 @@ unlock — not measured yet (stateful).
   `version="inactive"` — the #227 listing and ENHO/XHH are the same objects.
 - Trial: `POST enhoxhh` → **403** `ExceptionResourceNoAuthorization` "No
   authorization to access the resource /sap/bc/adt/enhancements/enhoxhh."
+  A `GET enhoxhh/zadt_enho_xhh_t1` on the trial (after the E19 cleanup) → **403**
+  too, where the same GET for the other subtypes answered 404 — the collection
+  itself is refused, not the name. Trial discovery lists no content type for
+  `enhoxhh`, `enhoxh` or `enhsxs`.
+- `enhoxh` / `enhsxs`: one GET each on E19 (500, above). That Eclipse opens both
+  in SAP GUI, and the 500 on both systems, is from mcp-abap-adt `5046d8a6`
+  (measured on BASIS 816 and the trial, 2026-10-02), not from this session.
 
 **Our `create.ts` body** (`enh:enhancement` in `http://www.sap.com/adt/enhancements`,
 Content-Type `…enhancements.v1+xml`) → **415** `SADT_RESOURCE/039` on trial.
