@@ -39,25 +39,64 @@ function fixture(statuses = [200, 200]) {
 }
 const req = { method: 'GET', url: '/test', timeout: 0 };
 
-test('records, frames bytes and settles in order with stateful envelope', async () => {
-  const { batch, send, session } = fixture();
+test('sends consecutive same-mode runs in order and restores the session', async () => {
+  const { batch, send, session } = fixture([200]);
+  const pending = [batch.makeAdtRequest(req)];
   batch.setSessionType('stateful');
-  const a = batch.makeAdtRequest(req);
-  batch.setSessionType('stateless');
-  const b = batch.makeAdtRequest({ ...req, method: 'PUT', data: 'é' });
-  expect(send).not.toHaveBeenCalled();
-  await batch.execute();
-  expect((await a).data).toBe('<body>0</body>');
-  expect((await b).data).toBe('<body>1</body>');
-  const sent = send.mock.calls[0][0] as unknown as {
-    data: string;
-    headers: Record<string, string>;
-  };
-  const boundary = sent.headers['Content-Type'].split('boundary=')[1];
-  expect(sent.data).toBe(
-    `--${boundary}\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /test HTTP/1.1\r\nX-sap-adt-sessiontype: stateful\r\n\r\n\r\n--${boundary}\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPUT /test HTTP/1.1\r\nContent-Length: 2\r\n\r\né\r\n\r\n--${boundary}--\r\n`,
+  pending.push(batch.makeAdtRequest({ ...req, url: '/test?_action=LOCK' }));
+  batch.setSessionType('stateful');
+  pending.push(batch.makeAdtRequest({ ...req, url: '/test?_action=UNLOCK' }));
+  pending.push(batch.makeAdtRequest({ ...req, method: 'PUT', data: 'é' }));
+  const single = await send({});
+  const double = fixture([200, 200]);
+  const paired = await double.send({});
+  send.mockClear();
+  send
+    .mockResolvedValueOnce(single)
+    .mockResolvedValueOnce(paired)
+    .mockResolvedValueOnce(single);
+  const result = await batch.execute();
+  expect(await Promise.all(pending)).toHaveLength(4);
+  expect(result).toBe(single);
+  expect(send).toHaveBeenCalledTimes(3);
+  const bodies = send.mock.calls.map(
+    ([request]) => (request as any).data as string,
   );
-  expect(session.mock.calls).toEqual([['stateful'], ['stateless']]);
+  expect(bodies[0]).toContain('GET /test HTTP/1.1');
+  expect(bodies[0]).not.toContain('stateful');
+  expect(bodies[1]).toContain('_action=LOCK');
+  expect(bodies[1]).toContain('_action=UNLOCK');
+  expect(bodies[1].match(/X-sap-adt-sessiontype: stateful/g)).toHaveLength(2);
+  expect(bodies[2]).toContain('Content-Length: 2');
+  expect(bodies[2]).not.toContain('stateful');
+  expect(session.mock.calls).toEqual([
+    ['stateless'],
+    ['stateful'],
+    ['stateless'],
+    ['stateless'],
+  ]);
+});
+
+test('a failed envelope stops later runs and rejects unsent parts without a SAP response', async () => {
+  const { batch, send } = fixture([200]);
+  const first = batch.makeAdtRequest(req);
+  batch.setSessionType('stateful');
+  const failed = batch.makeAdtRequest(req).catch((error) => error);
+  const unsent = batch.makeAdtRequest(req).catch((error) => error);
+  const success = await send({});
+  const failure = Object.assign(new Error('offline'), {
+    response: { status: 503 },
+  });
+  send.mockClear();
+  send.mockResolvedValueOnce(success).mockRejectedValueOnce(failure);
+  await expect(batch.execute()).rejects.toBe(failure);
+  expect((await first).status).toBe(200);
+  expect(await failed).toBe(failure);
+  const skipped = await unsent;
+  expect(skipped.message).toMatch(/not sent.*earlier.*envelope failed/i);
+  expect(skipped.response).toBeUndefined();
+  expect(send).toHaveBeenCalledTimes(2);
+  expect((await batch.execute()).status).toBe(204);
 });
 test('part failure carries response while another succeeds', async () => {
   const { batch } = fixture([404, 200]);
@@ -156,7 +195,9 @@ test.each([
   'lock',
   'unlock',
 ] as const)('%s scopes stateful mode to its own request', async (method) => {
-  const { batch, send } = fixture([200, 200, 200]);
+  const { batch, send, session } = fixture([200, 200]);
+  const single = await fixture([200]).send({});
+  send.mockResolvedValueOnce(single);
   const domain = new AdtClient(batch).getDomain();
   const config = {
     domainName: 'Z_TEST',
@@ -172,6 +213,13 @@ test.each([
   await Promise.all(pending);
   const body = (send.mock.calls[0][0] as any).data as string;
   expect(body.match(/X-sap-adt-sessiontype: stateful/g)).toHaveLength(1);
+  expect(send).toHaveBeenCalledTimes(2);
+  expect((send.mock.calls[1][0] as any).data).not.toContain('stateful');
+  expect(session.mock.calls).toEqual([
+    ['stateful'],
+    ['stateless'],
+    ['stateless'],
+  ]);
   expect(body).toMatch(
     new RegExp(
       `_action=${method.toUpperCase()}[^]*?X-sap-adt-sessiontype: stateful`,
@@ -231,4 +279,33 @@ test('envelope failures settle calls recorded while sending and their retries', 
   expect((await first).ok).toBe(false);
   expect((await second!).ok).toBe(false);
   expect((await batch.execute()).status).toBe(204);
+});
+
+test.each([
+  'parse',
+  'count',
+] as const)('%s failure rejects unsent runs and restores the wrapped mode', async (kind) => {
+  const { connection, send, session } = fixture([200]);
+  const batch = new AdtBatchConnection(
+    { ...connection, getSessionType: () => 'stateful' } as IAbapConnection,
+    { endpoint: 'communication' },
+  );
+  batch.setSessionType('stateless');
+  const failed = batch.makeAdtRequest(req).catch((error) => error);
+  batch.setSessionType('stateful');
+  const unsent = batch.makeAdtRequest(req).catch((error) => error);
+  const answer = await send({});
+  send.mockClear();
+  send.mockResolvedValueOnce({
+    ...answer,
+    headers: (kind === 'parse' ? {} : answer.headers) as typeof answer.headers,
+    data: kind === 'parse' ? 'invalid' : '',
+  });
+  await expect(batch.execute()).rejects.toThrow(
+    kind === 'parse' ? 'missing multipart boundary' : 'part count',
+  );
+  expect(await failed).toBeInstanceOf(Error);
+  expect((await unsent).message).toContain('not sent');
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(session.mock.calls.at(-1)).toEqual(['stateful']);
 });

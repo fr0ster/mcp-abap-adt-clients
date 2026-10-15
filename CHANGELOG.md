@@ -27,13 +27,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Added
 
 - `AdtBatchConnection`: record unchanged client members, then execute their requests
-  in one multipart transport envelope. Supports `communication` and `debugger`
-  endpoints, stateful lock windows, and per-part HTTP failures. The 2026-09
+  in consecutive multipart envelopes of one session mode each. Supports `communication` and `debugger`
+  endpoints, stateful LOCK/UNLOCK, stateless writes, and per-part HTTP failures. The 2026-09
   removal reason (mixed GET + POST returning 500) applied to `debugger/batch`;
   measurements on an on-premise system and ABAP Cloud on 2026-10-15 confirmed that
   `communication/batch` accepts mixed methods. Dependent calls still need separate
   envelopes to obtain lock handles; activation can use one plain group request.
 
+### Fixed
+
+- Batch execution preserves request order while splitting consecutive session modes
+  into separate envelopes. An envelope failure stops sending; unsent requests
+  reject with a library error rather than inheriting the failed SAP response.
+  Group creates before locks and writes before unlocks to minimize envelopes.
 
 ## [32.0.0] - 2026-10-15
 

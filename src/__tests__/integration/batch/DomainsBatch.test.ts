@@ -22,7 +22,7 @@ function value<T>(answer: IAdtResponse<T>): T {
 }
 
 gate('batch', 'domains')(
-  'domains: two write envelopes, group activation, read and delete',
+  'domains: separate create, lock, update and unlock envelopes, activation, read and delete',
   async () => {
     const testCase = configuredCase('batch', 'domains');
     if (!testCase)
@@ -50,6 +50,23 @@ gate('batch', 'domains')(
     // take setSessionType() on itself and send every envelope stateless.
     const send = connection.makeAdtRequest.bind(connection);
     connection.makeAdtRequest = (async (request: any) => {
+      if (request.url === '/sap/bc/adt/communication/batch') {
+        const mode = (connection as any).getSessionMode();
+        const methods = [
+          ...String(request.data).matchAll(
+            /^(GET|POST|PUT|DELETE|PATCH) (\S+) HTTP\/1\.1/gm,
+          ),
+        ];
+        expect(methods.length).toBeGreaterThan(0);
+        for (const [, , url] of methods) {
+          const action = new URL(url, 'https://example.test').searchParams.get(
+            '_action',
+          );
+          expect(mode).toBe(
+            action === 'LOCK' || action === 'UNLOCK' ? 'stateful' : 'stateless',
+          );
+        }
+      }
       const no = ++envelopeNo;
       const head = `${request.method} ${request.url} session=${(connection as any).getSessionMode?.() ?? '?'}`;
       const answer: any = await send(request).catch((e: any) => {
@@ -110,27 +127,30 @@ gate('batch', 'domains')(
     const failures: unknown[] = [];
     try {
       await remove('delete_leftovers_ms', false);
-      const created = configs.map(
-        (config) => [domain.create(config), domain.lock(config)] as const,
-      );
+      const created = configs.map((config) => domain.create(config));
+      const locked = configs.map((config) => domain.lock(config));
       await execute('create_lock_ms');
       const handles = await Promise.all(
-        created.map(async ([create, lock]) => {
+        created.map(async (create, i) => {
           value(await create);
-          const handle = value(await lock);
+          const handle = value(await locked[i]);
           expect(handle).not.toBe('');
           return handle;
         }),
       );
-      const writes = configs.flatMap((config, i) => {
+      const writes = configs.map((config, i) => {
         const source = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXmlAttr(config.domainName)}" adtcore:type="DOMA/DD" adtcore:description="Batch domain CHAR 1" adtcore:language="EN" adtcore:masterLanguage="EN"><adtcore:packageRef adtcore:name="${escapeXmlAttr(config.packageName)}"/><doma:content><doma:typeInformation><doma:datatype>CHAR</doma:datatype><doma:length>000001</doma:length><doma:decimals>000000</doma:decimals></doma:typeInformation><doma:outputInformation><doma:length>000001</doma:length><doma:style>00</doma:style><doma:conversionExit/><doma:signExists>false</doma:signExists><doma:lowercase>false</doma:lowercase><doma:ampmFormat>false</doma:ampmFormat></doma:outputInformation><doma:valueInformation><doma:valueTableRef/><doma:appendExists>false</doma:appendExists><doma:fixValues/></doma:valueInformation></doma:content></doma:domain>`;
-        return [
-          domain.updateMetadata(config, { source, lockHandle: handles[i] }),
-          domain.unlock(config, handles[i]),
-        ];
+        return domain.updateMetadata(config, {
+          source,
+          lockHandle: handles[i],
+        });
       });
+      const unlocked = configs.map((config, i) =>
+        domain.unlock(config, handles[i]),
+      );
       await execute('update_unlock_ms');
-      for (const answer of await Promise.all(writes)) value<unknown>(answer);
+      for (const answer of await Promise.all([...writes, ...unlocked]))
+        value<unknown>(answer);
       // The default returns the empty POST body; this strategy reads Location.
       const utils = new AdtClient(connection, logger).getUtils({
         ...utilDocuments,

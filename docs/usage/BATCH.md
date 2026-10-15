@@ -14,27 +14,25 @@ import { analyseActivation, utilActivationRunId } from '@mcp-abap-adt/adt-strate
 const batch = new AdtBatchConnection(connection, { endpoint: 'communication' });
 const domains = new AdtClient(batch).getDomain();
 // configs: { domainName, packageName, transportRequest, description }[]
-const first = configs.map(config => ({
-  created: domains.create(config),
-  locked: domains.lock(config),
-}));
+const created = configs.map(config => domains.create(config));
+const locked = configs.map(config => domains.lock(config));
 await batch.execute();
-const handles = await Promise.all(first.map(async ({ created, locked }) => {
-  const creation = await created;
+const handles = await Promise.all(created.map(async (pending, i) => {
+  const creation = await pending;
   if (!creation.ok) throw new Error(creation.getError().message);
-  const lock = await locked;
+  const lock = await locked[i];
   if (!lock.ok) throw new Error(lock.getError().message);
   return lock.getResult().value;
 }));
-const second = configs.flatMap((config, i) => [
+const writes = configs.map((config, i) =>
   domains.updateMetadata(config, {
     source: documents[i], // Full domain XML, including datatype CHAR and length 000001.
     lockHandle: handles[i],
   }),
-  domains.unlock(config, handles[i]),
-]);
+);
+const unlocked = configs.map((config, i) => domains.unlock(config, handles[i]));
 await batch.execute();
-for (const answer of await Promise.all(second)) {
+for (const answer of await Promise.all([...writes, ...unlocked])) {
   if (!answer.ok) throw new Error(answer.getError().message);
 }
 const utils = new AdtClient(connection).getUtils({
@@ -69,7 +67,7 @@ if (!/activationExecuted\s*=\s*["']true["']/.test(results) || /type\s*=\s*["']E[
 }
 ```
 
-A lock handle comes from the first envelope; placeholders cannot refer to another
+A lock handle comes from the lock envelope; placeholders cannot refer to another
 part's answer. A wrong UNLOCK handle can answer 200 while leaving the lock held.
 Use the real handles and inspect activation messages, including `type="E"`.
 The transport provides no transaction or rollback; callers own recovery and
@@ -95,13 +93,15 @@ for (const answer of answers) {
 }
 ```
 
-`execute()` returns the outer wire response. Empty execution returns a synthetic
+`execute()` returns the last outer wire response. Empty execution returns a synthetic
 `{ status: 204, statusText: 'Empty batch', headers: {}, data: '' }` without sending.
 Recorded request promises receive inner responses, in order: 2xx resolves; other
 statuses reject with an Error carrying `response: { status, statusText, headers,
 data }`, matching direct HTTP failure handling. Members keep their usual
-`IAdtResponse` and strategy behavior. Envelope/parse failures reject all outstanding
-parts and `execute()`; missing parts reject with a part-count error. A count
+`IAdtResponse` and strategy behavior. Envelope/parse failures stop execution immediately and reject `execute()` and
+parts in the failed envelope. Unsent runs and queued follow-ups reject with a
+library error saying the request was not sent because an earlier envelope failed;
+that error carries the cause, without a SAP response. Missing parts reject with a part-count error. A count
 mismatch also rejects `execute()`. Attach rejection handlers before execution when
 using raw connection promises. Each execute sends follow-up envelopes for requests recorded during settlement,
 including the automatic 406/415 corrected retry. It yields one event-loop turn
@@ -111,16 +111,20 @@ rejects execution and all remaining requests rather than looping forever.
 Envelope failures also reject queued follow-ups. Concurrent executes are rejected;
 calls made after execution resolves belong to the next execute.
 
-Any stateful part makes its envelope stateful, and carries the measured inner
-`X-sap-adt-sessiontype: stateful` header. The wrapped session mode is restored
-afterward. Connections exposing `getSessionMode()` or `getSessionType()` supply
-the previous mode; minimum-contract connections without a getter are assumed
-stateless. An explicit local `setSessionType` applies only to the next recorded
-request, then recording returns to the wrapped connection's initial mode. Thus LOCK and
-UNLOCK carry stateful headers without leaking their mode to adjacent reads or
-creates while waiting for their answers. A stateless switch takes effect
-immediately for subsequent recording. For an already stateful debugger connection,
-the wrapped mode remains the default for every recording.
+Each envelope contains one session mode. `execute()` partitions the queue into
+consecutive same-mode runs and sends them in order, without reordering requests.
+For ordinary client members, LOCK and UNLOCK run stateful; creates, writes, reads,
+and deletes run stateless. Group creates before locks, and writes before unlocks,
+to avoid one envelope per alternating request. One execute can send several
+envelopes and provides no transaction across them. Inner HTTP failures remain
+per-part failures and do not stop later runs, allowing negotiation retries.
+
+Stateful parts carry `X-sap-adt-sessiontype: stateful`. The wrapped session mode
+is restored afterward. Connections exposing `getSessionMode()` or
+`getSessionType()` supply the previous mode; minimum-contract connections without
+a getter are assumed stateless. An explicit local `setSessionType` applies only
+to the next recorded request, then recording returns to the wrapped connection's
+initial mode. An already stateful debugger connection retains that default.
 
 Measurements on 2026-10-15 on an on-premise system and ABAP Cloud accepted mixed GET + POST on
 `/sap/bc/adt/communication/batch`, including a 404 part beside successful parts.

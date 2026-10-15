@@ -87,26 +87,31 @@ export class AdtBatchConnection implements IAbapConnection {
   async execute(): Promise<IAdtWireResponse> {
     if (this.executing)
       throw new Error('An ADT batch execute is already in progress');
-    let pending = this.queue;
+    const pending = this.queue;
     this.queue = [];
     if (!pending.length)
       return { status: 204, statusText: 'Empty batch', headers: {}, data: '' };
     this.executing = true;
     const previous = this.wrappedSession();
+    let active: Pending[] = [];
     try {
       let response: IAdtWireResponse;
       for (let envelope = 0; ; envelope++) {
         if (envelope === 100)
           throw new Error('ADT batch exceeded 100 settlement envelopes');
+        const nextMode = pending.findIndex(
+          (part) => part.stateful !== pending[0].stateful,
+        );
+        active = pending.splice(0, nextMode < 0 ? pending.length : nextMode);
         const payload = buildBatchPayload(
-          pending.map((part) => innerRequest(part.request)),
+          active.map((part) => innerRequest(part.request)),
         );
         this.connection.setSessionType(
-          pending.some((part) => part.stateful) ? 'stateful' : 'stateless',
+          active[0].stateful ? 'stateful' : 'stateless',
         );
         this.options.logger?.debug('Executing ADT batch', {
           endpoint: this.options.endpoint,
-          parts: pending.length,
+          parts: active.length,
         });
         response = await this.connection.makeAdtRequest({
           url: BATCH[this.options.endpoint],
@@ -119,12 +124,12 @@ export class AdtBatchConnection implements IAbapConnection {
           },
         });
         const parts = parseBatchResponse(response);
-        for (const [index, part] of pending.entries()) {
+        for (const [index, part] of active.entries()) {
           const answer = parts[index];
           if (!answer)
             part.reject(
               new Error(
-                `ADT batch response part count mismatch: expected ${pending.length}, received ${parts.length}; missing part ${index + 1}`,
+                `ADT batch response part count mismatch: expected ${active.length}, received ${parts.length}; missing part ${index + 1}`,
               ),
             );
           else if (answer.status >= 200 && answer.status < 300)
@@ -137,21 +142,26 @@ export class AdtBatchConnection implements IAbapConnection {
               ),
             );
         }
-        if (parts.length !== pending.length)
+        if (parts.length !== active.length)
           throw new Error(
-            `ADT batch response part count mismatch: expected ${pending.length}, received ${parts.length}`,
+            `ADT batch response part count mismatch: expected ${active.length}, received ${parts.length}`,
           );
+        active = [];
         // Let negotiation and member continuations record their follow-up calls.
         await new Promise<void>((resolve) => setImmediate(resolve));
-        if (!this.queue.length) return response;
-        pending = this.queue;
-        this.queue = [];
+        pending.push(...this.queue.splice(0));
+        if (!pending.length) return response;
       }
     } catch (error) {
-      this.settlementFailure = { error };
-      for (const part of pending) part.reject(error);
+      const unsentError = new Error(
+        'ADT batch request not sent because an earlier batch envelope failed',
+        { cause: error },
+      );
+      this.settlementFailure = { error: unsentError };
+      for (const part of active) part.reject(error);
+      for (const part of pending) part.reject(unsentError);
       await new Promise<void>((resolve) => setImmediate(resolve));
-      for (const part of this.queue.splice(0)) part.reject(error);
+      for (const part of this.queue.splice(0)) part.reject(unsentError);
       await new Promise<void>((resolve) => setImmediate(resolve));
       throw error;
     } finally {

@@ -1119,8 +1119,8 @@ Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>
 ### Recording batches
 
 `AdtBatchConnection` records calls from the existing clients. Start the member
-calls, execute the envelope, then await their results. Split create + lock and
-update + unlock into two envelopes so writes use the returned lock handles;
+calls, execute the queue, then await their results. Group creates before locks,
+then queue writes with the returned lock handles before unlocks;
 activate all objects with one plain `activateObjectsGroup` call. At a debugger
 stop, record step + stack + variables on the attached stateful connection.
 See [domain and debugger examples](docs/usage/BATCH.md).
@@ -1128,7 +1128,11 @@ See [domain and debugger examples](docs/usage/BATCH.md).
 `execute()` also sends follow-up envelopes for requests recorded during settlement,
 including automatic 406/415 negotiation retries (up to 100 envelopes, then all
 remaining requests reject). Explicit session switches apply to the next recording;
-LOCK/UNLOCK cannot leak stateful mode to neighbouring requests.
+LOCK/UNLOCK run in stateful envelopes; other ordinary members run stateless.
+Consecutive same-mode runs become separate envelopes sent in queue order.
+Execution returns the last outer response. An envelope failure stops sending and
+rejects unsent requests with a clear library error; inner HTTP failures remain
+per-part failures. The wrapped session mode is restored after execution.
 
 ```typescript
 import { AdtBatchConnection, AdtClient } from '@mcp-abap-adt/adt-clients';
