@@ -3,7 +3,7 @@
  *
  * Both are POSTs to `…/publishjobs` / `…/unpublishjobs` — jobs by name — and
  * this library reads neither body and waits for neither to finish. Measured on
- * the trial: an unpublish "timed out" at the client's 120s and the binding was
+ * the ABAP Cloud system: an unpublish "timed out" at the client's 120s and the binding was
  * unpublished when looked at afterwards. So the job runs; the client gave up.
  *
  * This fires one transition and polls the binding's own `srvb:published` until

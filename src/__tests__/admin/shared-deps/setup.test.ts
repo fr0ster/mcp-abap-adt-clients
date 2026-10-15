@@ -102,7 +102,7 @@ describe('Admin: Setup shared dependencies', () => {
   /**
    * A dropped connection says nothing about the object.
    *
-   * Measured against the BTP trial: `ECONNRESET` and `timeout of 45000ms
+   * Measured against an ABAP Cloud system: `ECONNRESET` and `timeout of 45000ms
    * exceeded` accounted for every failure in a run where the logic was
    * otherwise correct — the same objects that failed one run succeeded in the
    * next. One aborted socket used to end that dependency for the whole run, and

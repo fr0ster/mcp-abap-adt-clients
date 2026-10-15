@@ -24,7 +24,7 @@ await releaseTestConnection(connection);           // never disconnect() here
 
 `globalSetup` opens **one** ABAP session and publishes it; every file adopts
 that one, and `globalTeardown` gives it back. Sessions are limited per user —
-two at a time on the BTP trial, measured — and multiplying them makes a loaded
+two at a time on a trial ABAP Cloud account, measured — and multiplying them makes a loaded
 system throttle you long before it refuses.
 
 So a test file must **not** call `connection.disconnect()`. On on-prem that is
@@ -53,7 +53,7 @@ new connection. One caller needs it — `cleanup_session_after_test`, which drop
 stuck locks by ending the session holding them.
 
 The package delete used to be a second caller, on the rule that a package cannot
-be deleted from the session that created it. Measured on the BTP trial, it can:
+be deleted from the session that created it. Measured on an ABAP Cloud system, it can:
 the delete succeeds either way. The exception is not carried on an unverified
 claim, and comes back only if an on-prem run shows the delete failing.
 

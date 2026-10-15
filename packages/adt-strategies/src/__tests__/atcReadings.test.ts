@@ -10,7 +10,7 @@ import {
 /**
  * The ATC readings, moved with their cases from adt-clients (`AdtAtc.test.ts`),
  * where `AdtAtc` applied them to every answer and threw where a value was
- * missing. The documents are the trial's captures
+ * missing. The documents are the ABAP Cloud system's captures
  * (`docs/evidence/2026-08-16-atc-trial-probe.md` in adt-clients) and variants a
  * server may validly send that differ from them only in attribute order or
  * namespace prefix.
@@ -24,7 +24,7 @@ const answer = (
   status = 200,
 ): IAdtWireResponse => ({ data, status, statusText: 'OK', headers });
 
-// The properties as the trial sent them: four of them, and the one this client
+// The properties as the ABAP Cloud system sent them: four of them, and the one this client
 // needs is not the first.
 const CUSTOMIZING = `<?xml version="1.0" encoding="utf-8"?>
 <atc:customizing xmlns:atc="http://www.sap.com/adt/atc"><properties>

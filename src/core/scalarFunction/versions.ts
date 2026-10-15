@@ -13,7 +13,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 
 /**
  * The version history — the Atom feed, as it arrived (candidate URI,
- * probe-verify on trial).
+ * probe-verify on the ABAP Cloud system).
  *
  * `objectVersions` in @mcp-abap-adt/adt-strategies reads it into entries. A
  * system without the resource answers 404 or 406, which comes back as the

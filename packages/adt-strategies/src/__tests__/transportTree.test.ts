@@ -1,7 +1,7 @@
 /**
  * The tree is parsed from two real payloads, not from a shape we imagined.
  *
- * Both come from the same trial on 2026-08-12 and differ only because the
+ * Both come from the ABAP Cloud system on 2026-08-12 and differ only because the
  * request differed: `?targets=true` inserts a `tm:target` container. A parser
  * that walks a fixed path passes one of these and silently returns zero
  * requests on the other — which is the failure mode this whole design exists
@@ -85,7 +85,7 @@ describe('parseTransportTree reads both captured shapes', () => {
       links.some((l) => String(l.attributes.rel).endsWith('/releasejobs')),
     ).toBe(true);
 
-    // Present and empty on this trial — captured as '', not dropped, and not
+    // Present and empty on the ABAP Cloud system — captured as '', not dropped, and not
     // flattened into undefined, which would mean "no element at all".
     expect(tree.requests[0].longDesc).toBe('');
   });

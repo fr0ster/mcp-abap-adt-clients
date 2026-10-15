@@ -258,7 +258,7 @@ function parseSystemCheckVariant(body: string): string | null {
  * This is what answers "which checks exist here": `/atc/checks` does not list
  * on the measured system, and a list of *variants* answers a different
  * question entirely — a variant is a selection of checks, not a check.
- * Measured 2026-09-08: the trial's form template carries 172 of these across
+ * Measured 2026-09-08: the ABAP Cloud system's form template carries 172 of these across
  * 36 categories, e.g. `SLIN_VERS`, `SYCM_CHECK_ABAP_LANGU_VERSION`.
  */
 function parseCheckNames(body: string): string[] {

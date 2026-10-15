@@ -2,7 +2,7 @@
  * Locking a service binding — which is what publishing one is.
  *
  * A binding is not edited the way a class is: it is created, and then published
- * and unpublished. Measured from Eclipse (ADT 3.60.3) on the BTP trial,
+ * and unpublished. Measured from Eclipse (ADT 3.60.3) on the ABAP Cloud system,
  * 2026-09-05, the lock is what those two take:
  *
  * ```

@@ -25,7 +25,7 @@ import { transportParsing } from '../../../helpers/transportParsing';
 const CONFIGURATIONS =
   '<?xml version="1.0" encoding="utf-8"?>' +
   '<configurations:configurations xmlns:configurations="http://www.sap.com/adt/configurations">' +
-  '<configuration:configuration createdBy="CB9980008038" client="100" ' +
+  '<configuration:configuration createdBy="DEVELOPER" client="100" ' +
   'xmlns:configuration="http://www.sap.com/adt/configuration">' +
   '<atom:link href="/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/7E5B" ' +
   'etag="20260807095048" xmlns:atom="http://www.w3.org/2005/Atom"/>' +

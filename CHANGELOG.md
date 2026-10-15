@@ -662,7 +662,7 @@ A developer release: not published to npm.
 
   `servicename` and `serviceversion` had been dropped from the request because a
   capture of Eclipse showed neither and the job answered `SEVERITY OK` — measured
-  on one system, and it does not hold for V2. Measured on a trial, 2026-09-29, one
+  on one system, and it does not hold for V2. Measured on an ABAP Cloud system, 2026-09-29, one
   binding per protocol with a known publication state and a single job each, the
   only difference being the query string:
 
@@ -1069,7 +1069,7 @@ is different.
   [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
   *"You cannot add any objects if the task type is Unclassified. You need to
   change the task type to Development/Correction or Repair."*
-- **Why every task on the BTP trial read as Unclassified.** The trial has no
+- **Why every task on the ABAP Cloud system read as Unclassified.** The ABAP Cloud system has no
   transport system configured, so the CTS edit flow never creates a request
   there, and every request and task on it was made by hand through `newtask`.
   Until `changeTaskType` existed, nothing typed them.
@@ -1291,7 +1291,7 @@ It is a major for two things a name count cannot show:
   ignored by the very code that took them**: a domain created with
   `datatype: 'CHAR', length: 10` came back with `<doma:datatype/>` empty, and
   SAP refused to activate it — `DO(251) Data type ' ' does not exist`, measured
-  on a cloud trial beside a domain whose type was in the request body, which
+  on the ABAP Cloud system beside a domain whose type was in the request body, which
   activated with no messages at all. Whether a field is honoured is decided in
   this package, which is now also where it is declared.
 
@@ -1697,8 +1697,7 @@ unknown.
 
 - **`docs/usage/CLIENT_API_REFERENCE.md`** and the JSDoc on
   `IAtcRunResult.findingStats`: a worklist with one priority-3 finding read
-  `"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (BTP
-  trial, 2026-09-08). Two points, and `(priority 1, priority 2, priority 3)` is
+  `"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (the ABAP Cloud system, 2026-09-08). Two points, and `(priority 1, priority 2, priority 3)` is
   the only ordering that fits both. A non-zero **first** position has still
   never been observed, which is why `findingStats` remains a string rather than
   becoming `{ errors, warnings, infos }` — naming the fields would publish a
@@ -1762,7 +1761,7 @@ the sequence around a write handed back to the consumer.
   defaults to `0`, which the HTTP clients here read as "do not abort".
 
   Aborting a request the server is still executing costs more than it saves.
-  Measured on the cloud trial: `POST /deletion/delete` was aborted at 45 s, the
+  Measured on an ABAP Cloud system: `POST /deletion/delete` was aborted at 45 s, the
   retry came back `400 … Session Timed Out or Not Found` **with a new session
   cookie**, and everything after it ran in a session nobody asked for. Of 794
   responses in that run, 30 carried `set-cookie` — 29 were `_action=LOCK`
@@ -1934,10 +1933,10 @@ the sequence around a write handed back to the consumer.
   /sap/bc/adt/cts/transportrequests/…` — a fact about the address, not about the
   request. `AdtRequest.checkDeletion` reads the request itself instead, where
   the two things ADT actually requires (empty, unreleased) are stated. Measured
-  on the cloud trial; a standalone include and a metadata extension *are*
+  on the ABAP Cloud system; a standalone include and a metadata extension *are*
   resolved by the service, and answer as a class does.
 
-  Measured on the cloud trial: the check is asked about a **URI**, and its
+  Measured on an ABAP Cloud system: the check is asked about a **URI**, and its
   answer names the type and package it resolved that address to. A type with an
   address has something to ask with, whether or not its own delete goes through
   the deletion service — which is how `getInclude()`, `getMetadataExtension()`
@@ -3303,7 +3302,7 @@ ATC check runs: start one, ask whether it is done, read what it found.
   on `waited` — `{ worklistId, runId }` without waiting, `{ worklistId, findingStats }` with.
 
 - **Seven checkable object types** — `class`, `interface`, `function_group`, `package`,
-  `ddl_source`, `table`, `behavior_definition`. Each was confirmed on an ABAP Cloud trial by a
+  `ddl_source`, `table`, `behavior_definition`. Each was confirmed on the ABAP Cloud system by a
   run submitted at the URI this client builds whose **finished** worklist then listed that
   object under that type. A run being *accepted* proves nothing: a URI that cannot exist is
   answered `201` too. `program` and `include` are absent because ABAP Cloud refuses to hold
@@ -3333,7 +3332,7 @@ ATC check runs: start one, ask whether it is done, read what it found.
   worklist; the second reads the execution and check-failure logs and takes an execution id.
   Neither accepts the other's identifier.
 
-- **Five questions the trial could not answer** — what a failed run reports, what
+- **Five questions the ABAP Cloud system could not answer** — what a failed run reports, what
   `withLongPolling` does to a run in flight, whether `includeExemptedFindings` changes a
   finished worklist, what the `FINDING_STATS` positions mean, and `program`/`include` on an
   on-prem system — are tracked in
@@ -3668,7 +3667,7 @@ A caller that treated a resolved `delete()` as proof the object was gone was bei
 - **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted `options?: { withLongPolling?: boolean }` and passed none of it on — it called `this.read(config)`, and `read()` took no options at all. The only occurrence of the word in the whole module was that parameter. The signature is now the contract's `(config, version, options)` shape and the flag reaches the URL, as in the other 26 handlers. This is about the handler matching what it claims, **not** about fixing readiness — see below.
 
 ### Changed
-- **The README no longer presents `withLongPolling` as a readiness guarantee.** Measured against an SAP BTP trial, the parameter changes nothing on an object read: creating a message class and reading it immediately returned `404` in ~650ms **with** the flag, the same latency as without, and the server did not hold the request. That system's discovery document declares `withLongPolling` for exactly **one** resource out of 601 templates — `/sap/bc/adt/activation/runs/{run_id}`, background activation runs — while this package appends it to object reads in 27 files.
+- **The README no longer presents `withLongPolling` as a readiness guarantee.** Measured against an ABAP Cloud system, the parameter changes nothing on an object read: creating a message class and reading it immediately returned `404` in ~650ms **with** the flag, the same latency as without, and the server did not hold the request. That system's discovery document declares `withLongPolling` for exactly **one** resource out of 601 templates — `/sap/bc/adt/activation/runs/{run_id}`, background activation runs — while this package appends it to object reads in 27 files.
 
   The option is kept and still passed: another system may honour it more widely, and removing it would take away a choice that costs nothing. What is removed is the claim that it *waits*. The underlying rule is blunter: **no ADT operation that changes system state guarantees when the change becomes visible.** Where readiness matters, poll with a bound.
 
@@ -3827,7 +3826,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 
 ### Added
 - **Message class (MSAG) CRUD.** Two new `IAdtObject` handlers via `AdtClient`: `getMessageClass()` (the class shell — create/read/update/delete/validate, no activation) and `getMessageClassMessage()` (an individual message, read-modify-write over the parent class). New config/state types `IMessageClassConfig`/`IMessageClassState` and `IMessageClassMessageConfig`/`IMessageClassMessageState`; requires `@mcp-abap-adt/interfaces` `^9.2.0` for the param types.
-  - Empirically verified against the ADT contract (SAP trial + Eclipse traces): class delete uses the stateless deletion service (`/sap/bc/adt/deletion/check` + `/delete`); a message is added/updated with a two-level lock (`LOCK_MSG` + class `LOCK …&onSave=X`) then a full-class PUT, and deleted by moving it into `<mc:deletedmessages>` (not by omission or a message-level DELETE); `validate` POSTs to `/messageclass/validation`.
+  - Empirically verified against the ADT contract (the ABAP Cloud system + Eclipse traces): class delete uses the stateless deletion service (`/sap/bc/adt/deletion/check` + `/delete`); a message is added/updated with a two-level lock (`LOCK_MSG` + class `LOCK …&onSave=X`) then a full-class PUT, and deleted by moving it into `<mc:deletedmessages>` (not by omission or a message-level DELETE); `validate` POSTs to `/messageclass/validation`.
   - Non-applicable operations throw `AdtOperationError` with `code === UNSUPPORTED_OPERATION`. Message/class attributes round-trip verbatim (including unknown/future namespaces and attributes). Transport (`corrNr`) is not yet wired — local-package path only.
 
 ## [7.2.1] - 2026-07-01
@@ -3861,7 +3860,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 ## [7.0.0] - 2026-06-28
 
 ### Added
-- **Object version history.** Every object handler now implements `getVersions(config)` (list the SAP version history as `IObjectVersion[]`) and `getVersionSource(contentUri)` (fetch a specific version's source). Each handler owns its own version endpoint: source-bearing types GET `<sourceUri>/versions` (classes use `/includes/{type}/versions`) as an Atom feed; non-source types and types without a version resource throw `AdtOperationError(code = UNSUPPORTED_OPERATION)` — raw HTTP is never surfaced. Trial-verified end-to-end for table, class, interface, and serviceDefinition; other source types build a candidate URL that safely degrades to `UNSUPPORTED_OPERATION` where the endpoint is absent.
+- **Object version history.** Every object handler now implements `getVersions(config)` (list the SAP version history as `IObjectVersion[]`) and `getVersionSource(contentUri)` (fetch a specific version's source). Each handler owns its own version endpoint: source-bearing types GET `<sourceUri>/versions` (classes use `/includes/{type}/versions`) as an Atom feed; non-source types and types without a version resource throw `AdtOperationError(code = UNSUPPORTED_OPERATION)` — raw HTTP is never surfaced. Verified on an ABAP Cloud system end-to-end for table, class, interface, and serviceDefinition; other source types build a candidate URL that safely degrades to `UNSUPPORTED_OPERATION` where the endpoint is absent.
 
 ### Changed (BREAKING)
 - **Requires `@mcp-abap-adt/interfaces@^9.0.0`** (up from `^7.3.0`), which adds the required `getVersions`/`getVersionSource` methods and `IObjectVersion`/`AdtObjectErrorCodes.UNSUPPORTED_OPERATION` to `IAdtObject`. Consumers that implement `IAdtObject` themselves must add the two methods; consumers pinned to an older `interfaces` major must upgrade. Major bump.
@@ -3939,7 +3938,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 
 ### Fixed
 
-- `checkAccessControl` no longer throws with an empty message when the ADT CHECK reporter intermittently returns `has_errors=true` with zero items in `errors`. Under sustained load on cloud trial (full integration suite), the async validation occasionally has not materialized yet — `parseCheckRunResponse` sets `has_errors=true` because `status='notProcessed'`, even with no real findings. The check now retries once with a 2 s delay and treats the state as a warning if it persists, matching the retry-on-transient pattern used in `src/core/view/check.ts`. Real findings (`errors` non-empty) still throw with the full message as before. (#20)
+- `checkAccessControl` no longer throws with an empty message when the ADT CHECK reporter intermittently returns `has_errors=true` with zero items in `errors`. Under sustained load on the ABAP Cloud system (full integration suite), the async validation occasionally has not materialized yet — `parseCheckRunResponse` sets `has_errors=true` because `status='notProcessed'`, even with no real findings. The check now retries once with a 2 s delay and treats the state as a warning if it persists, matching the retry-on-transient pattern used in `src/core/view/check.ts`. Real findings (`errors` non-empty) still throw with the full message as before. (#20)
 
 ## [5.4.2] - 2026-05-13
 
@@ -4067,7 +4066,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 ## [3.14.5] - 2026-04-05
 
 ### Fixed
-- **Domain create**: Use single-line XML and `limitDescription()` in create payload — same fix as DataElement in 3.14.4. Pretty-printed XML with newlines between declaration and root element caused intermittent 400 "description is missing" on BTP trial. (#12)
+- **Domain create**: Use single-line XML and `limitDescription()` in create payload — same fix as DataElement in 3.14.4. Pretty-printed XML with newlines between declaration and root element caused intermittent 400 "description is missing" on the ABAP Cloud system. (#12)
 
 ## [3.14.4] - 2026-04-05
 
@@ -4078,7 +4077,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 ## [3.14.3] - 2026-04-04
 
 ### Fixed
-- **Package update**: Empty string params (`master_system`, `responsible`, `package_type`, etc.) no longer overwrite existing SAP-managed values in read-modify-write pattern. Fixes `Check of condition failed` error on BTP trial. (#10)
+- **Package update**: Empty string params (`master_system`, `responsible`, `package_type`, etc.) no longer overwrite existing SAP-managed values in read-modify-write pattern. Fixes `Check of condition failed` error on the ABAP Cloud system. (#10)
 - **Profiler traces**: `listTraceFiles()` now supports `?user=` filter parameter. `ClassExecutor.runWithProfiling()` resolves current user via `getSystemInformation()` and polls trace files filtered by user — fixes `Failed to resolve traceId` on BTP. (#10)
 
 ### Added
@@ -4203,7 +4202,7 @@ No published-API break: the one public field (`ICreateEnhancementParams.source_c
 
 ### Fixed
 - **Interface test**: Fix `Read undefined failed: no response` on cloud by skipping initial source read after create (same as class — source not yet available immediately after creation).
-- **Package test**: Add `software_component: "ZLOCAL"` and `record_changes: false` for cloud trial packages.
+- **Package test**: Add `software_component: "ZLOCAL"` and `record_changes: false` for packages on ABAP Cloud.
 
 ## [3.8.9] - 2026-03-11
 

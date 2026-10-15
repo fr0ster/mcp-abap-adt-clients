@@ -3,7 +3,7 @@
  *
  * What it must get right is small and easy to get wrong: a refused LOCK from
  * the second session fails with SAP's own sentence, a granted one is released
- * again, and the second session is closed whatever happened — the trial grants
+ * again, and the second session is closed whatever happened — a trial ABAP Cloud account grants
  * two, and a check that leaked its session would take the run's last one.
  *
  * The refusal is the recorded one (`corpus/adt/refusal-lock-held-by-other`),
@@ -310,7 +310,7 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  // Measured on the cloud trial: a class created seconds before answered a
+  // Measured on an ABAP Cloud system: a class created seconds before answered a
   // second session's LOCK with 404 "does not exist", and the same test passed
   // alone. A new session can land on another application server. That is not
   // a held lock, and the check must not say it is.

@@ -251,7 +251,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     }
     if (isCloudSystem) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: Standard classes on cloud trial have no local test classes',
+        '⚠️ Skipping test: Standard classes on the ABAP Cloud system have no local test classes',
       );
       return;
     }

@@ -560,7 +560,7 @@ describe('Class local includes (using BaseTester)', () => {
         // used to carry its own `if (isCloudSystem)` saying "Macros are not
         // supported in cloud systems" — a second source of truth, and a wrong
         // one: a cloud class has a writable macros include, ADT 3.60.3 against
-        // the trial answers `PUT …/includes/macros` with 200. What the ABAP for
+        // the ABAP Cloud system answers `PUT …/includes/macros` with 200. What the ABAP for
         // Cloud language version forbids is `DEFINE`, which is what this case's
         // source contains, and that sentence now lives in the config.
 

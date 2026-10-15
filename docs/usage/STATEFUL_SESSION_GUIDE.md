@@ -21,8 +21,8 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
   since 23.0.2 — before that, `AdtInclude`, `AdtService` and `AdtMessageClass`
   did not. A caller with its own `IAbapConnection` needs the same: the cookie
   on the `LOCK` and the `UNLOCK`.
-- This is Eclipse's model, measured at two scales. A full run against the cloud
-  trial: 803 requests, of which exactly 100 carry `x-sap-adt-sessiontype:
+- This is Eclipse's model, measured at two scales. A full run against
+  the ABAP Cloud system: 803 requests, of which exactly 100 carry `x-sap-adt-sessiontype:
   stateful` — the 50 `LOCK`s and the 50 `UNLOCK`s, and nothing else. A probe
   doing two write windows on one class: 12 requests and 4 such headers, again
   the locks and the unlocks alone. The ratio is what the rule predicts, and the

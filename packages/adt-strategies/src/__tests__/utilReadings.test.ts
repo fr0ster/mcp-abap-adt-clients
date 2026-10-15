@@ -38,7 +38,7 @@ const LOGON = '<html><body>Logon</body></html>';
 
 // ---------------------------------------------------------------------------
 
-// Captured verbatim from an SAP BTP trial system (quickSearch, query Z*). Every
+// Captured verbatim from the ABAP Cloud system (quickSearch, query Z*). Every
 // attribute carries the `adtcore:` prefix, and the second entry has no
 // description — which is why `description` is normalised to ''.
 const PREFIXED = `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/packages/z" adtcore:type="DEVC/K" adtcore:name="Z" adtcore:packageName="Z" adtcore:description="gcek development"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/sicftyp/object_name/ZX" adtcore:type="SICF/TYP" adtcore:name="ZX" adtcore:packageName="Z_RAG_PRO1"/></adtcore:objectReferences>`;
@@ -62,7 +62,7 @@ describe('utilSearchHits', () => {
     });
   });
 
-  // Not observed on the trial, which prefixes everything. Kept because the
+  // Not observed on the ABAP Cloud system, which prefixes everything. Kept because the
   // reading accepts both and dropping the case would leave that untested.
   it('also reads unprefixed attributes and a single hit', () => {
     const hits = readSearchHits(UNPREFIXED);

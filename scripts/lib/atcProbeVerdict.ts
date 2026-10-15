@@ -49,7 +49,7 @@ export interface ICandidate {
   mappedBy68: boolean;
   /**
    * `cloud` — v1 needs this confirmed, and an unconfirmed one fails the probe.
-   * `onprem` — the object cannot exist on ABAP Cloud, so this trial can never
+   * `onprem` — the object cannot exist on ABAP Cloud, so the ABAP Cloud system can never
    * confirm it. Reported, never counted against the run: the spec ships the
    * cloud-confirmed union and widens it from an on-prem probe.
    */
@@ -240,8 +240,8 @@ export function assertKnownKeys(keys: string[]): void {
 /**
  * The candidate keys a run is judged on, and the reason for the choice.
  *
- * The verdict used to count cloud-scope candidates and nothing else. On the
- * trial that was right — a classic program cannot exist on ABAP Cloud, and
+ * The verdict used to count cloud-scope candidates and nothing else. On
+ * the ABAP Cloud system that was right — a classic program cannot exist on ABAP Cloud, and
  * counting it would have left the probe permanently INCOMPLETE. Run on an
  * **on-prem** system it became a trap: `program` and `include` were probed,
  * reported on a line of their own, and then left out of the verdict, so the

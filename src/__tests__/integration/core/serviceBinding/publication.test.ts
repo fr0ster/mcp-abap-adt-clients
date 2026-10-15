@@ -10,8 +10,8 @@
  * POST to a job endpoint and nothing else. So a returning hidden read fails the
  * ordinary run; only the live outcome needs a person and two minutes.
  * A
- * publication is the slowest thing this library asks of ADT: ~135s measured on a
- * trial, and one unpublish still unsettled after eleven minutes. ADT also
+ * publication is the slowest thing this library asks of ADT: ~135s measured on
+ * the ABAP Cloud system, and one unpublish still unsettled after eleven minutes. ADT also
  * refuses to delete a binding whose endpoints are published, so a flow that
  * publishes cannot clean up after itself — which is why the workflow test keeps
  * `desired_publication_state: "unchanged"` and these two live here.

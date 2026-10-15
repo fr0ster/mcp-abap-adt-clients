@@ -1,7 +1,7 @@
 /**
  * What the publication job carries, per protocol.
  *
- * **Measured on a trial, 2026-09-29**, one binding per protocol with a known
+ * **Measured on an ABAP Cloud system, 2026-09-29**, one binding per protocol with a known
  * publication state and a single job each — the only difference being the query
  * string:
  *

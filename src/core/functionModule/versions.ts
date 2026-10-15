@@ -18,7 +18,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  * system without the resource answers 404 or 406, which comes back as the
  * transport's failure; until 23.0.0 it was thrown as a library error.
  */
-// candidate URI — probe-verify on trial
+// candidate URI — probe-verify on the ABAP Cloud system
 export async function getFunctionModuleVersions(
   connection: IAbapConnection,
   config: Partial<IFunctionModuleConfig>,

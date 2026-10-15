@@ -216,7 +216,7 @@ each.
   `E`; the counts stand in only when SAP said nothing. An untyped message does
   not overturn an explicit `"true"`: a DDLS delete answers `isDeleted="true"`
   with one `del:type=""` message, text `S::000`, and the object is gone —
-  measured on premise (BASIS 816) and on the trial. Read as an `E`, it turned every CDS source
+  measured on premise (BASIS 816) and on the ABAP Cloud system. Read as an `E`, it turned every CDS source
   delete into a refusal.
 - **`readCheckRunRefusal` reads every `checkReport`.** Several read as a check
   that never ran. Defensive: no several-object capture exists yet.
@@ -284,7 +284,7 @@ each.
   `activationExecuted="false"` is not". The implementation was the only place
   that disagreed.
 
-  Measured again before changing it, on a trial system (2026-09-16), three
+  Measured again before changing it, on the ABAP Cloud system (2026-09-16), three
   ways, all answering the identical document: activating a class a second time
   straight after an activation that answered `activationExecuted="true"`;
   activating a function group straight after creating one, because a function

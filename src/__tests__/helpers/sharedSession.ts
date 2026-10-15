@@ -1,7 +1,7 @@
 /**
  * One ABAP session for the whole run.
  *
- * The trial grants **two concurrent sessions** — measured: held open without
+ * A trial ABAP Cloud account grants **two concurrent sessions** — measured: held open without
  * releasing, the third is refused with "the server authenticated the request
  * but opened no ABAP session". A suite that took one session per test reached
  * roughly a hundred and produced twenty setup failures carrying exactly that

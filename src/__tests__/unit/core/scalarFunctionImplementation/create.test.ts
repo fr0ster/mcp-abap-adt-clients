@@ -37,8 +37,8 @@ describe('scalarFunctionImplementation create', () => {
       scalar_function_name: 'zok_test_func',
       package_name: 'zok_test',
       description: 'SF SQL Impl',
-      masterSystem: 'TRL',
-      responsible: 'CB9980008038',
+      masterSystem: 'SID',
+      responsible: 'DEVELOPER',
     });
     expect(cap.url).toBe('/sap/bc/adt/ddic/dsfi');
     expect(cap.headers?.['Content-Type']).toBe(

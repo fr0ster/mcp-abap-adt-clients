@@ -64,8 +64,8 @@ test_settings:
     default: 60000
     long: 200000  # Long timeout for complex operations (group deletion, etc.)
     shared_admin: 3600000  # shared:setup / shared:teardown — ~20 objects, each a
-                           # lock/update/activate chain. Measured at 25+ minutes on a
-                           # BTP trial, and that is before a retry.
+                           # lock/update/activate chain. Measured at 25+ minutes on
+                           # an ABAP Cloud system, and that is before a retry.
     create: 60000
     delay: 3000  # Delay after delete/create operations
   # Operation delays (milliseconds) - time to wait for SAP to commit operations
@@ -1141,7 +1141,7 @@ create_authorization_field:
   test_cases:
     - name: "adt_authorization_field"
       enabled: true
-      # Measured on the cloud trial: validate 200, create 201, read 2285 bytes,
+      # Measured on an ABAP Cloud system: validate 200, create 201, read 2285 bytes,
       # update 200 — the type is fully available there. The onprem-only flag was
       # never measured; what actually failed on cloud was this case's own
       # fixture, `CHAR10`, which ABAP Cloud refuses as deprecated.
@@ -1666,7 +1666,7 @@ create_function_include:
   test_cases:
     - name: "adt_function_include"
       enabled: true
-      # Measured on the cloud trial with ADT 3.60.3: LOCK then
+      # Measured on an ABAP Cloud system with ADT 3.60.3: LOCK then
       # PUT .../functions/groups/<g>/includes/<i>/source/main?lockHandle=...
       # both answer 200. The previous onprem-only flag was never measured.
       available_in: ["onprem", "cloud"]
@@ -2451,7 +2451,7 @@ atc_run:
         # name rather than skipping or failing obscurely — and both must be
         # carried by the same finding.
         #
-        # Measured on the BTP trial, 2026-09-08 under
+        # Measured on an ABAP Cloud system, 2026-09-08 under
         # ABAP_CLOUD_DEVELOPMENT_DEFAULT: SLIN message 0245 ("No exception
         # handling after the CATCH statement." — the empty CATCH cx_root) at
         # priority 2, with FINDING_STATS "0,1,0". The test logs every finding
@@ -2624,8 +2624,8 @@ execute_program:
 # ─────────────────────────────────────────────────────────────────────────────
 # Service binding publication — TWO DELIBERATE RUNS, never the full suite.
 #
-# Publishing is the slowest thing this library asks of ADT: ~135s measured on a
-# trial, and one unpublish still unsettled after eleven minutes. ADT also
+# Publishing is the slowest thing this library asks of ADT: ~135s measured on
+# the ABAP Cloud system, and one unpublish still unsettled after eleven minutes. ADT also
 # refuses to delete a binding whose endpoints are published, so a flow that
 # publishes cannot clean up after itself. That is why these are their own test
 # cases, `enabled: false` by default, and why the workflow flow above keeps

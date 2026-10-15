@@ -102,12 +102,12 @@ was removed rather than deprecated.
 
 | claim | status |
 |---|---|
-| POST keeps `typeInformation` | **measured**, cloud trial — `scripts/probe-domain-create-payload.ts` |
+| POST keeps `typeInformation` | **measured**, the ABAP Cloud system — `scripts/probe-domain-create-payload.ts` |
 | a domain without a type cannot be activated | **measured** — `DO(251)`, `D0(408)` |
 | the document holds all three groups, filled | **measured** — `XFELD`, `SPRAS`, `ZOK_D_TEST` in both states |
 | POST keeps `outputInformation` | **not measured** |
 | POST keeps `valueInformation` (either form) | **not measured** |
-| any of it on **on-premise** | **not measured at all** — every measurement is the cloud trial |
+| any of it on **on-premise** | **not measured at all** — every measurement is from the ABAP Cloud system |
 
 Anything unmeasured either gets measured before it enters the contract as input,
 or does not enter. That rule is what this whole line of work exists to enforce.

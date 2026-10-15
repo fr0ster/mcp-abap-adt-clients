@@ -21,7 +21,7 @@ import { forgetSessionMaterial, publishSessionMaterial } from './sharedSession';
  * Milliseconds the preflight may spend before it gives up.
  *
  * 30s rather than the 10s it was: opening a session is a round trip plus a CSRF
- * fetch, and a BTP trial answers that in tens of seconds when it is cold. The
+ * fetch, and the ABAP Cloud system answers that in tens of seconds when it is cold. The
  * old budget was set for a preflight that sent one request and did not connect
  * — measured on an ABAP Cloud system, it aborted every run before the session was open.
  */
@@ -210,7 +210,7 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
     const connection = await openSessionWaitingForOne();
     // KEPT, not released. This is the session the whole run works on: the
     // material goes to a file, every test file adopts it, and the server sees
-    // one conversation instead of one per file. The trial grants two at a time,
+    // one conversation instead of one per file. A trial ABAP Cloud account grants two at a time,
     // and multiplying them is what makes a loaded system slow down long before
     // it refuses.
     publishSessionMaterial(connection.exportSession());

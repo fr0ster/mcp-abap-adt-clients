@@ -6,7 +6,7 @@
  *   npx ts-node scripts/read-gateway-errors.ts "Frontend Error" <errorId>   # read specific error
  *
  * Options (env vars):
- *   GW_USER=CB9980000974       — filter by user
+ *   GW_USER=DEVELOPER       — filter by user
  *   GW_MAX=10                  — max results
  *   GW_TRUNCATE=5000           — truncate output to N chars (0 or unset = no limit)
  *   MCP_ENV_PATH=trial.env     — switch SAP system
@@ -93,7 +93,7 @@ async function main() {
   } finally {
     // In `finally`, and the session given back rather than left to time out.
     // A small pool is easy to exhaust — two concurrent sessions is the measured
-    // ceiling on the trial — and a script that leaks one on every run locks the
+    // ceiling on the ABAP Cloud system — and a script that leaks one on every run locks the
     // next person out for no visible reason.
     await releaseTestConnection(connection);
   }

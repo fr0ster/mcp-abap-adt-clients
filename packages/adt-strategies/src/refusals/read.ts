@@ -290,7 +290,7 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
  * **The last row is measured, and it used to be read as a refusal.** An
  * earlier version of this function took the attribute as a refusal on its own,
  * "whether or not SAP explained itself". That is one reading too many, and it
- * made every no-op activation answer an error. Measured on a trial system
+ * made every no-op activation answer an error. Measured on an ABAP Cloud system
  * (2026-09-16), three ways, all answering the identical document:
  *
  * - activating a class a second time, straight after an activation that
@@ -622,7 +622,7 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
  * to validation, not to a check run; the word is what made this easy to confuse
  * and is exactly why it is written down here.
  *
- * Measured on the trial system, ours rather than taken from anyone's notes, and
+ * Measured on an ABAP Cloud system, ours rather than taken from anyone's notes, and
  * every row has a fixture:
  *
  * | family | name taken | name free |

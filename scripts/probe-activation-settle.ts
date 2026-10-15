@@ -36,7 +36,7 @@
  *
  * ---
  *
- * **Measured**, cloud trial, 2026-09-22, `ZAC_PROBE_FUGR` in `ZADT_BLD_PKG03`,
+ * **Measured**, the ABAP Cloud system, 2026-09-22, `ZAC_PROBE_FUGR` in `ZADT_BLD_PKG03`,
  * four runs, 44 reads of the list across windows of 30s, 8s, 5s and 4s.
  *
  * **Nothing settles late.** On the first run the POST answered

@@ -279,7 +279,7 @@ class Recorder {
     }
 
     // Scanned here rather than at the call sites: the run that actually carried
-    // FINDING_STATS on the trial was `clientWait=true`, which is issued
+    // FINDING_STATS on the ABAP Cloud system was `clientWait=true`, which is issued
     // directly and not through `runAt` — so a scan attached to `runAt` reported
     // "never appeared" about a response holding it. Caught by running the
     // probe, 2026-08-16.
@@ -567,7 +567,7 @@ async function main(): Promise<void> {
 
     await rec.call(
       'variants',
-      'The spec claims totalItemCount 0 on the trial — i.e. customizing is the only source of a variant.',
+      'The spec claims totalItemCount 0 on the ABAP Cloud system — i.e. customizing is the only source of a variant.',
       {
         method: 'GET',
         url: `${ATC}/variants?maxItemCount=500&name=*`,
@@ -1240,7 +1240,7 @@ async function main(): Promise<void> {
 
     // --- 5. Whether a run has an id of its own -------------------------------
     // Gated behind the multi-object run until 2026-08-16, which meant the one
-    // session that DID receive a Location never followed it: the trial had a
+    // session that DID receive a Location never followed it: the ABAP Cloud system had a
     // single measurable type, so the whole branch was skipped and the probe
     // reported nothing about the very claim it exists to settle. A run id
     // question must not depend on how many object types a package happens to

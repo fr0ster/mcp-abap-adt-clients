@@ -6,7 +6,7 @@
  *   npx ts-node scripts/read-system-messages.ts <messageId>  # read specific message
  *
  * Options (env vars):
- *   SM_USER=CB9980000974       — filter by user
+ *   SM_USER=DEVELOPER       — filter by user
  *   SM_MAX=10                  — max results
  *   MCP_ENV_PATH=trial.env     — switch SAP system
  */
@@ -76,7 +76,7 @@ async function main() {
   } finally {
     // In `finally`, and the session given back rather than left to time out.
     // A small pool is easy to exhaust — two concurrent sessions is the measured
-    // ceiling on the trial — and a script that leaks one on every run locks the
+    // ceiling on the ABAP Cloud system — and a script that leaks one on every run locks the
     // next person out for no visible reason.
     await releaseTestConnection(connection);
   }

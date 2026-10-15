@@ -6,7 +6,7 @@
  * probe's third question is whether this user may create a check variant, and
  * treating any non-2xx as "not allowed" would close it on evidence that says
  * something else entirely. That is not hypothetical — the first attempt against
- * the trial answered `400 "Parameter corrNr could not be found"`, a complaint
+ * the ABAP Cloud system answered `400 "Parameter corrNr could not be found"`, a complaint
  * about the URL, with authorisation never reached.
  *
  * A live run cannot be relied on to produce a 400, a 409 and a dropped socket

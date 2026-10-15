@@ -294,7 +294,7 @@ export async function readTransportObjects(
  * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
  * every task on that system read back as `Unclassified`, and passing
  * `tm:type` on the creating call changes nothing — the attribute is accepted
- * and ignored. That system is a trial with no transport system configured,
+ * and ignored. That ABAP Cloud system has no transport system configured,
  * so the CTS edit flow never creates a request there and every request and
  * task is made by hand. All of them came through `newtask`, from this
  * library's tests and from mcp-abap-adt's, and until this function existed

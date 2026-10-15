@@ -37,7 +37,7 @@ export async function create(
     finalResponsible = undefined;
   }
 
-  // Don't escape masterSystem and responsible - they are identifiers (like "TRL", "CB9980002377")
+  // Don't escape masterSystem and responsible - they are identifiers (like "SID", "DEVELOPER")
   // Escaping them may cause SAP to fail parsing and trigger Kerberos errors
   const masterSystemAttr = finalMasterSystem
     ? ` adtcore:masterSystem="${finalMasterSystem}"`

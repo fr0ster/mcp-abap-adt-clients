@@ -104,8 +104,8 @@ describe('RuntimeDumps', () => {
       } as any,
     );
 
-    const query = dumps.buildUserQuery('CB9980000423');
+    const query = dumps.buildUserQuery('DEVELOPER');
 
-    expect(query).toBe('and( equals( user, CB9980000423 ) )');
+    expect(query).toBe('and( equals( user, DEVELOPER ) )');
   });
 });

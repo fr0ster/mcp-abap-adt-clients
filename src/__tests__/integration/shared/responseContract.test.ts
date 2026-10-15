@@ -282,7 +282,7 @@ describe('Response contract - 17.0.0', () => {
 
       // **Two shapes, both honest, and which one you get is the system's.**
       // Some systems answer a read for an object that is not there with 200 and
-      // an empty body; others 404 it. Measured on the cloud trial: a class that
+      // an empty body; others 404 it. Measured on an ABAP Cloud system: a class that
       // does not exist at all is refused, while a class that exists without an
       // active version answers the empty body. This library does not paper over
       // the difference — whether an empty body *is* absence is the caller's

@@ -2505,8 +2505,8 @@ async function activateSharedFunctionGroup(
   // **The POST answering is not the group being active.** No `analyse` is
   // passed, so `ok` means the request came back — and ADT puts a refusal inside
   // a 200, which makes `ok` true for "activated" and for "will not activate"
-  // alike. Measured with `scripts/probe-activation-settle.ts` on the cloud
-  // trial: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
+  // alike. Measured with `scripts/probe-activation-settle.ts` on
+  // the ABAP Cloud system: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
   // on the inactive list afterwards — the exact state this repair exists to
   // remove, about to be recorded as removed.
   //
@@ -2669,7 +2669,7 @@ async function ensureSharedDependency(client, type, name, logger) {
       // find out", and turning that into `exists = false` is a guess that then
       // does something irreversible.
       //
-      // Measured on the BTP trial: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU
+      // Measured on an ABAP Cloud system: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU
       // failed on a flaky link, the blanket catch here called them missing, and
       // the create that followed came back
       // `400 ExceptionResourceAlreadyExists: Resource Domain ZAC_SHR_GA_DOM

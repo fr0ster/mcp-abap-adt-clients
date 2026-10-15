@@ -297,7 +297,7 @@ export interface ITestConnectionOptions {
    * `expectLockReleased` locks from here to prove the test's UNLOCK released
    * what its LOCK took, which the test's own session cannot prove: a lock is
    * granted again to the session that already holds it. The caller closes it
-   * with {@link closeOwnTestConnection}; the trial grants two sessions, and
+   * with {@link closeOwnTestConnection}; a trial ABAP Cloud account grants two sessions, and
    * this is the second.
    */
   ownSession?: boolean;
@@ -346,7 +346,7 @@ export async function createTestConnection(
   );
 
   // Join the session globalSetup opened, rather than asking for another. The
-  // trial grants two at a time, and a suite that took one per file was already
+  // a trial ABAP Cloud account grants two at a time, and a suite that took one per file was already
   // spending fifty-three of them on work that is one conversation.
   //
   // No material means nobody published any — a single file run on its own —

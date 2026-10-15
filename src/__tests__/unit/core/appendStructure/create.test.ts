@@ -37,8 +37,8 @@ describe('appendStructure create', () => {
       base_object: 'zac_shr_appstru',
       package_name: 'zac_shr_pkg',
       description: 'Test',
-      masterSystem: 'TRL',
-      responsible: 'CB9980008038',
+      masterSystem: 'SID',
+      responsible: 'DEVELOPER',
     });
     expect(cap.url).toBe('/sap/bc/adt/ddic/structures');
     expect(cap.headers?.['Content-Type']).toBe(

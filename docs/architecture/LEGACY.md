@@ -211,7 +211,7 @@ Measured catalogue sizes — collections advertised by `/sap/bc/adt/discovery`:
 |---|---|
 | Legacy on-prem (BASIS ~7.40) | 124 |
 | Modern on-prem (S/4 HANA) | 818 |
-| ABAP Cloud (trial and a production tenant, separately) | 918 each |
+| ABAP Cloud (a trial account and a production tenant, separately) | 918 each |
 
 The legacy system advertises **15%** of what the modern one does, and the two
 cloud captures were functionally identical — their only differences were their
