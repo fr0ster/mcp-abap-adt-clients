@@ -217,6 +217,7 @@ describe('Debugger batch wire measurements', () => {
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
   let attached = false;
+  let probeCreationAttempted = false;
 
   /** Fails the step naming what it waited on, instead of running blind. */
   function needs(condition: unknown, what: string): void {
@@ -359,7 +360,9 @@ describe('Debugger batch wire measurements', () => {
       description: 'Debugger integration probe',
       ...(transportRequest ? { transportRequest } : {}),
     };
-    const created = await cls.create(config);
+    const creation = cls.create(config);
+    probeCreationAttempted = true;
+    const created = await creation;
     if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
       throw new Error(`probe create: ${created.getError().message}`);
     }
@@ -408,7 +411,7 @@ describe('Debugger batch wire measurements', () => {
         errors.push(error);
       }
     };
-    if (listenerConnection) {
+    if (listenerApi && identity) {
       for (const id of armed) {
         await cleanup(`delete breakpoint ${id}`, () =>
           listenerApi.deleteBreakpoint(identity, id),
@@ -427,7 +430,7 @@ describe('Debugger batch wire measurements', () => {
         await closeOwnTestConnection(connection);
       });
     }
-    if (listenerConnection) {
+    if (listenerApi && identity) {
       await cleanup('stop listener', () => listenerApi.stopListener(identity));
     }
     if (run) {
@@ -443,7 +446,7 @@ describe('Debugger batch wire measurements', () => {
       await cleanup('set listener connection stateless', async () => {
         connection.setSessionType('stateless');
       });
-      if (!testCase?.params?.keep_probe) {
+      if (probeCreationAttempted && !testCase?.params?.keep_probe) {
         await cleanup('delete probe class', () =>
           new AdtClient(connection, connectionLogger).getClass().delete({
             className: CLASS_NAME,
