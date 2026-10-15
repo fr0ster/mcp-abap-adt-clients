@@ -16,7 +16,20 @@ export function configuredCase(
   );
 }
 
-/** Decide applicability before Jest starts the test body. */
+/**
+ * Decide applicability before Jest starts the test body.
+ *
+ * | Configuration | Registration |
+ * | --- | --- |
+ * | Loader throws, or system is missing/invalid | it (normal failure path) |
+ * | Case or handler section is absent | it (configuration defect) |
+ * | Case exists with enabled !== true | it.skip |
+ * | Enabled case unavailable per isTestAvailable | it.skip |
+ * | Enabled, available case | it |
+ *
+ * Availability follows TestConfigResolver, including legacy systems and
+ * unrestricted absent, non-array, or empty available_in values.
+ */
 export function gate(
   handlerName: string,
   testCaseName: string,
@@ -35,7 +48,8 @@ export function gate(
   // Match TestConfigResolver's named lookup and strict enabled semantics;
   // getTestCaseDefinition cannot be used because it filters via getEnvironmentType.
   const testCase = configuredCase(handlerName, testCaseName, () => config);
-  return testCase?.enabled === true &&
+  if (!testCase) return it;
+  return testCase.enabled === true &&
     TestConfigResolver.isTestAvailable(
       testCase,
       environment.system === 'cloud',
