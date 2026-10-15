@@ -1,4 +1,11 @@
-import { gate as registrationGate } from '../../helpers/caseGate';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  MISSING_TEST_CONFIG,
+  missingCaseMessage,
+  gate as registrationGate,
+} from '../../helpers/caseGate';
 
 const gate: typeof registrationGate = (handler, name, loader) =>
   registrationGate(handler, name, loader, {
@@ -153,6 +160,22 @@ describe('SAP configuration at registration', () => {
     else process.env.SAP_URL = originalUrl;
   });
 
+  it.each([
+    [undefined, it.skip],
+    ['   ', it.skip],
+    ['sap.example.com', it],
+    ['https://x', it],
+  ])('registers SAP_URL %p correctly', (url, expected) => {
+    if (url === undefined) delete process.env.SAP_URL;
+    else process.env.SAP_URL = url;
+    expect(
+      registrationGate('enhancement', 'enhoxhh', () => config(), {
+        loadEnv: () => {},
+        templateInUse: () => false,
+      }),
+    ).toBe(expected);
+  });
+
   it('skips without SAP before reading even broken configuration', () => {
     delete process.env.SAP_URL;
     expect(
@@ -192,5 +215,103 @@ describe('SAP configuration at registration', () => {
         },
       ),
     ).toBe(it);
+  });
+});
+
+describe('real environment loader and config provenance', () => {
+  let originalEnv: NodeJS.ProcessEnv;
+  let directory: string;
+
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+    directory = mkdtempSync(join(tmpdir(), 'case-gate-'));
+    delete process.env.SAP_URL;
+    process.env.MCP_ENV_PATH = join(directory, '.env');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    rmSync(directory, { recursive: true, force: true });
+    jest.restoreAllMocks();
+  });
+
+  it('chooses MCP_ENV_PATH over the repository .env', () => {
+    writeFileSync(
+      process.env.MCP_ENV_PATH!,
+      'SAP_URL=https://chosen.invalid\n',
+    );
+    jest.isolateModules(() => {
+      const { gate } = require('../../helpers/caseGate');
+      expect(
+        gate('enhancement', 'enhoxhh', () => config(), {
+          templateInUse: () => false,
+        }),
+      ).toBe(it);
+      expect(process.env.SAP_URL).toBe('https://chosen.invalid');
+    });
+  });
+
+  it('does not fall back to the repository .env for a nonexistent MCP_ENV_PATH', () => {
+    jest.isolateModules(() => {
+      const { gate } = require('../../helpers/caseGate');
+      expect(gate('enhancement', 'enhoxhh', () => config())).toBe(it.skip);
+      expect(process.env.SAP_URL).toBeUndefined();
+    });
+  });
+
+  it('preserves an already-set SAP_URL using dotenv precedence', () => {
+    writeFileSync(process.env.MCP_ENV_PATH!, 'SAP_URL=https://file.invalid\n');
+    process.env.SAP_URL = 'sap.example.com';
+    jest.isolateModules(() => {
+      const { gate } = require('../../helpers/caseGate');
+      expect(
+        gate('enhancement', 'enhoxhh', () => config(), {
+          templateInUse: () => false,
+        }),
+      ).toBe(it);
+      expect(process.env.SAP_URL).toBe('sap.example.com');
+    });
+  });
+
+  it('detects template provenance when the custom config is absent', () => {
+    writeFileSync(
+      process.env.MCP_ENV_PATH!,
+      'SAP_URL=https://chosen.invalid\n',
+    );
+    writeFileSync(
+      join(directory, 'test-config.yaml.template'),
+      'environment:\n  system: onprem\nenhancement:\n  test_cases:\n    - name: enhoxhh\n      enabled: false\n',
+    );
+    const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.isolateModules(() => {
+      const helper = require('../../helpers/test-helper');
+      const { gate } = require('../../helpers/caseGate');
+      expect(
+        gate('enhancement', 'enhoxhh', () => helper.loadTestConfig(directory)),
+      ).toBe(it);
+      expect(helper.isTestConfigTemplate()).toBe(true);
+    });
+    expect(warning.mock.calls).toEqual([
+      [
+        '⚠️ test-config.yaml not found. Using test-config.yaml.template; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
+      ],
+      [
+        '   Copy the template to test-config.yaml and fill in your SAP system details.',
+      ],
+    ]);
+  });
+});
+
+describe('enhancement configuration failure messages', () => {
+  it('reports template use with the exact setup failure text', () => {
+    expect(MISSING_TEST_CONFIG).toBe(
+      'test-config.yaml missing — copy the template and fill it in',
+    );
+  });
+
+  it('reports an absent case with the exact failure text', () => {
+    expect(missingCaseMessage('enhancement', 'enhoxhh')).toBe(
+      'case enhancement/enhoxhh not in test-config.yaml',
+    );
   });
 });

@@ -22,6 +22,7 @@ import {
   gate,
   isTestConfigTemplate,
   MISSING_TEST_CONFIG,
+  missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
@@ -89,7 +90,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     if (isTestConfigTemplate()) throw new Error(MISSING_TEST_CONFIG);
     const testCase = configuredCase('enhancement', name);
     if (!testCase) {
-      throw new Error(`case enhancement/${name} not in test-config.yaml`);
+      throw new Error(missingCaseMessage('enhancement', name));
     }
     if (!hasConfig) {
       throw new Error(`SAP setup failed for enhancement/${name}`);

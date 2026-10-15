@@ -1,4 +1,3 @@
-import { sapIsConfigured } from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
 
 const { loadTestConfig, loadTestEnv, isTestConfigTemplate } =
@@ -8,6 +7,13 @@ export { isTestConfigTemplate };
 
 export const MISSING_TEST_CONFIG =
   'test-config.yaml missing — copy the template and fill it in';
+
+export function missingCaseMessage(
+  handlerName: string,
+  testCaseName: string,
+): string {
+  return `case ${handlerName}/${testCaseName} not in test-config.yaml`;
+}
 
 type ConfigLoader = () => any;
 
@@ -51,7 +57,8 @@ export function gate(
 ): jest.It {
   // Reuse the helper loader in this Jest context; globalSetup is separate.
   (dependencies.loadEnv ?? loadTestEnv)();
-  if (!(dependencies.sapConfigured ?? sapIsConfigured)()) return it.skip;
+  if (!(dependencies.sapConfigured ?? (() => !!process.env.SAP_URL?.trim()))())
+    return it.skip;
 
   let config: ReturnType<ConfigLoader>;
   try {
