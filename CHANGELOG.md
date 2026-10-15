@@ -93,9 +93,9 @@ below and [MIGRATION-32.md](docs/usage/MIGRATION-32.md).
   document by default. An include's two reads take `context`, the main
   program's name (without it SAP answered 400 ED/258); the implementation
   builds the program's ADT URI from it.
-- The first enhancement-family integration tests, exercised on E19 and trial:
-  subtype lifecycles, metadata/source reads and host elements/options. Trial
-  refuses the `enhoxhh` collection with 403; XHH lifecycle coverage is on E19.
+- The first enhancement-family integration tests, exercised on an on-premise system and an ABAP Cloud system:
+  subtype lifecycles, metadata/source reads and host elements/options. ABAP Cloud
+  refuses the `enhoxhh` collection with 403; XHH lifecycle coverage is on an on-premise system.
 
 ### Migrating from 31
 
@@ -3586,7 +3586,7 @@ No public type changed and nothing was removed — all three fixes are inside ex
 ## [10.0.2] - 2026-08-06
 
 ### Fixed
-- **Activation no longer refuses objects that were already active.** `activationExecuted="false"` was treated as a failure signal in its own right, so `AdtClient` threw `Activation of ZAC_… failed: activationExecuted=false` over objects that were active and complete. Probed against a trial system, the flag does not mean what the code assumed:
+- **Activation no longer refuses objects that were already active.** `activationExecuted="false"` was treated as a failure signal in its own right, so `AdtClient` threw `Activation of ZAC_… failed: activationExecuted=false` over objects that were active and complete. Probed against an ABAP Cloud system, the flag does not mean what the code assumed:
 
   | scenario | HTTP | `activationExecuted` | `msg` |
   |---|---|---|---|
@@ -3603,7 +3603,7 @@ No public type changed and nothing was removed — all three fixes are inside ex
 
   Internal change only: `activationUtils` is not part of the public surface, and no exported name was added, removed or changed.
 
-  Verified against the trial system rather than by types alone — `scalarFunction` (2 suites), `accessControl`, `appendStructure`, `dataElement`, `transformation`, `serviceDefinition` pass; `authorizationField` and `featureToggle` are on-prem-only and skip on cloud. The `CdsUnitTest` integration test, which this bug had blocked outright, now runs its full chain.
+  Verified against an ABAP Cloud system rather than by types alone — `scalarFunction` (2 suites), `accessControl`, `appendStructure`, `dataElement`, `transformation`, `serviceDefinition` pass; `authorizationField` and `featureToggle` are on-prem-only and skip on cloud. The `CdsUnitTest` integration test, which this bug had blocked outright, now runs its full chain.
 
 ## [10.0.1] - 2026-08-05
 

@@ -660,7 +660,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     async () => {
       const resolver = configured('include_host');
       const host = { includeName: required(resolver, 'include_name') };
-      // First measurement: E19 answered 400 ED/258 without context on both reads,
+      // First measurement: an on-premise system answered 400 ED/258 without context on both reads,
       // and 200 with the main-program context.
       root(
         expectResult(

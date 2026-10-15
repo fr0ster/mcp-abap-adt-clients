@@ -4523,12 +4523,12 @@
   </app:workspace>
   <app:workspace>
     <atom:title>ADT Rest Framework Resources</atom:title>
-    <app:collection href="https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap-web.us10.hana.ondemand.com:443/sap/bc/adt">
+    <app:collection href="https://tenant.abap-web.region.hana.ondemand.com:443/sap/bc/adt">
       <atom:title>ADT HTTP(S) Endpoint</atom:title>
       <atom:category term="httpendpoint" scheme="http://www.sap.com/adt/categories/system/communication/services"></atom:category>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"></adtcomp:templateLinks>
     </app:collection>
-    <app:collection href="https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap-web.us10.hana.ondemand.com:443/sap/bc/adt">
+    <app:collection href="https://tenant.abap-web.region.hana.ondemand.com:443/sap/bc/adt">
       <atom:title>ADT Stateful HTTP(S) Endpoint</atom:title>
       <atom:category term="httpendpointStateful" scheme="http://www.sap.com/adt/categories/system/communication/services"></atom:category>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"></adtcomp:templateLinks>
@@ -6200,7 +6200,7 @@
       <app:accept></app:accept>
       <atom:category term="ComponentConfiguration" scheme="http://www.sap.com/adt/categories/webdynpro"></atom:category>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
-        <adtcomp:templateLink rel="http://www.sap.com/adt/categories/webdynpro/componentconfig/create" template="/sap/bc/adt/wdy/https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap-web.us10.hana.ondemand.com/sap/bc/webdynpro/sap/configure_component"></adtcomp:templateLink>
+        <adtcomp:templateLink rel="http://www.sap.com/adt/categories/webdynpro/componentconfig/create" template="/sap/bc/adt/wdy/https://tenant.abap-web.region.hana.ondemand.com/sap/bc/webdynpro/sap/configure_component"></adtcomp:templateLink>
       </adtcomp:templateLinks>
     </app:collection>
     <app:collection href="/sap/bc/adt/wdy/applicationconfig">
@@ -6208,7 +6208,7 @@
       <app:accept></app:accept>
       <atom:category term="ApplicationConfiguration" scheme="http://www.sap.com/adt/categories/webdynpro"></atom:category>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
-        <adtcomp:templateLink rel="http://www.sap.com/adt/categories/webdynpro/applicationconfig/create" template="/sap/bc/adt/wdy/https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap-web.us10.hana.ondemand.com/sap/bc/webdynpro/sap/configure_application"></adtcomp:templateLink>
+        <adtcomp:templateLink rel="http://www.sap.com/adt/categories/webdynpro/applicationconfig/create" template="/sap/bc/adt/wdy/https://tenant.abap-web.region.hana.ondemand.com/sap/bc/webdynpro/sap/configure_application"></adtcomp:templateLink>
       </adtcomp:templateLinks>
     </app:collection>
     <app:collection href="/sap/bc/adt/wdy/fpmapplications">

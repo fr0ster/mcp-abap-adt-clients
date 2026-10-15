@@ -382,7 +382,7 @@ export class BaseTester<TConfig, TState = unknown> {
    * so the `catch` blocks around these calls — written for a throw, and
    * carrying a deliberate policy about what to do with a failed cleanup — never
    * fired again. Measured twice: TEST_INNER_PKG02 on premise (BASIS 816), and ZAC_INNER_PKG04
-   * on the trial, where the suite passed three runs in a row and left the
+   * on an ABAP Cloud system, where the suite passed three runs in a row and left the
    * package behind every time.
    */
   private async deleteOrRaise(config: Partial<TConfig>): Promise<void> {
@@ -2167,7 +2167,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // the flow is exactly what this throw prevents. `ensureObjectReady` sets
     // `objectCreated` and says "post-test cleanup will delete it" — that was
     // true of the skip path and false of this one, so the object survived and
-    // every following run failed the same way. Measured on the trial: a
+    // every following run failed the same way. Measured on an ABAP Cloud system: a
     // function include stayed through three runs, each reporting that cleanup
     // would remove it.
     if (this.objectCreated && this.config) {

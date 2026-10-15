@@ -37,7 +37,7 @@ describe('classifyCreateOutcome', () => {
   });
 
   it('does not read an authorization-shaped refusal as the answer', () => {
-    // The 403 measured on the trial named S_ABPLNGVS — the ABAP language
+    // The 403 measured on an ABAP Cloud system named S_ABPLNGVS — the ABAP language
     // version, not a role — and the payload sent carried a SAP-owned variant's
     // package and version. So it may be about the request. A 401 is weaker
     // still: an expired session says nothing about what its owner may do.

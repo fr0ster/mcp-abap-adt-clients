@@ -23,7 +23,7 @@ import { forgetSessionMaterial, publishSessionMaterial } from './sharedSession';
  * 30s rather than the 10s it was: opening a session is a round trip plus a CSRF
  * fetch, and a BTP trial answers that in tens of seconds when it is cold. The
  * old budget was set for a preflight that sent one request and did not connect
- * — measured on the trial, it aborted every run before the session was open.
+ * — measured on an ABAP Cloud system, it aborted every run before the session was open.
  */
 const PREFLIGHT_TIMEOUT_MS = Number(
   process.env.SAP_PREFLIGHT_TIMEOUT_MS ?? 30000,
@@ -63,7 +63,7 @@ function unitOnlyRun(globalConfig?: JestGlobalConfig): boolean {
 /**
  * Opens the run's session, waiting if the pool is momentarily full.
  *
- * Sessions are limited per user — two at a time on the trial — and shared with
+ * Sessions are limited per user — two at a time on an ABAP Cloud system — and shared with
  * everything else logged on as them, including a SAP GUI. One that a previous
  * run left behind is freed by its own idle timeout, reported by this server as
  * 1800 seconds, so a refusal now is not a refusal in a minute.

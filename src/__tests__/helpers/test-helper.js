@@ -2587,10 +2587,10 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Existence is asked of the object's own URI — its metadata — never of its
   // source. A source answers nothing about existence: a service definition
   // created and not yet written answers `200` with an empty source, a function
-  // module that does not exist answers `500` on its source, and on the trial
+  // module that does not exist answers `500` on its source, and on an ABAP Cloud system
   // an absent object's source answers `200` and no body. Its metadata answers
   // a document when the object is there and `ExceptionResourceNotFound` when
-  // it is not. Measured on the trial for a function module, a service
+  // it is not. Measured on an ABAP Cloud system for a function module, a service
   // definition and a package.
   const readShared = async () => {
     if (type === 'domains') {

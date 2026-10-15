@@ -18,7 +18,7 @@
  *
  * ## A timeout is not an answer
  *
- * The publication endpoint is a **job**. Measured on the trial: the client gave
+ * The publication endpoint is a **job**. Measured on an ABAP Cloud system: the client gave
  * up at 120s with `timeout of 120000ms exceeded`, and the binding came back
  * `published="true"` — the job had finished, the connection had not. So a
  * refusal on the write is where this test *starts* asking, not where it stops:

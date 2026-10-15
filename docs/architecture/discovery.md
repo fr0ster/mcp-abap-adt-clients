@@ -1,6 +1,6 @@
 # ADT Discovery Endpoints
 
-Generated from: https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap.us10.hana.ondemand.com/sap/bc/adt/discovery
+Generated from: https://tenant.abap.region.hana.ondemand.com/sap/bc/adt/discovery
 Generated at: 2025-12-26T08:04:14.794Z
 
 ## BOPF
@@ -8177,7 +8177,7 @@ refused XHH with 403). Host elements are not listed in discovery. See the
 
 - **http://www.sap.com/adt/categories/webdynpro/componentconfig/create**
   - Method: `POST`
-  - Template: `/sap/bc/adt/wdy/https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap-web.us10.hana.ondemand.com/sap/bc/webdynpro/sap/configure_component`
+  - Template: `/sap/bc/adt/wdy/https://tenant.abap-web.region.hana.ondemand.com/sap/bc/webdynpro/sap/configure_component`
 
 ### Application Configuration
 
@@ -8187,7 +8187,7 @@ refused XHH with 403). Host elements are not listed in discovery. See the
 
 - **http://www.sap.com/adt/categories/webdynpro/applicationconfig/create**
   - Method: `POST`
-  - Template: `/sap/bc/adt/wdy/https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap-web.us10.hana.ondemand.com/sap/bc/webdynpro/sap/configure_application`
+  - Template: `/sap/bc/adt/wdy/https://tenant.abap-web.region.hana.ondemand.com/sap/bc/webdynpro/sap/configure_application`
 
 ### FPM Application Configuration
 

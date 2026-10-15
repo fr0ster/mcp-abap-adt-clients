@@ -16,7 +16,7 @@
  * `@mcp-abap-adt/connection` says it plainly: the wire holds the cookie jar.
  * So `globalSetup` opens one session and writes its material here; every file
  * adopts it and connects onto the session that already exists rather than
- * asking for another. Verified against the trial — a second connector handed
+ * asking for another. Verified against an ABAP Cloud system — a second connector handed
  * the first one's cookies reports the SAME `SAP_SESSIONID` and answers `200`
  * over it.
  *
