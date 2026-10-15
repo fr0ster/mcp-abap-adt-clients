@@ -53,7 +53,27 @@ Root namespaces: ENHS `http://www.sap.com/adt/enhancements/enhs`, ENHO
 | nonexistent class | **400** `EnhancementError`, `SEEF_BASE/104` | not probed |
 
 Content type `application/vnd.sap.adt.enhancements.v3+xml`; no Accept was sent.
-Function group and include hosts: not probed yet.
+
+Function group and include hosts (E19, later the same day):
+
+| request | answer |
+|---|---|
+| `GET /functions/groups/svim/source/main/enhancements/elements` | 200 `<enh:enhancements/>` |
+| `GET /functions/groups/svim/enhancements/options` | 200 `enho:enhancementOption` |
+| `GET /programs/includes/lsvimtop/source/main/enhancements/elements` (no context) | **400** `EnhancementError` "No main program for include LSVIMTOP found", `ED/258` |
+| `GET /programs/includes/lsvimtop/enhancements/options` (no context) | **400**, the same `ED/258` |
+| the options with `?context=/sap/bc/adt/programs/programs/saplsvim` | 200 |
+| the options with `?context=/sap/bc/adt/functions/groups/svim` | 200, the same document |
+
+Through the library: the E19 integration run of `getInclude().readEnhancementElements(
+{ includeName: 'LSVIMTOP' }, { context: 'SAPLSVIM' })` passed — the member sends
+the NAME as `?context=/sap/bc/adt/programs/programs/saplsvim` (the program uri
+above, measured 200). A bare name in `?context=` itself was never sent to SAP;
+the contract takes a name and the implementation owns the uri.
+
+So an include needs `?context=` on **both** reads, not only on the elements:
+`IAdtEnhancementHost.readEnhancementOptions` must take `context` too
+(interfaces-adt 17.0.0 has it on `readEnhancementElements` only).
 
 ## Create
 
