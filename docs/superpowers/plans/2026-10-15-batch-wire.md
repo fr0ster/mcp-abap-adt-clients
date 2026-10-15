@@ -51,6 +51,33 @@ Not measured: the same with the envelope stateless; a write without the lock
 handle known up front (LOCK and PUT in one envelope cannot work — the PUT needs
 the handle the LOCK answers).
 
+### Dependent requests — a domain created, locked, written, unlocked, activated (E19)
+
+Inner requests exactly as the library's members send them (recorded on a stub
+connection), envelope stateful, `ZAC_BATCH_DOMA1` in `ZAC_TEST_PKG` on
+`E19K907111`, deleted afterwards (404).
+
+**A — all five in one envelope** (the PUT and UNLOCK carry a placeholder: the
+handle exists only in the LOCK's answer) → 202:
+
+| part | answer |
+|---|---|
+| POST create | **201 Created** — the domain is created inside the batch |
+| LOCK | 200, `LOCK_HANDLE` 2E1E… |
+| PUT document | **423** `ExceptionResourceInvalidLockHandle` "Resource Domain ZAC_BATCH_DOMA1 is not locked (invalid lock handle: HANDLE_PLACEHOLDER)", `SADT_RESOURCE/026` |
+| UNLOCK (placeholder) | **200 — and released nothing**: the real lock stayed until a later UNLOCK with the real handle (200) |
+| activate | 200, `activationExecuted="true"`, but `type="E"` "Data type ' ' does not exist" (`DO/251`), "DOMA ZAC_BATCH_DOMA1 was not activated" (`D0/408`) — the PUT never wrote the type |
+
+Rakes: a part cannot use an earlier part's answer (no reference mechanism was
+found); an UNLOCK with a wrong handle answers 200 and leaves the lock; the
+envelope is 202 whatever its parts did — the verdict is per part, and for an
+activation inside the part's `chkl:messages`, not its status.
+
+**B — two envelopes**: `[create, LOCK]` → 202 (201, 200; the handle), then
+`[PUT with the real handle, UNLOCK, activate]` → 202 (200, 200, 200;
+`activationExecuted="true"`, no message). Read back: `version="active"`, the
+description the PUT wrote. Two round trips instead of five.
+
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 
 ```
