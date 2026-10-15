@@ -156,6 +156,27 @@ the stateful LOCK opened, as for single requests. A bodyless inner answer
 CRLF belongs to the next delimiter (RFC 2046); the parser takes it as an empty
 body.
 
+### Several steps with variables in ONE debugger envelope (2026-10-16)
+
+At the loop breakpoint, one `debugger/batch` envelope
+`[getVariables, stepOver, getVariables, … ×5]` — 11 parts, every one 200, on
+premise and on ABAP Cloud. The history comes back in one round trip, the same
+through the primitives, the recording client (one execute) and the client in a
+loop (5 envelopes):
+
+| read | SY-INDEX | LV_TOTAL |
+|---|---|---|
+| 0 (at the breakpoint) | 1 | 0 |
+| 1 | 1 | — (not in scope: the step is inside `add`) |
+| 2 | 1 | — |
+| 3 | 1 | 1 |
+| 4 | 1 | 1 |
+| 5 | 2 | 1 |
+
+A variable out of scope is simply absent from that answer. Timings (5 steps,
+6 reads): on premise 123 ms one envelope, 219 ms recording client, 514 ms
+client per step; ABAP Cloud 614 / 567 / 2895 ms.
+
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 
 ```

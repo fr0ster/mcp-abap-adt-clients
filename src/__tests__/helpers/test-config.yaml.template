@@ -2759,6 +2759,21 @@ debugger_batch:
     - name: "stack_children"
       enabled: false
       available_in: ["onprem", "cloud"]
+    - name: "multi_step_variables"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+    - name: "multi_step_variables_client"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+    - name: "loop_client_per_step"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
 
 # Recording transport. Debugger case also uses runtime_debugger.adt_abap_debugger
 # params and the debugger_batch fixture above.

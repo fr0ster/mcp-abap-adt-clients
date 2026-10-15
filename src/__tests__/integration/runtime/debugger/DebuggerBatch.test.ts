@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import type {
   IAdtResponse,
   IAdtRunnable,
@@ -16,7 +17,9 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { XMLParser } from 'fast-xml-parser';
 import { AdtBatchConnection } from '../../../../batch';
+import { parseBatchResponse } from '../../../../batch/wire';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import {
@@ -511,6 +514,266 @@ describe('Debugger batch wire measurements', () => {
     expect(response.status).toBeLessThan(300);
     expect(parts).toHaveLength(requests.length);
     assertBatchStatuses(response, file);
+  }
+
+  const measurementNames = [
+    'multi_step_variables',
+    'multi_step_variables_client',
+    'loop_client_per_step',
+  ] as const;
+  const timings: Partial<Record<(typeof measurementNames)[number], number>> =
+    {};
+  const timingFile = path.join(exchangeDir, 'timings.txt');
+
+  // The captured debugger-conversation--19-variables-in-double.body.xml has
+  // DATA/STPDA_ADT_VARIABLE rows with ID, NAME and VALUE (not attributes).
+  // adt-strategies currently supplies no debugger variable result reading.
+  function variableValues(xml: string): Record<string, string> {
+    const parsed = new XMLParser({
+      removeNSPrefix: true,
+      parseTagValue: false,
+      trimValues: true,
+      isArray: (name) => name === 'STPDA_ADT_VARIABLE',
+    }).parse(xml);
+    const rows = parsed?.abap?.values?.DATA?.STPDA_ADT_VARIABLE ?? [];
+    const values: Record<string, string> = {};
+    for (const row of rows) {
+      if (row.ID !== undefined && row.VALUE !== undefined)
+        values[String(row.ID)] = String(row.VALUE).trim();
+    }
+    return values;
+  }
+
+  for (const name of measurementNames) {
+    gate('debugger_batch', name)(
+      `${name}: stepOver variable history`,
+      async () => {
+        if (skipped()) return;
+        const steps = Number(
+          configuredCase('debugger_batch', name)?.params?.steps ?? 5,
+        );
+        needs(Number.isInteger(steps) && steps > 0, 'a positive integer steps');
+        await startAtBreakpoint();
+        const frame = await topFrame();
+        needs(frame.line === LINE.loop, 'the loop breakpoint in the probe');
+        const children = await debuggerApi.getChildVariables(['@LOCALS']);
+        const total = [
+          ...documentOf(children).matchAll(
+            /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
+          ),
+        ].find((row) => tag(row[1], 'NAME') === 'LV_TOTAL');
+        const totalId = total && tag(total[1], 'ID');
+        needs(
+          children.ok && totalId,
+          'LV_TOTAL id from stopped frame children',
+        );
+        const ids = ['SY-INDEX', totalId as string];
+        const file = path.join(exchangeDir, `${name}.txt`);
+        fs.writeFileSync(file, `${name}: ${steps} steps\n`);
+        testsLogger.info?.(`Debugger batch exchange: ${file}`);
+        const reads: string[] = [];
+        const envelopes: { response: IAdtWireResponse; expected: number }[] =
+          [];
+        let envelopesSent = 0;
+        let expected = 0;
+        // Capture the recording client's actual envelopes too, including any
+        // negotiation retries: a hidden second envelope must fail this probe.
+        const recordingConnection = new Proxy(sessionConnection as Connection, {
+          get(target, property) {
+            if (property === 'makeAdtRequest') {
+              return async (
+                request: Parameters<Connection['makeAdtRequest']>[0],
+              ) => {
+                envelopesSent++;
+                fs.appendFileSync(
+                  file,
+                  `\nREQUEST ${envelopesSent}\n${JSON.stringify(request, null, 2)}\n`,
+                );
+                try {
+                  const response = await target.makeAdtRequest(request);
+                  fs.appendFileSync(
+                    file,
+                    `\nRESPONSE ${envelopesSent}\n${JSON.stringify(response.headers)}\nStatus: ${response.status}\n${String(response.data)}\n`,
+                  );
+                  envelopes.push({ response, expected });
+                  return response;
+                } catch (error) {
+                  const response = (error as { response?: IAdtWireResponse })
+                    .response;
+                  fs.appendFileSync(
+                    file,
+                    `\nFAILED\n${String(error)}\n${JSON.stringify(response)}\n`,
+                  );
+                  throw error;
+                }
+              };
+            }
+            const value = Reflect.get(target, property);
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        });
+        const batch = new AdtBatchConnection(recordingConnection, {
+          endpoint: 'debugger',
+        });
+        const api = new AbapDebugger(
+          batch,
+          connectionLogger,
+          abapDebuggerDocuments,
+        );
+        const answers: IAdtResponse<unknown>[] = [];
+        let elapsed = 0;
+        try {
+          // The comparison starts with the same baseline, outside its N envelopes.
+          if (name === 'loop_client_per_step') {
+            const baseline = await debuggerApi.getVariables(ids);
+            fs.appendFileSync(
+              file,
+              `\nBASELINE (outside timing)\n${documentOf(baseline)}\n`,
+            );
+            needs(baseline.ok, `baseline variables: ${documentOf(baseline)}`);
+            reads.push(documentOf(baseline));
+          }
+          const started = performance.now();
+          try {
+            if (name === 'multi_step_variables') {
+              const requests = [
+                inner(
+                  'method=getVariables',
+                  buildVariablesXml(ids),
+                  DEBUGGER_VARIABLES_CONTENT_TYPE,
+                ),
+              ];
+              for (let i = 0; i < steps; i++) {
+                requests.push(
+                  inner('method=stepOver'),
+                  inner(
+                    'method=getVariables',
+                    buildVariablesXml(ids),
+                    DEBUGGER_VARIABLES_CONTENT_TYPE,
+                  ),
+                );
+              }
+              expected = requests.length;
+              await executeBatchRequest(
+                recordingConnection,
+                buildDebuggerBatchPayload(requests),
+              );
+            } else {
+              const rounds = name === 'loop_client_per_step' ? steps : 1;
+              for (let round = 0; round < rounds; round++) {
+                const pending: Promise<IAdtResponse<unknown>>[] = [];
+                if (name === 'multi_step_variables_client')
+                  pending.push(api.getVariables(ids));
+                for (let i = 0; i < (rounds === 1 ? steps : 1); i++) {
+                  pending.push(api.step('stepOver'), api.getVariables(ids));
+                }
+                expected = pending.length;
+                // Observe rejections immediately, even if execute itself fails.
+                const settled = Promise.allSettled(pending);
+                try {
+                  await batch.execute();
+                } finally {
+                  for (const result of await settled) {
+                    if (result.status === 'fulfilled')
+                      answers.push(result.value);
+                  }
+                }
+              }
+            }
+          } finally {
+            elapsed = performance.now() - started;
+          }
+        } finally {
+          timings[name] = elapsed;
+          const timingTable = measurementNames
+            .map(
+              (key) =>
+                `${key}: ${timings[key] === undefined ? 'not run' : `${timings[key].toFixed(3)} ms`}`,
+            )
+            .join('\n');
+          fs.writeFileSync(timingFile, `${timingTable}\n`);
+          for (const key of measurementNames) {
+            const exchange = path.join(exchangeDir, `${key}.txt`);
+            if (fs.existsSync(exchange))
+              fs.appendFileSync(
+                exchange,
+                `\nTIMINGS (excludes setup and baseline)\n${timingTable}\n`,
+              );
+          }
+          testsLogger.info?.(timingTable);
+          for (const { response } of envelopes) {
+            const statuses = [
+              ...String(response.data).matchAll(/^HTTP\/[^\r\n]+/gm),
+            ].map((match) => match[0]);
+            fs.appendFileSync(
+              file,
+              `\nInner statuses: ${JSON.stringify(statuses)}\n`,
+            );
+          }
+        }
+        for (const { response, expected: count } of envelopes) {
+          expect(response.status).toBeGreaterThanOrEqual(200);
+          expect(response.status).toBeLessThan(300);
+          const parts = parseBatchResponse(response);
+          expect(parts).toHaveLength(count);
+          for (const [index, part] of parts.entries()) {
+            if (part.status !== 200)
+              throw new Error(
+                `Batch part ${index + 1}: ${part.status}; ${String(part.data)}; exchange: ${file}`,
+              );
+          }
+          if (name === 'multi_step_variables') {
+            reads.push(
+              ...parts
+                .filter((_, index) => index % 2 === 0)
+                .map((part) => String(part.data)),
+            );
+          }
+        }
+        expect(envelopesSent).toBe(name === 'loop_client_per_step' ? steps : 1);
+        if (name !== 'multi_step_variables') {
+          for (const [index, answer] of answers.entries()) {
+            needs(
+              answer.ok,
+              `member ${index + 1}: ${documentOf(answer)}; exchange: ${file}`,
+            );
+            if (
+              name === 'loop_client_per_step'
+                ? index % 2 === 1
+                : index % 2 === 0
+            )
+              reads.push(documentOf(answer));
+          }
+        }
+        // Each read is its own getVariables answer body, without request echoes.
+        // A variable can leave scope while stepping into the add method.
+        const values = reads.map(variableValues);
+        const table = [
+          'step | SY-INDEX | LV_TOTAL',
+          ...values.map(
+            (row, index) =>
+              `${index} | ${ids.map((id) => row[id] ?? '—').join(' | ')}`,
+          ),
+        ].join('\n');
+        fs.appendFileSync(file, `\nVARIABLE HISTORY\n${table}\n`);
+        testsLogger.info?.(`${name}\n${table}\nexchange: ${file}`);
+        expect(values).toHaveLength(steps + 1);
+        needs(
+          values.every((row) => ids.some((id) => row[id] !== undefined)),
+          `at least one requested variable visible in every read; exchange: ${file}`,
+        );
+        for (const id of ids) {
+          const distinct = new Set(
+            values.map((row) => row[id]).filter((value) => value !== undefined),
+          );
+          needs(
+            distinct.size >= 2,
+            `at least two distinct values for ${id} across reads; exchange: ${file}`,
+          );
+        }
+      },
+      STEP_TIMEOUT,
+    );
   }
 
   const methods: IDebuggerStepMethod[] = [
