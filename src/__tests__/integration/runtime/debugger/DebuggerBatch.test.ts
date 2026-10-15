@@ -393,39 +393,72 @@ describe('Debugger batch wire measurements', () => {
 
   afterAll(async () => {
     const errors: unknown[] = [];
-    try {
-      if (listenerConnection) {
-        for (const id of armed) {
-          await listenerApi.deleteBreakpoint(identity, id);
+    const cleanup = async (
+      step: string,
+      action: () => Promise<IAdtResponse<unknown>> | Promise<void>,
+    ): Promise<void> => {
+      try {
+        const response = await action();
+        if (response && !response.ok) {
+          throw new Error(`Debugger cleanup failed: ${step}`, {
+            cause: response.getError(),
+          });
         }
-        if (attached) await debuggerApi.terminateDebuggee();
-        if (sessionConnection) {
-          sessionConnection.setSessionType('stateless');
-          await closeOwnTestConnection(sessionConnection);
-        }
-        await listenerApi.stopListener(identity);
-        if (run) {
-          await Promise.race([
-            run,
-            new Promise((resolve) => setTimeout(resolve, 15_000)),
-          ]);
-        }
-        listenerConnection.setSessionType('stateless');
-        if (!testCase?.params?.keep_probe) {
-          await new AdtClient(listenerConnection, connectionLogger)
-            .getClass()
-            .delete({
-              className: CLASS_NAME,
-              packageName,
-              ...(transportRequest ? { transportRequest } : {}),
-            });
-        }
-        await closeOwnTestConnection(triggerConnection);
-        await closeOwnTestConnection(listenerConnection);
+      } catch (error) {
+        errors.push(error);
       }
-    } catch (error) {
-      errors.push(error);
+    };
+    if (listenerConnection) {
+      for (const id of armed) {
+        await cleanup(`delete breakpoint ${id}`, () =>
+          listenerApi.deleteBreakpoint(identity, id),
+        );
+      }
     }
+    if (attached) {
+      await cleanup('terminate debuggee', () =>
+        debuggerApi.terminateDebuggee(),
+      );
+    }
+    if (sessionConnection) {
+      const connection = sessionConnection;
+      await cleanup('close session connection', async () => {
+        connection.setSessionType('stateless');
+        await closeOwnTestConnection(connection);
+      });
+    }
+    if (listenerConnection) {
+      await cleanup('stop listener', () => listenerApi.stopListener(identity));
+    }
+    if (run) {
+      await cleanup('wait for run', async () => {
+        await Promise.race([
+          run,
+          new Promise((resolve) => setTimeout(resolve, 15_000)),
+        ]);
+      });
+    }
+    if (listenerConnection) {
+      const connection = listenerConnection;
+      await cleanup('set listener connection stateless', async () => {
+        connection.setSessionType('stateless');
+      });
+      if (!testCase?.params?.keep_probe) {
+        await cleanup('delete probe class', () =>
+          new AdtClient(connection, connectionLogger).getClass().delete({
+            className: CLASS_NAME,
+            packageName,
+            ...(transportRequest ? { transportRequest } : {}),
+          }),
+        );
+      }
+    }
+    await cleanup('close trigger connection', () =>
+      closeOwnTestConnection(triggerConnection),
+    );
+    await cleanup('close listener connection', () =>
+      closeOwnTestConnection(listenerConnection),
+    );
     for (const report of [
       writeMeasurementSummary,
       compareMeasurementHistories,
