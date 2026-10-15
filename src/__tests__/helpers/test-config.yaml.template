@@ -2775,6 +2775,12 @@ debugger_batch:
       params:
         steps: 5
 
+    - name: "multi_step_variables_direct"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+
 # Recording transport. Debugger case also uses runtime_debugger.adt_abap_debugger
 # params and the debugger_batch fixture above.
 batch:

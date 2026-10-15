@@ -174,8 +174,14 @@ loop (5 envelopes):
 | 5 | 2 | 1 |
 
 A variable out of scope is simply absent from that answer. Timings (5 steps,
-6 reads): on premise 123 ms one envelope, 219 ms recording client, 514 ms
-client per step; ABAP Cloud 614 / 567 / 2895 ms.
+6 reads, second run 2026-10-16; all four histories identical):
+
+| Way | Requests | On premise | ABAP Cloud |
+|---|---|---|---|
+| One envelope (primitives) | 1 | 128 ms | 562 ms |
+| Recording client, one `execute()` | 1 | 150 ms | 613 ms |
+| Recording client, `execute()` per step | 6 | 526 ms | 2992 ms |
+| Plain `AbapDebugger`, no batch | 11 | 1082 ms | 6756 ms |
 
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 

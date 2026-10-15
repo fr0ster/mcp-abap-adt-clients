@@ -388,34 +388,38 @@ describe('Debugger batch wire measurements', () => {
   }, STEP_TIMEOUT);
 
   afterAll(async () => {
-    if (!listenerConnection) return;
-    for (const id of armed) {
-      await listenerApi.deleteBreakpoint(identity, id);
+    try {
+      if (!listenerConnection) return;
+      for (const id of armed) {
+        await listenerApi.deleteBreakpoint(identity, id);
+      }
+      if (attached) await debuggerApi.terminateDebuggee();
+      if (sessionConnection) {
+        sessionConnection.setSessionType('stateless');
+        await closeOwnTestConnection(sessionConnection);
+      }
+      await listenerApi.stopListener(identity);
+      if (run) {
+        await Promise.race([
+          run,
+          new Promise((resolve) => setTimeout(resolve, 15_000)),
+        ]);
+      }
+      listenerConnection.setSessionType('stateless');
+      if (!testCase?.params?.keep_probe) {
+        await new AdtClient(listenerConnection, connectionLogger)
+          .getClass()
+          .delete({
+            className: CLASS_NAME,
+            packageName,
+            ...(transportRequest ? { transportRequest } : {}),
+          });
+      }
+      await closeOwnTestConnection(triggerConnection);
+      await closeOwnTestConnection(listenerConnection);
+    } finally {
+      writeMeasurementSummary();
     }
-    if (attached) await debuggerApi.terminateDebuggee();
-    if (sessionConnection) {
-      sessionConnection.setSessionType('stateless');
-      await closeOwnTestConnection(sessionConnection);
-    }
-    await listenerApi.stopListener(identity);
-    if (run) {
-      await Promise.race([
-        run,
-        new Promise((resolve) => setTimeout(resolve, 15_000)),
-      ]);
-    }
-    listenerConnection.setSessionType('stateless');
-    if (!testCase?.params?.keep_probe) {
-      await new AdtClient(listenerConnection, connectionLogger)
-        .getClass()
-        .delete({
-          className: CLASS_NAME,
-          packageName,
-          ...(transportRequest ? { transportRequest } : {}),
-        });
-    }
-    await closeOwnTestConnection(triggerConnection);
-    await closeOwnTestConnection(listenerConnection);
   }, STEP_TIMEOUT);
 
   async function startAtBreakpoint(): Promise<void> {
@@ -520,10 +524,40 @@ describe('Debugger batch wire measurements', () => {
     'multi_step_variables',
     'multi_step_variables_client',
     'loop_client_per_step',
+    'multi_step_variables_direct',
   ] as const;
   const timings: Partial<Record<(typeof measurementNames)[number], number>> =
     {};
+  const histories: Partial<Record<(typeof measurementNames)[number], string>> =
+    {};
+  const measurementDescriptions = {
+    multi_step_variables: 'one envelope (primitives)',
+    multi_step_variables_client: 'recording client one execute',
+    loop_client_per_step: 'client per step (N envelopes)',
+    multi_step_variables_direct: 'direct (2N+1 requests)',
+  };
   const timingFile = path.join(exchangeDir, 'timings.txt');
+
+  function writeMeasurementSummary(): void {
+    const complete = measurementNames.every(
+      (name) => histories[name] !== undefined,
+    );
+    const summary = [
+      ...measurementNames.map(
+        (name) =>
+          `\n${name} VARIABLE HISTORY\n${histories[name] ?? 'not completed'}`,
+      ),
+      `\nHistory comparison: ${complete ? 'all four compared below' : 'requires all four completed cases'}`,
+    ].join('\n');
+    fs.appendFileSync(timingFile, `${summary}\n`);
+    testsLogger.info?.(
+      `Debugger measurement summary: ${timingFile}\n${summary}`,
+    );
+    if (complete) {
+      for (const name of measurementNames.slice(1))
+        expect(histories[name]).toBe(histories.multi_step_variables);
+    }
+  }
 
   // The captured debugger-conversation--19-variables-in-double.body.xml has
   // DATA/STPDA_ADT_VARIABLE rows with ID, NAME and VALUE (not attributes).
@@ -595,7 +629,8 @@ describe('Debugger batch wire measurements', () => {
                     file,
                     `\nRESPONSE ${envelopesSent}\n${JSON.stringify(response.headers)}\nStatus: ${response.status}\n${String(response.data)}\n`,
                   );
-                  envelopes.push({ response, expected });
+                  if (name !== 'multi_step_variables_direct')
+                    envelopes.push({ response, expected });
                   return response;
                 } catch (error) {
                   const response = (error as { response?: IAdtWireResponse })
@@ -612,11 +647,14 @@ describe('Debugger batch wire measurements', () => {
             return typeof value === 'function' ? value.bind(target) : value;
           },
         });
-        const batch = new AdtBatchConnection(recordingConnection, {
-          endpoint: 'debugger',
-        });
+        const batch =
+          name === 'multi_step_variables_direct'
+            ? undefined
+            : new AdtBatchConnection(recordingConnection, {
+                endpoint: 'debugger',
+              });
         const api = new AbapDebugger(
-          batch,
+          batch ?? recordingConnection,
           connectionLogger,
           abapDebuggerDocuments,
         );
@@ -635,7 +673,13 @@ describe('Debugger batch wire measurements', () => {
           }
           const started = performance.now();
           try {
-            if (name === 'multi_step_variables') {
+            if (name === 'multi_step_variables_direct') {
+              answers.push(await api.getVariables(ids));
+              for (let i = 0; i < steps; i++) {
+                answers.push(await api.step('stepOver'));
+                answers.push(await api.getVariables(ids));
+              }
+            } else if (name === 'multi_step_variables') {
               const requests = [
                 inner(
                   'method=getVariables',
@@ -671,7 +715,7 @@ describe('Debugger batch wire measurements', () => {
                 // Observe rejections immediately, even if execute itself fails.
                 const settled = Promise.allSettled(pending);
                 try {
-                  await batch.execute();
+                  await batch!.execute();
                 } finally {
                   for (const result of await settled) {
                     if (result.status === 'fulfilled')
@@ -688,7 +732,7 @@ describe('Debugger batch wire measurements', () => {
           const timingTable = measurementNames
             .map(
               (key) =>
-                `${key}: ${timings[key] === undefined ? 'not run' : `${timings[key].toFixed(3)} ms`}`,
+                `${key} (${measurementDescriptions[key]}): ${timings[key] === undefined ? 'not run' : `${timings[key].toFixed(3)} ms`}`,
             )
             .join('\n');
           fs.writeFileSync(timingFile, `${timingTable}\n`);
@@ -730,7 +774,15 @@ describe('Debugger batch wire measurements', () => {
             );
           }
         }
-        expect(envelopesSent).toBe(name === 'loop_client_per_step' ? steps : 1);
+        expect(envelopesSent).toBe(
+          name === 'multi_step_variables_direct'
+            ? 2 * steps + 1
+            : name === 'loop_client_per_step'
+              ? steps
+              : 1,
+        );
+        if (name === 'multi_step_variables_direct')
+          expect(answers).toHaveLength(2 * steps + 1);
         if (name !== 'multi_step_variables') {
           for (const [index, answer] of answers.entries()) {
             needs(
@@ -771,6 +823,7 @@ describe('Debugger batch wire measurements', () => {
             `at least two distinct values for ${id} across reads; exchange: ${file}`,
           );
         }
+        histories[name] = table;
       },
       STEP_TIMEOUT,
     );
