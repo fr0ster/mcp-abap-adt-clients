@@ -20,6 +20,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { INTERFACE, PROGRAM } from '../../../../endpoints/objects';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { escapeXmlAttr } from '../../../../utils/xml';
+import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -84,26 +85,14 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     if (connection) await releaseTestConnection(connection);
   });
 
-  function configured(name: string): TestConfigResolver | undefined {
-    const resolver = new TestConfigResolver({
-      handlerName: 'enhancement',
-      testCaseName: name,
-      isCloud,
-      isLegacy,
-      logger,
-    });
-    const reason = !hasConfig
-      ? 'no SAP configuration'
-      : !resolver.isAvailableForEnvironment()
-        ? `not available on ${isLegacy ? 'legacy' : isCloud ? 'cloud' : 'onprem'}`
-        : !resolver.isEnabled()
-          ? 'disabled'
-          : undefined;
-    if (reason) {
-      logger.info(`Skipping enhancement/${name}: ${reason}`);
-      return undefined;
+  function configured(name: string): TestConfigResolver {
+    const testCase = configuredCase('enhancement', name);
+    if (!hasConfig || !testCase) {
+      throw new Error(
+        `Configuration defect for enhancement/${name}: SAP setup or test case is missing`,
+      );
     }
-    return resolver;
+    return new TestConfigResolver({ testCase, isCloud, isLegacy, logger });
   }
 
   function required(resolver: TestConfigResolver, key: string): string {
@@ -198,11 +187,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     );
   }
 
-  it(
+  gate('enhancement', 'badi')(
     'badi: write and activate a definition and implementation',
     async () => {
       const resolver = configured('badi');
-      if (!resolver) return;
       const spot = config(resolver, 'enhsxsb', 'spot_name');
       const container = {
         ...config(resolver, 'enhoxhb'),
@@ -416,11 +404,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('enhancement', 'enhsxsb')(
     'enhsxsb: create, metadata, lock/unlock, activate, delete',
     async () => {
       const resolver = configured('enhsxsb');
-      if (!resolver) return;
       const object = config(resolver, 'enhsxsb');
       await removeLeftover(object);
       try {
@@ -449,11 +436,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('enhancement', 'enhoxhb')(
     'enhoxhb: create its own spot and container, then delete in reverse',
     async () => {
       const resolver = configured('enhoxhb');
-      if (!resolver) return;
       const spot = config(resolver, 'enhsxsb', 'spot_name');
       const object = {
         ...config(resolver, 'enhoxhb'),
@@ -494,11 +480,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('enhancement', 'enhoxhh')(
     'enhoxhh: use a shared program option, write and activate source',
     async () => {
       const resolver = configured('enhoxhh');
-      if (!resolver) return;
       const object = config(resolver, 'enhoxhh');
       const programName = required(resolver, 'program_name');
       const dependency = resolveSharedDependency('programs', programName);
@@ -582,14 +567,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  // Cloud-only refusal deliberately omitted: getTestCaseDefinition filters
-  // available_in through getEnvironmentType(), which never returns cloud.
-
-  it(
+  gate('enhancement', 'class_hosts')(
     'reads class elements and preserves the missing-class 400/SEEF_BASE refusal',
     async () => {
       const resolver = configured('class_hosts');
-      if (!resolver) return;
       root(
         expectResult(
           await client
@@ -616,11 +597,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('enhancement', 'program_host')(
     'reads program enhancement implementations',
     async () => {
       const resolver = configured('program_host');
-      if (!resolver) return;
       const document = expectResult(
         await client
           .getProgram()
@@ -644,11 +624,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('enhancement', 'function_group_host')(
     'first measurement: function group elements and options',
     async () => {
       const resolver = configured('function_group_host');
-      if (!resolver) return;
       const host = {
         functionGroupName: required(resolver, 'function_group_name'),
       };
@@ -673,11 +652,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('enhancement', 'include_host')(
     'first measurement: include elements with main-program context and options',
     async () => {
       const resolver = configured('include_host');
-      if (!resolver) return;
       const host = { includeName: required(resolver, 'include_name') };
       // First measurement: E19 answered 400 ED/258 without context on both reads,
       // and 200 with the main-program context.
