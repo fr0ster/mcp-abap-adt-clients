@@ -137,7 +137,7 @@ export type IServiceBindingPublicationConfig = Partial<ISBC> & {
 /**
  * What a publication job needs, which is not the same for the two protocols.
  *
- * **V2 requires the service name and version; V4 does not.** Measured on a trial,
+ * **V2 requires the service name and version; V4 does not.** Measured on an ABAP Cloud system,
  * 2026-09-29, on one binding per protocol with a known publication state and a
  * single job each — the only difference being the query string:
  *
@@ -176,7 +176,7 @@ interface IServiceBindingPublicationCommon {
    * How long to wait for the publication job, in milliseconds.
    *
    * A publication is the slowest request this library makes — ~135s measured on
-   * a trial, and one unpublish still unsettled after eleven minutes. Absent, the
+   * the ABAP Cloud system, and one unpublish still unsettled after eleven minutes. Absent, the
    * request carries no deadline: it waits for SAP's answer.
    */
   timeout?: number;

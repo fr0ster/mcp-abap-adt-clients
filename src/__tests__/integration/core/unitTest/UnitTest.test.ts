@@ -293,7 +293,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           //
           // Under the class's own lock: a class include is written with the
           // *class's* handle, which is why this takes a second one rather than
-          // reusing nothing. Measured on the trial before this was fixed —
+          // reusing nothing. Measured on an ABAP Cloud system before this was fixed —
           // `PUT …/includes/testclasses` with no handle is answered
           // `400 ExceptionParameterNotFound: Parameter lockHandle could not be
           // found`, and the suite passed anyway because the answer went unread.

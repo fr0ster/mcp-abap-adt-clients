@@ -59,7 +59,7 @@
  *   npx tsx scripts/capture-adt-corpus.ts [--env <path>] [--only a,b,c]
  *                                         [--empty-package ZNAME]
  *
- * Default --env is the prepared trial session
+ * Default --env is the prepared ABAP Cloud session
  * (~/.config/mcp-abap-adt/sessions/trial.env).
  *
  * `--only` captures just the named cases, for topping a partial corpus up.
@@ -124,7 +124,7 @@ const ACCEPT_VALIDATION = 'application/vnd.sap.as+xml';
 const ACCEPT_VALIDATION_CLASS =
   'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check';
 /**
- * A package that EXISTS but holds nothing. Verified read-only against trial:
+ * A package that EXISTS but holds nothing. Verified read-only against the ABAP Cloud system:
  * `getPackage().read()` succeeds, `getPackageContents()` answers HTTP 200 with
  * a zero-byte body — byte for byte the same answer a package that does not
  * exist gives. Capturing both is the whole point: it settles, from the wire,

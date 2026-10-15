@@ -17,7 +17,7 @@
  * session holding a lock is granted it again.
  *
  * It costs one session logon per check, so `VERIFY_LOCK_RELEASED=false` turns
- * it off. The trial grants two sessions — the run's and this one — so the
+ * it off. A trial ABAP Cloud account grants two sessions — the run's and this one — so the
  * session is always closed before this returns, and never two are open at once.
  */
 
@@ -151,7 +151,7 @@ export async function verifyLockReleased<TConfig>(
     const handler = openHandler(session.client);
     // A new session may land on another application server, where an object
     // created seconds ago is not visible yet: its LOCK answers 404 "does not
-    // exist". Measured on the cloud trial — the same test passed alone. That is
+    // exist". Measured on an ABAP Cloud system — the same test passed alone. That is
     // not a lock at all, so it is retried, and if the object stays invisible
     // the check reports it cannot judge rather than claiming a held lock.
     let locked = await handler.lock(config, { analyse: analyseException });
@@ -210,7 +210,7 @@ export async function verifyLockReleased<TConfig>(
   } catch (error) {
     failure = error;
   }
-  // Closed whatever happened above: the trial has two sessions, and this is
+  // Closed whatever happened above: a trial ABAP Cloud account has two sessions, and this is
   // the second. A close that fails is reported, but never over the finding.
   try {
     await session.close();

@@ -8,7 +8,7 @@
  * nothing. So this runs over `ZAC_SHR_ATC_DIRTY`, a shared class that exists to
  * be found in, and it fails when the triple comes back all zeroes.
  *
- * Measured on the BTP trial, 2026-09-08, under the variant the system nominates
+ * Measured on an ABAP Cloud system, 2026-09-08, under the variant the system nominates
  * (`ABAP_CLOUD_DEVELOPMENT_DEFAULT`): one finding, priority 2, SLIN message
  * 0245 "No exception handling after the CATCH statement." — the empty
  * `CATCH cx_root` in that class — and `FINDING_STATS "0,1,0"`. That pairing is
@@ -388,7 +388,7 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
 
         // And which finding, where the case says so. Optional because the
         // answer belongs to the system's check variant, not to this library:
-        // the trial's ABAP_CLOUD_DEVELOPMENT_DEFAULT reports 0245 at priority 2
+        // the ABAP Cloud system's ABAP_CLOUD_DEVELOPMENT_DEFAULT reports 0245 at priority 2
         // for the empty CATCH, and another system's variant may legitimately
         // report something else. Both attributes must sit on ONE finding, and
         // the line above logs what was seen — so filling this in is a copy.

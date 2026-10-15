@@ -503,7 +503,7 @@ describe('FeatureToggle (using AdtClient)', () => {
       getTimeout('test'),
     );
 
-    // Switch on/off requires a transport request. Cloud trial has no transport
+    // Switch on/off requires a transport request. The ABAP Cloud system has no transport
     // system, so gate the test with it.skip when none is configured.
     const resolvedTransport = resolveTransportRequest();
     const switchIt = resolvedTransport ? it : it.skip;

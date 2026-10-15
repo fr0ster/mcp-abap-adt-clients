@@ -4,7 +4,7 @@ import {
 } from '../../core/messageClass/xml';
 
 // class with an UNKNOWN root attr (mc:futureflag) + two messages, one carrying extra attrs
-const XML = `<?xml version="1.0" encoding="utf-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="Desc" adtcore:language="DE" adtcore:masterLanguage="DE" adtcore:masterSystem="TRL" adtcore:responsible="U1" mc:futureflag="X"><adtcore:packageRef adtcore:name="ZP"/><mc:messages adtcore:name="" mc:documented="false" mc:msgno="001" mc:msgtext="T1" mc:selfexplainatory="true"/><mc:messages mc:documented="true" mc:msgno="002" mc:msgtext="T2"/></mc:messageClass>`;
+const XML = `<?xml version="1.0" encoding="utf-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="Desc" adtcore:language="DE" adtcore:masterLanguage="DE" adtcore:masterSystem="SID" adtcore:responsible="U1" mc:futureflag="X"><adtcore:packageRef adtcore:name="ZP"/><mc:messages adtcore:name="" mc:documented="false" mc:msgno="001" mc:msgtext="T1" mc:selfexplainatory="true"/><mc:messages mc:documented="true" mc:msgno="002" mc:msgtext="T2"/></mc:messageClass>`;
 
 describe('parseMessageClass', () => {
   it('parses named fields + rawAttrs (class and messages)', () => {

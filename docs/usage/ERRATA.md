@@ -61,7 +61,7 @@ editing"*.
 **What Eclipse does.** It meets the same `403` on its own LOCK and publishes
 anyway:
 
-- Eclipse ADT 3.60.3 against the BTP trial, 2026-09-05: `LOCK` → `200` on its
+- Eclipse ADT 3.60.3 against the ABAP Cloud system, 2026-09-05: `LOCK` → `200` on its
   *"stateful, enqueue"* session; `POST …/odatav4/publishjobs` → `200`,
   stateless; `UNLOCK` → `200` only on *"Closing editor"*; a second `LOCK` before
   the unpublish → `403` while the first was still held.

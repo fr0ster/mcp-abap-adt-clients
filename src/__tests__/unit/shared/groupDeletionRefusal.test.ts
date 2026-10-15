@@ -10,7 +10,7 @@
  * its answer — `isDeletable="false"` with a reason is what a caller runs the
  * check *for*.
  *
- * The document below is verbatim from a cloud trial, 2026-09-03, for a package
+ * The document below is verbatim from the ABAP Cloud system, 2026-09-03, for a package
  * with two objects in it.
  */
 

@@ -25,7 +25,7 @@ const wire = (data: string, status = 200): IAdtWireResponse => ({
   headers: {},
 });
 
-/** Verbatim from a cloud trial, 2026-09-03. 1709 bytes in full; the shape is what matters. */
+/** Verbatim from the ABAP Cloud system, 2026-09-03. 1709 bytes in full; the shape is what matters. */
 const REFUSAL =
   '<?xml version="1.0" encoding="utf-8"?>' +
   '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +

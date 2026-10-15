@@ -10,7 +10,7 @@
  * was actually released. The second window on the same object is the only thing
  * that can tell the difference.
  *
- * **The lock handle is not the evidence.** Measured on a cloud trial: two
+ * **The lock handle is not the evidence.** Measured on an ABAP Cloud system: two
  * cycles inside one process get the *same* handle, and a fresh process against
  * the same class gets a different one (9A97E458…, D1AFDC1F…, BD3C75F5…). The
  * handle belongs to the session, not to the window, so comparing the two tells
@@ -27,7 +27,7 @@
  * whether a `disconnect()` on cloud really ends the ADT session: run it under
  * `WIRE_LOG` and count `sap-contextid` — two distinct values means it does.
  *
- * Exactly two sessions, opened one after the other and never at once. The trial
+ * Exactly two sessions, opened one after the other and never at once. The ABAP Cloud system
  * refuses a third, and churning connections is not something to do for its own
  * sake — this is a measurement with a fixed cost, not a pattern to copy.
  *

@@ -1,6 +1,6 @@
 /**
  * featureToggle readiness reads are a plain GET: the SFW endpoint's support for
- * withLongPolling could not be verified from the cloud trial (SFW is on-prem),
+ * withLongPolling could not be verified from the ABAP Cloud system (SFW is on-prem),
  * so we deliberately never send it. This test pins that — readFeatureToggle must
  * not put withLongPolling in the request URL or params. It guards against a
  * future "fix" that wires an unverified parameter.

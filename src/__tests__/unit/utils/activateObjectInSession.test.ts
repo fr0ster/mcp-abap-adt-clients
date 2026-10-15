@@ -43,10 +43,10 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
    * What ADT really answers for a class that is already active: the flag says
    * `false` because nothing needed doing, and the message list is empty.
    *
-   * Probed on a trial system, and the reason this guard exists — the previous
+   * Probed on an ABAP Cloud system, and the reason this guard exists — the previous
    * rule treated the flag alone as failure, so `AdtClient` refused a class that
    * was active, with its test include in place, and reported
-   * "Activation of ZAC_CDSUT_CLS failed: activationExecuted=false". The
+   * "Activation of ZEXAMPLE_CLASS failed: activationExecuted=false". The
    * CdsUnitTest integration test could not pass.
    */
   const ALREADY_ACTIVE_XML = `<?xml version="1.0" encoding="UTF-8"?>

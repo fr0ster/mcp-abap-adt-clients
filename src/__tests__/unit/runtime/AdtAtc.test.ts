@@ -59,7 +59,7 @@ const runAtc = async (
   return atc.startRun(worklistId, target, options);
 };
 
-// The properties as the trial sent them: four of them, and the one this client
+// The properties as the ABAP Cloud system sent them: four of them, and the one this client
 // needs is not the first.
 const CUSTOMIZING = `<?xml version="1.0" encoding="utf-8"?>
 <atc:customizing xmlns:atc="http://www.sap.com/adt/atc"><properties>

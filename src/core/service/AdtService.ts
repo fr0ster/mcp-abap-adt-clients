@@ -166,7 +166,7 @@ export class AdtServiceBinding<
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
     // **The caller's, when they give one — else none.** A publication job is
-    // the slowest thing this library asks for — measured at ~135s on a trial,
+    // the slowest thing this library asks for — measured at ~135s on the ABAP Cloud system,
     // and an unpublish once not settled after eleven minutes. The library sets
     // no deadline of its own; `IAdtOperationOptions.timeout` is how a caller
     // asks for one.
@@ -222,7 +222,7 @@ export class AdtServiceBinding<
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
     // **The caller's, when they give one — else none.** A publication job is
-    // the slowest thing this library asks for — measured at ~135s on a trial,
+    // the slowest thing this library asks for — measured at ~135s on the ABAP Cloud system,
     // and an unpublish once not settled after eleven minutes. The library sets
     // no deadline of its own; `IAdtOperationOptions.timeout` is how a caller
     // asks for one.

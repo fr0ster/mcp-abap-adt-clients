@@ -1,7 +1,7 @@
 /**
  * Integration test for object version history (getVersions / getVersionSource).
  *
- * Covers the types whose version URL is verified end-to-end on the cloud trial:
+ * Covers the types whose version URL is verified end-to-end on the ABAP Cloud system:
  * table, class, interface, serviceDefinition. Other source types build a
  * candidate URL that degrades to UNSUPPORTED_OPERATION where unsupported.
  *

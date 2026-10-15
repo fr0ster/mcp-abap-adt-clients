@@ -15,7 +15,7 @@ const hosts = [
   ['getInclude', 'includeName', '/sap/bc/adt/programs/includes'],
 ] as const;
 
-// Verbatim E19 responses recorded on 2026-10-15; keep whitespace and base64 intact.
+// Verbatim responses from an on-premise system recorded on 2026-10-15; keep whitespace and base64 intact.
 const recorded = (name: string) =>
   readFileSync(
     join(__dirname, '../../fixtures/enhancementHosts', name),

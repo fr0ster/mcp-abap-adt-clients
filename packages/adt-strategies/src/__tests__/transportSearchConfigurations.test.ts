@@ -7,8 +7,8 @@ import { parseSearchConfigurations } from '../results/transport';
 const CONFIGURATIONS_XML =
   '<?xml version="1.0" encoding="utf-8"?>' +
   '<configurations:configurations xmlns:configurations="http://www.sap.com/adt/configurations">' +
-  '<configuration:configuration createdBy="CB9980008038" createdAt="2026-08-07T09:50:48Z" ' +
-  'changedBy="CB9980008038" changedAt="2026-08-07T09:50:48Z" client="100" ' +
+  '<configuration:configuration createdBy="DEVELOPER" createdAt="2026-08-07T09:50:48Z" ' +
+  'changedBy="DEVELOPER" changedAt="2026-08-07T09:50:48Z" client="100" ' +
   'xmlns:configuration="http://www.sap.com/adt/configuration">' +
   '<atom:link href="/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/7E5B" ' +
   'rel="http://www.sap.com/adt/categories/configurations" ' +
@@ -26,9 +26,9 @@ describe('parseSearchConfigurations reads the href off the link, not the element
         uri: '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/7E5B',
         etag: '20260807095048',
         attributes: {
-          createdBy: 'CB9980008038',
+          createdBy: 'DEVELOPER',
           createdAt: '2026-08-07T09:50:48Z',
-          changedBy: 'CB9980008038',
+          changedBy: 'DEVELOPER',
           changedAt: '2026-08-07T09:50:48Z',
           client: '100',
         },

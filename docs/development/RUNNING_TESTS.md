@@ -48,7 +48,7 @@ objects that are not there yet.
 
 ## One run at a time
 
-A run holds a session on the target system, and the cloud trial grants **two**.
+A run holds a session on the target system, and a trial ABAP Cloud account grants **two**.
 Two runs at once will take the third and be refused — and worse, they will fight
 over the same shared objects. Do not edit `src/` while a run is in flight either:
 jest reads each test file when it reaches it, so an edit half-way through means
@@ -74,7 +74,7 @@ test fails with SAP's sentence; a released one is granted and released again.
 A class include is checked against the class lock, which is the one it was
 written under.
 
-It costs one session logon per check. The trial grants two sessions — the run's
+It costs one session logon per check. A trial ABAP Cloud account grants two sessions — the run's
 and this one — and the check always closes its own before it returns, so the
 two are never exceeded. Turn it off with `VERIFY_LOCK_RELEASED=false` when the
 extra logons matter more than the proof.
@@ -96,7 +96,7 @@ right for comparing headers and wrong for reading what SAP answered.
 
 ## On-prem
 
-The cloud trial skips 19 tests that only apply on-prem, so an on-prem run covers
+A run on ABAP Cloud skips 19 tests that only apply on-prem, so an on-prem run covers
 more, not less. Set in `src/__tests__/helpers/test-config.yaml`:
 
 | field | value |

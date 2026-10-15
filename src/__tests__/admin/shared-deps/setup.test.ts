@@ -102,7 +102,7 @@ describe('Admin: Setup shared dependencies', () => {
   /**
    * A dropped connection says nothing about the object.
    *
-   * Measured against the BTP trial: `ECONNRESET` and `timeout of 45000ms
+   * Measured against an ABAP Cloud system: `ECONNRESET` and `timeout of 45000ms
    * exceeded` accounted for every failure in a run where the logic was
    * otherwise correct — the same objects that failed one run succeeded in the
    * next. One aborted socket used to end that dependency for the whole run, and
@@ -325,7 +325,7 @@ describe('Admin: Setup shared dependencies', () => {
       // ask again.
       //
       // The list above activates the objects a human predicted would need it —
-      // `skip_activation: true`, mapped by type. Measured on the trial, that
+      // `skip_activation: true`, mapped by type. Measured on an ABAP Cloud system, that
       // list was incomplete in a way nobody could see: `ZAC_SHR_FUGR` has no
       // `source`, so the "already exists" path did nothing with it and never
       // activated it, and `Z_AC_SHR_FM01` reported "updated and activated" on

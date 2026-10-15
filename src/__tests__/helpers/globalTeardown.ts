@@ -5,7 +5,7 @@
  * rather than asking the server for its own. Something has to release it, and
  * this is the only place that knows the run is over.
  *
- * Without this it would sit until the trial's idle timeout, which the server
+ * Without this it would sit until the ABAP Cloud system's idle timeout, which the server
  * reports as `inactivityTimeout: 1800` — half an hour of one of the two
  * concurrent sessions a user gets, held by nobody.
  */

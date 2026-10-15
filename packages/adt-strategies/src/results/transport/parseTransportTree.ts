@@ -3,7 +3,7 @@
  *
  * The chain above a `tm:request` is not fixed: without `?targets=true` it is
  * `tm:workbench > tm:modifiable > tm:request`; with it, ADT inserts a
- * `tm:target` level in between. Both are real captures from the same trial —
+ * `tm:target` level in between. Both are real captures from the ABAP Cloud system —
  * same data, different request. So this recurses by element NAME — whenever a
  * key (namespace stripped) is `request`, that is a request, whatever nesting
  * got you there — instead of walking a path a caller happened to observe once.

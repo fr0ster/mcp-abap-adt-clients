@@ -1106,7 +1106,7 @@ export const HANDLERS = {
       'lockable',
     ],
     why:
-      'No versions resource. It DOES lock: measured from Eclipse on the trial, ' +
+      'No versions resource. It DOES lock: measured from Eclipse on an ABAP Cloud system, ' +
       '`_action=LOCK&accessMode=MODIFY` before a publish job and `_action=UNLOCK` ' +
       'when the editor closes — publishing is what editing a binding is. ' +
       'This entry used to say ADT offers no lock, which was never checked.',

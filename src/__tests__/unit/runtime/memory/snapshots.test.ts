@@ -23,7 +23,7 @@ describe('runtime/memory/snapshots', () => {
     const connection = createConnectionMock();
 
     await listSnapshots(connection);
-    await listSnapshots(connection, 'CB9980000423', 'BATCH_USER');
+    await listSnapshots(connection, 'DEVELOPER', 'BATCH_USER');
 
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       1,
@@ -35,7 +35,7 @@ describe('runtime/memory/snapshots', () => {
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/memory/snapshots?user=CB9980000423&originalUser=BATCH_USER',
+        url: '/sap/bc/adt/runtime/memory/snapshots?user=DEVELOPER&originalUser=BATCH_USER',
         method: 'GET',
       }),
     );

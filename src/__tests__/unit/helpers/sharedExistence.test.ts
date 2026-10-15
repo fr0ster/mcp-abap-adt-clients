@@ -1,7 +1,7 @@
 /**
  * Whether a refused read says the object is not there — judged by SAP's text
  * first, by the status only when there is no text. The bodies are the answers
- * the cloud trial gave, trimmed.
+ * the ABAP Cloud system gave, trimmed.
  */
 const { answerSaysAbsent } = require('../../helpers/test-helper');
 

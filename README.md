@@ -450,7 +450,7 @@ await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TE
 The `withLongPolling` parameter asks ADT to hold a read until the object is
 available, instead of answering from whatever is there right now:
 
-> **Measured caveat — do not rely on it for readiness.** On an SAP BTP trial the
+> **Measured caveat — do not rely on it for readiness.** On the ABAP Cloud system the
 > parameter changes nothing on an object read. Reading a message class straight
 > after creating it returned `404` in ~650ms **with** the flag — the same
 > latency as without it — and the server did not hold the request. The system's

@@ -6,7 +6,7 @@
  * probe's third question is whether this user may create a check variant, and
  * treating any non-2xx as "not allowed" would close it on evidence that says
  * something else entirely. That is not hypothetical — the first attempt against
- * the trial answered `400 "Parameter corrNr could not be found"`, a complaint
+ * the ABAP Cloud system answered `400 "Parameter corrNr could not be found"`, a complaint
  * about the URL, with authorisation never reached.
  *
  * A live run cannot be relied on to produce a 400, a 409 and a dropped socket
@@ -37,7 +37,7 @@ describe('classifyCreateOutcome', () => {
   });
 
   it('does not read an authorization-shaped refusal as the answer', () => {
-    // The 403 measured on the trial named S_ABPLNGVS — the ABAP language
+    // The 403 measured on an ABAP Cloud system named S_ABPLNGVS — the ABAP language
     // version, not a role — and the payload sent carried a SAP-owned variant's
     // package and version. So it may be about the request. A 401 is weaker
     // still: an expired session says nothing about what its owner may do.

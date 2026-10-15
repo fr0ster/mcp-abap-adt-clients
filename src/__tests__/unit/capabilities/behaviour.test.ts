@@ -260,7 +260,7 @@ const VERB_BY_HANDLER: Record<string, string> = {
   'functionInclude.validate': 'GET',
   // A transport request's deletion check is a GET on the request itself. The
   // deletion service answers `No URI-Mapping defined for URI …` for a transport
-  // — measured on the cloud trial — so asking it there would report a fact
+  // — measured on an ABAP Cloud system — so asking it there would report a fact
   // about the address rather than about the request.
   'transport.checkDeletion': 'GET',
   // A binding's `update` is its publication: one POST to a job endpoint, not a

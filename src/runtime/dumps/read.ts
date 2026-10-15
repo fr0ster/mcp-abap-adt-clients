@@ -66,7 +66,7 @@ export function buildDumpIdPrefix(
 /**
  * Build ADT runtime dumps query expression for user filtering.
  *
- * @example and( equals( user, CB9980000423 ) )
+ * @example and( equals( user, DEVELOPER ) )
  */
 export function buildRuntimeDumpsUserQuery(user?: string): string | undefined {
   const normalized = user?.trim();

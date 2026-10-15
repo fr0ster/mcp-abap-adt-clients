@@ -734,7 +734,7 @@ had:
 - **A task created explicitly through `createTask()` is born unclassified,
   and the creating call cannot change that.** Measured against BTP ABAP on
   2026-09-23: `tm:type` passed to `newtask` is accepted and ignored, and every
-  task on that system read back as `Unclassified`. That system is a trial with
+  task on that system read back as `Unclassified`. That ABAP Cloud system has
   no transport system configured, so the CTS edit flow never creates a request
   there and every request and task is made by hand. All of them came through
   `newtask`, from this library's tests and from mcp-abap-adt's, and until
@@ -1884,8 +1884,7 @@ if (done.ok) console.log(done.getResult().value.findingStats); // "0,0,1"
 `findingStats` is the server's `FINDING_STATS` triple verbatim, for example
 `"0,0,1"`. It is still not parsed into named counts, but the ordering is no
 longer a single observation: a worklist with one priority-3 finding read
-`"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (BTP
-trial, 2026-09-08, `ZAC_SHR_ATC_DIRTY` under `ABAP_CLOUD_DEVELOPMENT_DEFAULT`).
+`"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (the ABAP Cloud system, 2026-09-08, `ZAC_SHR_ATC_DIRTY` under `ABAP_CLOUD_DEVELOPMENT_DEFAULT`).
 Two points fitting `(priority 1, priority 2, priority 3)` and no other ordering
 that survives both. Position one has still never been seen non-zero, which is
 why this stays a string: `{ errors, warnings, infos }` would name a severity
@@ -1979,7 +1978,7 @@ const recentDumps = await dumps.list({
 });
 
 // Filter by user
-const userDumps = await dumps.listByUser('CB9980000423', {
+const userDumps = await dumps.listByUser('DEVELOPER', {
   inlinecount: 'allpages',
   top: 50,
   from: '20260401000000',

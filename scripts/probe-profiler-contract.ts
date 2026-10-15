@@ -1,7 +1,7 @@
 /**
  * The two measurements interfaces 22.0.0 waits on.
  *
- * Run on a system that HAS cross traces — the BTP trial has none, and its
+ * Run on a system that HAS cross traces — the ABAP Cloud system has none, and its
  * parameters endpoint refuses GET, which is why this exists. See
  * fr0ster/mcp-abap-adt-interfaces#46 and the plan's Tasks 0.1 / 0.2.
  *

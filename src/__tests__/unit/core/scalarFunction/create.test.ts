@@ -36,8 +36,8 @@ describe('scalarFunction create', () => {
       scalar_function_name: 'zok_test_func',
       package_name: 'zok_test',
       description: 'A & B',
-      masterSystem: 'TRL',
-      responsible: 'CB9980008038',
+      masterSystem: 'SID',
+      responsible: 'DEVELOPER',
     });
 
     expect(cap.url).toBe('/sap/bc/adt/ddic/dsfd/sources');
@@ -49,8 +49,8 @@ describe('scalarFunction create', () => {
     );
     expect(cap.data).toContain('adtcore:type="DSFD/SCF"');
     expect(cap.data).toContain('adtcore:name="ZOK_TEST_FUNC"');
-    expect(cap.data).toContain('adtcore:masterSystem="TRL"');
-    expect(cap.data).toContain('adtcore:responsible="CB9980008038"');
+    expect(cap.data).toContain('adtcore:masterSystem="SID"');
+    expect(cap.data).toContain('adtcore:responsible="DEVELOPER"');
     expect(cap.data).toContain('adtcore:description="A &amp; B"');
     expect(cap.data).toContain('<adtcore:packageRef adtcore:name="ZOK_TEST"/>');
   });

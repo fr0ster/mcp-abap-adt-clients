@@ -2505,8 +2505,8 @@ async function activateSharedFunctionGroup(
   // **The POST answering is not the group being active.** No `analyse` is
   // passed, so `ok` means the request came back — and ADT puts a refusal inside
   // a 200, which makes `ok` true for "activated" and for "will not activate"
-  // alike. Measured with `scripts/probe-activation-settle.ts` on the cloud
-  // trial: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
+  // alike. Measured with `scripts/probe-activation-settle.ts` on
+  // the ABAP Cloud system: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
   // on the inactive list afterwards — the exact state this repair exists to
   // remove, about to be recorded as removed.
   //
@@ -2587,10 +2587,10 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Existence is asked of the object's own URI — its metadata — never of its
   // source. A source answers nothing about existence: a service definition
   // created and not yet written answers `200` with an empty source, a function
-  // module that does not exist answers `500` on its source, and on the trial
+  // module that does not exist answers `500` on its source, and on an ABAP Cloud system
   // an absent object's source answers `200` and no body. Its metadata answers
   // a document when the object is there and `ExceptionResourceNotFound` when
-  // it is not. Measured on the trial for a function module, a service
+  // it is not. Measured on an ABAP Cloud system for a function module, a service
   // definition and a package.
   const readShared = async () => {
     if (type === 'domains') {
@@ -2669,7 +2669,7 @@ async function ensureSharedDependency(client, type, name, logger) {
       // find out", and turning that into `exists = false` is a guess that then
       // does something irreversible.
       //
-      // Measured on the BTP trial: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU
+      // Measured on an ABAP Cloud system: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU
       // failed on a flaky link, the blanket catch here called them missing, and
       // the create that followed came back
       // `400 ExceptionResourceAlreadyExists: Resource Domain ZAC_SHR_GA_DOM

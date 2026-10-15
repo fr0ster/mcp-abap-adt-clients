@@ -30,7 +30,7 @@ interface IT100Failure extends IAdtError {
   readonly t100: { readonly msgid: string; readonly msgno: string };
 }
 
-/** The refusal ADT answers for a class that is not there. Measured on trial. */
+/** The refusal ADT answers for a class that is not there. Measured on an ABAP Cloud system. */
 const REFUSED = `<?xml version="1.0" encoding="UTF-8"?>
 <chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">
   <chkl:properties checkExecuted="false" activationExecuted="false" generationExecuted="true"/>

@@ -556,8 +556,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * **A task is born without one**, and passing a type to
    * {@link createTask} does not change that: measured against BTP ABAP on
    * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
-   * every task on that system read back as `Unclassified`. That system is a
-   * trial with no transport system configured, so the CTS edit flow never
+   * every task on that system read back as `Unclassified`. That ABAP Cloud system has
+   * no transport system configured, so the CTS edit flow never
    * creates a request there and every request and task is made by hand. All
    * of them came through `newtask`, from this library's tests and from
    * mcp-abap-adt's, and until this member existed neither changed a task's
