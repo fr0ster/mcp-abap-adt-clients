@@ -24,6 +24,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [32.0.0] - 2026-10-15
+
+**BREAKING:** `@mcp-abap-adt/interfaces-adt` is `^18.0.0`. The enhancement
+contract now describes the three subtypes SAP serves through ADT, and custom
+result sets for enhancement hosts need two more slots. See *Migrating from 31*
+below and [MIGRATION-32.md](docs/usage/MIGRATION-32.md).
+
+### Changed
+
+- **`EnhancementType` is `enhoxhb | enhoxhh | enhsxsb`.** `enhoxh` and
+  `enhsxs` are gone: the measured reads answered 500, rather than an ADT
+  document. The subtype codes are SAP's `ENHO/XHB`, `ENHO/XHH` and `ENHS/XSB`,
+  replacing the invented `ENHO/EXHB`, `ENHO/EXHH` and `ENHS/EXSB`.
+- Each subtype sends its own Accept and Content-Type:
+  `enhoxhb` uses `application/vnd.sap.adt.enh.enhoxhb.v4+xml`, `enhoxhh`
+  uses `application/vnd.sap.adt.enh.enhoxhh.v3+xml`, and `enhsxsb` uses
+  `application/vnd.sap.adt.enh.enhs.v2+xml`. The old shared type answered
+  406 on reads and 415 on create; the 406 carried no acceptable types for
+  negotiation to retry. `enhoxhh` source reads send Accept `text/plain`:
+  `text/plain; charset=utf-8` answered 406.
+- Create bodies use SAP's ENHO/ENHS namespaces and subtype-specific content.
+  `enhoxhb` names its `enhancementSpot`; `enhoxhh` carries `enhancedObject`,
+  `enhancementOption` and `enhancementMode`; `enhsxsb` carries the BAdI
+  definition container. Create remains one POST, without a source write.
+- `IClassResults`, `IProgramResults`, `IFunctionGroupResults` and
+  `IIncludeResults` require `enhancementElements` and `enhancementOptions`.
+  Their shipped document sets supply `rawDocument` for both.
+- `@mcp-abap-adt/interfaces-adt` moves from `^16.0.0` to `^18.0.0`.
+  The `@mcp-abap-adt/adt-strategies` devDependency stays `^0.10.0`.
+
+### Added
+
+- **`readEnhancementElements` and `readEnhancementOptions`** on class,
+  program and function group via `IAdtEnhancementHost`, and on include via
+  `IAdtIncludeEnhancementHost` — closes #227. Each is one GET and answers its
+  document by default. An include's two reads take `context`, the main
+  program's name (without it SAP answered 400 ED/258); the implementation
+  builds the program's ADT URI from it.
+- The first enhancement-family integration tests, exercised on E19 and trial:
+  subtype lifecycles, metadata/source reads and host elements/options. Trial
+  refuses the `enhoxhh` collection with 403; XHH lifecycle coverage is on E19.
+
+### Migrating from 31
+
+- Declare `@mcp-abap-adt/interfaces-adt` `^18.0.0` wherever you import its
+  contracts; `adt-strategies` 0.12.0 declares that range too.
+- Custom result sets for class, program, function group and include add
+  `enhancementElements: rawDocument` and `enhancementOptions: rawDocument`,
+  or strategies of their own. Spreading the shipped document set supplies them.
+- Remove code using `enhoxh` or `enhsxs`; neither is in `EnhancementType`.
+- Pass `enhancementSpot` when creating `enhoxhb`. For `enhoxhh`, pass
+  `enhancedObject`, `enhancementOption` and `enhancementMode`: get the option
+  name from the host's `readEnhancementOptions` document. Its mode is the word
+  `static` or `dynamic`; create takes the corresponding code `S` or `D`.
+
 ## [31.1.0] - 2026-10-13
 
 ### Changed

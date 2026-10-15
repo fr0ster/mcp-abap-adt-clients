@@ -14,7 +14,7 @@ Primary public entry points:
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^12`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^1`, since 23.0.0); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
+- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^18`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^3`); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
 - **The library interprets nothing.** Every member makes one ADT request. What the answer becomes is the result strategy the implementation was built with; whether it is a failure is the `analyse` the caller passes with the call. The shipped result sets answer documents as they arrived; the readings and verdicts are in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). Decision 15 in [DECISIONS.md](DECISIONS.md).
 
 ## Layered Structure
@@ -120,9 +120,20 @@ in both cases, so a change can be checked against SAP rather than assumed.
 - `getFeatureToggle()` for FTG2/FT feature-toggle CRUD plus domain methods (switchOn, switchOff, getRuntimeState, checkState, readSource); modern on-prem and cloud only
 - `getServiceBinding()` for RAP BO service binding CRUD + lifecycle
 - `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`, `getEnhancement()`
+- `getInclude()` for standalone `PROG/I` includes
 - `getRequest()`
 - class include helpers: `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()`
 - utilities: `getUtils()`
+
+Class, program and function group also implement `IAdtEnhancementHost`;
+include implements `IAdtIncludeEnhancementHost`. Their `readEnhancementElements`
+and `readEnhancementOptions` each issue one GET and use result slots
+`enhancementElements` and `enhancementOptions` (`rawDocument` by default).
+Include `context` is the main program name on both reads; the implementation
+builds its URI. These are host members, not `AdtUtils` utilities.
+`getEnhancement()` supports `enhoxhb`, `enhoxhh` and `enhsxsb`, with SAP's
+subtype-specific content types and create bodies. See the
+[API reference](../usage/CLIENT_API_REFERENCE.md#enhancements-and-their-hosts).
 
 Each object module encapsulates its ADT endpoint specifics in `core/<object>/*.ts`, while `Adt<Object>.ts` implements the capability atoms, one request per member.
 
@@ -187,6 +198,9 @@ Critical conventions used across object modules:
 - SQL query and table contents.
 - group activation/deletion and inactive objects.
 - source/metadata helpers for supported object types.
+
+Enhancement elements and options are exposed on class, program, function group
+and include handlers, not `AdtUtils`; see the host members above.
 
 Notably, where-used is three calls, in the caller's order:
 - scope fetch (`getWhereUsedScope`) — a sub-resource some S/4 releases answer `404`; what to do then is the caller's decision,
@@ -268,7 +282,7 @@ produce is neither.
 
 Rationale: the two packages previously held independent copies of the same interfaces, and they drifted silently — a field required on one side and optional on the other produced no error anywhere. A single definition site makes that class of bug impossible.
 
-**Honest capability types (8.0.0, finished in 12.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces-adt` (`IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`) — and since interfaces 29.0.0 there is nothing above them: `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed for forcing one result type on members that answer different things. Each `Adt<Object>` class `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to that honest set, so calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error rather than a runtime throw.
+**Honest capability types (8.0.0, finished in 12.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces-adt` (`IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtEnhancementHost`, `IAdtIncludeEnhancementHost`) — and since interfaces 29.0.0 there is nothing above them: `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed for forcing one result type on members that answer different things. Each `Adt<Object>` class `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to that honest set, so calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error rather than a runtime throw.
 
 Since **12.0.0** the claim is enforced rather than asserted. Every stub that threw is gone — not narrowed, deleted — including the last three handlers whose composites lived in the interfaces package (`transport`, `featureToggle`, `serviceBinding`). Four class-include handlers lost `create()`, because an include is not created: it exists because its class does, and writing source into it is `update`. They no longer extend `AdtClass` either — a shared `AdtClassMemberBase` gives them the container's lock, activation, metadata, transport and include version history and nothing else, so their declared type and their runtime shape agree.
 
@@ -283,7 +297,7 @@ No contract type is re-exported, and no reading or verdict ships: those are in
 the contract packages and in `@mcp-abap-adt/adt-strategies`.
 
 What stays declared locally, and why:
-- **Runtime (value) exports** — these are code, not contract: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`src/core/enhancement/types.ts`), `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP` (`src/core/service/types.ts`).
+- **Internal runtime values** — `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`src/core/enhancement/types.ts`), `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP` (`src/core/service/types.ts`) are implementation details, not package exports.
 - **`AdtContentTypesBase` / `AdtContentTypesModern`** — the two shipped header-set implementations (354 lines, 38 methods). They `implements IAdtContentTypes` from `@mcp-abap-adt/interfaces-adt`; the interface itself is not declared here.
 
 **Contract consolidation (11.0.0).** As of 11.0.0 adt-clients declares no contract type at all, not even the ones a consumer needs only to configure or call this package's own clients: `IAdtClientOptions`, `IAdtSystemContext`, `IAdtContentTypes`, `IAdtHeaders`, the three `IBatch*` shapes, the twelve abapGit types, the ten executor types, and the five debugger types all moved to the contract packages — `@mcp-abap-adt/interfaces-adt` for all of these. Import them from there; the names and shapes are unchanged. Internal low-level helpers are intentionally not part of root API.

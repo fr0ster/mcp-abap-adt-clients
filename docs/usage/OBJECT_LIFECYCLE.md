@@ -156,7 +156,7 @@ await client.getClass().update({ className }, { source, lockHandle });
 
 | the type | what `source` holds |
 |---|---|
-| class, interface, program, include, function module, function include, enhancement | ABAP |
+| class, interface, program, include, function module, function include, enhancement (`enhoxhh` only) | ABAP |
 | DDL source, table, structure, append structure, scalar function | CDS DDL |
 | access control | CDS DCL |
 | transformation | XSLT or Simple Transformation |

@@ -24,6 +24,123 @@ live in [`@mcp-abap-adt/adt-strategies`](../../packages/adt-strategies), and
 [MIGRATION-23.md](MIGRATION-23.md) maps each removed behaviour to the code that
 replaces it.
 
+## Enhancements and their hosts
+
+`getEnhancement()` supports `enhoxhb` (BAdI implementation, `ENHO/XHB`),
+`enhoxhh` (source plugin, `ENHO/XHH`) and `enhsxsb` (BAdI spot, `ENHS/XSB`).
+`EnhancementType` comes from `@mcp-abap-adt/interfaces-adt` 18; `enhoxh` and
+`enhsxs` are no longer supported. Only `enhoxhh` has ABAP source (`read`); use `readMetadata` for the other
+two subtypes. The trial system refused the XHH collection
+with 403; E19 served it. Discovery alone does not prove access.
+
+| Factory | Capability atom | Members | Result slots |
+|---|---|---|---|
+| `getClass()` | `IAdtEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
+| `getProgram()` | `IAdtEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
+| `getFunctionGroup()` | `IAdtEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
+| `getInclude()` | `IAdtIncludeEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
+
+Each read is one GET: `{host}/source/main/enhancements/elements` lists existing
+implementations, while `{host}/enhancements/options` lists places that can be
+enhanced. Their Accept types are `application/vnd.sap.adt.enhancements.v3+xml`
+and `application/vnd.sap.adt.enhancementoptions.v2+xml`. Both answer raw XML by
+default; no base64 source is decoded. An empty `<enh:enhancements/>` is a valid
+answer. A nonexistent class answered 400 `EnhancementError`, not 404.
+These members belong to the typed hosts; `AdtUtils` has no enhancement member.
+
+```typescript
+const elements = await client.getClass().readEnhancementElements({
+  className: 'CL_ABAP_TYPEDESCR',
+});
+if (!elements.ok) throw new Error(elements.getError().message);
+const elementsXml = elements.getResult().value;
+
+const include = client.getInclude();
+const includeElements = await include.readEnhancementElements(
+  { includeName: 'LSVIMTOP' },
+  { context: 'SAPLSVIM' },
+);
+const includeOptions = await include.readEnhancementOptions(
+  { includeName: 'LSVIMTOP' },
+  { context: 'SAPLSVIM' },
+);
+```
+
+For an include, `context` on **both** reads is the main program's name, not a
+URI. The library builds `/sap/bc/adt/programs/programs/saplsvim` and encodes it
+in the query. Omitting context for LSVIMTOP answered 400 `ED/258`, "No main
+program for include LSVIMTOP found".
+
+Create an XHH from an option returned by the program. This example uses
+`fast-xml-parser` to read the default XML result; choose an option suitable for
+your host rather than assuming the first is the intended one:
+
+```typescript
+import { XMLParser } from 'fast-xml-parser';
+
+const programName = 'ZREPORT';
+const options = await client.getProgram().readEnhancementOptions({ programName });
+if (!options.ok) throw new Error(options.getError().message);
+const parsed = new XMLParser({ ignoreAttributes: false }).parse(
+  options.getResult().value,
+);
+const nodes = parsed['enho:enhancementOption']['enho:option'];
+const option = Array.isArray(nodes) ? nodes[0] : nodes;
+if (!option) throw new Error('The host returned no enhancement option');
+const mode = option['@_enho:mode'];
+if (mode !== 'static' && mode !== 'dynamic') throw new Error('Unknown option mode');
+const created = await client.getEnhancement().create({
+  enhancementName: 'ZENH_REPORT',
+  enhancementType: 'enhoxhh',
+  packageName: 'ZPACKAGE',
+  description: 'Report enhancement',
+  transportRequest: 'DEVK900001', // On-prem transport; omit for a local cloud object.
+  enhancedObject: {
+    uri: `/sap/bc/adt/programs/programs/${programName.toLowerCase()}`,
+    type: 'PROG/P',
+    name: programName,
+    program: programName,
+  },
+  enhancementOption: option['@_enhocore:full_name'],
+  enhancementMode: mode === 'static' ? 'S' : 'D',
+});
+if (!created.ok) throw new Error(created.getError().message);
+```
+
+The options document says `static`/`dynamic`; create requires `S`/`D`. Passing
+`static` to create answered 400. `enhoxhb` create instead requires
+`enhancementSpot`, the existing spot's name. It creates the BAdI container;
+adding BAdI definitions, implementing classes and filters is a separate concern.
+Create is one POST; source update, locking and activation remain the caller's
+sequence. See [OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md).
+
+Metadata and create use subtype-specific content types:
+
+| Subtype | Accept / Content-Type |
+|---|---|
+| `enhsxsb` | `application/vnd.sap.adt.enh.enhs.v2+xml` |
+| `enhoxhb` | `application/vnd.sap.adt.enh.enhoxhb.v4+xml` |
+| `enhoxhh` | `application/vnd.sap.adt.enh.enhoxhh.v3+xml` |
+
+XHH source reads use Accept `text/plain`. The previous shared enhancement type
+answered 406 on reads and 415 on create; a source Accept with charset answered
+406 too. The old internal `ACCEPT_ENHANCEMENT` / `CT_ENHANCEMENT` constants
+were never package exports; no public import replacement is needed.
+
+Custom `IClassResults`, `IProgramResults`, `IFunctionGroupResults` and
+`IIncludeResults` must provide both new slots. Spreading the shipped sets
+supplies `rawDocument` for them:
+
+```typescript
+import { classDocuments, rawDocument } from '@mcp-abap-adt/adt-clients';
+
+const classes = client.getClass({
+  ...classDocuments,
+  enhancementElements: rawDocument,
+  enhancementOptions: rawDocument,
+});
+```
+
 ## AdtClient
 
 ```typescript
