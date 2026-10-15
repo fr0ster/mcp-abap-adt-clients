@@ -1,4 +1,10 @@
-/** Integration measurements extending docs/superpowers/plans/2026-10-15-enhancement-wire.md. */
+/**
+ * The ENHO/ENHS family and the enhancement hosts against a real system.
+ *
+ * What these cases assert was measured on an on-premise and an ABAP Cloud
+ * system before the code was written (2026-10-15); the notes are in git history
+ * (removed in the 32.0.0 release branch), the facts in the CHANGELOG.
+ */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
