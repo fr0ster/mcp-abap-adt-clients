@@ -65,33 +65,94 @@ Function group and include hosts: not probed yet.
 
 - without `enhs:contentSpecific` → 400 `ExceptionInvalidData` "System expected the element '{…/enhs}contentSpecific'";
 - with it → **201**, `enhs:objectData` `version="inactive"`.
-- The same POST on E19 → 400 `ExceptionParameterNotFound` "Parameter corrNr could not be found." (needs a transport; not done — the one transport E19 offered belongs to unrelated work).
+- The same POST on E19 without `corrNr` → 400 `ExceptionParameterNotFound`
+  "Parameter corrNr could not be found."; with `?corrNr=E19K907111` into
+  `ZAC_TEST_PKG` → **201**.
+
+E19 test target, verified: `~/.config/mcp-abap-adt/test-config.e19.yaml` names
+`ZAC_TEST_PKG` / `E19K907111`. The request is OKYSLYTSIA's, status D,
+"adt-clients integration tests", and holds `ZAC_TEST_PKG` and
+`ZAC_TEST_PKG_SRVB` themselves (`lock_status="X"`). `ZADT_BLD_PKG03` exists on
+E19 too but has no transport layer — it is the trial's package, not E19's.
+
+### ENHO/XHB — two steps, as the editor does it
+
+A POST carrying no spot fails: trial 400 `TK620` "No administration
+authorization in Change and Transport System" (with and without corrNr), E19
+400 `SD/269` "No documentation class is assigned to object R3TR ENHO.". The
+container must name the spot in `enho:usages` (shape taken from
+vibing-steampunk `pkg/adt/enhancements_badi.go`, then verified here):
+
+```xml
+<enho:objectData xmlns:enho="http://www.sap.com/adt/enhancements/enho" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore" adtcore:name="…" adtcore:type="ENHO/XHB" adtcore:description="…" adtcore:language="EN" adtcore:masterLanguage="EN">
+  <adtcore:packageRef adtcore:name="…"/>
+  <enho:contentCommon enho:toolType="BADI_IMPL">
+    <enho:usages>
+      <enhcore:referencedObject enhcore:element_usage="EXTO" enhcore:program_id="R3TR">
+        <enhcore:objectReference adtcore:name="{SPOT}" adtcore:type="ENHS/XS"/>
+        <enhcore:mainObjectReference/>
+      </enhcore:referencedObject>
+    </enho:usages>
+  </enho:contentCommon>
+  <enho:contentSpecific><enho:badiTechnology><enho:badiImplementations/></enho:badiTechnology></enho:contentSpecific>
+</enho:objectData>
+```
+
+→ **201** on E19 (spot `ZDISCOUNT_CALCULATION`, corrNr) and on trial (spot
+`ZDEMO_ENHANCEMENT`, no corrNr). The implementation itself (BAdI definition,
+implementing class, filters) is then a lock / PUT of the full document /
+unlock — not measured yet (stateful).
+
+### ENHO/XHH — needs an enhancement option of the host
+
+`GET {host}/enhancements/options` (Accept
+`application/vnd.sap.adt.enhancementoptions.v2+xml`) lists the options, e.g.
+`\PR:ZOK_REQ_REP_TEST\IC:ZOK_REQ_REP_TEST\SE:END\EI`. Body (vibing-steampunk
+`pkg/adt/enhancements_create.go`, verified):
+
+```xml
+<enho:enhancement xmlns:enho="http://www.sap.com/adt/enhancements/enho" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="…" adtcore:type="ENHO/XHH" adtcore:description="…" adtcore:language="EN" adtcore:masterLanguage="EN">
+  <adtcore:packageRef adtcore:name="…"/>
+  <enho:contentCommon enho:toolType="HOOK_IMPL" enho:adjustmentStatus="" enho:upgradeFlag="false"/>
+  <enho:contentSpecific>
+    <enho:hookTechnology enho:nextId="2">
+      <enho:enhancedObject adtcore:uri="/sap/bc/adt/programs/programs/zok_req_rep_test" adtcore:type="PROG/P" adtcore:name="ZOK_REQ_REP_TEST"/>
+      <enho:hookImplementation enho:id="1" enho:spotname="" enho:programname="ZOK_REQ_REP_TEST" enho:overwrite="" enho:method="" enho:enhmode="S" enho:full_name="\PR:ZOK_REQ_REP_TEST\IC:ZOK_REQ_REP_TEST\SE:END\EI" enho:full_description=""/>
+    </enho:hookTechnology>
+  </enho:contentSpecific>
+</enho:enhancement>
+```
+
+- `enho:enhmode="static"` → 400 "An error occurred when deserializing in the
+  simple transformation program ST_ENH_ADT_ENHO_HOOK_IMPL" at
+  `hookImplementation`; the mode is a code (`S`, `D` — an existing plugin
+  carries `D`). With `S` → **201** on E19.
+- The new plugin's source reads at once (`?version=inactive`, `text/plain`):
+  `ENHANCEMENT 1  .` / `*` / `ENDENHANCEMENT.`
+- The host's `…/source/main/enhancements/elements` lists it immediately,
+  `version="inactive"` — the #227 listing and ENHO/XHH are the same objects.
+- Trial: `POST enhoxhh` → **403** `ExceptionResourceNoAuthorization` "No
+  authorization to access the resource /sap/bc/adt/enhancements/enhoxhh."
 
 **Our `create.ts` body** (`enh:enhancement` in `http://www.sap.com/adt/enhancements`,
 Content-Type `…enhancements.v1+xml`) → **415** `SADT_RESOURCE/039` on trial.
 Its type codes are invented too: `ENHS/EXSB`, `ENHO/EXHB`, … where SAP says
 `ENHS/XSB`, `ENHO/XHB`, `ENHO/XHH`, `ENHO/XH`, `ENHS/XS`.
 
-`POST enhoxhb` on trial (`enho:objectData`, `toolType="BADI_IMPL"`, empty
-`badiImplementations`), with and without `?corrNr=TRLK900438` → 400
-`ExceptionResourceCreationFailure` "No administration authorization in Change
-and Transport System" (`TK620`). Not resolved: may need a spot/BAdI reference
-in the body, as an existing XHB carries `enho:enhancementSpot`,
-`enho:badiDefinition`, `enho:implementingClass` per implementation.
-
 ## Delete
 
-`POST /sap/bc/adt/deletion/delete` (our `delete.ts` body, empty
-`del:transportNumber`) on trial → 200 `del:deletionResult`
-`del:isDeleted="true"`; the object then reads 404. **Works as it is.**
+`POST /sap/bc/adt/deletion/delete` (our `delete.ts` body;
+`del:transportNumber` empty on trial, `E19K907111` on E19) → 200
+`del:deletionResult` `del:isDeleted="true"` for XSB, XHB and XHH on both
+systems; each then reads 404. **Works as it is.**
 
 ## Not measured
 
-Lock / source write / unlock / activate (need a stateful session — through the
-library's integration tests once the reads are fixed); anything on E19 that
-creates (no transport); XHB create; function-group and include hosts of the
-elements read.
+Lock / source write / unlock / activate (stateful — through the library's
+integration tests once the wire is fixed); the BAdI implementation PUT into an
+XHB container; function-group and include hosts of the elements read.
 
 ## Left on systems
 
-Nothing. `ZADT_ENHS_XSB_T1` (trial) created and deleted.
+Nothing. Created and deleted: `ZADT_ENHS_XSB_T1` (both), `ZADT_ENHO_XHB_T1`
+(both), `ZADT_ENHO_XHH_T1` (E19).
