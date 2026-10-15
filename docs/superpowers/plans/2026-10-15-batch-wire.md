@@ -78,6 +78,29 @@ activation inside the part's `chkl:messages`, not its status.
 `activationExecuted="true"`, no message). Read back: `version="active"`, the
 description the PUT wrote. Two round trips instead of five.
 
+### 100 domains, timed (E19)
+
+Same inner requests as the library sends; envelope stateful; 100 names
+`ZAC_BD_0001…0100` in `ZAC_TEST_PKG` on `E19K907111`, deleted afterwards.
+
+| step | parts | size | answer | time |
+|---|---|---|---|---|
+| E1 create + LOCK | 200 | 110 KiB | 202; 100×201, 100×200; 100/100 handles | 11.9 s |
+| E2 PUT + UNLOCK + activate | 300 | 209 KiB | 202; 300×200; 0 activation parts with `type="E"` | 33.2 s |
+| E3 read metadata | 100 | 23 KiB | 202; 100×200; 100/100 `version="active"` | 1.3 s |
+| E4 delete | 100 | 58 KiB | 202; 100×200 | 14.0 s |
+| E5 read after delete | 100 | 23 KiB | 202; 100×404 | 0.9 s |
+
+create … activate: **45.1 s in 2 requests** (batch) against **111.9 s in 500
+requests** (the same steps one at a time through the members, on 100 other names;
+100/100 activated cleanly; deleted by batch, 100/100 404 afterwards). Most of E2
+is the hundred activations, run one after another server-side — one group
+activation should replace them.
+
+The 2026-09 removal of the old batch clients ("mixed GET and POST from unrelated
+resources in one envelope is a server-side 500") was measured on
+`debugger/batch`; `communication/batch` takes mixed envelopes (above).
+
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 
 ```
