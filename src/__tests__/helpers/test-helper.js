@@ -163,13 +163,16 @@ function isTestAvailableForEnv(testCase) {
 /**
  * Load test configuration from YAML
  */
-function loadTestConfig() {
+function loadTestConfig(configDirectory = __dirname) {
   if (cachedConfig) {
     return cachedConfig;
   }
 
-  const configPath = path.resolve(__dirname, 'test-config.yaml');
-  const templatePath = path.resolve(__dirname, 'test-config.yaml.template');
+  const configPath = path.resolve(configDirectory, 'test-config.yaml');
+  const templatePath = path.resolve(
+    configDirectory,
+    'test-config.yaml.template',
+  );
 
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, 'utf8');
@@ -181,10 +184,10 @@ function loadTestConfig() {
   if (fs.existsSync(templatePath)) {
     if (!displayedTemplateWarning) {
       console.warn(
-        '⚠️ tests/test-config.yaml not found. Using tests/test-config.yaml.template (all integration tests remain disabled).',
+        '⚠️ test-config.yaml not found. Using test-config.yaml.template; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
       );
       console.warn(
-        '   Copy the template to tests/test-config.yaml and fill in your SAP system details to run integration tests.',
+        '   Copy the template to test-config.yaml and fill in your SAP system details.',
       );
       displayedTemplateWarning = true;
     }
@@ -199,6 +202,12 @@ function loadTestConfig() {
     'Please copy tests/test-config.yaml.template to tests/test-config.yaml and configure test parameters.',
   );
   process.exit(1);
+}
+
+/** Whether the cached configuration came from the placeholder template. */
+function isTestConfigTemplate() {
+  loadTestConfig();
+  return configLoadedFrom === 'template';
 }
 
 /**
@@ -3295,6 +3304,7 @@ module.exports = {
   writeAndActivate,
   mustSucceed,
   loadTestConfig,
+  isTestConfigTemplate,
   getSessionConfig,
   getEnabledTestCase,
   getAllEnabledTestCases,

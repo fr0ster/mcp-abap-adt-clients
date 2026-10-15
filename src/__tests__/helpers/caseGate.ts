@@ -1,6 +1,19 @@
 import { TestConfigResolver } from './TestConfigResolver';
 
-const { loadTestConfig } = require('./test-helper');
+const { loadTestConfig, loadTestEnv, isTestConfigTemplate } =
+  require('./test-helper');
+
+export { isTestConfigTemplate };
+
+export const MISSING_TEST_CONFIG =
+  'test-config.yaml missing — copy the template and fill it in';
+
+export function missingCaseMessage(
+  handlerName: string,
+  testCaseName: string,
+): string {
+  return `case ${handlerName}/${testCaseName} not in test-config.yaml`;
+}
 
 type ConfigLoader = () => any;
 
@@ -21,6 +34,8 @@ export function configuredCase(
  *
  * | Configuration | Registration |
  * | --- | --- |
+ * | No SAP system configured | it.skip |
+ * | Template in use | it (configuration defect) |
  * | Loader throws, or system is missing/invalid | it (normal failure path) |
  * | Case or handler section is absent | it (configuration defect) |
  * | Case exists with enabled !== true | it.skip |
@@ -34,10 +49,21 @@ export function gate(
   handlerName: string,
   testCaseName: string,
   loadConfig: ConfigLoader = loadTestConfig,
+  dependencies: {
+    loadEnv?: () => void;
+    sapConfigured?: () => boolean;
+    templateInUse?: () => boolean;
+  } = {},
 ): jest.It {
+  // Reuse the helper loader in this Jest context; globalSetup is separate.
+  (dependencies.loadEnv ?? loadTestEnv)();
+  if (!(dependencies.sapConfigured ?? (() => !!process.env.SAP_URL?.trim()))())
+    return it.skip;
+
   let config: ReturnType<ConfigLoader>;
   try {
     config = loadConfig();
+    if ((dependencies.templateInUse ?? isTestConfigTemplate)()) return it;
   } catch {
     // Broken configuration must still reach the normal setup failure path.
     return it;
