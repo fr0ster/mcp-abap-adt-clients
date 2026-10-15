@@ -76,8 +76,8 @@ describe('records', () => {
     expect(PACKAGE.uri('$TMP')).toBe('/sap/bc/adt/packages/%24tmp');
   });
   it('enhancement takes its subtype as a segment', () => {
-    expect(ENHANCEMENT.uri('enhoxh', 'ZENH')).toBe(
-      '/sap/bc/adt/enhancements/enhoxh/zenh',
+    expect(ENHANCEMENT.uri('enhoxhb', 'ZENH')).toBe(
+      '/sap/bc/adt/enhancements/enhoxhb/zenh',
     );
   });
   it('service binding and its jobs', () => {

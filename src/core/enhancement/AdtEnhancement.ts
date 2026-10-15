@@ -2,7 +2,7 @@
  * AdtEnhancement - CRUD for enhancement implementations and spots.
  *
  * Every request needs the **type** as well as the name: the URI differs per
- * enhancement type (`enhoxh`, `enhoxhb`, `enhoxhh`, `enhsxs`, `enhsxsb`), so
+ * enhancement type (`enhoxhb`, `enhoxhh`, `enhsxsb`), so
  * a config without one cannot be turned into a request at all.
  *
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
@@ -208,7 +208,9 @@ export class AdtEnhancement<
             description: config.description,
             transport_request: config.transportRequest,
             enhancement_spot: config.enhancementSpot,
-            badi_definition: config.badiDefinition,
+            enhancedObject: config.enhancedObject,
+            enhancementOption: config.enhancementOption,
+            enhancementMode: config.enhancementMode,
             masterSystem: this.systemContext.masterSystem,
             responsible: this.systemContext.responsible,
             masterLanguage:

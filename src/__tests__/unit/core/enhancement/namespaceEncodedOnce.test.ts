@@ -20,27 +20,27 @@ const urlOf = (c: IAbapConnection): string =>
 const bodyOf = (c: IAbapConnection): string =>
   String((c.makeAdtRequest as jest.Mock).mock.calls[0][0].data ?? '');
 
-const ONCE = '/sap/bc/adt/enhancements/enhoxh/%2Fnsp%2Fzenh';
+const ONCE = '/sap/bc/adt/enhancements/enhoxhb/%2Fnsp%2Fzenh';
 
 describe('a namespaced enhancement is encoded once', () => {
   it('lock', async () => {
     const c = connection();
-    await lockEnhancement(c, 'enhoxh', '/NSP/ZENH');
+    await lockEnhancement(c, 'enhoxhb', '/NSP/ZENH');
     expect(urlOf(c)).toContain(ONCE);
   });
   it('unlock', async () => {
     const c = connection();
-    await unlockEnhancement(c, 'enhoxh', '/NSP/ZENH', 'LH');
+    await unlockEnhancement(c, 'enhoxhb', '/NSP/ZENH', 'LH');
     expect(urlOf(c)).toContain(ONCE);
   });
   it('read', async () => {
     const c = connection();
-    await getEnhancementMetadata(c, 'enhoxh', '/NSP/ZENH');
+    await getEnhancementMetadata(c, 'enhoxhb', '/NSP/ZENH');
     expect(urlOf(c)).toContain(ONCE);
   });
   it('activation names it once in the object reference', async () => {
     const c = connection();
-    await activateEnhancement(c, 'enhoxh', '/NSP/ZENH');
+    await activateEnhancement(c, 'enhoxhb', '/NSP/ZENH');
     expect(bodyOf(c)).toContain(ONCE);
     expect(bodyOf(c)).not.toContain('%252');
   });

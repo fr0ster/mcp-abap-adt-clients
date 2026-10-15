@@ -190,19 +190,15 @@ export function buildObjectUri(
     case 'FTG2':
       return `${FEATURE_TOGGLE.uri(name)}`;
 
-    // The subtype is a path segment — `/enhancements/enhoxh/<name>` — so it is
+    // The subtype is a path segment — `/enhancements/enhoxhb/<name>` — so it is
     // read off the type code, and built by the same function the enhancement's
     // own activation uses. This case built `/enhancements/<name>` until #173's
     // check found it, and the subtyped codes fell through to `default`.
-    case 'ENHO/EXH':
-      return getEnhancementUri('enhoxh', name);
-    case 'ENHO/EXHB':
+    case 'ENHO/XHB':
       return getEnhancementUri('enhoxhb', name);
-    case 'ENHO/EXHH':
+    case 'ENHO/XHH':
       return getEnhancementUri('enhoxhh', name);
-    case 'ENHS/EXS':
-      return getEnhancementUri('enhsxs', name);
-    case 'ENHS/EXSB':
+    case 'ENHS/XSB':
       return getEnhancementUri('enhsxsb', name);
 
     case 'ENHO':
@@ -210,7 +206,7 @@ export function buildObjectUri(
       // Which subtype is the caller's to say; guessing one is the `default`
       // branch's mistake below. Their argument is short, not SAP's answer.
       throw new Error(
-        `${type} does not say which enhancement subtype ${name} is, and the subtype is part of its address; pass the full type (e.g. ENHO/EXH, ENHO/EXHB, ENHO/EXHH, ENHS/EXS, ENHS/EXSB)`,
+        `${type} does not say which enhancement subtype ${name} is, and the subtype is part of its address; pass the full type (e.g. ENHO/XHB, ENHO/XHH, ENHS/XSB)`,
       );
 
     default:

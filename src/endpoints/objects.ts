@@ -227,7 +227,7 @@ export const AUTHORIZATION_FIELD = {
   uri: (name: string) => `/sap/bc/adt/aps/iam/auth/${seg(name)}`,
 } as const;
 
-/** The subtype is a path segment: `/enhancements/enhoxh/<name>`. */
+/** The subtype is a path segment: `/enhancements/enhoxhb/<name>`. */
 export const ENHANCEMENT = {
   root: '/sap/bc/adt/enhancements',
   collection: (type: EnhancementType) => `/sap/bc/adt/enhancements/${type}`,
