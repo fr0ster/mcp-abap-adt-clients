@@ -29,9 +29,10 @@ replaces it.
 `getEnhancement()` supports `enhoxhb` (BAdI implementation, `ENHO/XHB`),
 `enhoxhh` (source plugin, `ENHO/XHH`) and `enhsxsb` (BAdI spot, `ENHS/XSB`).
 `EnhancementType` comes from `@mcp-abap-adt/interfaces-adt` 18; `enhoxh` and
-`enhsxs` are no longer supported. Only `enhoxhh` has ABAP source (`read`); use `readMetadata` for the other
-two subtypes. The trial system refused the XHH collection
-with 403; E19 served it. Discovery alone does not prove access.
+`enhsxs` are no longer supported. Only `enhoxhh` has ABAP source (`read`);
+use `readMetadata` for the other two subtypes. An ABAP Cloud system refused
+the XHH collection with 403 where an on-premise one served it, so discovery
+alone does not prove access.
 
 | Factory | Capability atom | Members | Result slots |
 |---|---|---|---|
