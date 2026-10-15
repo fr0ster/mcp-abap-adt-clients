@@ -807,8 +807,9 @@ const request = client.getRequest({
 
 The `readObjects()` and `createTask()` examples above assume that set.
 
-**On a batch client** `list({ configUri })` records normally and resolves after
-`batchExecute()`, like any other member: it is one request now, so there is no
+**On a batch connection** (an `AdtClient` built on `AdtBatchConnection`, see
+[BATCH.md](BATCH.md)) `list({ configUri })` records normally and resolves after
+`batch.execute()`, like any other member: it is one request now, so there is no
 first answer a batch would have to deliver early.
 
 **Migration from filter parameters.** There is no server-side filtering to
