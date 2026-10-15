@@ -27,7 +27,7 @@ export function innerRequest(request: IAbapRequestOptions): string {
   const headers = { ...request.headers };
   // `data: null` is how a member says "no body" (lock, unlock): it must not
   // become the four characters "null". Sent that way, every PUT under those
-  // locks was refused 423 "invalid lock handle" (E19, 2026-10-16).
+  // locks was refused 423 "invalid lock handle" (on an on-premise system, 2026-10-16).
   const hasBody = request.data !== undefined && request.data !== null;
   const body = hasBody ? String(request.data) : '';
   if (hasBody) {
@@ -57,38 +57,48 @@ export function parseBatchResponse(
   );
   if (!boundary)
     throw new Error('Invalid ADT batch response: missing multipart boundary');
-  const delimiter = `--${boundary[1] ?? boundary[2]}`;
-  return String(response.data)
-    .split(delimiter)
-    .slice(1)
-    .filter((part) => !part.startsWith('--'))
-    .map((part) => {
-      const match = /(?:^|\r?\n)HTTP\/1\.\d\s+(\d{3})\s*([^\r\n]*)\r?\n/.exec(
-        part,
+  const escaped = (boundary[1] ?? boundary[2]).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  );
+  // Only complete delimiter lines count; boundary-like body text is payload.
+  const delimiter = new RegExp(
+    `(?:^|\\r?\\n)--${escaped}(--)?[ \t]*(?:\\r?\\n|$)`,
+    'g',
+  );
+  const body = String(response.data);
+  const chunks: string[] = [];
+  let start: number | undefined;
+  for (const match of body.matchAll(delimiter)) {
+    if (start !== undefined) chunks.push(body.slice(start, match.index));
+    if (match[1]) break;
+    start = match.index + match[0].length;
+  }
+  return chunks.map((part) => {
+    const match = /(?:^|\r?\n)HTTP\/1\.\d\s+(\d{3})\s*([^\r\n]*)\r?\n/.exec(
+      part,
+    );
+    if (!match || match.index === undefined)
+      throw new Error('Invalid ADT batch response: missing inner HTTP status');
+    const rest = part.slice(match.index + match[0].length);
+    const split = /\r?\n\r?\n/.exec(rest);
+    if (!split || split.index === undefined)
+      throw new Error(
+        'Invalid ADT batch response: missing inner header terminator',
       );
-      if (!match || match.index === undefined)
-        throw new Error(
-          'Invalid ADT batch response: missing inner HTTP status',
-        );
-      const rest = part.slice(match.index + match[0].length);
-      const split = /\r?\n\r?\n/.exec(rest);
-      if (!split || split.index === undefined)
-        throw new Error(
-          'Invalid ADT batch response: missing inner header terminator',
-        );
-      const headers: Record<string, string> = {};
-      for (const line of rest.slice(0, split.index).split(/\r?\n/)) {
-        const colon = line.indexOf(':');
-        if (colon > 0)
-          headers[line.slice(0, colon).toLowerCase()] = line
-            .slice(colon + 1)
-            .trim();
-      }
-      return {
-        status: Number(match[1]),
-        statusText: match[2].trim(),
-        headers,
-        data: rest.slice(split.index + split[0].length).replace(/\r?\n$/, ''),
-      };
-    });
+    const headers: Record<string, string> = {};
+    for (const line of rest.slice(0, split.index).split(/\r?\n/)) {
+      const colon = line.indexOf(':');
+      if (colon > 0)
+        headers[line.slice(0, colon).toLowerCase()] = line
+          .slice(colon + 1)
+          .trim();
+    }
+    return {
+      status: Number(match[1]),
+      statusText: match[2].trim(),
+      headers,
+      data: rest.slice(split.index + split[0].length),
+    };
+  });
 }

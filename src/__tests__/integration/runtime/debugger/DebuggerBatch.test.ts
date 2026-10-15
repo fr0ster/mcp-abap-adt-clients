@@ -32,6 +32,7 @@ import {
   executeBatchRequest,
 } from '../../../../runtime/debugger/abap';
 import { createRequestId } from '../../../../runtime/debugger/batchPayload';
+import { assertBatchStatuses } from '../../../helpers/batchStatuses';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import {
   closeOwnTestConnection,
@@ -509,6 +510,7 @@ describe('Debugger batch wire measurements', () => {
     expect(response.status).toBeGreaterThanOrEqual(200);
     expect(response.status).toBeLessThan(300);
     expect(parts).toHaveLength(requests.length);
+    assertBatchStatuses(response, file);
   }
 
   const methods: IDebuggerStepMethod[] = [

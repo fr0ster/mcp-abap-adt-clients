@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   in one multipart transport envelope. Supports `communication` and `debugger`
   endpoints, stateful lock windows, and per-part HTTP failures. The 2026-09
   removal reason (mixed GET + POST returning 500) applied to `debugger/batch`;
-  measurements on E19 and ABAP Cloud on 2026-10-15 confirmed that
+  measurements on an on-premise system and ABAP Cloud on 2026-10-15 confirmed that
   `communication/batch` accepts mixed methods. Dependent calls still need separate
   envelopes to obtain lock handles; activation can use one plain group request.
 

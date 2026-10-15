@@ -3,7 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtBatchConnection } from '../../batch';
-import { innerRequest } from '../../batch/wire';
+import { innerRequest, parseBatchResponse } from '../../batch/wire';
 import { AdtClient } from '../../clients/AdtClient';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
 
@@ -129,4 +129,106 @@ describe('innerRequest without a body', () => {
     expect(text).not.toMatch(/content-length/i);
     expect(text.endsWith('\r\n\r\n')).toBe(true);
   });
+});
+
+test.each([
+  406, 415,
+])('execute settles member negotiation for %s', async (status) => {
+  const { batch, send } = fixture([200]);
+  const success = await send({});
+  send.mockClear();
+  send.mockResolvedValueOnce({
+    ...success,
+    data: `--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Unsupported\r\nAccept: application/corrected+xml\r\nContent-Type: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n`,
+  });
+  const pending = new AdtClient(batch)
+    .getDomain()
+    .readMetadata({ domainName: 'Z_TEST' });
+  await batch.execute();
+  expect(send).toHaveBeenCalledTimes(2);
+  expect((await pending).ok).toBe(true);
+  expect((send.mock.calls[1][0] as any).data).toContain(
+    `${status === 406 ? 'Accept' : 'Content-Type'}: application/corrected+xml`,
+  );
+});
+
+test.each([
+  'lock',
+  'unlock',
+] as const)('%s scopes stateful mode to its own request', async (method) => {
+  const { batch, send } = fixture([200, 200, 200]);
+  const domain = new AdtClient(batch).getDomain();
+  const config = {
+    domainName: 'Z_TEST',
+    packageName: '$TMP',
+    description: 'Test',
+  };
+  const pending = [
+    method === 'lock' ? domain.lock(config) : domain.unlock(config, 'handle'),
+    domain.readMetadata(config),
+    domain.create(config),
+  ];
+  await batch.execute();
+  await Promise.all(pending);
+  const body = (send.mock.calls[0][0] as any).data as string;
+  expect(body.match(/X-sap-adt-sessiontype: stateful/g)).toHaveLength(1);
+  expect(body).toMatch(
+    new RegExp(
+      `_action=${method.toUpperCase()}[^]*?X-sap-adt-sessiontype: stateful`,
+    ),
+  );
+});
+
+test.each([
+  '\r\n',
+  '\n',
+])('multipart delimiters preserve body text with %j lines', (eol) => {
+  const body = `inline --answer${eol}--answersuffix${eol}--answer--suffix${eol}last`;
+  const parts = parseBatchResponse({
+    status: 200,
+    statusText: 'OK',
+    headers: { 'content-type': 'multipart/mixed; boundary=answer' },
+    data: `--answer \t${eol}Content-Type: application/http${eol}${eol}HTTP/1.1 200 OK${eol}Content-Type: text/plain${eol}${eol}${body}${eol}--answer--${eol}`,
+  });
+  expect(parts).toHaveLength(1);
+  expect(parts[0].data).toBe(body);
+});
+
+test('settlement chains are bounded and all recorded requests settle', async () => {
+  const { batch, send } = fixture([200]);
+  const answers: unknown[] = [];
+  const chain = async (): Promise<void> => {
+    for (;;) {
+      try {
+        answers.push(await batch.makeAdtRequest(req));
+      } catch (error) {
+        answers.push(error);
+        return;
+      }
+    }
+  };
+  const pending = chain();
+  await expect(batch.execute()).rejects.toThrow('exceeded 100');
+  await pending;
+  expect(send).toHaveBeenCalledTimes(100);
+  expect(answers).toHaveLength(101);
+  expect((await batch.execute()).status).toBe(204);
+});
+
+test('envelope failures settle calls recorded while sending and their retries', async () => {
+  const { batch, send } = fixture([200]);
+  const failure = Object.assign(new Error('envelope failed'), {
+    response: { status: 406, headers: { accept: 'application/corrected+xml' } },
+  });
+  const domain = new AdtClient(batch).getDomain();
+  const first = domain.readMetadata({ domainName: 'Z_FIRST' });
+  let second: typeof first;
+  send.mockImplementationOnce(async () => {
+    second = domain.readMetadata({ domainName: 'Z_SECOND' });
+    throw failure;
+  });
+  await expect(batch.execute()).rejects.toBe(failure);
+  expect((await first).ok).toBe(false);
+  expect((await second!).ok).toBe(false);
+  expect((await batch.execute()).status).toBe(204);
 });

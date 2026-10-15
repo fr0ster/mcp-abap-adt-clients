@@ -10,6 +10,7 @@ import { AdtBatchConnection } from '../../../batch';
 import { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { escapeXmlAttr } from '../../../utils/xml';
+import { finaliseBatch } from '../../helpers/batchFinalisation';
 import { configuredCase, gate } from '../../helpers/caseGate';
 import { createTestConnection } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
@@ -106,7 +107,7 @@ gate('batch', 'domains')(
           );
       }
     }
-    let primary: unknown;
+    const failures: unknown[] = [];
     try {
       await remove('delete_leftovers_ms', false);
       const created = configs.map(
@@ -179,33 +180,29 @@ gate('batch', 'domains')(
         expect(source).toContain('<doma:datatype>CHAR</doma:datatype>');
       }
     } catch (error) {
-      primary = error;
+      failures.push(error);
     }
     // Cleanup runs whatever happened above; the test's own failure is the one
     // reported, and a cleanup failure is reported beside it, never instead.
-    let cleanupFailure: unknown;
-    try {
-      await remove('delete_ms', true);
-      const missing = configs.map((config) => domain.readMetadata(config));
-      await execute('read_deleted_ms');
-      for (const answer of await Promise.all(missing)) {
-        expect(answer.ok).toBe(false);
-        if (!answer.ok) expect(answer.getError().response?.status).toBe(404);
-      }
-    } catch (error) {
-      cleanupFailure = error;
-    }
-    writeFileSync(file, JSON.stringify({ count, timings }, null, 2));
-    logger.info?.(`Domain batch timings: ${file}`);
-    await connection.disconnect();
-    if (primary) {
-      if (cleanupFailure)
-        logger.error?.(
-          `cleanup failed after the test failed: ${String(cleanupFailure)}`,
-        );
-      throw primary;
-    }
-    if (cleanupFailure) throw cleanupFailure;
+    await finaliseBatch(
+      failures,
+      [
+        async () => {
+          await remove('delete_ms', true);
+          const missing = configs.map((config) => domain.readMetadata(config));
+          await execute('read_deleted_ms');
+          for (const answer of await Promise.all(missing)) {
+            expect(answer.ok).toBe(false);
+            if (!answer.ok)
+              expect(answer.getError().response?.status).toBe(404);
+          }
+        },
+        () => writeFileSync(file, JSON.stringify({ count, timings }, null, 2)),
+        () => logger.info?.(`Domain batch timings: ${file}`),
+        () => connection.disconnect(),
+      ],
+      logger,
+    );
   },
   900_000,
 );

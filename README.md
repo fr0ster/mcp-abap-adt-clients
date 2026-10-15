@@ -1125,6 +1125,11 @@ activate all objects with one plain `activateObjectsGroup` call. At a debugger
 stop, record step + stack + variables on the attached stateful connection.
 See [domain and debugger examples](docs/usage/BATCH.md).
 
+`execute()` also sends follow-up envelopes for requests recorded during settlement,
+including automatic 406/415 negotiation retries (up to 100 envelopes, then all
+remaining requests reject). Explicit session switches apply to the next recording;
+LOCK/UNLOCK cannot leak stateful mode to neighbouring requests.
+
 ```typescript
 import { AdtBatchConnection, AdtClient } from '@mcp-abap-adt/adt-clients';
 
