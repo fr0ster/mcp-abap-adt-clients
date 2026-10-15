@@ -59,17 +59,16 @@
  *
  * `getTypeInfo` reached it with a domain's uri and `getTransaction` with
  * `/sap/bc/adt/transactions/{name}` — the same request about different objects,
- * which is what made two members of it. Plus one endpoint nothing else reaches:
+ * which is what made two members of it. The enhancement endpoint formerly
+ * recorded here is now exposed by the typed host handlers:
  *
  * ```
  * GET /sap/bc/adt/oo/classes/{name}/source/main/enhancements/elements
  * ```
  *
- * Recorded here, and not only in the history of a deleted file, so a typed
- * handler can be written when somebody wants one. A generic member kept in case
- * someone needs it is a member the contract must describe and every implementer
- * must provide; adding one when the need appears is cheaper than carrying six
- * that never had one.
+ * Enhancement hosts now expose this through `readEnhancementElements` on
+ * AdtClass, AdtProgram, AdtFunctionGroup and AdtInclude. Their
+ * `readEnhancementOptions` member lists the places that can be enhanced.
  */
 
 import type {

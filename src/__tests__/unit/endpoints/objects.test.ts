@@ -185,3 +185,20 @@ describe('records', () => {
     );
   });
 });
+
+// Host subresources use the same single name encoding as their object URI.
+describe.each([
+  [CLASS, '/sap/bc/adt/oo/classes'],
+  [PROGRAM, '/sap/bc/adt/programs/programs'],
+  [FUNCTION_GROUP, '/sap/bc/adt/functions/groups'],
+  [PROGRAM_INCLUDE, '/sap/bc/adt/programs/includes'],
+])('enhancement host addresses', (record, base) => {
+  it('builds both subresources with a namespaced name encoded once', () => {
+    expect(record.enhancementElements('/ABC/ZCL_X')).toBe(
+      `${base}/%2Fabc%2Fzcl_x/source/main/enhancements/elements`,
+    );
+    expect(record.enhancementOptions('/ABC/ZCL_X')).toBe(
+      `${base}/%2Fabc%2Fzcl_x/enhancements/options`,
+    );
+  });
+});

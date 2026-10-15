@@ -1,5 +1,9 @@
 import { withCallTimeout } from '../../utils/callTimeout';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import {
+  getClassEnhancementElements,
+  getClassEnhancementOptions,
+} from './enhancements';
 
 /**
  * AdtClass - High-level CRUD operations for Class objects
@@ -28,6 +32,7 @@ import type {
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
+  IAdtEnhancementHost,
   IAdtError,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -62,6 +67,11 @@ import { validateClassName } from './validation';
 export class AdtClass<R extends IClassResults = typeof classDocuments>
   extends AdtClassMemberBase<R>
   implements
+    IAdtEnhancementHost<
+      IClassConfig,
+      ReturnType<R['enhancementElements']>,
+      ReturnType<R['enhancementOptions']>
+    >,
     IAdtCreatable<IClassConfig, ReturnType<R['created']>>,
     IAdtReadable<IClassConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>>,
@@ -96,6 +106,36 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     protected readonly results: R = classDocuments as unknown as R,
   ) {
     super(connection, logger, systemContext, contentTypes, lockRegistry);
+  }
+
+  /** Read the host's enhancement elements. */
+  async readEnhancementElements<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    options?: IAdtOperationOptions<E> & { context?: string },
+  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () => getClassEnhancementElements(connection, config.className as string),
+      this.results.enhancementElements as IResultStrategy<
+        ReturnType<R['enhancementElements']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /** Read the host's enhancement options. */
+  async readEnhancementOptions<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () => getClassEnhancementOptions(connection, config.className as string),
+      this.results.enhancementOptions as IResultStrategy<
+        ReturnType<R['enhancementOptions']>
+      >,
+      options?.analyse,
+    );
   }
 
   /**

@@ -70,6 +70,10 @@ export interface IIncludeResults {
   readonly created: IResultStrategy<unknown>;
   readonly source: IResultStrategy<unknown>;
   readonly metadata: IResultStrategy<unknown>;
+  /** Enhancement implementations in the host's source. */
+  readonly enhancementElements: IResultStrategy<unknown>;
+  /** Places in the host that can be enhanced. */
+  readonly enhancementOptions: IResultStrategy<unknown>;
   readonly activation: IResultStrategy<unknown>;
   readonly validation: IResultStrategy<unknown>;
   readonly deletion: IResultStrategy<unknown>;
@@ -87,6 +91,8 @@ export const includeDocuments = {
   created: rawDocument,
   source: rawDocument,
   metadata: rawDocument,
+  enhancementElements: rawDocument,
+  enhancementOptions: rawDocument,
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
