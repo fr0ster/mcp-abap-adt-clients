@@ -84,7 +84,8 @@ export function parseBatchResponse(
     // A bodyless answer (an UNLOCK's 200) ends right after its headers: the
     // empty line's last CRLF belongs to the next delimiter (RFC 2046), so the
     // part holds one line break, not two. Headers then run to the end.
-    const found = /\r?\n\r?\n/.exec(rest);
+    // Immediately after the status line, one blank line means no headers.
+    const found = /^(?:\r?\n)|\r?\n\r?\n/.exec(rest);
     const split =
       found && found.index !== undefined
         ? { index: found.index, length: found[0].length }

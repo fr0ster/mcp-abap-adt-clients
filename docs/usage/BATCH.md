@@ -81,10 +81,10 @@ import { AbapDebugger, AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 const batch = new AdtBatchConnection(debugConnection, { endpoint: 'debugger' });
 const debuggerApi = new AbapDebugger(batch);
 const pending = [
-  // Explicit mode switches scope the next recording only.
-  (batch.setSessionType('stateful'), debuggerApi.step('stepOver')),
-  (batch.setSessionType('stateful'), debuggerApi.getStack()),
-  (batch.setSessionType('stateful'), debuggerApi.getVariables(variableIds)), // IDs obtained at the stop.
+  // Debugger recordings default to the attached stateful session.
+  debuggerApi.step('stepOver'),
+  debuggerApi.getStack(),
+  debuggerApi.getVariables(variableIds), // IDs obtained at the stop.
 ];
 await batch.execute();
 const answers = await Promise.all(pending);
@@ -123,8 +123,9 @@ Stateful parts carry `X-sap-adt-sessiontype: stateful`. The wrapped session mode
 is restored afterward. Connections exposing `getSessionMode()` or
 `getSessionType()` supply the previous mode; minimum-contract connections without
 a getter are assumed stateless. An explicit local `setSessionType` applies only
-to the next recorded request, then recording returns to the wrapped connection's
-initial mode. An already stateful debugger connection retains that default.
+to the next recorded request. Recording then returns to the endpoint default:
+communication is always stateless, independent of the wrapped connection's mode;
+debugger is always stateful because it uses an attached debugging session.
 
 Measurements on 2026-10-15 on an on-premise system and ABAP Cloud accepted mixed GET + POST on
 `/sap/bc/adt/communication/batch`, including a 404 part beside successful parts.

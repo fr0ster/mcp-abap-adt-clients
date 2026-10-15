@@ -447,7 +447,7 @@ describe('Debugger batch wire measurements', () => {
       `sap-adt-request-id:${createRequestId().padEnd(32, '0')}\r\n` +
       // A body-carrying part asks for its own type back, as the member does:
       // with application/xml SAP answers 406 "Accepted content types:
-      // application/vnd.sap.as+xml" (measured inside the batch on E19).
+      // application/vnd.sap.as+xml" (measured inside the batch on an on-premise system).
       `Accept:${contentType ?? 'application/xml'}\r\n` +
       (contentType ? `Content-Type:${contentType}\r\n` : '') +
       `\r\n${body === undefined ? '' : `${body}\r\n\r\n`}`

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -329,4 +331,112 @@ describe('a bodyless inner answer', () => {
       [200, ''],
     ]);
   });
+});
+
+test('communication defaults to stateless on a stateful wrapped connection, while lock stays stateful', async () => {
+  const { connection, send, session } = fixture([200]);
+  const batch = new AdtBatchConnection(
+    { ...connection, getSessionType: () => 'stateful' } as IAbapConnection,
+    { endpoint: 'communication' },
+  );
+  const domain = new AdtClient(batch).getDomain();
+  const config = { domainName: 'Z_TEST' };
+  const pending = [
+    domain.readMetadata(config),
+    domain.lock(config),
+    domain.readMetadata(config),
+  ];
+  await batch.execute();
+  await Promise.all(pending);
+  expect(send).toHaveBeenCalledTimes(3);
+  const bodies = send.mock.calls.map(([request]) => (request as any).data);
+  expect(bodies[0]).not.toContain('stateful');
+  expect(bodies[1]).toContain('_action=LOCK');
+  expect(bodies[1]).toContain('X-sap-adt-sessiontype: stateful');
+  expect(bodies[2]).not.toContain('stateful');
+  expect(session.mock.calls).toEqual([
+    ['stateless'],
+    ['stateful'],
+    ['stateless'],
+    ['stateful'],
+  ]);
+});
+
+test.each([
+  'stateful',
+  'stateless',
+] as const)('debugger defaults to stateful with a %s wrapped connection', async (mode) => {
+  const { connection, send, session } = fixture([200, 200]);
+  const batch = new AdtBatchConnection(
+    { ...connection, getSessionType: () => mode } as IAbapConnection,
+    { endpoint: 'debugger' },
+  );
+  const api = new AbapDebugger(batch);
+  const pending = [api.getStack(), api.getVariables(['id'])];
+  await batch.execute();
+  await Promise.all(pending);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(
+    (send.mock.calls[0][0] as any).data.match(
+      /X-sap-adt-sessiontype: stateful/g,
+    ),
+  ).toHaveLength(2);
+  expect(session.mock.calls).toEqual([['stateful'], [mode]]);
+});
+
+test.each([
+  '\r\n',
+  '\n',
+])('parses headerless, bodyless and boundary-like bodies together with %j lines', (eol) => {
+  const body = `inline --answer${eol}--answersuffix${eol}--answer--suffix${eol}last`;
+  const parts = parseBatchResponse({
+    status: 202,
+    statusText: 'Accepted',
+    headers: { 'content-type': 'multipart/mixed; boundary=answer' },
+    data: [
+      '--answer',
+      'Content-Type: application/http',
+      '',
+      'HTTP/1.1 200 OK',
+      '',
+      'payload',
+      '--answer',
+      'Content-Type: application/http',
+      '',
+      'HTTP/1.1 200 OK',
+      '~server_protocol: HTTP/1.1',
+      '',
+      '--answer',
+      'Content-Type: application/http',
+      '',
+      'HTTP/1.1 200 OK',
+      'Content-Type: text/plain',
+      '',
+      body,
+      '--answer--',
+      '',
+    ].join(eol),
+  });
+  expect(
+    parts.map(({ status, headers, data }) => ({ status, headers, data })),
+  ).toEqual([
+    { status: 200, headers: {}, data: 'payload' },
+    { status: 200, headers: { '~server_protocol': 'HTTP/1.1' }, data: '' },
+    { status: 200, headers: { 'content-type': 'text/plain' }, data: body },
+  ]);
+});
+
+test.each([
+  '../integration/runtime/debugger/DebuggerBatch.test.ts',
+  '../helpers/test-config.yaml.template',
+])('%s names no system', (file) => {
+  const source = readFileSync(join(__dirname, file), 'utf8');
+  const rule = readFileSync(
+    join(__dirname, 'notesNameNoSystem.test.ts'),
+    'utf8',
+  );
+  const expression = /const FORBIDDEN =\s*(\/.*\/i);/.exec(rule)![1];
+  const forbidden = new RegExp(expression.slice(1, -2), 'i');
+  expect(source).not.toMatch(forbidden);
+  expect(source).not.toMatch(/\b[A-Z][A-Z0-9]{2}K\d+\b/);
 });

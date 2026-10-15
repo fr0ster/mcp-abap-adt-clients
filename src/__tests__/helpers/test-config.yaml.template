@@ -1219,7 +1219,7 @@ create_include:
       available_in: ["onprem"]
       description: "Standalone PROG/I include reserved for AdtInclude tests"
       params:
-        include_name: "ZAC_INCL01"
+        include_name: "ZADT_INCL01"
         description: "AdtInclude workflow include"
         # package_name: "ZAC_PKG01"
         # transport_request: ""
@@ -1969,7 +1969,7 @@ create_cds_unit_test:
           with_navigation_uris: false
           format: "abapunit"
         cds_unit_test:
-          class_name: "ZAC_CDSUT_CLS"
+          class_name: "ZADT_CDSUT_CLS"
           test_class_name: "LTC_ZAC_SHR_CDSUT_DDLS"
           description: "CDS unit test class"
           # transport_request: ""  # Uses environment.default_transport if omitted
@@ -1987,7 +1987,7 @@ create_cds_unit_test:
               <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
             </abapsource:template>
           test_class_source: |
-            "!@testing ZAC_CDSUT_CLS
+            "!@testing ZADT_CDSUT_CLS
             CLASS LTC_ZAC_SHR_CDSUT_DDLS DEFINITION FINAL
               FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
 

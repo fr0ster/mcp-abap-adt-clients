@@ -29,7 +29,10 @@ export class AdtBatchConnection implements IAbapConnection {
       logger?: ILogger;
     },
   ) {
-    this.defaultSession = this.wrappedSession();
+    // Debugger requests use the attached stateful session; communication
+    // members opt into stateful mode only for their own LOCK or UNLOCK.
+    this.defaultSession =
+      options.endpoint === 'debugger' ? 'stateful' : 'stateless';
     this.session = this.defaultSession;
   }
   private wrappedSession(): Session {
