@@ -138,6 +138,20 @@ Debugger step + stack + variables worked at a live stop on both systems; keep
 its member-specific variable Accept headers. RFC, payload limits and per-part
 authorization remain unmeasured.
 
+Several steps fit one debugger envelope: five `stepOver` + `getVariables` pairs
+after an initial read (11 parts) answered every part 200, and the variable
+history matched the one read step by step. Measured on 2026-10-16:
+
+| Way | Requests | On premise | ABAP Cloud |
+|---|---|---|---|
+| One envelope, one `execute()` | 1 | ~130–180 ms | ~570–610 ms |
+| One `execute()` per step | 6 | ~520 ms | ~2.7–3.6 s |
+| Plain `AbapDebugger`, no batch | 11 | ~1.1 s | ~6.4–6.8 s |
+
+Domains on the on-premise system: 100 created, locked, written and unlocked
+through the batch connection, then group-activated, in 19.3 s against 111.9 s
+for the same 500 requests one at a time.
+
 Integration configuration uses `batch.test_cases`: `domains` (params `count`,
 default 100; `name_prefix`, default `ZAC_BD_`; optional `package_name` and
 `transport_request`, otherwise environment defaults) and `debugger_client`.

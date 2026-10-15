@@ -24,22 +24,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [32.1.0] - 2026-10-16
+
 ### Added
 
-- `AdtBatchConnection`: record unchanged client members, then execute their requests
-  in consecutive multipart envelopes of one session mode each. Supports `communication` and `debugger`
-  endpoints, stateful LOCK/UNLOCK, stateless writes, and per-part HTTP failures. The 2026-09
-  removal reason (mixed GET + POST returning 500) applied to `debugger/batch`;
-  measurements on an on-premise system and ABAP Cloud on 2026-10-15 confirmed that
-  `communication/batch` accepts mixed methods. Dependent calls still need separate
-  envelopes to obtain lock handles; activation can use one plain group request.
-
-### Fixed
-
-- Batch execution preserves request order while splitting consecutive session modes
-  into separate envelopes. An envelope failure stops sending; unsent requests
-  reject with a library error rather than inheriting the failed SAP response.
-  Group creates before locks and writes before unlocks to minimize envelopes.
+- `AdtBatchConnection` (`src/batch/`): an `IAbapConnection` that records the requests
+  unchanged client members issue and sends them on `execute()` as multipart envelopes to
+  `/sap/bc/adt/communication/batch` or `/sap/bc/adt/debugger/batch`. Each recorded call
+  settles with its own inner answer: 2xx resolves, any other status rejects with the
+  response attached, exactly as a direct request does. See `docs/usage/BATCH.md`.
+- An envelope never mixes session modes: on `communication`, consecutive LOCKs,
+  UNLOCKs and stateless requests each go in their own envelope, LOCK and UNLOCK
+  stateful, everything else stateless; `debugger` is one stateful envelope on the
+  attached session. Request order is kept; nothing is reordered.
+- A failed envelope stops `execute()`; requests not yet sent reject with a library
+  error saying so. 406/415 Accept-negotiation retries recorded while settling go out
+  in a follow-up envelope.
+- Measured on an on-premise system and ABAP Cloud: `communication/batch` accepts mixed
+  GET + POST (the 500 behind the 2026-09 removal was `debugger/batch`); a request that
+  needs another part's answer (a lock handle) cannot share its envelope; 100 domains
+  through create → lock → write → unlock + group activation took 19.3 s against
+  111.9 s one request at a time; five debugger steps with variables in one envelope
+  took ~130 ms against ~1.1 s through the plain debugger.
 
 ## [32.0.0] - 2026-10-15
 
