@@ -345,8 +345,8 @@ export async function createTestConnection(
     ),
   );
 
-  // Join the session globalSetup opened, rather than asking for another. The
-  // a trial ABAP Cloud account grants two at a time, and a suite that took one per file was already
+  // Join the session globalSetup opened, rather than asking for another. A
+  // trial ABAP Cloud account grants two at a time, and a suite that took one per file was already
   // spending fifty-three of them on work that is one conversation.
   //
   // No material means nobody published any — a single file run on its own —
