@@ -322,3 +322,9 @@ export const RECORDS = {
   TRANSPORT_REQUEST,
   TRANSPORT_REQUEST_LEGACY,
 } as const;
+
+export const DEBUGGER = '/sap/bc/adt/debugger';
+export const BATCH = {
+  communication: '/sap/bc/adt/communication/batch',
+  debugger: `${DEBUGGER}/batch`,
+} as const;

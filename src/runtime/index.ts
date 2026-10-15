@@ -2,6 +2,7 @@
  * Runtime Module - Exports
  */
 
+export { AdtBatchConnection } from '../batch';
 export * from './applicationLog';
 export * from './atc';
 export * from './ddic';

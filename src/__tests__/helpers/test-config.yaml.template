@@ -2737,3 +2737,61 @@ enhancement:
       params:
         include_name: "LSVIMTOP" # ← CHANGE if absent; first measurement, not previously probed.
         main_program: "SAPLSVIM" # ← CHANGE together with include_name to its main program.
+
+# Batch measurements reuse runtime_debugger.adt_abap_debugger params above.
+debugger_batch:
+  test_cases:
+    - name: "stepInto"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stepOver"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stepReturn"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stepContinue"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "step_stack_variables"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "stack_children"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+    - name: "multi_step_variables"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+    - name: "multi_step_variables_client"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+    - name: "loop_client_per_step"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+
+    - name: "multi_step_variables_direct"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        steps: 5
+
+# Recording transport. Debugger case also uses runtime_debugger.adt_abap_debugger
+# params and the debugger_batch fixture above.
+batch:
+  test_cases:
+    - name: "domains"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      params:
+        count: 100
+        name_prefix: "ZAC_BD_"
+        # package_name and transport_request fall back to environment defaults.
+    - name: "debugger_client"
+      enabled: false
+      available_in: ["onprem", "cloud"]

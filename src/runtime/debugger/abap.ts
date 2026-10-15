@@ -39,9 +39,9 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
-import { createBatchBoundary } from './batchPayload';
+import { buildBatchPayload, createBatchBoundary } from '../../batch/wire';
+import { DEBUGGER } from '../../endpoints/objects';
 
-const DEBUGGER = '/sap/bc/adt/debugger';
 const ADT_NAMESPACES =
   'xmlns:dbg="http://www.sap.com/adt/debugger" xmlns:adtcore="http://www.sap.com/adt/core"';
 const ASX_NAMESPACE = 'xmlns:asx="http://www.sap.com/abapxml"';
@@ -866,22 +866,7 @@ export function buildDebuggerBatchPayload(
   requests: readonly string[],
   boundary = createBatchBoundary(),
 ): IDebuggerBatchPayload {
-  const parts = requests
-    .map((request) =>
-      [
-        `--${boundary}`,
-        'Content-Type: application/http',
-        'content-transfer-encoding: binary',
-        '',
-        request,
-      ].join('\r\n'),
-    )
-    .join('');
-
-  return {
-    boundary,
-    body: `${parts}\r\n--${boundary}--\r\n`,
-  };
+  return buildBatchPayload(requests, boundary);
 }
 
 const boolOrKeep = (value: boolean | undefined) =>
