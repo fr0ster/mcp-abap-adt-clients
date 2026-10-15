@@ -26,6 +26,52 @@ replaces it.
 
 ## Enhancements and their hosts
 
+`updateMetadata` replaces the whole object document from `options.source` and
+returns SAP's document through `metadataUpdated`. The PUT uses the subtype's
+own Content-Type and Accept. It is measured for BAdI spots (`enhsxsb`) and
+containers (`enhoxhb`); `enhoxhh` document PUT is permitted by the template but
+unmeasured. `update` writes source instead.
+
+For a BAdI end to end, first create and activate an interface implementing
+`if_badi_interface`, then create an empty spot. Build the spot's complete
+`enhs:objectData` document with a definition under
+`enhs:contentSpecific/enhs:badiTechnology/enhs:badiDefinitions`, referencing
+that interface. Use `enhs:singleUse="true"` when a method has RETURNING.
+Write and activate the spot, then create and activate a class implementing both
+interfaces. Create an `enhoxhb` container referencing the spot, and build its
+complete `enho:objectData` document with an `enho:badiImplementation` under
+`enho:contentSpecific/enho:badiTechnology/enho:badiImplementations`, referencing
+the spot, definition and implementing class (`enho:active="false"` is valid).
+Apply this same sequence to each document:
+
+```typescript
+import { analyseActivation, analyseException } from '@mcp-abap-adt/adt-strategies';
+
+// config identifies the created spot or container and includes transportRequest.
+// document is the whole XML document built above, with XML-escaped names.
+const enhancement = client.getEnhancement();
+const locked = await enhancement.lock(config, { analyse: analyseException });
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+try {
+  const written = await enhancement.updateMetadata(config, {
+    source: document, lockHandle, analyse: analyseException,
+  });
+  if (!written.ok) throw new Error(written.getError().message);
+} finally {
+  const unlocked = await enhancement.unlock(config, lockHandle, {
+    analyse: analyseException,
+  });
+  if (!unlocked.ok) throw new Error(unlocked.getError().message);
+}
+const activated = await enhancement.activate(config, { analyse: analyseActivation });
+if (!activated.ok) throw new Error(activated.getError().message);
+const metadata = await enhancement.readMetadata(config, { analyse: analyseException });
+if (!metadata.ok) throw new Error(metadata.getError().message);
+// Inspect the active document for the definition or implementation just written.
+```
+
+
 `getEnhancement()` supports `enhoxhb` (BAdI implementation, `ENHO/XHB`),
 `enhoxhh` (source plugin, `ENHO/XHH`) and `enhsxsb` (BAdI spot, `ENHS/XSB`).
 `EnhancementType` comes from `@mcp-abap-adt/interfaces-adt` 18; `enhoxh` and

@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   EnhancementType,
   IEnhancementConfig,
@@ -171,4 +172,48 @@ it.each([
       '@_enho:full_name': '',
     });
   }
+});
+
+it.each(
+  rows,
+)('writes %s metadata verbatim with its own media type', async (type, media) => {
+  const { client, request } = setup();
+  const source =
+    ' \r\n<?xml version="1.0"?><document attr="&amp;">é</document>\n';
+  request.mockResolvedValue({ status: 200, data: source, headers: {} });
+  const answer = await client.updateMetadata(
+    { ...config(type), transportRequest: 'DEVK900001' },
+    { source, lockHandle: 'handle &/+' },
+  );
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request.mock.calls[0][0]).toMatchObject({
+    url: `/sap/bc/adt/enhancements/${type}/zenh?lockHandle=handle+%26%2F%2B&corrNr=DEVK900001`,
+    method: 'PUT',
+    headers: { Accept: media, 'Content-Type': media },
+    data: source,
+  });
+  expect(answer.ok).toBe(true);
+  if (answer.ok) expect(answer.getResult().value).toBe(source);
+});
+
+it.each(
+  rows,
+)('passes a %s metadata refusal response to analyse without throwing', async (type) => {
+  const { client, request } = setup();
+  const response = {
+    status: 400,
+    data: '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace>SEEF</namespace><type>ExceptionParameterNotFound</type><message lang="EN">Parameter lockHandle could not be found.</message></exc:exception>',
+    headers: {},
+  };
+  request.mockRejectedValue({ response });
+  const analyse = jest.fn(analyseException);
+  const answer = await client.updateMetadata(config(type), {
+    source: '<document/>',
+    analyse,
+  });
+  expect(answer.ok).toBe(false);
+  expect(analyse).toHaveBeenCalledWith(
+    expect.objectContaining({ response }),
+    response,
+  );
 });

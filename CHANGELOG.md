@@ -31,6 +31,14 @@ contract now describes the three subtypes SAP serves through ADT, and custom
 result sets for enhancement hosts need two more slots. See *Migrating from 31*
 below and [MIGRATION-32.md](docs/usage/MIGRATION-32.md).
 
+### Added
+
+- `getEnhancement().updateMetadata()` writes a whole object document under
+  the caller's lock. Measured PUTs write a BAdI spot's definitions (`enhsxsb`)
+  and an implementation container's BAdI implementations (`enhoxhb`), returning
+  the document through `metadataUpdated`. `enhoxhh` uses its own media type
+  too; its document PUT remains unmeasured.
+
 ### Changed
 
 - **`EnhancementType` is `enhoxhb | enhoxhh | enhsxsb`.** `enhoxh` and

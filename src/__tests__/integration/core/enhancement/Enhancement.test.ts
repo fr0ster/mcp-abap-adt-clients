@@ -11,8 +11,9 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import { PROGRAM } from '../../../../endpoints/objects';
+import { INTERFACE, PROGRAM } from '../../../../endpoints/objects';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { escapeXmlAttr } from '../../../../utils/xml';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -190,6 +191,224 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       logger,
     );
   }
+
+  it(
+    'badi: write and activate a definition and implementation',
+    async () => {
+      const resolver = configured('badi');
+      if (!resolver) return;
+      const spot = config(resolver, 'enhsxsb', 'spot_name');
+      const container = {
+        ...config(resolver, 'enhoxhb'),
+        enhancementSpot: spot.enhancementName,
+      };
+      const interfaceName = required(resolver, 'interface_name');
+      const className = required(resolver, 'class_name');
+      const definitionName = required(resolver, 'definition_name');
+      const implementationName = required(resolver, 'implementation_name');
+      for (const name of [
+        interfaceName,
+        className,
+        definitionName,
+        implementationName,
+      ]) {
+        expect(name).toMatch(/^[ZY]/i);
+      }
+      const common = {
+        packageName: spot.packageName,
+        transportRequest: spot.transportRequest,
+        description: spot.description,
+      };
+      const intfConfig = { ...common, interfaceName };
+      const classConfig = { ...common, className };
+      const intf = client.getInterface();
+      const cls = client.getClass();
+      const enhancement = client.getEnhancement();
+      const esc = escapeXmlAttr;
+      // Cleanup attempts every object in reverse dependency order, even on failure.
+      async function cleanup(): Promise<void> {
+        try {
+          await removeLeftover(container);
+        } finally {
+          try {
+            const read = await cls.readMetadata(classConfig, analyse);
+            if (read.ok)
+              expectResult(
+                await cls.delete(classConfig, { analyse: analyseDeletion }),
+                'delete BAdI class',
+              );
+            else expect(read.getError().response?.status).toBe(404);
+          } finally {
+            try {
+              await removeLeftover(spot);
+            } finally {
+              const read = await intf.readMetadata(intfConfig, analyse);
+              if (read.ok)
+                expectResult(
+                  await intf.delete(intfConfig, { analyse: analyseDeletion }),
+                  'delete BAdI interface',
+                );
+              else expect(read.getError().response?.status).toBe(404);
+            }
+          }
+        }
+      }
+      async function writeDocument(
+        object: IEnhancementConfig,
+        source: string,
+      ): Promise<void> {
+        const handle = expectResult(
+          await enhancement.lock(object, analyse),
+          'lock BAdI document',
+        );
+        try {
+          expectResult(
+            await enhancement.updateMetadata(object, {
+              ...analyse,
+              source,
+              lockHandle: handle,
+            }),
+            'write BAdI document',
+          );
+        } finally {
+          expectResult(
+            await enhancement.unlock(object, handle, analyse),
+            'unlock BAdI document',
+          );
+        }
+        expectResult(
+          await enhancement.activate(object, { analyse: analyseActivation }),
+          'activate BAdI document',
+        );
+      }
+      function document(
+        prefix: 'enhs' | 'enho',
+        name: string,
+        type: string,
+        content: string,
+      ): string {
+        return `<?xml version="1.0" encoding="UTF-8"?><${prefix}:objectData xmlns:${prefix}="http://www.sap.com/adt/enhancements/${prefix}" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore" adtcore:name="${esc(name)}" adtcore:type="${type}" adtcore:description="${esc(spot.description ?? '')}" adtcore:language="EN" adtcore:masterLanguage="EN"><adtcore:packageRef adtcore:name="${esc(spot.packageName ?? '')}"/>${content}</${prefix}:objectData>`;
+      }
+      await cleanup();
+      try {
+        expectResult(
+          await intf.create(intfConfig, analyse),
+          'create BAdI interface',
+        );
+        const interfaceHandle = expectResult(
+          await intf.lock(intfConfig, analyse),
+          'lock BAdI interface',
+        );
+        try {
+          expectResult(
+            await intf.update(intfConfig, {
+              ...analyse,
+              lockHandle: interfaceHandle,
+              source: `INTERFACE ${interfaceName} PUBLIC.\n INTERFACES if_badi_interface.\n METHODS calc RETURNING VALUE(r) TYPE i.\nENDINTERFACE.`,
+            }),
+            'write BAdI interface',
+          );
+        } finally {
+          expectResult(
+            await intf.unlock(intfConfig, interfaceHandle, analyse),
+            'unlock BAdI interface',
+          );
+        }
+        expectResult(
+          await intf.activate(intfConfig, { analyse: analyseActivation }),
+          'activate BAdI interface',
+        );
+        expectResult(
+          await enhancement.create(spot, analyse),
+          'create BAdI spot',
+        );
+        await writeDocument(
+          spot,
+          document(
+            'enhs',
+            spot.enhancementName,
+            'ENHS/XSB',
+            `<enhs:contentCommon enhs:toolType="BADI_DEF"/><enhs:contentSpecific><enhs:badiTechnology><enhs:badiDefinitions><enhs:badiDefinition enhs:name="${esc(definitionName)}" enhs:shorttext="BAdI test" enhs:singleUse="true" enhs:useFallbackClass="false" enhs:filterLimitation="false" enhs:contextMode="N" enhs:amdp="false" enhs:internalUse="false"><enhs:interface adtcore:uri="${esc(INTERFACE.uri(interfaceName))}" adtcore:type="INTF/OI" adtcore:name="${esc(interfaceName)}"/></enhs:badiDefinition></enhs:badiDefinitions></enhs:badiTechnology></enhs:contentSpecific>`,
+          ),
+        );
+        const spotMetadata = root(
+          expectResult(
+            await enhancement.readMetadata(spot, analyse),
+            'active BAdI spot',
+          ),
+          'enhs:objectData',
+        );
+        expect(spotMetadata['@_adtcore:version']).toBe('active');
+        const definition =
+          spotMetadata['enhs:contentSpecific']['enhs:badiTechnology'][
+            'enhs:badiDefinitions'
+          ]['enhs:badiDefinition'];
+        expect(definition['@_enhs:name']).toBe(definitionName);
+        expect(definition['enhs:interface']['@_adtcore:name']).toBe(
+          interfaceName,
+        );
+        expectResult(
+          await cls.create(classConfig, analyse),
+          'create BAdI class',
+        );
+        const classHandle = expectResult(
+          await cls.lock(classConfig, analyse),
+          'lock BAdI class',
+        );
+        try {
+          expectResult(
+            await cls.update(classConfig, {
+              ...analyse,
+              lockHandle: classHandle,
+              source: `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.\n PUBLIC SECTION.\n INTERFACES if_badi_interface.\n INTERFACES ${interfaceName}.\nENDCLASS.\nCLASS ${className} IMPLEMENTATION.\n METHOD ${interfaceName}~calc.\n r = 1.\n ENDMETHOD.\nENDCLASS.`,
+            }),
+            'write BAdI class',
+          );
+        } finally {
+          expectResult(
+            await cls.unlock(classConfig, classHandle, analyse),
+            'unlock BAdI class',
+          );
+        }
+        expectResult(
+          await cls.activate(classConfig, { analyse: analyseActivation }),
+          'activate BAdI class',
+        );
+        expectResult(
+          await enhancement.create(container, analyse),
+          'create BAdI container',
+        );
+        await writeDocument(
+          container,
+          document(
+            'enho',
+            container.enhancementName,
+            'ENHO/XHB',
+            `<enho:contentCommon enho:toolType="BADI_IMPL"><enho:usages><enhcore:referencedObject enhcore:element_usage="EXTO" enhcore:program_id="R3TR"><enhcore:objectReference adtcore:name="${esc(spot.enhancementName)}" adtcore:type="ENHS/XS"/><enhcore:mainObjectReference/></enhcore:referencedObject></enho:usages></enho:contentCommon><enho:contentSpecific><enho:badiTechnology><enho:badiImplementations><enho:badiImplementation enho:name="${esc(implementationName)}" enho:shortText="BAdI test" enho:example="false" enho:default="false" enho:active="false" enho:customizingLock=""><enho:enhancementSpot adtcore:type="ENHS/XSB" adtcore:name="${esc(spot.enhancementName)}"/><enho:badiDefinition adtcore:type="ENHS/XB" adtcore:name="${esc(definitionName)}"/><enho:implementingClass adtcore:type="CLAS/OC" adtcore:name="${esc(className)}"/></enho:badiImplementation></enho:badiImplementations></enho:badiTechnology></enho:contentSpecific>`,
+          ),
+        );
+        const metadata = root(
+          expectResult(
+            await enhancement.readMetadata(container, analyse),
+            'active BAdI container',
+          ),
+          'enho:objectData',
+        );
+        expect(metadata['@_adtcore:version']).toBe('active');
+        const implementation =
+          metadata['enho:contentSpecific']['enho:badiTechnology'][
+            'enho:badiImplementations'
+          ]['enho:badiImplementation'];
+        expect(implementation['@_enho:name']).toBe(implementationName);
+        expect(implementation['enho:implementingClass']['@_adtcore:name']).toBe(
+          className,
+        );
+      } finally {
+        await cleanup();
+      }
+    },
+    getTimeout('test'),
+  );
 
   it(
     'enhsxsb: create, metadata, lock/unlock, activate, delete',

@@ -2684,6 +2684,17 @@ unpublish_service_binding:
 # Cloud-only XHH refusal is omitted until getEnvironmentType supports cloud filtering.
 enhancement:
   test_cases:
+    - name: "badi"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        interface_name: "ZIF_AC_BADI01"
+        spot_name: "ZAC_BADI_SPOT01"
+        definition_name: "ZAC_BADI_DEF01"
+        class_name: "ZCL_AC_BADI01"
+        enhancement_name: "ZAC_BADI_CONT01"
+        implementation_name: "ZAC_BADI_IMPL01"
+        description: "Integration BAdI end to end"
     - name: "enhsxsb"
       enabled: true
       available_in: ["onprem", "cloud"]

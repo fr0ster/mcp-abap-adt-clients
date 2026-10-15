@@ -193,6 +193,11 @@ npm install @mcp-abap-adt/adt-clients
 | Feature Toggles (FTG2/FT) | ✅ |
 | Transports (TRNS) | ✅ |
 
+`getEnhancement().updateMetadata()` writes the whole object document from
+`options.source` under the caller's lock, then the caller unlocks and activates.
+This writes BAdI spot definitions and container implementations; the result slot
+is `metadataUpdated`. See the [BAdI example](docs/usage/CLIENT_API_REFERENCE.md#enhancements-and-their-hosts).
+
 Class, program and function-group handlers also expose `readEnhancementElements`
 and `readEnhancementOptions` (`IAdtEnhancementHost`). `getInclude()` exposes
 both through `IAdtIncludeEnhancementHost`, with `context` set to the main
@@ -986,7 +991,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
-- **[31.x → 32.0.0](docs/usage/MIGRATION-32.md)** — interfaces-adt 18, three enhancement subtypes, subtype-specific create fields, and two new result slots for enhancement hosts.
+- **[31.x → 32.0.0](docs/usage/MIGRATION-32.md)** — interfaces-adt 18, three enhancement subtypes, subtype-specific create fields, two new result slots for enhancement hosts, and `metadataUpdated` for enhancement document writes.
 - **[30.x → 31.0.0](docs/usage/MIGRATION-31.md)** — `interfaces-adt` 16 and
   `interfaces-adt-connection` 3: the per-request `signal`, `ADT_REQUEST_ERROR`
   and `IAdtError.refusal` are gone; code written for 30.x compiles unchanged.

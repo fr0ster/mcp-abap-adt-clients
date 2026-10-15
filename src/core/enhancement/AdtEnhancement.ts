@@ -18,6 +18,7 @@ import type {
   IAdtError,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -58,7 +59,7 @@ import {
   type IEnhancementResults,
 } from './types';
 import { unlockEnhancement } from './unlock';
-import { updateEnhancement } from './update';
+import { updateEnhancement, updateEnhancementMetadata } from './update';
 import { validate as validateEnhancement } from './validation';
 import {
   getEnhancementVersionSource,
@@ -71,6 +72,7 @@ export class AdtEnhancement<
     IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
     IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<IEnhancementConfig, ReturnType<R['metadataUpdated']>>,
     IAdtUpdatable<Partial<IEnhancementConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IEnhancementConfig,
@@ -271,6 +273,34 @@ export class AdtEnhancement<
           this.logger,
         ),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Replace the whole object document supplied in `options.source`.
+   * The caller owns the lock window; no document is read or merged here.
+   * Measured for enhsxsb and enhoxhb; enhoxhh document PUT is unmeasured
+   * (its discovery template allows it).
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        updateEnhancementMetadata(
+          connection,
+          this.enhancementType(config),
+          this.name(config),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

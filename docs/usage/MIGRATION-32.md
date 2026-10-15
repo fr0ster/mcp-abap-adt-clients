@@ -38,3 +38,13 @@ No public constant imports need replacing.
 
 See [Enhancements and their hosts](CLIENT_API_REFERENCE.md#enhancements-and-their-hosts)
 for class and include reads, a create from an option, and the content-type table.
+
+## Writing enhancement documents
+
+Custom enhancement result sets must add `metadataUpdated` (use `rawDocument`
+for the server's document). `getEnhancement().updateMetadata(config, options)`
+writes the entire object document from `options.source` to the object URI;
+`update` continues to write source to `/source/main`. The caller takes the lock,
+passes `options.lockHandle`, unlocks, and activates. No read or merge is done.
+BAdI definitions and implementations use the document write. A definition whose
+interface has a RETURNING parameter must use `singleUse="true"`.

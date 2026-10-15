@@ -581,6 +581,10 @@ export const HANDLERS = {
       create: '/sap/bc/adt/enhancements/enhoxhh',
       read: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
       readMetadata: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      updateMetadata: {
+        method: 'PUT',
+        path: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      },
       update: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -596,7 +600,7 @@ export const HANDLERS = {
         '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main/versions',
       readTransport: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   serviceDefinition: {
     factory: (c: AdtClient) => c.getServiceDefinition(),

@@ -918,6 +918,7 @@ export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
 > &
   IAdtReadable<IEnhancementConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>> &
+  IAdtMetadataUpdatable<IEnhancementConfig, ReturnType<R['metadataUpdated']>> &
   IAdtUpdatable<Partial<IEnhancementConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IEnhancementConfig,

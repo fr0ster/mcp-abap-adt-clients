@@ -123,6 +123,8 @@ export interface IEnhancementResults {
   readonly created: IResultStrategy<unknown>;
   readonly source: IResultStrategy<unknown>;
   readonly metadata: IResultStrategy<unknown>;
+  /** The whole document returned by the object document PUT. */
+  readonly metadataUpdated: IResultStrategy<unknown>;
   readonly check: IResultStrategy<unknown>;
   readonly activation: IResultStrategy<unknown>;
   readonly validation: IResultStrategy<unknown>;
@@ -146,6 +148,7 @@ export const enhancementDocuments = {
   created: rawDocument,
   source: rawDocument,
   metadata: rawDocument,
+  metadataUpdated: rawDocument,
   check: rawDocument,
   activation: rawDocument,
   validation: rawDocument,
