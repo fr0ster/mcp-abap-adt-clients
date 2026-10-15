@@ -166,6 +166,54 @@ Content-Type `…enhancements.v1+xml`) → **415** `SADT_RESOURCE/039` on trial.
 Its type codes are invented too: `ENHS/EXSB`, `ENHO/EXHB`, … where SAP says
 `ENHS/XSB`, `ENHO/XHB`, `ENHO/XHH`, `ENHO/XH`, `ENHS/XS`.
 
+## Writing the document — a BAdI end to end (E19)
+
+ADT has native editors for BAdI spots and BAdI implementations since ADT 3.12
+(backends ABAP 7.55 / BTP 2008; release notes, "Working with Business Add-Ins").
+Discovery's template for both collections carries `lockHandle`:
+`/sap/bc/adt/enhancements/enhoxhb/{object_name}{?corrNr,lockHandle,version,accessMode,_action}`
+(and the same for `enhsxsb`) — the object's own URI is a write target.
+
+Measured with one stateful session (script in the scratchpad), all in
+`ZAC_TEST_PKG` on `E19K907111`, everything deleted afterwards (404 for all four):
+
+1. interface `ZIF_AC_ENH_T1` (`INTERFACES if_badi_interface`, one method
+   `calc RETURNING VALUE(r) TYPE i`) — created, written, activated through the
+   library.
+2. spot `ZAC_ENHS_T2` created (empty), LOCK, then
+   **`PUT /sap/bc/adt/enhancements/enhsxsb/zac_enhs_t2?lockHandle=…&corrNr=…`**,
+   Content-Type/Accept `application/vnd.sap.adt.enh.enhs.v2+xml`, body the whole
+   `enhs:objectData` with
+   `<enhs:contentSpecific><enhs:badiTechnology><enhs:badiDefinitions><enhs:badiDefinition enhs:name="ZAC_BADI_T1" enhs:shorttext="…" enhs:singleUse="true" enhs:useFallbackClass="false" enhs:filterLimitation="false" enhs:contextMode="N" enhs:amdp="false" enhs:internalUse="false"><enhs:interface adtcore:uri="/sap/bc/adt/oo/interfaces/zif_ac_enh_t1" adtcore:type="INTF/OI" adtcore:name="ZIF_AC_ENH_T1"/></enhs:badiDefinition>…`
+   → **200**, the answer is the document. UNLOCK, activate →
+   `activationExecuted="true"`; read back: `version="active"`, the
+   `badiDefinition` as written (SAP adds `documentationId=""`,
+   `customLogicRegistered="false"`).
+   - First run with `singleUse="false"`: the PUT was taken (200), the activation
+     refused: `SEEF_BADI/090` "Interface ZIF_AC_ENH_T1 cannot be used" — long
+     text: a multiple-use BAdI's interface may not have RETURNING/EXPORTING
+     parameters or attributes. SAP's business rule, reported by the activation,
+     not by the write.
+3. class `ZCL_AC_BADI_T1` (`INTERFACES if_badi_interface`, `INTERFACES
+   zif_ac_enh_t1`) — through the library.
+4. XHB container `ZAC_ENHO_XHB_T2` created (spot named in `enho:usages`), LOCK,
+   **`PUT /sap/bc/adt/enhancements/enhoxhb/zac_enho_xhb_t2?lockHandle=…&corrNr=…`**,
+   `application/vnd.sap.adt.enh.enhoxhb.v4+xml`, body the container plus
+   `<enho:badiImplementations><enho:badiImplementation enho:name="ZAC_BADI_IMPL_T1" enho:shortText="…" enho:example="false" enho:default="false" enho:active="false" enho:customizingLock=""><enho:enhancementSpot adtcore:type="ENHS/XSB" adtcore:name="ZAC_ENHS_T2"/><enho:badiDefinition adtcore:type="ENHS/XB" adtcore:name="ZAC_BADI_T1"/><enho:implementingClass adtcore:type="CLAS/OC" adtcore:name="ZCL_AC_BADI_T1"/></enho:badiImplementation></enho:badiImplementations>`
+   → **200**. UNLOCK, activate → `activationExecuted="true"`; read back:
+   `version="active"`, the implementation with SAP-filled uris
+   (`…/enhsxsb/zac_enhs_t2#type=enhs%2fxb;name=zac_badi_t1`) and
+   `runtimeBehaviorShorttext="The implementation will not be called"` (active=false).
+   - In the first run the XHB activation failed only because its spot was
+     inactive: `SEEF_BASE/120` "Enhancement spot … is inactive; activate it".
+
+`GET …/enhsxsb/{spot}/enhancements/definitions` (the link in a spot's metadata)
+→ 400 "Parameter badiImplName could not be found" — it wants a parameter;
+not pursued.
+
+The XHH document PUT (`enhoxhh/{name}`, also `lockHandle` in its template) is
+**not measured**.
+
 ## Delete
 
 `POST /sap/bc/adt/deletion/delete` (our `delete.ts` body;
