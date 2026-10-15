@@ -135,6 +135,27 @@ Found on the way:
   itself: every envelope went stateless and every PUT got 423 — a test
   artefact, recorded so nobody repeats it.
 
+### Homogeneous envelopes (owner's rule), 100 domains through the client (2026-10-16)
+
+An envelope never mixes session modes: LOCK and UNLOCK in their own stateful
+envelopes, everything else stateless. Recorded per envelope (`session=`):
+
+| envelope | mode | parts | on premise | ABAP Cloud |
+|---|---|---|---|---|
+| create ×100 | stateless | | 100×201 | 100×201 |
+| LOCK ×100 | **stateful** | `_action=LOCK` only | 100×200 | 100×200 |
+| PUT ×100 | stateless | | 100×200 | 100×200 |
+| UNLOCK ×100 | **stateful** | `_action=UNLOCK` only | 100×200 | 100×200 |
+
+Then the group activation run, read (all `active`/`CHAR`), delete, read (404):
+green on both. create … activate: 19.3 s on premise, 61.4 s on the trial.
+
+The PUT under a lock goes stateless and is taken — the lock lives in the context
+the stateful LOCK opened, as for single requests. A bodyless inner answer
+(UNLOCK's 200) ends with one line break after its headers: the empty line's last
+CRLF belongs to the next delimiter (RFC 2046); the parser takes it as an empty
+body.
+
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 
 ```
