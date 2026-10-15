@@ -309,3 +309,24 @@ test.each([
   expect(send).toHaveBeenCalledTimes(1);
   expect(session.mock.calls.at(-1)).toEqual(['stateful']);
 });
+
+describe('a bodyless inner answer', () => {
+  it("parses an UNLOCK's 200 whose empty line's CRLF belongs to the next delimiter", () => {
+    // Bytes as an on-premise system answered 100 UNLOCKs (2026-10-16).
+    const body =
+      '--b\r\ncontent-type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\n' +
+      'HTTP/1.1 200  OK\r\n~server_protocol: HTTP/1.1\r\n\r\n' +
+      '--b\r\ncontent-type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\n' +
+      'HTTP/1.1 200  OK\r\n~server_protocol: HTTP/1.1\r\n\r\n--b--\r\n';
+    const parts = parseBatchResponse({
+      status: 202,
+      statusText: 'Accepted',
+      headers: { 'content-type': 'multipart/mixed; boundary=b; charset=utf-8' },
+      data: body,
+    } as any);
+    expect(parts.map((p) => [p.status, p.data])).toEqual([
+      [200, ''],
+      [200, ''],
+    ]);
+  });
+});

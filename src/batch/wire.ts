@@ -81,11 +81,14 @@ export function parseBatchResponse(
     if (!match || match.index === undefined)
       throw new Error('Invalid ADT batch response: missing inner HTTP status');
     const rest = part.slice(match.index + match[0].length);
-    const split = /\r?\n\r?\n/.exec(rest);
-    if (!split || split.index === undefined)
-      throw new Error(
-        'Invalid ADT batch response: missing inner header terminator',
-      );
+    // A bodyless answer (an UNLOCK's 200) ends right after its headers: the
+    // empty line's last CRLF belongs to the next delimiter (RFC 2046), so the
+    // part holds one line break, not two. Headers then run to the end.
+    const found = /\r?\n\r?\n/.exec(rest);
+    const split =
+      found && found.index !== undefined
+        ? { index: found.index, length: found[0].length }
+        : { index: rest.length, length: 0 };
     const headers: Record<string, string> = {};
     for (const line of rest.slice(0, split.index).split(/\r?\n/)) {
       const colon = line.indexOf(':');
@@ -98,7 +101,7 @@ export function parseBatchResponse(
       status: Number(match[1]),
       statusText: match[2].trim(),
       headers,
-      data: rest.slice(split.index + split[0].length),
+      data: rest.slice(split.index + split.length),
     };
   });
 }
