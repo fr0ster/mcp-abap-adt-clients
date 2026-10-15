@@ -8,9 +8,9 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
-  ACCEPT_ENHANCEMENT,
-  ACCEPT_SOURCE_UTF8,
+  ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
+  ENHANCEMENT_CONTENT_TYPES,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
@@ -24,7 +24,7 @@ import {
  * Get enhancement metadata (without source code)
  *
  * @param connection - SAP connection
- * @param enhancementType - Enhancement type (enhoxh, enhoxhb, enhoxhh, enhsxs, enhsxsb)
+ * @param enhancementType - Enhancement type (enhoxhb, enhoxhh, enhsxsb)
  * @param enhancementName - Enhancement name
  * @param options - Optional parameters including withLongPolling
  * @returns Axios response with enhancement metadata XML
@@ -49,7 +49,7 @@ export async function getEnhancementMetadata(
       method: 'GET',
       timeout: 0,
       headers: {
-        Accept: options?.accept ?? ACCEPT_ENHANCEMENT,
+        Accept: options?.accept ?? ENHANCEMENT_CONTENT_TYPES[enhancementType],
       },
     },
     { logger },
@@ -95,7 +95,7 @@ export async function getEnhancementSource(
       method: 'GET',
       timeout: 0,
       headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE_UTF8,
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },

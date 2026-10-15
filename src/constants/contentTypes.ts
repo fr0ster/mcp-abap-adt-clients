@@ -218,9 +218,11 @@ export const ACCEPT_TRANSFORMATION =
 export const CT_TRANSFORMATION = 'application/vnd.sap.adt.transformations+xml';
 
 // Enhancements
-export const ACCEPT_ENHANCEMENT =
-  'application/vnd.sap.adt.enhancements.v1+xml, application/xml';
-export const CT_ENHANCEMENT = 'application/vnd.sap.adt.enhancements.v1+xml';
+export const ENHANCEMENT_CONTENT_TYPES = {
+  enhsxsb: 'application/vnd.sap.adt.enh.enhs.v2+xml',
+  enhoxhb: 'application/vnd.sap.adt.enh.enhoxhb.v4+xml',
+  enhoxhh: 'application/vnd.sap.adt.enh.enhoxhh.v3+xml',
+} as const;
 
 // =============================================================================
 // Validation (per-object-type)
@@ -298,3 +300,9 @@ export const ACCEPT_ATC_WORKLIST_XML =
   'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml';
 export const ACCEPT_ATC_CUSTOMIZING =
   'application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml';
+
+// Enhancement hosts
+export const ACCEPT_ENHANCEMENT_ELEMENTS =
+  'application/vnd.sap.adt.enhancements.v3+xml';
+export const ACCEPT_ENHANCEMENT_OPTIONS =
+  'application/vnd.sap.adt.enhancementoptions.v2+xml';

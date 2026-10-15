@@ -200,7 +200,7 @@ describe('every builder lands under a declared path', () => {
   // spelling that address elsewhere would pass the check unseen.
   const sample: Record<string, string[]> = {
     CLASS_INCLUDE: ['zcl_x', 'testclasses'],
-    ENHANCEMENT: ['enhoxh', 'zenh'],
+    ENHANCEMENT: ['enhoxhb', 'zenh'],
     SERVICE_BINDING: ['odatav2', 'zui_b'],
   };
   const all = declaredPaths(Object.keys(RECORDS) as (keyof typeof RECORDS)[]);

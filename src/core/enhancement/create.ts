@@ -8,16 +8,13 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  ACCEPT_ENHANCEMENT,
-  CT_ENHANCEMENT,
-} from '../../constants/contentTypes';
+import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { escapeXmlAttr } from '../../utils/xml';
 import {
   ENHANCEMENT_TYPE_CODES,
   getEnhancementBaseUrl,
   type ICreateEnhancementParams,
-  isImplementationType,
 } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -30,47 +27,41 @@ function buildCreateXml(
   masterSystem?: string,
   username?: string,
 ): string {
-  const description = limitDescription(
-    args.description || args.enhancement_name || '',
-  );
-  const typeCode = ENHANCEMENT_TYPE_CODES[args.enhancement_type];
-
+  const esc = escapeXmlAttr;
+  const prefix = args.enhancement_type === 'enhsxsb' ? 'enhs' : 'enho';
+  const root =
+    args.enhancement_type === 'enhoxhh' ? 'enhancement' : 'objectData';
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${esc(masterSystem)}"`
     : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-
-  // Base XML structure - may need adjustment based on actual ADT API
-  // This is a template that should be verified against SAP documentation
-  let enhancementSpecificXml = '';
-
-  if (isImplementationType(args.enhancement_type)) {
-    // Implementation types need reference to enhancement spot
-    if (args.enhancement_spot) {
-      enhancementSpecificXml = `<enh:enhancementSpotRef adtcore:name="${args.enhancement_spot}"/>`;
-    }
-    if (args.badi_definition && args.enhancement_type === 'enhoxhb') {
-      enhancementSpecificXml += `<enh:badiDefinitionRef adtcore:name="${args.badi_definition}"/>`;
-    }
+  const responsibleAttr = username
+    ? ` adtcore:responsible="${esc(username)}"`
+    : '';
+  let content: string;
+  if (args.enhancement_type === 'enhsxsb') {
+    content =
+      '<enhs:contentCommon enhs:toolType="BADI_DEF"/><enhs:contentSpecific><enhs:badiTechnology><enhs:badiDefinitions/></enhs:badiTechnology></enhs:contentSpecific>';
+  } else if (args.enhancement_type === 'enhoxhb') {
+    content = `<enho:contentCommon enho:toolType="BADI_IMPL"><enho:usages><enhcore:referencedObject enhcore:element_usage="EXTO" enhcore:program_id="R3TR"><enhcore:objectReference adtcore:name="${esc(args.enhancement_spot ?? '')}" adtcore:type="ENHS/XS"/><enhcore:mainObjectReference/></enhcore:referencedObject></enho:usages></enho:contentCommon><enho:contentSpecific><enho:badiTechnology><enho:badiImplementations/></enho:badiTechnology></enho:contentSpecific>`;
+  } else {
+    const host = args.enhancedObject;
+    content = `<enho:contentCommon enho:toolType="HOOK_IMPL" enho:adjustmentStatus="" enho:upgradeFlag="false"/><enho:contentSpecific><enho:hookTechnology enho:nextId="2"><enho:enhancedObject adtcore:uri="${esc(host?.uri ?? '')}" adtcore:type="${esc(host?.type ?? '')}" adtcore:name="${esc(host?.name ?? '')}"/><enho:hookImplementation enho:id="1" enho:spotname="" enho:programname="${esc(host?.program ?? '')}" enho:overwrite="" enho:method="" enho:enhmode="${esc(args.enhancementMode ?? '')}" enho:full_name="${esc(args.enhancementOption ?? '')}" enho:full_description=""/></enho:hookTechnology></enho:contentSpecific>`;
   }
-
   return `<?xml version="1.0" encoding="UTF-8"?>
-<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements" xmlns:adtcore="http://www.sap.com/adt/core"
-  adtcore:description="${description}"
-  adtcore:language="${args.masterLanguage || 'EN'}"
-  adtcore:name="${args.enhancement_name}"
-  adtcore:type="${typeCode}"
-  adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
-  ${enhancementSpecificXml}
-</enh:enhancement>`;
+<${prefix}:${root} xmlns:${prefix}="http://www.sap.com/adt/enhancements/${prefix}" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"
+ adtcore:description="${esc(limitDescription(args.description || args.enhancement_name || ''))}"
+ adtcore:language="${esc(args.masterLanguage || 'EN')}"
+ adtcore:name="${esc(args.enhancement_name)}"
+ adtcore:type="${esc(ENHANCEMENT_TYPE_CODES[args.enhancement_type])}"
+ adtcore:masterLanguage="${esc(args.masterLanguage || 'EN')}"${masterSystemAttr}${responsibleAttr}>
+ <adtcore:packageRef adtcore:name="${esc(args.package_name)}"/>
+ ${content}
+</${prefix}:${root}>`;
 }
 
 /**
  * Low-level: Create enhancement object with metadata (POST)
  * Does NOT lock/upload/activate - just creates the object
- *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  *
  * @param connection - SAP connection
  * @param args - Create parameters
@@ -86,8 +77,8 @@ export async function create(
   const metadataXml = buildCreateXml(args, args.masterSystem, args.responsible);
 
   const headers = {
-    Accept: ACCEPT_ENHANCEMENT,
-    'Content-Type': CT_ENHANCEMENT,
+    Accept: ENHANCEMENT_CONTENT_TYPES[args.enhancement_type],
+    'Content-Type': ENHANCEMENT_CONTENT_TYPES[args.enhancement_type],
   };
 
   if (debugEnabled) {

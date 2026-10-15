@@ -76,8 +76,8 @@ describe('records', () => {
     expect(PACKAGE.uri('$TMP')).toBe('/sap/bc/adt/packages/%24tmp');
   });
   it('enhancement takes its subtype as a segment', () => {
-    expect(ENHANCEMENT.uri('enhoxh', 'ZENH')).toBe(
-      '/sap/bc/adt/enhancements/enhoxh/zenh',
+    expect(ENHANCEMENT.uri('enhoxhb', 'ZENH')).toBe(
+      '/sap/bc/adt/enhancements/enhoxhb/zenh',
     );
   });
   it('service binding and its jobs', () => {
@@ -182,6 +182,23 @@ describe('records', () => {
         'TRANSPORT_REQUEST',
         'TRANSPORT_REQUEST_LEGACY',
       ].sort(),
+    );
+  });
+});
+
+// Host subresources use the same single name encoding as their object URI.
+describe.each([
+  [CLASS, '/sap/bc/adt/oo/classes'],
+  [PROGRAM, '/sap/bc/adt/programs/programs'],
+  [FUNCTION_GROUP, '/sap/bc/adt/functions/groups'],
+  [PROGRAM_INCLUDE, '/sap/bc/adt/programs/includes'],
+])('enhancement host addresses', (record, base) => {
+  it('builds both subresources with a namespaced name encoded once', () => {
+    expect(record.enhancementElements('/ABC/ZCL_X')).toBe(
+      `${base}/%2Fabc%2Fzcl_x/source/main/enhancements/elements`,
+    );
+    expect(record.enhancementOptions('/ABC/ZCL_X')).toBe(
+      `${base}/%2Fabc%2Fzcl_x/enhancements/options`,
     );
   });
 });

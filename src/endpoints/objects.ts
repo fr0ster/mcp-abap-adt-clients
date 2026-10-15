@@ -52,18 +52,30 @@ export const PROGRAM = {
   collection: '/sap/bc/adt/programs/programs',
   validation: '/sap/bc/adt/programs/validation',
   uri: (name: string) => `/sap/bc/adt/programs/programs/${seg(name)}`,
+  enhancementElements: (name: string) =>
+    `${PROGRAM.uri(name)}/source/main/enhancements/elements`,
+  enhancementOptions: (name: string) =>
+    `${PROGRAM.uri(name)}/enhancements/options`,
 } as const;
 
 export const PROGRAM_INCLUDE = {
   collection: '/sap/bc/adt/programs/includes',
   validation: '/sap/bc/adt/includes/validation',
   uri: (name: string) => `/sap/bc/adt/programs/includes/${seg(name)}`,
+  enhancementElements: (name: string) =>
+    `${PROGRAM_INCLUDE.uri(name)}/source/main/enhancements/elements`,
+  enhancementOptions: (name: string) =>
+    `${PROGRAM_INCLUDE.uri(name)}/enhancements/options`,
 } as const;
 
 export const CLASS = {
   collection: '/sap/bc/adt/oo/classes',
   validation: '/sap/bc/adt/oo/validation/objectname',
   uri: (name: string) => `/sap/bc/adt/oo/classes/${seg(name)}`,
+  enhancementElements: (name: string) =>
+    `${CLASS.uri(name)}/source/main/enhancements/elements`,
+  enhancementOptions: (name: string) =>
+    `${CLASS.uri(name)}/enhancements/options`,
 } as const;
 
 export const CLASS_INCLUDE = {
@@ -81,6 +93,10 @@ export const FUNCTION_GROUP = {
   collection: '/sap/bc/adt/functions/groups',
   validation: '/sap/bc/adt/functions/validation',
   uri: (name: string) => `/sap/bc/adt/functions/groups/${seg(name)}`,
+  enhancementElements: (name: string) =>
+    `${FUNCTION_GROUP.uri(name)}/source/main/enhancements/elements`,
+  enhancementOptions: (name: string) =>
+    `${FUNCTION_GROUP.uri(name)}/enhancements/options`,
 } as const;
 
 export const FUNCTION_MODULE = {
@@ -227,7 +243,7 @@ export const AUTHORIZATION_FIELD = {
   uri: (name: string) => `/sap/bc/adt/aps/iam/auth/${seg(name)}`,
 } as const;
 
-/** The subtype is a path segment: `/enhancements/enhoxh/<name>`. */
+/** The subtype is a path segment: `/enhancements/enhoxhb/<name>`. */
 export const ENHANCEMENT = {
   root: '/sap/bc/adt/enhancements',
   collection: (type: EnhancementType) => `/sap/bc/adt/enhancements/${type}`,

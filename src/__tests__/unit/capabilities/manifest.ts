@@ -24,6 +24,8 @@ export const ATOM_METHODS = {
   creatable: ['create'],
   readable: ['read'],
   metadataReadable: ['readMetadata'],
+  enhancementHost: ['readEnhancementElements', 'readEnhancementOptions'],
+  includeEnhancementHost: ['readEnhancementElements', 'readEnhancementOptions'],
   updatable: ['update'],
   metadataUpdatable: ['updateMetadata'],
   deletable: ['delete', 'checkDeletion'],
@@ -136,6 +138,10 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
+      readEnhancementElements:
+        '/sap/bc/adt/oo/classes/zcl_guard/source/main/enhancements/elements',
+      readEnhancementOptions:
+        '/sap/bc/adt/oo/classes/zcl_guard/enhancements/options',
       create: '/sap/bc/adt/oo/classes',
       read: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
@@ -153,7 +159,7 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/oo/classes/zcl_guard/includes/main/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'enhancementHost'],
   },
   interface: {
     factory: (c: AdtClient) => c.getInterface(),
@@ -194,6 +200,10 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
+      readEnhancementElements:
+        '/sap/bc/adt/programs/includes/zguard_inc/source/main/enhancements/elements',
+      readEnhancementOptions:
+        '/sap/bc/adt/programs/includes/zguard_inc/enhancements/options',
       create: '/sap/bc/adt/programs/includes',
       read: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
       readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
@@ -222,6 +232,7 @@ export const HANDLERS = {
       'source, unlock, activate — and no version, checkrun or transport call ' +
       'appears in it. Additive the moment one is measured.',
     capabilities: [
+      'includeEnhancementHost',
       'creatable',
       'readable',
       'metadataReadable',
@@ -242,6 +253,10 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
+      readEnhancementElements:
+        '/sap/bc/adt/programs/programs/zguard/source/main/enhancements/elements',
+      readEnhancementOptions:
+        '/sap/bc/adt/programs/programs/zguard/enhancements/options',
       create: '/sap/bc/adt/programs/programs',
       read: '/sap/bc/adt/programs/programs/ZGUARD/source/main',
       readMetadata: '/sap/bc/adt/programs/programs/ZGUARD',
@@ -259,7 +274,7 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/programs/programs/ZGUARD/source/main/versions',
       readTransport: '/sap/bc/adt/programs/programs/ZGUARD/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'enhancementHost'],
   },
   ddl: {
     factory: (c: AdtClient) => c.getDdl(),
@@ -566,6 +581,10 @@ export const HANDLERS = {
       create: '/sap/bc/adt/enhancements/enhoxhh',
       read: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
       readMetadata: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      updateMetadata: {
+        method: 'PUT',
+        path: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      },
       update: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -581,7 +600,7 @@ export const HANDLERS = {
         '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main/versions',
       readTransport: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   serviceDefinition: {
     factory: (c: AdtClient) => c.getServiceDefinition(),
@@ -840,6 +859,10 @@ export const HANDLERS = {
       description: 'guard',
     },
     requests: {
+      readEnhancementElements:
+        '/sap/bc/adt/functions/groups/zguard_fg/source/main/enhancements/elements',
+      readEnhancementOptions:
+        '/sap/bc/adt/functions/groups/zguard_fg/enhancements/options',
       create: '/sap/bc/adt/functions/groups',
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       updateMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
@@ -856,6 +879,7 @@ export const HANDLERS = {
       readTransport: '/sap/bc/adt/functions/groups/ZGUARD_FG/transport',
     },
     capabilities: [
+      'enhancementHost',
       'creatable',
       'metadataReadable',
       'metadataUpdatable',

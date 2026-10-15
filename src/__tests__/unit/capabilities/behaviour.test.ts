@@ -213,6 +213,8 @@ const ATOM_VERB: Record<string, string | { method: string; url: RegExp }> = {
   create: 'POST',
   read: 'GET',
   readMetadata: 'GET',
+  readEnhancementElements: 'GET',
+  readEnhancementOptions: 'GET',
   update: 'PUT',
   updateMetadata: 'PUT',
   // Not every object is deleted by a DELETE on its own URI: ADT has a deletion

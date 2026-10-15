@@ -77,6 +77,8 @@ All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connect
 - `activation.ts`, `check.ts`, `validation.ts` — Supporting operations
 - `index.ts` — Re-exports public API of the module
 
+**Enhancement hosts**: class, program and function group implement `IAdtEnhancementHost`; include implements `IAdtIncludeEnhancementHost`. Both expose `readEnhancementElements` and `readEnhancementOptions`, with result slots `enhancementElements` and `enhancementOptions`. Include `context` is the main program name on both reads. `getEnhancement()` supports `enhoxhb`, `enhoxhh` and `enhsxsb` only.
+
 **Shared module** (`src/core/shared/AdtUtils.ts`): Large utility class — search, where-used, SQL queries, inactive objects, group activation/deletion, discovery, type info, virtual folders, etc. Result set `IUtilResults` / `utilDocuments`.
 
 ### Object addresses (`src/endpoints/objects.ts`)
@@ -219,7 +221,7 @@ See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for ful
 - `fast-xml-parser` — XML parsing for ADT responses
 - `axios` — HTTP client (used internally by connection layer)
 - `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests; `@mcp-abap-adt/interfaces-auth` and `-auth-sap` are dev-only too
-- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, published on its own, and **not a workspace**: no local link. adt-clients' tests take it from npm as a devDependency (`^0.7.0`); the package builds and tests against what it installs from the registry (`npm ci --prefix packages/adt-strategies`). A strategy change that adt-clients' tests need is published first.
+- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, published on its own, and **not a workspace**: no local link. adt-clients' tests take it from npm as a devDependency (`^0.10.0`); the package builds and tests against what it installs from the registry (`npm ci --prefix packages/adt-strategies`). A strategy change that adt-clients' tests need is published first.
 
 ## Public API (`src/index.ts`)
 

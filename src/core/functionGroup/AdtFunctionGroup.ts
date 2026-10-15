@@ -21,6 +21,7 @@ import type {
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
+  IAdtEnhancementHost,
   IAdtError,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -49,6 +50,10 @@ import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
 import { create as createFunctionGroup } from './create';
 import { checkDeletion, deleteFunctionGroup } from './delete';
+import {
+  getFunctionGroupEnhancementElements,
+  getFunctionGroupEnhancementOptions,
+} from './enhancements';
 import { lockFunctionGroup } from './lock';
 import { getFunctionGroup, getFunctionGroupTransport } from './read';
 import {
@@ -63,6 +68,11 @@ import { validateFunctionGroupName } from './validation';
 export class AdtFunctionGroup<
   R extends IFunctionGroupResults = typeof functionGroupDocuments,
 > implements
+    IAdtEnhancementHost<
+      IFunctionGroupConfig,
+      ReturnType<R['enhancementElements']>,
+      ReturnType<R['enhancementOptions']>
+    >,
     IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<
@@ -105,6 +115,44 @@ export class AdtFunctionGroup<
       this.objectType,
       (functionGroupName, lockHandle) =>
         unlockFunctionGroup(this.connection, functionGroupName, lockHandle),
+    );
+  }
+
+  /** Read the host's enhancement elements. */
+  async readEnhancementElements<E extends IAdtError = IAdtError>(
+    config: Partial<IFunctionGroupConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        getFunctionGroupEnhancementElements(
+          connection,
+          config.functionGroupName as string,
+        ),
+      this.results.enhancementElements as IResultStrategy<
+        ReturnType<R['enhancementElements']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /** Read the host's enhancement options. */
+  async readEnhancementOptions<E extends IAdtError = IAdtError>(
+    config: Partial<IFunctionGroupConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        getFunctionGroupEnhancementOptions(
+          connection,
+          config.functionGroupName as string,
+        ),
+      this.results.enhancementOptions as IResultStrategy<
+        ReturnType<R['enhancementOptions']>
+      >,
+      options?.analyse,
     );
   }
 

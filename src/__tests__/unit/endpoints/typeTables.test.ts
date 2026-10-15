@@ -83,8 +83,8 @@ describe('every table agrees on a class', () => {
 
 describe('an enhancement name is encoded once', () => {
   it('a namespace is not double-encoded', () => {
-    expect(buildObjectUri('/NSP/ZENH', 'ENHO/EXH')).toBe(
-      '/sap/bc/adt/enhancements/enhoxh/%2Fnsp%2Fzenh',
+    expect(buildObjectUri('/NSP/ZENH', 'ENHO/XHB')).toBe(
+      '/sap/bc/adt/enhancements/enhoxhb/%2Fnsp%2Fzenh',
     );
   });
 });

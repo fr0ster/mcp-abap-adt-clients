@@ -143,31 +143,19 @@ const rows: Row[] = [
   ],
   ['FTG2/FT', 'ZFTG_X', undefined, (c) => activateFeatureToggle(c, 'ZFTG_X')],
   [
-    'ENHO/EXH',
-    'ZENH_X',
-    undefined,
-    (c) => activateEnhancement(c, 'enhoxh', 'ZENH_X'),
-  ],
-  [
-    'ENHO/EXHB',
+    'ENHO/XHB',
     'ZENH_X',
     undefined,
     (c) => activateEnhancement(c, 'enhoxhb', 'ZENH_X'),
   ],
   [
-    'ENHO/EXHH',
+    'ENHO/XHH',
     'ZENH_X',
     undefined,
     (c) => activateEnhancement(c, 'enhoxhh', 'ZENH_X'),
   ],
   [
-    'ENHS/EXS',
-    'ZENH_X',
-    undefined,
-    (c) => activateEnhancement(c, 'enhsxs', 'ZENH_X'),
-  ],
-  [
-    'ENHS/EXSB',
+    'ENHS/XSB',
     'ZENH_X',
     undefined,
     (c) => activateEnhancement(c, 'enhsxsb', 'ZENH_X'),
@@ -184,7 +172,7 @@ describe('buildObjectUri matches each family’s own activation address', () => 
 });
 
 /**
- * An enhancement's address carries its subtype — `/enhancements/enhoxh/…` —
+ * An enhancement's address carries its subtype — `/enhancements/enhoxhb/…` —
  * and a bare `ENHO` or `ENHS` does not say which. Guessing one would be the
  * `default` branch's mistake again, so the caller is told what is missing.
  * That is the caller's argument, not SAP's answer, so it is thrown.

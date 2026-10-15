@@ -8,7 +8,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
+import {
+  ACCEPT_SOURCE,
+  CT_SOURCE,
+  ENHANCEMENT_CONTENT_TYPES,
+} from '../../constants/contentTypes';
+import { ENHANCEMENT } from '../../endpoints/objects';
 import { safeStringify } from '../../utils/internalUtils';
 import {
   type EnhancementType,
@@ -142,4 +147,29 @@ export async function updateEnhancement(
     },
     logger,
   );
+}
+
+/** Replace the object's whole document. enhoxhh PUT is allowed by its template but unmeasured. */
+export async function updateEnhancementMetadata(
+  connection: IAbapConnection,
+  type: EnhancementType,
+  name: string,
+  source: string,
+  lockHandle: string | undefined,
+  transportRequest?: string,
+): Promise<IAdtWireResponse> {
+  const params = new URLSearchParams();
+  if (lockHandle !== undefined) params.append('lockHandle', lockHandle);
+  if (transportRequest) params.append('corrNr', transportRequest);
+  const query = params.toString();
+  return connection.makeAdtRequest({
+    url: `${ENHANCEMENT.uri(type, name)}${query ? `?${query}` : ''}`,
+    method: 'PUT',
+    timeout: 0,
+    data: source,
+    headers: {
+      'Content-Type': ENHANCEMENT_CONTENT_TYPES[type],
+      Accept: ENHANCEMENT_CONTENT_TYPES[type],
+    },
+  });
 }

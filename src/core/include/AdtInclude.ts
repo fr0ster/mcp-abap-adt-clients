@@ -7,6 +7,7 @@
  * used to return is gone: a failure now abandons the chain and comes back as
  * the answer, with the request that produced it.
  */
+
 import type {
   IAdtActivatable,
   IAdtAnalyseOptions,
@@ -15,6 +16,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -38,6 +40,10 @@ import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
+import {
+  getIncludeEnhancementElements,
+  getIncludeEnhancementOptions,
+} from './enhancements';
 import { includeUrl, lockInclude } from './lock';
 import { getIncludeMetadata, getIncludeSource } from './read';
 import { type IIncludeResults, includeDocuments } from './types';
@@ -50,6 +56,11 @@ function requireName(config: Partial<IIncludeConfig>): string {
 
 export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   implements
+    IAdtIncludeEnhancementHost<
+      IIncludeConfig,
+      ReturnType<R['enhancementElements']>,
+      ReturnType<R['enhancementOptions']>
+    >,
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
@@ -76,6 +87,46 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     // Last, so the constructor every consumer already calls keeps its shape.
     private readonly systemContext: IAdtSystemContext = {},
   ) {}
+
+  /** Read the host's enhancement elements. */
+  async readEnhancementElements<E extends IAdtError = IAdtError>(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions<E> & { context?: string },
+  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        getIncludeEnhancementElements(
+          connection,
+          config.includeName as string,
+          options?.context,
+        ),
+      this.results.enhancementElements as IResultStrategy<
+        ReturnType<R['enhancementElements']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /** Read the host's enhancement options. */
+  async readEnhancementOptions<E extends IAdtError = IAdtError>(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions<E> & { context?: string },
+  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        getIncludeEnhancementOptions(
+          connection,
+          config.includeName as string,
+          options?.context,
+        ),
+      this.results.enhancementOptions as IResultStrategy<
+        ReturnType<R['enhancementOptions']>
+      >,
+      options?.analyse,
+    );
+  }
 
   /**
    * Validate before creating.

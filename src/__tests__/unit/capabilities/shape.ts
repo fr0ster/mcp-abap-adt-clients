@@ -27,6 +27,8 @@ import type {
   IAdtCheckable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtEnhancementHost,
+  IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -73,37 +75,41 @@ type Contract<H extends keyof typeof HANDLERS> = ReturnType<
  */
 type Offers<T, A> = T extends A ? true : false;
 
-type OffersAtom<T, A extends string> = A extends 'creatable'
-  ? Offers<T, IAdtCreatable<any, any>>
-  : A extends 'readable'
-    ? Offers<T, IAdtReadable<any, any>>
-    : A extends 'metadataReadable'
-      ? Offers<T, IAdtMetadataReadable<any, any>>
-      : A extends 'updatable'
-        ? Offers<T, IAdtUpdatable<any, any>>
-        : A extends 'metadataUpdatable'
-          ? Offers<T, IAdtMetadataUpdatable<any, any>>
-          : A extends 'deletable'
-            ? Offers<T, IAdtDeletable<any, any>>
-            : A extends 'validatable'
-              ? Offers<T, IAdtValidatable<any, any>>
-              : A extends 'checkable'
-                ? Offers<T, IAdtCheckable<any, any>>
-                : A extends 'activatable'
-                  ? Offers<T, IAdtActivatable<any, any>>
-                  : A extends 'lockable'
-                    ? Offers<T, IAdtLockable<any>>
-                    : A extends 'versionable'
-                      ? Offers<T, IAdtVersionable<any, any, any>>
-                      : A extends 'transportAware'
-                        ? Offers<T, IAdtTransportAware<any, any>>
-                        : // An atom this chain does not know resolves to
-                          // `never`, and `never extends true` is vacuously true
-                          // — so it would drop out of the product and be checked
-                          // by nothing at all. `everyAtomIsMapped` below refuses
-                          // to compile if a new atom is added to the manifest
-                          // without a line here.
-                          never;
+type OffersAtom<T, A extends string> = A extends 'enhancementHost'
+  ? Offers<T, IAdtEnhancementHost<any, any, any>>
+  : A extends 'includeEnhancementHost'
+    ? Offers<T, IAdtIncludeEnhancementHost<any, any, any>>
+    : A extends 'creatable'
+      ? Offers<T, IAdtCreatable<any, any>>
+      : A extends 'readable'
+        ? Offers<T, IAdtReadable<any, any>>
+        : A extends 'metadataReadable'
+          ? Offers<T, IAdtMetadataReadable<any, any>>
+          : A extends 'updatable'
+            ? Offers<T, IAdtUpdatable<any, any>>
+            : A extends 'metadataUpdatable'
+              ? Offers<T, IAdtMetadataUpdatable<any, any>>
+              : A extends 'deletable'
+                ? Offers<T, IAdtDeletable<any, any>>
+                : A extends 'validatable'
+                  ? Offers<T, IAdtValidatable<any, any>>
+                  : A extends 'checkable'
+                    ? Offers<T, IAdtCheckable<any, any>>
+                    : A extends 'activatable'
+                      ? Offers<T, IAdtActivatable<any, any>>
+                      : A extends 'lockable'
+                        ? Offers<T, IAdtLockable<any>>
+                        : A extends 'versionable'
+                          ? Offers<T, IAdtVersionable<any, any, any>>
+                          : A extends 'transportAware'
+                            ? Offers<T, IAdtTransportAware<any, any>>
+                            : // An atom this chain does not know resolves to
+                              // `never`, and `never extends true` is vacuously true
+                              // — so it would drop out of the product and be checked
+                              // by nothing at all. `everyAtomIsMapped` below refuses
+                              // to compile if a new atom is added to the manifest
+                              // without a line here.
+                              never;
 
 /**
  * Every atom in the manifest has a line in the chain above.
@@ -168,7 +174,13 @@ export type Offenders = {
  * tolerating silently, and the next one has somewhere to go — with the
  * assertion below failing until someone writes down why.
  */
-export type KnownDisagreements = never;
+// Optional context does not distinguish these atoms structurally: each host
+// satisfies both interfaces. The manifest records which contract it exposes.
+export type KnownDisagreements =
+  | 'include.enhancementHost — offered but not claimed'
+  | 'class.includeEnhancementHost — offered but not claimed'
+  | 'program.includeEnhancementHost — offered but not claimed'
+  | 'functionGroup.includeEnhancementHost — offered but not claimed';
 
 /**
  * The assertion.

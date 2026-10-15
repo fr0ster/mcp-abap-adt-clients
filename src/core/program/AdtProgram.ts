@@ -25,6 +25,7 @@ import type {
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
+  IAdtEnhancementHost,
   IAdtError,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -55,6 +56,10 @@ import { activateProgram } from './activation';
 import { checkProgram } from './check';
 import { create as createProgram } from './create';
 import { checkDeletion, deleteProgram } from './delete';
+import {
+  getProgramEnhancementElements,
+  getProgramEnhancementOptions,
+} from './enhancements';
 import { lockProgram } from './lock';
 import {
   getProgramMetadata,
@@ -73,6 +78,11 @@ import { getProgramVersionSource, getProgramVersions } from './versions';
 
 export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   implements
+    IAdtEnhancementHost<
+      IProgramConfig,
+      ReturnType<R['enhancementElements']>,
+      ReturnType<R['enhancementOptions']>
+    >,
     IAdtCreatable<IProgramConfig, ReturnType<R['created']>>,
     IAdtReadable<IProgramConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>>,
@@ -121,6 +131,38 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
       this.objectType,
       (programName, lockHandle) =>
         unlockProgram(this.connection, programName, lockHandle),
+    );
+  }
+
+  /** Read the host's enhancement elements. */
+  async readEnhancementElements<E extends IAdtError = IAdtError>(
+    config: Partial<IProgramConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        getProgramEnhancementElements(connection, config.programName as string),
+      this.results.enhancementElements as IResultStrategy<
+        ReturnType<R['enhancementElements']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /** Read the host's enhancement options. */
+  async readEnhancementOptions<E extends IAdtError = IAdtError>(
+    config: Partial<IProgramConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () =>
+        getProgramEnhancementOptions(connection, config.programName as string),
+      this.results.enhancementOptions as IResultStrategy<
+        ReturnType<R['enhancementOptions']>
+      >,
+      options?.analyse,
     );
   }
 

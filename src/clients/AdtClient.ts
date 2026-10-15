@@ -22,7 +22,9 @@ import type {
   IAdtDataPreview,
   IAdtDeletable,
   IAdtDiscovery,
+  IAdtEnhancementHost,
   IAdtGroupLifecycle,
+  IAdtIncludeEnhancementHost,
   IAdtInformationSystem,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -261,6 +263,11 @@ export type IClassContract<R extends IClassResults> = IAdtCreatable<
 > &
   IAdtReadable<IClassConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>> &
+  IAdtEnhancementHost<
+    IClassConfig,
+    ReturnType<R['enhancementElements']>,
+    ReturnType<R['enhancementOptions']>
+  > &
   IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IClassConfig,
@@ -283,6 +290,11 @@ export type IProgramContract<R extends IProgramResults> = IAdtCreatable<
 > &
   IAdtReadable<IProgramConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
+  IAdtEnhancementHost<
+    IProgramConfig,
+    ReturnType<R['enhancementElements']>,
+    ReturnType<R['enhancementOptions']>
+  > &
   IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IProgramConfig,
@@ -305,6 +317,11 @@ export type IIncludeContract<R extends IIncludeResults> = IAdtCreatable<
 > &
   IAdtReadable<IIncludeConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
+  IAdtIncludeEnhancementHost<
+    IIncludeConfig,
+    ReturnType<R['enhancementElements']>,
+    ReturnType<R['enhancementOptions']>
+  > &
   IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IIncludeConfig,
@@ -484,6 +501,11 @@ export type IDdlContract<R extends IDdlResults> = IAdtCreatable<
 export type IFunctionGroupContract<R extends IFunctionGroupResults> =
   IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
+    IAdtEnhancementHost<
+      IFunctionGroupConfig,
+      ReturnType<R['enhancementElements']>,
+      ReturnType<R['enhancementOptions']>
+    > &
     IAdtMetadataUpdatable<
       Partial<IFunctionGroupConfig>,
       ReturnType<R['metadataUpdated']>
@@ -896,6 +918,7 @@ export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
 > &
   IAdtReadable<IEnhancementConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>> &
+  IAdtMetadataUpdatable<IEnhancementConfig, ReturnType<R['metadataUpdated']>> &
   IAdtUpdatable<Partial<IEnhancementConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IEnhancementConfig,

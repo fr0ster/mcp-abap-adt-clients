@@ -78,6 +78,10 @@ export interface IFunctionGroupResults {
   readonly created: IResultStrategy<unknown>;
   readonly source: IResultStrategy<unknown>;
   readonly metadata: IResultStrategy<unknown>;
+  /** Enhancement implementations in the host's source. */
+  readonly enhancementElements: IResultStrategy<unknown>;
+  /** Places in the host that can be enhanced. */
+  readonly enhancementOptions: IResultStrategy<unknown>;
   readonly check: IResultStrategy<unknown>;
   readonly activation: IResultStrategy<unknown>;
   readonly validation: IResultStrategy<unknown>;
@@ -97,6 +101,8 @@ export const functionGroupDocuments = {
   created: rawDocument,
   source: rawDocument,
   metadata: rawDocument,
+  enhancementElements: rawDocument,
+  enhancementOptions: rawDocument,
   check: rawDocument,
   activation: rawDocument,
   validation: rawDocument,

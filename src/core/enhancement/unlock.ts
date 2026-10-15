@@ -16,7 +16,7 @@ import { type EnhancementType, getEnhancementUri } from './types';
  * after calling this function
  *
  * @param connection - SAP connection
- * @param enhancementType - Enhancement type (enhoxh, enhoxhb, enhoxhh, enhsxs, enhsxsb)
+ * @param enhancementType - Enhancement type (enhoxhb, enhoxhh, enhsxsb)
  * @param enhancementName - Enhancement name
  * @param lockHandle - Lock handle obtained from lockEnhancement
  * @returns Axios response

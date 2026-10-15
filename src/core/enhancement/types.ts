@@ -2,14 +2,15 @@
  * Enhancement module type definitions
  *
  * Supports multiple enhancement types:
- * - enhoxh: Enhancement Implementation (ENHO)
  * - enhoxhb: BAdI Implementation
  * - enhoxhh: Source Code Plugin (has source code)
- * - enhsxs: Enhancement Spot (ENHS)
  * - enhsxsb: BAdI Enhancement Spot
  */
 
-import type { EnhancementType } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  EnhancementType,
+  IEnhancementConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import { ENHANCEMENT } from '../../endpoints/objects';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -22,11 +23,9 @@ export type {
  * Enhancement object type codes for ADT
  */
 export const ENHANCEMENT_TYPE_CODES: Record<EnhancementType, string> = {
-  enhoxh: 'ENHO/EXH', // Enhancement Implementation
-  enhoxhb: 'ENHO/EXHB', // BAdI Implementation
-  enhoxhh: 'ENHO/EXHH', // Source Code Plugin
-  enhsxs: 'ENHS/EXS', // Enhancement Spot
-  enhsxsb: 'ENHS/EXSB', // BAdI Enhancement Spot
+  enhoxhb: 'ENHO/XHB', // BAdI Implementation
+  enhoxhh: 'ENHO/XHH', // Source Code Plugin
+  enhsxsb: 'ENHS/XSB', // BAdI Enhancement Spot
 };
 
 /**
@@ -55,17 +54,17 @@ export function supportsSourceCode(type: EnhancementType): boolean {
 }
 
 /**
- * Check if enhancement type is an implementation (requires enhancement spot)
+ * Check if enhancement type is an implementation
  */
 export function isImplementationType(type: EnhancementType): boolean {
-  return type === 'enhoxh' || type === 'enhoxhb' || type === 'enhoxhh';
+  return type === 'enhoxhb' || type === 'enhoxhh';
 }
 
 /**
  * Check if enhancement type is a spot/definition
  */
 export function isSpotType(type: EnhancementType): boolean {
-  return type === 'enhsxs' || type === 'enhsxsb';
+  return type === 'enhsxsb';
 }
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
@@ -124,6 +123,8 @@ export interface IEnhancementResults {
   readonly created: IResultStrategy<unknown>;
   readonly source: IResultStrategy<unknown>;
   readonly metadata: IResultStrategy<unknown>;
+  /** The whole document returned by the object document PUT. */
+  readonly metadataUpdated: IResultStrategy<unknown>;
   readonly check: IResultStrategy<unknown>;
   readonly activation: IResultStrategy<unknown>;
   readonly validation: IResultStrategy<unknown>;
@@ -147,6 +148,7 @@ export const enhancementDocuments = {
   created: rawDocument,
   source: rawDocument,
   metadata: rawDocument,
+  metadataUpdated: rawDocument,
   check: rawDocument,
   activation: rawDocument,
   validation: rawDocument,
@@ -183,7 +185,9 @@ export interface ICreateEnhancementParams {
   package_name: string;
   transport_request?: string;
   enhancement_spot?: string;
-  badi_definition?: string;
+  enhancedObject?: IEnhancementConfig['enhancedObject'];
+  enhancementOption?: string;
+  enhancementMode?: IEnhancementConfig['enhancementMode'];
   masterSystem?: string;
   responsible?: string;
   masterLanguage?: string;

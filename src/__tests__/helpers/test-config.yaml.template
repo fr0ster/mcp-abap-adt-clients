@@ -2678,3 +2678,62 @@ unpublish_service_binding:
         # two, once still unsettled after eleven minutes.
         wait_minutes: 12
         poll_seconds: 15
+
+# Enhancement wire measurements (2026-10-15). Package/transport use environment defaults.
+# Run shared:setup first: XHH uses the existing active shared program, never deletes it.
+# Cloud-only XHH refusal is omitted until getEnvironmentType supports cloud filtering.
+enhancement:
+  test_cases:
+    - name: "badi"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        interface_name: "ZIF_AC_BADI01"
+        spot_name: "ZAC_BADI_SPOT01"
+        definition_name: "ZAC_BADI_DEF01"
+        class_name: "ZCL_AC_BADI01"
+        enhancement_name: "ZAC_BADI_CONT01"
+        implementation_name: "ZAC_BADI_IMPL01"
+        description: "Integration BAdI end to end"
+    - name: "enhsxsb"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        enhancement_name: "ZAC_ENHS_XSB01"
+        description: "Integration enhancement spot"
+    - name: "enhoxhb"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        enhancement_name: "ZAC_ENHO_XHB01"
+        spot_name: "ZAC_ENHS_XHB01"
+        description: "Integration BAdI container"
+    - name: "enhoxhh"
+      enabled: true
+      available_in: ["onprem"]
+      params:
+        enhancement_name: "ZAC_ENHO_XHH01"
+        description: "Integration source plugin"
+        program_name: "ZAC_SHR_PROG" # Must name an active shared_dependencies.programs entry.
+    - name: "class_hosts"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        class_name: "CL_ABAP_TYPEDESCR"
+        missing_class_name: "ZAC_ENH_NO_SUCH_CLASS" # Must remain nonexistent.
+    - name: "program_host"
+      enabled: true
+      available_in: ["onprem"]
+      params:
+        program_name: "SAPMV45A" # ← CHANGE if this standard program is absent.
+    - name: "function_group_host"
+      enabled: true
+      available_in: ["onprem"]
+      params:
+        function_group_name: "SVIM" # ← CHANGE if absent; first measurement, not previously probed.
+    - name: "include_host"
+      enabled: true
+      available_in: ["onprem"]
+      params:
+        include_name: "LSVIMTOP" # ← CHANGE if absent; first measurement, not previously probed.
+        main_program: "SAPLSVIM" # ← CHANGE together with include_name to its main program.
