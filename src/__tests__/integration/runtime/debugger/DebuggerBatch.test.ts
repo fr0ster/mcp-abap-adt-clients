@@ -314,10 +314,14 @@ describe('Debugger batch wire measurements', () => {
       'stepContinue',
       'step_stack_variables',
       'stack_children',
+      ...measurementNames,
     ]) {
       if (!configuredCase('debugger_batch', name)) {
         throw new Error(`case debugger_batch/${name} not in test-config.yaml`);
       }
+    }
+    for (const name of measurementNames) {
+      measurementSteps(name);
     }
     if (!testCase) {
       throw new Error('runtime_debugger.adt_abap_debugger params are required');
@@ -388,37 +392,59 @@ describe('Debugger batch wire measurements', () => {
   }, STEP_TIMEOUT);
 
   afterAll(async () => {
+    const errors: unknown[] = [];
     try {
-      if (!listenerConnection) return;
-      for (const id of armed) {
-        await listenerApi.deleteBreakpoint(identity, id);
+      if (listenerConnection) {
+        for (const id of armed) {
+          await listenerApi.deleteBreakpoint(identity, id);
+        }
+        if (attached) await debuggerApi.terminateDebuggee();
+        if (sessionConnection) {
+          sessionConnection.setSessionType('stateless');
+          await closeOwnTestConnection(sessionConnection);
+        }
+        await listenerApi.stopListener(identity);
+        if (run) {
+          await Promise.race([
+            run,
+            new Promise((resolve) => setTimeout(resolve, 15_000)),
+          ]);
+        }
+        listenerConnection.setSessionType('stateless');
+        if (!testCase?.params?.keep_probe) {
+          await new AdtClient(listenerConnection, connectionLogger)
+            .getClass()
+            .delete({
+              className: CLASS_NAME,
+              packageName,
+              ...(transportRequest ? { transportRequest } : {}),
+            });
+        }
+        await closeOwnTestConnection(triggerConnection);
+        await closeOwnTestConnection(listenerConnection);
       }
-      if (attached) await debuggerApi.terminateDebuggee();
-      if (sessionConnection) {
-        sessionConnection.setSessionType('stateless');
-        await closeOwnTestConnection(sessionConnection);
+    } catch (error) {
+      errors.push(error);
+    }
+    for (const report of [
+      writeMeasurementSummary,
+      compareMeasurementHistories,
+    ]) {
+      try {
+        report();
+      } catch (error) {
+        errors.push(error);
       }
-      await listenerApi.stopListener(identity);
-      if (run) {
-        await Promise.race([
-          run,
-          new Promise((resolve) => setTimeout(resolve, 15_000)),
-        ]);
-      }
-      listenerConnection.setSessionType('stateless');
-      if (!testCase?.params?.keep_probe) {
-        await new AdtClient(listenerConnection, connectionLogger)
-          .getClass()
-          .delete({
-            className: CLASS_NAME,
-            packageName,
-            ...(transportRequest ? { transportRequest } : {}),
-          });
-      }
-      await closeOwnTestConnection(triggerConnection);
-      await closeOwnTestConnection(listenerConnection);
-    } finally {
-      writeMeasurementSummary();
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(
+        errors,
+        'Debugger cleanup and measurement reporting failed',
+        {
+          cause: errors[0],
+        },
+      );
     }
   }, STEP_TIMEOUT);
 
@@ -538,24 +564,38 @@ describe('Debugger batch wire measurements', () => {
   };
   const timingFile = path.join(exchangeDir, 'timings.txt');
 
-  function writeMeasurementSummary(): void {
-    const complete = measurementNames.every(
-      (name) => histories[name] !== undefined,
+  function measurementSteps(name: (typeof measurementNames)[number]): number {
+    const steps = Number(configuredCase('debugger_batch', name)?.params?.steps);
+    needs(
+      Number.isInteger(steps) && steps > 0,
+      `a positive integer steps for debugger_batch/${name}`,
     );
+    return steps;
+  }
+
+  function completedMeasurements(): (typeof measurementNames)[number][] {
+    return measurementNames.filter((name) => histories[name] !== undefined);
+  }
+
+  function writeMeasurementSummary(): void {
+    const completed = completedMeasurements();
     const summary = [
       ...measurementNames.map(
         (name) =>
           `\n${name} VARIABLE HISTORY\n${histories[name] ?? 'not completed'}`,
       ),
-      `\nHistory comparison: ${complete ? 'all four compared below' : 'requires all four completed cases'}`,
+      `\nHistory comparison: ${completed.length >= 2 ? `${completed.length} completed cases compared below` : 'requires at least two completed cases'}`,
     ].join('\n');
     fs.appendFileSync(timingFile, `${summary}\n`);
     testsLogger.info?.(
       `Debugger measurement summary: ${timingFile}\n${summary}`,
     );
-    if (complete) {
-      for (const name of measurementNames.slice(1))
-        expect(histories[name]).toBe(histories.multi_step_variables);
+  }
+
+  function compareMeasurementHistories(): void {
+    const completed = completedMeasurements();
+    for (const name of completed.slice(1)) {
+      expect(histories[name]).toBe(histories[completed[0]]);
     }
   }
 
@@ -583,10 +623,7 @@ describe('Debugger batch wire measurements', () => {
       `${name}: stepOver variable history`,
       async () => {
         if (skipped()) return;
-        const steps = Number(
-          configuredCase('debugger_batch', name)?.params?.steps ?? 5,
-        );
-        needs(Number.isInteger(steps) && steps > 0, 'a positive integer steps');
+        const steps = measurementSteps(name);
         await startAtBreakpoint();
         const frame = await topFrame();
         needs(frame.line === LINE.loop, 'the loop breakpoint in the probe');
