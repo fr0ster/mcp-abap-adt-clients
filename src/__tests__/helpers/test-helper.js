@@ -181,10 +181,10 @@ function loadTestConfig() {
   if (fs.existsSync(templatePath)) {
     if (!displayedTemplateWarning) {
       console.warn(
-        '⚠️ tests/test-config.yaml not found. Using tests/test-config.yaml.template (all integration tests remain disabled).',
+        '⚠️ test-config.yaml not found. Using test-config.yaml.template; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
       );
       console.warn(
-        '   Copy the template to tests/test-config.yaml and fill in your SAP system details to run integration tests.',
+        '   Cases run only once test-config.yaml exists. Copy the template and fill in your SAP system details.',
       );
       displayedTemplateWarning = true;
     }
@@ -199,6 +199,12 @@ function loadTestConfig() {
     'Please copy tests/test-config.yaml.template to tests/test-config.yaml and configure test parameters.',
   );
   process.exit(1);
+}
+
+/** Whether the cached configuration came from the placeholder template. */
+function isTestConfigTemplate() {
+  loadTestConfig();
+  return configLoadedFrom === 'template';
 }
 
 /**
@@ -3295,6 +3301,7 @@ module.exports = {
   writeAndActivate,
   mustSucceed,
   loadTestConfig,
+  isTestConfigTemplate,
   getSessionConfig,
   getEnabledTestCase,
   getAllEnabledTestCases,

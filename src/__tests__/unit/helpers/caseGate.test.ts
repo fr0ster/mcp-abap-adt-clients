@@ -1,4 +1,11 @@
-import { gate } from '../../helpers/caseGate';
+import { gate as registrationGate } from '../../helpers/caseGate';
+
+const gate: typeof registrationGate = (handler, name, loader) =>
+  registrationGate(handler, name, loader, {
+    loadEnv: () => {},
+    sapConfigured: () => true,
+    templateInUse: () => false,
+  });
 
 function config(system = 'onprem', enabled = true, availableIn = ['onprem']) {
   return {
@@ -135,6 +142,55 @@ describe('case registration gate', () => {
   it('allows cases with no availability restriction', () => {
     expect(
       gate('enhancement', 'enhoxhh', () => config('cloud', true, [])),
+    ).toBe(it);
+  });
+});
+
+describe('SAP configuration at registration', () => {
+  const originalUrl = process.env.SAP_URL;
+  afterEach(() => {
+    if (originalUrl === undefined) delete process.env.SAP_URL;
+    else process.env.SAP_URL = originalUrl;
+  });
+
+  it('skips without SAP before reading even broken configuration', () => {
+    delete process.env.SAP_URL;
+    expect(
+      registrationGate(
+        'enhancement',
+        'enhoxhh',
+        () => {
+          throw new Error('Configuration must not be read without SAP');
+        },
+        { loadEnv: () => {} },
+      ),
+    ).toBe(it.skip);
+  });
+
+  it('loads the environment before deciding whether SAP is configured', () => {
+    delete process.env.SAP_URL;
+    expect(
+      registrationGate('enhancement', 'enhoxhh', () => config(), {
+        loadEnv: () => {
+          process.env.SAP_URL = 'https://sap.invalid';
+        },
+        templateInUse: () => false,
+      }),
+    ).toBe(it);
+  });
+
+  it('registers a template case as a failure even when disabled', () => {
+    expect(
+      registrationGate(
+        'enhancement',
+        'enhoxhh',
+        () => config('onprem', false),
+        {
+          loadEnv: () => {},
+          sapConfigured: () => true,
+          templateInUse: () => true,
+        },
+      ),
     ).toBe(it);
   });
 });

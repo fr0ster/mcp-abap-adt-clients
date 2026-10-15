@@ -5,8 +5,6 @@
  * system before the code was written (2026-10-15); the notes are in git history
  * (removed in the 32.0.0 release branch), the facts in the CHANGELOG.
  */
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
@@ -14,13 +12,17 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IEnhancementConfig } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import * as dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { INTERFACE, PROGRAM } from '../../../../endpoints/objects';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { escapeXmlAttr } from '../../../../utils/xml';
-import { configuredCase, gate } from '../../../helpers/caseGate';
+import {
+  configuredCase,
+  gate,
+  isTestConfigTemplate,
+  MISSING_TEST_CONFIG,
+} from '../../../helpers/caseGate';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -41,9 +43,6 @@ const {
   getTimeout,
   resolveSharedDependency,
 } = require('../../../helpers/test-helper');
-const envPath =
-  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) dotenv.config({ path: envPath, quiet: true });
 const logger = createTestsLogger();
 const parser = new XMLParser({ ignoreAttributes: false });
 const analyse = { analyse: analyseException };
@@ -65,6 +64,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
 
   beforeAll(async () => {
     try {
+      if (isTestConfigTemplate()) throw new Error(MISSING_TEST_CONFIG);
       connection = await createTestConnection(createConnectionLogger());
       isCloud = await isCloudEnvironment(connection);
       const context = await resolveSystemContext(connection, isCloud);
@@ -86,11 +86,13 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
   });
 
   function configured(name: string): TestConfigResolver {
+    if (isTestConfigTemplate()) throw new Error(MISSING_TEST_CONFIG);
     const testCase = configuredCase('enhancement', name);
-    if (!hasConfig || !testCase) {
-      throw new Error(
-        `Configuration defect for enhancement/${name}: SAP setup or test case is missing`,
-      );
+    if (!testCase) {
+      throw new Error(`case enhancement/${name} not in test-config.yaml`);
+    }
+    if (!hasConfig) {
+      throw new Error(`SAP setup failed for enhancement/${name}`);
     }
     return new TestConfigResolver({ testCase, isCloud, isLegacy, logger });
   }
