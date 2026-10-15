@@ -24,6 +24,7 @@ import type {
   IAdtDiscovery,
   IAdtEnhancementHost,
   IAdtGroupLifecycle,
+  IAdtIncludeEnhancementHost,
   IAdtInformationSystem,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -316,7 +317,7 @@ export type IIncludeContract<R extends IIncludeResults> = IAdtCreatable<
 > &
   IAdtReadable<IIncludeConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
-  IAdtEnhancementHost<
+  IAdtIncludeEnhancementHost<
     IIncludeConfig,
     ReturnType<R['enhancementElements']>,
     ReturnType<R['enhancementOptions']>

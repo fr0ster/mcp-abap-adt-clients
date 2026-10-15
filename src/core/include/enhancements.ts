@@ -8,14 +8,16 @@ import {
 } from '../../constants/contentTypes';
 import { PROGRAM, PROGRAM_INCLUDE } from '../../endpoints/objects';
 
+function contextQuery(context?: string): string {
+  return context ? `?context=${encodeURIComponent(PROGRAM.uri(context))}` : '';
+}
+
 export async function getIncludeEnhancementElements(
   connection: IAbapConnection,
   name: string,
   context?: string,
 ): Promise<IAdtWireResponse> {
-  const url =
-    PROGRAM_INCLUDE.enhancementElements(name) +
-    (context ? `?context=${encodeURIComponent(PROGRAM.uri(context))}` : '');
+  const url = PROGRAM_INCLUDE.enhancementElements(name) + contextQuery(context);
   return connection.makeAdtRequest({
     url,
     method: 'GET',
@@ -27,8 +29,9 @@ export async function getIncludeEnhancementElements(
 export async function getIncludeEnhancementOptions(
   connection: IAbapConnection,
   name: string,
+  context?: string,
 ): Promise<IAdtWireResponse> {
-  const url = PROGRAM_INCLUDE.enhancementOptions(name);
+  const url = PROGRAM_INCLUDE.enhancementOptions(name) + contextQuery(context);
   return connection.makeAdtRequest({
     url,
     method: 'GET',

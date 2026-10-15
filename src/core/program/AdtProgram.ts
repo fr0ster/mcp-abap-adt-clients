@@ -137,7 +137,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   /** Read the host's enhancement elements. */
   async readEnhancementElements<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions<E> & { context?: string },
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(

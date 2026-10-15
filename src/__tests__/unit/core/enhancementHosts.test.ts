@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   IAdtEnhancementHost,
+  IAdtIncludeEnhancementHost,
   IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -94,28 +95,35 @@ for (const [factory, nameKey, base] of hosts) {
         });
       }
     }
-    it('elements context is a program name only for standalone includes', async () => {
-      const { client, makeAdtRequest } = fixture();
-      await (
-        client[factory]() as IAdtEnhancementHost<
-          Record<string, string>,
-          string,
-          string
-        >
-      ).readEnhancementElements(
-        { [nameKey]: 'ZHOST' },
-        { context: '/ABC/ZMAIN' },
-      );
-      const query =
-        factory === 'getInclude'
-          ? '?context=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2F%252Fabc%252Fzmain'
-          : '';
-      expect(makeAdtRequest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          url: `${base}/zhost/source/main/enhancements/elements${query}`,
-        }),
-      );
-    });
+    if (factory === 'getInclude') {
+      for (const [member, suffix] of [
+        ['readEnhancementElements', '/source/main/enhancements/elements'],
+        ['readEnhancementOptions', '/enhancements/options'],
+      ] as const) {
+        for (const context of [undefined, 'SAPLSVIM', '/ABC/ZMAIN']) {
+          it(`${member}: include context ${context ?? 'omitted'} is a main-program name`, async () => {
+            const { client, makeAdtRequest } = fixture();
+            const host: IAdtIncludeEnhancementHost<
+              Record<string, string>,
+              string,
+              string
+            > = client.getInclude();
+            await host[member]({ includeName: 'ZHOST' }, { context });
+            const query =
+              context === undefined
+                ? ''
+                : context === 'SAPLSVIM'
+                  ? '?context=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2Fsaplsvim'
+                  : '?context=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2F%252Fabc%252Fzmain';
+            expect(makeAdtRequest).toHaveBeenCalledWith(
+              expect.objectContaining({
+                url: `${base}/zhost${suffix}${query}`,
+              }),
+            );
+          });
+        }
+      }
+    }
   });
 }
 

@@ -15,8 +15,8 @@ import type {
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
-  IAdtEnhancementHost,
   IAdtError,
+  IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -56,7 +56,7 @@ function requireName(config: Partial<IIncludeConfig>): string {
 
 export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   implements
-    IAdtEnhancementHost<
+    IAdtIncludeEnhancementHost<
       IIncludeConfig,
       ReturnType<R['enhancementElements']>,
       ReturnType<R['enhancementOptions']>
@@ -111,12 +111,16 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   /** Read the host's enhancement options. */
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options?: IAdtOperationOptions<E> & { context?: string },
   ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
-        getIncludeEnhancementOptions(connection, config.includeName as string),
+        getIncludeEnhancementOptions(
+          connection,
+          config.includeName as string,
+          options?.context,
+        ),
       this.results.enhancementOptions as IResultStrategy<
         ReturnType<R['enhancementOptions']>
       >,

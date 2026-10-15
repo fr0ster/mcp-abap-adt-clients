@@ -25,6 +25,7 @@ export const ATOM_METHODS = {
   readable: ['read'],
   metadataReadable: ['readMetadata'],
   enhancementHost: ['readEnhancementElements', 'readEnhancementOptions'],
+  includeEnhancementHost: ['readEnhancementElements', 'readEnhancementOptions'],
   updatable: ['update'],
   metadataUpdatable: ['updateMetadata'],
   deletable: ['delete', 'checkDeletion'],
@@ -231,7 +232,7 @@ export const HANDLERS = {
       'source, unlock, activate — and no version, checkrun or transport call ' +
       'appears in it. Additive the moment one is measured.',
     capabilities: [
-      'enhancementHost',
+      'includeEnhancementHost',
       'creatable',
       'readable',
       'metadataReadable',
