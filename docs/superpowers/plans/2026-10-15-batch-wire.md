@@ -33,6 +33,24 @@ empty line, then the inner request (request line, headers, empty line, body).
 - Mixed GET + POST is accepted here (the 500 recorded in 2026-08 was the old
   batch client on `debugger/batch`).
 
+### A write inside communication/batch (E19)
+
+Program `ZAC_BATCH_T1` created in `ZAC_TEST_PKG` (normally), then, on one
+connection set **stateful** for each envelope:
+
+1. envelope `[POST {uri}?_action=LOCK&accessMode=MODIFY` (lock Accept,
+   `X-sap-adt-sessiontype: stateful`)`]` → 202; part `HTTP/1.1 200` with the
+   usual `asx:abap` lock result: `LOCK_HANDLE`, `CORRNR E19K907111`, `CORRUSER`.
+2. envelope `[PUT {uri}/source/main?lockHandle=…&corrNr=… (text/plain body),
+   POST {uri}?_action=UNLOCK&lockHandle=… (stateful)]` → 202; parts 200, 200.
+3. the inactive source read afterwards is the text written in the batch; the
+   delete afterwards succeeded (the lock was released). Program gone (404).
+
+So the lock window can run through the batch when the envelope goes stateful.
+Not measured: the same with the envelope stateless; a write without the lock
+handle known up front (LOCK and PUT in one envelope cannot work — the PUT needs
+the handle the LOCK answers).
+
 ## debugger/batch — Eclipse's request (captured by the owner, 2026-10-09)
 
 ```
@@ -61,8 +79,7 @@ a live stop, each step method, and whether `getVariables` can join the envelope.
 
 ## Still to measure
 
-- communication/batch: a write (lock / PUT / unlock) inside a batch — the lock
-  needs a stateful session; does the batch carry it; per-part authorization
+- communication/batch: per-part authorization
   (`S_ADT_RES` on inner requests); limits (part count, size); RFC transport.
 - debugger/batch: live step + stack for stepInto / stepOver / stepReturn /
   stepContinue; + getVariables; + getChildVariables.
