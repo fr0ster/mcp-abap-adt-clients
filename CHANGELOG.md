@@ -24,6 +24,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [34.1.0] - 2026-10-16
+
+### Added
+
+- `exemptFromAcceptNegotiation(connection)` is exported: it marks a connection
+  so accept negotiation never corrects or resends through it, as an
+  `AdtBatchConnection` marks itself. For a consumer that hands members its own
+  wrapper over a batch connection, which is otherwise negotiated like any other
+  connection.
+
 ## [34.0.0] - 2026-10-16
 
 **BREAKING:** nothing in a batch is corrected or sent again. A batch part
