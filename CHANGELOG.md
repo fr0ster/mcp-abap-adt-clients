@@ -24,6 +24,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [32.2.0] - 2026-10-16
+
+### Changed
+
+- No SAP system identity in the package or the repository: system ids, cloud user ids,
+  a tenant host and system-named files are gone from comments, JSDoc examples, docs and
+  tests; observations keep their meaning ("an on-premise system", "an ABAP Cloud
+  system", "a trial ABAP Cloud account" where a fact belongs to the trial offering).
+  `docs/discovery/textsearch_*_objecttypes.xml` are renamed `textsearch_onprem_a` /
+  `textsearch_onprem_b`. No API or behaviour change.
+- The repository guard against system names now checks file paths as well as contents,
+  across tests, scripts, docs, the strategies package, `CHANGELOG.md`, `README.md` and
+  `.gitignore`.
+
 ## [32.1.0] - 2026-10-16
 
 ### Added
