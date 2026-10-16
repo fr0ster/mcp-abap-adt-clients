@@ -24,9 +24,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [33.0.1] - 2026-10-16
+## [34.0.0] - 2026-10-16
 
-### Fixed
+**BREAKING:** nothing in a batch is corrected or sent again. A batch part
+answered `406`/`415` used to be corrected and resent in a follow-up envelope; it
+is now that call's answer. No type changes; see
+[MIGRATION-34.md](docs/usage/MIGRATION-34.md).
+
+### Changed
 
 - Accept negotiation no longer corrects or resends anything in a batch.
   - A part answered `406`/`415` used to be corrected by its member's

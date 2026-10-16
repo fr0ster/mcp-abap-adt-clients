@@ -1021,6 +1021,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[33.x → 34.0.0](docs/usage/MIGRATION-34.md)** — a batch corrects and resends nothing: a part's `406`/`415` is that call's answer.
 - **[32.x → 33.0.0](docs/usage/MIGRATION-33.md)** — a credential the provider refused before SAP was asked rejects with the connection's refusal as it came; a `401` SAP refused it with comes back carrying that response.
 - **[31.x → 32.0.0](docs/usage/MIGRATION-32.md)** — interfaces-adt 18, three enhancement subtypes, subtype-specific create fields, two new result slots for enhancement hosts, and `metadataUpdated` for enhancement document writes.
 - **[30.x → 31.0.0](docs/usage/MIGRATION-31.md)** — `interfaces-adt` 16 and
