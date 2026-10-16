@@ -73,6 +73,19 @@ Use the real handles and inspect activation messages, including `type="E"`.
 The transport provides no transaction or rollback; callers own recovery and
 cleanup after partial failures.
 
+Accept negotiation never corrects or resends an envelope or its parts. A batch
+connection is exempt from it: an `AdtClient` built over one does not wrap it,
+whatever `enableAcceptCorrection` it is given, and a member that negotiates by
+itself sends through it once. On a connection an `AdtClient` wrapped with
+correction on, a `406` or `415` answered to the envelope reaches `execute()` and
+every part of that envelope as it came. A part's own `401`, `406` or `415` is
+that part's answer like any other status; nothing reads it, corrects it or
+sends it again. A batch is yours, and so is
+what SAP answered to each of its parts. The envelope request itself still goes
+through the connection's own handling — credential renewal, CSRF recovery and
+session — as every request does: that is about the connection to the endpoint,
+not about what the parts answered.
+
 At an attached debugger stop, use the attached connection and its stateful session:
 
 ```typescript
@@ -103,8 +116,8 @@ parts in the failed envelope. Unsent runs and queued follow-ups reject with a
 library error saying the request was not sent because an earlier envelope failed;
 that error carries the cause, without a SAP response. Missing parts reject with a part-count error. A count
 mismatch also rejects `execute()`. Attach rejection handlers before execution when
-using raw connection promises. Each execute sends follow-up envelopes for requests recorded during settlement,
-including the automatic 406/415 corrected retry. It yields one event-loop turn
+using raw connection promises. Each execute sends follow-up envelopes for requests recorded during settlement
+by member continuations; accept negotiation records none. It yields one event-loop turn
 after settling each envelope to let member continuations record requests. It
 returns the last outer response once that queue is empty. A limit of 100 envelopes
 rejects execution and all remaining requests rather than looping forever.
@@ -121,7 +134,7 @@ For ordinary client members, LOCK and UNLOCK run stateful; creates, writes, read
 and deletes run stateless. Group creates before locks, and writes before unlocks,
 to avoid one envelope per alternating request. One execute can send several
 envelopes and provides no transaction across them. Inner HTTP failures remain
-per-part failures and do not stop later runs, allowing negotiation retries.
+per-part failures and do not stop later runs.
 
 Stateful parts carry `X-sap-adt-sessiontype: stateful`. The wrapped session mode
 is restored afterward. Connections exposing `getSessionMode()` or

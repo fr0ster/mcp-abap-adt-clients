@@ -1021,6 +1021,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[33.x → 34.0.0](docs/usage/MIGRATION-34.md)** — a batch corrects and resends nothing: a part's `406`/`415` is that call's answer.
 - **[32.x → 33.0.0](docs/usage/MIGRATION-33.md)** — a credential the provider refused before SAP was asked rejects with the connection's refusal as it came; a `401` SAP refused it with comes back carrying that response.
 - **[31.x → 32.0.0](docs/usage/MIGRATION-32.md)** — interfaces-adt 18, three enhancement subtypes, subtype-specific create fields, two new result slots for enhancement hosts, and `metadataUpdated` for enhancement document writes.
 - **[30.x → 31.0.0](docs/usage/MIGRATION-31.md)** — `interfaces-adt` 16 and
@@ -1156,9 +1157,13 @@ activate all objects with one plain `activateObjectsGroup` call. At a debugger
 stop, record step + stack + variables on the attached stateful connection.
 See [domain and debugger examples](docs/usage/BATCH.md).
 
-`execute()` also sends follow-up envelopes for requests recorded during settlement,
-including automatic 406/415 negotiation retries (up to 100 envelopes, then all
-remaining requests reject). Explicit session switches apply to the next recording;
+`execute()` also sends follow-up envelopes for requests member continuations
+record during settlement (up to 100 envelopes, then all remaining requests
+reject). Nothing in a batch is corrected or sent again: a batch connection is
+exempt from accept negotiation, so a part's `401`, `406` or `415` is that call's
+answer, and a `406`/`415` to the envelope reaches `execute()` as it came. The
+connection's own handling of the envelope request — credential renewal, CSRF
+recovery, session — stays. Explicit session switches apply to the next recording;
 LOCK/UNLOCK run in stateful envelopes; other ordinary members run stateless.
 Consecutive LOCKs, consecutive UNLOCKs, and consecutive stateless requests each
 form separate envelopes sent in queue order.

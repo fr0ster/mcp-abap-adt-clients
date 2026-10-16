@@ -44,6 +44,31 @@ function stateOf(connection: IAbapConnection): INegotiationState {
   return state;
 }
 
+/**
+ * The mark of a connection accept negotiation never touches: a recording batch
+ * connection. What SAP answers to a recorded request — a `406`/`415` included —
+ * is the batch caller's to read, so nothing is corrected, cached or sent again,
+ * whatever switch an `AdtClient` built over it was given.
+ */
+const NO_NEGOTIATION = Symbol.for(
+  '@mcp-abap-adt/adt-clients/acceptNegotiation/none',
+);
+
+/** Mark a connection so accept negotiation never corrects or resends through it. */
+export function exemptFromAcceptNegotiation(connection: IAbapConnection): void {
+  Object.defineProperty(connection, NO_NEGOTIATION, {
+    value: true,
+    enumerable: false,
+    configurable: false,
+  });
+}
+
+function isExempt(connection: IAbapConnection): boolean {
+  return (
+    (connection as unknown as Record<symbol, unknown>)[NO_NEGOTIATION] === true
+  );
+}
+
 const baseRequestMap = new WeakMap<
   IAbapConnection,
   IAbapConnection['makeAdtRequest']
@@ -160,7 +185,15 @@ function buildCacheKey(request: IAbapRequestOptions): string {
   return `${request.method.toUpperCase()} ${request.url}`;
 }
 
-function getBaseRequest(
+/**
+ * The connection's request as it was before an `AdtClient` with correction on
+ * wrapped it: accept negotiation corrects and resends nothing. The
+ * connection's own handling (credential, CSRF, session) is untouched.
+ *
+ * Exported for the batch connection: what SAP answers to an envelope is the
+ * caller's to read.
+ */
+export function getBaseRequest(
   connection: IAbapConnection,
 ): IAbapConnection['makeAdtRequest'] {
   return (
@@ -172,7 +205,7 @@ export function wrapConnectionAcceptNegotiation(
   connection: IAbapConnection,
   logger?: ILogger,
 ): void {
-  if (baseRequestMap.has(connection)) {
+  if (baseRequestMap.has(connection) || isExempt(connection)) {
     return;
   }
 
@@ -199,6 +232,9 @@ export async function makeAdtRequestWithAcceptNegotiation<
   request: IAbapRequestOptions,
   options?: IAcceptNegotiationOptions,
 ): Promise<IAdtWireResponse<T, D>> {
+  if (isExempt(connection)) {
+    return getBaseRequest(connection)<T, D>(request);
+  }
   const enableCorrection =
     options?.enableAcceptCorrection ?? getAcceptCorrectionEnabled(connection);
   const { accept: acceptCache, contentType: contentTypeCache } =

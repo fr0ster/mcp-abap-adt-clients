@@ -24,6 +24,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [34.0.0] - 2026-10-16
+
+**BREAKING:** nothing in a batch is corrected or sent again. A batch part
+answered `406`/`415` used to be corrected and resent in a follow-up envelope; it
+is now that call's answer. No type changes; see
+[MIGRATION-34.md](docs/usage/MIGRATION-34.md).
+
+### Changed
+
+- Accept negotiation no longer corrects or resends anything in a batch.
+  - A part answered `406`/`415` used to be corrected by its member's
+    negotiation and sent again in a follow-up envelope, replacing SAP's answer;
+    it is now that call's answer. An `AdtBatchConnection` is exempt from accept
+    negotiation: an `AdtClient` built over it does not wrap it, whatever
+    `enableAcceptCorrection` it is given, and a member that negotiates by itself
+    sends through it once.
+  - A `406`/`415` answered to the envelope, on a connection an `AdtClient`
+    wrapped with correction on, used to be corrected and the whole envelope sent
+    again; it now reaches `execute()` and the envelope's parts as it came.
+  - The connection's own handling of the envelope request (credential renewal,
+    CSRF recovery, session) is unchanged.
+
 ## [33.0.0] - 2026-10-16
 
 **BREAKING:** a credential the provider refused before SAP was asked now

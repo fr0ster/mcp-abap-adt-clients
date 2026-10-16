@@ -5,6 +5,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { BATCH } from '../endpoints/objects';
+import {
+  exemptFromAcceptNegotiation,
+  getBaseRequest,
+} from '../utils/acceptNegotiation';
 import { isUnansweredCredentialRefusal } from '../utils/adtResponse';
 import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
 
@@ -35,6 +39,9 @@ export class AdtBatchConnection implements IAbapConnection {
     this.defaultSession =
       options.endpoint === 'debugger' ? 'stateful' : 'stateless';
     this.session = this.defaultSession;
+    // What SAP answers to a recorded request is the caller's: no member's
+    // accept negotiation corrects or resends through this connection.
+    exemptFromAcceptNegotiation(this);
   }
   private wrappedSession(): Session {
     const connection = this.connection as IAbapConnection & {
@@ -136,7 +143,11 @@ export class AdtBatchConnection implements IAbapConnection {
           endpoint: this.options.endpoint,
           parts: active.length,
         });
-        response = await this.connection.makeAdtRequest({
+        // Not through accept negotiation: when an `AdtClient` wrapped the
+        // connection, it would answer a 406/415 to the envelope by sending it
+        // again. A batch is the caller's, and so is what SAP answered to it.
+        // The connection's own handling (credential, CSRF, session) stays.
+        response = await getBaseRequest(this.connection)({
           url: BATCH[this.options.endpoint],
           method: 'POST',
           timeout: 0,
@@ -170,7 +181,7 @@ export class AdtBatchConnection implements IAbapConnection {
             `ADT batch response part count mismatch: expected ${active.length}, received ${parts.length}`,
           );
         active = [];
-        // Let negotiation and member continuations record their follow-up calls.
+        // Let member continuations record their follow-up calls.
         await new Promise<void>((resolve) => setImmediate(resolve));
         pending.push(...this.queue.splice(0));
         if (!pending.length) return response;
