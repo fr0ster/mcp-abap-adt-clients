@@ -122,6 +122,7 @@ const RUNTIME_EXPORTS = [
   'domainDocuments',
   'enhancementDocuments',
   'exemptFromAcceptNegotiation',
+  'getBaseRequest',
   'featureToggleDocuments',
   'feedDocuments',
   'fetchDiscoveryEndpoints',

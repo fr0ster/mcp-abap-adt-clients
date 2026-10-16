@@ -24,6 +24,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [34.2.0] - 2026-10-16
+
+### Added
+
+- `getBaseRequest(connection)` is exported: a connection's request as it was
+  before an `AdtClient` with accept correction on wrapped it. A consumer whose
+  batch connection wraps a forwarder of its own over such a connection forwards
+  the envelope through it, so accept negotiation never corrects or resends the
+  envelope.
+
 ## [34.1.0] - 2026-10-16
 
 ### Added
