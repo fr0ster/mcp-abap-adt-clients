@@ -5,6 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { BATCH } from '../endpoints/objects';
+import { isUnansweredCredentialRefusal } from '../utils/adtResponse';
 import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
 
 type Session = 'stateful' | 'stateless';
@@ -175,10 +176,16 @@ export class AdtBatchConnection implements IAbapConnection {
         if (!pending.length) return response;
       }
     } catch (error) {
-      const unsentError = new Error(
-        'ADT batch request not sent because an earlier batch envelope failed',
-        { cause: error },
-      );
+      // A credential refusal SAP was never asked about is the caller's signal
+      // to stop, so every part — sent, queued, or recorded while settling —
+      // rejects with that same object, never with the "not sent" wrapper: a
+      // member reached through `answering` rethrows it as it came.
+      const unsentError = isUnansweredCredentialRefusal(error)
+        ? error
+        : new Error(
+            'ADT batch request not sent because an earlier batch envelope failed',
+            { cause: error },
+          );
       this.settlementFailure = { error: unsentError };
       for (const part of active) part.reject(error);
       for (const part of pending) part.reject(unsentError);

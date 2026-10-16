@@ -159,6 +159,37 @@ describe('answering a refused credential', () => {
     expect(answer.getError().response?.status).toBe(401);
   });
 
+  it("rejects when the provider's own throw carries an identity provider's 400", async () => {
+    // A foreign provider may throw an error carrying its identity provider's
+    // response: a 400 invalid_grant is not SAP answering.
+    const cause = Object.assign(new Error('invalid_grant'), {
+      response: { ...unauthorized, status: 400, statusText: 'Bad Request' },
+      request: { method: 'POST', url: '/oauth/token' },
+    });
+    const thrown = refused(cause);
+
+    await expect(
+      answering(async () => {
+        throw thrown;
+      }, rawDocument),
+    ).rejects.toBe(thrown);
+  });
+
+  it('answers a failure when the provider-thrown cause carries status 401', async () => {
+    const cause = Object.assign(new Error('the provider gave up'), {
+      response: unauthorized,
+    });
+    const thrown = refused(cause);
+
+    const answer = await answering(async () => {
+      throw thrown;
+    }, rawDocument);
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError().response?.status).toBe(401);
+  });
+
   it('looks one level down only: a cause wrapping the 401 is not SAP answering', async () => {
     const thrown = refused(new WireLogonError(wireError(), 401));
 

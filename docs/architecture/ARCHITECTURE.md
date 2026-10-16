@@ -37,7 +37,9 @@ request, its reading and the caller's verdict meet: it runs the request, lets
 reading. The reading runs outside the failure classification, so a parser that
 throws surfaces as itself. A credential refusal SAP was never asked about —
 the connection's `AuthRefusedError`, recognised by shape, with no `401` in its
-cause — is rethrown as the same object before any strategy sees it; one SAP
+cause — is rethrown as the same object before any strategy sees it, and no
+other catch in the library (chain, lock registry, batch, request trace)
+converts it; one SAP
 answered with a `401` comes back as a failure carrying that response, which
 `analyse` cannot clear.
 

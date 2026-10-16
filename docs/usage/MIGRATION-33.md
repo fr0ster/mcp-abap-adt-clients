@@ -30,18 +30,39 @@ try {
 
 `orThrow` passes the same object through.
 
+The same holds everywhere else this library catches what a request threw:
+
+- **A multi-step member** (lock, write, unlock — a message write, say) still
+  runs its unlocks and rollbacks, then rejects with the refusal. A rollback
+  that did not complete is logged (`warn`), not attached: the refusal is not
+  this library's to change. A refusal met by an unlock on a chain that had
+  otherwise succeeded or failed rejects the same way, after every cleanup ran;
+  the failure the chain would have answered is logged.
+- **`AdtClient.unlockAll()`** used to return every failed unlock as a
+  `LockFailure`. It now stops at a refusal and rejects with it; that lock and
+  those not yet tried stay in `pendingLocks`. **`await using`** (the client's
+  `Symbol.asyncDispose`) lets it through — under `await using` a scope that
+  also threw sees the language's `SuppressedError` holding both.
+- **`AdtBatchConnection.execute()`** rejects every part with the refusal —
+  sent, unsent and recorded while settling — where unsent parts used to get
+  "ADT batch request not sent because an earlier batch envelope failed". A
+  member recorded on the batch rejects with it too.
+
 ## A credential SAP refused
 
 When SAP answered `401` and the provider could not renew the credential, the
-refusal carries SAP's response as its cause. A member now answers a failure
-with that response (`response.status === 401`) and the request it was sent
-with, where it used to answer one with neither. The message is the refusal's.
+refusal carries SAP's response as its cause (`cause.response.status ===
+401`). A member now answers a failure with that response
+(`response.status === 401`) and the request it was sent with, where it used
+to answer one with neither. The message is the refusal's.
 `analyse` still sees it, but cannot clear it: there is no document to read.
 
 ## How a refusal is recognised
 
 By shape, not by `instanceof`: own data properties `refusal` (an object with
 string `kind` and `reason`) and `at` (a string), and no own `response`. SAP's
-answer is looked for one level down only, as `cause.response` with a numeric
-`status`. Getters are never run. A value of your own that carries this shape is
+answer is looked for one level down only, as `cause.response` with
+`status` exactly `401`: any other status there (an identity provider's
+`400 invalid_grant` a provider threw) is not SAP answering, and the refusal
+rejects. Getters are never run. A value of your own that carries this shape is
 treated the same way.

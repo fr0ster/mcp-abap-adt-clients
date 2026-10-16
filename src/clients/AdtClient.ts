@@ -1315,6 +1315,10 @@ export class AdtClient {
    * This is a safety net for abandoned locks (a forgot-to-unlock, or a managed
    * flow that threw before its unlock). Preventing a timeout from interrupting a
    * lock→unlock critical section remains the caller's responsibility.
+   *
+   * Rejects with the connection's credential refusal, the same object, when
+   * the provider refused before SAP was asked: the remaining locks stay in
+   * {@link pendingLocks}, untried.
    */
   async unlockAll(): Promise<LockFailure[]> {
     return this.lockRegistry.unlockAll();
@@ -1332,9 +1336,13 @@ export class AdtClient {
   /**
    * Release all held locks when used with `await using`.
    *
-   * Best-effort: like {@link unlockAll}, this never throws — a lock whose unlock
-   * fails is retained rather than surfaced as an error, so a disposer failure
-   * cannot mask the error that ended the `using` scope. Any residual failures
+   * Best-effort: like {@link unlockAll}, this throws for nothing SAP answered —
+   * a lock whose unlock fails is retained rather than surfaced as an error, so
+   * a disposer failure cannot mask the error that ended the `using` scope. The
+   * one exception is the credential refusal {@link unlockAll} rejects with: it
+   * is the caller's signal to stop and propagates as the same object (under
+   * `await using`, a scope that also threw sees the language's
+   * `SuppressedError` holding both). Any residual failures
    * are logged as a warning and remain observable via {@link pendingLocks}.
    * Callers that must react to unlock failures should call `unlockAll()`
    * explicitly and inspect the returned `LockFailure[]`.

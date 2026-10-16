@@ -106,16 +106,32 @@ function credentialRefusal(error: unknown): ICredentialRefusal | undefined {
   }
   // One level down, and only there: the connection puts the wire's error as
   // the cause when SAP refused the credential, and the provider's own throw
-  // when it never got that far.
+  // when it never got that far. Only a 401 is SAP refusing the credential: a
+  // provider's throw may carry a response of its own — an identity provider's
+  // 400 invalid_grant — and that is not SAP answering.
   const cause = ownValue(error, 'cause');
   const response = ownValue(cause, 'response');
-  if (typeof ownValue(response, 'status') !== 'number') return {};
+  if (ownValue(response, 'status') !== 401) return {};
   return {
     answered: {
       response: response as IAdtWireResponse,
       request: ownValue(cause, 'request') as IWithResponse['request'],
     },
   };
+}
+
+/**
+ * Whether `error` is a credential refusal SAP was never asked about: the
+ * connection's refusal with no `401` from SAP as its cause.
+ *
+ * Module-internal (not in the package's index). Every place in this library
+ * that catches what a request threw asks this first, after its own cleanup, and
+ * rethrows such a refusal as the same object — never converted, wrapped or
+ * swallowed — so a caller walking many objects sees it and stops.
+ */
+export function isUnansweredCredentialRefusal(error: unknown): boolean {
+  const refused = credentialRefusal(error);
+  return refused !== undefined && refused.answered === undefined;
 }
 
 /**
@@ -204,8 +220,13 @@ export const nothingIsARefusal: IAnalyse<IAdtError> = () => ADT_NO_FAILURE;
  * | returned | yes | none | — | the value, or a failure if `analyse` names one |
  * | threw, response attached | yes | `recogniseFailure` | **yes** | cleared → the value read from that same wire |
  * | threw, no response | **no** | `recogniseFailure` | **no** | always a failure |
- * | credential refused, SAP answered | **no** | `recogniseFailure`, SAP's response | **no** | always a failure |
+ * | credential refused, SAP answered `401` | **no** | `recogniseFailure`, SAP's response | **no** | always a failure |
  * | credential refused, SAP not asked | — | — | — | **rejects** with the refusal as it came |
+ *
+ * SAP answered only when the refusal's cause carries a response of status
+ * `401` (`cause.response.status`, one level down). Any other status there — an
+ * identity provider's `400 invalid_grant` a provider threw — is the provider's,
+ * not SAP's, and the refusal rejects.
  *
  * **A credential refusal SAP never saw is not an answer.** The connection
  * raises one when the credential provider says no before the request reaches
@@ -243,8 +264,7 @@ export async function answering<T, E extends IAdtError = IAdtError>(
     // The provider refused before SAP said anything: no answer exists to come
     // back, and every further request would only ask the provider again. It is
     // thrown as it came — the same object, before any strategy sees it.
-    const refused = credentialRefusal(error);
-    if (refused && !refused.answered) throw error;
+    if (isUnansweredCredentialRefusal(error)) throw error;
     verdict = recogniseFailure(error);
     wire = (error as IWithResponse)?.response;
   }

@@ -680,6 +680,18 @@ A refusal is recognised by its shape — own data properties `refusal` (with
 string `kind` and `reason`) and `at`, and no `response` of its own — not by
 `instanceof`, since this package does not depend on the connection. That is a
 passthrough convention: anything carrying the shape is passed on as it came.
+SAP answered only when the refusal's cause, one level down, carries a response
+of status `401` (`cause.response.status === 401`); any other status there — an
+identity provider's `400 invalid_grant` a provider threw — is not SAP's, and
+the refusal rejects.
+
+No part of this library converts, wraps or swallows a refusal SAP never saw.
+A multi-step member (a lock, a write, an unlock) still runs its unlocks and
+rollbacks, then rejects with the same object; a rollback that did not complete
+is logged, not added to it. `unlockAll()` and `await using` stop at it, the
+locks not yet released staying in `pendingLocks`. An `AdtBatchConnection`
+whose envelope is refused rejects every part — sent, unsent or recorded while
+settling — with that same object, not with the "not sent" error.
 
 The transport frame is `IAdtWireResponse`. It is the shape the connection layer
 speaks and lives at that boundary; `IAdtResponse` names what a member answers
