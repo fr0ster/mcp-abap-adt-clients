@@ -474,7 +474,7 @@ test.each([
   expect(source).not.toMatch(/\b[A-Z][A-Z0-9]{2}K\d+\b/);
 });
 
-describe('the envelope goes out once', () => {
+describe('accept negotiation never resends an envelope', () => {
   // A batch is the caller's: what SAP answers to the envelope is theirs to
   // read. Accept negotiation, on a connection an AdtClient wrapped with
   // correction on, would answer a 406/415 by sending the envelope again.

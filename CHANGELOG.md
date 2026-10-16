@@ -28,10 +28,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
-- `AdtBatchConnection` sends each envelope once. On a connection an `AdtClient`
-  wrapped with accept correction on, a `406`/`415` answered to the envelope was
-  corrected and the whole envelope sent again; it now reaches `execute()` and the
-  envelope's parts as it came. The parts' own requests were never corrected.
+- Accept negotiation no longer corrects or resends a batch envelope. On a
+  connection an `AdtClient` wrapped with accept correction on, a `406`/`415`
+  answered to the envelope was corrected and the whole envelope sent again; it
+  now reaches `execute()` and the envelope's parts as it came. The parts' own
+  answers were never corrected. The connection's own handling of the envelope
+  request (credential renewal, CSRF recovery, session) is unchanged.
 
 ## [33.0.0] - 2026-10-16
 

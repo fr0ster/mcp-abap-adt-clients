@@ -162,10 +162,11 @@ function buildCacheKey(request: IAbapRequestOptions): string {
 
 /**
  * The connection's request as it was before an `AdtClient` with correction on
- * wrapped it: nothing is corrected or sent again.
+ * wrapped it: accept negotiation corrects and resends nothing. The
+ * connection's own handling (credential, CSRF, session) is untouched.
  *
- * Exported for the batch connection, whose envelope must go out once: what SAP
- * answers to it is the caller's to read.
+ * Exported for the batch connection: what SAP answers to an envelope is the
+ * caller's to read.
  */
 export function getBaseRequest(
   connection: IAbapConnection,
