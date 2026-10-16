@@ -121,6 +121,7 @@ const RUNTIME_EXPORTS = [
   'ddlDocuments',
   'domainDocuments',
   'enhancementDocuments',
+  'exemptFromAcceptNegotiation',
   'featureToggleDocuments',
   'feedDocuments',
   'fetchDiscoveryEndpoints',

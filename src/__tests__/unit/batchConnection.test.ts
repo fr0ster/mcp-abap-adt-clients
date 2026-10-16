@@ -7,6 +7,7 @@ import type {
 import { AdtBatchConnection } from '../../batch';
 import { innerRequest, parseBatchResponse } from '../../batch/wire';
 import { AdtClient } from '../../clients/AdtClient';
+import { exemptFromAcceptNegotiation } from '../../index';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 
@@ -574,4 +575,59 @@ test.each([
   expect(
     ((await pending) as { response?: { status?: number } }).response?.status,
   ).toBe(status);
+});
+
+describe('a consumer wrapper over a batch connection', () => {
+  // A consumer may hand members its own connection over the batch (per call,
+  // say). The public mark is how that wrapper is exempt too; unmarked, it is
+  // negotiated like any other connection.
+  function wrapperOver(batch: AdtBatchConnection): IAbapConnection {
+    return {
+      makeAdtRequest: (
+        request: Parameters<IAbapConnection['makeAdtRequest']>[0],
+      ) => batch.makeAdtRequest(request),
+      setSessionType: (mode: 'stateful' | 'stateless') =>
+        batch.setSessionType(mode),
+      connect: () => batch.connect(),
+      getBaseUrl: () => batch.getBaseUrl(),
+      getSessionId: () => batch.getSessionId(),
+    } as unknown as IAbapConnection;
+  }
+  const refused406 = <S extends { data: string }>(success: S): S => ({
+    ...success,
+    data: '--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 406 Unsupported\r\nAccept: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n',
+  });
+
+  it('marked with exemptFromAcceptNegotiation, resends nothing', async () => {
+    const { batch, send } = fixture([200]);
+    const success = await send({});
+    send.mockClear();
+    send.mockResolvedValueOnce(refused406(success));
+    const wrapper = wrapperOver(batch);
+    exemptFromAcceptNegotiation(wrapper);
+    const pending = new AdtClient(wrapper, undefined, {
+      enableAcceptCorrection: true,
+    })
+      .getDomain()
+      .readMetadata({ domainName: 'Z_TEST' });
+    await batch.execute();
+    expect(send).toHaveBeenCalledTimes(1);
+    const answer = await pending;
+    expect(answer.ok).toBe(false);
+  });
+
+  it('unmarked, is negotiated like any other connection', async () => {
+    const { batch, send } = fixture([200]);
+    const success = await send({});
+    send.mockClear();
+    send.mockResolvedValueOnce(refused406(success));
+    const pending = new AdtClient(wrapperOver(batch), undefined, {
+      enableAcceptCorrection: true,
+    })
+      .getDomain()
+      .readMetadata({ domainName: 'Z_TEST' });
+    await batch.execute();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect((await pending).ok).toBe(true);
+  });
 });

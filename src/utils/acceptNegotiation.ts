@@ -54,7 +54,14 @@ const NO_NEGOTIATION = Symbol.for(
   '@mcp-abap-adt/adt-clients/acceptNegotiation/none',
 );
 
-/** Mark a connection so accept negotiation never corrects or resends through it. */
+/**
+ * Mark a connection so accept negotiation never corrects or resends through it.
+ *
+ * Public for a consumer that hands members its own connection over an
+ * `AdtBatchConnection` — a per-call wrapper, say: an `AdtBatchConnection` marks
+ * itself, but a different object is not it, and is negotiated like any other
+ * connection unless it is marked too. The mark is permanent; there is no unmark.
+ */
 export function exemptFromAcceptNegotiation(connection: IAbapConnection): void {
   Object.defineProperty(connection, NO_NEGOTIATION, {
     value: true,
