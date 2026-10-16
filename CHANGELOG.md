@@ -24,6 +24,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [33.0.0] - 2026-10-16
+
+**BREAKING:** a credential the provider refused before SAP was asked now
+rejects instead of answering a failure. No type changes; see
+[MIGRATION-33.md](docs/usage/MIGRATION-33.md).
+
+### Changed
+
+- `answering` (every member) rethrows the connection's credential refusal
+  (`AuthRefusedError`) as the same object when SAP was never asked — the
+  provider refused before the request reached SAP. It used to come back as
+  `origin: 'connection'` with the message alone, its `refusal` dropped, so a
+  caller could not tell it from a network failure and walked on, asking the
+  provider again for every further object. `analyse` and the reading are not
+  called for it.
+- A credential SAP refused (a `401` the provider could not renew) comes back as
+  a failure carrying SAP's `401` response and request from the refusal's cause,
+  in the refusal's words; `analyse` cannot clear it. It used to carry neither.
+- A refusal is recognised by shape (own data `refusal.kind`, `refusal.reason`,
+  `at`, no own `response`), never by `instanceof`; getters are never run.
+
 ## [32.2.0] - 2026-10-16
 
 ### Changed

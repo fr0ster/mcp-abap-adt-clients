@@ -35,7 +35,11 @@ Consumer code  ── result sets (at construction), analyse (per call)
 request, its reading and the caller's verdict meet: it runs the request, lets
 `analyse` decide whether the answer is a failure, and only then applies the
 reading. The reading runs outside the failure classification, so a parser that
-throws surfaces as itself.
+throws surfaces as itself. A credential refusal SAP was never asked about —
+the connection's `AuthRefusedError`, recognised by shape, with no `401` in its
+cause — is rethrown as the same object before any strategy sees it; one SAP
+answered with a `401` comes back as a failure carrying that response, which
+`analyse` cannot clear.
 
 ## Legacy System Support
 
@@ -253,7 +257,10 @@ request is built (a function include without its group, an enhancement without
 its subtype, a where-used type nobody knows), or a defect. A reading that throws
 — the consumer's own, or one from `adt-strategies` — surfaces as itself, because
 calling it a verdict about SAP points a caller at a system that answered
-correctly.
+correctly. The one exception from below: a credential refusal SAP was never
+asked about rejects with the connection's own object, because there is no
+answer to come back and every further request would ask the provider again
+(see `answering`).
 
 Common behaviors in implementations:
 - Preserve raw ADT responses for caller inspection — the failure half carries

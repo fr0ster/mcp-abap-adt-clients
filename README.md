@@ -663,6 +663,24 @@ where-used type no vocabulary knows), or a defect. A reading that throws — you
 own, or one from `adt-strategies` — surfaces as itself, not as a connection
 failure, because a parser's bug is not advice to reauthenticate.
 
+**A refused credential.** The connection raises one refusal
+(`AuthRefusedError`) for two different things, and they come back differently:
+
+- **SAP refused the credential** — a `401` the credential provider could not
+  renew. That is SAP's answer: a failure with `origin: 'connection'`, the
+  refusal's message and SAP's `401` response. `analyse` sees it but cannot
+  clear it.
+- **The provider refused before SAP was asked** — a login that ended, a token
+  the identity provider will not renew. There is no answer to come back, and
+  every further request would only ask the provider again, so the member
+  **rejects** with the refusal as it came, the same object. Catch it where you
+  walk many objects: it is your signal to stop.
+
+A refusal is recognised by its shape — own data properties `refusal` (with
+string `kind` and `reason`) and `at`, and no `response` of its own — not by
+`instanceof`, since this package does not depend on the connection. That is a
+passthrough convention: anything carrying the shape is passed on as it came.
+
 The transport frame is `IAdtWireResponse`. It is the shape the connection layer
 speaks and lives at that boundary; `IAdtResponse` names what a member answers
 with.
@@ -991,6 +1009,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[32.x → 33.0.0](docs/usage/MIGRATION-33.md)** — a credential the provider refused before SAP was asked rejects with the connection's refusal as it came; a `401` SAP refused it with comes back carrying that response.
 - **[31.x → 32.0.0](docs/usage/MIGRATION-32.md)** — interfaces-adt 18, three enhancement subtypes, subtype-specific create fields, two new result slots for enhancement hosts, and `metadataUpdated` for enhancement document writes.
 - **[30.x → 31.0.0](docs/usage/MIGRATION-31.md)** — `interfaces-adt` 16 and
   `interfaces-adt-connection` 3: the per-request `signal`, `ADT_REQUEST_ERROR`
