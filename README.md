@@ -1156,9 +1156,13 @@ activate all objects with one plain `activateObjectsGroup` call. At a debugger
 stop, record step + stack + variables on the attached stateful connection.
 See [domain and debugger examples](docs/usage/BATCH.md).
 
-`execute()` also sends follow-up envelopes for requests recorded during settlement,
-including automatic 406/415 negotiation retries (up to 100 envelopes, then all
-remaining requests reject). Explicit session switches apply to the next recording;
+`execute()` also sends follow-up envelopes for requests member continuations
+record during settlement (up to 100 envelopes, then all remaining requests
+reject). Nothing in a batch is corrected or sent again: a batch connection is
+exempt from accept negotiation, so a part's `401`, `406` or `415` is that call's
+answer, and a `406`/`415` to the envelope reaches `execute()` as it came. The
+connection's own handling of the envelope request — credential renewal, CSRF
+recovery, session — stays. Explicit session switches apply to the next recording;
 LOCK/UNLOCK run in stateful envelopes; other ordinary members run stateless.
 Consecutive LOCKs, consecutive UNLOCKs, and consecutive stateless requests each
 form separate envelopes sent in queue order.
