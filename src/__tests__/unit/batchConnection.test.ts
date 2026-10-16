@@ -8,6 +8,7 @@ import { AdtBatchConnection } from '../../batch';
 import { innerRequest, parseBatchResponse } from '../../batch/wire';
 import { AdtClient } from '../../clients/AdtClient';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 
 function fixture(statuses = [200, 200]) {
   const send = jest.fn(async (_request: unknown) => ({
@@ -208,7 +209,7 @@ describe('innerRequest without a body', () => {
 
 test.each([
   406, 415,
-])('execute settles member negotiation for %s', async (status) => {
+])("a part answered %s is that call's answer, and nothing is resent", async (status) => {
   const { batch, send } = fixture([200]);
   const success = await send({});
   send.mockClear();
@@ -220,11 +221,34 @@ test.each([
     .getDomain()
     .readMetadata({ domainName: 'Z_TEST' });
   await batch.execute();
-  expect(send).toHaveBeenCalledTimes(2);
-  expect((await pending).ok).toBe(true);
-  expect((send.mock.calls[1][0] as any).data).toContain(
-    `${status === 406 ? 'Accept' : 'Content-Type'}: application/corrected+xml`,
-  );
+  expect(send).toHaveBeenCalledTimes(1);
+  const answer = await pending;
+  expect(answer.ok).toBe(false);
+  if (answer.ok) throw new Error('expected a failure');
+  expect(answer.getError().response?.status).toBe(status);
+});
+
+test.each([
+  406, 415,
+] as const)('an AdtClient with correction switched on explicitly still resends nothing (%s)', async (status) => {
+  const { batch, send } = fixture([200]);
+  const success = await send({});
+  send.mockClear();
+  send.mockResolvedValueOnce({
+    ...success,
+    data: `--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Unsupported\r\nAccept: application/corrected+xml\r\nContent-Type: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n`,
+  });
+  const pending = new AdtClient(batch, undefined, {
+    enableAcceptCorrection: true,
+  })
+    .getDomain()
+    .readMetadata({ domainName: 'Z_TEST' });
+  await batch.execute();
+  expect(send).toHaveBeenCalledTimes(1);
+  const answer = await pending;
+  expect(answer.ok).toBe(false);
+  if (answer.ok) throw new Error('expected a failure');
+  expect(answer.getError().response?.status).toBe(status);
 });
 
 test.each([
@@ -526,4 +550,28 @@ describe('accept negotiation never resends an envelope', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(await settled).toBe(refusal);
   });
+});
+
+test.each([
+  406, 415,
+] as const)('a member that negotiates directly resends nothing through a batch (%s)', async (status) => {
+  // Some members call the negotiation themselves rather than through the
+  // wrapped connection: the exemption holds there too.
+  const { batch, send } = fixture([200]);
+  const success = await send({});
+  send.mockClear();
+  send.mockResolvedValueOnce({
+    ...success,
+    data: `--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Unsupported\r\nAccept: application/corrected+xml\r\nContent-Type: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n`,
+  });
+  const pending = makeAdtRequestWithAcceptNegotiation(
+    batch,
+    { ...req, headers: { Accept: 'application/xml' } },
+    { enableAcceptCorrection: true },
+  ).catch((error: unknown) => error);
+  await batch.execute();
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(
+    ((await pending) as { response?: { status?: number } }).response?.status,
+  ).toBe(status);
 });

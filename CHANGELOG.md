@@ -28,12 +28,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
-- Accept negotiation no longer corrects or resends a batch envelope. On a
-  connection an `AdtClient` wrapped with accept correction on, a `406`/`415`
-  answered to the envelope was corrected and the whole envelope sent again; it
-  now reaches `execute()` and the envelope's parts as it came. The parts' own
-  answers were never corrected. The connection's own handling of the envelope
-  request (credential renewal, CSRF recovery, session) is unchanged.
+- Accept negotiation no longer corrects or resends anything in a batch.
+  - A part answered `406`/`415` used to be corrected by its member's
+    negotiation and sent again in a follow-up envelope, replacing SAP's answer;
+    it is now that call's answer. An `AdtBatchConnection` is exempt from accept
+    negotiation: an `AdtClient` built over it does not wrap it, whatever
+    `enableAcceptCorrection` it is given, and a member that negotiates by itself
+    sends through it once.
+  - A `406`/`415` answered to the envelope, on a connection an `AdtClient`
+    wrapped with correction on, used to be corrected and the whole envelope sent
+    again; it now reaches `execute()` and the envelope's parts as it came.
+  - The connection's own handling of the envelope request (credential renewal,
+    CSRF recovery, session) is unchanged.
 
 ## [33.0.0] - 2026-10-16
 
