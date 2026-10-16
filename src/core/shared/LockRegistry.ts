@@ -11,6 +11,8 @@
  * interrupting the lock→unlock critical section is the caller's responsibility.
  */
 
+import { isUnansweredCredentialRefusal } from '../../utils/adtResponse';
+
 /**
  * Releases a single held lock. Provided by the handler that acquired it.
  *
@@ -61,6 +63,13 @@ export class LockRegistry {
    * Release every lock still held. Successfully released locks are dropped;
    * locks whose unlock throws are kept and returned as failures.
    *
+   * **A credential refusal SAP was never asked about ends the batch.** Every
+   * further unlock would only ask the credential provider again, so the loop
+   * stops there: that lock and every lock not yet tried stay held (see
+   * {@link pending}), the session is restored as on every path, and the refusal
+   * rejects as the same object rather than being returned as one failure among
+   * many.
+   *
    * The whole batch runs under a single stateful→stateless transition so that a
    * per-unlock switch to stateless can't clear the session mid-batch and break
    * the remaining lock handles.
@@ -76,6 +85,7 @@ export class LockRegistry {
           await unlock();
           this.locks.delete(key);
         } catch (error) {
+          if (isUnansweredCredentialRefusal(error)) throw error;
           failures.push({ key, error });
         }
       }

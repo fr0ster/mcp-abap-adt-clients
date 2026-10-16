@@ -23,10 +23,26 @@
  *
  * An error raised *by* cleanup is logged, never propagated: a failing unlock must
  * not replace the reason the chain failed, which is what the caller needs.
+ *
+ * **A credential refusal SAP was never asked about is not a failure to return.**
+ * When a step rejects with the connection's refusal (see `answering`), the
+ * cleanups and rollbacks still run, in the same order, and then the chain
+ * rejects with that same object — not converted, not wrapped, not written to —
+ * so a caller walking many objects stops. A rollback that did not complete
+ * cannot be said in the answer then, since the refusal is not this library's to
+ * change: it is logged (`warn`), as every cleanup failure already is. The same
+ * holds when a cleanup or rollback is what met the refusal on a chain that
+ * otherwise succeeded or failed: after unwinding, the chain rejects with the
+ * first such refusal, and the failure it would have returned is logged instead.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { failed, recogniseFailure, succeeded } from '../../utils/adtResponse';
+import {
+  failed,
+  isUnansweredCredentialRefusal,
+  recogniseFailure,
+  succeeded,
+} from '../../utils/adtResponse';
 import { safeErrorMessage } from '../../utils/internalUtils';
 
 /**
@@ -85,6 +101,9 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     onFailure: (undo) => register(rollbacks, undo),
   };
 
+  // The first credential refusal SAP never saw that a cleanup or rollback met.
+  // Unwinding still runs every entry; the refusal is rethrown once it is done.
+  let cleanupRefusal: { error: unknown } | undefined;
   const unwind = async (
     list: Array<() => Promise<void>>,
     collect?: (reason: string) => void,
@@ -93,6 +112,9 @@ export async function chain<T, E extends IAdtError = IAdtError>(
       try {
         await undo();
       } catch (cleanupError: unknown) {
+        if (!cleanupRefusal && isUnansweredCredentialRefusal(cleanupError)) {
+          cleanupRefusal = { error: cleanupError };
+        }
         const reason = safeErrorMessage(cleanupError);
         logger?.warn?.('cleanup failed', { error: reason });
         collect?.(reason);
@@ -100,11 +122,17 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     }
   };
 
+  let value: T;
   try {
-    const value = await body(scope);
-    await unwind(undos);
-    return succeeded<T, E>(value);
+    value = await body(scope);
   } catch (error: unknown) {
+    return abandon(error);
+  }
+  await unwind(undos);
+  if (cleanupRefusal) throw cleanupRefusal.error;
+  return succeeded<T, E>(value);
+
+  async function abandon(error: unknown): Promise<IAdtResponse<T, E>> {
     // Cleanups first, rollbacks after — the order a single reverse-ordered list
     // already produced, since a rollback is registered before the lock it must
     // outlive. A delete issued while the chain still holds the object's lock is
@@ -113,12 +141,36 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     const unrolled: string[] = [];
     await unwind(rollbacks, (reason) => unrolled.push(reason));
 
+    // The refusal is the caller's to see, as it came, once everything that
+    // must run has run. What the rollback could not undo is in the log above.
+    if (isUnansweredCredentialRefusal(error)) {
+      if (unrolled.length > 0) {
+        logger?.warn?.(
+          'rollback did not complete before the credential refusal',
+          {
+            error: unrolled.join('; '),
+          },
+        );
+      }
+      throw error;
+    }
+
     // The same cast `answering` makes, for the same reason: a chain abandons
     // with whatever failure its failing step answered, and a step that had no
     // strategy answered the library's own `IAdtError` — which is what every `E`
     // extends. Nothing a caller sees is cast.
     const failure =
       error instanceof ChainAbandoned ? error.failure : recogniseFailure(error);
+
+    if (cleanupRefusal) {
+      // A cleanup or rollback met the refusal: that is the caller's signal to
+      // stop, and the failure this chain would have answered goes to the log.
+      logger?.warn?.('chain failed before a cleanup met a credential refusal', {
+        error: failure.message,
+        ...(unrolled.length > 0 ? { rollback: unrolled.join('; ') } : {}),
+      });
+      throw cleanupRefusal.error;
+    }
 
     if (unrolled.length === 0) return failed<T, E>(failure as E);
 

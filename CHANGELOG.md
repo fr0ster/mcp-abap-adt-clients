@@ -24,6 +24,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [33.0.0] - 2026-10-16
+
+**BREAKING:** a credential the provider refused before SAP was asked now
+rejects instead of answering a failure. No type changes; see
+[MIGRATION-33.md](docs/usage/MIGRATION-33.md).
+
+### Changed
+
+- `answering` (every member) rethrows the connection's credential refusal
+  (`AuthRefusedError`) as the same object when SAP was never asked — the
+  provider refused before the request reached SAP. It used to come back as
+  `origin: 'connection'` with the message alone, its `refusal` dropped, so a
+  caller could not tell it from a network failure and walked on, asking the
+  provider again for every further object. `analyse` and the reading are not
+  called for it.
+- A credential SAP refused (a `401` the provider could not renew) comes back as
+  a failure carrying SAP's `401` response and request from the refusal's cause,
+  in the refusal's words; `analyse` cannot clear it. It used to carry neither.
+- A refusal is recognised by shape (own data `refusal.kind`, `refusal.reason`,
+  `at`, no own `response`), never by `instanceof`; getters are never run. SAP
+  answered only when `cause.response.status === 401`, one level down; any other
+  status there (an identity provider's `400` a provider threw) rejects.
+- No internal catch converts, wraps or swallows a refusal SAP never saw. A
+  chain (lock, write, unlock) runs its unlocks and rollbacks, then rejects with
+  the same object; a rollback that did not complete is logged, not attached.
+  A refusal an unlock meets rejects the chain too, after every cleanup ran.
+- `AdtClient.unlockAll()` and `await using` stop at the refusal and reject with
+  it, the remaining locks kept in `pendingLocks`; it used to be returned as one
+  `LockFailure` among many.
+- `AdtBatchConnection.execute()` rejects every part — sent, unsent, recorded
+  while settling — with the refusal, not with the "not sent" error.
+- The request trace no longer writes `request` onto a refusal.
+
 ## [32.2.0] - 2026-10-16
 
 ### Changed

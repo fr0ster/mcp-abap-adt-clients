@@ -35,6 +35,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { isUnansweredCredentialRefusal } from './adtResponse';
 
 /** Enough to say which call, and nothing more. Matches `IAdtError.request`. */
 export interface IAdtRequestTrace {
@@ -116,6 +117,11 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
       // No check that the thrown thing can carry a field. A transport that
       // throws a string is broken in a way this wrapper must not paper over,
       // and the TypeError says so where a silent skip would not.
+      //
+      // A credential refusal SAP was never asked about is not annotated: it is
+      // the connection's own object, rethrown to the caller as it came, and
+      // this wrapper does not write onto it.
+      if (isUnansweredCredentialRefusal(error)) throw error;
       (error as { request?: unknown }).request = asked;
       throw error;
     }
