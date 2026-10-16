@@ -5,6 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { BATCH } from '../endpoints/objects';
+import { getBaseRequest } from '../utils/acceptNegotiation';
 import { isUnansweredCredentialRefusal } from '../utils/adtResponse';
 import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
 
@@ -136,7 +137,11 @@ export class AdtBatchConnection implements IAbapConnection {
           endpoint: this.options.endpoint,
           parts: active.length,
         });
-        response = await this.connection.makeAdtRequest({
+        // The envelope goes out once. Accept negotiation, when an `AdtClient`
+        // wrapped the connection, would answer a 406/415 to the envelope by
+        // sending it again; a batch is the caller's, and so is what SAP
+        // answered to it.
+        response = await getBaseRequest(this.connection)({
           url: BATCH[this.options.endpoint],
           method: 'POST',
           timeout: 0,

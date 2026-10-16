@@ -160,7 +160,14 @@ function buildCacheKey(request: IAbapRequestOptions): string {
   return `${request.method.toUpperCase()} ${request.url}`;
 }
 
-function getBaseRequest(
+/**
+ * The connection's request as it was before an `AdtClient` with correction on
+ * wrapped it: nothing is corrected or sent again.
+ *
+ * Exported for the batch connection, whose envelope must go out once: what SAP
+ * answers to it is the caller's to read.
+ */
+export function getBaseRequest(
   connection: IAbapConnection,
 ): IAbapConnection['makeAdtRequest'] {
   return (

@@ -473,3 +473,57 @@ test.each([
   expect(source).not.toMatch(forbidden);
   expect(source).not.toMatch(/\b[A-Z][A-Z0-9]{2}K\d+\b/);
 });
+
+describe('the envelope goes out once', () => {
+  // A batch is the caller's: what SAP answers to the envelope is theirs to
+  // read. Accept negotiation, on a connection an AdtClient wrapped with
+  // correction on, would answer a 406/415 by sending the envelope again.
+  function refusing(status: 406 | 415) {
+    const refusal = Object.assign(new Error(`status ${status}`), {
+      response: {
+        status,
+        statusText: 'Refused',
+        headers: {
+          accept: 'multipart/alternative',
+          'x-sap-adt-supported-accept': 'multipart/alternative',
+          'x-sap-adt-supported-content-type': 'multipart/alternative',
+        },
+        data: '',
+      },
+    });
+    const send = jest.fn(async (_request: unknown) => {
+      throw refusal;
+    });
+    const connection = {
+      makeAdtRequest: send,
+      setSessionType: jest.fn(),
+      connect: jest.fn(),
+      getBaseUrl: async () => 'https://example.test',
+      getSessionId: () => 'session',
+    } as unknown as IAbapConnection;
+    // Wraps the connection's makeAdtRequest with accept negotiation.
+    new AdtClient(connection, undefined, { enableAcceptCorrection: true });
+    return { connection, send, refusal };
+  }
+
+  it.each([
+    406, 415,
+  ] as const)('sends an envelope answered %s once, and the parts see that answer', async (status) => {
+    const { connection, send, refusal } = refusing(status);
+    expect(connection.makeAdtRequest).not.toBe(send);
+    const batch = new AdtBatchConnection(connection, {
+      endpoint: 'communication',
+    });
+    const part = batch.makeAdtRequest({
+      ...req,
+      method: 'POST',
+      data: '<x/>',
+      headers: { 'Content-Type': 'application/xml' },
+    });
+    const settled = part.catch((error: unknown) => error);
+
+    await expect(batch.execute()).rejects.toBe(refusal);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await settled).toBe(refusal);
+  });
+});

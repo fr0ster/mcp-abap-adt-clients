@@ -24,6 +24,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [33.0.1] - 2026-10-16
+
+### Fixed
+
+- `AdtBatchConnection` sends each envelope once. On a connection an `AdtClient`
+  wrapped with accept correction on, a `406`/`415` answered to the envelope was
+  corrected and the whole envelope sent again; it now reaches `execute()` and the
+  envelope's parts as it came. The parts' own requests were never corrected.
+
 ## [33.0.0] - 2026-10-16
 
 **BREAKING:** a credential the provider refused before SAP was asked now

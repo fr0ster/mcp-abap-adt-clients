@@ -73,6 +73,11 @@ Use the real handles and inspect activation messages, including `type="E"`.
 The transport provides no transaction or rollback; callers own recovery and
 cleanup after partial failures.
 
+Each envelope goes out once. Accept negotiation does not correct it: on a
+connection an `AdtClient` wrapped with correction on, a `406` or `415` answered
+to the envelope reaches `execute()` and every part of that envelope as it came,
+and nothing is sent again. A batch is yours, and so is what SAP answered to it.
+
 At an attached debugger stop, use the attached connection and its stateful session:
 
 ```typescript
