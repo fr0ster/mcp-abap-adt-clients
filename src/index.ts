@@ -27,4 +27,7 @@ export * from './index.executors';
 export * from './index.readings';
 export * from './index.runtime';
 export * from './index.ws';
-export { exemptFromAcceptNegotiation } from './utils/acceptNegotiation';
+export {
+  exemptFromAcceptNegotiation,
+  getBaseRequest,
+} from './utils/acceptNegotiation';

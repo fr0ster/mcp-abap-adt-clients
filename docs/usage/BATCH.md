@@ -83,7 +83,10 @@ that part's answer like any other status; nothing reads it, corrects it or
 sends it again. A connection of your own that members send through instead of
 the batch connection — a per-call wrapper over it, say — is a different object
 and is negotiated like any other; mark it with `exemptFromAcceptNegotiation(wrapper)`
-(exported by the package) and it is exempt too. A batch is yours, and so is
+(exported by the package) and it is exempt too. When the batch connection wraps
+a forwarder of yours over a connection an `AdtClient` wrapped, forward through
+`getBaseRequest(thatConnection)` (exported): the envelope then bypasses that
+connection's accept negotiation and is sent once. A batch is yours, and so is
 what SAP answered to each of its parts. The envelope request itself still goes
 through the connection's own handling — credential renewal, CSRF recovery and
 session — as every request does: that is about the connection to the endpoint,

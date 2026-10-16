@@ -7,7 +7,7 @@ import type {
 import { AdtBatchConnection } from '../../batch';
 import { innerRequest, parseBatchResponse } from '../../batch/wire';
 import { AdtClient } from '../../clients/AdtClient';
-import { exemptFromAcceptNegotiation } from '../../index';
+import { exemptFromAcceptNegotiation, getBaseRequest } from '../../index';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 
@@ -629,5 +629,71 @@ describe('a consumer wrapper over a batch connection', () => {
     await batch.execute();
     expect(send).toHaveBeenCalledTimes(2);
     expect((await pending).ok).toBe(true);
+  });
+});
+
+describe('a forwarding connection over one an AdtClient wrapped', () => {
+  // A consumer whose batch wraps a forwarder of its own (a late-bound target
+  // over its instance's connection, say) forwards through getBaseRequest of
+  // the connection it forwards to: the envelope then bypasses that
+  // connection's accept negotiation and is sent once.
+  function wrappedRefusing406() {
+    const refusal = Object.assign(new Error('status 406'), {
+      response: {
+        status: 406,
+        statusText: 'Refused',
+        headers: { 'x-sap-adt-supported-accept': 'multipart/alternative' },
+        data: '',
+      },
+    });
+    const send = jest.fn(async (_request: unknown) => {
+      throw refusal;
+    });
+    const connection = {
+      makeAdtRequest: send,
+      setSessionType: jest.fn(),
+      connect: jest.fn(),
+      getBaseUrl: async () => 'https://example.test',
+      getSessionId: () => 'session',
+    } as unknown as IAbapConnection;
+    new AdtClient(connection, undefined, { enableAcceptCorrection: true });
+    return { connection, send, refusal };
+  }
+  function forwarder(
+    to: IAbapConnection,
+    request: IAbapConnection['makeAdtRequest'],
+  ): IAbapConnection {
+    return {
+      makeAdtRequest: request,
+      setSessionType: (mode: 'stateful' | 'stateless') =>
+        to.setSessionType(mode),
+      connect: () => to.connect(),
+      getBaseUrl: () => to.getBaseUrl(),
+      getSessionId: () => to.getSessionId(),
+    } as unknown as IAbapConnection;
+  }
+
+  it('forwarding through getBaseRequest sends the envelope once', async () => {
+    const { connection, send, refusal } = wrappedRefusing406();
+    const batch = new AdtBatchConnection(
+      forwarder(connection, (r) => getBaseRequest(connection)(r)),
+      { endpoint: 'communication' },
+    );
+    const part = batch.makeAdtRequest(req).catch((e: unknown) => e);
+    await expect(batch.execute()).rejects.toBe(refusal);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await part).toBe(refusal);
+  });
+
+  it('forwarding through the wrapped makeAdtRequest sends it again', async () => {
+    const { connection, send } = wrappedRefusing406();
+    const batch = new AdtBatchConnection(
+      forwarder(connection, (r) => connection.makeAdtRequest(r)),
+      { endpoint: 'communication' },
+    );
+    const part = batch.makeAdtRequest(req).catch((e: unknown) => e);
+    await batch.execute().catch(() => undefined);
+    await part;
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });
