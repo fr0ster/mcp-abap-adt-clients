@@ -1868,21 +1868,15 @@ export async function runFull(
       ]);
     }
     const extras = { discoveryContentType, pairs, existence, knownWorking };
-    // The contrast rule on phase 2's evidence: an unnamed 406 is checked when
-    // another Accept got a 2xx or a 404 on the endpoint, in any phase.
-    const contrasted = [
-      ...evidence.filter((item) => item.phase === 1),
-      ...withContrast(
-        evidence.filter((item) => item.phase === 2),
-        [
-          ...rowsOf('clients none'),
-          ...rowsOf('clients corpus'),
-          ...rowsOf('discovery none'),
-          ...rowsOf('discovery corpus'),
-          ...phase2Rows,
-        ],
-      ),
-    ];
+    // The contrast rule: an unnamed 406 is checked when another Accept got a
+    // 2xx or a 404 on the endpoint — from any source and phase, keyed by the
+    // endpoint. Phase 1's own count takes phase 1's rows only.
+    const phase1Rows = [...corpora.values()].flatMap((corpus) => corpus.rows);
+    const phase1 = withContrast(
+      evidence.filter((item) => item.phase === 1),
+      phase1Rows,
+    );
+    const contrasted = withContrast(evidence, [...phase1Rows, ...phase2Rows]);
     const entries = buildHeaderCorpus(contrasted, extras);
     file = {
       startedAt,
@@ -1890,12 +1884,7 @@ export async function runFull(
       phases,
       totalMs: performance.now() - started,
       counts: {
-        phase1: needsCounts(
-          buildHeaderCorpus(
-            contrasted.filter((item) => item.phase === 1),
-            extras,
-          ),
-        ),
+        phase1: needsCounts(buildHeaderCorpus(phase1, extras)),
         phase2: needsCounts(entries),
       },
       entries,

@@ -378,12 +378,14 @@ Per header, from its bogus request:
 
 | verdict | when |
 |---|---|
-| `checked` | 406 for Accept only when it names the Accept (T100 `SADT_RESOURCE` 044 or a list of accepted types, below), 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
+| `checked` | 406 for Accept only when it names the Accept (T100 `SADT_RESOURCE` 044, its list empty or not, or a list naming at least one accepted type, below), 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
 | `not checked` | a 2xx: the resource never compares the header |
 | `unknown` | anything else — 401, 403, 404, 405 (`method not implemented`), 500 (`dump or router`, with the dump's short text), any other status with its SAP exception |
 
 A 406 points at the Accept only when it names it: T100 `SADT_RESOURCE`
-**044** ("Accepted content types: …") or a list of accepted types. Any other
+**044** ("Accepted content types: …"; it is the Accept check even with an
+empty list, as on the DDIC creates — measured) or a list naming at least one
+type (a bare `Accepted content types:` marker is no list). Any other
 406 does not say the Accept was refused. **037** ("The message content is not
 acceptable", no list) is the default text of `CX_ADT_RES_NOT_ACCEPTABLE`
 raised without a text id (from reading SAP's code: the search raises it for an
@@ -395,9 +397,10 @@ unless the same endpoint answered a 2xx or a 404 to another Accept (none, or
 the client's own): then it is `checked (037, inferred from the contrast)` (or
 `(406 without a list (…), inferred from the contrast)`). The contrast holds in
 every phase: in phase 1 per member; in the write cycle the known probe's
-answer beside its bogus-Accept probe; and for the write cycle, the update
-measurement and the reads of phase 2, any answer on the same endpoint, in any
-phase, that did not carry the bogus Accept.
+answer beside its bogus-Accept probe; and in the header corpus, for every
+piece of evidence, any answer on the same endpoint, from any source and in any
+phase, that did not carry the bogus Accept (the phase-1 count takes phase 1's
+answers only).
 
 The probe's own arguments must build a real request: a stand-in value that a
 real call never sends (`undefined`, an object type that is not an ADT type

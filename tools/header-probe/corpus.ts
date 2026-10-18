@@ -885,8 +885,9 @@ export function t100Of(
 }
 
 /**
- * Whether a 406 names what the Accept should be: T100 SADT_RESOURCE 044,
- * "Accepted content types: …", or a list of accepted types. Only then does
+ * Whether a 406 names what the Accept should be: T100 SADT_RESOURCE 044
+ * ("Accepted content types: …", its list empty or not), or a list naming at
+ * least one accepted type. Only then does
  * the 406 point at the Accept. Any other 406 — SAP's generic default text
  * (`CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id: T100 SADT_RESOURCE
  * 037, which the search raises for an invalid `objectType` whatever the
@@ -895,12 +896,25 @@ export function t100Of(
 export function namesAccepted(row: ICorpusRow): boolean {
   const key = t100Of(row.body);
   return (
+    // 044 is the Accept check, its list empty or not (measured on the DDIC
+    // creates: 044 with an empty list).
     (key?.id === 'SADT_RESOURCE' && key.no === '044') ||
-    // A row built from the write cycle's answers may carry no named lists.
-    Boolean(row.named?.acceptedText) ||
+    // A list counts only with at least one type after the marker.
+    listsAType(row.named?.acceptedText) ||
     Boolean(row.named?.supportedAccept.length) ||
-    (row.body ?? '').includes('Accepted content types')
+    // A row built from the write cycle's answers may carry no named lists.
+    listsAType(row.body)
   );
+}
+
+/** Whether a text names at least one type after `Accepted content types:`. */
+function listsAType(text: string | undefined): boolean {
+  if (!text) return false;
+  const at = text.indexOf(ACCEPTED_MARKER);
+  if (at === -1) return false;
+  const rest = text.slice(at + ACCEPTED_MARKER.length);
+  const end = rest.indexOf('<');
+  return mediaTypesIn(end === -1 ? rest : rest.slice(0, end)).length > 0;
 }
 
 /** The T100 key of a 406 that names nothing, for its reason. */

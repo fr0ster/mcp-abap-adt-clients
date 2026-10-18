@@ -3079,3 +3079,70 @@ describe('the contrast on the write cycle and the update measurement', () => {
     expect(entry?.accept.verdict).toBe('checked');
   });
 });
+
+describe('a list counts only with a type after the marker', () => {
+  it('a bare marker without T100 044 is unknown; T100 044 is checked with an empty list too', () => {
+    const at = (extra: Partial<ICorpusRow>) =>
+      judge(row({ bogus: 'accept', status: 406, ...extra }), 406).verdict;
+    const bare =
+      '<exc:exception><message lang="EN">Accepted content types:</message></exc:exception>';
+    expect(at({ body: bare })).toBe('unknown');
+    expect(
+      at({
+        named: { ...emptyNamed(), acceptedText: 'Accepted content types: ' },
+      }),
+    ).toBe('unknown');
+    expect(
+      at({
+        body: `${t100Body('SADT_RESOURCE', '044')}${bare}`,
+        named: { ...emptyNamed(), acceptedText: 'Accepted content types:' },
+      }),
+    ).toBe('checked');
+    expect(
+      at({
+        body: '<exc:exception><message lang="EN">Accepted content types: application/a+xml</message></exc:exception>',
+      }),
+    ).toBe('checked');
+  });
+});
+
+describe('the final contrast takes every source and phase', () => {
+  it("discovery's unnamed 406 is checked by the client's known 200 on the endpoint, its bogus probe a 500", async () => {
+    const discovery = DISCOVERY.replace(
+      '/sap/bc/adt/probe/things',
+      '/sap/bc/adt/oo/classes',
+    );
+    const generic =
+      '<exc:exception><type id="ExceptionResourceNotAcceptable"/><message lang="EN">The message content is not acceptable</message></exc:exception>';
+    // Discovery runs first; the clients start with their known Accept.
+    let clients = false;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: discovery };
+      if (request.method !== 'POST' || request.url !== '/sap/bc/adt/oo/classes')
+        return { status: 500, body: 'dump' };
+      const accept = request.headers.accept;
+      if (accept === 'application/vnd.sap.adt.oo.classes.v4+xml') {
+        clients = true;
+        return { status: 200, body: '' };
+      }
+      if (accept === PROBE_TYPE && !clients)
+        return { status: 406, body: generic };
+      return { status: 500, body: 'dump' };
+    });
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const entry = result.file?.entries.find(
+      (e) => e.endpoint === 'POST /sap/bc/adt/oo/classes',
+    );
+    expect(entry?.accept).toMatchObject({
+      verdict: 'checked',
+      reason: '406 without a list (no T100), inferred from the contrast',
+    });
+  });
+});
