@@ -224,7 +224,8 @@ a type neither vocabulary knows is thrown before any request.
 - Can wrap `connection.makeAdtRequest` once per connection.
 - Extracts supported accept values from headers/body.
 - Retries once with corrected `Accept` and caches per `METHOD + URL`.
-- On unless the constructor option `enableAcceptCorrection` is `false` or the env var `ADT_ACCEPT_CORRECTION=false`.
+- Off unless the constructor option `enableAcceptCorrection` is `true`, `setAcceptCorrectionEnabled` was called, or the env var `ADT_ACCEPT_CORRECTION` is exactly `true` (the default was on until 35.0.0).
+- `cachedAccept` / `rememberAccept` read and write the same per-connection cache, whatever the switch says.
 - The caches and the switch are the connection's (kept on it under a symbol, forwarded by the call-timeout proxy). Until 23.0.0 they were module globals, so a correction learned on one system was sent to every other.
 
 ## Error and Response Handling
