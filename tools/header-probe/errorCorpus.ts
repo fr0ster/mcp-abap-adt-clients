@@ -8,13 +8,13 @@
  *     `environment.system` from it.
  *
  * Run:
- *   npm run header:discovery:next          # the full run: the system's header corpus
- *   npm run header:discovery:next -- --from discovery --headers corpus
- *   npm run header:discovery:next -- --from clients --headers none
- *   npm run header:discovery:next -- --from clients --headers bogus
- *   npm run header:discovery:next -- --from discovery --headers bogus --sequential
- *   npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
- *   npm run header:discovery:next -- --render <corpus.json> [<corpus.json> …]
+ *   npm run header:discovery          # the full run: the system's header corpus
+ *   npm run header:discovery -- --from discovery --headers corpus
+ *   npm run header:discovery -- --from clients --headers none
+ *   npm run header:discovery -- --from clients --headers bogus
+ *   npm run header:discovery -- --from discovery --headers bogus --sequential
+ *   npm run header:discovery -- --summary <corpus.json> [<corpus.json> …]
+ *   npm run header:discovery -- --render <corpus.json> [<corpus.json> …]
  *
  * Without flags: the authorization check; phase 1, both sources in every
  * mode on the probe name; phase 2, for the endpoints still unknown only,

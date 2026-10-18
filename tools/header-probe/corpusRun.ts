@@ -86,7 +86,6 @@ import {
   endpointKey,
   endpointOf,
   type IRemoval,
-  PROBE_TYPE,
   removalWord,
   unproven,
 } from './record';

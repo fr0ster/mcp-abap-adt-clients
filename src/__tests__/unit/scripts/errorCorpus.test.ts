@@ -2308,3 +2308,28 @@ describe('the run decides its exit once, from its state', () => {
     expect(fs.readdirSync(dir).length).toBeGreaterThan(0);
   });
 });
+
+describe('the command', () => {
+  it('npm run header:discovery is the error corpus; the old probe has no command', () => {
+    const scripts = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, '../../../../package.json'),
+        'utf8',
+      ),
+    ).scripts as Record<string, string>;
+    expect(scripts['header:discovery']).toBe(
+      'npx ts-node tools/header-probe/errorCorpus.ts',
+    );
+    expect(scripts['header:discovery:next']).toBeUndefined();
+    expect(
+      Object.values(scripts).some((command) =>
+        command.includes('header-probe/probe.ts'),
+      ),
+    ).toBe(false);
+    const probe = fs.readFileSync(
+      path.resolve(__dirname, '../../../../tools/header-probe/probe.ts'),
+      'utf8',
+    );
+    expect(probe.includes('require.main')).toBe(false);
+  });
+});
