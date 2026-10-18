@@ -24,6 +24,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [36.0.1] - 2026-10-18
+
+### Fixed
+
+- `extractSupportedContentType(error)` reads only the list SAP writes into its
+  `415` body, `Supported Media Types: …`, and answers `[]` for a bare
+  `Unsupported Media Type`. Measured on an on-premise system: SAP's `415` is
+  its exception document with `content-type: application/xml`, and the
+  parser answered that type and two fragments of the document's namespace URI
+  (`www.sap.com/abapxml`, `types/communicationframework`) before the type SAP
+  named, so a consumer taking the first entry sent `application/xml`. It reads
+  no header any more; a `415` that names its types only in a header answers
+  `[]`. `extractSupportedAccept` (`406`) shares the same list reader.
+
 ## [36.0.0] - 2026-10-18
 
 On `@mcp-abap-adt/interfaces-adt` `^20.0.0`: the `options.headers` of its

@@ -948,8 +948,10 @@ pair you choose. Two pure functions over the error are exported:
 - `extractSupportedAccept(error)` — the list SAP writes into its `406` body,
   `Accepted content types: …` (often empty; measured on an on-premise system).
   It reads no header and no other text.
-- `extractSupportedContentType(error)` — the types a `415` names (its headers
-  and body; unchanged).
+- `extractSupportedContentType(error)` — the list SAP writes into its `415`
+  body, `Supported Media Types: …` (absent from a bare `Unsupported Media
+  Type`; measured on an on-premise system). It reads no header — the `415`'s
+  own `content-type` is its error document's — and no other text (36.0.1).
 
 ```typescript
 import { extractSupportedAccept } from '@mcp-abap-adt/adt-clients';
