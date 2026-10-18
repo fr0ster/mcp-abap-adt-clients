@@ -73,7 +73,13 @@ import {
   recordMembers,
   UNIVERSAL,
 } from './members';
-import { endpointKey, type IRemoval, PROBE_TYPE } from './record';
+import {
+  endpointKey,
+  type IRemoval,
+  PROBE_TYPE,
+  removalWord,
+  unproven,
+} from './record';
 
 /** How many probes go in one envelope (each write probe brings its read). */
 export const ENVELOPE_PROBES = 25;
@@ -457,6 +463,37 @@ function resetAnswer(row: ICorpusRow): void {
   row.onWire = [];
 }
 
+/**
+ * What a removal proves: removed only on positive evidence — the read after
+ * the delete answered absent, or a 2xx delete and a read that does not find
+ * the object; not removed when the read still finds it; anything else
+ * (unreadable reads, a failed delete) may remain.
+ */
+export function removalOutcome(
+  after: 'absent' | 'exists' | 'not found' | 'unreadable',
+  deleted: number | undefined,
+  afterStatus: number | undefined,
+  what: string,
+): { removed: boolean | 'unknown'; detail: string } {
+  const deleteOk = deleted !== undefined && deleted >= 200 && deleted < 300;
+  if (after === 'absent')
+    return { removed: true, detail: `deleted (${deleted ?? 'no status'})` };
+  if (after === 'not found' && deleteOk)
+    return {
+      removed: true,
+      detail: `deleted (${deleted}); the read (${afterStatus}) does not find it`,
+    };
+  if (after === 'exists')
+    return {
+      removed: false,
+      detail: `the delete answered ${deleted ?? 'nothing'}; ${what} still reads ${afterStatus ?? 'unknown'}`,
+    };
+  return {
+    removed: 'unknown',
+    detail: `unknown ${afterStatus ?? 'no answer'}: the delete answered ${deleted ?? 'nothing'} and ${what} cannot be read; it may remain`,
+  };
+}
+
 /** A raw request's status, an error's included. */
 const statusOf = (request: Promise<IAdtWireResponse>) =>
   request.then(
@@ -468,7 +505,7 @@ const statusOf = (request: Promise<IAdtWireResponse>) =>
 export function discoveryRemoval(
   connection: IAbapConnection,
   uri: string,
-): () => Promise<{ removed: boolean; detail: string }> {
+): () => Promise<{ removed: boolean | 'unknown'; detail: string }> {
   const request = () =>
     connection.makeAdtRequest({
       url: uri,
@@ -506,19 +543,20 @@ export function discoveryRemoval(
       }),
     );
     const after = await readState();
-    if (after.exists === false)
-      return { removed: true, detail: `deleted (${deleted ?? 'no status'})` };
-    // Never readable as an object at this address, before or after: nothing
-    // was ever seen to remove. Not confirmed either way, and said so.
-    if (before.exists !== true && after.exists !== true)
-      return {
-        removed: true,
-        detail: `unconfirmed: ${uri} answers ${after.status ?? 'nothing'}, no object of that name was ever readable there; the deletion answered ${deleted ?? 'nothing'}`,
-      };
-    return {
-      removed: false,
-      detail: `the deletion answered ${deleted ?? 'nothing'}; ${uri} still reads ${after.status ?? 'unknown'}`,
-    };
+    return removalOutcome(
+      after.exists === false
+        ? 'absent'
+        : after.exists === true
+          ? 'exists'
+          : after.status !== undefined &&
+              after.status >= 200 &&
+              after.status < 300
+            ? 'not found'
+            : 'unreadable',
+      deleted,
+      after.status,
+      uri,
+    );
   };
 }
 
@@ -886,35 +924,45 @@ function clientsRemoval(
   handlerAt: (on: ITarget) => IHandler,
   reference: IHandler,
   handler: string,
-): () => Promise<{ removed: boolean; detail: string }> {
+): () => Promise<{ removed: boolean | 'unknown'; detail: string }> {
   const read = () =>
     once((on, analyse) =>
       Promise.resolve(handlerAt(on).readMetadata(UNIVERSAL, { analyse })),
     );
   return async () => {
-    if ((await read()).wire?.status === 404)
-      return { removed: true, detail: 'not there any more' };
+    const before = (await read()).wire?.status;
+    if (before === 404) return { removed: true, detail: 'not there any more' };
     const pair = pairOf(handler, 'delete');
     if (
       !pair?.accept ||
       !pair.contentType ||
       typeof reference.delete !== 'function'
     )
-      return { removed: false, detail: `${handler} has no delete with a pair` };
+      return before !== undefined && before >= 200 && before < 300
+        ? {
+            removed: false,
+            detail: `${handler} has no delete with a pair; the object reads ${before}`,
+          }
+        : {
+            removed: 'unknown' as const,
+            detail: `unknown ${before ?? 'no answer'}: ${handler} has no delete with a pair and the read cannot rule the object out`,
+          };
     const headers = { accept: pair.accept, contentType: pair.contentType };
     const deleted = await once((on, analyse) =>
       Promise.resolve(handlerAt(on).delete(UNIVERSAL, { headers, analyse })),
     );
-    const after = await read();
-    return after.wire?.status === 404
-      ? {
-          removed: true,
-          detail: `deleted (${deleted.wire?.status ?? 'no status'})`,
-        }
-      : {
-          removed: false,
-          detail: `the delete answered ${deleted.wire?.status ?? deleted.failure}; the object still reads ${after.wire?.status ?? 'unknown'}`,
-        };
+    const after = (await read()).wire?.status;
+    // A metadata read that answers 2xx finds the object.
+    return removalOutcome(
+      after === 404
+        ? 'absent'
+        : after !== undefined && after >= 200 && after < 300
+          ? 'exists'
+          : 'unreadable',
+      deleted.wire?.status,
+      after,
+      handler,
+    );
   };
 }
 
@@ -1032,9 +1080,7 @@ async function runOn(
   const registered = new Set<string>();
   const ledger = new Ledger((removal: IRemoval) => {
     corpus.removals.push(removal);
-    out.progress(
-      `  cleanup: ${removal.removed ? 'removed' : 'NOT REMOVED'} ${removal.label}`,
-    );
+    out.progress(`  cleanup: ${removalWord(removal)} ${removal.label}`);
   });
   try {
     const ctx: IContext = {
@@ -1079,13 +1125,15 @@ async function runOn(
         `!!!   ${row.group} ${row.label}: ${row.endpoint?.method} ${row.endpoint?.path}`,
       );
   }
-  const left = corpus.removals.filter((removal) => !removal.removed);
+  const left = unproven(corpus.removals);
   if (left.length) {
     out.loud(
-      `\n!!! ${left.length} object(s) could not be removed — delete them by hand:`,
+      `\n!!! ${left.length} object(s) could not be removed or may remain — check and delete them by hand:`,
     );
     for (const removal of left)
-      out.loud(`!!!   ${removal.label}: ${removal.detail}`);
+      out.loud(
+        `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
+      );
   }
   return { exitCode: input.interrupt.requested ? 130 : 0, files, corpus };
 }
@@ -1511,13 +1559,15 @@ export async function runFull(
     fs.writeFileSync(`${base}.json`, `${JSON.stringify(file, null, 2)}\n`);
     fs.writeFileSync(`${base}.md`, renderHeaderCorpus(file));
     for (const written of [`${base}.json`, `${base}.md`]) out.progress(written);
-    const left = removals.filter((removal) => !removal.removed);
+    const left = unproven(removals);
     if (left.length) {
       out.loud(
-        `\n!!! ${left.length} temporary object(s) could not be removed — delete them by hand:`,
+        `\n!!! ${left.length} temporary object(s) could not be removed or may remain — check and delete them by hand:`,
       );
       for (const removal of left)
-        out.loud(`!!!   ${removal.label}: ${removal.detail}`);
+        out.loud(
+          `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
+        );
     }
     return {
       exitCode: input.interrupt.requested ? 130 : 0,

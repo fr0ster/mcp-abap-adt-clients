@@ -29,6 +29,16 @@ export function handlerOfRow(objectType: string): string | undefined {
   );
 }
 
+/** The probe row type of a handler's members (a local include is its own). */
+export function rowTypeOfHandler(handler: string): string | undefined {
+  if (handler === 'getMessageClassMessage()') return 'messageClassMessage';
+  if (handler === 'getUtils()') return 'utils';
+  return (
+    LOCAL_INCLUDES.find((local) => local.handler === handler)?.type ??
+    OBJECT_SPECS.find((spec) => spec.handler === handler)?.type
+  );
+}
+
 /** The probe's `--only` type that runs a handler's members. */
 export function typeOfHandler(handler: string): string | undefined {
   if (handler === 'getMessageClassMessage()') return 'messageClass';
@@ -104,14 +114,18 @@ export async function runWriteCycle(
 ): Promise<IWriteCycleResult> {
   const wanted = new Set<string>();
   const types = new Set<string>();
+  const members = new Set<string>();
   for (const key of input.unknown) {
     const who = key.slice(0, key.indexOf(' — '));
     if (who.startsWith('legacy ')) continue;
     const handler = who.slice(0, who.lastIndexOf('.'));
+    const member = who.slice(who.lastIndexOf('.') + 1);
     const type = typeOfHandler(handler);
-    if (!type) continue;
+    const rowType = rowTypeOfHandler(handler);
+    if (!type || !rowType) continue;
     wanted.add(who);
     types.add(type);
+    members.add(`${rowType}.${member}`);
   }
   const removals: IRemoval[] = [];
   if (!types.size) return { evidence: [], removals };
@@ -119,7 +133,14 @@ export async function runWriteCycle(
   const probe = new Probe(
     input.connection,
     input.clientOptions,
-    { only: [...types], sequential: false, contentTypeFirst: true },
+    // Probes only for the members still unknown; the cycle's prerequisites
+    // (the create a write needs, with the known pair) run as before.
+    {
+      only: [...types],
+      members: [...members],
+      sequential: false,
+      contentTypeFirst: true,
+    },
     ledger,
     {
       packageName: input.packageName,

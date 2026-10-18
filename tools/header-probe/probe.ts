@@ -86,8 +86,10 @@ import {
   probePair,
   readAnswer,
   readState,
+  removalWord,
   renderComparison,
   renderMarkdown,
+  unproven,
   wants,
 } from './record';
 
@@ -108,6 +110,8 @@ const loud = (line: string): void => {
 export interface IArgs {
   only?: string[];
   operation?: string;
+  /** Only these rows, `<object type>.<member>`; the cycle's prerequisites still run. */
+  members?: string[];
   sequential: boolean;
   /**
    * The bogus Content-Type before the bogus Accept (the error corpus's
@@ -306,6 +310,12 @@ export class Probe {
           return {
             removed: true,
             detail: `deleted (${deleted.wire?.status ?? 'no status'})`,
+          };
+        // Unreadable: the object may remain, which is not proof of either.
+        if (after.exists === 'unknown')
+          return {
+            removed: 'unknown',
+            detail: `unknown ${after.status ?? 'no answer'}: the delete answered ${deleted.wire?.status ?? deleted.failure ?? 'nothing'}; it may remain`,
           };
         const answer = this.answerOf(
           deleted,
@@ -889,9 +899,7 @@ async function main(): Promise<void> {
   };
   const ledger = new Ledger((removal: IRemoval) => {
     report.removals.push(removal);
-    progress(
-      `  cleanup: ${removal.removed ? 'removed' : 'NOT REMOVED'} ${removal.label}`,
-    );
+    progress(`  cleanup: ${removalWord(removal)} ${removal.label}`);
   });
 
   const interrupt = new Interrupt();
@@ -916,13 +924,15 @@ async function main(): Promise<void> {
   const finish = async (): Promise<void> => {
     report.finishedAt = new Date().toISOString();
     for (const file of writeReport(report)) progress(file);
-    const left = report.removals.filter((removal) => !removal.removed);
+    const left = unproven(report.removals);
     if (left.length) {
       loud(
-        `\n!!! ${left.length} temporary object(s) could not be removed — delete them by hand:`,
+        `\n!!! ${left.length} temporary object(s) could not be removed or may remain — check and delete them by hand:`,
       );
       for (const removal of left)
-        loud(`!!!   ${removal.label}: ${removal.detail}`);
+        loud(
+          `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
+        );
     }
   };
 

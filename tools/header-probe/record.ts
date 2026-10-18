@@ -26,6 +26,8 @@ export const PROBE_KINDS: readonly ProbeKind[] = [
 export interface IProbeFilters {
   only?: readonly string[];
   operation?: string;
+  /** Only these rows, as `<object type>.<member>` (the error corpus's phase 2). */
+  members?: readonly string[];
 }
 
 /** The `--only` key an object type answers to: its includes and messages go with their parent. */
@@ -42,6 +44,8 @@ export function wants(
   member: string,
 ): boolean {
   if (filters.only && !filters.only.includes(filterGroup(objectType)))
+    return false;
+  if (filters.members && !filters.members.includes(`${objectType}.${member}`))
     return false;
   return !filters.operation || filters.operation === member;
 }
@@ -165,9 +169,27 @@ export interface IOperationRow {
 
 export interface IRemoval {
   label: string;
-  removed: boolean;
+  /**
+   * `true` only on positive evidence (a read after the delete answered
+   * absent, or a 2xx delete and a read that does not find it); `'unknown'`
+   * when the reads are unreadable or the delete failed: it may remain.
+   */
+  removed: boolean | 'unknown';
   detail: string;
 }
+
+/** How a removal reads in a report. */
+export const removalWord = (removal: Pick<IRemoval, 'removed'>): string =>
+  removal.removed === true
+    ? 'removed'
+    : removal.removed === 'unknown'
+      ? 'MAY REMAIN'
+      : 'NOT REMOVED';
+
+/** The removals not proven: not removed, or may remain. */
+export const unproven = <R extends Pick<IRemoval, 'removed'>>(
+  removals: readonly R[],
+): R[] => removals.filter((removal) => removal.removed !== true);
 
 export interface IProbeReport {
   startedAt: string;
@@ -600,9 +622,9 @@ export function renderMarkdown(report: IProbeReport): string {
   if (!report.removals.length) lines.push('The run created nothing.');
   for (const removal of report.removals)
     lines.push(
-      `- ${removal.removed ? 'removed' : '**NOT REMOVED**'}: ${cell(removal.label)} — ${cell(removal.detail)}`,
+      `- ${removal.removed === true ? 'removed' : `**${removalWord(removal)}**`}: ${cell(removal.label)} — ${cell(removal.detail)}`,
     );
-  const left = report.removals.filter((removal) => !removal.removed);
+  const left = unproven(report.removals);
   if (left.length)
     lines.push(
       '',

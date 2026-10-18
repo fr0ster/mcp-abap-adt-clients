@@ -18,7 +18,9 @@ import {
   type IRemoval,
   type ISentRequest,
   PROBE_TYPE,
+  removalWord,
   textFrom,
+  unproven,
 } from './record';
 
 /** The fixed name every probe works on; no system has an object of that name. */
@@ -1217,13 +1219,13 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
   if (!corpus.removals.length) lines.push('Nothing to remove.');
   for (const removal of corpus.removals)
     lines.push(
-      `- ${removal.removed ? 'removed' : '**NOT REMOVED**'}: ${cell(removal.label)} — ${cell(removal.detail)}`,
+      `- ${removal.removed === true ? 'removed' : `**${removalWord(removal)}**`}: ${cell(removal.label)} — ${cell(removal.detail)}`,
     );
-  const left = corpus.removals.filter((removal) => !removal.removed);
+  const left = unproven(corpus.removals);
   if (left.length)
     lines.push(
       '',
-      `**${left.length} object(s) could not be removed; delete them by hand.**`,
+      `**${left.length} object(s) could not be removed or may remain; check and delete them by hand.**`,
     );
   lines.push('');
   return lines.join('\n');
@@ -1639,7 +1641,7 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
       `- ${cell(object.handler)}${object.type ? ` (${object.type})` : ''}: ${object.name ? `\`${object.name}\`` : cell(object.reason)}`,
     );
   lines.push('', '## Left behind', '');
-  const left = file.removals.filter((removal) => !removal.removed);
+  const left = unproven(file.removals);
   if (!file.removals.length) lines.push('Phase 2 created nothing.');
   else if (!left.length)
     lines.push(
@@ -1648,7 +1650,7 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
   else
     for (const removal of left)
       lines.push(
-        `- **NOT REMOVED** ${cell(removal.label)}: ${cell(removal.detail)}`,
+        `- **${removalWord(removal)}** ${cell(removal.label)}: ${cell(removal.detail)}`,
       );
   lines.push(
     '',

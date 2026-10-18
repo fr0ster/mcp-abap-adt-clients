@@ -40,7 +40,11 @@ import {
   stats,
   wireNote,
 } from '../../../../tools/header-probe/corpus';
-import { runCorpus, runFull } from '../../../../tools/header-probe/corpusRun';
+import {
+  removalOutcome,
+  runCorpus,
+  runFull,
+} from '../../../../tools/header-probe/corpusRun';
 import { Interrupt } from '../../../../tools/header-probe/ledger';
 import {
   clientsOn,
@@ -55,7 +59,10 @@ import {
   LEGACY_PAIRS,
 } from '../../../../tools/header-probe/pairs';
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
-import { evidenceOfRows } from '../../../../tools/header-probe/writeCycle';
+import {
+  evidenceOfRows,
+  runWriteCycle,
+} from '../../../../tools/header-probe/writeCycle';
 
 const SAMPLE = path.resolve(
   __dirname,
@@ -1593,6 +1600,120 @@ describe('the write cycle evidence', () => {
     expect(evidence[0].contentType.verdict).toBe('checked');
     expect(evidence[0].namedAccept).toEqual([
       'application/vnd.sap.adt.oo.classes.v4+xml',
+    ]);
+  });
+});
+
+describe('a removal proves what it claims', () => {
+  it('removed only on positive evidence; unreadable or a failed delete may remain', () => {
+    expect(removalOutcome('absent', 403, 404, 'x').removed).toBe(true);
+    expect(removalOutcome('not found', 200, 200, 'x').removed).toBe(true);
+    expect(removalOutcome('not found', 403, 200, 'x').removed).toBe('unknown');
+    expect(removalOutcome('unreadable', 200, 403, 'x').removed).toBe('unknown');
+    expect(removalOutcome('unreadable', 403, 403, 'x').detail).toMatch(
+      /^unknown 403: .*may remain$/,
+    );
+    expect(removalOutcome('exists', 200, 200, 'x').removed).toBe(false);
+  });
+
+  it('a discovery write whose reads and delete answer 403 is listed loudly as may remain', async () => {
+    const uri = `/sap/bc/adt/probe/things/${PROBE_NAME.toLowerCase()}`;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.method === 'POST' &&
+        request.url === '/sap/bc/adt/probe/things'
+      )
+        return { status: 201 };
+      if (request.url === uri || request.url === '/sap/bc/adt/deletion/delete')
+        return { status: 403 };
+      return { status: 404 };
+    });
+    const { loud, out } = output();
+    const { corpus, files } = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+    });
+    expect(corpus?.removals).toEqual([
+      expect.objectContaining({ removed: 'unknown' }),
+    ]);
+    expect(loud.join('\n')).toContain('could not be removed or may remain');
+    expect(loud.join('\n')).toContain(`MAY REMAIN discovery: ${uri}`);
+    expect(fs.readFileSync(files[1], 'utf8')).toContain('**MAY REMAIN**');
+  });
+});
+
+describe('phase 2 writes', () => {
+  it('probe only the members still unknown: the class update, its create as a prerequisite, the cleanup', async () => {
+    const created = new Set<string>();
+    const bogusSent: string[] = [];
+    let locks = 0;
+    let unlocks = 0;
+    const system = fakeSystem((request) => {
+      const { method, url } = request;
+      if (Object.values(request.headers).includes(PROBE_TYPE))
+        bogusSent.push(`${method} ${url.split('?')[0]}`);
+      const name = url.split('/')[6]?.split('?')[0];
+      if (method === 'POST' && url === '/sap/bc/adt/oo/classes') {
+        const match = /adtcore:name="([^"]+)"/.exec(request.body);
+        if (match) created.add(match[1].toLowerCase());
+        return { status: 201 };
+      }
+      if (url.includes('_action=LOCK')) {
+        locks++;
+        return {
+          status: 200,
+          body: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>',
+        };
+      }
+      if (url.includes('_action=UNLOCK')) {
+        unlocks++;
+        return { status: 200 };
+      }
+      if (url === '/sap/bc/adt/deletion/delete') {
+        for (const n of [...created])
+          if (request.body.toLowerCase().includes(n)) created.delete(n);
+        return { status: 200, body: '<del:deletionResult/>' };
+      }
+      if (url.startsWith('/sap/bc/adt/oo/classes/') && name)
+        return created.has(name.toLowerCase())
+          ? {
+              status: 200,
+              body: url.includes('/source/main')
+                ? 'CLASS x DEFINITION. ENDCLASS.'
+                : `<class:abapClass adtcore:name="${name}" adtcore:version="inactive"/>`,
+            }
+          : { status: 404 };
+      return { status: 200 };
+    });
+    const result = await runWriteCycle({
+      connection: system.connection,
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      unknown: new Set([
+        'getClass().update — PUT /sap/bc/adt/oo/classes/{name}/source/main',
+      ]),
+      packageName: 'ZPKG',
+      transportRequest: '',
+    });
+    // The bogus headers went to the update alone.
+    expect(bogusSent.length).toBeGreaterThan(0);
+    expect(
+      new Set(
+        bogusSent.map((s) => s.replace(/classes\/[^/]+/, 'classes/{name}')),
+      ),
+    ).toEqual(new Set(['PUT /sap/bc/adt/oo/classes/{name}/source/main']));
+    expect(locks).toBe(unlocks);
+    expect(created.size).toBe(0);
+    expect(result.removals.every((r) => r.removed === true)).toBe(true);
+    expect(result.evidence.map((e) => e.who.split(' ')[0])).toEqual([
+      'getClass().update',
     ]);
   });
 });

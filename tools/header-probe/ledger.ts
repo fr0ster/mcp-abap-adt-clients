@@ -12,7 +12,7 @@ import type { IRemoval } from './record';
 export interface ILedgerEntry {
   label: string;
   /** Removes the object, or says it was never there. Throwing counts as not removed. */
-  remove: () => Promise<{ removed: boolean; detail: string }>;
+  remove: () => Promise<{ removed: boolean | 'unknown'; detail: string }>;
 }
 
 export class Ledger {
