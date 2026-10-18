@@ -609,6 +609,64 @@ export function writeCheck(wire: IAdtWireResponse | undefined): IWriteCheck {
 export const isWrite = (method: string): boolean =>
   ['POST', 'PUT', 'DELETE'].includes(method.toUpperCase());
 
+// --- authorization -----------------------------------------------------------
+
+/** A 403 text that names a refusal of the user's authorization. */
+export const AUTHORIZATION_TEXTS: readonly string[] = [
+  'not authorized',
+  'not authorised',
+  'no authorization',
+  'no authorisation',
+  'authorization missing',
+  'missing authorization',
+  'keine berechtigung',
+  'nicht berechtigt',
+];
+
+/** A 403 text that is about the object, not the user: a missing object or package. */
+export const OBJECT_TEXTS: readonly string[] = [
+  'does not exist',
+  'not found',
+  'package',
+  'paket',
+];
+
+/**
+ * Whether an answer is an authorization problem a person must fix: any 401;
+ * a 403 that is a CSRF refusal (its text names the CSRF token); a 403 whose
+ * SAP exception type names authorization, or whose text is one of
+ * {@link AUTHORIZATION_TEXTS}, unless the text is about a missing object or
+ * package ({@link OBJECT_TEXTS}).
+ */
+export function authorizationProblem(
+  wire: Pick<IAdtWireResponse, 'status' | 'data' | 'headers'>,
+): { status: number; kind: string } | undefined {
+  const body =
+    typeof wire.data === 'string'
+      ? wire.data
+      : wire.data == null
+        ? ''
+        : JSON.stringify(wire.data);
+  const refusal = sapErrorIn(body);
+  if (wire.status === 401)
+    return { status: 401, kind: refusal?.adtType ?? 'no SAP exception' };
+  if (wire.status !== 403) return undefined;
+  const csrf = headerValue(wire.headers, 'x-csrf-token');
+  if (
+    (csrf ?? '').toLowerCase() === 'required' ||
+    body.toLowerCase().includes('csrf')
+  )
+    return { status: 403, kind: 'CSRF' };
+  const text = (refusal?.message ?? body).toLowerCase();
+  const type = refusal?.adtType ?? '';
+  const named =
+    /authori[sz]/i.test(type) ||
+    AUTHORIZATION_TEXTS.some((words) => text.includes(words));
+  if (!named) return undefined;
+  if (OBJECT_TEXTS.some((words) => text.includes(words))) return undefined;
+  return { status: 403, kind: type || 'authorization' };
+}
+
 // --- the summary -------------------------------------------------------------
 
 export const statusOf = (row: ICorpusRow): string =>

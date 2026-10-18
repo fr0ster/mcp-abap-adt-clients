@@ -115,6 +115,32 @@ function metered(
 
 export const current = new AsyncLocalStorage<ICapture>();
 
+/** Told of every answer a traced connection gets: a part's, a request's, an envelope's. */
+export type AnswerWatcher = (
+  wire: IAdtWireResponse,
+  request: IAbapRequestOptions,
+) => void;
+
+const watchers = new Set<AnswerWatcher>();
+
+/** Watches every answer until the returned function is called. */
+export function watchAnswers(watcher: AnswerWatcher): () => void {
+  watchers.add(watcher);
+  return () => {
+    watchers.delete(watcher);
+  };
+}
+
+function notify(wire: unknown, request: IAbapRequestOptions): void {
+  if (!wire || typeof (wire as IAdtWireResponse).status !== 'number') return;
+  for (const watcher of watchers)
+    try {
+      watcher(wire as IAdtWireResponse, request);
+    } catch {
+      // A watcher's own failure is not the request's.
+    }
+}
+
 export const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -226,7 +252,16 @@ export function traced(
         capture.onWire.push(partHeadersOf(sent));
       }
     }
-    return connection.makeAdtRequest(sent);
+    return connection.makeAdtRequest(sent).then(
+      (wire) => {
+        notify(wire, request);
+        return wire;
+      },
+      (error: unknown) => {
+        notify((error as { response?: unknown } | null)?.response, request);
+        throw error;
+      },
+    );
   };
   return wrapper as unknown as IAbapConnection;
 }

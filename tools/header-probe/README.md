@@ -180,6 +180,29 @@ header corpus, everything batched and poisoned envelopes split:
    prints `Oops: no authorization (<status>)` and exits with 2; nothing else
    is sent and no file is written. Then `GET /sap/bc/adt/discovery`: a 401
    or 403 gives the same Oops, any other non-2xx prints the status and stops.
+
+   **An authorization problem later in the run stops it:** a person fixes it,
+   not the script. Every answer is watched — every request and envelope
+   part, in every phase, the write cycle's included. On the first one no new
+   probe goes out, the calls in flight finish, the cleanup and the unlocks
+   run as on Ctrl-C, the files are still written (marked `stopped:
+   authorization (…)`), and the run ends with `Oops: authorization problem
+   (<status>, <SAP exception type or "CSRF">) at <endpoint> — fix it and run
+   again`, exit code 2. Counted as an authorization problem:
+   - any 401;
+   - a 403 that is a CSRF refusal: `x-csrf-token: Required`, or a body that
+     names the CSRF token;
+   - a 403 whose SAP exception type names authorization (`…Authoriz…`), or
+     whose text holds `not authorized`, `not authorised`, `no authorization`,
+     `no authorisation`, `authorization missing`, `missing authorization`,
+     `keine Berechtigung` or `nicht berechtigt` —
+   unless its text is about the object, not the user (`does not exist`,
+   `not found`, `package`, `Paket`): a 403 such as `ExceptionNoToggleAuthorization`
+   "Package failure occurs for toggle …" or `ExceptionResourceNoAccess`
+   "Tunnel is disabled in ATC settings." (both measured on the probe name) is
+   an answer, not a stop. The cleanup's own requests may still be refused:
+   each such removal is `removed: unknown <status>`, listed under may remain.
+   The connection's own CSRF token refresh is left as it is.
 2. **The endpoints** (`--from`):
    - `discovery`: every `app:collection` of the document just read — its
      href, its `app:accept` types and its template links with their `type`

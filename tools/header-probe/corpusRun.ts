@@ -22,9 +22,11 @@ import {
   message,
   runCalls,
   traced,
+  watchAnswers,
 } from './capture';
 import {
   askedFor,
+  authorizationProblem,
   authorizationVerdict,
   type BogusHeader,
   bogusHeaders,
@@ -48,6 +50,7 @@ import {
   isWrite,
   needsCounts,
   PROBE_NAME,
+  PROBE_PACKAGE,
   parseDiscovery,
   readCorpusAnswer,
   renderCorpusMarkdown,
@@ -75,6 +78,7 @@ import {
 } from './members';
 import {
   endpointKey,
+  endpointOf,
   type IRemoval,
   PROBE_TYPE,
   removalWord,
@@ -493,6 +497,45 @@ export function removalOutcome(
     detail: `unknown ${afterStatus ?? 'no answer'}: the delete answered ${deleted ?? 'nothing'} and ${what} cannot be read; it may remain`,
   };
 }
+
+/** Where an authorization problem stopped a run. */
+export interface IAuthStop {
+  status: number;
+  /** The SAP exception type, or `CSRF`. */
+  kind: string;
+  endpoint: string;
+}
+
+/** Watches every answer for an authorization problem; the first stops the run. */
+export function guardAuthorization(interrupt: Interrupt): {
+  stop: () => IAuthStop | undefined;
+  release: () => void;
+} {
+  let stopped: IAuthStop | undefined;
+  const release = watchAnswers((wire, request) => {
+    if (stopped) return;
+    const problem = authorizationProblem(wire);
+    if (!problem) return;
+    stopped = {
+      ...problem,
+      endpoint: endpointKey(
+        endpointOf(
+          String(request.method ?? ''),
+          String(request.url ?? ''),
+          request.params,
+          [PROBE_NAME, PROBE_PACKAGE],
+        ),
+      ),
+    };
+    // Nothing new goes out; what is in flight finishes, the cleanup runs.
+    interrupt.stop();
+  });
+  return { stop: () => stopped, release };
+}
+
+/** The line an authorization stop ends with. */
+export const authorizationLine = (stop: IAuthStop): string =>
+  `Oops: authorization problem (${stop.status}, ${stop.kind}) at ${stop.endpoint} — fix it and run again`;
 
 /** A raw request's status, an error's included. */
 const statusOf = (request: Promise<IAdtWireResponse>) =>
@@ -1026,6 +1069,8 @@ export interface ICorpusRunInput {
   only?: string[];
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
   envelopeProbes?: number;
+  /** The run's authorization guard (set by runCorpus / runFull). */
+  auth?: { stop: () => IAuthStop | undefined };
 }
 
 /**
@@ -1050,9 +1095,11 @@ export async function runCorpus(
       throw error;
     }
   }
+  const auth = guardAuthorization(input.interrupt);
   try {
-    return await runOn(connection, input);
+    return await runOn(connection, { ...input, auth });
   } finally {
+    auth.release();
     if (input.close && !input.connection) await input.close(connection);
   }
 }
@@ -1112,7 +1159,10 @@ async function runOn(
       out.loud(`The run stopped: ${corpus.error}`);
     }
   }
-  if (input.interrupt.requested) corpus.error = 'interrupted (SIGINT)';
+  const stop = input.auth?.stop();
+  if (stop)
+    corpus.error = `stopped: authorization (${stop.status}, ${stop.kind}) at ${stop.endpoint}`;
+  else if (input.interrupt.requested) corpus.error = 'interrupted (SIGINT)';
   if (input.mode === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
   corpus.finishedAt = new Date().toISOString();
   const files = writeCorpus(corpus, input.outDir);
@@ -1134,6 +1184,10 @@ async function runOn(
       out.loud(
         `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
       );
+  }
+  if (stop) {
+    out.progress(authorizationLine(stop));
+    return { exitCode: 2, files, corpus };
   }
   return { exitCode: input.interrupt.requested ? 130 : 0, files, corpus };
 }
@@ -1422,6 +1476,7 @@ export async function runFull(
     }
     throw error;
   }
+  const auth = guardAuthorization(input.interrupt);
   try {
     const authorized = await readDiscovery(connection);
     if (!authorized.ok) {
@@ -1444,7 +1499,20 @@ export async function runFull(
       for (const { source, mode } of PHASE1) {
         if (input.interrupt.requested) break;
         out.progress(`phase 1: ${source} ${mode}`);
-        const result = await runOn(connection, { ...input, source, mode });
+        const result = await runOn(connection, {
+          ...input,
+          source,
+          mode,
+          auth,
+          // An authorization stop is said once, at the end of the full run.
+          out: {
+            ...out,
+            progress: (line) =>
+              line.startsWith('Oops: authorization')
+                ? undefined
+                : out.progress(line),
+          },
+        });
         files.push(...result.files);
         if (result.corpus) corpora.set(`${source} ${mode}`, result.corpus);
         if (result.corpus?.error) error ??= result.corpus.error;
@@ -1548,11 +1616,15 @@ export async function runFull(
       corpora: files,
       removals,
       objects,
-      ...(input.interrupt.requested
-        ? { error: 'interrupted (SIGINT)' }
-        : error
-          ? { error }
-          : {}),
+      ...(auth.stop()
+        ? {
+            error: `stopped: authorization (${auth.stop()?.status}, ${auth.stop()?.kind}) at ${auth.stop()?.endpoint}`,
+          }
+        : input.interrupt.requested
+          ? { error: 'interrupted (SIGINT)' }
+          : error
+            ? { error }
+            : {}),
     };
     fs.mkdirSync(input.outDir, { recursive: true });
     const base = path.join(input.outDir, `header-corpus-${stamp()}`);
@@ -1569,12 +1641,15 @@ export async function runFull(
           `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
         );
     }
+    const stopped = auth.stop();
+    if (stopped) out.progress(authorizationLine(stopped));
     return {
-      exitCode: input.interrupt.requested ? 130 : 0,
+      exitCode: stopped ? 2 : input.interrupt.requested ? 130 : 0,
       files: [...files, `${base}.json`, `${base}.md`],
       file,
     };
   } finally {
+    auth.release();
     await input.close?.(connection);
   }
 }

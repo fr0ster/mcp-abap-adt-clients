@@ -23,6 +23,7 @@ import {
   traced,
 } from '../../../../tools/header-probe/capture';
 import {
+  authorizationProblem,
   classifyNeeds,
   discoveryProbes,
   emptyNamed,
@@ -1715,5 +1716,141 @@ describe('phase 2 writes', () => {
     expect(result.evidence.map((e) => e.who.split(' ')[0])).toEqual([
       'getClass().update',
     ]);
+  });
+});
+
+describe('an authorization problem', () => {
+  const exc = (type: string, message: string) =>
+    `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="${type}"/><message lang="EN">${message}</message></exc:exception>`;
+  const wire = (
+    status: number,
+    data: string,
+    headers: Record<string, string> = {},
+  ) => ({
+    status,
+    data,
+    headers,
+  });
+
+  it('is a 401, a CSRF refusal, or a 403 naming authorization — not a missing object or package', () => {
+    expect(authorizationProblem(wire(401, ''))).toEqual({
+      status: 401,
+      kind: 'no SAP exception',
+    });
+    expect(
+      authorizationProblem(wire(403, 'CSRF token validation failed')),
+    ).toEqual({
+      status: 403,
+      kind: 'CSRF',
+    });
+    expect(
+      authorizationProblem(wire(403, '', { 'x-csrf-token': 'Required' }))?.kind,
+    ).toBe('CSRF');
+    expect(
+      authorizationProblem(
+        wire(
+          403,
+          exc(
+            'ExceptionResourceNoAuthorization',
+            'You are not authorized to display this object',
+          ),
+        ),
+      ),
+    ).toEqual({ status: 403, kind: 'ExceptionResourceNoAuthorization' });
+    // Measured 403s that are not the user's authorization:
+    expect(
+      authorizationProblem(
+        wire(
+          403,
+          exc(
+            'ExceptionNoToggleAuthorization',
+            'Package failure occurs for toggle Z_HPEC_PROBE',
+          ),
+        ),
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizationProblem(
+        wire(
+          403,
+          exc(
+            'ExceptionResourceNoAccess',
+            'Tunnel is disabled in ATC settings.',
+          ),
+        ),
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizationProblem(
+        wire(
+          403,
+          exc(
+            'ExceptionResourceCreationFailure',
+            'Package Z_HPEC_NO_PACKAGE does not exist',
+          ),
+        ),
+      ),
+    ).toBeUndefined();
+    expect(authorizationProblem(wire(404, ''))).toBeUndefined();
+  });
+
+  it('in the middle of phase 1 stops the run: no new probe, the cleanup runs, the Oops, exit 2, the files marked', async () => {
+    const denied = '/sap/bc/adt/probe/c3';
+    const document = manyCollections(6, true);
+    let exists = false;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: document };
+      if (request.url === denied)
+        return {
+          status: 403,
+          body: exc(
+            'ExceptionResourceNoAuthorization',
+            'You are not authorized',
+          ),
+        };
+      if (request.method === 'POST' && request.url === '/sap/bc/adt/probe/c1') {
+        exists = true;
+        return { status: 201 };
+      }
+      if (request.url === `/sap/bc/adt/probe/c1/${PROBE_NAME.toLowerCase()}`)
+        return exists ? { status: 200, body: PROBE_NAME } : { status: 404 };
+      if (request.url === '/sap/bc/adt/deletion/delete') {
+        exists = false;
+        return { status: 200 };
+      }
+      return { status: 404 };
+    });
+    const { lines, out } = output();
+    const result = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+      // One probe (and its read) per envelope: the stop falls between envelopes.
+      envelopeProbes: 1,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(lines[lines.length - 1]).toBe(
+      `Oops: authorization problem (403, ExceptionResourceNoAuthorization) at GET ${denied} — fix it and run again`,
+    );
+    expect(result.corpus?.error).toBe(
+      `stopped: authorization (403, ExceptionResourceNoAuthorization) at GET ${denied}`,
+    );
+    // Nothing after the refused probe.
+    expect(
+      system.seen.some((s) => s.url.startsWith('/sap/bc/adt/probe/c4')),
+    ).toBe(false);
+    // The cleanup ran: what the POST before it created is gone.
+    expect(exists).toBe(false);
+    expect(result.corpus?.removals).toContainEqual(
+      expect.objectContaining({ removed: true }),
+    );
+    expect(fs.readFileSync(result.files[1], 'utf8')).toContain(
+      'stopped: authorization',
+    );
   });
 });
