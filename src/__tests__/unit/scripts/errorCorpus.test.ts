@@ -44,6 +44,7 @@ import {
   renderCorpusMarkdown,
   renderNamedSummary,
   stats,
+  t100Of,
   wireNote,
 } from '../../../../tools/header-probe/corpus';
 import {
@@ -2818,5 +2819,58 @@ describe('stand-in arguments', () => {
       'legacy getClassExecutor().runWithProfiler: profilerId=undefined',
       'legacy getProgramExecutor().runWithProfiler: profilerId=undefined',
     ]);
+  });
+});
+
+describe('a 406 with T100 SADT_RESOURCE 037', () => {
+  const exc037 =
+    '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceNotAcceptable"/><message lang="EN">The message content is not acceptable</message><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">037</entry></properties></exc:exception>';
+  const exc044 =
+    '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceNotAcceptable"/><message lang="EN">The message content is not acceptable. Accepted content types: application/xml</message><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">044</entry></properties></exc:exception>';
+  const bogus406 = (label: string, body: string) =>
+    row({
+      label,
+      bogus: 'accept',
+      status: 406,
+      body,
+      named: {
+        ...emptyNamed(),
+        ...(body === exc044
+          ? { acceptedText: 'Accepted content types: application/xml' }
+          : {}),
+      },
+    });
+  it('is unknown — unless another Accept on the same endpoint got a 2xx or a 404; 044 is checked', () => {
+    const needs = Object.fromEntries(
+      classifyNeeds(
+        [
+          bogus406('g', exc037),
+          bogus406('c', exc037),
+          bogus406('f', exc044),
+          bogus406('n', exc037),
+        ],
+        [
+          // The client's own Accept (corpus) got a 404 here: the contrast.
+          row({
+            label: 'c',
+            status: 404,
+            sapType: 'ExceptionResourceNotFound',
+          }),
+          // And here every Accept got 037: no contrast.
+          row({ label: 'n', status: 406, body: exc037 }),
+        ],
+      ).map((entry) => [entry.endpoint.split('.')[1].split(' ')[0], entry]),
+    );
+    expect(needs.g.needs).toBe('unknown');
+    expect(needs.g.accept.reason).toBe(
+      '406 generic (T100 037): not necessarily the Accept',
+    );
+    expect(needs.c.needs).toBe('accept');
+    expect(needs.c.detail).toContain(
+      'checked (037, inferred from the contrast)',
+    );
+    expect(needs.f.needs).toBe('accept');
+    expect(needs.n.needs).toBe('unknown');
+    expect(t100Of(exc037)).toEqual({ id: 'SADT_RESOURCE', no: '037' });
   });
 });

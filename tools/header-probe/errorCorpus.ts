@@ -197,7 +197,11 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
         corpus.needs = classifyNeeds(
           corpus.rows,
           corpora
-            .filter((c) => c.source === corpus.source && c.headers === 'none')
+            .filter(
+              (c) =>
+                c.source === corpus.source &&
+                (c.headers === 'none' || c.headers === 'corpus'),
+            )
             .flatMap((c) => c.rows),
         );
       fs.writeFileSync(file, `${JSON.stringify(corpus, null, 2)}\n`);

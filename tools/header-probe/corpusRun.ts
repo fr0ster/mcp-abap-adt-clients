@@ -1600,7 +1600,11 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
   const bogus = corpora.find((corpus) => corpus.headers === 'bogus');
   const none = corpora.find((corpus) => corpus.headers === 'none');
   if (!bogus) return { evidence: [], objects, files: [], rows: [] };
-  bogus.needs = classifyNeeds(bogus.rows, none?.rows ?? []);
+  const own = corpora.find((corpus) => corpus.headers === 'corpus');
+  bogus.needs = classifyNeeds(bogus.rows, [
+    ...(none?.rows ?? []),
+    ...(own?.rows ?? []),
+  ]);
   const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
   return {
     evidence: evidenceOf(bogus.needs, 'clients', 2),
@@ -1719,11 +1723,15 @@ export async function runFull(
       }
     });
     const needs1 = {
-      discovery: classifyNeeds(
-        rowsOf('discovery bogus'),
-        rowsOf('discovery none'),
-      ),
-      clients: classifyNeeds(rowsOf('clients bogus'), rowsOf('clients none')),
+      // The none and the corpus answers: evidence beside the bogus ones.
+      discovery: classifyNeeds(rowsOf('discovery bogus'), [
+        ...rowsOf('discovery none'),
+        ...rowsOf('discovery corpus'),
+      ]),
+      clients: classifyNeeds(rowsOf('clients bogus'), [
+        ...rowsOf('clients none'),
+        ...rowsOf('clients corpus'),
+      ]),
     };
     evidence.push(
       ...evidenceOf(needs1.discovery, 'discovery', 1),

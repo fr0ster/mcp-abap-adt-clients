@@ -378,9 +378,25 @@ Per header, from its bogus request:
 
 | verdict | when |
 |---|---|
-| `checked` | 406 for Accept, 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
+| `checked` | 406 for Accept — but not a 406 with SAP's generic text (T100 `SADT_RESOURCE` 037, below) —, 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
 | `not checked` | a 2xx: the resource never compares the header |
 | `unknown` | anything else — 401, 403, 404, 405 (`method not implemented`), 500 (`dump or router`, with the dump's short text), any other status with its SAP exception |
+
+A 406 with T100 `SADT_RESOURCE` **037** ("The message content is not
+acceptable", no list) does not say the Accept was refused: 037 is the default
+text of `CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id (from reading
+SAP's code: the search raises it for an invalid `objectType`, whatever the
+Accept — measured). Only **044** ("Accepted content types: …") names the
+types and points at the Accept. So a bogus Accept answered 406/037 is
+`unknown` (`406 generic (T100 037): not necessarily the Accept`) — unless the
+same endpoint answered a 2xx or a 404 to another Accept (none, or the client's
+own): then it is `checked (037, inferred from the contrast)`.
+
+The probe's own arguments must build a real request: a stand-in value that a
+real call never sends (`undefined`, an object type that is not an ADT type
+`XXXX` or `XXXX/YYYY`) can make the answer say nothing about the headers.
+Each member's recorded request is checked for such parameters; the members
+still carrying one are marked `standIn` in the corpus.
 
 | needs | when |
 |---|---|

@@ -860,6 +860,44 @@ export interface IHeaderVerdict {
   verdict: 'checked' | 'not checked' | 'unknown' | 'no body';
   status?: number;
   reason?: string;
+  /** A 406 with SAP's generic text (T100 SADT_RESOURCE 037). */
+  generic037?: boolean;
+}
+
+/** The T100 key of a SAP exception body, if it carries one. */
+export function t100Of(
+  body: string | undefined,
+): { id: string; no: string } | undefined {
+  if (!body) return undefined;
+  const read = (key: string) => {
+    const open = `<entry key="${key}">`;
+    const at = body.indexOf(open);
+    if (at === -1) return undefined;
+    const end = body.indexOf('<', at + open.length);
+    return end === -1 ? undefined : body.slice(at + open.length, end);
+  };
+  const id = read('T100KEY-ID');
+  const no = read('T100KEY-NO');
+  return id && no ? { id, no } : undefined;
+}
+
+/**
+ * A 406 that says nothing of the Accept: SAP's generic default text
+ * (`CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id: T100
+ * SADT_RESOURCE 037, "The message content is not acceptable"), with no list
+ * of accepted types. From reading SAP's code: the search raises it for an
+ * invalid `objectType` parameter, whatever the Accept. Only 044, "Accepted
+ * content types: …", names the types and points at the Accept.
+ */
+export function isGeneric037(row: ICorpusRow): boolean {
+  const key = t100Of(row.body);
+  return (
+    row.status === 406 &&
+    key?.id === 'SADT_RESOURCE' &&
+    key.no === '037' &&
+    !row.named.acceptedText &&
+    !row.named.supportedAccept.length
+  );
 }
 
 export interface IEndpointNeeds {
@@ -984,6 +1022,13 @@ export function judge(
       verdict: 'unknown',
       reason: `no answer: ${row.failure ?? 'nothing came back'}`,
     };
+  if (row.status === refusal && refusal === 406 && isGeneric037(row))
+    return {
+      verdict: 'unknown',
+      status: 406,
+      reason: '406 generic (T100 037): not necessarily the Accept',
+      generic037: true,
+    };
   if (row.status === refusal) return { verdict: 'checked', status: row.status };
   if (row.status >= 200 && row.status < 300)
     return { verdict: 'not checked', status: row.status };
@@ -1013,7 +1058,7 @@ const verdictText = (name: string, verdict: IHeaderVerdict): string =>
     ? `${name}: no body`
     : verdict.verdict === 'unknown'
       ? `${name}: unknown (${verdict.reason})`
-      : `${name}: ${verdict.verdict} (${verdict.status})`;
+      : `${name}: ${verdict.verdict} (${verdict.reason ?? verdict.status})`;
 
 /**
  * Per endpoint of a bogus run: which headers it needs, and what the system
@@ -1037,6 +1082,14 @@ export function classifyNeeds(
     else entry.accept ??= row;
     by.set(key, entry);
   }
+  const contrast = new Set<string>();
+  for (const row of evidence)
+    if (
+      !row.bogus &&
+      row.status !== undefined &&
+      ((row.status >= 200 && row.status < 300) || row.status === 404)
+    )
+      contrast.add(needsKey(row));
   const missing = new Map<string, ICorpusRow>();
   for (const row of [...rows, ...evidence])
     if (isAcceptHeaderMissing(row) && !missing.has(needsKey(row)))
@@ -1044,6 +1097,15 @@ export function classifyNeeds(
   const out: IEndpointNeeds[] = [];
   for (const [endpoint, pair] of by) {
     let accept = judge(pair.accept, 406);
+    // A generic 406/037 to the bogus Accept, while another Accept (none, or
+    // the client's own) got a 2xx or a 404 on the same endpoint: the Accept
+    // made the difference after all.
+    if (accept.generic037 && contrast.has(endpoint))
+      accept = {
+        verdict: 'checked',
+        status: 406,
+        reason: '037, inferred from the contrast',
+      };
     const absent = missing.get(endpoint);
     if (accept.verdict !== 'checked' && absent)
       accept = {
@@ -1410,7 +1472,7 @@ export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
         named.set(key, entry);
       }
     const evidence = of
-      .filter((c) => c.headers === 'none')
+      .filter((c) => c.headers === 'none' || c.headers === 'corpus')
       .flatMap((c) => c.rows);
     for (const corpus of of.filter((c) => c.headers === 'bogus'))
       for (const entry of classifyNeeds(corpus.rows, evidence))
@@ -1541,7 +1603,11 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
         classifyNeeds(
           corpus.rows,
           corpora
-            .filter((c) => c.source === corpus.source && c.headers === 'none')
+            .filter(
+              (c) =>
+                c.source === corpus.source &&
+                (c.headers === 'none' || c.headers === 'corpus'),
+            )
             .flatMap((c) => c.rows),
         ),
       ),
