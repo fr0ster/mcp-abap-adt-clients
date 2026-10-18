@@ -56,7 +56,14 @@ import {
 import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
 import { AdtBatchConnection } from '../../src/batch/AdtBatchConnection';
 import { AdtClient } from '../../src/clients/AdtClient';
-import { Interrupt, Interrupted, Ledger, withCleanup } from './ledger';
+import {
+  eachInTurn,
+  Interrupt,
+  Interrupted,
+  Ledger,
+  withCleanup,
+  withLock,
+} from './ledger';
 import {
   type IObjectSpec,
   type IProbeable,
@@ -222,8 +229,10 @@ class Probe {
         ),
       );
     if (!batched) {
-      for (const [i, call] of calls.entries())
-        await invoke(this.direct, call, captures[i]);
+      // Asked before every request, not only before the list.
+      await eachInTurn(calls, gated ? this.interrupt : undefined, (call, i) =>
+        invoke(this.direct, call, captures[i]),
+      );
       return captures;
     }
     const batch = new AdtBatchConnection(this.connection, {
@@ -234,6 +243,8 @@ class Probe {
     // A member may record its request a few turns after it was called.
     for (let turn = 0; turn < 3; turn++)
       await new Promise<void>((resolve) => setImmediate(resolve));
+    // Ctrl-C while the parts were being recorded: the envelope never leaves.
+    if (gated) this.interrupt.check();
     try {
       await batch.execute();
     } catch (error) {
@@ -420,19 +431,26 @@ class Probe {
       );
       const handle = lockHandle(locked);
       if (!handle) return false;
-      await this.direct1(
-        (client, analyse) =>
-          spec.handle(client).update?.(config, {
-            headers: pair('update'),
-            source,
-            lockHandle: handle,
-            analyse,
-          }) ?? Promise.resolve(),
-      );
-      await this.direct1(
-        (client, analyse) =>
-          spec.handle(client).unlock?.(config, handle, { analyse }) ??
-          Promise.resolve(),
+      await withLock(
+        handle,
+        // Released after an interrupt too: unlocking is cleanup.
+        (held) =>
+          this.direct1(
+            (client, analyse) =>
+              spec.handle(client).unlock?.(config, held, { analyse }) ??
+              Promise.resolve(),
+            false,
+          ),
+        (held) =>
+          this.direct1(
+            (client, analyse) =>
+              spec.handle(client).update?.(config, {
+                headers: pair('update'),
+                source,
+                lockHandle: held,
+                analyse,
+              }) ?? Promise.resolve(),
+          ),
       );
     }
     const activated = await this.direct1(
@@ -549,37 +567,50 @@ class Probe {
           handle(client).lock?.(config, { analyse }) ?? Promise.resolve(),
       );
       const lock = lockHandle(locked);
-      if (!lock || body === undefined) {
-        const why = !lock
-          ? `skipped: the lock answered ${locked.wire?.status ?? locked.failure}`
-          : 'skipped: the object could not be read to write it back';
+      if (!lock) {
         if (this.wanted(spec.type, writeMember))
-          this.skip(spec.type, writeMember, why);
-      } else {
-        try {
-          await this.operation({
-            objectType: spec.type,
-            handler: spec.handler,
-            member: writeMember,
-            call: (_kind, headers) => (client, analyse) =>
-              handle(client)[writeMember]?.(config, {
-                headers,
-                source: body,
-                lockHandle: lock,
-                analyse,
-              }) ?? Promise.resolve(),
-            state: () => stateOf(names.known),
-          });
-          if (spec.type === 'class') await this.locals(names.known, lock);
-        } finally {
-          // Released after an interrupt too: the lock is this session's.
-          await this.direct1(
-            (client, analyse) =>
-              handle(client).unlock?.(config, lock, { analyse }) ??
-              Promise.resolve(),
-            false,
+          this.skip(
+            spec.type,
+            writeMember,
+            `skipped: the lock answered ${locked.wire?.status ?? locked.failure}`,
           );
-        }
+      } else {
+        const source = body;
+        await withLock(
+          lock,
+          // Released after an interrupt too: unlocking is cleanup.
+          (held) =>
+            this.direct1(
+              (client, analyse) =>
+                handle(client).unlock?.(config, held, { analyse }) ??
+                Promise.resolve(),
+              false,
+            ),
+          async (held) => {
+            if (source === undefined) {
+              if (this.wanted(spec.type, writeMember))
+                this.skip(
+                  spec.type,
+                  writeMember,
+                  'skipped: the object could not be read to write it back',
+                );
+            } else
+              await this.operation({
+                objectType: spec.type,
+                handler: spec.handler,
+                member: writeMember,
+                call: (_kind, headers) => (client, analyse) =>
+                  handle(client)[writeMember]?.(config, {
+                    headers,
+                    source,
+                    lockHandle: held,
+                    analyse,
+                  }) ?? Promise.resolve(),
+                state: () => stateOf(names.known),
+              });
+            if (spec.type === 'class') await this.locals(names.known, held);
+          },
+        );
       }
     }
     if (spec.type === 'messageClass') await this.messages(names.known);

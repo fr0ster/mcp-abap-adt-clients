@@ -103,6 +103,39 @@ export class Interrupt {
   }
 }
 
+/**
+ * Runs `run` for each item in turn, asking the interrupt before each: after
+ * Ctrl-C the item in flight finishes and no later one starts. Without an
+ * interrupt (cleanup work) every item runs.
+ */
+export async function eachInTurn<T>(
+  items: readonly T[],
+  interrupt: Interrupt | undefined,
+  run: (item: T, index: number) => Promise<unknown>,
+): Promise<void> {
+  for (const [index, item] of items.entries()) {
+    interrupt?.check();
+    await run(item, index);
+  }
+}
+
+/**
+ * Works under a lock already taken and releases it whatever happens — a
+ * failure, an interrupt — before anything else runs. The release is cleanup:
+ * `unlock` must not be stopped by the interrupt.
+ */
+export async function withLock<T>(
+  handle: string,
+  unlock: (handle: string) => Promise<unknown>,
+  body: (handle: string) => Promise<T>,
+): Promise<T> {
+  try {
+    return await body(handle);
+  } finally {
+    await unlock(handle);
+  }
+}
+
 /** Runs `body`; the ledger is cleaned up whatever happens, failure included. */
 export async function withCleanup<T>(
   ledger: Ledger,

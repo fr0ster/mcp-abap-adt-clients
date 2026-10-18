@@ -5,10 +5,12 @@
  */
 
 import {
+  eachInTurn,
   Interrupt,
   Interrupted,
   Ledger,
   withCleanup,
+  withLock,
 } from '../../../../tools/header-probe/ledger';
 import { KNOWN_PAIRS, knownPair } from '../../../../tools/header-probe/pairs';
 import {
@@ -573,5 +575,127 @@ describe('prerequisites', () => {
         'known',
       ]),
     ).toEqual(['badAccept', 'badContentType', 'known']);
+  });
+});
+
+describe('an interrupt, request by request', () => {
+  /** A request that answers only when told to. */
+  function wire() {
+    let answer: (() => void) | undefined;
+    let answering = false;
+    return {
+      send: () =>
+        new Promise<void>((resolve) => {
+          answer = resolve;
+          if (answering) resolve();
+        }),
+      inFlight: () =>
+        new Promise<void>((resolve) => {
+          const poll = () => (answer ? resolve() : setImmediate(poll));
+          poll();
+        }),
+      answer: () => {
+        answering = true;
+        answer?.();
+      },
+    };
+  }
+
+  it('under --sequential, sends nothing after the create in flight but the cleanup', async () => {
+    const interrupt = new Interrupt();
+    const ledger = new Ledger();
+    const net = wire();
+    const sent: string[] = [];
+    ledger.add({
+      label: 'ZHP1',
+      remove: async () => {
+        sent.push('delete ZHP1');
+        return { removed: true, detail: 'deleted' };
+      },
+    });
+    // One step's calls as the sequential path sends them: a create, its
+    // state read, the two bad-header creates and theirs.
+    const step = [
+      'create K',
+      'read K',
+      'create A',
+      'read A',
+      'create C',
+      'read C',
+    ];
+    const run = withCleanup(ledger, () =>
+      eachInTurn(step, interrupt, async (request) => {
+        sent.push(request);
+        await net.send();
+      }),
+    );
+    const stopped = expect(run).rejects.toBeInstanceOf(Interrupted);
+    await net.inFlight();
+    interrupt.stop();
+    net.answer();
+    await stopped;
+    expect(sent).toEqual(['create K', 'delete ZHP1']);
+  });
+
+  it('runs every item when there is no interrupt to ask (cleanup work)', async () => {
+    const done: number[] = [];
+    await eachInTurn([1, 2, 3], undefined, async (item) => {
+      done.push(item);
+    });
+    expect(done).toEqual([1, 2, 3]);
+  });
+
+  it("a Ctrl-C during a prerequisite's lock still unlocks, then deletes", async () => {
+    const interrupt = new Interrupt();
+    const ledger = new Ledger();
+    const net = wire();
+    const sent: string[] = [];
+    let locked = false;
+    ledger.add({
+      label: 'ZHPDDL',
+      remove: async () => {
+        sent.push(locked ? 'delete while locked' : 'delete');
+        return { removed: !locked, detail: locked ? 'locked' : 'deleted' };
+      },
+    });
+    // The dependency setup as the driver runs it: lock, then write and
+    // unlock under withLock; the unlock is cleanup and not stopped.
+    const setup = withCleanup(ledger, async () => {
+      interrupt.check();
+      sent.push('lock');
+      await net.send();
+      locked = true;
+      await withLock(
+        'handle',
+        async () => {
+          sent.push('unlock');
+          locked = false;
+        },
+        async () => {
+          interrupt.check();
+          sent.push('update');
+        },
+      );
+    });
+    const stopped = expect(setup).rejects.toBeInstanceOf(Interrupted);
+    await net.inFlight();
+    interrupt.stop(); // while the LOCK is on the wire
+    net.answer();
+    await stopped;
+    expect(sent).toEqual(['lock', 'unlock', 'delete']);
+  });
+
+  it('releases the lock when the write under it fails', async () => {
+    const released: string[] = [];
+    await expect(
+      withLock(
+        'h',
+        async (handle) => released.push(handle),
+        async () => {
+          throw new Error('423');
+        },
+      ),
+    ).rejects.toThrow('423');
+    expect(released).toEqual(['h']);
   });
 });
