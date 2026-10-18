@@ -881,7 +881,13 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
       tableNotes.push(
         `the pair table lists Content-Type ${table.contentType}; a bogus Content-Type was answered ${contentType.status}`,
       );
-    if (table?.contentType && contentType.verdict === 'no body')
+    // Discovery's types are a POST body's: on its GET they are no claim.
+    const source = (pair.accept ?? pair.contentType)?.source;
+    if (
+      source === 'clients' &&
+      table?.contentType &&
+      contentType.verdict === 'no body'
+    )
       tableNotes.push(
         `the pair table lists Content-Type ${table.contentType} for a request without a body`,
       );
