@@ -259,12 +259,38 @@ class Run<T> {
     split: ISplit,
   ): Promise<void> {
     const reads: IPlanned<T>[] = [];
+    const writes: IPlanned<T>[] = [];
     for (const entry of entries)
       if (entry.write) {
         resetAnswer(entry.row);
-        entry.row.failure = 'poisoned, not resent: write';
         entry.row.settled = { depth, path: path.join(' → ') };
+        writes.push(entry);
       } else reads.push(entry);
+    // A write is not resent; whether it took effect is read, on its own.
+    for (const entry of writes) {
+      this.interrupt.check();
+      let after = 'unreadable (no read of the object)';
+      if (entry.read) {
+        const [read] = await runCalls({
+          calls: [entry.read],
+          batched: false,
+          connection: this.connection,
+          direct: this.direct,
+          onBatch: this.onBatch,
+          interrupt: this.interrupt,
+        });
+        entry.row.afterWrite = existsAfter(read);
+        after =
+          entry.row.afterWrite.exists === true
+            ? 'exists'
+            : entry.row.afterWrite.exists === false
+              ? 'absent'
+              : `unreadable ${entry.row.afterWrite.status ?? entry.row.afterWrite.note ?? ''}`.trim();
+        if (entry.row.afterWrite.exists === true)
+          split.writesThatExist.push(rowKey(entry.row));
+      }
+      entry.row.failure = `poisoned, not resent: write; after: ${after}`;
+    }
     for (const [index, group] of splitInTen(reads).entries()) {
       this.interrupt.check();
       const where = [...path, `group ${index + 1}`];
@@ -340,6 +366,7 @@ class Run<T> {
           envelope: envelopeId,
           parts: part.length,
           causes: [],
+          writesThatExist: [],
           envelopes: 0,
           requestsAlone: 0,
           ms: 0,
@@ -436,18 +463,28 @@ export function discoveryRemoval(
   connection: IAbapConnection,
   uri: string,
 ): () => Promise<{ removed: boolean; detail: string }> {
-  const read = () =>
-    statusOf(
-      connection.makeAdtRequest({
-        url: uri,
-        method: 'GET',
-        timeout: 0,
-        headers: { Accept: '*/*' },
-      }),
+  const request = () =>
+    connection.makeAdtRequest({
+      url: uri,
+      method: 'GET',
+      timeout: 0,
+      headers: { Accept: '*/*' },
+    });
+  // Exists only as a 2xx naming the probe, as after a write.
+  const readState = () =>
+    request().then(
+      (wire) => existsAfter({ requests: [], wire }),
+      (error: unknown) =>
+        existsAfter({
+          requests: [],
+          wire: (error as { response?: IAdtWireResponse })?.response,
+        }),
     );
   return async () => {
-    if ((await read()) === 404)
-      return { removed: true, detail: 'not there any more' };
+    const before = await readState();
+    if (before.exists === false) return { removed: true, detail: 'not there' };
+    // Readable or not, the deletion is sent: a read that says nothing proves
+    // nothing about the object.
     const headers = pairOf('getUtils()', 'deleteObjectsGroup') as IAdtHeaders;
     const body = `<?xml version="1.0" encoding="UTF-8"?><del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">\n  <del:object adtcore:uri="${uri}">\n    <del:transportNumber/>\n  </del:object>\n</del:deletionRequest>`;
     const deleted = await statusOf(
@@ -462,13 +499,20 @@ export function discoveryRemoval(
         },
       }),
     );
-    const after = await read();
-    return after === 404
-      ? { removed: true, detail: `deleted (${deleted ?? 'no status'})` }
-      : {
-          removed: false,
-          detail: `the deletion answered ${deleted ?? 'nothing'}; ${uri} still reads ${after ?? 'unknown'}`,
-        };
+    const after = await readState();
+    if (after.exists === false)
+      return { removed: true, detail: `deleted (${deleted ?? 'no status'})` };
+    // Never readable as an object at this address, before or after: nothing
+    // was ever seen to remove. Not confirmed either way, and said so.
+    if (before.exists !== true && after.exists !== true)
+      return {
+        removed: true,
+        detail: `unconfirmed: ${uri} answers ${after.status ?? 'nothing'}, no object of that name was ever readable there; the deletion answered ${deleted ?? 'nothing'}`,
+      };
+    return {
+      removed: false,
+      detail: `the deletion answered ${deleted ?? 'nothing'}; ${uri} still reads ${after.status ?? 'unknown'}`,
+    };
   };
 }
 

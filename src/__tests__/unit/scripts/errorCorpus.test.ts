@@ -1255,7 +1255,7 @@ describe('a poisoned envelope', () => {
     expect(posts).toHaveLength(4);
     for (const r of corpus?.rows ?? [])
       if (r.endpoint?.method === 'POST')
-        expect(r.failure).toBe('poisoned, not resent: write');
+        expect(r.failure).toBe('poisoned, not resent: write; after: absent');
   });
 });
 
@@ -1379,5 +1379,68 @@ describe('the logon is the authorization check', () => {
     expect(opened).toBe(1);
     expect(asked).toBe(false);
     expect(fs.readdirSync(dir)).toEqual([]);
+  });
+});
+
+describe('a poisoned write', () => {
+  it('is read after, recorded `after: exists`, listed, and deleted by the cleanup', async () => {
+    const bad = '/sap/bc/adt/probe/c2';
+    const created = new Set<string>();
+    let envelope: string[] = [];
+    const document = manyCollections(3, true);
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: document };
+      if (request.method === 'POST' && request.url === '/sap/bc/adt/probe/c1')
+        created.add(`/sap/bc/adt/probe/c1/${PROBE_NAME.toLowerCase()}`);
+      if (request.url === '/sap/bc/adt/deletion/delete') {
+        created.clear();
+        return { status: 200 };
+      }
+      if (request.part && envelope.includes(bad))
+        return { status: 500, body: DUMP };
+      if (created.has(request.url)) return { status: 200, body: PROBE_NAME };
+      return request.url === bad
+        ? { status: 500, body: DUMP }
+        : { status: 404 };
+    });
+    const make = system.connection.makeAdtRequest.bind(system.connection);
+    (system.connection as { makeAdtRequest: unknown }).makeAdtRequest = (
+      request: IAbapRequestOptions,
+    ) => {
+      envelope =
+        request.url === '/sap/bc/adt/communication/batch'
+          ? String(request.data)
+              .split('\r\n')
+              .filter((line) => / HTTP\/1\.1$/.test(line))
+              .map((line) => line.split(' ')[1])
+          : [];
+      return make(request);
+    };
+    const { corpus, files } = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const post = corpus?.rows.find(
+      (r) =>
+        r.endpoint?.path === '/sap/bc/adt/probe/c1' &&
+        r.endpoint.method === 'POST',
+    );
+    expect(post?.failure).toBe('poisoned, not resent: write; after: exists');
+    expect(corpus?.splits?.[0].writesThatExist).toEqual([
+      'POST /sap/bc/adt/probe/c1',
+    ]);
+    expect(created.size).toBe(0);
+    expect(
+      corpus?.removals.find((r) => r.label.includes('/probe/c1/')),
+    ).toEqual(expect.objectContaining({ removed: true }));
+    expect(fs.readFileSync(files[1], 'utf8')).toContain(
+      'Poisoned writes whose object exists after them: POST /sap/bc/adt/probe/c1.',
+    );
   });
 });

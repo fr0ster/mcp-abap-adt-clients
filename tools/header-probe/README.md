@@ -195,9 +195,11 @@ needs.
    to the probe name with a fake body: a minimal document of the corpus type,
    or a fixed text. Before every write is sent, the probe name it may create
    goes into the ledger (once per object), whatever follows — an interrupt
-   before the read, a read that fails or says nothing; the `finally` reads
-   each entry and deletes what exists, and what could not be deleted is
-   listed loudly. After every write the probe name is read too, and a write
+   before the read, a read that fails or says nothing; the `finally` sends
+   each entry's deletion unless a read says 404, and lists loudly what still
+   reads as an object afterwards. Where the address never reads as an
+   object (a collection that answers 400/405/500 to `GET <href>/<name>`), the
+   removal says `unconfirmed: …` instead. After every write the probe name is read too, and a write
    that created it is listed loudly. A `LOCK` that a member still answered
    2xx is released the same way. No locks are taken.
 5. **Batch.** Everything goes in envelopes of 25 probes through
@@ -278,8 +280,11 @@ a tenth each (never an empty group, so fewer than ten make one each); each
 group goes as an envelope of its own; a group that comes back clean is
 settled, one poisoned again is split the same way, and a poisoned single
 call is sent alone — its 500 is its own answer, the dump, and it is listed
-as the cause. Its writes are never resent: they are recorded `poisoned, not
-resent: write`. Each probe records where it was settled (`settled`: depth
+as the cause. Its writes are never resent: whether each took effect is read
+once, on its own, and recorded as `poisoned, not resent: write; after:
+exists` (or `absent`, or `unreadable <status>`); the summary lists every
+poisoned write whose object exists after it, and the ledger entry registered
+before the write removes it in the `finally`. Each probe records where it was settled (`settled`: depth
 and path, e.g. `env 12 → group 3 → group 7`), and `inEnvelope` what the
 envelope said; the summary lists every poisoned envelope, the envelopes and
 the calls alone its splitting needed, its time, and the cause.

@@ -1116,6 +1116,8 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
       );
     lines.push(
       '',
+      `Poisoned writes whose object exists after them: ${splits.flatMap((x) => x.writesThatExist ?? []).join('; ') || 'none'}.`,
+      '',
       `${splits.length} poisoned envelope(s); the splitting sent ${splits.reduce((n, x) => n + x.envelopes, 0)} envelope(s) and ${splits.reduce((n, x) => n + x.requestsAlone, 0)} call(s) alone, in ${Math.round(splits.reduce((n, x) => n + x.ms, 0))} ms.`,
       '',
     );
@@ -1285,6 +1287,8 @@ export interface ISplit {
   parts: number;
   /** The calls whose own 500 poisoned their group. */
   causes: string[];
+  /** Its writes (not resent) whose object exists after them. */
+  writesThatExist: string[];
   /** Envelopes the splitting sent. */
   envelopes: number;
   /** Calls sent alone (each a poisoned single). */
