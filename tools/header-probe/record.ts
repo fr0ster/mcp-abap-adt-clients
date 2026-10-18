@@ -187,7 +187,12 @@ const SAP_PREFIX = 'SAP refused the request: ';
 
 /** The raw `Accepted content types: …` text, up to the end of its element or line. */
 export function acceptedContentTypesText(body: string): string | undefined {
-  const at = body.indexOf(ACCEPTED_CONTENT_TYPES);
+  return textFrom(body, ACCEPTED_CONTENT_TYPES);
+}
+
+/** The raw text from `marker` on, up to the end of its element or line. */
+export function textFrom(body: string, marker: string): string | undefined {
+  const at = body.indexOf(marker);
   if (at === -1) return undefined;
   let end = body.length;
   for (const stop of ['<', '"', '\n']) {
@@ -197,7 +202,7 @@ export function acceptedContentTypesText(body: string): string | undefined {
   return body.slice(at, end).trim();
 }
 
-function headerValue(
+export function headerValue(
   headers: IAdtWireResponse['headers'] | undefined,
   name: string,
 ): string | undefined {

@@ -38,15 +38,10 @@
  * More in tools/header-probe/README.md.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtHeaders, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  IAbapRequestOptions,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -54,10 +49,15 @@ import {
   resolveSystemContext,
 } from '../../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
-import { AdtBatchConnection } from '../../src/batch/AdtBatchConnection';
 import { AdtClient } from '../../src/clients/AdtClient';
 import {
-  eachInTurn,
+  type ICallOn,
+  type ICapture,
+  message,
+  runCalls,
+  traced,
+} from './capture';
+import {
   Interrupt,
   Interrupted,
   Ledger,
@@ -126,56 +126,7 @@ function parseArgs(argv: readonly string[]): IArgs {
   return args;
 }
 
-/** What one call captured: its answer and the requests it issued. */
-interface ICapture {
-  wire?: IAdtWireResponse;
-  /** What the member returned. */
-  result?: unknown;
-  failure?: string;
-  requests: { method: string; url: string; params: unknown }[];
-}
-
-const current = new AsyncLocalStorage<ICapture>();
-
-/**
- * The connection a client is built on, recording each request into the call
- * that issued it.
- *
- * A plain object of its own, not a `Proxy`: the client installs its request
- * trace by assigning `makeAdtRequest` on the connection it is given, and a
- * proxy without a `set` trap would pass that assignment to the connection
- * below and call itself.
- */
-function traced(connection: IAbapConnection): IAbapConnection {
-  const wrapper: Record<string | symbol, unknown> = {};
-  const seen = new Set<string | symbol>();
-  for (
-    let level: object | null = connection;
-    level && level !== Object.prototype;
-    level = Object.getPrototypeOf(level)
-  ) {
-    for (const key of Reflect.ownKeys(level)) {
-      if (seen.has(key) || key === 'constructor') continue;
-      seen.add(key);
-      const value = Reflect.get(connection, key);
-      if (typeof value === 'function') wrapper[key] = value.bind(connection);
-    }
-  }
-  wrapper.makeAdtRequest = (request: IAbapRequestOptions) => {
-    current.getStore()?.requests.push({
-      method: request.method,
-      url: request.url,
-      params: request.params,
-    });
-    return connection.makeAdtRequest(request);
-  };
-  return wrapper as unknown as IAbapConnection;
-}
-
-type ICall = (client: AdtClient, analyse: IAnalyse) => Promise<unknown>;
-
-const message = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+type ICall = ICallOn<AdtClient>;
 
 class Probe {
   readonly rows: IOperationRow[] = [];
@@ -199,61 +150,20 @@ class Probe {
   }
 
   /** Runs the calls in one envelope, or one by one with `--sequential`. */
-  async calls(
+  calls(
     calls: ICall[],
     batched = !this.args.sequential,
     gated = true,
   ): Promise<ICapture[]> {
     // After Ctrl-C nothing new goes out, except what releases or removes.
-    if (gated) this.interrupt.check();
-    const captures = calls.map((): ICapture => ({ requests: [] }));
-    const invoke = (client: AdtClient, call: ICall, capture: ICapture) =>
-      current.run(capture, () =>
-        call(client, (verdict, wire) => {
-          capture.wire = wire;
-          if (
-            !wire &&
-            verdict &&
-            typeof verdict === 'object' &&
-            'message' in verdict
-          )
-            capture.failure = String(verdict.message);
-          return verdict;
-        }).then(
-          (result: unknown) => {
-            capture.result = result;
-          },
-          (error: unknown) => {
-            capture.failure = message(error);
-          },
-        ),
-      );
-    if (!batched) {
-      // Asked before every request, not only before the list.
-      await eachInTurn(calls, gated ? this.interrupt : undefined, (call, i) =>
-        invoke(this.direct, call, captures[i]),
-      );
-      return captures;
-    }
-    const batch = new AdtBatchConnection(this.connection, {
-      endpoint: 'communication',
+    return runCalls({
+      calls,
+      batched,
+      connection: this.connection,
+      direct: this.direct,
+      onBatch: (batch) => this.client(traced(batch)),
+      interrupt: gated ? this.interrupt : undefined,
     });
-    const client = this.client(traced(batch));
-    const pending = calls.map((call, i) => invoke(client, call, captures[i]));
-    // A member may record its request a few turns after it was called.
-    for (let turn = 0; turn < 3; turn++)
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    // Ctrl-C while the parts were being recorded: the envelope never leaves.
-    if (gated) this.interrupt.check();
-    try {
-      await batch.execute();
-    } catch (error) {
-      for (const capture of captures)
-        if (!capture.wire)
-          capture.failure ??= `the envelope failed: ${message(error)}`;
-    }
-    await Promise.all(pending);
-    return captures;
   }
 
   wanted(type: string, member: string): boolean {
