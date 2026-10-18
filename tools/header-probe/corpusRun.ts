@@ -1056,14 +1056,62 @@ export async function readDiscovery(
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
+/** A folder name from the connection target: host and client, lowercased, every other character `-`. */
+export function systemFolder(
+  url: string | undefined,
+  client: string | undefined,
+): string {
+  let host = 'unknown-system';
+  try {
+    if (url) host = new URL(url).host;
+  } catch {
+    host = url ?? host;
+  }
+  const raw = `${host}${client ? `-${client}` : ''}`.toLowerCase();
+  let name = '';
+  for (const char of raw) name += /[a-z0-9._-]/.test(char) ? char : '-';
+  return name;
+}
+
 /**
- * Where a run writes: `--out`, else `<os temp dir>/mcp-abap-adt-clients/
- * header-probe` — outside the worktree, so removing one keeps the corpora.
- * Absolute; created when missing.
+ * The default output folder, as the auth chain keeps its sessions: on Linux
+ * and macOS `~/.config/mcp-abap-adt-clients/header-probe/<system>`, on
+ * Windows `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>`.
+ * Persistent and local: never committed.
+ */
+export function defaultOutputDir(target: {
+  platform: NodeJS.Platform;
+  home: string;
+  url?: string | undefined;
+  client?: string | undefined;
+}): string {
+  const join = target.platform === 'win32' ? path.win32.join : path.posix.join;
+  const base =
+    target.platform === 'win32'
+      ? join(target.home, 'Documents')
+      : join(target.home, '.config');
+  return join(
+    base,
+    'mcp-abap-adt-clients',
+    'header-probe',
+    systemFolder(target.url, target.client),
+  );
+}
+
+/**
+ * Where a run writes: `--out`, else {@link defaultOutputDir} for the
+ * connection target in `SAP_URL` / `SAP_CLIENT`. Absolute; created when
+ * missing.
  */
 export function outputDir(given?: string): string {
   const dir = path.resolve(
-    given ?? path.join(os.tmpdir(), 'mcp-abap-adt-clients', 'header-probe'),
+    given ??
+      defaultOutputDir({
+        platform: process.platform,
+        home: os.homedir(),
+        url: process.env.SAP_URL?.split('#')[0].trim(),
+        client: process.env.SAP_CLIENT?.split('#')[0].trim(),
+      }),
   );
   fs.mkdirSync(dir, { recursive: true });
   return dir;

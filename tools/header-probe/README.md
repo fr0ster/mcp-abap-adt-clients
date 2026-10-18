@@ -20,7 +20,7 @@ deletes them again.
 
 ```bash
 npm run header:discovery                     # the full run: the system's header corpus
-npm run header:discovery -- --isolate /tmp/mcp-abap-adt-clients/header-probe/header-corpus-<ts>.json
+npm run header:discovery -- --isolate ~/.config/mcp-abap-adt-clients/header-probe/<system>/header-corpus-<ts>.json
 npm run header:discovery -- --out <dir>        # write there instead
 npm run header:discovery -- --from discovery --headers corpus
 npm run header:discovery -- --from discovery --headers none
@@ -306,13 +306,20 @@ Deliberate, and left as they are:
 ## The corpus
 
 **Where the output goes.** Everything a run writes — the corpora, the header
-corpus files, the summaries — goes to `<os temp dir>/mcp-abap-adt-clients/header-probe`
-(`path.join(os.tmpdir(), 'mcp-abap-adt-clients', 'header-probe')`, created
-when missing), outside the repository, so removing a worktree keeps them;
-`--out <dir>` writes elsewhere. The run prints the absolute folder at the end.
-`.header-probe/` in the repository is no longer written (its `.gitignore` line
-stays for old checkouts). The files hold the system's answers: they are never
-committed.
+corpus files, the summaries — goes to a persistent folder per user and per
+system, as the auth chain keeps its sessions (`~/.config/mcp-abap-adt` on
+Unix, `Documents/mcp-abap-adt` on Windows):
+
+- Linux and macOS: `~/.config/mcp-abap-adt-clients/header-probe/<system>/`;
+- Windows: `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>\`.
+
+`<system>` is the connection target (`SAP_URL`'s host and port, and
+`SAP_CLIENT`), lowercased, every character outside `[a-z0-9._-]` replaced by
+`-` (e.g. `127.0.0.1-8000-100`). The folder is created when missing, is local
+only, and is never committed; removing a worktree keeps it. `--out <dir>`
+replaces the whole path. The run prints the absolute folder at the end.
+`.header-probe/` in the repository is no longer written (its `.gitignore`
+line stays for old checkouts). The files hold the system's answers.
 
 Two files per run:
 

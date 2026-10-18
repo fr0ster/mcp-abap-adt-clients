@@ -47,10 +47,12 @@ import {
   wireNote,
 } from '../../../../tools/header-probe/corpus';
 import {
+  defaultOutputDir,
   outputDir,
   removalOutcome,
   runCorpus,
   runFull,
+  systemFolder,
 } from '../../../../tools/header-probe/corpusRun';
 import { Interrupt, Interrupted } from '../../../../tools/header-probe/ledger';
 import {
@@ -2437,11 +2439,33 @@ describe('endpoint existence', () => {
 });
 
 describe('the output folder', () => {
-  it('is <os temp dir>/mcp-abap-adt-clients/header-probe by default, --out overrides it; both absolute and created', () => {
-    expect(outputDir()).toBe(
-      path.join(os.tmpdir(), 'mcp-abap-adt-clients', 'header-probe'),
+  it('defaults, as the auth chain keeps its sessions, to ~/.config on Linux and macOS and Documents on Windows, per system', () => {
+    const target = { url: 'http://127.0.0.1:8000', client: '100' };
+    expect(
+      defaultOutputDir({ platform: 'linux', home: '/home/u', ...target }),
+    ).toBe(
+      '/home/u/.config/mcp-abap-adt-clients/header-probe/127.0.0.1-8000-100',
     );
-    expect(fs.existsSync(outputDir())).toBe(true);
+    expect(
+      defaultOutputDir({ platform: 'darwin', home: '/Users/u', ...target }),
+    ).toBe(
+      '/Users/u/.config/mcp-abap-adt-clients/header-probe/127.0.0.1-8000-100',
+    );
+    expect(
+      defaultOutputDir({ platform: 'win32', home: 'C:\\Users\\u', ...target }),
+    ).toBe(
+      'C:\\Users\\u\\Documents\\mcp-abap-adt-clients\\header-probe\\127.0.0.1-8000-100',
+    );
+  });
+
+  it('names the system folder from host and client, lowercased, the rest replaced', () => {
+    expect(systemFolder('https://My.Host.example:44300/sap', '001')).toBe(
+      'my.host.example-44300-001',
+    );
+    expect(systemFolder(undefined, undefined)).toBe('unknown-system');
+  });
+
+  it('--out overrides the whole path; absolute and created', () => {
     const chosen = path.join(tempDir(), 'nested', 'out');
     expect(outputDir(chosen)).toBe(chosen);
     expect(fs.existsSync(chosen)).toBe(true);

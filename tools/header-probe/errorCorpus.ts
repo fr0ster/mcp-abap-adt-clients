@@ -34,8 +34,9 @@
  * every call an earlier run's group split found poisoning envelopes (a header
  * corpus file stands for the corpora it lists); the rest is batched as usual.
  * `--out <dir>` writes there instead of the default folder,
- * `<os temp dir>/mcp-abap-adt-clients/header-probe` (created when missing);
- * the run prints the absolute folder at the end.
+ * `~/.config/mcp-abap-adt-clients/header-probe/<system>` (Windows:
+ * `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>`), created
+ * when missing; the run prints the absolute folder at the end.
  * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
  * (clients) or href (discovery) contains one of the texts.
  * `--sequential` sends every request on its own, no envelope (to compare
