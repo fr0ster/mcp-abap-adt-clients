@@ -13,6 +13,7 @@
  *   npm run header:discovery:next -- --from clients --headers bogus
  *   npm run header:discovery:next -- --from discovery --headers bogus --sequential
  *   npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
+ *   npm run header:discovery:next -- --render <corpus.json> [<corpus.json> …]
  *
  * `--from` (required): `discovery` probes every `app:collection` of
  * `/sap/bc/adt/discovery` (GET, plus POST where it lists `app:accept`);
@@ -21,8 +22,12 @@
  * `--headers` (required): `corpus` sends the prepared pair (the collection's
  * own `app:accept` types, or pairs.ts); `none` sends no Accept and no
  * Content-Type; `bogus` sends `application/x-header-probe` as both.
+ * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
+ * (clients) or href (discovery) contains one of the texts.
  * `--sequential` sends every request on its own, no envelope (to compare
  * the time per request with a batched run).
+ * `--render` recomputes a saved corpus's `needs` and writes its .md again,
+ * sending nothing.
  * `--summary` reads corpus files and writes, per endpoint, the Accept and
  * Content-Type values the system named in any of them.
  *
@@ -48,9 +53,11 @@ import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
 import { message, onTheWire } from './capture';
 import {
   authorizationVerdict,
+  classifyNeeds,
   HEADERS_MODES,
   type HeadersMode,
   type ICorpus,
+  renderCorpusMarkdown,
   renderNamedSummary,
   SOURCES,
   type Source,
@@ -71,7 +78,9 @@ interface IArgs {
   from?: Source;
   headers?: HeadersMode;
   summary?: string[];
+  render?: string[];
   sequential?: boolean;
+  only?: string[];
 }
 
 function parseArgs(argv: readonly string[]): IArgs {
@@ -90,12 +99,17 @@ function parseArgs(argv: readonly string[]): IArgs {
       args.headers = value;
     } else if (arg === '--sequential') {
       args.sequential = true;
+    } else if (arg === '--only') {
+      args.only = (argv[++i] ?? '').split(',').filter(Boolean);
+    } else if (arg === '--render') {
+      args.render = argv.slice(i + 1);
+      break;
     } else if (arg === '--summary') {
       args.summary = argv.slice(i + 1);
       break;
     } else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (!args.summary && (!args.from || !args.headers))
+  if (!args.summary && !args.render && (!args.from || !args.headers))
     throw new Error(
       'both --from discovery|clients and --headers corpus|none|bogus are required',
     );
@@ -114,6 +128,19 @@ async function main(): Promise<number> {
     const out = path.join(OUT_DIR, `summary-${stamp()}.md`);
     fs.writeFileSync(out, renderNamedSummary(corpora));
     progress(out);
+    return 0;
+  }
+  if (args.render) {
+    // From the saved corpus, nothing sent: `needs` recomputed, the .md
+    // written again beside the .json.
+    for (const file of args.render) {
+      const corpus = JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus;
+      if (corpus.headers === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
+      fs.writeFileSync(file, `${JSON.stringify(corpus, null, 2)}\n`);
+      const md = file.replace(/\.json$/, '.md');
+      fs.writeFileSync(md, renderCorpusMarkdown(corpus));
+      progress(md);
+    }
     return 0;
   }
   const system = getTargetSystem();
@@ -156,6 +183,7 @@ async function main(): Promise<number> {
       clientOptions: () => resolveSystemContext(connection, system === 'cloud'),
       out: { progress, loud },
       sequential: args.sequential === true,
+      ...(args.only ? { only: args.only } : {}),
     });
     return exitCode;
   } finally {

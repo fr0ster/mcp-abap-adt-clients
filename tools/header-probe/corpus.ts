@@ -659,7 +659,11 @@ export function typesNamed(row: ICorpusRow): {
   return { accept: [], contentType: [] };
 }
 
-/** Rows whose corpus pair the system refused with 406 or 415. */
+/**
+ * Rows whose corpus pair the system refused: a 406 where the pair's Accept
+ * was sent, a 415 where its Content-Type was. A 406 without an Accept, or a
+ * 415 without a Content-Type, refuses no pair.
+ */
 export function refusedCorpusPairs(
   corpus: Pick<ICorpus, 'headers' | 'rows'>,
 ): ICorpusRow[] {
@@ -667,9 +671,8 @@ export function refusedCorpusPairs(
   return corpus.rows.filter(
     (row) =>
       !row.noCorpusPair &&
-      row.asked &&
-      (row.asked.accept || row.asked.contentType) &&
-      (row.status === 406 || row.status === 415),
+      ((row.status === 406 && Boolean(row.asked?.accept)) ||
+        (row.status === 415 && Boolean(row.asked?.contentType))),
   );
 }
 
@@ -760,10 +763,25 @@ export function needsKey(row: ICorpusRow): string {
 }
 
 /**
+ * The SAP exceptions that are a content error about the request itself: the
+ * handler read the request — its body or its parameters — and refused what
+ * it found, so the header had already been let through. A 4xx with any other
+ * exception (or none) does not show that.
+ */
+export const CONTENT_ERRORS: readonly string[] = [
+  'ExceptionInvalidData',
+  'ExceptionParameterNotFound',
+  'ExceptionResourceBadRequest',
+  'ElementInfoBadRequest',
+  'NoIdentifierFormattingPossible',
+];
+
+/**
  * What a bogus request says about the header it carried: `needed` when it
- * was refused for it (406 for Accept, 415 for Content-Type); `unjudged` when
- * the answer came before the header could matter (a 404 on the fake name, a
- * 405 for the method), or no answer came; `ignored` otherwise.
+ * was refused for it (406 for Accept, 415 for Content-Type); `ignored` only
+ * on a 2xx, or a 4xx whose SAP exception is one of {@link CONTENT_ERRORS};
+ * anything else — a 404 on the fake name, a 405, a 500, another 4xx, no
+ * answer — is `unjudged`, with the status and the SAP exception type.
  */
 export function judge(
   row: ICorpusRow | undefined,
@@ -777,27 +795,30 @@ export function judge(
       reason: `no answer: ${row.failure ?? 'nothing came back'}`,
     };
   if (row.status === refusal) return { verdict: 'needed', status: row.status };
-  if (row.status === 404)
-    return {
-      verdict: 'unjudged',
-      status: 404,
-      reason: '404: the probe name was not found before the header was judged',
-    };
-  if (row.status === 405)
-    return {
-      verdict: 'unjudged',
-      status: 405,
-      reason: '405: the method is not served, so the header never mattered',
-    };
-  return { verdict: 'ignored', status: row.status };
+  if (row.status >= 200 && row.status < 300)
+    return { verdict: 'ignored', status: row.status };
+  if (
+    row.status >= 400 &&
+    row.status < 500 &&
+    row.status !== 404 &&
+    row.status !== 405 &&
+    row.sapType &&
+    CONTENT_ERRORS.includes(row.sapType)
+  )
+    return { verdict: 'ignored', status: row.status };
+  return {
+    verdict: 'unjudged',
+    status: row.status,
+    reason: `${row.status} ${row.sapType ?? '(no SAP exception)'}`,
+  };
 }
 
 const verdictText = (name: string, verdict: IHeaderVerdict): string =>
   verdict.verdict === 'no body'
     ? `${name}: no body`
     : verdict.verdict === 'unjudged'
-      ? `${name}: ${verdict.reason}`
-      : `${name}: ${verdict.status}`;
+      ? `${name}: unknown (${verdict.reason})`
+      : `${name}: ${verdict.verdict} (${verdict.status})`;
 
 /** Per endpoint of a bogus run: which headers it needs, and what the system named. */
 export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
@@ -835,8 +856,8 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
         verdictText('Content-Type', contentType),
       ].join('; ');
     } else if (
-      accept.verdict === 'ignored' ||
-      contentType.verdict === 'ignored'
+      accept.verdict === 'ignored' &&
+      (contentType.verdict === 'ignored' || contentType.verdict === 'no body')
     ) {
       needs = 'neither';
       detail = [
@@ -845,8 +866,10 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
       ].join('; ');
     } else {
       needs = 'unknown';
-      detail =
-        accept.reason ?? contentType.reason ?? 'neither request was judged';
+      detail = [
+        verdictText('Accept', accept),
+        verdictText('Content-Type', contentType),
+      ].join('; ');
     }
     const table = (pair.accept ?? pair.contentType)?.pair;
     const tableNotes: string[] = [];
@@ -1061,7 +1084,7 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
 
   if (corpus.headers === 'bogus') {
     lines.push('', '### What each endpoint needs', '');
-    lines.push(...needsLines(corpus.needs ?? classifyNeeds(corpus.rows)));
+    lines.push(...needsLines(classifyNeeds(corpus.rows)));
   }
 
   lines.push(
@@ -1147,7 +1170,7 @@ export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
         named.set(key, entry);
       }
     for (const corpus of of.filter((c) => c.headers === 'bogus'))
-      for (const entry of corpus.needs ?? classifyNeeds(corpus.rows))
+      for (const entry of classifyNeeds(corpus.rows))
         needs.set(entry.endpoint, `${entry.needs} (${entry.detail})`);
     lines.push(
       `## The header corpus: ${source}`,
@@ -1254,7 +1277,7 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
     lines.push(
       `## What each endpoint needs: ${corpus.source}`,
       '',
-      ...needsLines(corpus.needs ?? classifyNeeds(corpus.rows)),
+      ...needsLines(classifyNeeds(corpus.rows)),
       '',
     );
   return lines.join('\n');

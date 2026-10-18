@@ -324,6 +324,7 @@ interface IContext {
   out: IOutput;
   meter: IMeter;
   sequential: boolean;
+  only?: string[];
 }
 
 /** Where the calls go: the connection (or the envelope), and whether it is an envelope. */
@@ -335,7 +336,11 @@ interface ITarget {
 async function runDiscovery(ctx: IContext, document: string): Promise<void> {
   const collections = parseDiscovery(document);
   ctx.corpus.collections = collections;
-  const probes = discoveryProbes(collections, ctx.mode);
+  const only = ctx.only;
+  const probes = discoveryProbes(collections, ctx.mode).filter(
+    (probe) =>
+      !only || only.some((text) => probe.collection.href.includes(text)),
+  );
   ctx.out.progress(
     `discovery: ${collections.length} collections, ${probes.length} probes`,
   );
@@ -438,7 +443,14 @@ export function headersFor(
 }
 
 async function runClients(ctx: IContext): Promise<void> {
-  const { members, helpers } = await recordMembers();
+  const recorded = await recordMembers();
+  const only = ctx.only;
+  const members = recorded.members.filter(
+    (member) =>
+      !only ||
+      only.some((text) => `${member.handler}.${member.member}`.includes(text)),
+  );
+  const helpers = recorded.helpers;
   ctx.corpus.notMembers = helpers;
   const clientsAt = (
     on: ITarget,
@@ -701,6 +713,8 @@ export interface ICorpusRunInput {
   out: IOutput;
   /** Every request one at a time, no envelope. */
   sequential?: boolean;
+  /** Keep only the endpoints whose `handler.member` or href contains one of these. */
+  only?: string[];
 }
 
 /**
@@ -744,6 +758,7 @@ export async function runCorpus(
       out,
       meter,
       sequential: input.sequential === true,
+      ...(input.only ? { only: input.only } : {}),
     };
     await withCleanup(ledger, () =>
       input.source === 'discovery'

@@ -822,7 +822,10 @@ describe('what each endpoint needs', () => {
       bogusRow('n', 'accept', 200, {
         pair: { accept: 'application/n+xml', contentType: 'application/n+xml' },
       }),
-      bogusRow('n', 'content-type', 400),
+      bogusRow('n', 'content-type', 400, { sapType: 'ExceptionInvalidData' }),
+      bogusRow('x', 'accept', 500),
+      bogusRow('x', 'content-type', 200),
+      bogusRow('y', 'accept', 400, { sapType: 'uriMappingError' }),
       bogusRow('u', 'accept', 404),
       bogusRow('u', 'content-type', 404),
       bogusRow('g', 'accept', 200, {
@@ -842,19 +845,28 @@ describe('what each endpoint needs', () => {
     expect(needs.c.namedContentType).toEqual(['application/c+xml']);
     expect(needs.b.needs).toBe('both');
     expect(needs.n.needs).toBe('neither');
-    expect(needs.n.detail).toBe('Accept: 200; Content-Type: 400');
+    expect(needs.n.detail).toBe(
+      'Accept: ignored (200); Content-Type: ignored (400)',
+    );
+    // A 500 shows nothing about the header; a 4xx outside the content errors neither.
+    expect(needs.x.needs).toBe('unknown');
+    expect(needs.x.detail).toBe(
+      'Accept: unknown (500 (no SAP exception)); Content-Type: ignored (200)',
+    );
+    expect(needs.y.needs).toBe('unknown');
+    expect(needs.y.detail).toContain('400 uriMappingError');
     expect(needs.n.tableNotes).toEqual([
       'the pair table lists Accept application/n+xml; a bogus Accept was answered 200',
       'the pair table lists Content-Type application/n+xml; a bogus Content-Type was answered 400',
     ]);
     expect(needs.u.needs).toBe('unknown');
-    expect(needs.u.detail).toMatch(/^404: the probe name was not found/);
+    expect(needs.u.detail).toContain('404 (no SAP exception)');
     expect(needs.g.needs).toBe('neither');
     expect(needs.g.tableNotes).toEqual([
       'the pair table lists Content-Type application/g+xml for a request without a body',
     ]);
     expect(needs.s.needs).toBe('unknown');
-    expect(needs.s.detail).toBe('skipped: needs a URI');
+    expect(needs.s.detail).toContain('skipped: needs a URI');
     const md = needsLines(classifyNeeds(rows)).join('\n');
     expect(md).toContain('| both | 1 |');
     expect(md).toContain('#### needs: accept');
@@ -1004,5 +1016,34 @@ describe('time', () => {
       p95: 5,
     });
     expect(stats([])).toEqual({ count: 0, total: 0, median: 0, p95: 0 });
+  });
+});
+
+describe('a refused corpus pair', () => {
+  it('is a 406 to the Accept sent, or a 415 to the Content-Type sent — nothing else', () => {
+    const corpus = (rows: ICorpusRow[]): ICorpus => ({
+      source: 'discovery',
+      headers: 'corpus',
+      startedAt: '',
+      rows,
+      removals: [],
+    });
+    const refused = refusedCorpusPairs(
+      corpus([
+        row({
+          label: 'a',
+          status: 406,
+          asked: { contentType: 'application/x' },
+        }),
+        row({
+          label: 'b',
+          status: 415,
+          asked: { contentType: 'application/x' },
+        }),
+        row({ label: 'c', status: 406, asked: { accept: 'application/y' } }),
+        row({ label: 'd', status: 415, asked: { accept: 'application/y' } }),
+      ]),
+    );
+    expect(refused.map((r) => r.label)).toEqual(['b', 'c']);
   });
 });

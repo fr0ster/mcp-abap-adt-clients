@@ -119,9 +119,13 @@ npm run header:discovery:next -- --from clients --headers none
 npm run header:discovery:next -- --from clients --headers bogus
 npm run header:discovery:next -- --from discovery --headers bogus --sequential
 npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
+npm run header:discovery:next -- --render <corpus.json> [<corpus.json> …]
 ```
 
-Both `--from` and `--headers` are required. `--sequential` sends every
+Both `--from` and `--headers` are required. `--only <text>[,<text>]` keeps
+the endpoints whose `handler.member` (clients) or href (discovery) contains one
+of the texts. `--render` recomputes a saved
+corpus's `needs` and writes its `.md` again, sending nothing. `--sequential` sends every
 request on its own, without envelopes, to compare the time per request with a
 batched run. `--summary` reads corpus files and writes
 `summary-<timestamp>.md`: per endpoint, the Accept and Content-Type values the
@@ -224,8 +228,16 @@ A bogus run also classifies each endpoint by what it **needs**:
 | `accept` | the bogus Accept got 406 |
 | `content-type` | the bogus Content-Type got 415 |
 | `both` | both happened |
-| `neither` | the bogus values were answered without 406/415 (the statuses are given) |
-| `unknown` | no request could be judged — a 404 on the probe name, a 405 for the method, no answer, a skipped row (the reason is given) |
+| `neither` | the bogus Accept was ignored, and the bogus Content-Type too or there is no body |
+| `unknown` | anything else: a header could not be judged (the status and the SAP exception are given) |
+
+A bogus header counts as **ignored** only when its request got a 2xx, or a
+4xx whose SAP exception is a content error about the request itself — the
+handler read the body or the parameters and refused them, so the header had
+been let through: `ExceptionInvalidData`, `ExceptionParameterNotFound`,
+`ExceptionResourceBadRequest`, `ElementInfoBadRequest`,
+`NoIdentifierFormattingPossible`. A 404 (the probe name), a 405, a 5xx, any
+other 4xx or no answer shows nothing about the header: it is unknown.
 
 The summary lists the endpoints per `needs` value with the values the system
 named, and notes where the pair table lists a header the system ignores (or a
