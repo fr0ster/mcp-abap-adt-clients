@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type { IAdtHeaders, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -43,6 +44,7 @@ import {
   dumpText,
   emptyNamed,
   evidenceOf,
+  existencePerEndpoint,
   FIXED_TEXT,
   fakeBody,
   type HeadersMode,
@@ -53,7 +55,9 @@ import {
   type IEvidence,
   type IHeaderCorpusFile,
   type ISplit,
+  isIsolated,
   isWrite,
+  judge,
   needsCounts,
   PROBE_NAME,
   PROBE_PACKAGE,
@@ -64,6 +68,7 @@ import {
   rowKey,
   type Source,
   wireNote,
+  withContrast,
   writeCheck,
 } from './corpus';
 import {
@@ -86,7 +91,6 @@ import {
   endpointKey,
   endpointOf,
   type IRemoval,
-  PROBE_TYPE,
   removalWord,
   unproven,
 } from './record';
@@ -401,6 +405,18 @@ class Run<T> {
   }
 }
 
+/** Sends alone, from the start, each call an earlier run found poisoning envelopes. */
+function isolateKnown(
+  planned: readonly { row: ICorpusRow; sequential?: string }[],
+  keys: ReadonlySet<string> | undefined,
+): void {
+  if (!keys?.size) return;
+  for (const entry of planned)
+    if (!entry.sequential && isIsolated(entry.row, keys))
+      entry.sequential =
+        'isolated: an earlier run found it poisoning its envelope (--isolate)';
+}
+
 /**
  * A poisoned envelope: more than one part, and every part — the reads after
  * the writes included — answered 500 with the same text.
@@ -613,6 +629,8 @@ interface IContext {
   sequential: boolean;
   only?: string[];
   envelopeProbes: number;
+  /** The calls an earlier run found poisoning envelopes: each is sent alone. */
+  isolate?: ReadonlySet<string>;
   /** Adds a ledger entry once per key, before the write it covers is sent. */
   register: (key: string, entry: () => ILedgerEntry) => void;
 }
@@ -708,6 +726,7 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
     return entry;
   });
   ctx.corpus.rows.push(...planned.map((entry) => entry.row));
+  isolateKnown(planned, ctx.isolate);
   for (const [index, probe] of probes.entries())
     if (probe.skipped) planned[index].row.skipped = probe.skipped;
   const sent = planned.filter((_entry, index) => !probes[index].skipped);
@@ -833,6 +852,7 @@ async function runClients(ctx: IContext): Promise<void> {
           : {}),
         ...(member.pair ? { pair: { ...member.pair } } : {}),
         ...(bogus ? { bogus } : {}),
+        ...(member.standIn ? { standIn: member.standIn } : {}),
       };
       ctx.corpus.rows.push(row);
       if (member.skipped || !call || !spec) {
@@ -942,6 +962,7 @@ async function runClients(ctx: IContext): Promise<void> {
           });
         }
       };
+      isolateKnown([entry], ctx.isolate);
       planned.push(entry);
     }
   }
@@ -1038,6 +1059,67 @@ export async function readDiscovery(
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
+/** A folder name from the connection target: host and client, lowercased, every other character `-`. */
+export function systemFolder(
+  url: string | undefined,
+  client: string | undefined,
+): string {
+  let host = 'unknown-system';
+  try {
+    if (url) host = new URL(url).host;
+  } catch {
+    host = url ?? host;
+  }
+  const raw = `${host}${client ? `-${client}` : ''}`.toLowerCase();
+  let name = '';
+  for (const char of raw) name += /[a-z0-9._-]/.test(char) ? char : '-';
+  return name;
+}
+
+/**
+ * The default output folder, as the auth chain keeps its sessions: on Linux
+ * and macOS `~/.config/mcp-abap-adt-clients/header-probe/<system>`, on
+ * Windows `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>`.
+ * Persistent and local: never committed.
+ */
+export function defaultOutputDir(target: {
+  platform: NodeJS.Platform;
+  home: string;
+  url?: string | undefined;
+  client?: string | undefined;
+}): string {
+  const join = target.platform === 'win32' ? path.win32.join : path.posix.join;
+  const base =
+    target.platform === 'win32'
+      ? join(target.home, 'Documents')
+      : join(target.home, '.config');
+  return join(
+    base,
+    'mcp-abap-adt-clients',
+    'header-probe',
+    systemFolder(target.url, target.client),
+  );
+}
+
+/**
+ * Where a run writes: `--out`, else {@link defaultOutputDir} for the
+ * connection target in `SAP_URL` / `SAP_CLIENT`. Absolute; created when
+ * missing.
+ */
+export function outputDir(given?: string): string {
+  const dir = path.resolve(
+    given ??
+      defaultOutputDir({
+        platform: process.platform,
+        home: os.homedir(),
+        url: process.env.SAP_URL?.split('#')[0].trim(),
+        client: process.env.SAP_CLIENT?.split('#')[0].trim(),
+      }),
+  );
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 export function writeCorpus(corpus: ICorpus, outDir: string): string[] {
   fs.mkdirSync(outDir, { recursive: true });
   const base = path.join(
@@ -1070,6 +1152,8 @@ export interface ICorpusRunInput {
   sequential?: boolean;
   /** Keep only the endpoints whose `handler.member` or href contains one of these. */
   only?: string[];
+  /** The calls an earlier run's split found poisoning envelopes (`--isolate`): each is sent alone from the start. */
+  isolate?: ReadonlySet<string>;
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
   envelopeProbes?: number;
 }
@@ -1243,6 +1327,7 @@ async function runOn(
       sequential: input.sequential === true,
       ...(input.only ? { only: input.only } : {}),
       envelopeProbes: input.envelopeProbes ?? ENVELOPE_PROBES,
+      ...(input.isolate ? { isolate: input.isolate } : {}),
       register: (key, entry) => {
         if (registered.has(key)) return;
         registered.add(key);
@@ -1337,6 +1422,8 @@ export interface IRealReadsInput {
   /** The needs keys (`handler.member — endpoint`) phase 1 left unknown. */
   unknown: ReadonlySet<string>;
   envelopeProbes?: number;
+  /** As for phase 1: the calls known to poison envelopes go alone. */
+  isolate?: ReadonlySet<string>;
 }
 
 /**
@@ -1349,6 +1436,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
   evidence: IEvidence[];
   objects: IHeaderCorpusFile['objects'];
   files: string[];
+  rows: ICorpusRow[];
 }> {
   const { members } = await recordMembers();
   const candidates = members.filter((member) => {
@@ -1422,7 +1510,8 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
   );
   const meter: IMeter = { envelopes: [] };
   const corpora: ICorpus[] = [];
-  for (const mode of ['bogus', 'none'] as const) {
+  // The client's own headers too (corpus): which Accept works on a real object.
+  for (const mode of ['bogus', 'none', 'corpus'] as const) {
     if (input.interrupt.requested) break;
     const corpus: ICorpus = {
       source: 'clients',
@@ -1451,6 +1540,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
         named: emptyNamed(),
         ...(mode === 'bogus' ? { bogus: 'accept' as const } : {}),
         ...(member.pair ? { pair: { ...member.pair } } : {}),
+        headersMode: mode,
         asked: askedFor(
           mode,
           member.pair,
@@ -1480,6 +1570,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
           ),
       });
     }
+    isolateKnown(planned, input.isolate);
     if (planned.length) {
       input.out.progress(
         `phase 2 reads, ${mode}: ${planned.length} probes on existing objects`,
@@ -1507,11 +1598,21 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
     corpus.finishedAt = new Date().toISOString();
     corpora.push(corpus);
   }
-  const [bogus, none] = corpora;
-  if (!bogus) return { evidence: [], objects, files: [] };
-  bogus.needs = classifyNeeds(bogus.rows, none?.rows ?? []);
+  const bogus = corpora.find((corpus) => corpus.headers === 'bogus');
+  const none = corpora.find((corpus) => corpus.headers === 'none');
+  if (!bogus) return { evidence: [], objects, files: [], rows: [] };
+  const own = corpora.find((corpus) => corpus.headers === 'corpus');
+  bogus.needs = classifyNeeds(bogus.rows, [
+    ...(none?.rows ?? []),
+    ...(own?.rows ?? []),
+  ]);
   const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
-  return { evidence: evidenceOf(bogus.needs, 'clients', 2), objects, files };
+  return {
+    evidence: evidenceOf(bogus.needs, 'clients', 2),
+    objects,
+    files,
+    rows: corpora.flatMap((corpus) => corpus.rows),
+  };
 }
 
 // --- the full run: one command, the system's header corpus -------------------
@@ -1526,6 +1627,8 @@ export interface IWriteCycleInput {
 
 export interface IWriteCycleResult {
   evidence: IEvidence[];
+  /** The cycle's answers as rows, for `exists`. */
+  rows?: ICorpusRow[];
   removals: IRemoval[];
   error?: string;
 }
@@ -1537,6 +1640,16 @@ export interface IFullRunInput
    * unknown. Given by the command line, which holds the test config.
    */
   writeCycle?: (input: IWriteCycleInput) => Promise<IWriteCycleResult>;
+  /**
+   * Phase 2's update measurement: per object type, an update with a bogus
+   * Accept on a temporary object, and whether it took effect.
+   */
+  updateMeasure?: (input: Omit<IWriteCycleInput, 'unknown'>) => Promise<{
+    updates: IHeaderCorpusFile['updates'];
+    removals: IRemoval[];
+    rows?: ICorpusRow[];
+    error?: string;
+  }>;
 }
 
 const PHASE1: readonly { source: Source; mode: HeadersMode }[] = [
@@ -1568,6 +1681,8 @@ export async function runFull(
   let objects: IHeaderCorpusFile['objects'] = [];
   let removals: IRemoval[] = [];
   let file: IHeaderCorpusFile | undefined;
+  const phase2Rows: ICorpusRow[] = [];
+  let updates: IHeaderCorpusFile['updates'] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
 
   const body = async (connection: IAbapConnection, state: IRunState) => {
@@ -1604,24 +1719,37 @@ export async function runFull(
           state,
         );
         files.push(...result.files);
+        for (const row of result.corpus.rows) row.headersMode = mode;
         corpora.set(`${source} ${mode}`, result.corpus);
       }
     });
     const needs1 = {
-      discovery: classifyNeeds(
-        rowsOf('discovery bogus'),
-        rowsOf('discovery none'),
-      ),
-      clients: classifyNeeds(rowsOf('clients bogus'), rowsOf('clients none')),
+      // The none and the corpus answers: evidence beside the bogus ones.
+      discovery: classifyNeeds(rowsOf('discovery bogus'), [
+        ...rowsOf('discovery none'),
+        ...rowsOf('discovery corpus'),
+      ]),
+      clients: classifyNeeds(rowsOf('clients bogus'), [
+        ...rowsOf('clients none'),
+        ...rowsOf('clients corpus'),
+      ]),
     };
     evidence.push(
       ...evidenceOf(needs1.discovery, 'discovery', 1),
       ...evidenceOf(needs1.clients, 'clients', 1),
     );
     const unknown = needs1.clients.filter((entry) => entry.needs === 'unknown');
+    // The reads still unknown, and those that need Accept but whose 406
+    // named nothing: a real object shows which Accept works.
     const unknownReads = new Set(
-      unknown
-        .filter((entry) => entry.endpoint.includes(' — GET '))
+      needs1.clients
+        .filter(
+          (entry) =>
+            entry.endpoint.includes(' — GET ') &&
+            (entry.needs === 'unknown' ||
+              ((entry.needs === 'accept' || entry.needs === 'both') &&
+                !entry.namedAccept.length)),
+        )
         .map((entry) => entry.endpoint),
     );
     const unknownWrites = new Set(
@@ -1643,8 +1771,10 @@ export async function runFull(
             ...(input.envelopeProbes
               ? { envelopeProbes: input.envelopeProbes }
               : {}),
+            ...(input.isolate ? { isolate: input.isolate } : {}),
           });
           evidence.push(...reads.evidence);
+          phase2Rows.push(...reads.rows);
           objects = reads.objects;
           files.push(...reads.files);
         },
@@ -1661,8 +1791,42 @@ export async function runFull(
             unknown: unknownWrites,
           });
           evidence.push(...writes.evidence);
-          removals = writes.removals;
+          phase2Rows.push(...(writes.rows ?? []));
+          removals = [...removals, ...writes.removals];
           if (writes.error) state.failure ??= writes.error;
+        },
+      );
+    const measure = input.updateMeasure;
+    if (!stopped() && measure)
+      await timed(
+        'phase 2: updates with a bogus Accept, applied or not',
+        async () => {
+          const measured = await measure({
+            connection,
+            clientOptions: await input.clientOptions(connection),
+            interrupt: input.interrupt,
+          });
+          updates = measured.updates;
+          phase2Rows.push(...(measured.rows ?? []));
+          // Each update went with a bogus Accept: evidence for its Accept.
+          for (const row of measured.rows ?? [])
+            if (row.endpoint)
+              evidence.push({
+                endpoint: endpointKey(row.endpoint),
+                source: 'clients',
+                phase: 2,
+                who: `${row.group}.${row.label} (update measurement, temporary object)`,
+                accept: judge(row, 406),
+                contentType: {
+                  verdict: 'unknown',
+                  reason: 'not probed by the update measurement',
+                },
+                namedAccept: [],
+                namedContentType: [],
+                text: `bogus Accept: ${row.status ?? row.failure ?? 'no answer'}${row.sapType ? ` ${row.sapType}` : ''}`,
+              });
+          removals = [...removals, ...measured.removals];
+          if (measured.error) state.failure ??= measured.error;
         },
       );
   };
@@ -1684,26 +1848,50 @@ export async function runFull(
         .join(', ')}`;
       pairs.set(key, [...new Set([...(pairs.get(key) ?? []), text])]);
     }
-    const extras = { discoveryContentType, pairs };
-    const entries = buildHeaderCorpus(evidence, extras);
+    const existence = existencePerEndpoint([
+      ...[...corpora.values()].flatMap((corpus) => corpus.rows),
+      ...phase2Rows,
+    ]);
+    // What the client sends today, and what it got: the corpus-mode answers
+    // of phase 1 (the probe name) and phase 2 (an existing object).
+    const knownWorking = new Map<string, string[]>();
+    for (const row of [...rowsOf('clients corpus'), ...phase2Rows]) {
+      if (row.headersMode !== 'corpus' || !row.endpoint || row.skipped)
+        continue;
+      const accept = row.onWire[0]?.accept;
+      if (!accept) continue;
+      const key = endpointKey(row.endpoint);
+      const status = row.status ?? 'no answer';
+      const text = `${row.group}.${row.label}: Accept ${accept} → ${status}${row.status !== undefined && row.status >= 200 && row.status < 300 ? ' (works)' : ''}`;
+      knownWorking.set(key, [
+        ...new Set([...(knownWorking.get(key) ?? []), text]),
+      ]);
+    }
+    const extras = { discoveryContentType, pairs, existence, knownWorking };
+    // The contrast rule: an unnamed 406 is checked when another Accept got a
+    // 2xx or a 404 on the endpoint — from any source and phase, keyed by the
+    // endpoint. Phase 1's own count takes phase 1's rows only.
+    const phase1Rows = [...corpora.values()].flatMap((corpus) => corpus.rows);
+    const phase1 = withContrast(
+      evidence.filter((item) => item.phase === 1),
+      phase1Rows,
+    );
+    const contrasted = withContrast(evidence, [...phase1Rows, ...phase2Rows]);
+    const entries = buildHeaderCorpus(contrasted, extras);
     file = {
       startedAt,
       finishedAt: new Date().toISOString(),
       phases,
       totalMs: performance.now() - started,
       counts: {
-        phase1: needsCounts(
-          buildHeaderCorpus(
-            evidence.filter((item) => item.phase === 1),
-            extras,
-          ),
-        ),
+        phase1: needsCounts(buildHeaderCorpus(phase1, extras)),
         phase2: needsCounts(entries),
       },
       entries,
       corpora: [...files],
       removals,
       objects,
+      updates,
       endedBy: ended,
       ...(ended !== 'complete' ? { error: ended } : {}),
     };

@@ -29,9 +29,13 @@ import {
   classifyNeeds,
   discoveryProbes,
   emptyNamed,
+  existenceOf,
+  existencePerEndpoint,
   headerShape,
   type ICorpus,
   type ICorpusRow,
+  isolationKeys,
+  judge,
   namedPerEndpoint,
   needsLines,
   notSent,
@@ -41,12 +45,17 @@ import {
   renderCorpusMarkdown,
   renderNamedSummary,
   stats,
+  t100Of,
   wireNote,
+  withContrast,
 } from '../../../../tools/header-probe/corpus';
 import {
+  defaultOutputDir,
+  outputDir,
   removalOutcome,
   runCorpus,
   runFull,
+  systemFolder,
 } from '../../../../tools/header-probe/corpusRun';
 import { Interrupt, Interrupted } from '../../../../tools/header-probe/ledger';
 import {
@@ -56,6 +65,7 @@ import {
   prototypeMembers,
   recordingConnection,
   recordMembers,
+  standInParameters,
 } from '../../../../tools/header-probe/members';
 import {
   KNOWN_PAIRS,
@@ -64,7 +74,9 @@ import {
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
 import {
   evidenceOfRows,
+  measureUpdates,
   runWriteCycle,
+  verdictOf,
 } from '../../../../tools/header-probe/writeCycle';
 
 const SAMPLE = path.resolve(
@@ -875,7 +887,12 @@ describe('what each endpoint needs', () => {
       bogusRow('c', 'content-type', 415, {
         named: { ...emptyNamed(), supportedContentType: ['application/c+xml'] },
       }),
-      bogusRow('b', 'accept', 406),
+      bogusRow('b', 'accept', 406, {
+        named: {
+          ...emptyNamed(),
+          acceptedText: 'Accepted content types: application/b+xml',
+        },
+      }),
       bogusRow('b', 'content-type', 415),
       bogusRow('n', 'accept', 200, {
         pair: { accept: 'application/n+xml', contentType: 'application/n+xml' },
@@ -1025,7 +1042,12 @@ describe('the header corpus', () => {
         }),
       ]),
       at('bogus', [
-        row({ ...base, bogus: 'accept', status: 406 }),
+        row({
+          ...base,
+          bogus: 'accept',
+          status: 406,
+          named: { ...emptyNamed(), supportedAccept: ['application/x+xml'] },
+        }),
         row({
           ...base,
           bogus: 'content-type',
@@ -1038,7 +1060,7 @@ describe('the header corpus', () => {
       ]),
     ]);
     expect(md).toContain(
-      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  |  | application/vnd.probe.thing+xml | both (Accept: checked (406); Content-Type: checked (415)) |',
+      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  | application/x+xml | application/vnd.probe.thing+xml | both (Accept: checked (406); Content-Type: checked (415)) |',
     );
   });
 });
@@ -1546,6 +1568,12 @@ describe('the full run', () => {
         cycles.push([...unknown]);
         return { evidence: [], removals: [] };
       },
+      updateMeasure: async () => ({
+        updates: [
+          { type: 'class', member: 'update', status: 406, applied: true },
+        ],
+        removals: [],
+      }),
     });
     expect(result.exitCode).toBe(0);
     const file = result.file as NonNullable<typeof result.file>;
@@ -1553,6 +1581,10 @@ describe('the full run', () => {
       'phase 1',
       'phase 2',
       'phase 2',
+      'phase 2',
+    ]);
+    expect(file.updates).toEqual([
+      { type: 'class', member: 'update', status: 406, applied: true },
     ]);
     expect(file.totalMs).toBeGreaterThan(0);
     const entry = file.entries.find(
@@ -1560,6 +1592,7 @@ describe('the full run', () => {
     );
     expect(entry?.needs).toBe('accept');
     expect(entry?.settledBy).toBe('phase 2');
+    expect(entry?.exists).toBe('yes');
     expect(entry?.namedAccept).toEqual([
       'application/vnd.sap.adt.oo.classes.v4+xml',
     ]);
@@ -1590,6 +1623,9 @@ describe('the full run', () => {
     expect(
       fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
     ).toContain('| accept |');
+    expect(
+      fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
+    ).toContain('| class | update | 406 | yes |');
   });
 
   it('a 401 at the logon is the Oops, and nothing runs', async () => {
@@ -2306,5 +2342,807 @@ describe('the run decides its exit once, from its state', () => {
         : await runFull({ ...common, open: async () => system.connection });
     expect(result.exitCode).toBe(130);
     expect(fs.readdirSync(dir).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the command', () => {
+  it('npm run header:discovery is the error corpus; the old probe has no command', () => {
+    const scripts = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, '../../../../package.json'),
+        'utf8',
+      ),
+    ).scripts as Record<string, string>;
+    expect(scripts['header:discovery']).toBe(
+      'npx ts-node tools/header-probe/errorCorpus.ts',
+    );
+    expect(scripts['header:discovery:next']).toBeUndefined();
+    expect(
+      Object.values(scripts).some((command) =>
+        command.includes('header-probe/probe.ts'),
+      ),
+    ).toBe(false);
+    const probe = fs.readFileSync(
+      path.resolve(__dirname, '../../../../tools/header-probe/probe.ts'),
+      'utf8',
+    );
+    expect(probe.includes('require.main')).toBe(false);
+  });
+});
+
+describe('--isolate', () => {
+  it('sends alone from the start the calls an earlier run found poisoning; the rest batched, no split', async () => {
+    const bad = '/sap/bc/adt/probe/c17';
+    const once = async (isolate?: ReadonlySet<string>) => {
+      const system = dumpingSystem(manyCollections(29), bad);
+      const { corpus } = await runCorpus({
+        connection: system.connection,
+        source: 'discovery',
+        mode: 'none',
+        interrupt: new Interrupt(),
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: output().out,
+        envelopeProbes: 29,
+        ...(isolate ? { isolate } : {}),
+      });
+      return { corpus, system };
+    };
+    const first = await once();
+    expect(first.corpus.splits?.[0].causes).toEqual([`GET ${bad}`]);
+    const keys = isolationKeys([first.corpus]);
+    const second = await once(keys);
+    expect(second.corpus.splits).toEqual([]);
+    expect(second.corpus.envelopes).toHaveLength(1);
+    const row = second.corpus.rows.find((r) => r.endpoint?.path === bad);
+    expect(row?.ran).toBe(
+      'sequential: isolated: an earlier run found it poisoning its envelope (--isolate)',
+    );
+    expect(row?.status).toBe(500);
+    for (const r of second.corpus.rows)
+      if (r.endpoint?.path !== bad) {
+        expect(r.ran).toBe('batched');
+        expect(r.status).toBe(404);
+      }
+  });
+});
+
+describe('endpoint existence', () => {
+  const r = (status: number | undefined, extra: Partial<ICorpusRow> = {}) =>
+    row({ status, ...extra });
+  it('no from a router 404, the ICF service missing, or a 405; yes from the resource; else unknown', () => {
+    expect(
+      existenceOf(r(404, { body: 'No suitable resource found' })).exists,
+    ).toBe('no');
+    expect(
+      existenceOf(
+        r(404, { body: '<html><title>Service cannot be reached</title>' }),
+      ).exists,
+    ).toBe('no');
+    expect(
+      existenceOf(r(405, { sapType: 'ExceptionMethodNotSupported' })).exists,
+    ).toBe('no');
+    // The resource said the object is missing: the endpoint is there.
+    expect(
+      existenceOf(r(404, { sapType: 'ExceptionResourceNotFound' })).exists,
+    ).toBe('yes');
+    for (const status of [200, 400, 406, 415, 409])
+      expect(existenceOf(r(status)).exists).toBe('yes');
+    expect(existenceOf(r(500, { body: 'dump' })).exists).toBe('unknown');
+    expect(existenceOf(r(401)).exists).toBe('unknown');
+    expect(existenceOf(r(undefined, { failure: 'x' })).exists).toBe('unknown');
+  });
+
+  it('per endpoint: any answer from the resource wins; every row is kept', () => {
+    const rows = [
+      r(405, { endpoint: { method: 'GET', path: '/a' } }),
+      r(406, { endpoint: { method: 'GET', path: '/a' } }),
+      // A later "no" does not undo an earlier "yes".
+      r(405, { endpoint: { method: 'GET', path: '/a' } }),
+      r(405, { endpoint: { method: 'POST', path: '/a' } }),
+      r(500, { endpoint: { method: 'GET', path: '/b' } }),
+    ];
+    const by = existencePerEndpoint(rows);
+    expect(by.get('GET /a')?.exists).toBe('yes');
+    expect(by.get('POST /a')).toEqual({
+      exists: 'no',
+      reason: '405 method not implemented',
+    });
+    expect(by.get('GET /b')?.exists).toBe('unknown');
+    expect(rows).toHaveLength(5);
+  });
+});
+
+describe('the output folder', () => {
+  it('defaults, as the auth chain keeps its sessions, to ~/.config on Linux and macOS and Documents on Windows, per system', () => {
+    const target = { url: 'http://127.0.0.1:8000', client: '100' };
+    expect(
+      defaultOutputDir({ platform: 'linux', home: '/home/u', ...target }),
+    ).toBe(
+      '/home/u/.config/mcp-abap-adt-clients/header-probe/127.0.0.1-8000-100',
+    );
+    expect(
+      defaultOutputDir({ platform: 'darwin', home: '/Users/u', ...target }),
+    ).toBe(
+      '/Users/u/.config/mcp-abap-adt-clients/header-probe/127.0.0.1-8000-100',
+    );
+    expect(
+      defaultOutputDir({ platform: 'win32', home: 'C:\\Users\\u', ...target }),
+    ).toBe(
+      'C:\\Users\\u\\Documents\\mcp-abap-adt-clients\\header-probe\\127.0.0.1-8000-100',
+    );
+  });
+
+  it('names the system folder from host and client, lowercased, the rest replaced', () => {
+    expect(systemFolder('https://My.Host.example:44300/sap', '001')).toBe(
+      'my.host.example-44300-001',
+    );
+    expect(systemFolder(undefined, undefined)).toBe('unknown-system');
+  });
+
+  it('--out overrides the whole path; absolute and created', () => {
+    const chosen = path.join(tempDir(), 'nested', 'out');
+    expect(outputDir(chosen)).toBe(chosen);
+    expect(fs.existsSync(chosen)).toBe(true);
+    const relative = path.relative(process.cwd(), path.join(tempDir(), 'rel'));
+    expect(path.isAbsolute(outputDir(relative))).toBe(true);
+  });
+});
+
+describe('the update measurement', () => {
+  const classSystem = (applies: boolean) => {
+    const sources = new Map<string, string>();
+    let locks = 0;
+    let unlocks = 0;
+    const system = fakeSystem((request) => {
+      const { method, url } = request;
+      const name = url.split('/')[6]?.split('?')[0]?.toLowerCase();
+      if (method === 'POST' && url === '/sap/bc/adt/oo/classes') {
+        const match = /adtcore:name="([^"]+)"/.exec(request.body);
+        if (match)
+          sources.set(match[1].toLowerCase(), 'CLASS x DEFINITION. ENDCLASS.');
+        return { status: 201 };
+      }
+      if (url.includes('_action=LOCK')) {
+        locks++;
+        return {
+          status: 200,
+          body: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>',
+        };
+      }
+      if (url.includes('_action=UNLOCK')) {
+        unlocks++;
+        return { status: 200 };
+      }
+      if (url === '/sap/bc/adt/deletion/delete') {
+        for (const n of [...sources.keys()])
+          if (request.body.toLowerCase().includes(n)) sources.delete(n);
+        return { status: 200 };
+      }
+      if (name && url.startsWith('/sap/bc/adt/oo/classes/')) {
+        if (!sources.has(name)) return { status: 404 };
+        if (method === 'PUT') {
+          if (applies) sources.set(name, request.body);
+          return { status: 406, body: NOT_ACCEPTABLE('text/plain') };
+        }
+        return url.includes('/source/main')
+          ? { status: 200, body: sources.get(name) ?? '' }
+          : { status: 200, body: `<class:abapClass adtcore:name="${name}"/>` };
+      }
+      return { status: 404 };
+    });
+    return { system, sources, counts: () => ({ locks, unlocks }) };
+  };
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])('an update the system applies despite its 406 (%s) is recorded applied: %s; unlocked, cleaned, no content kept', async (applies, applied) => {
+    const { system, sources, counts } = classSystem(applies);
+    const result = await measureUpdates({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      only: ['class'],
+    });
+    expect(result.updates).toEqual([
+      expect.objectContaining({
+        type: 'class',
+        member: 'update',
+        status: 406,
+        applied,
+      }),
+    ]);
+    expect(counts().locks).toBe(1);
+    expect(counts().unlocks).toBe(1);
+    expect(sources.size).toBe(0);
+    expect(result.removals.every((r) => r.removed === true)).toBe(true);
+    // Hashes only: neither content reaches the record.
+    expect(JSON.stringify(result)).not.toContain('error corpus update');
+    expect(JSON.stringify(result)).not.toContain('ENDCLASS');
+    // The update went with the bogus Accept.
+    const put = system.seen.find((s) => s.method === 'PUT');
+    expect(put?.headers.accept).toBe(PROBE_TYPE);
+  });
+});
+
+describe('a failed unlock', () => {
+  const run = (unlockAnswers: number[]) => {
+    // The class system of the update measurement, its UNLOCK answering as told.
+    const sources = new Map<string, string>();
+    let unlocks = 0;
+    const system = fakeSystem((request) => {
+      const { method, url } = request;
+      const name = url.split('/')[6]?.split('?')[0]?.toLowerCase();
+      if (method === 'POST' && url === '/sap/bc/adt/oo/classes') {
+        const match = /adtcore:name="([^"]+)"/.exec(request.body);
+        if (match)
+          sources.set(match[1].toLowerCase(), 'CLASS x DEFINITION. ENDCLASS.');
+        return { status: 201 };
+      }
+      if (url.includes('_action=LOCK'))
+        return {
+          status: 200,
+          body: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>',
+        };
+      if (url.includes('_action=UNLOCK')) {
+        unlocks++;
+        return { status: unlockAnswers.shift() ?? 200 };
+      }
+      if (url === '/sap/bc/adt/deletion/delete') {
+        for (const n of [...sources.keys()])
+          if (request.body.toLowerCase().includes(n)) sources.delete(n);
+        return { status: 200 };
+      }
+      if (name && url.startsWith('/sap/bc/adt/oo/classes/')) {
+        if (!sources.has(name)) return { status: 404 };
+        if (method === 'PUT')
+          return { status: 406, body: NOT_ACCEPTABLE('text/plain') };
+        return url.includes('/source/main')
+          ? { status: 200, body: sources.get(name) ?? '' }
+          : { status: 200, body: `<class:abapClass adtcore:name="${name}"/>` };
+      }
+      return { status: 404 };
+    });
+    return measureUpdates({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      only: ['class'],
+    }).then((result) => ({ result, unlocks: () => unlocks, sources, system }));
+  };
+
+  it('fails the run, keeps its handle, and the cleanup unlocks again before it deletes', async () => {
+    const { result, unlocks, sources, system } = await run([500]);
+    expect(result.error).toMatch(
+      /^unlock failed: class .*: the unlock answered 500/,
+    );
+    expect(unlocks()).toBe(2);
+    const locked = result.removals.find((r) =>
+      r.label.startsWith('(locked) class'),
+    );
+    expect(locked).toEqual(expect.objectContaining({ removed: true }));
+    // The unlock came before the deletion.
+    const order = system.seen
+      .filter(
+        (s) =>
+          s.url.includes('_action=UNLOCK') ||
+          s.url === '/sap/bc/adt/deletion/delete',
+      )
+      .map((s) => (s.url.includes('UNLOCK') ? 'unlock' : 'delete'));
+    expect(order).toEqual(['unlock', 'unlock', 'delete']);
+    expect(sources.size).toBe(0);
+  });
+
+  it('still refused in the cleanup: MAY REMAIN (locked)', async () => {
+    const { result } = await run([500, 500]);
+    const locked = result.removals.find((r) =>
+      r.label.startsWith('(locked) class'),
+    );
+    expect(locked?.removed).toBe('unknown');
+    expect(locked?.detail).toMatch(
+      /^MAY REMAIN \(locked\): the unlock answered 500 again/,
+    );
+  });
+
+  it('ends the full run failed: exit 1', async () => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 404 },
+    );
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      updateMeasure: async () => ({
+        updates: [],
+        removals: [
+          {
+            label: '(locked) class Z',
+            removed: 'unknown',
+            detail: 'MAY REMAIN (locked): x',
+          },
+        ],
+        error: 'unlock failed: class Z: the unlock answered 500',
+      }),
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toBe(
+      'failed: unlock failed: class Z: the unlock answered 500',
+    );
+  });
+});
+
+describe('every phase counts', () => {
+  it('a resource answer of the write cycle or the update measurement settles exists, and the update its Accept', async () => {
+    let n = 0;
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 500, body: `dump ${n++}` },
+    );
+    const update = {
+      method: 'PUT',
+      path: '/sap/bc/adt/oo/classes/{name}/source/main',
+    };
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      writeCycle: async () => ({
+        evidence: [],
+        rows: [
+          row({
+            endpoint: { method: 'POST', path: '/sap/bc/adt/oo/classes' },
+            status: 415,
+          }),
+        ],
+        removals: [],
+      }),
+      updateMeasure: async () => ({
+        updates: [
+          { type: 'class', member: 'update', status: 406, applied: false },
+        ],
+        rows: [
+          row({
+            endpoint: update,
+            status: 406,
+            sapType: 'ExceptionResourceNotAcceptable',
+            body: '<exc:exception><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">044</entry></properties></exc:exception>',
+          }),
+        ],
+        removals: [],
+      }),
+    });
+    const of = (endpoint: string) =>
+      result.file?.entries.find((e) => e.endpoint === endpoint);
+    // Phase 1 saw only 500s on these.
+    expect(of('PUT /sap/bc/adt/oo/classes/{name}/source/main')?.exists).toBe(
+      'yes',
+    );
+    expect(
+      of('PUT /sap/bc/adt/oo/classes/{name}/source/main')?.accept.verdict,
+    ).toBe('checked');
+    expect(of('POST /sap/bc/adt/oo/classes')?.exists).toBe('yes');
+  });
+});
+
+describe('knownWorking', () => {
+  it("reads an endpoint whose 406 named nothing on an existing object, with the client's own headers, and records what worked", async () => {
+    const real = 'CL_REAL_ONE';
+    const probeRead = `/sap/bc/adt/oo/classes/${PROBE_NAME.toLowerCase()}`;
+    const realRead = `/sap/bc/adt/oo/classes/${real.toLowerCase()}`;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.url.startsWith(
+          '/sap/bc/adt/repository/informationsystem/search',
+        )
+      )
+        return {
+          status: 200,
+          body: `<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:name="${real}"/></adtcore:objectReferences>`,
+        };
+      // On the probe name a bogus Accept gets a 406 that names nothing.
+      if (request.url === probeRead)
+        return request.headers.accept === PROBE_TYPE
+          ? {
+              status: 406,
+              body: AUTH_EXCEPTION(
+                'ExceptionResourceNotAcceptable',
+                'The message content is not acceptable',
+              ),
+            }
+          : { status: 404 };
+      if (request.url === realRead)
+        return request.headers.accept === PROBE_TYPE
+          ? { status: 406 }
+          : { status: 200, body: '<class/>' };
+      return { status: 404 };
+    });
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const entry = result.file?.entries.find(
+      (e) => e.endpoint === 'GET /sap/bc/adt/oo/classes/{name}',
+    );
+    expect(entry?.needs).toBe('accept');
+    expect(entry?.namedAccept).toEqual([]);
+    expect(entry?.workingAccept.length).toBeGreaterThan(0);
+    expect(
+      entry?.knownWorking.some((text) => text.endsWith('→ 200 (works)')),
+    ).toBe(true);
+    // The corpus-mode read on the real object went with the client's own Accept.
+    const corpusRead = system.seen.find(
+      (s) =>
+        s.url === realRead &&
+        s.headers.accept &&
+        s.headers.accept !== PROBE_TYPE,
+    );
+    expect(corpusRead).toBeDefined();
+  });
+});
+
+describe('stand-in arguments', () => {
+  it('spots a parameter a stand-in produced', () => {
+    expect(
+      standInParameters([
+        { url: '/x?query=undefined&objectType=program&maxResults=1' },
+        {
+          url: '/y?objectType=PROG/P&lockHandle=H',
+          params: { profilerId: undefined },
+        },
+      ]),
+    ).toEqual([
+      'query=undefined',
+      'objectType=program',
+      'profilerId=undefined',
+    ]);
+  });
+
+  it('the search goes as a real call does; what still carries a stand-in is marked', async () => {
+    const { members } = await recordMembers();
+    const of = (handler: string, member: string) =>
+      members.find((m) => m.handler === handler && m.member === member);
+    expect(of('getUtils()', 'search')?.standIn).toBeUndefined();
+    expect(of('getProgram()', 'update')?.standIn).toBeUndefined();
+    const marked = members
+      .filter((m) => m.standIn && !m.skipped)
+      .map((m) => `${m.handler}.${m.member}: ${m.standIn?.join(', ')}`);
+    // Left marked: a profiler id the system assigns; a service version the
+    // service binding's internal publish helpers take positionally.
+    expect(marked).toEqual([
+      'getServiceBinding().publishByServiceType: serviceversion=undefined',
+      'getServiceBinding().unpublishByServiceType: serviceversion=undefined',
+      'getClassExecutor().runWithProfiler: profilerId=undefined',
+      'getProgramExecutor().runWithProfiler: profilerId=undefined',
+      'legacy getClassExecutor().runWithProfiler: profilerId=undefined',
+      'legacy getProgramExecutor().runWithProfiler: profilerId=undefined',
+    ]);
+  });
+});
+
+describe('a 406 with T100 SADT_RESOURCE 037', () => {
+  const exc037 =
+    '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceNotAcceptable"/><message lang="EN">The message content is not acceptable</message><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">037</entry></properties></exc:exception>';
+  const exc044 =
+    '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceNotAcceptable"/><message lang="EN">The message content is not acceptable. Accepted content types: application/xml</message><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">044</entry></properties></exc:exception>';
+  const bogus406 = (label: string, body: string) =>
+    row({
+      label,
+      bogus: 'accept',
+      status: 406,
+      body,
+      named: {
+        ...emptyNamed(),
+        ...(body === exc044
+          ? { acceptedText: 'Accepted content types: application/xml' }
+          : {}),
+      },
+    });
+  it('is unknown — unless another Accept on the same endpoint got a 2xx or a 404; 044 is checked', () => {
+    const needs = Object.fromEntries(
+      classifyNeeds(
+        [
+          bogus406('g', exc037),
+          bogus406('c', exc037),
+          bogus406('f', exc044),
+          bogus406('n', exc037),
+        ],
+        [
+          // The client's own Accept (corpus) got a 404 here: the contrast.
+          row({
+            label: 'c',
+            status: 404,
+            sapType: 'ExceptionResourceNotFound',
+          }),
+          // And here every Accept got 037: no contrast.
+          row({ label: 'n', status: 406, body: exc037 }),
+        ],
+      ).map((entry) => [entry.endpoint.split('.')[1].split(' ')[0], entry]),
+    );
+    expect(needs.g.needs).toBe('unknown');
+    expect(needs.g.accept.reason).toBe(
+      '406 generic (T100 037): not necessarily the Accept',
+    );
+    expect(needs.c.needs).toBe('accept');
+    expect(needs.c.detail).toContain(
+      'checked (037, inferred from the contrast)',
+    );
+    expect(needs.f.needs).toBe('accept');
+    expect(needs.n.needs).toBe('unknown');
+    expect(t100Of(exc037)).toEqual({ id: 'SADT_RESOURCE', no: '037' });
+  });
+});
+
+describe('the write cycle verdicts', () => {
+  it('judge a bad probe that carries no named lists (a 406/037 included)', () => {
+    const body =
+      '<exc:exception><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">037</entry></properties></exc:exception>';
+    const answer = {
+      probe: 'badAccept' as const,
+      sent: { accept: 'a', contentType: 'c' },
+      mode: 'batched',
+      requests: [],
+      status: 406,
+      body,
+      supportedAccept: [],
+      supportedContentType: [],
+    };
+    expect(verdictOf(answer, 406).verdict).toBe('unknown');
+    expect(
+      verdictOf(
+        { ...answer, body: 'Accepted content types: application/xml' },
+        406,
+      ).verdict,
+    ).toBe('checked');
+  });
+});
+
+const t100Body = (id: string, no: string) =>
+  `<exc:exception><properties><entry key="T100KEY-ID">${id}</entry><entry key="T100KEY-NO">${no}</entry></properties></exc:exception>`;
+
+describe('a 406 is checked only when it names the Accept', () => {
+  it('T100 044 or a list: checked; 037, another T100 or none: unknown with its T100', () => {
+    const at = (extra: Partial<ICorpusRow>) =>
+      judge(row({ bogus: 'accept', status: 406, ...extra }), 406);
+    expect(at({ body: t100Body('SADT_RESOURCE', '044') }).verdict).toBe(
+      'checked',
+    );
+    expect(
+      at({ named: { ...emptyNamed(), supportedAccept: ['application/a+xml'] } })
+        .verdict,
+    ).toBe('checked');
+    expect(
+      at({
+        named: {
+          ...emptyNamed(),
+          acceptedText: 'Accepted content types: application/a+xml',
+        },
+      }).verdict,
+    ).toBe('checked');
+    expect(at({})).toEqual({
+      verdict: 'unknown',
+      status: 406,
+      reason: '406 without a list (no T100): not necessarily the Accept',
+      unnamed406: true,
+    });
+    expect(at({ body: t100Body('SADT_RESOURCE', '037') }).reason).toBe(
+      '406 generic (T100 037): not necessarily the Accept',
+    );
+    expect(at({ body: t100Body('SWB_TOOL', '012') })).toEqual({
+      verdict: 'unknown',
+      status: 406,
+      reason:
+        '406 without a list (T100 SWB_TOOL 012): not necessarily the Accept',
+      unnamed406: true,
+    });
+  });
+
+  it('an unnamed 406 is checked by contrast in classifyNeeds, with its T100 in the reason', () => {
+    const needs = classifyNeeds(
+      [row({ label: 'q', bogus: 'accept', status: 406 })],
+      [row({ label: 'q', status: 200 })],
+    );
+    expect(needs[0].accept).toEqual({
+      verdict: 'checked',
+      status: 406,
+      reason: '406 without a list (no T100), inferred from the contrast',
+    });
+  });
+});
+
+describe('the contrast on the write cycle and the update measurement', () => {
+  const answer = (
+    probe: 'known' | 'badAccept' | 'badContentType',
+    status: number,
+  ) => ({
+    probe,
+    sent: { accept: 'a', contentType: 'c' },
+    mode: 'batched',
+    requests: [
+      { method: 'PUT', path: '/sap/bc/adt/oo/classes/{name}/source/main' },
+    ],
+    status,
+    ...(status === 406 ? { body: t100Body('SADT_RESOURCE', '037') } : {}),
+    supportedAccept: [],
+    supportedContentType: [],
+  });
+  const cycle = (known: number) =>
+    evidenceOfRows(
+      [
+        {
+          objectType: 'class',
+          member: 'update',
+          probes: [answer('known', known), answer('badAccept', 406)],
+        },
+      ],
+      new Set(['getClass().update']),
+    )[0];
+
+  it('the cycle: a 406/037 to the bogus Accept beside a 2xx or a 404 to the known one is checked', () => {
+    expect(cycle(200).accept).toEqual({
+      verdict: 'checked',
+      status: 406,
+      reason: '037, inferred from the contrast',
+    });
+    expect(cycle(404).accept.verdict).toBe('checked');
+    expect(cycle(500).accept.verdict).toBe('unknown');
+  });
+
+  it('phase 2 evidence: an unnamed 406 is checked when another row of the endpoint got a 2xx or a 404 without the bogus Accept', () => {
+    const endpoint = 'PUT /sap/bc/adt/oo/classes/{name}/source/main';
+    const path = '/sap/bc/adt/oo/classes/{name}/source/main';
+    const item = {
+      endpoint,
+      source: 'clients' as const,
+      phase: 2 as const,
+      who: 'getClass().update (update measurement, temporary object)',
+      accept: judge(
+        row({
+          bogus: 'accept',
+          status: 406,
+          body: t100Body('SADT_RESOURCE', '037'),
+        }),
+        406,
+      ),
+      contentType: { verdict: 'unknown' as const, reason: 'x' },
+      namedAccept: [],
+      namedContentType: [],
+      text: 'x',
+    };
+    const known = row({ endpoint: { method: 'PUT', path }, status: 200 });
+    expect(withContrast([item], [known])[0].accept.verdict).toBe('checked');
+    // The bogus Accept's own 2xx elsewhere is no contrast.
+    expect(
+      withContrast([item], [{ ...known, bogus: 'accept' }])[0].accept.verdict,
+    ).toBe('unknown');
+    // A refused answer is no contrast.
+    expect(
+      withContrast([item], [{ ...known, status: 500 }])[0].accept.verdict,
+    ).toBe('unknown');
+  });
+
+  it("a full run: the update measurement's 406/037 is checked by the write cycle's known answer", async () => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 500, body: 'dump' },
+    );
+    const update = {
+      method: 'PUT',
+      path: '/sap/bc/adt/oo/classes/{name}/source/main',
+    };
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      writeCycle: async () => ({
+        evidence: [],
+        rows: [row({ endpoint: update, status: 200 })],
+        removals: [],
+      }),
+      updateMeasure: async () => ({
+        updates: [
+          { type: 'class', member: 'update', status: 406, applied: false },
+        ],
+        rows: [
+          row({
+            endpoint: update,
+            bogus: 'accept',
+            status: 406,
+            body: t100Body('SADT_RESOURCE', '037'),
+          }),
+        ],
+        removals: [],
+      }),
+    });
+    const entry = result.file?.entries.find(
+      (e) => e.endpoint === 'PUT /sap/bc/adt/oo/classes/{name}/source/main',
+    );
+    expect(entry?.accept.verdict).toBe('checked');
+  });
+});
+
+describe('a list counts only with a type after the marker', () => {
+  it('a bare marker without T100 044 is unknown; T100 044 is checked with an empty list too', () => {
+    const at = (extra: Partial<ICorpusRow>) =>
+      judge(row({ bogus: 'accept', status: 406, ...extra }), 406).verdict;
+    const bare =
+      '<exc:exception><message lang="EN">Accepted content types:</message></exc:exception>';
+    expect(at({ body: bare })).toBe('unknown');
+    expect(
+      at({
+        named: { ...emptyNamed(), acceptedText: 'Accepted content types: ' },
+      }),
+    ).toBe('unknown');
+    expect(
+      at({
+        body: `${t100Body('SADT_RESOURCE', '044')}${bare}`,
+        named: { ...emptyNamed(), acceptedText: 'Accepted content types:' },
+      }),
+    ).toBe('checked');
+    expect(
+      at({
+        body: '<exc:exception><message lang="EN">Accepted content types: application/a+xml</message></exc:exception>',
+      }),
+    ).toBe('checked');
+  });
+});
+
+describe('the final contrast takes every source and phase', () => {
+  it("discovery's unnamed 406 is checked by the client's known 200 on the endpoint, its bogus probe a 500", async () => {
+    const discovery = DISCOVERY.replace(
+      '/sap/bc/adt/probe/things',
+      '/sap/bc/adt/oo/classes',
+    );
+    const generic =
+      '<exc:exception><type id="ExceptionResourceNotAcceptable"/><message lang="EN">The message content is not acceptable</message></exc:exception>';
+    // Discovery runs first; the clients start with their known Accept.
+    let clients = false;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: discovery };
+      if (request.method !== 'POST' || request.url !== '/sap/bc/adt/oo/classes')
+        return { status: 500, body: 'dump' };
+      const accept = request.headers.accept;
+      if (accept === 'application/vnd.sap.adt.oo.classes.v4+xml') {
+        clients = true;
+        return { status: 200, body: '' };
+      }
+      if (accept === PROBE_TYPE && !clients)
+        return { status: 406, body: generic };
+      return { status: 500, body: 'dump' };
+    });
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const entry = result.file?.entries.find(
+      (e) => e.endpoint === 'POST /sap/bc/adt/oo/classes',
+    );
+    expect(entry?.accept).toMatchObject({
+      verdict: 'checked',
+      reason: '406 without a list (no T100), inferred from the contrast',
+    });
   });
 });

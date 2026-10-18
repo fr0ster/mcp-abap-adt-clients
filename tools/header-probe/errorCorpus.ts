@@ -8,20 +8,20 @@
  *     `environment.system` from it.
  *
  * Run:
- *   npm run header:discovery:next          # the full run: the system's header corpus
- *   npm run header:discovery:next -- --from discovery --headers corpus
- *   npm run header:discovery:next -- --from clients --headers none
- *   npm run header:discovery:next -- --from clients --headers bogus
- *   npm run header:discovery:next -- --from discovery --headers bogus --sequential
- *   npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
- *   npm run header:discovery:next -- --render <corpus.json> [<corpus.json> …]
+ *   npm run header:discovery          # the full run: the system's header corpus
+ *   npm run header:discovery -- --from discovery --headers corpus
+ *   npm run header:discovery -- --from clients --headers none
+ *   npm run header:discovery -- --from clients --headers bogus
+ *   npm run header:discovery -- --from discovery --headers bogus --sequential
+ *   npm run header:discovery -- --summary <corpus.json> [<corpus.json> …]
+ *   npm run header:discovery -- --render <corpus.json> [<corpus.json> …]
  *
  * Without flags: the authorization check; phase 1, both sources in every
  * mode on the probe name; phase 2, for the endpoints still unknown only,
  * existing objects (found read-only by the repository search) for the reads
  * and the header probe's temporary-object cycle for the writes (it needs
  * `default_package` and `default_transport` in test-config.yaml); then
- * `.header-probe/header-corpus-<timestamp>.{json,md}`, with each phase's time.
+ * `<out>/header-corpus-<timestamp>.{json,md}`, with each phase's time.
  *
  * `--from` (with `--headers`, one run): `discovery` probes every `app:collection` of
  * `/sap/bc/adt/discovery` (GET, plus POST where it lists `app:accept`);
@@ -30,6 +30,13 @@
  * `--headers`: `corpus` sends the prepared pair (the collection's
  * own `app:accept` types, or pairs.ts); `none` sends no Accept and no
  * Content-Type; `bogus` sends `application/x-header-probe` as both.
+ * `--isolate <corpus.json>[,<corpus.json>]` sends alone, from the start,
+ * every call an earlier run's group split found poisoning envelopes (a header
+ * corpus file stands for the corpora it lists); the rest is batched as usual.
+ * `--out <dir>` writes there instead of the default folder,
+ * `~/.config/mcp-abap-adt-clients/header-probe/<system>` (Windows:
+ * `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>`), created
+ * when missing; the run prints the absolute folder at the end.
  * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
  * (clients) or href (discovery) contains one of the texts.
  * `--sequential` sends every request on its own, no envelope (to compare
@@ -43,9 +50,9 @@
  * `GET /sap/bc/adt/discovery`: a 401 or 403 at either prints
  * `Oops: no authorization (<status>)` and exits 2, sending nothing more.
  *
- * Output: `.header-probe/corpus-<source>-<headers>-<timestamp>.json` (every
+ * Output (in `<out>`, below): `corpus-<source>-<headers>-<timestamp>.json` (every
  * answer, bodies whole) and `.md` (a table per endpoint group, the summary).
- * The directory is gitignored: the corpus holds system answers.
+ * The corpus holds system answers: it stays out of the repository.
  *
  * More in tools/header-probe/README.md.
  */
@@ -65,22 +72,20 @@ import {
   HEADERS_MODES,
   type HeadersMode,
   type ICorpus,
+  isolationKeys,
   renderCorpusMarkdown,
   renderNamedSummary,
   SOURCES,
   type Source,
 } from './corpus';
-import { runCorpus, runFull } from './corpusRun';
-import { runWriteCycle } from './writeCycle';
+import { outputDir, runCorpus, runFull } from './corpusRun';
+import { Interrupt } from './ledger';
+import { measureUpdates, runWriteCycle } from './writeCycle';
 
 // The helpers load `.env` when imported; nothing else here reads it.
 const {
   getEnvironmentConfig,
 } = require('../../src/__tests__/helpers/test-helper');
-
-import { Interrupt } from './ledger';
-
-const OUT_DIR = path.resolve(__dirname, '../../.header-probe');
 
 const progress = (line: string): void => {
   process.stdout.write(`${line}\n`);
@@ -96,6 +101,8 @@ interface IArgs {
   render?: string[];
   sequential?: boolean;
   only?: string[];
+  isolate?: string[];
+  out?: string;
 }
 
 function parseArgs(argv: readonly string[]): IArgs {
@@ -114,6 +121,10 @@ function parseArgs(argv: readonly string[]): IArgs {
       args.headers = value;
     } else if (arg === '--sequential') {
       args.sequential = true;
+    } else if (arg === '--out') {
+      args.out = argv[++i];
+    } else if (arg === '--isolate') {
+      args.isolate = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--only') {
       args.only = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--render') {
@@ -131,10 +142,38 @@ function parseArgs(argv: readonly string[]): IArgs {
   return args;
 }
 
+/**
+ * The calls earlier runs' splits found poisoning envelopes: from corpus
+ * files, or from a header corpus file (through the corpora it lists).
+ */
+function isolateFrom(files: readonly string[]): Set<string> {
+  const corpora: ICorpus[] = [];
+  for (const file of files) {
+    const read = JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus & {
+      corpora?: string[];
+    };
+    if (Array.isArray(read.corpora) && !Array.isArray(read.rows)) {
+      for (const listed of read.corpora)
+        if (listed.endsWith('.json') && fs.existsSync(listed))
+          corpora.push(JSON.parse(fs.readFileSync(listed, 'utf8')) as ICorpus);
+    } else corpora.push(read);
+  }
+  return isolationKeys(corpora);
+}
+
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
+  const OUT_DIR = outputDir(args.out);
+  try {
+    return await run(args, OUT_DIR);
+  } finally {
+    progress(`output: ${OUT_DIR}`);
+  }
+}
+
+async function run(args: IArgs, OUT_DIR: string): Promise<number> {
   if (args.summary) {
     const corpora = args.summary.map(
       (file) => JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus,
@@ -158,7 +197,11 @@ async function main(): Promise<number> {
         corpus.needs = classifyNeeds(
           corpus.rows,
           corpora
-            .filter((c) => c.source === corpus.source && c.headers === 'none')
+            .filter(
+              (c) =>
+                c.source === corpus.source &&
+                (c.headers === 'none' || c.headers === 'corpus'),
+            )
             .flatMap((c) => c.rows),
         );
       fs.writeFileSync(file, `${JSON.stringify(corpus, null, 2)}\n`);
@@ -181,6 +224,8 @@ async function main(): Promise<number> {
       'interrupted: waiting for the request in flight, then cleaning up',
     );
   });
+  const isolate = args.isolate ? isolateFrom(args.isolate) : undefined;
+  if (isolate) progress(`--isolate: ${isolate.size} call(s) go alone`);
   const open = async () =>
     onTheWire(
       await createTestConnection(createConnectionLogger(), {
@@ -192,6 +237,7 @@ async function main(): Promise<number> {
     const environment = getEnvironmentConfig();
     const { exitCode } = await runFull({
       open,
+      ...(isolate ? { isolate } : {}),
       close: (connection) => closeOwnTestConnection(connection),
       interrupt,
       outDir: OUT_DIR,
@@ -201,6 +247,12 @@ async function main(): Promise<number> {
       writeCycle: (cycle) =>
         runWriteCycle({
           ...cycle,
+          packageName: String(environment.default_package ?? ''),
+          transportRequest: String(environment.default_transport ?? ''),
+        }),
+      updateMeasure: (measure) =>
+        measureUpdates({
+          ...measure,
           packageName: String(environment.default_package ?? ''),
           transportRequest: String(environment.default_transport ?? ''),
         }),
@@ -226,6 +278,7 @@ async function main(): Promise<number> {
     out: { progress, loud },
     sequential: args.sequential === true,
     ...(args.only ? { only: args.only } : {}),
+    ...(isolate ? { isolate } : {}),
   });
   return exitCode;
 }

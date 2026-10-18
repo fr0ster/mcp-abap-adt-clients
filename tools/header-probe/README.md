@@ -1,129 +1,42 @@
-# Header probe
+# Header discovery: the error corpus
 
-`npm run header:discovery` asks a system how it answers each member's request
-headers. It is a developer tool for collecting information: it is not run in
-CI, and it is not part of the npm package (`tools/` is outside `src/`, so
-nothing here reaches `dist/`, and `files` does not list it).
+`npm run header:discovery` asks a system for every answer it gives the ADT
+endpoints, errors above all, and records what each error names as
+acceptable: the system's header corpus. It is a developer tool for
+collecting information: it is not run in CI, and it is not part of the npm
+package (`tools/` is outside `src/`, so nothing here reaches `dist/`, and
+`files` does not list it).
 
 ## Prepare
 
 - `.env` in the repository root with the SAP connection (`SAP_URL`,
   `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`), as the integration tests use.
-- `src/__tests__/helpers/test-config.yaml` (`npm run test:init`): the probe
-  reads `environment.system`, `default_package` and `default_transport` from
-  it. The package must exist; every object is created in it, on that
-  transport, and deleted again.
-
-## Run
-
-```bash
-npm run header:discovery
-npm run header:discovery -- --only class,domain   # these object types only
-npm run header:discovery -- --operation update    # this member only
-npm run header:discovery -- --sequential          # every request on its own, no batch
-npm run header:discovery -- --compare <batched.json> <sequential.json>
-```
-
-`--only` takes object types: `class`, `interface`, `program`, `include`,
-`domain`, `dataElement`, `structure`, `table`, `tableType`, `ddl`,
-`functionGroup`, `functionModule`, `messageClass`, `transformation`,
-`serviceDefinition`, `accessControl`, `metadataExtension`, `utils` (`class`
-includes its local includes, `messageClass` its messages). `--operation`
-keeps the whole cycle but probes only that member; the other steps run with
-the known pair and are not reported. `--compare` reads a batched and a
-sequential report and writes which probes differ between them.
-
-## What it does
-
-On temporary objects it creates in the package (`ZHP`, or `Z_HP` for a
-function module, plus a random suffix), it runs each object type's cycle —
-create; read, lock, write, unlock; check and activate; deletion check and
-delete — and sends every member that takes `options.headers` three times,
-through the member itself:
-
-- **known pair:** the pair from `pairs.ts`, taken verbatim from
-  `docs/usage/MIGRATION-36.md` ("The pairs 35.0.0 sent", modern client, with
-  "The completed pairs, measured" where 35.0.0 sent one header or none);
-- **bad Accept:** `Accept: application/x-header-probe`, the known
-  `Content-Type` — a `406` is expected;
-- **bad Content-Type:** the known `Accept`,
-  `Content-Type: application/x-header-probe` — a `415` is expected.
-
-A create probe works on a name of its own, so a refused create that still
-created something is found and removed. A delete sends the two bad probes
-first and the known pair last. After every write probe the object is read
-again and its existence and version are recorded.
-
-The probes of one step go to SAP in one batch envelope (`AdtBatchConnection`).
-Lock and unlock, and the steps that set up a dependency, run on their own; a
-row whose member is a chain (a message class message) is marked
-`sequential: <reason>`. `--sequential` sends everything one request at a time.
-
-Everything the probe may have created goes into a ledger before the create is
-sent; a `finally` deletes it all, on failure and on Ctrl-C too, reports each
-deletion, and lists loudly what could not be deleted. Ctrl-C sends nothing
-new: the member call in flight finishes first — whole, so a member whose call
-is a chain of requests (a message class message's create or update: read,
-locks, the write, unlocks) sends the rest of its chain and releases its own
-locks —, then the ledger is cleaned as it stands (a second Ctrl-C during the cleanup is ignored). A create runs
-whatever `--only`/`--operation` say, since every later step needs its object;
-it is reported only when asked for. Operations the cycle
-cannot run on its own (a debugger session, an abapGit repository, objects
-whose key the server assigns) are reported as `skipped: <reason>`.
-
-## Report
-
-Two files in `.header-probe/` (gitignored: they hold the system's answers):
-
-- `report-<timestamp>.json` — everything recorded: per probe the pair sent,
-  the requests (method, path with the object name as `{name}`, `_action`),
-  the status, SAP's exception type and message, the answer's own
-  `content-type`, `extractSupportedAccept(error)` and
-  `extractSupportedContentType(error)` as returned, the raw
-  `Accepted content types: …` text, the body of a non-2xx answer, and the
-  object's state after a write;
-- `report-<timestamp>.md` — a table per object type: operation, endpoint,
-  batched or sequential, then status, accepted types and SAP message for each
-  of the three probes, and the state after a write. The summary lists every
-  known pair SAP refused with `406`/`415` and what it named; every endpoint
-  (method, path, `_action`) that two members or two object types share, with
-  each one's pair and answers, flagged where the answers differ (one
-  endpoint, one member); the skipped operations; and every temporary object
-  with whether it was removed.
-
-Nothing but progress and the two paths goes to stdout.
-
-# Error corpus
-
-`npm run header:discovery:next` asks a system for every answer it gives the
-ADT endpoints, errors above all, and records what each error names as
-acceptable. It is the successor of the header probe and runs beside it until
-the owner swaps the two. Like the probe, it is a developer tool: not in CI,
-not in the npm package.
-
-## Prepare
-
-As for the header probe: `.env` with the SAP connection and
-`src/__tests__/helpers/test-config.yaml`. The single runs (`--from`) read only
-`environment.system`. The full run's phase 2 also needs `default_package` and
+- `src/__tests__/helpers/test-config.yaml` (`npm run test:init`). The single
+  runs (`--from`) read only `environment.system`. The full run's phase 2 also needs `default_package` and
 `default_transport`: its write cycle creates temporary objects there and
 deletes them again.
 
 ## Run
 
 ```bash
-npm run header:discovery:next                     # the full run: the system's header corpus
-npm run header:discovery:next -- --from discovery --headers corpus
-npm run header:discovery:next -- --from discovery --headers none
-npm run header:discovery:next -- --from discovery --headers bogus
-npm run header:discovery:next -- --from clients --headers corpus
-npm run header:discovery:next -- --from clients --headers none
-npm run header:discovery:next -- --from clients --headers bogus
-npm run header:discovery:next -- --from discovery --headers bogus --sequential
-npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
-npm run header:discovery:next -- --render <corpus.json> [<corpus.json> …]
+npm run header:discovery                     # the full run: the system's header corpus
+npm run header:discovery -- --isolate ~/.config/mcp-abap-adt-clients/header-probe/<system>/header-corpus-<ts>.json
+npm run header:discovery -- --out <dir>        # write there instead
+npm run header:discovery -- --from discovery --headers corpus
+npm run header:discovery -- --from discovery --headers none
+npm run header:discovery -- --from discovery --headers bogus
+npm run header:discovery -- --from clients --headers corpus
+npm run header:discovery -- --from clients --headers none
+npm run header:discovery -- --from clients --headers bogus
+npm run header:discovery -- --from discovery --headers bogus --sequential
+npm run header:discovery -- --summary <corpus.json> [<corpus.json> …]
+npm run header:discovery -- --render <corpus.json> [<corpus.json> …]
 ```
 
+`--isolate <corpus.json>[,<corpus.json>]` sends alone, from the start, every
+call an earlier run's group split found poisoning envelopes (its `causes`; a
+header corpus file stands for the corpora it lists); every other call is
+batched and split as usual. Without it the run is unchanged.
 Both `--from` and `--headers` are required. `--only <text>[,<text>]` keeps
 the endpoints whose `handler.member` (clients) or href (discovery) contains one
 of the texts. `--render` recomputes a saved
@@ -138,7 +51,7 @@ needs.
 
 ## The full run
 
-`npm run header:discovery:next` with no flags gives the connected system's
+`npm run header:discovery` with no flags gives the connected system's
 header corpus, everything batched and poisoned envelopes split:
 
 1. **The authorization check** (below).
@@ -146,18 +59,31 @@ header corpus, everything batched and poisoned envelopes split:
    and bogus (corpus for the comparison column). It settles every endpoint
    whose `needs` it can.
 3. **Phase 2, real objects, for the clients endpoints still `unknown` only:**
-   - **reads** (`GET` with the object's name in the path): one existing
-     object per object type, found read-only by the repository's quick search
+   - **reads** (`GET` with the object's name in the path) still unknown, or
+     needing Accept with a 406 that named nothing: one existing object per
+     object type, found read-only by the repository's quick search
      (`query=*`, the first hit), is named in place of the probe name; each
-     such read goes with a bogus Accept, then with none, in envelopes.
+     such read goes with a bogus Accept, with none, and with the client's own
+     headers, in envelopes.
      Nothing is created. A handler with no search type, or a type the search
      finds nothing of, stays unknown with that reason.
-   - **writes**: the header probe's temporary-object cycle, only for the
+   - **writes**: the write cycle (the former header probe, below), only for the
      object types whose write members are still unknown (the modern client's;
      the legacy client's writes stay as phase 1 left them). The bogus
      Content-Type goes first, then the bogus Accept; the ledger holds every
      object before its create is sent, locks are released in a `finally`, the
      state is read after every write probe.
+   - **the update measurement**: per object type of the write cycle, on a
+     temporary object of its own: the content read (the source, or the
+     metadata), an update changing it sent with a bogus Accept under a lock
+     released in a `finally`, the content read again. Applied = the two
+     contents' hashes differ; the content itself is never kept or printed.
+     The ledger holds the object before its create is sent, and the cleanup
+     removes it. Every unlock's answer is checked, here and in the write
+     cycle: a failed unlock keeps its handle in the ledger, the cleanup
+     unlocks again before it deletes, and what stays locked is listed loudly
+     as `MAY REMAIN (locked)`; the run then ends `failed` (exit 1). The header corpus lists, per type, the update's answer and
+     whether it was applied.
    What phase 2 cannot settle stays `unknown`, with its reason.
 4. **`header-corpus-<timestamp>.json` and `.md`**, one per run of the system:
    per endpoint (method, path pattern, `_action`) its `needs`, the Accept and
@@ -286,9 +212,81 @@ header corpus, everything batched and poisoned envelopes split:
    new requests (asked before each envelope and request),
    the one in flight finishes, and the `finally` cleanup runs.
 
+### knownWorking
+
+Where SAP's 406 names nothing (no T100 044 and no list — the generic 037,
+"The message content is not acceptable", above all), the header corpus says which
+Accept works from what the client sends today: `knownWorking` lists, per
+endpoint, every corpus-mode answer — `<member>: Accept <what went on the
+wire> → <status>`, marked `(works)` on a 2xx — from phase 1 (the probe name)
+and from phase 2, which reads such an endpoint (a GET naming an object) on an
+existing object with the client's own headers as well as with a bogus Accept
+and with none. `workingAccept` keeps the Accept values that got a 2xx. The
+pair table (`pairs.ts`) has no row for a member that takes no `headers` —
+most reads —, so its column is empty there by design.
+
+### Endpoint existence
+
+Beside `needs`, every endpoint gets `exists: yes | no | unknown`, merged over
+every answer of every run:
+
+| exists | from |
+|---|---|
+| `no` | the router found no route (a 404 with no SAP exception, "No suitable resource found"), the ICF service is not there (a 404 "Service cannot be reached"), or the method is not implemented (a 405, for that method) |
+| `yes` | any answer from the resource itself: a 2xx, 400, 406, 415, 409, a 404 the resource raised (`ExceptionResourceNotFound`: the object is missing, the endpoint is there), … — one such answer is enough |
+| `unknown` | only what comes before the resource or says nothing of it: 401, an authorization 403, a 500, no answer, a skipped row |
+
+Nothing is dropped: every answer stays in the corpus; `exists` only reads
+them. `exists`, and `needs` where it applies, take the answers of every phase:
+phase 1, the reads on existing objects, the write cycle and the update
+measurement (whose bogus Accept is evidence for the update's Accept).
+
+## The write cycle (the former header probe)
+
+The former header probe has no command of its own any more; its code
+(`probe.ts`, `objects.ts`, `pairs.ts`, `record.ts`, `ledger.ts`) stays because
+the full run's phase 2 drives it (`writeCycle.ts`) for the write members still
+unknown — only those members, with the bogus Content-Type first — and for the
+update measurement. What the cycle does:
+
+On temporary objects it creates in the package (`ZHP`, or `Z_HP` for a
+function module, plus a random suffix), it runs each object type's cycle —
+create; read, lock, write, unlock; check and activate; deletion check and
+delete — and sends every member that takes `options.headers` three times,
+through the member itself:
+
+- **known pair:** the pair from `pairs.ts`, taken verbatim from
+  `docs/usage/MIGRATION-36.md` ("The pairs 35.0.0 sent", modern client, with
+  "The completed pairs, measured" where 35.0.0 sent one header or none);
+- **bad Accept:** `Accept: application/x-header-probe`, the known
+  `Content-Type` — a `406` is expected;
+- **bad Content-Type:** the known `Accept`,
+  `Content-Type: application/x-header-probe` — a `415` is expected.
+
+A create probe works on a name of its own, so a refused create that still
+created something is found and removed. A delete sends the two bad probes
+first and the known pair last. After every write probe the object is read
+again and its existence and version are recorded.
+
+The probes of one step go to SAP in one batch envelope (`AdtBatchConnection`).
+Lock and unlock, and the steps that set up a dependency, run on their own; a
+row whose member is a chain (a message class message) is marked
+`sequential: <reason>`. 
+
+Everything the probe may have created goes into a ledger before the create is
+sent; a `finally` deletes it all, on failure and on Ctrl-C too, reports each
+deletion, and lists loudly what could not be deleted. Ctrl-C sends nothing
+new: the member call in flight finishes first — whole, so a member whose call
+is a chain of requests (a message class message's create or update: read,
+locks, the write, unlocks) sends the rest of its chain and releases its own
+locks —, then the ledger is cleaned as it stands (a second Ctrl-C during the cleanup is ignored). A create runs whatever members are asked for, since every later step needs its
+object; it is reported only when asked for. Operations the cycle
+cannot run on its own (a debugger session, an abapGit repository, objects
+whose key the server assigns) are reported as `skipped: <reason>`.
+
 ## One gate, one exit
 
-Every request the error corpus (and the header probe) sends goes through one
+Every request the error corpus sends — the write cycle's included — goes through one
 gate, `gate()` in `capture.ts`: the logon (`gateConnect`), the system
 context, every discovery read, every probe and envelope, the state reads,
 the cleanup and the unlocks. Before sending, the gate asks the interrupt
@@ -327,7 +325,23 @@ Deliberate, and left as they are:
 
 ## The corpus
 
-Two files in `.header-probe/` (gitignored: they hold the system's answers):
+**Where the output goes.** Everything a run writes — the corpora, the header
+corpus files, the summaries — goes to a persistent folder per user and per
+system, as the auth chain keeps its sessions (`~/.config/mcp-abap-adt` on
+Unix, `Documents/mcp-abap-adt` on Windows):
+
+- Linux and macOS: `~/.config/mcp-abap-adt-clients/header-probe/<system>/`;
+- Windows: `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>\`.
+
+`<system>` is the connection target (`SAP_URL`'s host and port, and
+`SAP_CLIENT`), lowercased, every character outside `[a-z0-9._-]` replaced by
+`-` (e.g. `127.0.0.1-8000-100`). The folder is created when missing, is local
+only, and is never committed; removing a worktree keeps it. `--out <dir>`
+replaces the whole path. The run prints the absolute folder at the end.
+`.header-probe/` in the repository is no longer written (its `.gitignore`
+line stays for old checkouts). The files hold the system's answers.
+
+Two files per run:
 
 - `corpus-<source>-<headers>-<timestamp>.json` — every row: the endpoint and
   its source, the headers asked for, the Accept and Content-Type that went on
@@ -364,9 +378,35 @@ Per header, from its bogus request:
 
 | verdict | when |
 |---|---|
-| `checked` | 406 for Accept, 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
+| `checked` | 406 for Accept only when it names the Accept (T100 `SADT_RESOURCE` 044, its list empty or not, or a list naming at least one accepted type, below), 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
 | `not checked` | a 2xx: the resource never compares the header |
 | `unknown` | anything else — 401, 403, 404, 405 (`method not implemented`), 500 (`dump or router`, with the dump's short text), any other status with its SAP exception |
+
+A 406 points at the Accept only when it names it: T100 `SADT_RESOURCE`
+**044** ("Accepted content types: …"; it is the Accept check even with an
+empty list, as on the DDIC creates — measured) or a list naming at least one
+type (a bare `Accepted content types:` marker is no list). Any other
+406 does not say the Accept was refused. **037** ("The message content is not
+acceptable", no list) is the default text of `CX_ADT_RES_NOT_ACCEPTABLE`
+raised without a text id (from reading SAP's code: the search raises it for an
+invalid `objectType`, whatever the Accept — measured); a 406 with another
+T100 or none says no more. So a bogus Accept answered by such a 406 is
+`unknown` — `406 generic (T100 037): not necessarily the Accept`, or `406
+without a list (T100 <id> <no> | no T100): not necessarily the Accept` —
+unless the same endpoint answered a 2xx or a 404 to another Accept (none, or
+the client's own): then it is `checked (037, inferred from the contrast)` (or
+`(406 without a list (…), inferred from the contrast)`). The contrast holds in
+every phase: in phase 1 per member; in the write cycle the known probe's
+answer beside its bogus-Accept probe; and in the header corpus, for every
+piece of evidence, any answer on the same endpoint, from any source and in any
+phase, that did not carry the bogus Accept (the phase-1 count takes phase 1's
+answers only).
+
+The probe's own arguments must build a real request: a stand-in value that a
+real call never sends (`undefined`, an object type that is not an ADT type
+`XXXX` or `XXXX/YYYY`) can make the answer say nothing about the headers.
+Each member's recorded request is checked for such parameters; the members
+still carrying one are marked `standIn` in the corpus.
 
 | needs | when |
 |---|---|

@@ -523,6 +523,10 @@ export interface ICorpusRow {
   settled?: { depth: number; path: string };
   /** A single call whose own 500 poisoned its group: the cause of a poisoning. */
   poisonCause?: boolean;
+  /** Request parameters a stand-in argument produced: the request is not what a real call sends. */
+  standIn?: string[];
+  /** The headers mode of the run the row came from (a full run's rows). */
+  headersMode?: HeadersMode;
   /** Batched: the envelope it went out in (see {@link ICorpus.envelopes}). */
   envelope?: number;
   /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
@@ -703,6 +707,36 @@ export function rowKey(row: ICorpusRow): string {
     : `${endpoint}${row.corpusType ? ` [${row.corpusType}]` : ''}`;
 }
 
+/** The calls the group split of earlier runs found poisoning envelopes. */
+export function isolationKeys(
+  corpora: readonly Pick<ICorpus, 'splits'>[],
+): Set<string> {
+  const keys = new Set<string>();
+  for (const corpus of corpora)
+    for (const split of corpus.splits ?? [])
+      for (const cause of split.causes) keys.add(cause);
+  return keys;
+}
+
+/**
+ * Whether a row is one of those calls: its row key, or — a discovery row —
+ * its endpoint whatever corpus type it carries.
+ */
+export function isIsolated(
+  row: ICorpusRow,
+  keys: ReadonlySet<string>,
+): boolean {
+  if (keys.has(rowKey(row))) return true;
+  if (row.source !== 'discovery' || !row.endpoint) return false;
+  const endpoint = endpointKey(row.endpoint);
+  for (const key of keys) {
+    const bracket = key.indexOf(' [');
+    if ((bracket === -1 ? key : key.slice(0, bracket)) === endpoint)
+      return true;
+  }
+  return false;
+}
+
 /** Rows per status, in status order. */
 export function rowsByStatus(
   rows: readonly ICorpusRow[],
@@ -826,6 +860,109 @@ export interface IHeaderVerdict {
   verdict: 'checked' | 'not checked' | 'unknown' | 'no body';
   status?: number;
   reason?: string;
+  /**
+   * A 406 that names no accepted type (no T100 044, no list): the Accept may
+   * not be what it refused. Checked only by contrast.
+   */
+  unnamed406?: boolean;
+}
+
+/** The T100 key of a SAP exception body, if it carries one. */
+export function t100Of(
+  body: string | undefined,
+): { id: string; no: string } | undefined {
+  if (!body) return undefined;
+  const read = (key: string) => {
+    const open = `<entry key="${key}">`;
+    const at = body.indexOf(open);
+    if (at === -1) return undefined;
+    const end = body.indexOf('<', at + open.length);
+    return end === -1 ? undefined : body.slice(at + open.length, end);
+  };
+  const id = read('T100KEY-ID');
+  const no = read('T100KEY-NO');
+  return id && no ? { id, no } : undefined;
+}
+
+/**
+ * Whether a 406 names what the Accept should be: T100 SADT_RESOURCE 044
+ * ("Accepted content types: …", its list empty or not), or a list naming at
+ * least one accepted type. Only then does
+ * the 406 point at the Accept. Any other 406 — SAP's generic default text
+ * (`CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id: T100 SADT_RESOURCE
+ * 037, which the search raises for an invalid `objectType` whatever the
+ * Accept), another T100 or none — says nothing of it.
+ */
+export function namesAccepted(row: ICorpusRow): boolean {
+  const key = t100Of(row.body);
+  return (
+    // 044 is the Accept check, its list empty or not (measured on the DDIC
+    // creates: 044 with an empty list).
+    (key?.id === 'SADT_RESOURCE' && key.no === '044') ||
+    // A list counts only with at least one type after the marker.
+    listsAType(row.named?.acceptedText) ||
+    Boolean(row.named?.supportedAccept.length) ||
+    // A row built from the write cycle's answers may carry no named lists.
+    listsAType(row.body)
+  );
+}
+
+/** Whether a text names at least one type after `Accepted content types:`. */
+function listsAType(text: string | undefined): boolean {
+  if (!text) return false;
+  const at = text.indexOf(ACCEPTED_MARKER);
+  if (at === -1) return false;
+  const rest = text.slice(at + ACCEPTED_MARKER.length);
+  const end = rest.indexOf('<');
+  return mediaTypesIn(end === -1 ? rest : rest.slice(0, end)).length > 0;
+}
+
+/** The T100 key of a 406 that names nothing, for its reason. */
+function unnamedReason(row: ICorpusRow): string {
+  const key = t100Of(row.body);
+  if (key?.id === 'SADT_RESOURCE' && key.no === '037')
+    return '406 generic (T100 037): not necessarily the Accept';
+  return `406 without a list (${key ? `T100 ${key.id} ${key.no}` : 'no T100'}): not necessarily the Accept`;
+}
+
+/** An unnamed 406 made `checked` by the contrast: another Accept got a 2xx or a 404 on the endpoint. */
+export function byContrast(verdict: IHeaderVerdict): IHeaderVerdict {
+  return {
+    verdict: 'checked',
+    status: 406,
+    reason: verdict.reason?.startsWith('406 generic (T100 037)')
+      ? '037, inferred from the contrast'
+      : `${verdict.reason?.slice(0, verdict.reason.indexOf(':')) ?? '406'}, inferred from the contrast`,
+  };
+}
+
+/** Whether a row shows another Accept than the bogus one reaching the resource: a 2xx or a 404. */
+export function isContrast(row: ICorpusRow): boolean {
+  return (
+    row.bogus !== 'accept' &&
+    row.status !== undefined &&
+    ((row.status >= 200 && row.status < 300) || row.status === 404)
+  );
+}
+
+/**
+ * The contrast rule on evidence built outside {@link classifyNeeds} (the
+ * write cycle, the update measurement, the reads): an unnamed 406 is
+ * `checked` when a row of the same endpoint is a contrast.
+ */
+export function withContrast(
+  evidence: readonly IEvidence[],
+  rows: readonly ICorpusRow[],
+): IEvidence[] {
+  const contrast = new Set<string>();
+  for (const row of rows)
+    if (row.endpoint && isContrast(row))
+      contrast.add(endpointKey(row.endpoint));
+  return evidence.map((item) =>
+    item.accept.unnamed406 && contrast.has(item.endpoint)
+      ? { ...item, accept: byContrast(item.accept) }
+      : item,
+  );
 }
 
 export interface IEndpointNeeds {
@@ -950,6 +1087,13 @@ export function judge(
       verdict: 'unknown',
       reason: `no answer: ${row.failure ?? 'nothing came back'}`,
     };
+  if (row.status === refusal && refusal === 406 && !namesAccepted(row))
+    return {
+      verdict: 'unknown',
+      status: 406,
+      reason: unnamedReason(row),
+      unnamed406: true,
+    };
   if (row.status === refusal) return { verdict: 'checked', status: row.status };
   if (row.status >= 200 && row.status < 300)
     return { verdict: 'not checked', status: row.status };
@@ -979,7 +1123,7 @@ const verdictText = (name: string, verdict: IHeaderVerdict): string =>
     ? `${name}: no body`
     : verdict.verdict === 'unknown'
       ? `${name}: unknown (${verdict.reason})`
-      : `${name}: ${verdict.verdict} (${verdict.status})`;
+      : `${name}: ${verdict.verdict} (${verdict.reason ?? verdict.status})`;
 
 /**
  * Per endpoint of a bogus run: which headers it needs, and what the system
@@ -1003,6 +1147,9 @@ export function classifyNeeds(
     else entry.accept ??= row;
     by.set(key, entry);
   }
+  const contrast = new Set<string>();
+  for (const row of evidence)
+    if (!row.bogus && isContrast(row)) contrast.add(needsKey(row));
   const missing = new Map<string, ICorpusRow>();
   for (const row of [...rows, ...evidence])
     if (isAcceptHeaderMissing(row) && !missing.has(needsKey(row)))
@@ -1010,6 +1157,11 @@ export function classifyNeeds(
   const out: IEndpointNeeds[] = [];
   for (const [endpoint, pair] of by) {
     let accept = judge(pair.accept, 406);
+    // A 406 naming nothing to the bogus Accept, while another Accept (none,
+    // or the client's own) got a 2xx or a 404 on the same endpoint: the
+    // Accept made the difference after all.
+    if (accept.unnamed406 && contrast.has(endpoint))
+      accept = byContrast(accept);
     const absent = missing.get(endpoint);
     if (accept.verdict !== 'checked' && absent)
       accept = {
@@ -1229,6 +1381,18 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
       '',
     );
   }
+  const existence = existencePerEndpoint(corpus.rows);
+  lines.push(
+    '### Endpoint existence',
+    '',
+    '| exists | endpoints |',
+    '|---|---|',
+  );
+  for (const value of ['yes', 'no', 'unknown'] as const)
+    lines.push(
+      `| ${value} | ${[...existence.values()].filter((e) => e.exists === value).length} |`,
+    );
+  lines.push('');
   lines.push('### Counts per status', '');
   const byStatus = rowsByStatus(corpus.rows);
   lines.push('| status | rows |', '|---|---|');
@@ -1364,7 +1528,7 @@ export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
         named.set(key, entry);
       }
     const evidence = of
-      .filter((c) => c.headers === 'none')
+      .filter((c) => c.headers === 'none' || c.headers === 'corpus')
       .flatMap((c) => c.rows);
     for (const corpus of of.filter((c) => c.headers === 'bogus'))
       for (const entry of classifyNeeds(corpus.rows, evidence))
@@ -1495,7 +1659,11 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
         classifyNeeds(
           corpus.rows,
           corpora
-            .filter((c) => c.source === corpus.source && c.headers === 'none')
+            .filter(
+              (c) =>
+                c.source === corpus.source &&
+                (c.headers === 'none' || c.headers === 'corpus'),
+            )
             .flatMap((c) => c.rows),
         ),
       ),
@@ -1505,6 +1673,77 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
 }
 
 // --- the header corpus: one file per system ----------------------------------
+
+// --- endpoint existence -----------------------------------------------------
+
+export type Exists = 'yes' | 'no' | 'unknown';
+
+/**
+ * Whether an answer shows the endpoint exists, by where it came from.
+ * `no`: the router found no route (a 404 with no SAP exception, "No
+ * suitable resource found"), the ICF service is not there (a 404 "Service
+ * cannot be reached"), or the method is not implemented (405). `yes`: any
+ * answer from the resource itself — a 2xx, 400, 406, 415, a 404 the
+ * resource raised (`ExceptionResourceNotFound`: the object is missing, the
+ * endpoint is there), … `unknown`: what comes before the resource or says
+ * nothing of it — 401, an authorization 403, a 500 (a router failure or a
+ * dump), no answer, a skipped row.
+ */
+export function existenceOf(row: ICorpusRow): {
+  exists: Exists;
+  reason: string;
+} {
+  if (row.skipped) return { exists: 'unknown', reason: row.skipped };
+  if (row.status === undefined)
+    return {
+      exists: 'unknown',
+      reason: `no answer: ${row.failure ?? ''}`.trim(),
+    };
+  const body = row.body ?? '';
+  if (row.status === 404 && !row.sapType) {
+    if (body.includes('No suitable resource found'))
+      return {
+        exists: 'no',
+        reason: '404 no route (No suitable resource found)',
+      };
+    if (body.includes('Service cannot be reached'))
+      return { exists: 'no', reason: '404 the ICF service cannot be reached' };
+    return { exists: 'unknown', reason: '404 without a SAP exception' };
+  }
+  if (row.status === 405)
+    return { exists: 'no', reason: '405 method not implemented' };
+  if (row.status === 401) return { exists: 'unknown', reason: '401' };
+  if (row.status === 500)
+    return {
+      exists: 'unknown',
+      reason: `500 ${dumpText(body) ?? 'dump or router'}`,
+    };
+  if (
+    row.status === 403 &&
+    authorizationProblem({ status: 403, data: body, headers: {} })
+  )
+    return { exists: 'unknown', reason: '403 authorization' };
+  return {
+    exists: 'yes',
+    reason: `${row.status}${row.sapType ? ` ${row.sapType}` : ''}`,
+  };
+}
+
+/** Per endpoint over many rows: yes if any answer came from the resource, else no if any said so, else unknown. */
+export function existencePerEndpoint(
+  rows: readonly ICorpusRow[],
+): Map<string, { exists: Exists; reason: string }> {
+  const by = new Map<string, { exists: Exists; reason: string }>();
+  const rank: Record<Exists, number> = { yes: 2, no: 1, unknown: 0 };
+  for (const row of rows) {
+    if (!row.endpoint) continue;
+    const key = endpointKey(row.endpoint);
+    const found = existenceOf(row);
+    const held = by.get(key);
+    if (!held || rank[found.exists] > rank[held.exists]) by.set(key, found);
+  }
+  return by;
+}
 
 /** One piece of evidence about an endpoint's headers. */
 export interface IEvidence {
@@ -1589,6 +1828,13 @@ export interface IHeaderCorpusEntry {
   pairs: string[];
   /** Which phase settled it, or why nothing did. */
   settledBy: 'phase 1' | 'phase 2' | 'unsettled';
+  /** Whether the endpoint exists, and the answer that says so. */
+  exists: Exists;
+  existsBecause: string;
+  /** What the client sends today, and the answer it got (corpus mode, phase 1 and 2). */
+  knownWorking: string[];
+  /** The Accept values the client sends that got a 2xx. */
+  workingAccept: string[];
   /** Who said what: status and raw text. */
   evidence: string[];
 }
@@ -1599,6 +1845,10 @@ export function buildHeaderCorpus(
   extras: {
     discoveryContentType: ReadonlyMap<string, readonly string[]>;
     pairs: ReadonlyMap<string, readonly string[]>;
+    /** Per endpoint, from every row of every run. */
+    existence?: ReadonlyMap<string, { exists: Exists; reason: string }>;
+    /** Per endpoint: `who: Accept … → status`. */
+    knownWorking?: ReadonlyMap<string, readonly string[]>;
   },
 ): IHeaderCorpusEntry[] {
   const by = new Map<string, IEvidence[]>();
@@ -1633,6 +1883,19 @@ export function buildHeaderCorpus(
       ],
       pairs: [...(extras.pairs.get(endpoint) ?? [])],
       settledBy,
+      exists: extras.existence?.get(endpoint)?.exists ?? 'unknown',
+      existsBecause:
+        extras.existence?.get(endpoint)?.reason ?? 'no answer recorded',
+      knownWorking: [...(extras.knownWorking?.get(endpoint) ?? [])],
+      workingAccept: [
+        ...new Set(
+          (extras.knownWorking?.get(endpoint) ?? [])
+            .filter((text) => text.endsWith(' (works)'))
+            .map((text) =>
+              text.slice(text.indexOf('Accept ') + 7, text.lastIndexOf(' → ')),
+            ),
+        ),
+      ],
       evidence: items.map(
         (item) =>
           `phase ${item.phase} ${item.source} ${item.who}: ${item.text}`,
@@ -1669,6 +1932,15 @@ export interface IHeaderCorpusFile {
   removals: IRemoval[];
   /** What ended the run. */
   endedBy?: string;
+  /** Phase 2's update measurement: per object type, the update's answer to a bogus Accept and whether it took effect. */
+  updates?: {
+    type: string;
+    member: string;
+    status?: number;
+    sapType?: string;
+    applied: boolean | 'unknown';
+    note?: string;
+  }[];
   /** Phase 2's read objects: per object type, the name found or why none. */
   objects: { handler: string; type?: string; name?: string; reason?: string }[];
   error?: string;
@@ -1697,6 +1969,17 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
     lines.push(
       `| ${value} | ${file.counts.phase1[value]} | ${file.counts.phase2[value]} |`,
     );
+  lines.push(
+    '',
+    '## Endpoint existence',
+    '',
+    '| exists | endpoints |',
+    '|---|---|',
+  );
+  for (const value of ['yes', 'no', 'unknown'] as const)
+    lines.push(
+      `| ${value} | ${file.entries.filter((entry) => entry.exists === value).length} |`,
+    );
   for (const value of NEEDS) {
     const of = file.entries.filter((entry) => entry.needs === value);
     lines.push('', `## needs: ${value} (${of.length})`, '');
@@ -1705,12 +1988,26 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
       continue;
     }
     lines.push(
-      '| endpoint | Accept named | Content-Type named | discovery Content-Type | pair table | settled by | evidence |',
-      '|---|---|---|---|---|---|---|',
+      '| endpoint | exists | Accept named | Content-Type named | discovery Content-Type | pair table | knownWorking | settled by | evidence |',
+      '|---|---|---|---|---|---|---|---|---|',
     );
     for (const entry of of)
       lines.push(
-        `| ${cell(entry.endpoint)} | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+        `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${cell(entry.knownWorking.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+      );
+  }
+  lines.push('', '## Updates with a bogus Accept', '');
+  if (!file.updates?.length) lines.push('Not measured.');
+  else {
+    lines.push(
+      'Per object type, on a temporary object: the content read, an update changing it sent with a bogus Accept, the content read again; applied = the two hashes differ.',
+      '',
+      '| type | member | update answer | applied |',
+      '|---|---|---|---|',
+    );
+    for (const update of file.updates)
+      lines.push(
+        `| ${cell(update.type)} | ${update.member} | ${update.status ?? '—'}${update.sapType ? ` ${cell(update.sapType)}` : ''} | ${update.applied === 'unknown' ? `unknown${update.note ? ` (${cell(update.note)})` : ''}` : update.applied ? 'yes' : 'no'} |`,
       );
   }
   lines.push('', '## Phase 2 objects', '');

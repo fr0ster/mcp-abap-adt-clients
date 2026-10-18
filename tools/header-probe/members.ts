@@ -222,7 +222,14 @@ function universalFor(objectName: string): unknown {
         // A name the address needs, where a type is part of it.
         if (key === 'transportNumber') return objectName;
         if (key === 'enhancementType') return 'enhoxhb';
-        if (key === 'object_type' || key === 'objectType') return 'program';
+        // The client's own type name where it takes one (where-used); the
+        // search's `objectType` stays unset: a value that is not an ADT type
+        // makes it answer 406/037 for any Accept (measured).
+        if (key === 'object_type') return 'program';
+        if (key === 'query') return objectName;
+        if (key === 'maxResults' || key === 'max_results') return 1;
+        if (key === 'rootEntity') return objectName;
+        if (key === 'implementationType') return 'managed';
         if (key === 'toString' || key === 'valueOf') return () => objectName;
         const fromString = (objectName as unknown as Record<string, unknown>)[
           key
@@ -263,7 +270,12 @@ export function argumentFor(
   options: IMemberOptions,
 ): { value: unknown } | { skip: string } {
   const lower = name.toLowerCase();
-  if (lower.includes('option')) return { value: options };
+  // A member reads its lock handle from the options too.
+  if (lower.includes('option'))
+    return { value: { lockHandle: PROBE_HANDLE, ...options } };
+  // A positional ADT object type: a valid one.
+  if (lower === 'objecttype' || lower === 'object_type')
+    return { value: 'PROG/P' };
   if (lower === 'lockhandle' || lower === 'handle' || lower.endsWith('handle'))
     return { value: PROBE_HANDLE };
   if (lower === 'version' || lower === 'status' || lower === 'transportrequest')
@@ -275,6 +287,39 @@ export function argumentFor(
   if (lower === 'objects' || lower.endsWith('objects'))
     return { value: [{ type: 'PROG/P', name: PROBE_NAME }] };
   return { value: options.name ? universal(options.name) : UNIVERSAL };
+}
+
+/**
+ * The request parameters a stand-in argument produced: a value `undefined`,
+ * `null`, `NaN` or `[object Object]`, or an object type that is not an ADT
+ * type (`XXXX` or `XXXX/YYYY`).
+ */
+export function standInParameters(
+  requests: readonly { url: string; params?: unknown }[],
+): string[] {
+  const found: string[] = [];
+  for (const request of requests) {
+    const at = String(request.url ?? '').indexOf('?');
+    const pairs: [string, string][] =
+      at === -1
+        ? []
+        : [...new URLSearchParams(String(request.url).slice(at + 1)).entries()];
+    if (request.params && typeof request.params === 'object')
+      for (const [key, value] of Object.entries(
+        request.params as Record<string, unknown>,
+      ))
+        pairs.push([key, String(value)]);
+    for (const [key, value] of pairs) {
+      const typeKey =
+        key.toLowerCase() === 'objecttype' || key.toLowerCase() === 'type';
+      if (
+        ['undefined', 'null', 'NaN', '[object Object]'].includes(value) ||
+        (typeKey && !/^[A-Za-z0-9]{1,4}(\/[A-Za-z0-9]{1,4})?$/.test(value))
+      )
+        found.push(`${key}=${value}`);
+    }
+  }
+  return [...new Set(found)];
 }
 
 /** How many requests one recording may issue before it is stopped (a polling member). */
@@ -317,6 +362,8 @@ export interface IMemberEndpoint {
   skipped?: string;
   /** The member's corpus pair (pairs.ts); a header the table names none for is absent. */
   pair?: Partial<IAdtHeaders>;
+  /** Request parameters a stand-in argument produced (`key=value`): the request is not what a real call sends. */
+  standIn?: string[];
   /** Whether any request the member builds carries a body. */
   hasBody?: boolean;
 }
@@ -432,6 +479,8 @@ export async function recordMembers(): Promise<{
           },
         );
       entry.requests = endpointsOf(capture);
+      const standIn = standInParameters(capture.requests);
+      if (standIn.length) entry.standIn = standIn;
       entry.hasBody = capture.requests.some((request) => request.hasBody);
       // The legacy client's member is the modern one's: the same reason.
       const notSent = NOT_SENT[key.replace(/^legacy /, '')];

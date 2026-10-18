@@ -1,80 +1,32 @@
 /**
- * Header probe: how SAP answers each member's request headers.
- *
- * Prepare:
- *   - `.env` in the repository root with the SAP connection (SAP_URL,
- *     SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT), as the integration tests use.
- *   - `src/__tests__/helpers/test-config.yaml` (`npm run test:init`): the
- *     probe reads `environment.system`, `default_package` and
- *     `default_transport` from it. The package must exist; every object is
- *     created in it, on that transport, and deleted again.
- *
- * Run:
- *   npm run header:discovery
- *   npm run header:discovery -- --only class,domain      # these object types only
- *   npm run header:discovery -- --operation update       # this member only
- *   npm run header:discovery -- --sequential             # one request at a time, no batch
- *   npm run header:discovery -- --compare <batched.json> <sequential.json>
- *
- * `--only` takes object types (class, interface, program, include, domain,
- * dataElement, structure, table, tableType, ddl, functionGroup,
- * functionModule, messageClass, transformation, serviceDefinition,
- * accessControl, metadataExtension, utils). `--operation` keeps the whole
- * cycle but probes only that member; the other steps run with the known pair
- * and are not reported. `--compare` reads two reports and writes which probes
- * differ between them.
- *
- * Report: `.header-probe/report-<timestamp>.json` (everything recorded) and
- * `.header-probe/report-<timestamp>.md` (a table per object type, then the
- * summary). The directory is gitignored: the report holds system answers.
- *
- * Every operation gets three requests, each through the member itself:
- *   - known pair: the operation's pair from MIGRATION-36 (pairs.ts), as given;
- *   - bad Accept: Accept `application/x-header-probe`, the known
- *     Content-Type — a 406 is expected;
- *   - bad Content-Type: the known Accept, Content-Type
- *     `application/x-header-probe` — a 415 is expected.
+ * The header probe's temporary-object cycle, as the error corpus's phase 2
+ * runs it (writeCycle.ts): per object type, create; read, lock, write,
+ * unlock; check and activate; deletion check and delete — each member sent
+ * with its known pair, a bad Content-Type and a bad Accept, on temporary
+ * objects it creates in the configured package and deletes again. It has no
+ * command of its own any more: `npm run header:discovery` is the error corpus.
  *
  * More in tools/header-probe/README.md.
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  closeOwnTestConnection,
-  createTestConnection,
-  getTargetSystem,
-  resolveSystemContext,
-} from '../../src/__tests__/helpers/sessionConfig';
-import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../../src/clients/AdtClient';
 import {
   cleanupOf,
-  gate,
-  gateConnect,
   type ICallOn,
   type ICapture,
-  message,
   runCalls,
   throughGate,
   traced,
 } from './capture';
-import {
-  Interrupt,
-  Interrupted,
-  Ledger,
-  withCleanup,
-  withLock,
-} from './ledger';
+import { type Interrupt, type Ledger, withLock } from './ledger';
 import {
   type IObjectSpec,
   type IProbeable,
   type ISpecContext,
   LOCAL_INCLUDES,
   OBJECT_SPECS,
-  SKIPPED,
 } from './objects';
 import { knownPair } from './pairs';
 import {
@@ -82,33 +34,17 @@ import {
   type IObjectState,
   type IOperationRow,
   type IProbeAnswer,
-  type IProbeReport,
-  type IRemoval,
   PROBE_KINDS,
   type ProbeKind,
   plannedKinds,
   probePair,
   readAnswer,
   readState,
-  removalWord,
-  renderComparison,
-  renderMarkdown,
-  unproven,
   wants,
 } from './record';
 
-// The helpers load `.env` when imported; nothing else here reads it.
-const {
-  getEnvironmentConfig,
-} = require('../../src/__tests__/helpers/test-helper');
-
-const OUT_DIR = path.resolve(__dirname, '../../.header-probe');
-
 const progress = (line: string): void => {
   process.stdout.write(`${line}\n`);
-};
-const loud = (line: string): void => {
-  process.stderr.write(`${line}\n`);
 };
 
 export interface IArgs {
@@ -122,21 +58,6 @@ export interface IArgs {
    * phase 2); the known pair keeps its place.
    */
   contentTypeFirst?: boolean;
-  compare?: [string, string];
-}
-
-function parseArgs(argv: readonly string[]): IArgs {
-  const args: IArgs = { sequential: false };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--only')
-      args.only = (argv[++i] ?? '').split(',').filter(Boolean);
-    else if (arg === '--operation') args.operation = argv[++i];
-    else if (arg === '--sequential') args.sequential = true;
-    else if (arg === '--compare') args.compare = [argv[++i], argv[++i]];
-    else throw new Error(`Unknown argument: ${arg}`);
-  }
-  return args;
 }
 
 type ICall = ICallOn<AdtClient>;
@@ -287,6 +208,41 @@ export class Probe {
     return capture;
   }
 
+  /** Every unlock that failed: `<what>: <answer>`. A run with one ends failed. */
+  readonly lockFailures: string[] = [];
+
+  /**
+   * Releases a lock and checks the answer. A failed unlock keeps its handle in
+   * the ledger: the cleanup unlocks again before it deletes (newest first), a
+   * cleanup action, not a probe resend; still refused, it is `MAY REMAIN`.
+   */
+  async release(
+    label: string,
+    unlock: (handle: string) => ICall,
+    held: string,
+  ): Promise<void> {
+    const capture = await this.direct1(unlock(held), false);
+    if (ok(capture)) return;
+    this.lockFailures.push(
+      `${label}: the unlock answered ${capture.wire?.status ?? capture.failure ?? 'nothing'}`,
+    );
+    this.ledger.add({
+      label: `(locked) ${label}`,
+      remove: async () => {
+        const again = await this.direct1(unlock(held), false);
+        return ok(again)
+          ? {
+              removed: true,
+              detail: `unlocked in the cleanup (${again.wire?.status})`,
+            }
+          : {
+              removed: 'unknown',
+              detail: `MAY REMAIN (locked): the unlock answered ${again.wire?.status ?? again.failure ?? 'nothing'} again`,
+            };
+      },
+    });
+  }
+
   /** A ledger entry that deletes `name` with the known delete pair, if it is there. */
   remember(spec: IObjectSpec, name: string, context: ISpecContext): void {
     const config = spec.config(name, context);
@@ -370,11 +326,12 @@ export class Probe {
         handle,
         // Released after an interrupt too: unlocking is cleanup.
         (held) =>
-          this.direct1(
-            (client, analyse) =>
-              spec.handle(client).unlock?.(config, held, { analyse }) ??
+          this.release(
+            `${spec.type} ${name}`,
+            (h) => (client, analyse) =>
+              spec.handle(client).unlock?.(config, h, { analyse }) ??
               Promise.resolve(),
-            false,
+            held,
           ),
         (held) =>
           this.direct1(
@@ -515,11 +472,12 @@ export class Probe {
           lock,
           // Released after an interrupt too: unlocking is cleanup.
           (held) =>
-            this.direct1(
-              (client, analyse) =>
-                handle(client).unlock?.(config, held, { analyse }) ??
+            this.release(
+              `${spec.type} ${names.known}`,
+              (h) => (client, analyse) =>
+                handle(client).unlock?.(config, h, { analyse }) ??
                 Promise.resolve(),
-              false,
+              held,
             ),
           async (held) => {
             if (source === undefined) {
@@ -858,18 +816,6 @@ function lockHandle(capture: ICapture): string | undefined {
   return typeof value === 'string' && value ? value : undefined;
 }
 
-function stamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, '-');
-}
-
-function writeReport(report: IProbeReport): string[] {
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  const base = path.join(OUT_DIR, `report-${stamp()}`);
-  fs.writeFileSync(`${base}.json`, `${JSON.stringify(report, null, 2)}\n`);
-  fs.writeFileSync(`${base}.md`, renderMarkdown(report));
-  return [`${base}.json`, `${base}.md`];
-}
-
 export function randomRun(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let run = '';
@@ -877,114 +823,3 @@ export function randomRun(): string {
     run += alphabet[Math.floor(Math.random() * alphabet.length)];
   return run;
 }
-
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.compare) {
-    const [a, b] = args.compare.map(
-      (file) => JSON.parse(fs.readFileSync(file, 'utf8')) as IProbeReport,
-    );
-    const [batched, sequential] = a.mode === 'batched' ? [a, b] : [b, a];
-    fs.mkdirSync(OUT_DIR, { recursive: true });
-    const out = path.join(OUT_DIR, `compare-${stamp()}.md`);
-    fs.writeFileSync(out, renderComparison(batched, sequential));
-    progress(out);
-    return;
-  }
-
-  const environment = getEnvironmentConfig();
-  const packageName = String(environment.default_package ?? '');
-  const transportRequest = String(environment.default_transport ?? '');
-  if (!packageName)
-    throw new Error('test-config.yaml: environment.default_package is not set');
-  const system = getTargetSystem();
-
-  const report: IProbeReport = {
-    startedAt: new Date().toISOString(),
-    mode: args.sequential ? 'sequential' : 'batched',
-    filters: { only: args.only, operation: args.operation },
-    rows: [],
-    removals: [],
-  };
-  const ledger = new Ledger((removal: IRemoval) => {
-    report.removals.push(removal);
-    progress(`  cleanup: ${removalWord(removal)} ${removal.label}`);
-  });
-
-  const interrupt = new Interrupt();
-  const raw = await gateConnect(
-    () => createTestConnection(createConnectionLogger(), { ownSession: true }),
-    interrupt,
-  );
-  // Every request of the probe goes through the gate.
-  const gated = gate(raw, { interrupt });
-  const connection = gated;
-  const clientOptions = await resolveSystemContext(gated, system === 'cloud');
-  const probe = new Probe(
-    connection,
-    clientOptions,
-    args,
-    ledger,
-    { packageName, transportRequest },
-    randomRun(),
-    interrupt,
-  );
-  report.rows = probe.rows;
-
-  const finish = async (): Promise<void> => {
-    report.finishedAt = new Date().toISOString();
-    for (const file of writeReport(report)) progress(file);
-    const left = unproven(report.removals);
-    if (left.length) {
-      loud(
-        `\n!!! ${left.length} temporary object(s) could not be removed or may remain — check and delete them by hand:`,
-      );
-      for (const removal of left)
-        loud(
-          `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
-        );
-    }
-  };
-
-  // Ctrl-C stops new requests; the one in flight answers, the run unwinds,
-  // and the `finally` cleans the ledger as it then stands. A second Ctrl-C
-  // while that cleanup runs is ignored.
-  process.on('SIGINT', () => {
-    if (interrupt.requested) return;
-    interrupt.stop();
-    report.error = 'interrupted (SIGINT)';
-    progress(
-      'interrupted: waiting for the request in flight, then removing the temporary objects',
-    );
-  });
-
-  try {
-    await withCleanup(ledger, async () => {
-      for (const spec of OBJECT_SPECS) {
-        if (args.only && !args.only.includes(spec.type)) continue;
-        await probe.objectType(spec);
-      }
-      if (!args.only || args.only.includes('utils')) await probe.utils();
-      for (const skipped of SKIPPED)
-        if (probe.wanted(skipped.type, skipped.member))
-          probe.skip(skipped.type, skipped.member, skipped.reason);
-    });
-  } catch (error) {
-    if (!(error instanceof Interrupted)) {
-      report.error = message(error);
-      loud(`The probe stopped: ${report.error}`);
-    }
-  }
-  await finish();
-  await closeOwnTestConnection(raw);
-  if (interrupt.requested) process.exit(130);
-}
-
-if (require.main === module)
-  main().then(
-    () => process.exit(0),
-    (error: unknown) => {
-      loud(`header probe: ${message(error)}`);
-      process.exit(1);
-    },
-  );
