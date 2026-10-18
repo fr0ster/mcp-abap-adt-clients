@@ -1,5 +1,12 @@
 # Stateful Session Guide
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](../../README.md#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRUD workflows.
 
 ## Key Points
@@ -51,19 +58,19 @@ const cls = client.getClass();
 const config = { className: 'ZCL_TEST' };
 
 // The POST that makes the class shell. Nothing else.
-await cls.create({ ...config, packageName: 'ZPKG', description: 'Test' });
+await cls.create({ ...config, packageName: 'ZPKG', description: 'Test' }, { headers });
 
 const locked = await cls.lock(config);          // the LOCK goes stateful
 if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 
 try {
-  await cls.update(config, { source: updatedCode, lockHandle });
+  await cls.update(config, { headers, source: updatedCode, lockHandle });
 } finally {
   await cls.unlock(config, lockHandle);          // so does the UNLOCK
 }
 
-await cls.activate(config);
+await cls.activate(config, { headers });
 ```
 
 Passing no `lockHandle` is allowed. Whether a write without a lock is accepted
@@ -105,7 +112,7 @@ and only you can make one:
 // The consumer owns the lifecycle, so the consumer recycles.
 await connection.disconnect();   // on your concrete connector, not on IAbapConnection
 await connection.connect();
-await client.getPackage().delete({ packageName }, { analyse: analyseDeletion });
+await client.getPackage().delete({ packageName }, { headers, analyse: analyseDeletion });
 ```
 
 This library's part is to hand the refusal back whole rather than swallow it —

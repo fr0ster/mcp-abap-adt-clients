@@ -2,17 +2,13 @@
  * FunctionInclude (FUGR/I) delete operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 export interface IDeleteFunctionIncludeParams {
   function_group_name: string;
@@ -29,6 +25,7 @@ function objectUri(groupName: string, includeName: string): string {
  */
 export async function checkDeletion(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteFunctionIncludeParams,
 ): Promise<IAdtWireResponse> {
   const uri = objectUri(params.function_group_name, params.include_name);
@@ -43,10 +40,7 @@ export async function checkDeletion(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION_CHECK,
-      'Content-Type': CT_DELETION_CHECK,
-    },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -55,6 +49,7 @@ export async function checkDeletion(
  */
 export async function deleteFunctionInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteFunctionIncludeParams,
 ): Promise<IAdtWireResponse> {
   const uri = objectUri(params.function_group_name, params.include_name);
@@ -81,9 +76,6 @@ export async function deleteFunctionInclude(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION,
-      'Content-Type': CT_DELETION,
-    },
+    headers: requestHeaders(headers),
   });
 }

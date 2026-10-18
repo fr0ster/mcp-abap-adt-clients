@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { activateObjectInSession } from '../../../utils/activationUtils';
+import { TEST_HEADERS } from '../../helpers/adtHeaders';
 
 /**
  * The writer hands the answer over. It does not judge it.
@@ -58,6 +59,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
     const connection = connectionReturning(ALREADY_ACTIVE_XML);
     const res = await activateObjectInSession(
       connection,
+      TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
     );
@@ -69,6 +71,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
 
     const res = await activateObjectInSession(
       connection,
+      TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
     );
@@ -83,6 +86,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
     const connection = connectionReturning(SUCCESS_XML);
     const res = await activateObjectInSession(
       connection,
+      TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
     );
@@ -93,6 +97,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
     const connection = connectionReturning('');
     const res = await activateObjectInSession(
       connection,
+      TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
     );
@@ -103,6 +108,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
     const connection = connectionReturning('<something:else/>');
     const res = await activateObjectInSession(
       connection,
+      TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
     );

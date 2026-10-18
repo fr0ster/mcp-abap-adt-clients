@@ -15,6 +15,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -143,7 +144,7 @@ export class AdtAppendStructure<
   /** Create the append structure. Metadata only — the fields come via update. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IAppendStructureConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -166,7 +167,7 @@ export class AdtAppendStructure<
 
     return answering(
       () =>
-        createAppendStructure(connection, {
+        createAppendStructure(connection, options.headers, {
           append_structure_name: name,
           base_object: config.baseObject as string,
           package_name: config.packageName as string,
@@ -273,7 +274,7 @@ export class AdtAppendStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -290,6 +291,7 @@ export class AdtAppendStructure<
       () =>
         updateAppendStructure(
           connection,
+          options.headers,
           {
             append_structure_name: name,
             source_code: source as string,
@@ -311,7 +313,7 @@ export class AdtAppendStructure<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -319,7 +321,7 @@ export class AdtAppendStructure<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           append_structure_name: name,
           transport_request: config.transportRequest,
         }),
@@ -337,7 +339,7 @@ export class AdtAppendStructure<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -345,7 +347,7 @@ export class AdtAppendStructure<
     const name = this.name(config);
     return answering(
       () =>
-        deleteAppendStructure(connection, {
+        deleteAppendStructure(connection, options.headers, {
           append_structure_name: name,
           transport_request: config.transportRequest,
         }),
@@ -357,7 +359,7 @@ export class AdtAppendStructure<
   /** Activate the append structure. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -365,7 +367,7 @@ export class AdtAppendStructure<
     const name = this.name(config);
 
     return answering(
-      () => activateAppendStructure(connection, name),
+      () => activateAppendStructure(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -374,8 +376,8 @@ export class AdtAppendStructure<
   /** Check the append structure. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -385,7 +387,7 @@ export class AdtAppendStructure<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkAppendStructure(connection, name, version),
+      () => checkAppendStructure(connection, options.headers, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

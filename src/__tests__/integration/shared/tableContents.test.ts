@@ -19,6 +19,7 @@ import * as dotenv from 'dotenv';
 import { selectEveryColumn } from '../../../../scripts/lib/tableSelect';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -127,13 +128,16 @@ describe('Shared - getTableContents', () => {
     // as the failure half, naming which.
     const document = expectResult(
       await withAcceptHandling(
-        client.getUtils().getTableContents({
-          table_name: tableName,
-          max_rows: maxRows,
-          // The statement is the caller's since 19.0.0. This one reproduces
-          // what the member used to build for itself.
-          sql_query: await selectEveryColumn(connection, tableName),
-        }),
+        client.getUtils().getTableContents(
+          {
+            table_name: tableName,
+            max_rows: maxRows,
+            // The statement is the caller's since 19.0.0. This one reproduces
+            // what the member used to build for itself.
+            sql_query: await selectEveryColumn(connection, tableName),
+          },
+          { headers: headersOf(client.getUtils(), 'getTableContents') },
+        ),
       ),
       'table contents',
     ) as string;
@@ -188,10 +192,13 @@ describe('Shared - getTableContents', () => {
     // as the failure half, naming which.
     const document = expectResult(
       await withAcceptHandling(
-        client.getUtils().getTableContents({
-          table_name: tableName,
-          sql_query: await selectEveryColumn(connection, tableName),
-        }),
+        client.getUtils().getTableContents(
+          {
+            table_name: tableName,
+            sql_query: await selectEveryColumn(connection, tableName),
+          },
+          { headers: headersOf(client.getUtils(), 'getTableContents') },
+        ),
       ),
       'table contents',
     ) as string;
@@ -231,10 +238,13 @@ describe('Shared - getTableContents', () => {
     // the server answers. What comes back is the server's words, which a
     // strategy can read — the sentence this package used to compose was not.
     logTestStep('an empty table name is answered by the server', testsLogger);
-    const answer = await client.getUtils().getTableContents({
-      table_name: '',
-      sql_query: 'SELECT 1 FROM T000',
-    });
+    const answer = await client.getUtils().getTableContents(
+      {
+        table_name: '',
+        sql_query: 'SELECT 1 FROM T000',
+      },
+      { headers: headersOf(client.getUtils(), 'getTableContents') },
+    );
 
     expect(answer.ok).toBe(false);
     if (answer.ok) throw new Error('expected the server to refuse');

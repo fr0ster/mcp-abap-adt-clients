@@ -2,6 +2,7 @@
  * View check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -19,12 +20,14 @@ import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
  */
 export async function checkDdl(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   ddlName: string,
   version: CheckRunVersion = 'active',
   sourceCode?: string,
 ): Promise<IAdtWireResponse> {
   return runCheckRun(
     connection,
+    headers,
     'view',
     ddlName,
     version,

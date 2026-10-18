@@ -1,10 +1,11 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_ACCESS_CONTROL } from '../../constants/contentTypes';
 import { ACCESS_CONTROL } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateAccessControlParams } from './types';
 
@@ -14,6 +15,7 @@ import type { ICreateAccessControlParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateAccessControlParams,
 ): Promise<IAdtWireResponse> {
   const url = `${ACCESS_CONTROL.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -37,16 +39,11 @@ export async function create(
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </dcl:dclSource>`;
 
-  const headers = {
-    Accept: CT_ACCESS_CONTROL,
-    'Content-Type': CT_ACCESS_CONTROL,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

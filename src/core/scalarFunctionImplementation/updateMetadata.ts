@@ -1,17 +1,16 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_SCALAR_FUNCTION_IMPL,
-  CT_SCALAR_FUNCTION_IMPL_UPDATE,
-} from '../../constants/contentTypes';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateScalarFunctionImplementationParams } from './types';
 
 export async function updateScalarFunctionImplementationMetadata(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: IUpdateScalarFunctionImplementationParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
@@ -21,9 +20,6 @@ export async function updateScalarFunctionImplementationMetadata(
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers: {
-      Accept: ACCEPT_SCALAR_FUNCTION_IMPL,
-      'Content-Type': CT_SCALAR_FUNCTION_IMPL_UPDATE,
-    },
+    headers: requestHeaders(headers),
   });
 }

@@ -16,6 +16,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtError,
+  IAdtHeaders,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -28,6 +29,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { LockRegistry } from '../shared/LockRegistry';
@@ -95,6 +97,7 @@ export class AdtLocalDefinitions<
       () =>
         checkClassDefinitions(
           connection,
+          CHECK_RUN_HEADERS,
           config.className as string,
           config.source as string,
           'inactive',
@@ -152,7 +155,7 @@ export class AdtLocalDefinitions<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -167,6 +170,7 @@ export class AdtLocalDefinitions<
       () =>
         updateClassDefinitions(
           connection,
+          options.headers,
           name,
           source,
           // `as string` because the low-level writer types it required; the
@@ -174,7 +178,6 @@ export class AdtLocalDefinitions<
           // ADT's judgement, not this library's.
           options?.lockHandle as string,
           config.transportRequest,
-          this.contentTypes?.sourceArtifactContentType(),
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       options?.analyse,
@@ -189,7 +192,7 @@ export class AdtLocalDefinitions<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     return await this.update({ ...config, source: '' }, options);
   }
@@ -198,7 +201,7 @@ export class AdtLocalDefinitions<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
     status: string = 'inactive',
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -207,6 +210,7 @@ export class AdtLocalDefinitions<
       () =>
         checkClassDefinitions(
           connection,
+          options.headers,
           config.className as string,
           config.source as string,
           status === 'active' ? 'active' : 'inactive',

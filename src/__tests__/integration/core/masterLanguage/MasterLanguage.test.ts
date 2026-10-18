@@ -12,6 +12,7 @@
  *
  * Run: npm test -- integration/core/masterLanguage
  */
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
@@ -20,6 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -117,7 +119,7 @@ describe('Master language on create (#105)', () => {
         expectResult(
           await cls.delete(
             { className, transportRequest },
-            { analyse: analyseDeletion },
+            { headers: headersOf(cls, 'delete'), analyse: analyseDeletion },
           ),
           what,
         );
@@ -133,12 +135,15 @@ describe('Master language on create (#105)', () => {
       let bodyPassed = false;
       try {
         expectResult(
-          await cls.create({
-            className,
-            packageName,
-            transportRequest,
-            description: 'master language integration probe',
-          }),
+          await cls.create(
+            {
+              className,
+              packageName,
+              transportRequest,
+              description: 'master language integration probe',
+            },
+            { headers: headersOf(cls, 'create') },
+          ),
           'create',
         );
 
@@ -164,7 +169,13 @@ describe('Master language on create (#105)', () => {
         //
         //    So all eight attempts failed on every run, this assertion never
         //    ran, and the run paid sixteen seconds for the privilege.
-        expectResult(await cls.activate({ className }), 'activate');
+        expectResult(
+          await cls.activate(
+            { className },
+            { headers: headersOf(cls, 'activate') },
+          ),
+          'activate',
+        );
 
         const meta = expectResult(
           await cls.readMetadata({ className }),
@@ -183,7 +194,7 @@ describe('Master language on create (#105)', () => {
           await cls
             .delete(
               { className, transportRequest },
-              { analyse: analyseDeletion },
+              { headers: headersOf(cls, 'delete'), analyse: analyseDeletion },
             )
             .catch(() => undefined);
         }

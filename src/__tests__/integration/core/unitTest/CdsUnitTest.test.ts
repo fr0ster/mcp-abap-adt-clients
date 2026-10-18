@@ -28,6 +28,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -244,10 +245,13 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
 
           // Delete existing test class if it exists (idempotent test)
           try {
-            await client.getClass().delete({
-              className,
-              transportRequest,
-            });
+            await client.getClass().delete(
+              {
+                className,
+                transportRequest,
+              },
+              { headers: headersOf(client.getClass(), 'delete') },
+            );
             testsLogger.info?.(
               'Deleted existing CDS unit test class:',
               className,
@@ -275,15 +279,19 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           // A CDS view's tests live in a global class made for them from a
           // template: an ordinary class create, final, with the template.
           const createState = expectResult(
-            await client.getClass().create({
-              className,
-              packageName,
-              classTemplate,
-              final: true,
-              description:
-                cdsUnitTestConfig.description || `CDS unit test for ${ddlName}`,
-              transportRequest,
-            }),
+            await client.getClass().create(
+              {
+                className,
+                packageName,
+                classTemplate,
+                final: true,
+                description:
+                  cdsUnitTestConfig.description ||
+                  `CDS unit test for ${ddlName}`,
+                transportRequest,
+              },
+              { headers: headersOf(client.getClass(), 'create') },
+            ),
             'createState',
           );
           expect(createState).toBeDefined();
@@ -291,10 +299,13 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
 
           // Step 3: Activate class
           logTestStep('activate', testsLogger);
-          const activateState = await client.getClass().activate({
-            className,
-            transportRequest,
-          });
+          const activateState = await client.getClass().activate(
+            {
+              className,
+              transportRequest,
+            },
+            { headers: headersOf(client.getClass(), 'activate') },
+          );
           expect(activateState).toBeDefined();
           testsLogger.info?.('CDS unit test class activated');
 
@@ -379,10 +390,13 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                   'Cleaning up CDS unit test class:',
                   className,
                 );
-                await client.getClass().delete({
-                  className,
-                  transportRequest,
-                });
+                await client.getClass().delete(
+                  {
+                    className,
+                    transportRequest,
+                  },
+                  { headers: headersOf(client.getClass(), 'delete') },
+                );
                 testsLogger.info?.('CDS unit test class deleted successfully');
               } catch (cleanupError: any) {
                 testsLogger.warn?.(

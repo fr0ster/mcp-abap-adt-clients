@@ -2,16 +2,18 @@
  * Include source upload — assumes the include is already locked.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { includeUrl } from './lock';
 
 export async function uploadIncludeSource(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   includeName: string,
   sourceCode: string,
   lockHandle?: string,
@@ -22,6 +24,6 @@ export async function uploadIncludeSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: { Accept: ACCEPT_SOURCE, 'Content-Type': CT_SOURCE },
+    headers: requestHeaders(headers),
   });
 }

@@ -4,9 +4,11 @@
  * would come back as a resolved `connection` failure, telling the caller to
  * check the network about an argument of theirs.
  */
+
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { headersOf } from '../../helpers/adtHeaders';
 
 const makeAdtRequest = jest.fn();
 const connection = {
@@ -30,9 +32,27 @@ describe('group members refuse an object they cannot address', () => {
   beforeEach(() => makeAdtRequest.mockClear());
 
   it.each([
-    ['activateObjectsGroup', (o: never) => utils().activateObjectsGroup(o)],
-    ['checkDeletionGroup', (o: never) => utils().checkDeletionGroup(o)],
-    ['deleteObjectsGroup', (o: never) => utils().deleteObjectsGroup(o)],
+    [
+      'activateObjectsGroup',
+      (o: never) =>
+        utils().activateObjectsGroup(o, undefined, {
+          headers: headersOf(utils(), 'activateObjectsGroup'),
+        }),
+    ],
+    [
+      'checkDeletionGroup',
+      (o: never) =>
+        utils().checkDeletionGroup(o, {
+          headers: headersOf(utils(), 'checkDeletionGroup'),
+        }),
+    ],
+    [
+      'deleteObjectsGroup',
+      (o: never) =>
+        utils().deleteObjectsGroup(o, undefined, {
+          headers: headersOf(utils(), 'deleteObjectsGroup'),
+        }),
+    ],
   ])('%s throws before any request', async (_name, call) => {
     for (const objects of [unknown, untyped, moduleWithoutGroup]) {
       await expect(call(objects as never)).rejects.toThrow();

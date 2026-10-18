@@ -27,6 +27,7 @@ import type {
   IAdtDeletable,
   IAdtEnhancementHost,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -196,7 +197,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   /** Create the program. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IProgramConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -218,31 +219,27 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     const name = config.programName as string;
     return answering(
       () =>
-        createProgram(
-          connection,
-          {
-            programName: name,
-            packageName: config.packageName as string,
-            transportRequest: config.transportRequest,
-            description: config.description,
-            programType: config.programType,
-            application: config.application,
-            // No `sourceCode` here. `create` is the POST that makes the
-            // program, and it sends metadata only — the source is a PUT to
-            // `…/source/main` under a lock, which this member neither holds nor
-            // can obtain. Passing the field read as if it did something, and it
-            // never did: a program created with a body came back empty, and the
-            // only symptom was the object failing to do its job later. Writing
-            // the source is `update`'s, after `lock`. See
-            // fr0ster/mcp-abap-adt-interfaces#76 for taking the field off the
-            // create contract so the compiler says this instead of a comment.
-            masterSystem: this.systemContext.masterSystem,
-            responsible: this.systemContext.responsible,
-            masterLanguage:
-              config.masterLanguage ?? this.systemContext.masterLanguage,
-          },
-          this.contentTypes,
-        ),
+        createProgram(connection, options.headers, {
+          programName: name,
+          packageName: config.packageName as string,
+          transportRequest: config.transportRequest,
+          description: config.description,
+          programType: config.programType,
+          application: config.application,
+          // No `sourceCode` here. `create` is the POST that makes the
+          // program, and it sends metadata only — the source is a PUT to
+          // `…/source/main` under a lock, which this member neither holds nor
+          // can obtain. Passing the field read as if it did something, and it
+          // never did: a program created with a body came back empty, and the
+          // only symptom was the object failing to do its job later. Writing
+          // the source is `update`'s, after `lock`. See
+          // fr0ster/mcp-abap-adt-interfaces#76 for taking the field off the
+          // create contract so the compiler says this instead of a comment.
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
+        }),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
     );
@@ -303,7 +300,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -321,6 +318,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
       () =>
         uploadProgramSource(
           connection,
+          options.headers,
           name,
           source as string,
           options?.lockHandle as string,
@@ -341,7 +339,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -349,7 +347,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     const name = config.programName as string;
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           programName: name,
           transportRequest: config.transportRequest,
         }),
@@ -371,7 +369,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -379,7 +377,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     const name = config.programName as string;
     return answering(
       () =>
-        deleteProgram(connection, {
+        deleteProgram(connection, options.headers, {
           programName: name,
           transportRequest: config.transportRequest,
         }),
@@ -391,13 +389,18 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   /** Activate the program. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
-      () => activateProgram(connection, config.programName as string),
+      () =>
+        activateProgram(
+          connection,
+          options.headers,
+          config.programName as string,
+        ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -406,8 +409,8 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   /** Check the program. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -419,6 +422,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
       () =>
         checkProgram(
           connection,
+          options.headers,
           config.programName as string,
           version,
           config.source,

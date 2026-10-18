@@ -9,7 +9,6 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE, transportUri } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import {
   encodeSapObjectName,
   longPollingQuery,
@@ -97,18 +96,14 @@ export async function getClassDefinitionsInclude(
     options?.withLongPolling,
   );
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -130,18 +125,14 @@ export async function getClassMacrosInclude(
     options?.withLongPolling,
   );
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -163,18 +154,14 @@ export async function getClassTestClassesInclude(
     options?.withLongPolling,
   );
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -196,16 +183,12 @@ export async function getClassImplementationsInclude(
     options?.withLongPolling,
   );
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }

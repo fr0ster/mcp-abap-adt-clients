@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "35.0.0",
+  "version": "36.0.0",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -117,7 +117,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^18.0.0",
+    "@mcp-abap-adt/interfaces-adt": "^20.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
     "@mcp-abap-adt/interfaces-network": "^2.0.1",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",

@@ -4,15 +4,13 @@
  * when the caller intends to keep the lock on the object for further updates.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_AUTHORIZATION_FIELD,
-  CT_AUTHORIZATION_FIELD,
-} from '../../constants/contentTypes';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateAuthorizationFieldParams } from './types';
 import { buildAuthorizationFieldXml } from './xmlBuilder';
 
@@ -21,22 +19,18 @@ import { buildAuthorizationFieldXml } from './xmlBuilder';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
   const url = `${AUTHORIZATION_FIELD.collection}${args.transport_request ? `?corrNr=${encodeURIComponent(args.transport_request)}` : ''}`;
 
   const xmlBody = buildAuthorizationFieldXml(args);
 
-  const headers = {
-    Accept: ACCEPT_AUTHORIZATION_FIELD,
-    'Content-Type': CT_AUTHORIZATION_FIELD,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

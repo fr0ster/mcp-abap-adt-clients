@@ -2,6 +2,7 @@
  * Enhancement activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -22,6 +23,7 @@ import { type EnhancementType, getEnhancementUri } from './types';
  */
 export async function activateEnhancement(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   enhancementType: EnhancementType,
   enhancementName: string,
 ): Promise<IAdtWireResponse> {
@@ -29,6 +31,7 @@ export async function activateEnhancement(
 
   return await activateObjectInSession(
     connection,
+    headers,
     objectUri,
     enhancementName.toUpperCase(),
     true,

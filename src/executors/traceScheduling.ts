@@ -14,6 +14,7 @@
 import type {
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IProfilerTraceParameters,
   IResultStrategy,
@@ -133,10 +134,11 @@ export class TraceScheduling<
    * missing one with `analyse`.
    */
   async scheduleTrace<E extends IAdtError = IAdtError>(
-    options?: IProfilerTraceParameters & IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IProfilerTraceParameters &
+      IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['scheduled']>, E>> {
     return answering(
-      () => createTraceParameters(this.connection, options),
+      () => createTraceParameters(this.connection, options.headers, options),
       this.results.scheduled as IResultStrategy<ReturnType<R['scheduled']>>,
       options?.analyse,
     );

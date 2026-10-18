@@ -12,6 +12,7 @@ import {
   listTraceRequests,
   normalizeProfilerTraceId,
 } from '../../../../runtime/traces/profiler';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 describe('runtime/traces/profiler', () => {
   function createConnectionMock() {
@@ -45,7 +46,11 @@ describe('runtime/traces/profiler', () => {
   it('createTraceParameters posts XML payload', async () => {
     const connection = createConnectionMock();
 
-    await createTraceParameters(connection, { aggregate: true });
+    await createTraceParameters(
+      connection,
+      headersFor('TraceScheduling.scheduleTrace'),
+      { aggregate: true },
+    );
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({

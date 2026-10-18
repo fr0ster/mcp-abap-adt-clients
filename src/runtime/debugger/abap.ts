@@ -27,6 +27,7 @@
 
 import type {
   IAdtError,
+  IAdtHeaders,
   IDebuggerBreakpoint,
   IDebuggerBreakpointSync,
   IDebuggerIdentity,
@@ -41,6 +42,7 @@ import type {
 import { XMLParser } from 'fast-xml-parser';
 import { buildBatchPayload, createBatchBoundary } from '../../batch/wire';
 import { DEBUGGER } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 const ADT_NAMESPACES =
   'xmlns:dbg="http://www.sap.com/adt/debugger" xmlns:adtcore="http://www.sap.com/adt/core"';
@@ -201,6 +203,7 @@ export function buildSyncBreakpointsXml(
  */
 export async function setBreakpoints(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   identity: IDebuggerIdentity,
   breakpoints: readonly IDebuggerBreakpoint[],
   validationOnly = false,
@@ -210,7 +213,7 @@ export async function setBreakpoints(
     method: 'POST',
     timeout: 0,
     data: buildBreakpointsXml(identity, breakpoints, validationOnly),
-    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -256,6 +259,7 @@ export async function setBreakpoints(
  */
 export async function syncBreakpoints(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   identity: IDebuggerIdentity,
   sync: IDebuggerBreakpointSync,
 ): Promise<IAdtWireResponse> {
@@ -264,7 +268,7 @@ export async function syncBreakpoints(
     method: 'POST',
     timeout: 0,
     data: buildSyncBreakpointsXml(identity, sync),
-    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -534,6 +538,7 @@ export function buildChildVariablesXml(parentIds: readonly string[]): string {
  */
 export async function getChildVariables(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   parentIds: readonly string[],
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
@@ -541,10 +546,7 @@ export async function getChildVariables(
     method: 'POST',
     timeout: 0,
     data: buildChildVariablesXml(parentIds),
-    headers: {
-      'Content-Type': DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
-      Accept: DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
-    },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -566,6 +568,7 @@ export function buildVariablesXml(variableIds: readonly string[]): string {
 /** Read variables by id — a path such as `LT_ITEMS[3]-MATNR` included. */
 export async function getVariables(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   variableIds: readonly string[],
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
@@ -573,10 +576,7 @@ export async function getVariables(
     method: 'POST',
     timeout: 0,
     data: buildVariablesXml(variableIds),
-    headers: {
-      'Content-Type': DEBUGGER_VARIABLES_CONTENT_TYPE,
-      Accept: DEBUGGER_VARIABLES_CONTENT_TYPE,
-    },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -909,6 +909,7 @@ export function buildDebuggerSettingsXml(settings: IDebuggerSettings): string {
  */
 export async function setDebuggerSettings(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   settings: IDebuggerSettings,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
@@ -916,6 +917,6 @@ export async function setDebuggerSettings(
     method: 'POST',
     timeout: 0,
     data: buildDebuggerSettingsXml(settings),
-    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' },
+    headers: requestHeaders(headers),
   });
 }

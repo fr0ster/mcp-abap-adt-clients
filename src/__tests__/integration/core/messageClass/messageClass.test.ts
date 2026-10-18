@@ -28,6 +28,7 @@ import type {
 import { parseMessageClass } from '../../../../core/messageClass';
 import type { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -145,10 +146,13 @@ describe('MessageClass (using AdtClient)', () => {
             // the bare check was always true and this deleted a class that was
             // not there on every run.
             if (state.ok) {
-              await client.getMessageClass().delete({
-                name: msgClassName,
-                transportRequest: resolvedTransport,
-              });
+              await client.getMessageClass().delete(
+                {
+                  name: msgClassName,
+                  transportRequest: resolvedTransport,
+                },
+                { headers: headersOf(client.getMessageClass(), 'delete') },
+              );
               // The deletion service is asynchronous — poll until the object is
               // actually gone (read → 404) before recreating, so a same-name
               // re-run does not race the still-completing delete.
@@ -174,7 +178,9 @@ describe('MessageClass (using AdtClient)', () => {
         cleanupObject: async (config: IMessageClassConfig) => {
           await client
             .getMessageClass()
-            .delete(config as Partial<IMessageClassConfig>);
+            .delete(config as Partial<IMessageClassConfig>, {
+              headers: headersOf(client.getMessageClass(), 'delete'),
+            });
         },
       });
     } catch (error) {
@@ -229,7 +235,9 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 1: Create message class ───────────────────────────────────
           logTestStep('create message class', testsLogger);
           const createState = expectResult(
-            await mcHandler.create(config),
+            await mcHandler.create(config, {
+              headers: headersOf(mcHandler, 'create'),
+            }),
             'createState',
           );
 
@@ -265,12 +273,15 @@ describe('MessageClass (using AdtClient)', () => {
           // agree on when the class is there. Retry rather than treat the first
           // answer as final.
           const createMessage = () =>
-            msgHandler.create({
-              className: msgClassName,
-              msgno: msgNo,
-              msgtext: msgTextInitial,
-              transportRequest: config.transportRequest,
-            });
+            msgHandler.create(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+                msgtext: msgTextInitial,
+                transportRequest: config.transportRequest,
+              },
+              { headers: headersOf(msgHandler, 'create') },
+            );
           let created = await createMessage().catch((e: unknown) => e as Error);
           for (
             let attempt = 0;
@@ -302,12 +313,15 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 5: Update message ─────────────────────────────────────────
           logTestStep(`update message ${msgNo}`, testsLogger);
           const msgUpdateState = expectResult(
-            await msgHandler.update({
-              className: msgClassName,
-              msgno: msgNo,
-              msgtext: msgTextUpdated,
-              transportRequest: config.transportRequest,
-            }),
+            await msgHandler.update(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+                msgtext: msgTextUpdated,
+                transportRequest: config.transportRequest,
+              },
+              { headers: headersOf(msgHandler, 'update') },
+            ),
             'msgUpdateState',
           );
 
@@ -333,11 +347,19 @@ describe('MessageClass (using AdtClient)', () => {
           // through the composition the factory declares.
           logTestStep(`remove message ${msgNo}`, testsLogger);
           const msgDeleteState = expectResult(
-            await (msgHandler as unknown as AdtMessageClassMessage).delete({
-              className: msgClassName,
-              msgno: msgNo,
-              transportRequest: config.transportRequest,
-            }),
+            await (msgHandler as unknown as AdtMessageClassMessage).delete(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+                transportRequest: config.transportRequest,
+              },
+              {
+                headers: headersOf(
+                  msgHandler as unknown as AdtMessageClassMessage,
+                  'delete',
+                ),
+              },
+            ),
             'msgDeleteState',
           );
 
@@ -366,7 +388,9 @@ describe('MessageClass (using AdtClient)', () => {
           // BaseTester.afterAll only closes the connection; object deletion
           // must happen here so the next run starts with a clean state.
           try {
-            await mcHandler.delete(config as Partial<IMessageClassConfig>);
+            await mcHandler.delete(config as Partial<IMessageClassConfig>, {
+              headers: headersOf(mcHandler, 'delete'),
+            });
             // The deletion service is asynchronous — wait until the class is
             // actually gone so a back-to-back re-run does not race an in-flight
             // delete (create-then-read would otherwise 404 on the same name).

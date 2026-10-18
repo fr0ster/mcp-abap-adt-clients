@@ -22,17 +22,16 @@
  * address, not about a kind of object.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 export async function checkDeletionByUri(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objectUri: string,
 ): Promise<IAdtWireResponse> {
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -45,9 +44,6 @@ export async function checkDeletionByUri(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION_CHECK,
-      'Content-Type': CT_DELETION_CHECK,
-    },
+    headers: requestHeaders(headers),
   });
 }

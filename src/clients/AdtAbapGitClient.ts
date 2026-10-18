@@ -3,7 +3,7 @@
  *
  * Standalone top-level class — NOT a factory on AdtClient (which is
  * reserved for IAdtObject<Config, State> implementations only).
- * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, options).
+ * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, results?).
  *
  * Implements IAdtAbapGitClient. HTTP operations are delegated to
  * low-level functions in ./abapGit/*; this class owns the options,
@@ -17,9 +17,9 @@ import type {
   IAbapGitPullArgs,
   IAbapGitUnlinkArgs,
   IAdtAbapGitClient,
-  IAdtAbapGitClientOptions,
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IAnalyse,
   IResultStrategy,
@@ -57,32 +57,31 @@ export class AdtAbapGitClient<
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
-  private readonly contentTypeVersion: 'v3' | 'v4';
   private readonly results: R;
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
-    options?: IAdtAbapGitClientOptions,
+    // The options (`contentTypeVersion`, which chose what `link` and `pull`
+    // sent) are gone since 36.0.0: those members send the caller's `headers`.
     // The one cast in this file, and it is on the default. See AdtClass.
     results: R = abapGitDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
-    this.contentTypeVersion = options?.contentTypeVersion ?? 'v3';
     this.results = results;
   }
 
   /** Link a package to a repository. */
   async link<E extends IAdtError = IAdtError>(
     args: IAbapGitLinkArgs,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     this.logger?.debug?.(
       `AdtAbapGitClient.link: package=${args.package} url=${args.url}`,
     );
     return answering(
-      () => linkRepo(this.connection, args, this.contentTypeVersion),
+      () => linkRepo(this.connection, options.headers, args),
       this.results.linked as IResultStrategy<void>,
       options?.analyse as IAnalyse<E> | undefined,
     );
@@ -97,11 +96,11 @@ export class AdtAbapGitClient<
    */
   async pull<E extends IAdtError = IAdtError>(
     args: IAbapGitPullArgs,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['pulled']>, E>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
     return answering(
-      () => pullRepo(this.connection, args, this.contentTypeVersion),
+      () => pullRepo(this.connection, options.headers, args),
       this.results.pulled as IResultStrategy<ReturnType<R['pulled']>>,
       options?.analyse as IAnalyse<E> | undefined,
     );
@@ -148,10 +147,10 @@ export class AdtAbapGitClient<
   /** What an external repository offers, before linking anything to it. */
   async checkExternalRepo<E extends IAdtError = IAdtError>(
     args: IAbapGitExternalRepoCredentials,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['externalRepo']>, E>> {
     return answering(
-      () => checkExternalRepo(this.connection, args),
+      () => checkExternalRepo(this.connection, options.headers, args),
       this.results.externalRepo as IResultStrategy<
         ReturnType<R['externalRepo']>
       >,

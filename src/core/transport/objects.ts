@@ -18,28 +18,22 @@
  * `corrNr`**. Without `removeobject` the only ways out are releasing the whole
  * request, shipping everything else in it, or SE09 by hand.
  *
- * **The headers are the server's, not a guess.** Both `PUT`s go out as
- * `Content-Type: text/plain` with `Accept:
- * application/vnd.sap.adt.transportorganizer.v1+xml`. That pairing looks
- * wrong for an XML body and is what Eclipse ADT 3.60.0 sends (captured against
- * an on-premise system, 2026-09-21); it is pinned in a test so it is not
- * "corrected" later by someone reading only the body.
+ * **The headers are the caller's** (`options.headers`, since 36.0.0). What
+ * Eclipse ADT 3.60.0 sends on both `PUT`s (captured against an on-premise
+ * system, 2026-09-21) is `Content-Type: text/plain` with `Accept:
+ * application/vnd.sap.adt.transportorganizer.v1+xml` — a pairing that looks
+ * wrong for an XML body, and the one this library sent until 36.0.0.
  */
 
-import type { AdtTaskType } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtTaskType, IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IAbapObjectEntry } from './types';
-
-/** `text/plain`, as the server is sent it. See the note above. */
-const USER_ACTION_HEADERS = {
-  'Content-Type': 'text/plain',
-  Accept: ACCEPT_TRANSPORT,
-} as const;
 
 const requestUrl = (number: string): string =>
   `${TRANSPORT_REQUEST.uri(number)}`;
@@ -111,6 +105,7 @@ function userActionDocument(
  */
 export async function removeObjectFromTransport(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   transportNumber: string,
   object: IAbapObjectEntry & { position: string },
 ): Promise<IAdtWireResponse> {
@@ -119,7 +114,7 @@ export async function removeObjectFromTransport(
     method: 'PUT',
     timeout: 0,
     data: userActionDocument(transportNumber, 'removeobject', [object]),
-    headers: USER_ACTION_HEADERS,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -136,6 +131,7 @@ export async function removeObjectFromTransport(
  */
 export async function moveObjectsBetweenTransports(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   sourceTask: string,
   targetNumber: string,
   objects: readonly (IAbapObjectEntry & { position: string })[],
@@ -145,7 +141,7 @@ export async function moveObjectsBetweenTransports(
     method: 'POST',
     timeout: 0,
     data: userActionDocument(targetNumber, 'moveobjects', objects),
-    headers: USER_ACTION_HEADERS,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -165,6 +161,7 @@ export async function moveObjectsBetweenTransports(
  */
 export async function addObjectToTransport(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   transportNumber: string,
   object: IAbapObjectEntry,
 ): Promise<IAdtWireResponse> {
@@ -173,7 +170,7 @@ export async function addObjectToTransport(
     method: 'PUT',
     timeout: 0,
     data: userActionDocument(transportNumber, 'addobject', [object]),
-    headers: USER_ACTION_HEADERS,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -204,6 +201,7 @@ export async function addObjectToTransport(
  */
 export async function createTransportTask(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   transportNumber: string,
   targetUser: string,
 ): Promise<IAdtWireResponse> {
@@ -214,7 +212,7 @@ export async function createTransportTask(
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
       `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}" tm:targetuser="${attribute(targetUser)}" tm:useraction="newtask"/>`,
-    headers: USER_ACTION_HEADERS,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -340,6 +338,7 @@ export async function readTransportObjects(
  */
 export async function changeTransportTaskType(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   taskNumber: string,
   type: AdtTaskType,
 ): Promise<IAdtWireResponse> {
@@ -353,6 +352,6 @@ export async function changeTransportTaskType(
       `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${number}" tm:useraction="changetasktype">` +
       `<tm:task tm:number="${number}" tm:type="${attribute(type)}"/>` +
       '</tm:root>',
-    headers: USER_ACTION_HEADERS,
+    headers: requestHeaders(headers),
   });
 }

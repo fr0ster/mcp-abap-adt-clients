@@ -1,12 +1,12 @@
-import type { IAbapGitPullArgs } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapGitPullArgs,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  CT_ABAPGIT_REPO_V3,
-  CT_ABAPGIT_REPO_V4,
-} from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { buildPullBody } from './xmlBuilder';
 
 /**
@@ -25,17 +25,14 @@ import { buildPullBody } from './xmlBuilder';
  */
 export async function pullRepo(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: IAbapGitPullArgs,
-  contentTypeVersion: 'v3' | 'v4' = 'v3',
 ): Promise<IAdtWireResponse> {
-  const ct =
-    contentTypeVersion === 'v4' ? CT_ABAPGIT_REPO_V4 : CT_ABAPGIT_REPO_V3;
-
   return connection.makeAdtRequest({
     method: 'POST',
     url: args.pullLink,
     timeout: 0,
-    headers: { 'Content-Type': ct, Accept: ct },
+    headers: requestHeaders(headers),
     data: buildPullBody(args, args.branchName),
   });
 }

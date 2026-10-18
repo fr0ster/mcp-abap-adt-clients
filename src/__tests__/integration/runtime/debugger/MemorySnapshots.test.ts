@@ -42,6 +42,7 @@ import {
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
 import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
+import { headersOf } from '../../../helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -226,7 +227,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       description: 'Memory integration probe',
       ...(transportRequest ? { transportRequest } : {}),
     };
-    const created = await cls.create(config);
+    const created = await cls.create(config, {
+      headers: headersOf(cls, 'create'),
+    });
     // A probe kept from an earlier run is rewritten in place; the 400 says so
     // in its body, not in the message.
     if (
@@ -240,11 +243,17 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     const lock = await cls.lock(config);
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
     const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, { source: SOURCE, lockHandle });
+    const written = await cls.update(config, {
+      headers: headersOf(cls, 'update'),
+      source: SOURCE,
+      lockHandle,
+    });
     await cls.unlock(config, lockHandle);
     if (!written.ok)
       throw new Error(`probe write: ${written.getError().message}`);
-    const activated = await cls.activate(config);
+    const activated = await cls.activate(config, {
+      headers: headersOf(cls, 'activate'),
+    });
     if (!activated.ok)
       throw new Error(`probe activate: ${activated.getError().message}`);
     logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
@@ -270,11 +279,19 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     if (!testCase?.params?.keep_probe) {
       await new AdtClient(listenerConnection, connectionLogger)
         .getClass()
-        .delete({
-          className: CLASS_NAME,
-          packageName,
-          ...(transportRequest ? { transportRequest } : {}),
-        });
+        .delete(
+          {
+            className: CLASS_NAME,
+            packageName,
+            ...(transportRequest ? { transportRequest } : {}),
+          },
+          {
+            headers: headersOf(
+              new AdtClient(listenerConnection, connectionLogger).getClass(),
+              'delete',
+            ),
+          },
+        );
     }
     await closeOwnTestConnection(triggerConnection);
     await closeOwnTestConnection(listenerConnection);
@@ -284,10 +301,14 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     'stops before the table is filled',
     async () => {
       if (skipped()) return;
-      const set = await listenerApi.setBreakpoints(identity, [
-        { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.before}` },
-        { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.after}` },
-      ]);
+      const set = await listenerApi.setBreakpoints(
+        identity,
+        [
+          { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.before}` },
+          { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.after}` },
+        ],
+        { headers: headersOf(listenerApi, 'setBreakpoints') },
+      );
       expect(set.ok).toBe(true);
       for (const m of documentOf(set).matchAll(/\bid="([^"]*)"/g))
         armed.push(m[1]);

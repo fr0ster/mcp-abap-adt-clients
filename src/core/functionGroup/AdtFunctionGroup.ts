@@ -23,6 +23,7 @@ import type {
   IAdtDeletable,
   IAdtEnhancementHost,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -180,7 +181,7 @@ export class AdtFunctionGroup<
   /** Create the function group. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IFunctionGroupConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -204,6 +205,7 @@ export class AdtFunctionGroup<
       () =>
         createFunctionGroup(
           connection,
+          options.headers,
           {
             functionGroupName: name,
             packageName: config.packageName as string,
@@ -216,7 +218,6 @@ export class AdtFunctionGroup<
               config.masterLanguage ?? this.systemContext.masterLanguage,
           },
           this.logger,
-          this.contentTypes,
         ),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
@@ -282,7 +283,7 @@ export class AdtFunctionGroup<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -293,11 +294,12 @@ export class AdtFunctionGroup<
       () =>
         updateFunctionGroup(
           connection,
+          options.headers,
           {
             function_group_name: name,
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
-          } as Parameters<typeof updateFunctionGroup>[1],
+          } as Parameters<typeof updateFunctionGroup>[2],
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata` for why that is the only channel.
           //
@@ -305,7 +307,6 @@ export class AdtFunctionGroup<
           // into a document read here, inside a lock window opened here; both
           // the read and the window are theirs now.
           options?.source as string,
-          this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
@@ -323,7 +324,7 @@ export class AdtFunctionGroup<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -331,7 +332,7 @@ export class AdtFunctionGroup<
     const name = config.functionGroupName as string;
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           function_group_name: name,
           transport_request: config.transportRequest,
         }),
@@ -349,7 +350,7 @@ export class AdtFunctionGroup<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -357,7 +358,7 @@ export class AdtFunctionGroup<
     const name = config.functionGroupName as string;
     return answering(
       () =>
-        deleteFunctionGroup(connection, {
+        deleteFunctionGroup(connection, options.headers, {
           function_group_name: name,
           transport_request: config.transportRequest,
         }),
@@ -369,14 +370,18 @@ export class AdtFunctionGroup<
   /** Activate the function group. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () =>
-        activateFunctionGroup(connection, config.functionGroupName as string),
+        activateFunctionGroup(
+          connection,
+          options.headers,
+          config.functionGroupName as string,
+        ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -385,8 +390,8 @@ export class AdtFunctionGroup<
   /** Check the function group. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -398,6 +403,7 @@ export class AdtFunctionGroup<
       () =>
         checkFunctionGroup(
           connection,
+          options.headers,
           config.functionGroupName as string,
           version,
         ),

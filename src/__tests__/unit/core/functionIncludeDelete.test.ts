@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { deleteFunctionInclude } from '../../../core/functionInclude/delete';
+import { headersFor } from '../../helpers/adtHeaders';
 
 function connReturning(xml: string): IAbapConnection {
   const makeAdtRequest = jest.fn(async () => ({ status: 200, data: xml }));
@@ -22,10 +23,14 @@ const REFUSED_XML =
 describe('deleteFunctionInclude', () => {
   it('hands back the server\'s document when it reports isDeleted="true"', async () => {
     const conn = connReturning(OK_XML);
-    const res = await deleteFunctionInclude(conn, {
-      function_group_name: 'ZG',
-      include_name: 'LZG_C01',
-    });
+    const res = await deleteFunctionInclude(
+      conn,
+      headersFor('AdtFunctionInclude.delete'),
+      {
+        function_group_name: 'ZG',
+        include_name: 'LZG_C01',
+      },
+    );
 
     // The document, not `{ success: true, include_name: 'LZG_C01' }` — prose
     // this library wrote about a call it had not read, handed to a caller in
@@ -35,10 +40,14 @@ describe('deleteFunctionInclude', () => {
 
   it('does the same on the real success shape (isDeleted="true" + type="S" empty message)', async () => {
     const conn = connReturning(OK_XML_WITH_S_MESSAGE);
-    const res = await deleteFunctionInclude(conn, {
-      function_group_name: 'ZOK_TEST_FG_01',
-      include_name: 'LZOK_TEST_FG_01ZOK',
-    });
+    const res = await deleteFunctionInclude(
+      conn,
+      headersFor('AdtFunctionInclude.delete'),
+      {
+        function_group_name: 'ZOK_TEST_FG_01',
+        include_name: 'LZOK_TEST_FG_01ZOK',
+      },
+    );
 
     expect(res.data).toBe(OK_XML_WITH_S_MESSAGE);
   });
@@ -49,10 +58,14 @@ describe('deleteFunctionInclude', () => {
   // @mcp-abap-adt/adt-strategies); the wire hands the answer over whole.
   it('hands back the refusal document when isDeleted="false", unjudged', async () => {
     const conn = connReturning(REFUSED_XML);
-    const res = await deleteFunctionInclude(conn, {
-      function_group_name: 'ZG',
-      include_name: 'LZG_T01',
-    });
+    const res = await deleteFunctionInclude(
+      conn,
+      headersFor('AdtFunctionInclude.delete'),
+      {
+        function_group_name: 'ZG',
+        include_name: 'LZG_T01',
+      },
+    );
 
     expect(res.status).toBe(200);
     expect(res.data).toBe(REFUSED_XML);
@@ -60,10 +73,14 @@ describe('deleteFunctionInclude', () => {
 
   it('hands back an empty body as it came', async () => {
     const conn = connReturning('');
-    const res = await deleteFunctionInclude(conn, {
-      function_group_name: 'ZG',
-      include_name: 'LZG_X',
-    });
+    const res = await deleteFunctionInclude(
+      conn,
+      headersFor('AdtFunctionInclude.delete'),
+      {
+        function_group_name: 'ZG',
+        include_name: 'LZG_X',
+      },
+    );
 
     expect(res.data).toBe('');
   });

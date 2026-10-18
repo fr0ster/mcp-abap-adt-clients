@@ -26,6 +26,7 @@ import {
   isCloudEnvironment,
 } from '../../../../utils/systemInfo';
 import { patchXmlElement } from '../../../../utils/xmlPatch';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -115,7 +116,10 @@ describe('AdtRequest', () => {
     for (const number of createdTransports) {
       const answer = await client
         .getRequest()
-        .delete({ transportNumber: number });
+        .delete(
+          { transportNumber: number },
+          { headers: headersOf(client.getRequest(), 'delete') },
+        );
       if (answer.ok) {
         testsLogger.info?.(`Deleted test transport ${number}`);
       } else {
@@ -210,7 +214,12 @@ describe('AdtRequest', () => {
           const created = expectResult(
             await client
               .getRequest(transportParsing)
-              .create(buildConfig(testCase) as any),
+              .create(buildConfig(testCase) as any, {
+                headers: headersOf(
+                  client.getRequest(transportParsing),
+                  'create',
+                ),
+              }),
             'create transport request',
           );
 
@@ -428,7 +437,9 @@ describe('AdtRequest', () => {
         try {
           logTestStep('create the request this block works in', testsLogger);
           const created = expectResult(
-            await request.create(buildConfig(testCase) as any),
+            await request.create(buildConfig(testCase) as any, {
+              headers: headersOf(request, 'create'),
+            }),
             'create transport request',
           );
           transportNumber = created.transportNumber || null;
@@ -483,6 +494,7 @@ describe('AdtRequest', () => {
           }
           logTestStep(`the task will be owned by ${targetUser}`, testsLogger);
           const task = await request.createTask(transportNumber as string, {
+            headers: headersOf(request, 'createTask'),
             targetUser,
           });
           if (!task.ok) {
@@ -531,6 +543,7 @@ describe('AdtRequest', () => {
             await request.changeTaskType(
               taskNumber,
               ADT_TASK_TYPE.developmentCorrection,
+              { headers: headersOf(request, 'changeTaskType') },
             ),
             'give the task its type',
           );
@@ -602,11 +615,15 @@ describe('AdtRequest', () => {
               `an entry for ${domainName} is present at ${stale.task}/${stale.position} — clearing it`,
               testsLogger,
             );
-            await request.removeObject(stale.task, {
-              name: domainName,
-              type: 'DOMA',
-              position: stale.position,
-            });
+            await request.removeObject(
+              stale.task,
+              {
+                name: domainName,
+                type: 'DOMA',
+                position: stale.position,
+              },
+              { headers: headersOf(request, 'removeObject') },
+            );
           }
 
           // A previous run may have left the object itself, not just an entry.
@@ -617,18 +634,24 @@ describe('AdtRequest', () => {
               `${domainName} still exists — deleting it`,
               testsLogger,
             );
-            await domain.delete({
-              domainName,
-              transportRequest: sharedRequest,
-            });
+            await domain.delete(
+              {
+                domainName,
+                transportRequest: sharedRequest,
+              },
+              { headers: headersOf(domain, 'delete') },
+            );
           }
 
-          const madeIt = await domain.create({
-            domainName,
-            packageName,
-            transportRequest: sharedRequest,
-            description: 'AdtRequest object-list round trip',
-          });
+          const madeIt = await domain.create(
+            {
+              domainName,
+              packageName,
+              transportRequest: sharedRequest,
+              description: 'AdtRequest object-list round trip',
+            },
+            { headers: headersOf(domain, 'create') },
+          );
           if (!madeIt.ok) {
             logTestSkip(
               testsLogger,
@@ -685,7 +708,11 @@ describe('AdtRequest', () => {
                 packageName,
                 transportRequest: sharedRequest,
               },
-              { source: typed, lockHandle: domainHandle },
+              {
+                headers: headersOf(domain, 'updateMetadata'),
+                source: typed,
+                lockHandle: domainHandle,
+              },
             );
             if (!typedIn.ok) {
               testsLogger.warn?.(
@@ -702,7 +729,10 @@ describe('AdtRequest', () => {
             testsLogger,
           );
 
-          await domain.delete({ domainName, transportRequest: sharedRequest });
+          await domain.delete(
+            { domainName, transportRequest: sharedRequest },
+            { headers: headersOf(domain, 'delete') },
+          );
 
           logTestStep('find the entry the deletion left behind', testsLogger);
           const entry = await findEntry(sharedRequest, domainName);
@@ -749,11 +779,15 @@ describe('AdtRequest', () => {
           // entry and refuses to detach it, saying the entry "does not exist"
           // in itself.
           logTestStep('remove the entry, then re-read the task', testsLogger);
-          const removed = await request.removeObject(resorted.task, {
-            name: domainName,
-            type: 'DOMA',
-            position: resorted.position,
-          });
+          const removed = await request.removeObject(
+            resorted.task,
+            {
+              name: domainName,
+              type: 'DOMA',
+              position: resorted.position,
+            },
+            { headers: headersOf(request, 'removeObject') },
+          );
           expect(removed.ok).toBe(true);
 
           const after = await objectsOn(resorted.task);
@@ -813,7 +847,12 @@ describe('AdtRequest', () => {
               const createState = expectResult(
                 await client
                   .getRequest(transportParsing)
-                  .create(buildConfig(testCase) as any),
+                  .create(buildConfig(testCase) as any, {
+                    headers: headersOf(
+                      client.getRequest(transportParsing),
+                      'create',
+                    ),
+                  }),
                 'createState',
               );
               knownTransportNumber = createState.transportNumber || null;

@@ -1,5 +1,6 @@
 // The source path, not the package: the reading is new in adt-strategies and
 // the package's built entry point does not carry it until it is released.
+
 import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
@@ -7,6 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /**
  * Start, then status, then results — through the client a consumer holds.
@@ -58,9 +60,11 @@ it('starts a run, reads its status, then its results', async () => {
     activation: utilActivationRunId,
   });
 
-  const started = await utils.activateObjectsGroup([
-    { name: 'ZCL_X', type: 'CLAS/OC' },
-  ]);
+  const started = await utils.activateObjectsGroup(
+    [{ name: 'ZCL_X', type: 'CLAS/OC' }],
+    undefined,
+    { headers: headersOf(utils, 'activateObjectsGroup') },
+  );
   expect(started.ok).toBe(true);
   if (!started.ok) throw new Error('expected the run id');
 
@@ -86,7 +90,12 @@ it('answers the POST as it came by default', async () => {
   const { connection } = recording();
   const started = await new AdtClient(connection)
     .getUtils()
-    .activateObjectsGroup([{ name: 'ZCL_X', type: 'CLAS/OC' }]);
+    .activateObjectsGroup([{ name: 'ZCL_X', type: 'CLAS/OC' }], undefined, {
+      headers: headersOf(
+        new AdtClient(connection).getUtils(),
+        'activateObjectsGroup',
+      ),
+    });
   expect(started.ok).toBe(true);
   if (!started.ok) throw new Error('expected the answer');
   // The body, which carries nothing — the id is in a header the default does

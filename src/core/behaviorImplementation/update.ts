@@ -2,13 +2,14 @@
  * Behavior Implementation update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update behavior implementation class implementations include source code (low-level function)
@@ -22,6 +23,7 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
  */
 export async function updateBehaviorImplementation(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   sourceCode: string,
   lockHandle?: string,
@@ -29,16 +31,11 @@ export async function updateBehaviorImplementation(
 ): Promise<IAdtWireResponse> {
   const url = `${CLASS_INCLUDE.uri(className, 'implementations')}${writeQuery(lockHandle, transportRequest)}`;
 
-  const headers = {
-    'Content-Type': CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

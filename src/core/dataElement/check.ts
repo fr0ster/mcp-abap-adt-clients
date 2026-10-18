@@ -2,16 +2,14 @@
  * DataElement check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check data element syntax
@@ -28,6 +26,7 @@ import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
  */
 export async function checkDataElement(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   dataElementName: string,
   version: CheckRunVersion = 'active',
   xmlContent?: string,
@@ -51,11 +50,6 @@ export async function checkDataElement(
   </chkrun:checkObject>
 </chkrun:checkObjectList>`;
 
-    const headers = {
-      Accept: ACCEPT_CHECK_MESSAGES,
-      'Content-Type': CT_CHECK_OBJECTS,
-    };
-
     const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
     response = await connection.makeAdtRequest({
@@ -63,12 +57,13 @@ export async function checkDataElement(
       method: 'POST',
       timeout: 0,
       data: xmlBody,
-      headers,
+      headers: requestHeaders(headers),
     });
   } else {
     // Check saved version (without XML content)
     response = await runCheckRun(
       connection,
+      headers,
       'data_element',
       dataElementName,
       version,

@@ -6,6 +6,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtEnhancement } from '../../../../core/enhancement/AdtEnhancement';
+import { headersOf } from '../../../helpers/adtHeaders';
 
 const parser = new XMLParser({ ignoreAttributes: false });
 const enhancedObject = {
@@ -61,7 +62,9 @@ it.each(
   rows,
 )('creates %s using its measured document', async (type, media, root, code) => {
   const { client, request } = setup();
-  await client.create(config(type));
+  await client.create(config(type), {
+    headers: { accept: media, contentType: media },
+  });
   expect(request).toHaveBeenCalledTimes(1);
   const sent = request.mock.calls[0][0];
   expect(sent.url).toBe(`/sap/bc/adt/enhancements/${type}`);
@@ -141,11 +144,14 @@ it.each([
   'enhoxhh',
 ] as const)('creates %s with empty attributes when subtype fields are omitted', async (type) => {
   const { client, request } = setup();
-  await client.create({
-    enhancementType: type,
-    enhancementName: 'ZENH',
-    packageName: '$TMP',
-  });
+  await client.create(
+    {
+      enhancementType: type,
+      enhancementName: 'ZENH',
+      packageName: '$TMP',
+    },
+    { headers: headersOf(client, 'create') },
+  );
   expect(request).toHaveBeenCalledTimes(1);
   const sent = request.mock.calls[0][0];
   expect(sent.method).toBe('POST');
@@ -183,7 +189,11 @@ it.each(
   request.mockResolvedValue({ status: 200, data: source, headers: {} });
   const answer = await client.updateMetadata(
     { ...config(type), transportRequest: 'DEVK900001' },
-    { source, lockHandle: 'handle &/+' },
+    {
+      headers: { accept: media, contentType: media },
+      source,
+      lockHandle: 'handle &/+',
+    },
   );
   expect(request).toHaveBeenCalledTimes(1);
   expect(request.mock.calls[0][0]).toMatchObject({
@@ -208,6 +218,7 @@ it.each(
   request.mockRejectedValue({ response });
   const analyse = jest.fn(analyseException);
   const answer = await client.updateMetadata(config(type), {
+    headers: headersOf(client, 'updateMetadata'),
     source: '<document/>',
     analyse,
   });

@@ -48,6 +48,7 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
+import { headersOf } from './adtHeaders';
 import { expectResult } from './contract';
 import {
   expectLockReleased,
@@ -389,6 +390,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // `isDeleted="false"` arrives inside a 200 and the library reads nothing
     // into it; the test wants the real outcome, so it asks for the reading.
     const answer = await this.adtObject.delete(config, {
+      headers: headersOf(this.adtObject, 'delete'),
       analyse: analyseDeletion,
     });
     if (!answer.ok) {
@@ -452,10 +454,16 @@ export class BaseTester<TConfig, TState = unknown> {
     options?: IAdtOperationOptions,
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.update) {
-      return this.adtObject.update(config, options);
+      return this.adtObject.update(config, {
+        ...options,
+        headers: headersOf(this.adtObject, 'update'),
+      });
     }
     if (this.adtObject.updateMetadata) {
-      return this.adtObject.updateMetadata(config, options);
+      return this.adtObject.updateMetadata(config, {
+        ...options,
+        headers: headersOf(this.adtObject, 'updateMetadata'),
+      });
     }
     throw new Error(
       `${this.loggerPrefix} offers neither update() nor updateMetadata() — ` +
@@ -1080,7 +1088,7 @@ export class BaseTester<TConfig, TState = unknown> {
       expectResult(
         await this.adtObject.create(
           createConfig as Omit<TConfig, 'source'> & { source?: never },
-          createOptions,
+          { ...createOptions, headers: headersOf(this.adtObject, 'create') },
         ),
         'create',
       );
@@ -1094,7 +1102,9 @@ export class BaseTester<TConfig, TState = unknown> {
       if (options?.activateOnCreate && this.adtObject.activate) {
         logTestStep('activate (after create)', this.logger);
         expectResult(
-          await this.adtObject.activate(config as Partial<TConfig>),
+          await this.adtObject.activate(config as Partial<TConfig>, {
+            headers: headersOf(this.adtObject, 'activate'),
+          }),
           'activate after create',
         );
       }
@@ -1189,7 +1199,9 @@ export class BaseTester<TConfig, TState = unknown> {
         if (options?.activateOnUpdate && this.adtObject.activate) {
           logTestStep('activate (after update)', this.logger);
           expectResult(
-            await this.adtObject.activate(config as Partial<TConfig>),
+            await this.adtObject.activate(config as Partial<TConfig>, {
+              headers: headersOf(this.adtObject, 'activate'),
+            }),
             'activate after update',
           );
         }
@@ -1220,7 +1232,9 @@ export class BaseTester<TConfig, TState = unknown> {
         // A refused activation is a failure in the answer — the handlers read
         // `<msg type="E">` for it, which a status check never could.
         expectResult(
-          await this.adtObject.activate(config as Partial<TConfig>),
+          await this.adtObject.activate(config as Partial<TConfig>, {
+            headers: headersOf(this.adtObject, 'activate'),
+          }),
           'activate',
         );
         // Delay after activate
@@ -2010,6 +2024,7 @@ export class BaseTester<TConfig, TState = unknown> {
         logTestStep(currentStep, this.logger);
         const activateState = await this.adtObject.activate(
           config as Partial<TConfig>,
+          { headers: headersOf(this.adtObject, 'activate') },
         );
         const activateResponse =
           (activateState as any)?.activateResponse || activateState;

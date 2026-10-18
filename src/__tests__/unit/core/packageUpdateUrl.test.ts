@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { updatePackage } from '../../../core/package/update';
+import { headersFor } from '../../helpers/adtHeaders';
 
 function capturingConnection(): {
   connection: IAbapConnection;
@@ -33,7 +34,13 @@ describe('updatePackage URL', () => {
 
   it('carries the handle and the transport when both are given', async () => {
     const { connection, urls } = capturingConnection();
-    await updatePackage(connection, params, '<pak:package/>', 'ABC123');
+    await updatePackage(
+      connection,
+      headersFor('AdtPackage.updateMetadata'),
+      params,
+      '<pak:package/>',
+      'ABC123',
+    );
     expect(urls).toEqual([
       '/sap/bc/adt/packages/zac_pkg?lockHandle=ABC123&corrNr=DEVK900001',
     ]);
@@ -43,6 +50,7 @@ describe('updatePackage URL', () => {
     const { connection, urls } = capturingConnection();
     await updatePackage(
       connection,
+      headersFor('AdtPackage.updateMetadata'),
       params,
       '<pak:package/>',
       undefined as unknown as string,

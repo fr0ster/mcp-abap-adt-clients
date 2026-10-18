@@ -2,13 +2,13 @@
  * FunctionModule update operations - low-level functions for AdtFunctionModule
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { FUNCTION_MODULE, sourceUri } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateFunctionModuleParams } from './types';
 
 /**
@@ -22,26 +22,20 @@ import type { IUpdateFunctionModuleParams } from './types';
  */
 export async function update(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateFunctionModuleParams,
-  contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
   let url = `${sourceUri(FUNCTION_MODULE.uri(params.functionGroupName, params.functionModuleName))}?lockHandle=${encodeURIComponent(params.lockHandle)}`;
   if (params.transportRequest) {
     url += `&corrNr=${params.transportRequest}`;
   }
 
-  const sourceContentType = contentTypes?.sourceArtifactContentType();
-  const headers = {
-    'Content-Type': sourceContentType || CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   const response = await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: params.sourceCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   return response;

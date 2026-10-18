@@ -30,15 +30,17 @@
  * `del:isDeleted` in the body, and reading it is the caller's question.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_DELETION, CT_DELETION } from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { includeUrl } from './lock';
 
 export async function deleteInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   includeName: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
@@ -58,9 +60,6 @@ export async function deleteInclude(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION,
-      'Content-Type': CT_DELETION,
-    },
+    headers: requestHeaders(headers),
   });
 }

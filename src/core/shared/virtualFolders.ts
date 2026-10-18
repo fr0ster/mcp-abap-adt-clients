@@ -4,14 +4,12 @@
  * Retrieves hierarchical virtual folder contents from ADT information system.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_VIRTUAL_FOLDERS,
-  CT_VIRTUAL_FOLDERS,
-} from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IGetVirtualFoldersContentsParams } from './types';
 
 const VIRTUAL_FOLDERS_NAMESPACE = 'http://www.sap.com/adt/ris/virtualFolders';
@@ -70,6 +68,7 @@ const buildVirtualFoldersRequestXml = (
  */
 export async function getVirtualFoldersContents(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IGetVirtualFoldersContentsParams,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/repository/informationsystem/virtualfolders/contents`;
@@ -92,9 +91,6 @@ export async function getVirtualFoldersContents(
     timeout: 0,
     params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_VIRTUAL_FOLDERS,
-      'Content-Type': CT_VIRTUAL_FOLDERS,
-    },
+    headers: requestHeaders(headers),
   });
 }

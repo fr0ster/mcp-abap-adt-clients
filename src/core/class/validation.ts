@@ -6,7 +6,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
+import {
+  ACCEPT_VALIDATION_CLASS_NAME,
+  CHECK_RUN_HEADERS,
+} from '../../constants/contentTypes';
 import { CLASS } from '../../endpoints/objects';
 
 /**
@@ -87,6 +90,7 @@ export async function validateClassSource(
     // Live validation with artifacts (code not saved to SAP)
     response = await runCheckRunWithSource(
       connection,
+      CHECK_RUN_HEADERS,
       'class',
       className,
       sourceCode,
@@ -97,6 +101,7 @@ export async function validateClassSource(
     // Validate existing object in SAP (without artifacts)
     response = await runCheckRun(
       connection,
+      CHECK_RUN_HEADERS,
       'class',
       className,
       version,

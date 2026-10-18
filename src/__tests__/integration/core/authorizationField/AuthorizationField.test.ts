@@ -22,6 +22,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IAuthorizationFieldConfig } from '../../../../core/authorizationField';
 import { readAuthorizationField } from '../../../../core/authorizationField/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
@@ -230,12 +231,17 @@ describe('AuthorizationField (using AdtClient)', () => {
             /already exists/i.test(cleanup.reason || '')
           ) {
             try {
-              await client.getAuthorizationField().delete({
-                authorizationFieldName,
-                transportRequest: resolveTransportRequest(
-                  tc.params.transport_request,
-                ),
-              });
+              await client.getAuthorizationField().delete(
+                {
+                  authorizationFieldName,
+                  transportRequest: resolveTransportRequest(
+                    tc.params.transport_request,
+                  ),
+                },
+                {
+                  headers: headersOf(client.getAuthorizationField(), 'delete'),
+                },
+              );
               testsLogger.info?.(
                 `Pre-existing authorization field ${authorizationFieldName} deleted before test`,
               );

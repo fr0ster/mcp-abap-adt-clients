@@ -2,6 +2,7 @@
  * Interface activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -15,11 +16,13 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateInterface(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   interfaceName: string,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${INTERFACE.uri(interfaceName)}`;
   return await activateObjectInSession(
     connection,
+    headers,
     objectUri,
     interfaceName,
     true,

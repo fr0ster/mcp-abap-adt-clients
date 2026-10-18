@@ -14,6 +14,7 @@
  *
  * Caught in review, 2026-09-06.
  */
+
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -21,6 +22,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../clients/AdtClient';
 import { classDocuments } from '../../../core/class/types';
+import { headersOf } from '../../helpers/adtHeaders';
 
 const logger = {
   log: jest.fn(),
@@ -57,8 +59,13 @@ describe('the deletion check reads its own document', () => {
     const { calls, connection } = recording();
     const cls = new AdtClient(connection, logger).getClass();
 
-    await cls.check({ className: 'ZCL_X' });
-    await cls.checkDeletion({ className: 'ZCL_X' });
+    await cls.check({ className: 'ZCL_X' }, undefined, {
+      headers: headersOf(cls, 'check'),
+    });
+    await cls.checkDeletion(
+      { className: 'ZCL_X' },
+      { headers: headersOf(cls, 'checkDeletion') },
+    );
 
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain('/sap/bc/adt/checkruns');
@@ -81,8 +88,13 @@ describe('the deletion check reads its own document', () => {
       }),
     });
 
-    const checked = await cls.check({ className: 'ZCL_X' });
-    const deletable = await cls.checkDeletion({ className: 'ZCL_X' });
+    const checked = await cls.check({ className: 'ZCL_X' }, undefined, {
+      headers: headersOf(cls, 'check'),
+    });
+    const deletable = await cls.checkDeletion(
+      { className: 'ZCL_X' },
+      { headers: headersOf(cls, 'checkDeletion') },
+    );
 
     expect(checked.ok && checked.getResult().value).toBe(
       'read by the check-run strategy',
@@ -100,7 +112,15 @@ describe('the deletion check reads its own document', () => {
     const { connection } = recording();
     const answer = await new AdtClient(connection, logger)
       .getClass()
-      .checkDeletion({ className: 'ZCL_X' });
+      .checkDeletion(
+        { className: 'ZCL_X' },
+        {
+          headers: headersOf(
+            new AdtClient(connection, logger).getClass(),
+            'checkDeletion',
+          ),
+        },
+      );
 
     expect(answer.ok).toBe(true);
     if (!answer.ok) throw new Error('expected a result');

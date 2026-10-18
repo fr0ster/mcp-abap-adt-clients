@@ -6,6 +6,7 @@ import { createPackage } from '../../../core/package/create';
 import { AdtProgram } from '../../../core/program/AdtProgram';
 import { create as createProgram } from '../../../core/program/create';
 import { AdtServiceBinding } from '../../../core/service/AdtService';
+import { headersFor, headersOf } from '../../helpers/adtHeaders';
 
 /**
  * Master/original language wiring (fr0ster/mcp-abap-adt#105).
@@ -31,7 +32,7 @@ describe('masterLanguage on create', () => {
   describe('low-level program create', () => {
     it('uses the given language for both language attributes', async () => {
       const c = mockConnection();
-      await createProgram(c, {
+      await createProgram(c, headersFor('AdtProgram.create'), {
         programName: 'ZTEST',
         packageName: '$TMP',
         masterLanguage: 'ZH',
@@ -43,7 +44,10 @@ describe('masterLanguage on create', () => {
 
     it('falls back to EN when language is not provided', async () => {
       const c = mockConnection();
-      await createProgram(c, { programName: 'ZTEST', packageName: '$TMP' });
+      await createProgram(c, headersFor('AdtProgram.create'), {
+        programName: 'ZTEST',
+        packageName: '$TMP',
+      });
       const body = bodyOf(c);
       expect(body).toContain('adtcore:language="EN"');
       expect(body).toContain('adtcore:masterLanguage="EN"');
@@ -53,12 +57,16 @@ describe('masterLanguage on create', () => {
   describe('low-level metadataExtension create', () => {
     it('uses the language for BOTH attributes (no hardcoded EN language)', async () => {
       const c = mockConnection();
-      await createMetadataExtension(c, {
-        name: 'ZMDE',
-        packageName: '$TMP',
-        description: 'x',
-        masterLanguage: 'ZH',
-      });
+      await createMetadataExtension(
+        c,
+        headersFor('AdtMetadataExtension.create'),
+        {
+          name: 'ZMDE',
+          packageName: '$TMP',
+          description: 'x',
+          masterLanguage: 'ZH',
+        },
+      );
       const body = bodyOf(c);
       expect(body).toContain('adtcore:language="ZH"');
       expect(body).toContain('adtcore:masterLanguage="ZH"');
@@ -68,23 +76,31 @@ describe('masterLanguage on create', () => {
   describe('low-level behaviorDefinition create', () => {
     it('uses the language for both attributes, EN otherwise', async () => {
       const c1 = mockConnection();
-      await createBehaviorDefinition(c1, {
-        name: 'ZBDEF',
-        package: '$TMP',
-        description: 'x',
-        implementationType: 'managed',
-        language: 'ZH',
-      } as never);
+      await createBehaviorDefinition(
+        c1,
+        headersFor('AdtBehaviorDefinition.create'),
+        {
+          name: 'ZBDEF',
+          package: '$TMP',
+          description: 'x',
+          implementationType: 'managed',
+          language: 'ZH',
+        } as never,
+      );
       expect(bodyOf(c1)).toContain('adtcore:masterLanguage="ZH"');
       expect(bodyOf(c1)).toContain('adtcore:language="ZH"');
 
       const c2 = mockConnection();
-      await createBehaviorDefinition(c2, {
-        name: 'ZBDEF',
-        package: '$TMP',
-        description: 'x',
-        implementationType: 'managed',
-      } as never);
+      await createBehaviorDefinition(
+        c2,
+        headersFor('AdtBehaviorDefinition.create'),
+        {
+          name: 'ZBDEF',
+          package: '$TMP',
+          description: 'x',
+          implementationType: 'managed',
+        } as never,
+      );
       expect(bodyOf(c2)).toContain('adtcore:masterLanguage="EN"');
     });
   });
@@ -143,7 +159,9 @@ describe('masterLanguage on create', () => {
       // `createServiceBinding` is gone: it and `create` were one request under
       // two names, and the pair existed only because the second answered the
       // envelope. `create` is the member now.
-      await binding.create(baseParams);
+      await binding.create(baseParams, {
+        headers: headersOf(binding, 'create'),
+      });
       expect(bindingBody(c)).toContain('adtcore:masterLanguage="FR"');
     });
 
@@ -152,10 +170,13 @@ describe('masterLanguage on create', () => {
       const binding = new AdtServiceBinding(c, undefined, {
         masterLanguage: 'FR',
       });
-      await binding.create({
-        ...(baseParams as object),
-        masterLanguage: 'ZH',
-      } as never);
+      await binding.create(
+        {
+          ...(baseParams as object),
+          masterLanguage: 'ZH',
+        } as never,
+        { headers: headersOf(binding, 'create') },
+      );
       expect(bindingBody(c)).toContain('adtcore:masterLanguage="ZH"');
     });
   });
@@ -185,73 +206,114 @@ describe('masterLanguage on create', () => {
 
     it('high-level: config language in both attributes', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, {}).create({
-        ...baseConfig,
-        masterLanguage: 'DE',
-      } as never);
+      await new AdtPackage(c, undefined, {}).create(
+        {
+          ...baseConfig,
+          masterLanguage: 'DE',
+        } as never,
+        { headers: headersOf(new AdtPackage(c, undefined, {}), 'create') },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="DE"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="DE"');
     });
     it('high-level: systemContext fallback', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
-        ...baseConfig,
-      } as never);
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create(
+        {
+          ...baseConfig,
+        } as never,
+        {
+          headers: headersOf(
+            new AdtPackage(c, undefined, { masterLanguage: 'IT' }),
+            'create',
+          ),
+        },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="IT"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="IT"');
     });
     it('high-level: config overrides systemContext', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
-        ...baseConfig,
-        masterLanguage: 'FR',
-      } as never);
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create(
+        {
+          ...baseConfig,
+          masterLanguage: 'FR',
+        } as never,
+        {
+          headers: headersOf(
+            new AdtPackage(c, undefined, { masterLanguage: 'IT' }),
+            'create',
+          ),
+        },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="FR"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="FR"');
     });
     it('high-level: neither set -> EN', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, {}).create({ ...baseConfig } as never);
+      await new AdtPackage(c, undefined, {}).create(
+        { ...baseConfig } as never,
+        { headers: headersOf(new AdtPackage(c, undefined, {}), 'create') },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="EN"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="EN"');
     });
     it('high-level: empty config falls through to systemContext', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
-        ...baseConfig,
-        masterLanguage: '',
-      } as never);
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create(
+        {
+          ...baseConfig,
+          masterLanguage: '',
+        } as never,
+        {
+          headers: headersOf(
+            new AdtPackage(c, undefined, { masterLanguage: 'IT' }),
+            'create',
+          ),
+        },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="IT"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="IT"');
     });
     it('high-level: whitespace config falls through to systemContext', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
-        ...baseConfig,
-        masterLanguage: '   ',
-      } as never);
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create(
+        {
+          ...baseConfig,
+          masterLanguage: '   ',
+        } as never,
+        {
+          headers: headersOf(
+            new AdtPackage(c, undefined, { masterLanguage: 'IT' }),
+            'create',
+          ),
+        },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="IT"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="IT"');
     });
     it('high-level: surrounding spaces are trimmed', async () => {
       const c = mockConnection();
-      await new AdtPackage(c, undefined, {}).create({
-        ...baseConfig,
-        masterLanguage: ' DE ',
-      } as never);
+      await new AdtPackage(c, undefined, {}).create(
+        {
+          ...baseConfig,
+          masterLanguage: ' DE ',
+        } as never,
+        { headers: headersOf(new AdtPackage(c, undefined, {}), 'create') },
+      );
       expect(pkgBody(c)).toContain('adtcore:language="DE"');
       expect(pkgBody(c)).toContain('adtcore:masterLanguage="DE"');
     });
     it('low-level: blank -> EN, surrounding spaces trimmed', async () => {
       const c1 = mockConnection();
-      await createPackage(c1, {
+      await createPackage(c1, headersFor('AdtPackage.create'), {
         ...baseParams,
         master_language: '   ',
       } as never);
       expect(pkgBody(c1)).toContain('adtcore:language="EN"');
       expect(pkgBody(c1)).toContain('adtcore:masterLanguage="EN"');
       const c2 = mockConnection();
-      await createPackage(c2, {
+      await createPackage(c2, headersFor('AdtPackage.create'), {
         ...baseParams,
         master_language: ' DE ',
       } as never);
@@ -264,25 +326,34 @@ describe('masterLanguage on create', () => {
     it('uses systemContext.masterLanguage when config omits it', async () => {
       const c = mockConnection();
       const program = new AdtProgram(c, undefined, { masterLanguage: 'IT' });
-      await program.create({ programName: 'ZTEST', packageName: '$TMP' });
+      await program.create(
+        { programName: 'ZTEST', packageName: '$TMP' },
+        { headers: headersOf(program, 'create') },
+      );
       expect(bodyOf(c)).toContain('adtcore:masterLanguage="IT"');
     });
 
     it('config.masterLanguage overrides systemContext', async () => {
       const c = mockConnection();
       const program = new AdtProgram(c, undefined, { masterLanguage: 'IT' });
-      await program.create({
-        programName: 'ZTEST',
-        packageName: '$TMP',
-        masterLanguage: 'FR',
-      });
+      await program.create(
+        {
+          programName: 'ZTEST',
+          packageName: '$TMP',
+          masterLanguage: 'FR',
+        },
+        { headers: headersOf(program, 'create') },
+      );
       expect(bodyOf(c)).toContain('adtcore:masterLanguage="FR"');
     });
 
     it('falls back to EN with no language anywhere', async () => {
       const c = mockConnection();
       const program = new AdtProgram(c, undefined, {});
-      await program.create({ programName: 'ZTEST', packageName: '$TMP' });
+      await program.create(
+        { programName: 'ZTEST', packageName: '$TMP' },
+        { headers: headersOf(program, 'create') },
+      );
       expect(bodyOf(c)).toContain('adtcore:masterLanguage="EN"');
     });
   });

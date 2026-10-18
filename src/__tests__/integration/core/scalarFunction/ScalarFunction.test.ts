@@ -21,6 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -144,22 +145,28 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
 
         // ── 1) Idempotent cleanup of any leftover object from a previous run ──
         try {
-          await sf.delete({
-            scalarFunctionName,
-            transportRequest,
-          });
+          await sf.delete(
+            {
+              scalarFunctionName,
+              transportRequest,
+            },
+            { headers: headersOf(sf, 'delete') },
+          );
         } catch {
           // Ignore — object may not exist yet
         }
 
         // ── 2) Create (also confirms DSFD is supported on this system) ──
         try {
-          await sf.create({
-            scalarFunctionName,
-            packageName,
-            transportRequest,
-            description: 'ADT integration test scalar function',
-          });
+          await sf.create(
+            {
+              scalarFunctionName,
+              packageName,
+              transportRequest,
+              description: 'ADT integration test scalar function',
+            },
+            { headers: headersOf(sf, 'create') },
+          );
         } catch (createError) {
           const status = (createError as { response?: { status?: number } })
             .response?.status;
@@ -202,7 +209,11 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               expectResult(
                 await sf.update(
                   { scalarFunctionName, transportRequest },
-                  { source: configuredSource, lockHandle: sfLock },
+                  {
+                    headers: headersOf(sf, 'update'),
+                    source: configuredSource,
+                    lockHandle: sfLock,
+                  },
                 ),
                 'update scalar function',
               );
@@ -216,7 +227,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               testsLogger,
             );
             expectResult(
-              await sf.activate({ scalarFunctionName }),
+              await sf.activate(
+                { scalarFunctionName },
+                { headers: headersOf(sf, 'activate') },
+              ),
               'activate scalar function',
             );
 
@@ -237,10 +251,13 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
 
           // ── 5) Delete ──
           const deleteState = expectResult(
-            await sf.delete({
-              scalarFunctionName,
-              transportRequest,
-            }),
+            await sf.delete(
+              {
+                scalarFunctionName,
+                transportRequest,
+              },
+              { headers: headersOf(sf, 'delete') },
+            ),
             'deleteState',
           );
           expect(deleteState).toBeDefined();
@@ -250,7 +267,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           logTestError(testsLogger, TEST_LABEL, error);
           // Best-effort cleanup
           try {
-            await sf.delete({ scalarFunctionName, transportRequest });
+            await sf.delete(
+              { scalarFunctionName, transportRequest },
+              { headers: headersOf(sf, 'delete') },
+            );
           } catch {
             // Ignore cleanup errors
           }

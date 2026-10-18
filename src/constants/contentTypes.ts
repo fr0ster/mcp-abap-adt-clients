@@ -1,3 +1,5 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+
 /**
  * Centralized ADT content type constants
  *
@@ -40,6 +42,21 @@ export const CT_ACTIVATION = 'application/vnd.sap.adt.activation+xml';
 
 // Validation
 export const ACCEPT_VALIDATION = 'application/vnd.sap.as+xml';
+
+/**
+ * The pairs of the requests that are not a member taking `options.headers`
+ * (interfaces-adt 19.0.0) but share a wire function with one: a `validate`
+ * that runs the check run, `activateTestClasses`. Those keep their own
+ * headers; the members that take `headers` send the caller's.
+ */
+export const CHECK_RUN_HEADERS: IAdtHeaders = {
+  accept: ACCEPT_CHECK_MESSAGES,
+  contentType: CT_CHECK_OBJECTS,
+};
+export const ACTIVATION_HEADERS: IAdtHeaders = {
+  accept: ACCEPT_ACTIVATION,
+  contentType: CT_ACTIVATION,
+};
 
 /**
  * What a publication job answers, asked for the way Eclipse asks.
@@ -263,11 +280,9 @@ export const ACCEPT_FEATURE_TOGGLE_SOURCE = CT_FEATURE_TOGGLE_SOURCE;
 export const MESSAGE_CLASS_UPDATE_CONTENT_TYPE =
   'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
 
-// abapGit (/sap/bc/adt/abapgit/*)
-// Envelope for the repository entity (sapcli parity: v3; v4 advertised
-// in discovery but kept opt-in via IAdtAbapGitClientOptions.contentTypeVersion).
-export const CT_ABAPGIT_REPO_V3 = 'application/abapgit.adt.repo.v3+xml';
-export const CT_ABAPGIT_REPO_V4 = 'application/abapgit.adt.repo.v4+xml';
+// abapGit (/sap/bc/adt/abapgit/*). `link` and `pull` send the caller's
+// `headers` since 36.0.0 (until then `application/abapgit.adt.repo.v3+xml`,
+// or v4 through the removed `contentTypeVersion` option).
 
 // Accept for the repo list (sapcli uses v2; v4 advertised in discovery).
 export const ACCEPT_ABAPGIT_REPOS_V2 = 'application/abapgit.adt.repos.v2+xml';

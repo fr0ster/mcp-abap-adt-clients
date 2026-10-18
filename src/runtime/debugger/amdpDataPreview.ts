@@ -2,11 +2,15 @@
  * AMDP debugger data preview: a table variable's rows at the current stop.
  */
 
-import type { IGetAmdpDataPreviewOptions } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtHeaders,
+  IGetAmdpDataPreviewOptions,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * A table variable's rows at the current stop.
@@ -27,6 +31,7 @@ import type {
  */
 export async function getAmdpDataPreview(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   options: IGetAmdpDataPreviewOptions,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/datapreview/amdpdebugger`;
@@ -50,10 +55,6 @@ export async function getAmdpDataPreview(
     // The server refuses a request without a content type, the empty one too
     // (400 "Content type missing"); no SELECT is an empty body.
     data: options.query ?? '',
-    headers: {
-      Accept:
-        'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
-      'Content-Type': 'text/plain',
-    },
+    headers: requestHeaders(headers),
   });
 }

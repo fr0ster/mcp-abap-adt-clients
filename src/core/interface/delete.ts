@@ -2,17 +2,13 @@
  * Interface delete operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { INTERFACE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IDeleteInterfaceParams } from './types';
 
 /**
@@ -20,6 +16,7 @@ import type { IDeleteInterfaceParams } from './types';
  */
 export async function checkDeletion(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteInterfaceParams,
 ): Promise<IAdtWireResponse> {
   const { interface_name } = params;
@@ -33,17 +30,12 @@ export async function checkDeletion(
   <del:object adtcore:uri="${objectUri}"/>
 </del:checkRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION_CHECK,
-    'Content-Type': CT_DELETION_CHECK,
-  };
-
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -52,6 +44,7 @@ export async function checkDeletion(
  */
 export async function deleteInterface(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteInterfaceParams,
 ): Promise<IAdtWireResponse> {
   const { interface_name, transport_request } = params;
@@ -75,17 +68,12 @@ export async function deleteInterface(
   </del:object>
 </del:deletionRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION,
-    'Content-Type': CT_DELETION,
-  };
-
   const response = await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   // The response, as it arrived. This used to replace the server's document

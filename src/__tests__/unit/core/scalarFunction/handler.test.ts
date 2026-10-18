@@ -5,6 +5,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 
 type Call = { url: string; method?: string };
@@ -37,11 +38,14 @@ describe('AdtScalarFunction handler', () => {
     const sf = new AdtScalarFunction(conn);
     // No source either way: `create` posts the metadata document, and since
     // interfaces 38.0.0 the signature says so rather than the comment.
-    await sf.create({
-      scalarFunctionName: 'ZOK_F',
-      packageName: 'ZPKG',
-      description: 'd',
-    });
+    await sf.create(
+      {
+        scalarFunctionName: 'ZOK_F',
+        packageName: 'ZPKG',
+        description: 'd',
+      },
+      { headers: headersOf(sf, 'create') },
+    );
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfd/sources');
@@ -133,7 +137,11 @@ describe('AdtScalarFunction handler', () => {
     const sf = new AdtScalarFunction(conn);
     await sf.update(
       { scalarFunctionName: 'ZOK_SF' },
-      { source: 'new source', lockHandle: 'LOCK_HANDLE_42' },
+      {
+        headers: headersOf(sf, 'update'),
+        source: 'new source',
+        lockHandle: 'LOCK_HANDLE_42',
+      },
     );
 
     expect(calls).toHaveLength(1);

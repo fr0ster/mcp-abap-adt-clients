@@ -36,6 +36,7 @@ import type {
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -195,7 +196,9 @@ async function deployProbeClass(
     description: 'Debugger probe',
   };
 
-  const created = await cls.create(config);
+  const created = await cls.create(config, {
+    headers: headersOf(cls, 'create'),
+  });
   if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
     say(`class create REFUSED: ${created.getError().message}`);
     return false;
@@ -208,13 +211,19 @@ async function deployProbeClass(
     return false;
   }
   const lockHandle = String(lock.getResult().value ?? '');
-  const written = await cls.update(config, { source: SOURCE, lockHandle });
+  const written = await cls.update(config, {
+    headers: headersOf(cls, 'update'),
+    source: SOURCE,
+    lockHandle,
+  });
   await cls.unlock(config, lockHandle);
   if (!written.ok) {
     say(`class update REFUSED: ${written.getError().message}`);
     return false;
   }
-  const activated = await cls.activate(config);
+  const activated = await cls.activate(config, {
+    headers: headersOf(cls, 'activate'),
+  });
   say(
     `class activate ${activated.ok ? 'ok' : `REFUSED: ${activated.getError().message}`}`,
   );
@@ -226,7 +235,10 @@ async function deleteProbeClass(
   packageName: string,
 ): Promise<void> {
   const cls = new AdtClient(connection, createConnectionLogger()).getClass();
-  const deleted = await cls.delete({ className: CLASS_NAME, packageName });
+  const deleted = await cls.delete(
+    { className: CLASS_NAME, packageName },
+    { headers: headersOf(cls, 'delete') },
+  );
   say(
     `class delete ${deleted.ok ? 'ok' : `REFUSED: ${deleted.getError().message}`}`,
   );

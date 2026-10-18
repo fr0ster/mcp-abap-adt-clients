@@ -1,17 +1,16 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_FEATURE_TOGGLE_METADATA,
-  CT_FEATURE_TOGGLE_METADATA,
-} from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFeatureToggleParams } from './types';
 import { buildFeatureToggleXml } from './xmlBuilder';
 
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
   const xml = buildFeatureToggleXml(args);
@@ -21,10 +20,7 @@ export async function create(
     method: 'POST',
     url: FEATURE_TOGGLE.collection,
     timeout: 0,
-    headers: {
-      'Content-Type': CT_FEATURE_TOGGLE_METADATA,
-      Accept: ACCEPT_FEATURE_TOGGLE_METADATA,
-    },
+    headers: requestHeaders(headers),
     params,
     data: xml,
   });

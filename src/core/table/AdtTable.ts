@@ -17,6 +17,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -135,7 +136,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITableConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -161,7 +162,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
         // package, transport, master and responsible — and `ddl_code` was not
         // among them, so passing it read as if a create wrote the source, and
         // it never did. The source is `update`'s, after `lock`.
-        createTable(connection, {
+        createTable(connection, options.headers, {
           table_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
@@ -250,7 +251,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ITableConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -262,6 +263,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
       () =>
         updateTable(
           connection,
+          options.headers,
           {
             table_name: name,
             ddl_code: source as string,
@@ -283,7 +285,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITableConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -291,7 +293,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           table_name: name,
           transport_request: config.transportRequest,
         }),
@@ -313,7 +315,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITableConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -321,7 +323,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        deleteTable(connection, {
+        deleteTable(connection, options.headers, {
           table_name: name,
           transport_request: config.transportRequest,
         }),
@@ -333,7 +335,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<ITableConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -341,7 +343,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     const name = this.name(config);
 
     return answering(
-      () => activateTable(connection, name),
+      () => activateTable(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -350,8 +352,8 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<ITableConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -362,7 +364,14 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
 
     return answering(
       () =>
-        runTableCheckRun(connection, 'abapCheckRun', name, undefined, version),
+        runTableCheckRun(
+          connection,
+          options.headers,
+          'abapCheckRun',
+          name,
+          undefined,
+          version,
+        ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

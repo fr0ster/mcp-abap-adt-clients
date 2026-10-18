@@ -45,6 +45,7 @@ import * as path from 'node:path';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -201,6 +202,7 @@ async function runCycle(
 
   const updated = await step(`update #${revision}`, () =>
     cls.update(config, {
+      headers: headersOf(cls, 'update'),
       source: sourceFor(className, revision),
       lockHandle: handle,
     }),
@@ -220,7 +222,7 @@ async function runCycle(
 
   const activated = await step(
     `activate #${revision}`,
-    () => cls.activate({ className }),
+    () => cls.activate({ className }, { headers: headersOf(cls, 'activate') }),
     readActivation,
   );
   steps.push(activated.record);
@@ -304,10 +306,13 @@ async function main(): Promise<void> {
     say(present ? '· class is there' : '· class is not there — creating it');
     if (!present) {
       const created = await step('create', () =>
-        session.cls.create({
-          ...config,
-          description: 'Two-update-cycle probe',
-        }),
+        session.cls.create(
+          {
+            ...config,
+            description: 'Two-update-cycle probe',
+          },
+          { headers: headersOf(session.cls, 'create') },
+        ),
       );
       steps.push(created.record);
       if (!created.record.ok) say(`  create failed: ${created.record.detail}`);
@@ -333,6 +338,7 @@ async function main(): Promise<void> {
       if (handleA) {
         const carried = await step("update (session A's handle in B)", () =>
           session.cls.update(config, {
+            headers: headersOf(session.cls, 'update'),
             source: sourceFor(className, 9),
             lockHandle: handleA,
           }),
@@ -360,7 +366,10 @@ async function main(): Promise<void> {
     say('');
     say('── after the window ────────────────────────────────');
     const naked = await step('update (no handle)', () =>
-      session.cls.update(config, { source: sourceFor(className, 3) }),
+      session.cls.update(config, {
+        headers: headersOf(session.cls, 'update'),
+        source: sourceFor(className, 3),
+      }),
     );
     steps.push(naked.record);
     say(

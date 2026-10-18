@@ -22,6 +22,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -171,7 +172,7 @@ export class AdtFunctionModule<
   /** Create the function module. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IFunctionModuleConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -179,7 +180,7 @@ export class AdtFunctionModule<
     const { group, module } = this.names(config);
     return answering(
       () =>
-        createFunctionModule(connection, {
+        createFunctionModule(connection, options.headers, {
           functionGroupName: group,
           functionModuleName: module,
           transportRequest: config.transportRequest,
@@ -267,7 +268,7 @@ export class AdtFunctionModule<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -282,17 +283,13 @@ export class AdtFunctionModule<
 
     return answering(
       () =>
-        update(
-          connection,
-          {
-            functionModuleName: module,
-            functionGroupName: group,
-            sourceCode: source as string,
-            lockHandle: options?.lockHandle as string,
-            transportRequest: config.transportRequest,
-          },
-          this.contentTypes,
-        ),
+        update(connection, options.headers, {
+          functionModuleName: module,
+          functionGroupName: group,
+          sourceCode: source as string,
+          lockHandle: options?.lockHandle as string,
+          transportRequest: config.transportRequest,
+        }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       options?.analyse,
     );
@@ -307,7 +304,7 @@ export class AdtFunctionModule<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -315,7 +312,7 @@ export class AdtFunctionModule<
     const { group, module } = this.names(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           function_module_name: module,
           function_group_name: group,
           transport_request: config.transportRequest,
@@ -334,7 +331,7 @@ export class AdtFunctionModule<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -342,7 +339,7 @@ export class AdtFunctionModule<
     const { group, module } = this.names(config);
     return answering(
       () =>
-        deleteFunctionModule(connection, {
+        deleteFunctionModule(connection, options.headers, {
           function_module_name: module,
           function_group_name: group,
           transport_request: config.transportRequest,
@@ -355,7 +352,7 @@ export class AdtFunctionModule<
   /** Activate the function module. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -363,7 +360,7 @@ export class AdtFunctionModule<
     const { group, module } = this.names(config);
 
     return answering(
-      () => activateFunctionModule(connection, group, module),
+      () => activateFunctionModule(connection, options.headers, group, module),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -372,8 +369,8 @@ export class AdtFunctionModule<
   /** Check the function module. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -386,6 +383,7 @@ export class AdtFunctionModule<
       () =>
         checkFunctionModule(
           connection,
+          options.headers,
           group,
           module,
           version,

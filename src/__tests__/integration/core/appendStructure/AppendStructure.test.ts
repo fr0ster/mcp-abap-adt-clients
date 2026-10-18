@@ -21,6 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -209,20 +210,26 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
           // ── 1) Idempotent cleanup of any leftover object from a previous run ──
           try {
-            await as.delete({ appendStructureName, transportRequest });
+            await as.delete(
+              { appendStructureName, transportRequest },
+              { headers: headersOf(as, 'delete') },
+            );
           } catch {
             // Ignore — object may not exist yet
           }
 
           // ── 2) Create (also confirms append structures are supported on this system) ──
           try {
-            await as.create({
-              appendStructureName,
-              baseObject,
-              packageName,
-              transportRequest,
-              description: 'ADT integration test append structure',
-            });
+            await as.create(
+              {
+                appendStructureName,
+                baseObject,
+                packageName,
+                transportRequest,
+                description: 'ADT integration test append structure',
+              },
+              { headers: headersOf(as, 'create') },
+            );
           } catch (createError) {
             const status = (createError as { response?: { status?: number } })
               .response?.status;
@@ -266,7 +273,11 @@ describe('AppendStructure (TABL/DS) integration', () => {
               expectResult(
                 await as.update(
                   { appendStructureName, transportRequest },
-                  { source: source, lockHandle: appendLock },
+                  {
+                    headers: headersOf(as, 'update'),
+                    source: source,
+                    lockHandle: appendLock,
+                  },
                 ),
                 'update append structure',
               );
@@ -280,7 +291,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
               testsLogger,
             );
             expectResult(
-              await as.activate({ appendStructureName }),
+              await as.activate(
+                { appendStructureName },
+                { headers: headersOf(as, 'activate') },
+              ),
               'activate append structure',
             );
 
@@ -306,10 +320,13 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
             // ── 5) Delete ──
             const deleteState = expectResult(
-              await as.delete({
-                appendStructureName,
-                transportRequest,
-              }),
+              await as.delete(
+                {
+                  appendStructureName,
+                  transportRequest,
+                },
+                { headers: headersOf(as, 'delete') },
+              ),
               'deleteState',
             );
             expect(deleteState).toBeDefined();
@@ -319,7 +336,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
             logTestError(testsLogger, TEST_LABEL, error);
             // Best-effort cleanup
             try {
-              await as.delete({ appendStructureName, transportRequest });
+              await as.delete(
+                { appendStructureName, transportRequest },
+                { headers: headersOf(as, 'delete') },
+              );
             } catch {
               // Ignore cleanup errors
             }

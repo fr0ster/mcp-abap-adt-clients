@@ -5,6 +5,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/AdtScalarFunctionImplementation';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
@@ -42,12 +43,15 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const h = new AdtScalarFunctionImplementation(conn);
     // No source either way — the create is the POST of the metadata document.
-    await h.create({
-      implementationName: 'ZI',
-      scalarFunctionName: 'ZF',
-      packageName: 'ZP',
-      description: 'd',
-    });
+    await h.create(
+      {
+        implementationName: 'ZI',
+        scalarFunctionName: 'ZF',
+        packageName: 'ZP',
+        description: 'd',
+      },
+      { headers: headersOf(h, 'create') },
+    );
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfi');
@@ -58,7 +62,11 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const h = new AdtScalarFunctionImplementation(conn);
     await h.update(
       { implementationName: 'ZI', scalarFunctionName: 'ZF' },
-      { source: 'src', lockHandle: 'LOCK_HANDLE_42' },
+      {
+        headers: headersOf(h, 'update'),
+        source: 'src',
+        lockHandle: 'LOCK_HANDLE_42',
+      },
     );
 
     expect(calls).toHaveLength(1);
@@ -75,7 +83,11 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const h = new AdtScalarFunctionImplementation(conn);
     await h.updateMetadata(
       { implementationName: 'ZI' },
-      { source: '<blues/>', lockHandle: 'LOCK_HANDLE_42' },
+      {
+        headers: headersOf(h, 'updateMetadata'),
+        source: '<blues/>',
+        lockHandle: 'LOCK_HANDLE_42',
+      },
     );
 
     expect(calls).toHaveLength(1);

@@ -100,16 +100,13 @@ const traced = new WeakSet<IAbapConnection>();
  * was. It reads nothing and decides nothing: what a body means is the caller's,
  * through their own `analyse`.
  *
- * Replaces `makeAdtRequest` and calls the method captured at install time, which
- * is how `installAcceptNegotiation` in `./acceptNegotiation` already works —
- * deliberately the same shape, because the two must compose in either order.
+ * Replaces `makeAdtRequest` and calls the method captured at install time,
+ * keeping the connection object's identity: per-connection state elsewhere
+ * (the `traced` set below, a consumer's own) is keyed by that object.
  *
- * A `Proxy` was tried first and is wrong here: accept-negotiation keys a
- * `WeakMap` by the connection object to remember the original method, and a
- * proxy is a different object from its target. The negotiation wrapper then
- * resolved `connection.makeAdtRequest` back through the proxy and the two called
- * each other until the stack ran out. Preserving the object's identity is not a
- * detail — another wrapper depends on it.
+ * A `Proxy` was tried first and is wrong here: until 36.0.0 accept negotiation
+ * keyed a `WeakMap` by the connection object, and the proxy, a different object,
+ * sent the two wrappers into each other until the stack ran out.
  */
 export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
   // A connection that cannot issue a request has no answer to annotate. Some

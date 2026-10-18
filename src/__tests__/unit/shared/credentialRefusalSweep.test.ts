@@ -23,7 +23,6 @@ import { AdtClass } from '../../../core/class/AdtClass';
 import { AdtMessageClassMessage } from '../../../core/messageClass/AdtMessageClassMessage';
 import { chain } from '../../../core/shared/chain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
-import { makeAdtRequestWithAcceptNegotiation } from '../../../utils/acceptNegotiation';
 import {
   answering,
   failed,
@@ -37,6 +36,7 @@ import {
   getSystemInformation,
   isModernAdtSystem,
 } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /** A refusal the provider raised before SAP was asked. */
 function refused(): AuthRefusedError {
@@ -96,11 +96,19 @@ describe('a message-class write (chain)', () => {
     );
 
     await expect(
-      new AdtMessageClassMessage(connection, noopLogger).update({
-        className: 'ZT',
-        msgno: '001',
-        msgtext: 'NEW',
-      }),
+      new AdtMessageClassMessage(connection, noopLogger).update(
+        {
+          className: 'ZT',
+          msgno: '001',
+          msgtext: 'NEW',
+        },
+        {
+          headers: headersOf(
+            new AdtMessageClassMessage(connection, noopLogger),
+            'update',
+          ),
+        },
+      ),
     ).rejects.toBe(thrown);
 
     expect(calls.some((c) => c.includes('_action=UNLOCK_ALL'))).toBe(true);
@@ -118,11 +126,19 @@ describe('a message-class write (chain)', () => {
     );
 
     await expect(
-      new AdtMessageClassMessage(connection, noopLogger).update({
-        className: 'ZT',
-        msgno: '001',
-        msgtext: 'NEW',
-      }),
+      new AdtMessageClassMessage(connection, noopLogger).update(
+        {
+          className: 'ZT',
+          msgno: '001',
+          msgtext: 'NEW',
+        },
+        {
+          headers: headersOf(
+            new AdtMessageClassMessage(connection, noopLogger),
+            'update',
+          ),
+        },
+      ),
     ).rejects.toBe(thrown);
 
     expect(calls.some((c) => c.includes('_action=UNLOCK_ALL'))).toBe(true);
@@ -141,11 +157,14 @@ describe('a class create', () => {
     } as unknown as IAbapConnection;
 
     await expect(
-      new AdtClass(connection, noopLogger).create({
-        className: 'ZCL_T',
-        packageName: 'ZP',
-        description: 'd',
-      }),
+      new AdtClass(connection, noopLogger).create(
+        {
+          className: 'ZCL_T',
+          packageName: 'ZP',
+          description: 'd',
+        },
+        { headers: headersOf(new AdtClass(connection, noopLogger), 'create') },
+      ),
     ).rejects.toBe(thrown);
   });
 });
@@ -320,15 +339,6 @@ describe('catches that already let it through', () => {
     ['discovery', (c: IAbapConnection) => fetchDiscoveryEndpoints(c)],
     ['system information', (c: IAbapConnection) => getSystemInformation(c)],
     ['modern ADT probe', (c: IAbapConnection) => isModernAdtSystem(c)],
-    [
-      'accept negotiation',
-      (c: IAbapConnection) =>
-        makeAdtRequestWithAcceptNegotiation(c, {
-          method: 'GET',
-          url: '/x',
-          timeout: 0,
-        }),
-    ],
   ])('%s rejects with the same object', async (_, run) => {
     const thrown = refused();
     await expect(run(refusing(thrown))).rejects.toBe(thrown);

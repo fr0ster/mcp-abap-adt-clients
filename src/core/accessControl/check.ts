@@ -1,3 +1,4 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -17,12 +18,14 @@ import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
  */
 export async function checkAccessControl(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   accessControlName: string,
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtWireResponse> {
   return runCheckRun(
     connection,
+    headers,
     'access_control',
     accessControlName,
     version,

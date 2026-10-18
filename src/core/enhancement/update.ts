@@ -2,19 +2,16 @@
  * Enhancement update operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  ACCEPT_SOURCE,
-  CT_SOURCE,
-  ENHANCEMENT_CONTENT_TYPES,
-} from '../../constants/contentTypes';
 import { ENHANCEMENT } from '../../endpoints/objects';
 import { safeStringify } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import {
   type EnhancementType,
   getEnhancementUri,
@@ -40,6 +37,7 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  */
 export async function update(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   // See the note in behaviorDefinition/update.ts: the handle is passed as given.
   args: Omit<IUpdateEnhancementParams, 'lock_handle'> & {
     lock_handle?: string;
@@ -68,11 +66,6 @@ export async function update(
 
   const url = `${baseUri}/source/main?${params.toString()}`;
 
-  const headers = {
-    'Content-Type': CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   if (debugEnabled) {
     logger?.debug?.(`[DEBUG] Updating enhancement - URL: ${url}`);
     logger?.debug?.(`[DEBUG] Updating enhancement - Method: PUT`);
@@ -90,7 +83,7 @@ export async function update(
       method: 'PUT',
       timeout: 0,
       data: args.source_code,
-      headers,
+      headers: requestHeaders(headers),
     });
     return response;
   } catch (error: unknown) {
@@ -129,6 +122,7 @@ export async function update(
  */
 export async function updateEnhancement(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   enhancementType: EnhancementType,
   enhancementName: string,
   sourceCode: string,
@@ -138,6 +132,7 @@ export async function updateEnhancement(
 ): Promise<IAdtWireResponse> {
   return update(
     connection,
+    headers,
     {
       enhancement_name: enhancementName,
       enhancement_type: enhancementType,
@@ -152,6 +147,7 @@ export async function updateEnhancement(
 /** Replace the object's whole document. enhoxhh PUT is allowed by its template but unmeasured. */
 export async function updateEnhancementMetadata(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   type: EnhancementType,
   name: string,
   source: string,
@@ -167,9 +163,6 @@ export async function updateEnhancementMetadata(
     method: 'PUT',
     timeout: 0,
     data: source,
-    headers: {
-      'Content-Type': ENHANCEMENT_CONTENT_TYPES[type],
-      Accept: ENHANCEMENT_CONTENT_TYPES[type],
-    },
+    headers: requestHeaders(headers),
   });
 }

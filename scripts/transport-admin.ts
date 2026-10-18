@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
       const answer = await requests.updateMetadata(
         { transportNumber },
         {
+          headers: headersOf(requests, 'updateMetadata'),
           source: patchXmlAttribute(
             String(current.getResult().value),
             'tm:desc',
@@ -78,7 +80,10 @@ async function main(): Promise<void> {
     }
 
     for (const transportNumber of rest) {
-      const answer = await requests.delete({ transportNumber });
+      const answer = await requests.delete(
+        { transportNumber },
+        { headers: headersOf(requests, 'delete') },
+      );
       // biome-ignore lint/suspicious/noConsole: same
       console.log(
         answer.ok

@@ -14,7 +14,9 @@
  * back a contract that disagreed with the object behind it. `interfaces-adt`
  * 2.0.0 settled that, and this file is what keeps them agreeing.
  */
+
 import type { AdtClient } from '../../../clients/AdtClient';
+import { headersOf } from '../../helpers/adtHeaders';
 import { transportParsing } from '../../helpers/transportParsing';
 
 () => {
@@ -34,15 +36,26 @@ import { transportParsing } from '../../helpers/transportParsing';
   // What a caller writes instead — the reading that produces the position,
   // and the removal that consumes it. No error expected on either.
   c.getRequest().readObjects('DEVK905942');
-  c.getRequest().removeObject('DEVK905942', {
-    name: 'ZCL_X',
-    type: 'CLAS',
-    position: '000025',
+  c.getRequest().removeObject(
+    'DEVK905942',
+    {
+      name: 'ZCL_X',
+      type: 'CLAS',
+      position: '000025',
+    },
+    { headers: headersOf(c.getRequest(), 'removeObject') },
+  );
+  c.getRequest().createTask('DEVK905941', {
+    headers: headersOf(c.getRequest(), 'createTask'),
+    targetUser: 'DEVELOPER',
   });
-  c.getRequest().createTask('DEVK905941', { targetUser: 'DEVELOPER' });
 
   // An entry being added does not exist yet, so it has no position to give.
-  c.getRequest().addObject('DEVK905942', { name: 'ZCL_X', type: 'CLAS' });
+  c.getRequest().addObject(
+    'DEVK905942',
+    { name: 'ZCL_X', type: 'CLAS' },
+    { headers: headersOf(c.getRequest(), 'addObject') },
+  );
 
   // **A listed entry is not removable on sight.** `readObjects` answers
   // `position?: string`, because an entry the server described without one
@@ -63,7 +76,11 @@ import { transportParsing } from '../../helpers/transportParsing';
     if (entry.position !== undefined)
       await c
         .getRequest()
-        .removeObject('DEVK905942', { ...entry, position: entry.position });
+        .removeObject(
+          'DEVK905942',
+          { ...entry, position: entry.position },
+          { headers: headersOf(c.getRequest(), 'removeObject') },
+        );
   })();
 };
 

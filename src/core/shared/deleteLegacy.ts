@@ -8,8 +8,10 @@
  * through only when the caller gives one.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Delete an ADT object via direct DELETE request. No lock is needed.
@@ -21,6 +23,7 @@ import { writeQuery } from '../../utils/internalUtils';
  */
 export async function deleteObjectDirect(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objectUrl: string,
   lockHandle: string | undefined,
   transportRequest?: string,
@@ -30,6 +33,7 @@ export async function deleteObjectDirect(
   return connection.makeAdtRequest({
     url,
     method: 'DELETE',
+    headers: requestHeaders(headers),
     timeout: 0,
     data: null,
   });

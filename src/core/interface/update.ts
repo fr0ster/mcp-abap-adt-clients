@@ -3,12 +3,13 @@
  * Use AdtInterface.update() for high-level operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { INTERFACE, sourceUri } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Low-level: Upload interface source code (PUT)
@@ -16,18 +17,16 @@ import { INTERFACE, sourceUri } from '../../endpoints/objects';
  */
 export async function upload(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   interfaceName: string,
   sourceCode: string,
   lockHandle: string,
   corrNr: string | undefined,
-  sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   let url = `${sourceUri(INTERFACE.uri(interfaceName))}?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }
-
-  const contentType = sourceContentType || CT_SOURCE;
   // The answer is returned rather than discarded: what a write becomes is the
   // consumer's result strategy to decide, and a function that swallowed it left
   // that strategy nothing to read.
@@ -36,6 +35,6 @@ export async function upload(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: { 'Content-Type': contentType, Accept: ACCEPT_SOURCE },
+    headers: requestHeaders(headers),
   });
 }

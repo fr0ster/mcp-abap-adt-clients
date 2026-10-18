@@ -3,6 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { create } from '../../../../core/scalarFunction/create';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function mockConn(capture: {
   url?: string;
@@ -32,7 +33,7 @@ describe('scalarFunction create', () => {
       data?: string;
       headers?: Record<string, string>;
     } = {};
-    await create(mockConn(cap), {
+    await create(mockConn(cap), headersFor('AdtScalarFunction.create'), {
       scalar_function_name: 'zok_test_func',
       package_name: 'zok_test',
       description: 'A & B',
@@ -57,7 +58,7 @@ describe('scalarFunction create', () => {
 
   it('appends encoded corrNr when a transport is supplied and omits masterSystem when absent', async () => {
     const cap: { url?: string; data?: string } = {};
-    await create(mockConn(cap as any), {
+    await create(mockConn(cap as any), headersFor('AdtScalarFunction.create'), {
       scalar_function_name: 'zok_f',
       package_name: 'zok_test',
       description: 'd',

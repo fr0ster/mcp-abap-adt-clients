@@ -5,6 +5,7 @@ import type {
 import { getScalarFunctionSource } from '../../../../core/scalarFunction/read';
 import { unlockScalarFunction } from '../../../../core/scalarFunction/unlock';
 import { updateScalarFunction } from '../../../../core/scalarFunction/update';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function cap() {
   const c: {
@@ -36,6 +37,7 @@ describe('scalarFunction wire', () => {
     const { c, conn } = cap();
     await updateScalarFunction(
       conn,
+      headersFor('AdtScalarFunction.update'),
       {
         scalar_function_name: 'ZOK_TEST_FUNC',
         source_code: 'define scalar function ...',

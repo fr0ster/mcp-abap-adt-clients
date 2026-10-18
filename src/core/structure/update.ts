@@ -2,13 +2,14 @@
  * Structure update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_SOURCE } from '../../constants/contentTypes';
 import { STRUCTURE, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateStructureParams } from './types';
 
 /**
@@ -18,22 +19,18 @@ import type { IUpdateStructureParams } from './types';
  */
 export async function upload(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateStructureParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(STRUCTURE.uri(params.structureName as string))}${writeQuery(lockHandle, params.transportRequest)}`;
-
-  const headers = {
-    Accept: 'application/xml, application/json, text/plain, */*',
-    'Content-Type': CT_SOURCE,
-  };
 
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: params.ddlCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -46,7 +43,8 @@ export async function upload(
  */
 export async function updateStructure(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateStructureParams & { lockHandle: string },
 ): Promise<IAdtWireResponse> {
-  return upload(connection, params, params.lockHandle);
+  return upload(connection, headers, params, params.lockHandle);
 }

@@ -7,10 +7,9 @@ import type {
 import { AdtBatchConnection } from '../../batch';
 import { innerRequest, parseBatchResponse } from '../../batch/wire';
 import { AdtClient } from '../../clients/AdtClient';
-import { exemptFromAcceptNegotiation, getBaseRequest } from '../../index';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { withRequestTrace } from '../../utils/requestTrace';
+import { headersOf } from '../helpers/adtHeaders';
 
 function fixture(statuses = [200, 200]) {
   const send = jest.fn(async (_request: unknown) => ({
@@ -187,7 +186,7 @@ test('debugger records step, stack and variables', async () => {
   const pending = [
     api.step('stepOver'),
     api.getStack(),
-    api.getVariables(['id']),
+    api.getVariables(['id'], { headers: headersOf(api, 'getVariables') }),
   ];
   await batch.execute();
   expect((await Promise.all(pending)).every((r) => r.ok)).toBe(true);
@@ -232,7 +231,7 @@ test.each([
 
 test.each([
   406, 415,
-] as const)('an AdtClient with correction switched on explicitly still resends nothing (%s)', async (status) => {
+] as const)('an AdtClient over a batch resends nothing (%s)', async (status) => {
   const { batch, send } = fixture([200]);
   const success = await send({});
   send.mockClear();
@@ -240,9 +239,7 @@ test.each([
     ...success,
     data: `--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Unsupported\r\nAccept: application/corrected+xml\r\nContent-Type: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n`,
   });
-  const pending = new AdtClient(batch, undefined, {
-    enableAcceptCorrection: true,
-  })
+  const pending = new AdtClient(batch, undefined)
     .getDomain()
     .readMetadata({ domainName: 'Z_TEST' });
   await batch.execute();
@@ -269,7 +266,7 @@ test.each([
   const pending = [
     method === 'lock' ? domain.lock(config) : domain.unlock(config, 'handle'),
     domain.readMetadata(config),
-    domain.create(config),
+    domain.create(config, { headers: headersOf(domain, 'create') }),
   ];
   await batch.execute();
   await Promise.all(pending);
@@ -432,7 +429,10 @@ test.each([
     { endpoint: 'debugger' },
   );
   const api = new AbapDebugger(batch);
-  const pending = [api.getStack(), api.getVariables(['id'])];
+  const pending = [
+    api.getStack(),
+    api.getVariables(['id'], { headers: headersOf(api, 'getVariables') }),
+  ];
   await batch.execute();
   await Promise.all(pending);
   expect(send).toHaveBeenCalledTimes(1);
@@ -500,21 +500,23 @@ test.each([
   expect(source).not.toMatch(/\b[A-Z][A-Z0-9]{2}K\d+\b/);
 });
 
-describe('accept negotiation never resends an envelope', () => {
-  // A batch is the caller's: what SAP answers to the envelope is theirs to
-  // read. Accept negotiation, on a connection an AdtClient wrapped with
-  // correction on, would answer a 406/415 by sending the envelope again.
+/**
+ * Nothing corrects or resends (since 36.0.0 there is no accept negotiation):
+ * an envelope SAP answers 406/415 is sent once, and the parts see that answer,
+ * whether the batch wraps the connection an AdtClient was built over, a
+ * consumer's wrapper over a batch, or a forwarder of the consumer's.
+ */
+describe('a refused envelope is sent once', () => {
   function refusing(status: 406 | 415) {
     const refusal = Object.assign(new Error(`status ${status}`), {
       response: {
         status,
         statusText: 'Refused',
-        headers: {
-          accept: 'multipart/alternative',
-          'x-sap-adt-supported-accept': 'multipart/alternative',
-          'x-sap-adt-supported-content-type': 'multipart/alternative',
-        },
-        data: '',
+        headers: {},
+        data:
+          status === 406
+            ? '<message lang="EN">The message content is not acceptable. Accepted content types: multipart/alternative</message>'
+            : '',
       },
     });
     const send = jest.fn(async (_request: unknown) => {
@@ -527,8 +529,8 @@ describe('accept negotiation never resends an envelope', () => {
       getBaseUrl: async () => 'https://example.test',
       getSessionId: () => 'session',
     } as unknown as IAbapConnection;
-    // Wraps the connection's makeAdtRequest with accept negotiation.
-    new AdtClient(connection, undefined, { enableAcceptCorrection: true });
+    // An AdtClient built over the connection used to wrap it; nothing does.
+    new AdtClient(connection, undefined);
     return { connection, send, refusal };
   }
 
@@ -536,7 +538,6 @@ describe('accept negotiation never resends an envelope', () => {
     406, 415,
   ] as const)('sends an envelope answered %s once, and the parts see that answer', async (status) => {
     const { connection, send, refusal } = refusing(status);
-    expect(connection.makeAdtRequest).not.toBe(send);
     const batch = new AdtBatchConnection(connection, {
       endpoint: 'communication',
     });
@@ -552,38 +553,36 @@ describe('accept negotiation never resends an envelope', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(await settled).toBe(refusal);
   });
-});
 
-test.each([
-  406, 415,
-] as const)('a member that negotiates directly resends nothing through a batch (%s)', async (status) => {
-  // Some members call the negotiation themselves rather than through the
-  // wrapped connection: the exemption holds there too.
-  const { batch, send } = fixture([200]);
-  const success = await send({});
-  send.mockClear();
-  send.mockResolvedValueOnce({
-    ...success,
-    data: `--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Unsupported\r\nAccept: application/corrected+xml\r\nContent-Type: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n`,
+  it('a forwarder over the connection sends the envelope once', async () => {
+    const { connection, send, refusal } = refusing(406);
+    const forwarder = {
+      makeAdtRequest: (r: Parameters<IAbapConnection['makeAdtRequest']>[0]) =>
+        connection.makeAdtRequest(r),
+      setSessionType: (mode: 'stateful' | 'stateless') =>
+        connection.setSessionType(mode),
+      connect: () => connection.connect(),
+      getBaseUrl: () => connection.getBaseUrl(),
+      getSessionId: () => connection.getSessionId(),
+    } as unknown as IAbapConnection;
+    const batch = new AdtBatchConnection(forwarder, {
+      endpoint: 'communication',
+    });
+    const part = batch.makeAdtRequest(req).catch((e: unknown) => e);
+    await expect(batch.execute()).rejects.toBe(refusal);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await part).toBe(refusal);
   });
-  const pending = makeAdtRequestWithAcceptNegotiation(
-    batch,
-    { ...req, headers: { Accept: 'application/xml' } },
-    { enableAcceptCorrection: true },
-  ).catch((error: unknown) => error);
-  await batch.execute();
-  expect(send).toHaveBeenCalledTimes(1);
-  expect(
-    ((await pending) as { response?: { status?: number } }).response?.status,
-  ).toBe(status);
-});
 
-describe('a consumer wrapper over a batch connection', () => {
-  // A consumer may hand members its own connection over the batch (per call,
-  // say). The public mark is how that wrapper is exempt too; unmarked, it is
-  // negotiated like any other connection.
-  function wrapperOver(batch: AdtBatchConnection): IAbapConnection {
-    return {
+  it("a consumer wrapper over a batch: a part answered 406 is that call's answer", async () => {
+    const { batch, send } = fixture([200]);
+    const success = await send({});
+    send.mockClear();
+    send.mockResolvedValueOnce({
+      ...success,
+      data: '--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 406 Unsupported\r\nContent-Type: application/xml\r\n\r\n<message>The message content is not acceptable. Accepted content types: application/corrected+xml</message>\r\n--answer--\r\n',
+    });
+    const wrapper = {
       makeAdtRequest: (
         request: Parameters<IAbapConnection['makeAdtRequest']>[0],
       ) => batch.makeAdtRequest(request),
@@ -593,109 +592,12 @@ describe('a consumer wrapper over a batch connection', () => {
       getBaseUrl: () => batch.getBaseUrl(),
       getSessionId: () => batch.getSessionId(),
     } as unknown as IAbapConnection;
-  }
-  const refused406 = <S extends { data: string }>(success: S): S => ({
-    ...success,
-    data: '--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 406 Unsupported\r\nAccept: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n',
-  });
-
-  it('marked with exemptFromAcceptNegotiation, resends nothing', async () => {
-    const { batch, send } = fixture([200]);
-    const success = await send({});
-    send.mockClear();
-    send.mockResolvedValueOnce(refused406(success));
-    const wrapper = wrapperOver(batch);
-    exemptFromAcceptNegotiation(wrapper);
-    const pending = new AdtClient(wrapper, undefined, {
-      enableAcceptCorrection: true,
-    })
+    const pending = new AdtClient(wrapper, undefined)
       .getDomain()
       .readMetadata({ domainName: 'Z_TEST' });
     await batch.execute();
     expect(send).toHaveBeenCalledTimes(1);
-    const answer = await pending;
-    expect(answer.ok).toBe(false);
-  });
-
-  it('unmarked, is negotiated like any other connection', async () => {
-    const { batch, send } = fixture([200]);
-    const success = await send({});
-    send.mockClear();
-    send.mockResolvedValueOnce(refused406(success));
-    const pending = new AdtClient(wrapperOver(batch), undefined, {
-      enableAcceptCorrection: true,
-    })
-      .getDomain()
-      .readMetadata({ domainName: 'Z_TEST' });
-    await batch.execute();
-    expect(send).toHaveBeenCalledTimes(2);
-    expect((await pending).ok).toBe(true);
-  });
-});
-
-describe('a forwarding connection over one an AdtClient wrapped', () => {
-  // A consumer whose batch wraps a forwarder of its own (a late-bound target
-  // over its instance's connection, say) forwards through getBaseRequest of
-  // the connection it forwards to: the envelope then bypasses that
-  // connection's accept negotiation and is sent once.
-  function wrappedRefusing406() {
-    const refusal = Object.assign(new Error('status 406'), {
-      response: {
-        status: 406,
-        statusText: 'Refused',
-        headers: { 'x-sap-adt-supported-accept': 'multipart/alternative' },
-        data: '',
-      },
-    });
-    const send = jest.fn(async (_request: unknown) => {
-      throw refusal;
-    });
-    const connection = {
-      makeAdtRequest: send,
-      setSessionType: jest.fn(),
-      connect: jest.fn(),
-      getBaseUrl: async () => 'https://example.test',
-      getSessionId: () => 'session',
-    } as unknown as IAbapConnection;
-    new AdtClient(connection, undefined, { enableAcceptCorrection: true });
-    return { connection, send, refusal };
-  }
-  function forwarder(
-    to: IAbapConnection,
-    request: IAbapConnection['makeAdtRequest'],
-  ): IAbapConnection {
-    return {
-      makeAdtRequest: request,
-      setSessionType: (mode: 'stateful' | 'stateless') =>
-        to.setSessionType(mode),
-      connect: () => to.connect(),
-      getBaseUrl: () => to.getBaseUrl(),
-      getSessionId: () => to.getSessionId(),
-    } as unknown as IAbapConnection;
-  }
-
-  it('forwarding through getBaseRequest sends the envelope once', async () => {
-    const { connection, send, refusal } = wrappedRefusing406();
-    const batch = new AdtBatchConnection(
-      forwarder(connection, (r) => getBaseRequest(connection)(r)),
-      { endpoint: 'communication' },
-    );
-    const part = batch.makeAdtRequest(req).catch((e: unknown) => e);
-    await expect(batch.execute()).rejects.toBe(refusal);
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(await part).toBe(refusal);
-  });
-
-  it('forwarding through the wrapped makeAdtRequest sends it again', async () => {
-    const { connection, send } = wrappedRefusing406();
-    const batch = new AdtBatchConnection(
-      forwarder(connection, (r) => connection.makeAdtRequest(r)),
-      { endpoint: 'communication' },
-    );
-    const part = batch.makeAdtRequest(req).catch((e: unknown) => e);
-    await batch.execute().catch(() => undefined);
-    await part;
-    expect(send).toHaveBeenCalledTimes(2);
+    expect((await pending).ok).toBe(false);
   });
 });
 

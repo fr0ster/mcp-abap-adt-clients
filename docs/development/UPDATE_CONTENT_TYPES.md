@@ -1,6 +1,10 @@
 # Update Content Types Reference
 
-This document lists content types used by update operations in core modules.
+**Since 36.0.0 these files hold no content type.** `update` and
+`updateMetadata` send the `options.headers` their caller passes (interfaces-adt
+19.0.0) and choose none of their own. The tables below record what each one
+sent until 35.0.0 — the pair a caller wanting the old behaviour passes; the
+test helper `src/__tests__/helpers/adtHeaders.ts` holds the full set.
 
 ## text/plain (source code)
 
@@ -30,5 +34,8 @@ This document lists content types used by update operations in core modules.
 
 ## Notes
 
-- Check endpoints should use matching content types when validating updates.
+- Check endpoints should use matching content types when validating updates
+  (the check run's `Content-Type` is the caller's too since 36.0.0; the
+  artifact's content type inside the check-run document is still the client's
+  `contentTypes` / `unicode` setting).
 - Function Group updates only metadata (no source code).

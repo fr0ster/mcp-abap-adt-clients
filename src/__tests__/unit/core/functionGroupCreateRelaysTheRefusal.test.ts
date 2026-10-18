@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { create } from '../../../core/functionGroup/create';
 import type { ICreateFunctionGroupParams } from '../../../core/functionGroup/types';
+import { headersFor } from '../../helpers/adtHeaders';
 
 const refusing: Partial<IAbapConnection> = {
   makeAdtRequest: async () => {
@@ -19,13 +20,10 @@ const refusing: Partial<IAbapConnection> = {
 
 it('relays a 400 instead of answering 201', async () => {
   await expect(
-    create(
-      refusing as IAbapConnection,
-      {
-        functionGroupName: 'ZOK_FG',
-        description: 'x',
-        packageName: 'ZLOCAL',
-      } as ICreateFunctionGroupParams,
-    ),
+    create(refusing as IAbapConnection, headersFor('AdtFunctionGroup.create'), {
+      functionGroupName: 'ZOK_FG',
+      description: 'x',
+      packageName: 'ZLOCAL',
+    } as ICreateFunctionGroupParams),
   ).rejects.toMatchObject({ response: { status: 400 } });
 });

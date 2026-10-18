@@ -19,6 +19,7 @@ import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { getSqlQuery } from '../../../core/shared/sqlQuery';
 import { getTableContents } from '../../../core/shared/tableContents';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { headersFor, headersOf } from '../../helpers/adtHeaders';
 
 function recordingConnection() {
   const sent: IAbapRequestOptions[] = [];
@@ -55,11 +56,17 @@ const logger = {
 };
 
 const calls: Array<[string, (c: IAbapConnection) => Promise<unknown>]> = [
-  ['getSqlQuery', (c) => getSqlQuery(c, { sql_query: 'SELECT * FROM T000' })],
+  [
+    'getSqlQuery',
+    (c) =>
+      getSqlQuery(c, headersFor('AdtUtils.getSqlQuery'), {
+        sql_query: 'SELECT * FROM T000',
+      }),
+  ],
   [
     'getTableContents',
     (c) =>
-      getTableContents(c, {
+      getTableContents(c, headersFor('AdtUtils.getTableContents'), {
         table_name: 't000',
         sql_query: 'SELECT T000~MANDT FROM T000',
       }),
@@ -67,17 +74,33 @@ const calls: Array<[string, (c: IAbapConnection) => Promise<unknown>]> = [
   [
     'AdtUtils.getSqlQuery',
     (c) =>
-      new AdtUtils(c, logger, utilDocuments).getSqlQuery({
-        sql_query: 'SELECT * FROM T000',
-      }),
+      new AdtUtils(c, logger, utilDocuments).getSqlQuery(
+        {
+          sql_query: 'SELECT * FROM T000',
+        },
+        {
+          headers: headersOf(
+            new AdtUtils(c, logger, utilDocuments),
+            'getSqlQuery',
+          ),
+        },
+      ),
   ],
   [
     'AdtUtils.getTableContents',
     (c) =>
-      new AdtUtils(c, logger, utilDocuments).getTableContents({
-        table_name: 't000',
-        sql_query: 'SELECT T000~MANDT FROM T000',
-      }),
+      new AdtUtils(c, logger, utilDocuments).getTableContents(
+        {
+          table_name: 't000',
+          sql_query: 'SELECT T000~MANDT FROM T000',
+        },
+        {
+          headers: headersOf(
+            new AdtUtils(c, logger, utilDocuments),
+            'getTableContents',
+          ),
+        },
+      ),
   ],
 ];
 

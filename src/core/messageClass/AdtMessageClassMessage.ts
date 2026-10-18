@@ -29,6 +29,7 @@ import type {
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -39,12 +40,12 @@ import type {
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { chain } from '../shared/chain';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
@@ -150,7 +151,7 @@ export class AdtMessageClassMessage<
     config: Omit<IMessageClassMessageConfig, 'source'> & {
       source?: never;
     },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }
@@ -162,7 +163,7 @@ export class AdtMessageClassMessage<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }
@@ -177,7 +178,7 @@ export class AdtMessageClassMessage<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     return this.writeClass(config, true, options) as Promise<
       IAdtResponse<ReturnType<R['deleted']>, E>
@@ -195,7 +196,7 @@ export class AdtMessageClassMessage<
   private async writeClass<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     deleting: boolean,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -300,7 +301,9 @@ export class AdtMessageClassMessage<
               method: 'PUT',
               timeout: 0,
               data: xmlBody,
-              headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
+              // The main write carries the caller's pair; the chain's read,
+              // locks and unlocks keep their own.
+              headers: requestHeaders(options.headers),
             }),
           this.results.written as IResultStrategy<ReturnType<R['written']>>,
           options?.analyse,

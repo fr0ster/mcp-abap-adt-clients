@@ -1,5 +1,12 @@
 # The lifecycle of an ADT object
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](../../README.md#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 Every object type in this library answers the same small set of members, and
 they compose into one flow:
 
@@ -29,7 +36,7 @@ const answer = await client.getClass().create({
   className: 'ZCL_TEST',
   packageName: 'ZPACKAGE',
   description: 'Test class',
-});
+}, { headers });
 ```
 
 What comes back is an object that exists, is inactive, and is empty. Source is a
@@ -64,13 +71,13 @@ both: a function include, a scalar function implementation and a feature toggle.
 
 ```typescript
 // a class — has a source
-await client.getClass().update({ className }, { source, lockHandle });
+await client.getClass().update({ className }, { headers, source, lockHandle });
 
 // a domain — is its document, and the document is what you send
 const current = await client.getDomain().readMetadata({ domainName });
 if (!current.ok) throw new Error(current.getError().message);
 const document = patched(current.getResult().value); // yours to edit
-await client.getDomain().updateMetadata({ domainName }, { source: document, lockHandle });
+await client.getDomain().updateMetadata({ domainName }, { headers, source: document, lockHandle });
 ```
 
 **The whole document, every time.** An update is a replace, not a merge: read
@@ -100,12 +107,12 @@ if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 
 try {
-  await cls.update(config, { source, lockHandle });
+  await cls.update(config, { headers, source, lockHandle });
 } finally {
   await cls.unlock(config, lockHandle);           // so does the UNLOCK
 }
 
-await cls.activate(config);                       // when you want it active
+await cls.activate(config, { headers });                       // when you want it active
 ```
 
 `lock` and `unlock` are the only members that change the session type, and
@@ -151,7 +158,7 @@ What goes *in* it depends on the member, and there are two kinds.
 ### `update()` — the object's source, in the object's own language
 
 ```typescript
-await client.getClass().update({ className }, { source, lockHandle });
+await client.getClass().update({ className }, { headers, source, lockHandle });
 ```
 
 | the type | what `source` holds |
@@ -180,7 +187,7 @@ message class, a function include and a scalar function implementation:
 const current = await domain.readMetadata({ domainName });
 const edited  = patch(String(current.getResult().value)); // yours to do
 const handle  = (await domain.lock({ domainName })).getResult().value;
-await domain.updateMetadata({ domainName }, { source: edited, lockHandle: handle });
+await domain.updateMetadata({ domainName }, { headers, source: edited, lockHandle: handle });
 ```
 
 **The body may travel in either place.** `options.source` is what the
@@ -258,11 +265,11 @@ resolved that address to, so a type with an address has something to ask with.
 ```typescript
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 
-const approved = await client.getClass().checkDeletion(config, {
+const approved = await client.getClass().checkDeletion(config, { headers,
   analyse: analyseDeletion,
 });
 if (!approved.ok) throw new Error(approved.getError().message);
-await client.getClass().delete(config, { analyse: analyseDeletion });
+await client.getClass().delete(config, { headers, analyse: analyseDeletion });
 ```
 
 Both answer `200` whether the server agreed or not — the verdict is in the
@@ -304,7 +311,7 @@ A behavior implementation *is* a class, so the shell goes in with the class's ow
 import { mainSourceFor } from '@mcp-abap-adt/adt-clients';
 
 const bimpl = client.getBehaviorImplementation();
-await bimpl.create(config);
+await bimpl.create(config, { headers });
 
 const cls = client.getClass();
 const locked = await cls.lock({ className });
@@ -313,14 +320,14 @@ const lockHandle = locked.getResult().value;
 try {
   await cls.update(
     { className },
-    { source: mainSourceFor(className, behaviorDefinition), lockHandle },
+    { headers, source: mainSourceFor(className, behaviorDefinition), lockHandle },
   );
-  await bimpl.update({ className }, { source, lockHandle });
+  await bimpl.update({ className }, { headers, source, lockHandle });
 } finally {
   await cls.unlock({ className }, lockHandle);
 }
 
-await bimpl.activate({ className });
+await bimpl.activate({ className }, { headers });
 ```
 
 There was an `updateMain()` member that composed the template and wrote it. It

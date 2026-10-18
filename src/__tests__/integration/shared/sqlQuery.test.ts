@@ -18,6 +18,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -126,10 +127,13 @@ describe('Shared - getSqlQuery', () => {
     // as the failure half, naming which.
     const document = expectResult(
       await withAcceptHandling(
-        client.getUtils().getSqlQuery({
-          sql_query: sqlQuery,
-          row_number: rowNumber,
-        }),
+        client.getUtils().getSqlQuery(
+          {
+            sql_query: sqlQuery,
+            row_number: rowNumber,
+          },
+          { headers: headersOf(client.getUtils(), 'getSqlQuery') },
+        ),
       ),
       'SQL query',
     ) as string;
@@ -184,9 +188,12 @@ describe('Shared - getSqlQuery', () => {
     // as the failure half, naming which.
     const document = expectResult(
       await withAcceptHandling(
-        client.getUtils().getSqlQuery({
-          sql_query: sqlQuery,
-        }),
+        client.getUtils().getSqlQuery(
+          {
+            sql_query: sqlQuery,
+          },
+          { headers: headersOf(client.getUtils(), 'getSqlQuery') },
+        ),
       ),
       'SQL query',
     ) as string;
@@ -231,7 +238,12 @@ describe('Shared - getSqlQuery', () => {
     // So what is asserted is what is true — it is refused — and not the
     // wording of a check that no longer exists.
     logTestStep('validate error if SQL query is missing', testsLogger);
-    const answer = await client.getUtils().getSqlQuery({ sql_query: '' });
+    const answer = await client
+      .getUtils()
+      .getSqlQuery(
+        { sql_query: '' },
+        { headers: headersOf(client.getUtils(), 'getSqlQuery') },
+      );
     if (answer.ok) throw new Error('expected an empty query to be refused');
     expect(answer.getError().message).toMatch(/\S/);
     testsLogger.info?.(`empty query refused: ${answer.getError().message}`);

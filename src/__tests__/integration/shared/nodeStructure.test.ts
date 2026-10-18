@@ -5,8 +5,6 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/nodeStructure.test
  */
 
-// The source path, not the package: these readings are new in adt-strategies
-// and the package's built entry point does not carry them until it is released.
 import {
   type IRepositoryNodeContents,
   utilNodeContents,
@@ -19,6 +17,9 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+// The source path, not the package: these readings are new in adt-strategies
+// and the package's built entry point does not carry them until it is released.
+import { headersOf } from '../../helpers/adtHeaders';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -106,6 +107,10 @@ class NodeStructureObject implements TestableObject<INodeStructureParams> {
     return this.client
       .getUtils({ ...utilDocuments, node: utilNodeContents })
       .fetchNodeStructure(config.parent_type, config.parent_name, {
+        headers: headersOf(
+          this.client.getUtils({ ...utilDocuments, node: utilNodeContents }),
+          'fetchNodeStructure',
+        ),
         nodeId: config.node_id,
       });
   }

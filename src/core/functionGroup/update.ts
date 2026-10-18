@@ -5,13 +5,13 @@
  * They don't have source code to update directly, but metadata can be updated.
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateFunctionGroupParams } from './types';
 
 /**
@@ -29,25 +29,18 @@ import type { IUpdateFunctionGroupParams } from './types';
  */
 export async function updateFunctionGroup(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateFunctionGroupParams,
   document: string,
-  contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
   const lockHandle = params.lock_handle as string;
   const url = `${FUNCTION_GROUP.uri(params.function_group_name as string)}${lockHandle ? `?lockHandle=${encodeURIComponent(lockHandle)}` : ''}${params.transport_request ? `${lockHandle ? '&' : '?'}corrNr=${params.transport_request}` : ''}`;
-
-  const ct = contentTypes?.functionGroupUpdate();
 
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: {
-      'Content-Type':
-        ct?.contentType ||
-        'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
-      Accept: ct?.accept || CT_FUNCTION_GROUP,
-    },
+    headers: requestHeaders(headers),
   });
 }

@@ -2,13 +2,14 @@
  * ServiceDefinition update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { SERVICE_DEFINITION, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateServiceDefinitionParams } from './types';
 
 /**
@@ -21,21 +22,17 @@ import type { IUpdateServiceDefinitionParams } from './types';
  */
 export async function updateServiceDefinition(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: IUpdateServiceDefinitionParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(SERVICE_DEFINITION.uri(args.service_definition_name.toLowerCase()))}${writeQuery(lockHandle, args.transport_request)}`;
-
-  const headers: Record<string, string> = {
-    Accept: ACCEPT_SOURCE,
-    'Content-Type': CT_SOURCE,
-  };
 
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

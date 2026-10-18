@@ -27,6 +27,7 @@ import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { abapGitDocuments } from '../../../../clients/abapGit/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -66,7 +67,6 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       abapGit = new AdtAbapGitClient(
         connection,
         createLibraryLogger(),
-        undefined,
         results,
       );
       hasConfig = true;
@@ -122,7 +122,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         return;
       }
       const info = expectResult(
-        await abapGit.checkExternalRepo({ url: checkCase.params.url }),
+        await abapGit.checkExternalRepo(
+          { url: checkCase.params.url },
+          { headers: headersOf(abapGit, 'checkExternalRepo') },
+        ),
         'check external repo',
       );
       expect(Array.isArray(info.branches)).toBe(true);
@@ -142,11 +145,14 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         return;
       }
 
-      await abapGit.link({
-        package: flowCaseDef.params.package,
-        url: flowCaseDef.params.url,
-        branchName: flowCaseDef.params.branch,
-      });
+      await abapGit.link(
+        {
+          package: flowCaseDef.params.package,
+          url: flowCaseDef.params.url,
+          branchName: flowCaseDef.params.branch,
+        },
+        { headers: headersOf(abapGit, 'link') },
+      );
 
       // Four steps since 19.0.0, because a pull was four requests: find the
       // link, post, wait, and read the log if the status says to. The waiting
@@ -163,11 +169,14 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       }
 
       expectResult(
-        await abapGit.pull({
-          package: flowCaseDef.params.package,
-          pullLink: repo.pullLink,
-          branchName: flowCaseDef.params.branch,
-        }),
+        await abapGit.pull(
+          {
+            package: flowCaseDef.params.package,
+            pullLink: repo.pullLink,
+            branchName: flowCaseDef.params.branch,
+          },
+          { headers: headersOf(abapGit, 'pull') },
+        ),
         'pull',
       );
 

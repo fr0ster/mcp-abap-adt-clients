@@ -15,7 +15,17 @@
  * and functionGroup. The shape is identical for all six.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
+
+// Since 36.0.0 a request's Accept and Content-Type are the caller's
+// (`options.headers`): the member sends exactly this pair. These are the ones
+// 35.0.0 chose for itself on a modern system.
+const DOMAIN_DOCUMENT: IAdtHeaders = {
+  accept:
+    'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
+  contentType: 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
+};
 
 /** The fields the old `updateDomain` accepted and patched in for you. */
 export interface IDomainEdits {
@@ -94,7 +104,7 @@ export async function updateADomain(
     //    package inspects nothing, and the server says so in its own words.
     const written = await domain.updateMetadata(
       { domainName },
-      { source: edited, lockHandle },
+      { headers: DOMAIN_DOCUMENT, source: edited, lockHandle },
     );
     if (!written.ok) throw new Error(written.getError().message);
   } finally {

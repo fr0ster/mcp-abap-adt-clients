@@ -1,4 +1,6 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { CheckRunVersion } from '../../utils/checkRun';
+import { requestHeaders } from '../../utils/requestHeaders';
 /**
  * Behavior Definition check operations
  */
@@ -7,10 +9,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION, sourceUri } from '../../endpoints/objects';
 import type { CheckReporter } from './types';
 
@@ -38,6 +36,7 @@ import type { CheckReporter } from './types';
  */
 export async function check(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   reporter: CheckReporter,
   _sessionId: string,
@@ -66,11 +65,6 @@ export async function check(
 </chkrun:checkObjectList>`;
   }
 
-  const headers = {
-    Accept: ACCEPT_CHECK_MESSAGES,
-    'Content-Type': CT_CHECK_OBJECTS,
-  };
-
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
 
   return connection.makeAdtRequest({
@@ -78,7 +72,7 @@ export async function check(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -105,6 +99,7 @@ export async function check(
  */
 export async function checkImplementation(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   sessionId: string,
   version: CheckRunVersion = 'inactive',
@@ -112,6 +107,7 @@ export async function checkImplementation(
 ): Promise<IAdtWireResponse> {
   return check(
     connection,
+    headers,
     name,
     'bdefImplementationCheck',
     sessionId,
@@ -143,6 +139,7 @@ export async function checkImplementation(
  */
 export async function checkAbap(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   sessionId: string,
   version: CheckRunVersion = 'inactive',
@@ -150,6 +147,7 @@ export async function checkAbap(
 ): Promise<IAdtWireResponse> {
   return check(
     connection,
+    headers,
     name,
     'abapCheckRun',
     sessionId,

@@ -13,6 +13,7 @@
  * is the point, since nothing at runtime can tell a narrowed type from a wide
  * one.
  */
+
 import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -20,6 +21,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /**
  * What a consumer who reads T100 keys would declare. The library ships no field
@@ -70,7 +72,10 @@ describe('the failure type a caller injected', () => {
 
     const answer = await client
       .getClass()
-      .activate({ className: 'ZZ_NO_SUCH_OBJECT_ZZ' }, { analyse: t100 });
+      .activate(
+        { className: 'ZZ_NO_SUCH_OBJECT_ZZ' },
+        { headers: headersOf(client.getClass(), 'activate'), analyse: t100 },
+      );
 
     expect(answer.ok).toBe(false);
     if (answer.ok) throw new Error('expected a refusal');
@@ -89,7 +94,10 @@ describe('the failure type a caller injected', () => {
 
     const answer = await client
       .getClass()
-      .activate({ className: 'ZZ_NO_SUCH_OBJECT_ZZ' });
+      .activate(
+        { className: 'ZZ_NO_SUCH_OBJECT_ZZ' },
+        { headers: headersOf(client.getClass(), 'activate') },
+      );
 
     // Nothing here reads an activation checklist. ADT answered 200, so the
     // exchange succeeded and the document is the result; whether it says the
@@ -104,12 +112,13 @@ describe('the failure type a caller injected', () => {
   it('can still clear a verdict a strategy of its own raised', async () => {
     const client = new AdtClient(answering(REFUSED));
 
-    const answer = await client
-      .getClass()
-      .activate(
-        { className: 'ZZ_NO_SUCH_OBJECT_ZZ' },
-        { analyse: () => ADT_NO_FAILURE },
-      );
+    const answer = await client.getClass().activate(
+      { className: 'ZZ_NO_SUCH_OBJECT_ZZ' },
+      {
+        headers: headersOf(client.getClass(), 'activate'),
+        analyse: () => ADT_NO_FAILURE,
+      },
+    );
 
     // Overruling in the other direction still works: a caller who considers
     // this answer fine gets the result half.

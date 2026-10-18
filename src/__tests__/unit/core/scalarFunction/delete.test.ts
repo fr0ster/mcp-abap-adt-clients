@@ -6,6 +6,7 @@ import {
   checkDeletion,
   deleteScalarFunction,
 } from '../../../../core/scalarFunction/delete';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function capConn() {
   const calls: Array<{ url: string; data?: string }> = [];
@@ -27,7 +28,9 @@ function capConn() {
 describe('scalarFunction delete', () => {
   it('checkDeletion uses the lower-cased object URI', async () => {
     const { calls, conn } = capConn();
-    await checkDeletion(conn, { scalar_function_name: 'ZOK_TEST_FUNC' });
+    await checkDeletion(conn, headersFor('AdtScalarFunction.checkDeletion'), {
+      scalar_function_name: 'ZOK_TEST_FUNC',
+    });
     expect(calls[0].data).toContain(
       'adtcore:uri="/sap/bc/adt/ddic/dsfd/sources/zok_test_func"',
     );
@@ -35,7 +38,9 @@ describe('scalarFunction delete', () => {
 
   it('delete uses the lower-cased object URI', async () => {
     const { calls, conn } = capConn();
-    await deleteScalarFunction(conn, { scalar_function_name: 'ZOK_TEST_FUNC' });
+    await deleteScalarFunction(conn, headersFor('AdtScalarFunction.delete'), {
+      scalar_function_name: 'ZOK_TEST_FUNC',
+    });
     expect(calls[0].data).toContain(
       'adtcore:uri="/sap/bc/adt/ddic/dsfd/sources/zok_test_func"',
     );

@@ -16,6 +16,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -81,6 +82,8 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     // narrate; removing it would make this one class take different arguments.
     // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
     private readonly logger?: ILogger,
+    // Read by `create` until 36.0.0; its headers are the caller's now.
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
     private readonly contentTypes?: IAdtContentTypes,
     // The one cast in this file, and it is on the default. See AdtClass.
     private readonly results: R = includeDocuments as unknown as R,
@@ -177,7 +180,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IIncludeConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -199,20 +202,16 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     const includeName = requireName(config);
     return answering(
       () =>
-        create(
-          connection,
-          {
-            includeName,
-            description: config.description,
-            packageName: config.packageName as string,
-            transportRequest: config.transportRequest,
-            masterLanguage:
-              config.masterLanguage ?? this.systemContext.masterLanguage,
-            masterSystem: this.systemContext.masterSystem,
-            responsible: this.systemContext.responsible,
-          },
-          this.contentTypes,
-        ),
+        create(connection, options.headers, {
+          includeName,
+          description: config.description,
+          packageName: config.packageName as string,
+          transportRequest: config.transportRequest,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+        }),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
     );
@@ -264,7 +263,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -283,6 +282,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
       () =>
         uploadIncludeSource(
           connection,
+          options.headers,
           includeName,
           source as string,
           options?.lockHandle,
@@ -301,7 +301,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -309,7 +309,12 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     const includeName = requireName(config);
 
     return answering(
-      () => checkDeletionByUri(connection, includeUrl(includeName)),
+      () =>
+        checkDeletionByUri(
+          connection,
+          options.headers,
+          includeUrl(includeName),
+        ),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -326,7 +331,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -334,7 +339,13 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     const includeName = requireName(config);
 
     return answering(
-      () => deleteInclude(connection, includeName, config.transportRequest),
+      () =>
+        deleteInclude(
+          connection,
+          options.headers,
+          includeName,
+          config.transportRequest,
+        ),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -343,14 +354,14 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
     return answering(
-      () => activateInclude(connection, includeName),
+      () => activateInclude(connection, options.headers, includeName),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );

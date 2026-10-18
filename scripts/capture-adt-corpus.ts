@@ -80,6 +80,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import * as yaml from 'yaml';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   getTargetSystem,
@@ -1010,7 +1011,12 @@ async function main(): Promise<void> {
       return;
     }
     try {
-      await client.getClass().delete({ className: SCRATCH_CLASS_NAME });
+      await client
+        .getClass()
+        .delete(
+          { className: SCRATCH_CLASS_NAME },
+          { headers: headersOf(client.getClass(), 'delete') },
+        );
     } catch (error) {
       console.error(
         `  delete during teardown threw: ${(error as Error).message}`,
@@ -1057,15 +1063,33 @@ async function main(): Promise<void> {
     > = [
       [
         CREATE_CLASS_NAME,
-        () => client.getClass().delete({ className: CREATE_CLASS_NAME }),
+        () =>
+          client
+            .getClass()
+            .delete(
+              { className: CREATE_CLASS_NAME },
+              { headers: headersOf(client.getClass(), 'delete') },
+            ),
       ],
       [
         CREATE_DOMAIN_NAME,
-        () => client.getDomain().delete({ domainName: CREATE_DOMAIN_NAME }),
+        () =>
+          client
+            .getDomain()
+            .delete(
+              { domainName: CREATE_DOMAIN_NAME },
+              { headers: headersOf(client.getDomain(), 'delete') },
+            ),
       ],
       [
         UNIT_TEST_CLASS_NAME,
-        () => client.getClass().delete({ className: UNIT_TEST_CLASS_NAME }),
+        () =>
+          client
+            .getClass()
+            .delete(
+              { className: UNIT_TEST_CLASS_NAME },
+              { headers: headersOf(client.getClass(), 'delete') },
+            ),
         () =>
           present(
             `/sap/bc/adt/oo/classes/${UNIT_TEST_CLASS_NAME.toLowerCase()}`,
@@ -1074,7 +1098,12 @@ async function main(): Promise<void> {
       [
         CREATE_DTEL_NAME,
         () =>
-          client.getDataElement().delete({ dataElementName: CREATE_DTEL_NAME }),
+          client
+            .getDataElement()
+            .delete(
+              { dataElementName: CREATE_DTEL_NAME },
+              { headers: headersOf(client.getDataElement(), 'delete') },
+            ),
       ],
     ];
     // Do not believe the delete. ADT answers a refused deletion with HTTP 200
@@ -1112,7 +1141,9 @@ async function main(): Promise<void> {
     await withCase('refusal-check-nonexistent-object', async () => {
       await client
         .getClass()
-        .check({ className: NONEXISTENT_CLASS_NAME }, 'active');
+        .check({ className: NONEXISTENT_CLASS_NAME }, 'active', {
+          headers: headersOf(client.getClass(), 'check'),
+        });
     });
 
     // The pre-check a caller makes before walking: `/packages/{name}` is the
@@ -1130,7 +1161,9 @@ async function main(): Promise<void> {
     });
 
     await withCase('refusal-package-not-found-objectslist-empty', async () => {
-      await utils.fetchNodeStructure('DEVC/K', NONEXISTENT_PACKAGE_NAME);
+      await utils.fetchNodeStructure('DEVC/K', NONEXISTENT_PACKAGE_NAME, {
+        headers: headersOf(utils, 'fetchNodeStructure'),
+      });
     });
 
     // The same walk, two levels deep, against the package that is not there.
@@ -1150,7 +1183,12 @@ async function main(): Promise<void> {
     if (needScratchWrites) {
       track(`setup: create scratch class ${SCRATCH_CLASS_NAME}`);
       try {
-        await client.getClass().delete({ className: SCRATCH_CLASS_NAME });
+        await client
+          .getClass()
+          .delete(
+            { className: SCRATCH_CLASS_NAME },
+            { headers: headersOf(client.getClass(), 'delete') },
+          );
         console.log(
           '  (a leftover scratch class from a previous run was deleted)',
         );
@@ -1165,7 +1203,7 @@ async function main(): Promise<void> {
         },
         // `create` is the POST and nothing else since 19.0.0: no source is
         // written with it, and it activates nothing.
-        {},
+        { headers: headersOf(client.getClass(), 'create') },
       );
       scratchClassCreated = true;
       console.log('  created (inactive, valid source, not yet activated)');
@@ -1196,6 +1234,7 @@ async function main(): Promise<void> {
         await client.getClass().update(
           { className: SCRATCH_CLASS_NAME },
           {
+            headers: headersOf(client.getClass(), 'update'),
             lockHandle: 'ZZ_INVALID_LOCK_HANDLE_0001',
             source: MINIMAL_VALID_SOURCE,
           },
@@ -1210,6 +1249,7 @@ async function main(): Promise<void> {
           .check(
             { className: SCRATCH_CLASS_NAME, source: BROKEN_SOURCE },
             'inactive',
+            { headers: headersOf(client.getClass(), 'check') },
           );
       });
 
@@ -1217,18 +1257,25 @@ async function main(): Promise<void> {
       await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
         // A raw PUT never syntax-checks; it saves whatever bytes it is given.
         // `sourceCode` is an option, not config — config.source is check's.
-        await client
-          .getClass()
-          .update(
-            { className: SCRATCH_CLASS_NAME },
-            { lockHandle, source: BROKEN_SOURCE },
-          );
+        await client.getClass().update(
+          { className: SCRATCH_CLASS_NAME },
+          {
+            headers: headersOf(client.getClass(), 'update'),
+            lockHandle,
+            source: BROKEN_SOURCE,
+          },
+        );
       });
       console.log('  broken source saved as the inactive version, unlocked');
 
       // THE big one #1: SAP answers HTTP 200 with the refusal inside the body.
       await withCase('refusal-activation-fails', async () => {
-        await client.getClass().activate({ className: SCRATCH_CLASS_NAME });
+        await client
+          .getClass()
+          .activate(
+            { className: SCRATCH_CLASS_NAME },
+            { headers: headersOf(client.getClass(), 'activate') },
+          );
       });
 
       track('setup: lock scratch class before attempting delete');
@@ -1236,7 +1283,12 @@ async function main(): Promise<void> {
         // THE big one #2: a refused deletion, answered HTTP 200 with
         // `isDeleted="false"` and a `del:message` rather than a 4xx.
         await withCase('refusal-delete-refused', async () => {
-          await client.getClass().delete({ className: SCRATCH_CLASS_NAME });
+          await client
+            .getClass()
+            .delete(
+              { className: SCRATCH_CLASS_NAME },
+              { headers: headersOf(client.getClass(), 'delete') },
+            );
         });
       });
 
@@ -1246,16 +1298,23 @@ async function main(): Promise<void> {
         'setup: restore valid source before the activation-success capture',
       );
       await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
-        await client
-          .getClass()
-          .update(
-            { className: SCRATCH_CLASS_NAME },
-            { lockHandle, source: MINIMAL_VALID_SOURCE },
-          );
+        await client.getClass().update(
+          { className: SCRATCH_CLASS_NAME },
+          {
+            headers: headersOf(client.getClass(), 'update'),
+            lockHandle,
+            source: MINIMAL_VALID_SOURCE,
+          },
+        );
       });
 
       await withCase('activation-success-verdict', async () => {
-        await client.getClass().activate({ className: SCRATCH_CLASS_NAME });
+        await client
+          .getClass()
+          .activate(
+            { className: SCRATCH_CLASS_NAME },
+            { headers: headersOf(client.getClass(), 'activate') },
+          );
       });
     } else {
       console.log('\n(no write case selected — scratch class not created)');
@@ -1278,7 +1337,9 @@ async function main(): Promise<void> {
     });
 
     await withCase('check-success-verdict', async () => {
-      await client.getClass().check({ className: SHARED_CLASS }, 'active');
+      await client.getClass().check({ className: SHARED_CLASS }, 'active', {
+        headers: headersOf(client.getClass(), 'check'),
+      });
     });
 
     await withCase('read-table-metadata-structure', async () => {
@@ -1299,11 +1360,14 @@ async function main(): Promise<void> {
 
     if (needCreateWrites) {
       await withCase('create-class', async () => {
-        await client.getClass().create({
-          className: CREATE_CLASS_NAME,
-          packageName: devPackage,
-          description: 'corpus create capture (safe to delete)',
-        });
+        await client.getClass().create(
+          {
+            className: CREATE_CLASS_NAME,
+            packageName: devPackage,
+            description: 'corpus create capture (safe to delete)',
+          },
+          { headers: headersOf(client.getClass(), 'create') },
+        );
       });
 
       // The corpus had a PUT that was refused with 423 and no PUT that worked,
@@ -1316,6 +1380,7 @@ async function main(): Promise<void> {
           await client.getClass().update(
             { className: CREATE_CLASS_NAME },
             {
+              headers: headersOf(client.getClass(), 'update'),
               lockHandle,
               source:
                 MINIMAL_VALID_SOURCE.split(SCRATCH_CLASS_NAME).join(
@@ -1327,22 +1392,28 @@ async function main(): Promise<void> {
       });
 
       await withCase('create-domain', async () => {
-        await client.getDomain().create({
-          domainName: CREATE_DOMAIN_NAME,
-          packageName: devPackage,
-          description: 'corpus create capture (safe to delete)',
-        });
+        await client.getDomain().create(
+          {
+            domainName: CREATE_DOMAIN_NAME,
+            packageName: devPackage,
+            description: 'corpus create capture (safe to delete)',
+          },
+          { headers: headersOf(client.getDomain(), 'create') },
+        );
       });
 
       await withCase('create-dataelement', async () => {
-        await client.getDataElement().create({
-          dataElementName: CREATE_DTEL_NAME,
-          packageName: devPackage,
-          description: 'corpus create capture (safe to delete)',
-          typeKind: 'predefinedAbapType',
-          dataType: 'CHAR',
-          length: 10,
-        });
+        await client.getDataElement().create(
+          {
+            dataElementName: CREATE_DTEL_NAME,
+            packageName: devPackage,
+            description: 'corpus create capture (safe to delete)',
+            typeKind: 'predefinedAbapType',
+            dataType: 'CHAR',
+            length: 10,
+          },
+          { headers: headersOf(client.getDataElement(), 'create') },
+        );
       });
     }
 
@@ -1363,22 +1434,32 @@ async function main(): Promise<void> {
             headers: { 'Content-Type': 'text/plain; charset=utf-8' },
           });
         });
-        await client.getClass().activate({ className: UNIT_TEST_CLASS_NAME });
+        await client
+          .getClass()
+          .activate(
+            { className: UNIT_TEST_CLASS_NAME },
+            { headers: headersOf(client.getClass(), 'activate') },
+          );
       };
 
       track(`setup: create ${UNIT_TEST_CLASS_NAME} with a local test class`);
-      await client.getClass().create({
-        className: UNIT_TEST_CLASS_NAME,
-        packageName: devPackage,
-        description: 'corpus unit-test capture (safe to delete)',
-      });
+      await client.getClass().create(
+        {
+          className: UNIT_TEST_CLASS_NAME,
+          packageName: devPackage,
+          description: 'corpus unit-test capture (safe to delete)',
+        },
+        { headers: headersOf(client.getClass(), 'create') },
+      );
       await withLock(UNIT_TEST_CLASS_NAME, async (lockHandle) => {
-        await client
-          .getClass()
-          .update(
-            { className: UNIT_TEST_CLASS_NAME },
-            { lockHandle, source: UNIT_TEST_MAIN_SOURCE },
-          );
+        await client.getClass().update(
+          { className: UNIT_TEST_CLASS_NAME },
+          {
+            headers: headersOf(client.getClass(), 'update'),
+            lockHandle,
+            source: UNIT_TEST_MAIN_SOURCE,
+          },
+        );
       });
       await writeTestInclude(UNIT_TEST_PASSING);
 
@@ -1513,7 +1594,9 @@ async function main(): Promise<void> {
     // trip GetPackageTree pays is the only thing that can tell them apart.
     await withCase('read-empty-package-contents', async () => {
       await walkPackage(connection, emptyPackage, 1);
-      await utils.fetchNodeStructure('DEVC/K', emptyPackage);
+      await utils.fetchNodeStructure('DEVC/K', emptyPackage, {
+        headers: headersOf(utils, 'fetchNodeStructure'),
+      });
     });
 
     await withCase('read-object-tree-structure', async () => {
@@ -1521,10 +1604,13 @@ async function main(): Promise<void> {
     });
 
     await withCase('read-where-used-list-structure', async () => {
-      await utils.getWhereUsed({
-        object_name: SHARED_CLASS,
-        object_type: 'class',
-      });
+      await utils.getWhereUsed(
+        {
+          object_name: SHARED_CLASS,
+          object_type: 'class',
+        },
+        { headers: headersOf(utils, 'getWhereUsed') },
+      );
     });
 
     await withCase('read-transport-list-structure', async () => {
@@ -1547,7 +1633,12 @@ async function main(): Promise<void> {
     // -----------------------------------------------------------------
 
     await withCase('delete-success', async () => {
-      await client.getClass().delete({ className: SCRATCH_CLASS_NAME });
+      await client
+        .getClass()
+        .delete(
+          { className: SCRATCH_CLASS_NAME },
+          { headers: headersOf(client.getClass(), 'delete') },
+        );
     });
     scratchClassCreated = false;
   } catch (error) {

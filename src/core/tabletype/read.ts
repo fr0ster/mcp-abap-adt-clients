@@ -14,7 +14,6 @@ import {
   CT_TABLE_TYPE,
 } from '../../constants/contentTypes';
 import { sourceUri, TABLE_TYPE, transportUri } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -31,18 +30,14 @@ export async function getTableTypeMetadata(
   const acceptHeader = options?.accept ?? CT_TABLE_TYPE;
 
   try {
-    return await makeAdtRequestWithAcceptNegotiation(
-      connection,
-      {
-        url,
-        method: 'GET',
-        timeout: 0,
-        headers: {
-          Accept: acceptHeader,
-        },
+    return await connection.makeAdtRequest({
+      url,
+      method: 'GET',
+      timeout: 0,
+      headers: {
+        Accept: acceptHeader,
       },
-      { logger },
-    );
+    });
   } catch (error: unknown) {
     const e = error as HttpError;
     // Output full error response as-is for debugging
@@ -90,18 +85,14 @@ export async function getTableTypeSource(
 
   const url = `${sourceUri(TABLE_TYPE.uri(tableTypeName))}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

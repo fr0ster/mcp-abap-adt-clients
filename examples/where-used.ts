@@ -9,7 +9,23 @@
  * handed. That is why it is the one member here that answers a plain string.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
+
+// Since 36.0.0 a request's Accept and Content-Type are the caller's
+// (`options.headers`): the member sends exactly this pair. These are the ones
+// 35.0.0 chose for itself on a modern system.
+const WHERE_USED_SCOPE: IAdtHeaders = {
+  accept:
+    'application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml',
+  contentType:
+    'application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml',
+};
+const WHERE_USED: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
+  contentType:
+    'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
+};
 
 export async function whereUsed(
   client: AdtClient,
@@ -19,10 +35,13 @@ export async function whereUsed(
 ): Promise<string> {
   const utils = client.getUtils();
 
-  const scope = await utils.getWhereUsedScope({
-    object_name: objectName,
-    object_type: objectType,
-  });
+  const scope = await utils.getWhereUsedScope(
+    {
+      object_name: objectName,
+      object_type: objectType,
+    },
+    { headers: WHERE_USED_SCOPE },
+  );
   if (!scope.ok) throw new Error(scope.getError().message);
 
   let scopeXml = String(scope.getResult().value ?? '');
@@ -32,11 +51,14 @@ export async function whereUsed(
     });
   }
 
-  const found = await utils.getWhereUsed({
-    object_name: objectName,
-    object_type: objectType,
-    scopeXml,
-  });
+  const found = await utils.getWhereUsed(
+    {
+      object_name: objectName,
+      object_type: objectType,
+      scopeXml,
+    },
+    { headers: WHERE_USED },
+  );
   if (!found.ok) throw new Error(found.getError().message);
 
   // The document, because that is the shipped default. For a parsed reference

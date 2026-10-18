@@ -6,21 +6,20 @@
  * the server re-reads the persisted version by URI.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check function include via /sap/bc/adt/checkruns?reporters=abapCheckRun.
  */
 export async function checkFunctionInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   groupName: string,
   includeName: string,
   version: 'active' | 'inactive',
@@ -56,10 +55,7 @@ export async function checkFunctionInclude(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_CHECK_MESSAGES,
-      'Content-Type': CT_CHECK_OBJECTS,
-    },
+    headers: requestHeaders(headers),
   });
 
   return response;

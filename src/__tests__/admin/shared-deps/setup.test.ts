@@ -27,6 +27,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -265,7 +266,9 @@ describe('Admin: Setup shared dependencies', () => {
           // the next object against a system still activating the last one.
           const utils = readingUtils();
           const runId = await orThrow(
-            utils.activateObjectsGroup(groupActivationObjects),
+            utils.activateObjectsGroup(groupActivationObjects, undefined, {
+              headers: headersOf(utils, 'activateObjectsGroup'),
+            }),
           );
           let runStatus = '';
           const runDeadline = Date.now() + 180_000;
@@ -352,6 +355,8 @@ describe('Admin: Setup shared dependencies', () => {
           const runId = await orThrow(
             utils.activateObjectsGroup(
               firstPass.map((o) => ({ type: o.type, name: o.name })),
+              undefined,
+              { headers: headersOf(utils, 'activateObjectsGroup') },
             ),
           );
           let runStatus = '';

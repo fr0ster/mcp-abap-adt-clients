@@ -5,6 +5,7 @@
  * `DELETE` on the item resource. This pins the request shape so neither stub
  * can silently come back.
  */
+
 import type { ITransportConfig } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -12,6 +13,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { headersOf } from '../../../helpers/adtHeaders';
 
 const ITEM_URL = '/sap/bc/adt/cts/transportrequests/DEVK900438';
 
@@ -83,7 +85,10 @@ describe('AdtRequest.update()', () => {
     // The body goes in the options, where the contract puts it.
     await new AdtRequest(connection).updateMetadata(
       { transportNumber: 'DEVK900438' },
-      { source: edited },
+      {
+        headers: headersOf(new AdtRequest(connection), 'updateMetadata'),
+        source: edited,
+      },
     );
 
     expect(calls).toHaveLength(1);
@@ -115,10 +120,13 @@ describe('AdtRequest.update()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).updateMetadata({
-      transportNumber: 'DEVK900438',
-      description: 'New description',
-    });
+    await new AdtRequest(connection).updateMetadata(
+      {
+        transportNumber: 'DEVK900438',
+        description: 'New description',
+      },
+      { headers: headersOf(new AdtRequest(connection), 'updateMetadata') },
+    );
 
     for (const call of calls) {
       expect(call.url).not.toBe('/sap/bc/adt/cts/transportrequests');
@@ -132,9 +140,12 @@ describe('AdtRequest.update()', () => {
     // it. What the caller must guarantee is that the document is valid.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).updateMetadata({
-      transportNumber: 'DEVK900438',
-    });
+    await new AdtRequest(connection).updateMetadata(
+      {
+        transportNumber: 'DEVK900438',
+      },
+      { headers: headersOf(new AdtRequest(connection), 'updateMetadata') },
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('PUT');
@@ -145,7 +156,10 @@ describe('AdtRequest.delete()', () => {
   it('issues exactly one DELETE to the item URL', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete({ transportNumber: 'DEVK900438' });
+    await new AdtRequest(connection).delete(
+      { transportNumber: 'DEVK900438' },
+      { headers: headersOf(new AdtRequest(connection), 'delete') },
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('DELETE');
@@ -155,7 +169,10 @@ describe('AdtRequest.delete()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete({ transportNumber: 'DEVK900438' });
+    await new AdtRequest(connection).delete(
+      { transportNumber: 'DEVK900438' },
+      { headers: headersOf(new AdtRequest(connection), 'delete') },
+    );
 
     for (const call of calls) {
       expect(call.url).not.toBe('/sap/bc/adt/cts/transportrequests');
@@ -169,7 +186,10 @@ describe('AdtRequest.delete()', () => {
     // server's words, which a strategy can read.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete({});
+    await new AdtRequest(connection).delete(
+      {},
+      { headers: headersOf(new AdtRequest(connection), 'delete') },
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('DELETE');

@@ -2,13 +2,14 @@
  * Behavior Definition update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateBehaviorDefinitionParams } from './types';
 
 /**
@@ -53,6 +54,7 @@ import type { IUpdateBehaviorDefinitionParams } from './types';
  */
 export async function update(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   // The handle is accepted as given, including not at all. The params type in
   // the interfaces package still requires one; whether a write without a lock
   // is allowed is ADT's judgement, so this function does not add its own.
@@ -62,16 +64,11 @@ export async function update(
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(params.name as string))}${writeQuery(params.lockHandle, params.transportRequest)}`;
 
-  const headers = {
-    'Content-Type': CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: params.sourceCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

@@ -13,7 +13,24 @@
  * body.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
+
+// Since 36.0.0 a request's Accept and Content-Type are the caller's
+// (`options.headers`): the member sends exactly this pair. These are the ones
+// 35.0.0 chose for itself on a modern system.
+const CHECK_RUN: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.checkmessages+xml',
+  contentType: 'application/vnd.sap.adt.checkobjects+xml',
+};
+const SOURCE: IAdtHeaders = {
+  accept: 'text/plain',
+  contentType: 'text/plain; charset=utf-8',
+};
+const ACTIVATION: IAdtHeaders = {
+  accept: 'application/xml',
+  contentType: 'application/vnd.sap.adt.activation+xml',
+};
 
 export async function updateAClass(
   client: AdtClient,
@@ -35,7 +52,9 @@ export async function updateAClass(
   //    answers its report now, whatever the findings; what a warning means for
   //    whether you write is yours. Skip this whole block if you do not want a
   //    check, which is a choice the old member did not offer.
-  const report = await cls.check({ className, source: edited }, 'inactive');
+  const report = await cls.check({ className, source: edited }, 'inactive', {
+    headers: CHECK_RUN,
+  });
   if (!report.ok) throw new Error(report.getError().message);
   if (
     /<\w*:?checkMessage[^>]*type="E"/.test(
@@ -56,7 +75,7 @@ export async function updateAClass(
     //    write, in its own words.
     const written = await cls.update(
       { className },
-      { source: edited, lockHandle },
+      { headers: SOURCE, source: edited, lockHandle },
     );
     if (!written.ok) throw new Error(written.getError().message);
   } finally {
@@ -67,6 +86,6 @@ export async function updateAClass(
 
   // 7. Activate. ADT answers `200` with a checklist even when it did not
   //    activate; see judge-a-refusal.ts for reading that.
-  const activated = await cls.activate({ className });
+  const activated = await cls.activate({ className }, { headers: ACTIVATION });
   if (!activated.ok) throw new Error(activated.getError().message);
 }

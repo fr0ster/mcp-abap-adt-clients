@@ -45,6 +45,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { headersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -136,7 +137,9 @@ describe('Shared - what check answers', () => {
     }
     logTestStep(`check ${className} as stored`, testsLogger);
 
-    const answer = await client.getClass().check({ className }, 'active');
+    const answer = await client.getClass().check({ className }, 'active', {
+      headers: headersOf(client.getClass(), 'check'),
+    });
 
     // `ok` first, but it is not the assertion — it only says there is a
     // document to read.
@@ -182,7 +185,9 @@ describe('Shared - what check answers', () => {
 
     const answer = await client
       .getClass()
-      .check({ className, source: BROKEN_SOURCE }, 'inactive');
+      .check({ className, source: BROKEN_SOURCE }, 'inactive', {
+        headers: headersOf(client.getClass(), 'check'),
+      });
 
     if (!answer.ok) {
       const message = answer.getError().message;
@@ -238,7 +243,9 @@ describe('Shared - what check answers', () => {
 
     const answer = await client
       .getClass()
-      .check({ className: NEVER_EXISTS }, 'active');
+      .check({ className: NEVER_EXISTS }, 'active', {
+        headers: headersOf(client.getClass(), 'check'),
+      });
 
     if (!answer.ok) {
       const message = answer.getError().message;
@@ -296,6 +303,7 @@ describe('Shared - what check answers', () => {
     const judged = await client
       .getClass()
       .check({ className, source: BROKEN_SOURCE }, 'inactive', {
+        headers: headersOf(client.getClass(), 'check'),
         analyse: everythingIsAFailure,
       });
 
@@ -318,6 +326,7 @@ describe('Shared - what check answers', () => {
     const realistic = await client
       .getClass()
       .check({ className, source: BROKEN_SOURCE }, 'inactive', {
+        headers: headersOf(client.getClass(), 'check'),
         analyse: bySeverity,
       });
     testsLogger.info?.(

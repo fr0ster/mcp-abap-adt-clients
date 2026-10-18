@@ -10,6 +10,7 @@
 import type {
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IAmdpBreakpoint,
   IAmdpDebugger,
@@ -157,10 +158,11 @@ export class AmdpDebugger<
   }
 
   async getDataPreview<E extends IAdtError = IAdtError>(
-    options: IGetAmdpDataPreviewOptions & IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IGetAmdpDataPreviewOptions &
+      IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'preview'>, E>> {
     return answering(
-      () => getAmdpDataPreview(this.connection, options),
+      () => getAmdpDataPreview(this.connection, options.headers, options),
       this.reading('preview'),
       options.analyse,
     );

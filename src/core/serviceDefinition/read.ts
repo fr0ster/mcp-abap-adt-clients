@@ -17,7 +17,6 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -40,18 +39,14 @@ export async function getServiceDefinition(
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
   const url = `${SERVICE_DEFINITION.uri(serviceDefinitionName)}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? CT_SERVICE_DEFINITION,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? CT_SERVICE_DEFINITION,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -74,18 +69,14 @@ export async function getServiceDefinitionSource(
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
   const url = `${sourceUri(SERVICE_DEFINITION.uri(serviceDefinitionName))}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

@@ -9,12 +9,13 @@
  * same server.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Write the document the caller built.
@@ -31,6 +32,7 @@ import { TRANSPORT_REQUEST } from '../../endpoints/objects';
  */
 export async function updateTransport(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   transportNumber: string,
   document: string,
 ): Promise<IAdtWireResponse> {
@@ -41,9 +43,6 @@ export async function updateTransport(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: {
-      'Content-Type': ACCEPT_TRANSPORT,
-      Accept: ACCEPT_TRANSPORT,
-    },
+    headers: requestHeaders(headers),
   });
 }

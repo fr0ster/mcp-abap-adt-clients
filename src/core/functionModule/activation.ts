@@ -2,6 +2,7 @@
  * FunctionModule activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -14,6 +15,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateFunctionModule(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   functionGroupName: string,
   functionModuleName: string,
 ): Promise<IAdtWireResponse> {
@@ -21,6 +23,7 @@ export async function activateFunctionModule(
 
   return await activateObjectInSession(
     connection,
+    headers,
     objectUri,
     functionModuleName,
     true,

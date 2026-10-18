@@ -5,10 +5,12 @@
  * Used by GetObjectInfo, GetIncludesList, and other tree navigation operations.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Fetch node structure from ADT repository
@@ -30,6 +32,7 @@ import type {
  */
 export async function fetchNodeStructure(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   parentType: string,
   parentName: string,
   nodeId?: string,
@@ -61,11 +64,6 @@ export async function fetchNodeStructure(
     timeout: 0,
     params,
     data: xmlBody,
-    headers: {
-      Accept:
-        'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
-      'Content-Type':
-        'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
-    },
+    headers: requestHeaders(headers),
   });
 }

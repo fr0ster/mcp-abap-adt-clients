@@ -12,6 +12,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -143,7 +144,7 @@ export class AdtScalarFunction<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IScalarFunctionConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -165,7 +166,7 @@ export class AdtScalarFunction<
     const name = this.name(config);
     return answering(
       () =>
-        createScalarFunction(connection, {
+        createScalarFunction(connection, options.headers, {
           scalar_function_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
@@ -262,7 +263,7 @@ export class AdtScalarFunction<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -279,6 +280,7 @@ export class AdtScalarFunction<
       () =>
         updateScalarFunction(
           connection,
+          options.headers,
           {
             scalar_function_name: name,
             source_code: source as string,
@@ -300,7 +302,7 @@ export class AdtScalarFunction<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -308,7 +310,7 @@ export class AdtScalarFunction<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           scalar_function_name: name,
           transport_request: config.transportRequest,
         }),
@@ -330,7 +332,7 @@ export class AdtScalarFunction<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -338,7 +340,7 @@ export class AdtScalarFunction<
     const name = this.name(config);
     return answering(
       () =>
-        deleteScalarFunction(connection, {
+        deleteScalarFunction(connection, options.headers, {
           scalar_function_name: name,
           transport_request: config.transportRequest,
         }),
@@ -350,7 +352,7 @@ export class AdtScalarFunction<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -358,7 +360,7 @@ export class AdtScalarFunction<
     const name = this.name(config);
 
     return answering(
-      () => activateScalarFunction(connection, name),
+      () => activateScalarFunction(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -367,8 +369,8 @@ export class AdtScalarFunction<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -378,7 +380,14 @@ export class AdtScalarFunction<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkScalarFunction(connection, name, version, config.source),
+      () =>
+        checkScalarFunction(
+          connection,
+          options.headers,
+          name,
+          version,
+          config.source,
+        ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

@@ -13,7 +13,6 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -36,18 +35,14 @@ export async function getAccessControl(
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
   const url = `${ACCESS_CONTROL.uri(accessControlName)}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? CT_ACCESS_CONTROL,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? CT_ACCESS_CONTROL,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -70,18 +65,14 @@ export async function getAccessControlSource(
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
   const url = `${sourceUri(ACCESS_CONTROL.uri(accessControlName))}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

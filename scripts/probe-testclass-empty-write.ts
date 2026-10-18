@@ -24,6 +24,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersFor } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -142,6 +143,7 @@ async function main(): Promise<void> {
         `PUT includes/testclasses — ${what} (${source.length} chars)`,
         await updateClassTestInclude(
           connection,
+          headersFor('AdtLocalTestClass.update'),
           className,
           source,
           handle,
@@ -165,12 +167,16 @@ async function main(): Promise<void> {
 
     say('[0] create the class with the library, then let it settle');
     try {
-      const wire = await createClass(connection, {
-        class_name: className,
-        package_name: packageName,
-        description: 'Empty-write probe (safe to delete)',
-        transport_request: transportRequest || undefined,
-      });
+      const wire = await createClass(
+        connection,
+        headersFor('AdtClass.create'),
+        {
+          class_name: className,
+          package_name: packageName,
+          description: 'Empty-write probe (safe to delete)',
+          transport_request: transportRequest || undefined,
+        },
+      );
       say(`    create → status ${wire.status}`);
       ours = true;
     } catch (error) {
@@ -194,10 +200,14 @@ async function main(): Promise<void> {
   } finally {
     if (ours) {
       try {
-        const gone = await deleteClass(connection, {
-          class_name: className,
-          transport_request: transportRequest || undefined,
-        });
+        const gone = await deleteClass(
+          connection,
+          headersFor('AdtClass.delete'),
+          {
+            class_name: className,
+            transport_request: transportRequest || undefined,
+          },
+        );
         say(`[cleanup] delete → status ${gone.status}`);
       } catch (error) {
         say(`[cleanup] delete threw — ${(error as Error).message}`);

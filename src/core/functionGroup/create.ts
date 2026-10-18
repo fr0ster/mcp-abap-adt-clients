@@ -2,16 +2,16 @@
  * FunctionGroup create operations
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFunctionGroupParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -22,9 +22,9 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateFunctionGroupParams,
   logger?: ILogger,
-  contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
   const url = `${FUNCTION_GROUP.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
@@ -66,11 +66,6 @@ export async function create(
   <adtcore:packageRef adtcore:name="${params.packageName}"/>
 </group:abapFunctionGroup>`;
 
-  const ct = contentTypes?.functionGroupCreate();
-  const headers: Record<string, string> = {
-    'Content-Type': ct?.contentType || CT_FUNCTION_GROUP,
-  };
-
   // Log request details for debugging authorization issues (same as class/create.ts)
   if (debugEnabled) {
     logger?.debug?.(`[DEBUG] Creating FunctionGroup - URL: ${url}`);
@@ -89,7 +84,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: xmlPayload,
-      headers,
+      headers: requestHeaders(headers),
     });
     return response;
   } catch (error: unknown) {

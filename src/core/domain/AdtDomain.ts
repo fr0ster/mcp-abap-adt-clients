@@ -15,6 +15,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -139,7 +140,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IDomainConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -161,7 +162,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        createDomain(connection, {
+        createDomain(connection, options.headers, {
           domain_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
@@ -223,7 +224,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -246,11 +247,12 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
       () =>
         updateDomain(
           connection,
+          options.headers,
           {
             domain_name: name,
             package_name: config.packageName as string,
             transport_request: config.transportRequest,
-          } as Parameters<typeof updateDomain>[1],
+          } as Parameters<typeof updateDomain>[2],
           options?.source as string,
           options?.lockHandle,
         ),
@@ -270,7 +272,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -278,7 +280,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           domain_name: name,
           transport_request: config.transportRequest,
         }),
@@ -300,7 +302,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -308,7 +310,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        deleteDomain(connection, {
+        deleteDomain(connection, options.headers, {
           domain_name: name,
           transport_request: config.transportRequest,
         }),
@@ -320,7 +322,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -328,7 +330,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
     const name = this.name(config);
 
     return answering(
-      () => activateDomain(connection, name),
+      () => activateDomain(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -337,8 +339,8 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -349,7 +351,14 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
 
     return answering(
       () =>
-        checkDomainSyntax(connection, name, version, undefined, this.logger),
+        checkDomainSyntax(
+          connection,
+          options.headers,
+          name,
+          version,
+          undefined,
+          this.logger,
+        ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

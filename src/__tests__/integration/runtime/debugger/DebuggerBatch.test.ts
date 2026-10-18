@@ -1,4 +1,5 @@
 /** Measurement only: whole exchanges survive Jest forceExit in the system temp directory. */
+
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,6 +36,7 @@ import {
   executeBatchRequest,
 } from '../../../../runtime/debugger/abap';
 import { createRequestId } from '../../../../runtime/debugger/batchPayload';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { assertBatchStatuses } from '../../../helpers/batchStatuses';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import {
@@ -360,7 +362,7 @@ describe('Debugger batch wire measurements', () => {
       description: 'Debugger integration probe',
       ...(transportRequest ? { transportRequest } : {}),
     };
-    const creation = cls.create(config);
+    const creation = cls.create(config, { headers: headersOf(cls, 'create') });
     probeCreationAttempted = true;
     const created = await creation;
     if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
@@ -369,21 +371,31 @@ describe('Debugger batch wire measurements', () => {
     const lock = await cls.lock(config);
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
     const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, { source: SOURCE, lockHandle });
+    const written = await cls.update(config, {
+      headers: headersOf(cls, 'update'),
+      source: SOURCE,
+      lockHandle,
+    });
     await cls.unlock(config, lockHandle);
     if (!written.ok)
       throw new Error(`probe write: ${written.getError().message}`);
-    const activated = await cls.activate(config);
+    const activated = await cls.activate(config, {
+      headers: headersOf(cls, 'activate'),
+    });
     if (!activated.ok)
       throw new Error(`probe activate: ${activated.getError().message}`);
     logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
 
     // Every debugger request needs the stateful session it attached on.
     listenerConnection.setSessionType('stateful');
-    const breakpoints = await listenerApi.setBreakpoints(identity, [
-      { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
-      { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.add}` },
-    ]);
+    const breakpoints = await listenerApi.setBreakpoints(
+      identity,
+      [
+        { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
+        { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.add}` },
+      ],
+      { headers: headersOf(listenerApi, 'setBreakpoints') },
+    );
     if (!breakpoints.ok) throw new Error('Could not arm probe breakpoints');
     armed.push(
       ...[
@@ -448,11 +460,19 @@ describe('Debugger batch wire measurements', () => {
       });
       if (probeCreationAttempted && !testCase?.params?.keep_probe) {
         await cleanup('delete probe class', () =>
-          new AdtClient(connection, connectionLogger).getClass().delete({
-            className: CLASS_NAME,
-            packageName,
-            ...(transportRequest ? { transportRequest } : {}),
-          }),
+          new AdtClient(connection, connectionLogger).getClass().delete(
+            {
+              className: CLASS_NAME,
+              packageName,
+              ...(transportRequest ? { transportRequest } : {}),
+            },
+            {
+              headers: headersOf(
+                new AdtClient(connection, connectionLogger).getClass(),
+                'delete',
+              ),
+            },
+          ),
         );
       }
     }
@@ -663,7 +683,9 @@ describe('Debugger batch wire measurements', () => {
         await startAtBreakpoint();
         const frame = await topFrame();
         needs(frame.line === LINE.loop, 'the loop breakpoint in the probe');
-        const children = await debuggerApi.getChildVariables(['@LOCALS']);
+        const children = await debuggerApi.getChildVariables(['@LOCALS'], {
+          headers: headersOf(debuggerApi, 'getChildVariables'),
+        });
         const total = [
           ...documentOf(children).matchAll(
             /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
@@ -736,7 +758,9 @@ describe('Debugger batch wire measurements', () => {
         try {
           // The comparison starts with the same baseline, outside its N envelopes.
           if (name === 'loop_client_per_step') {
-            const baseline = await debuggerApi.getVariables(ids);
+            const baseline = await debuggerApi.getVariables(ids, {
+              headers: headersOf(debuggerApi, 'getVariables'),
+            });
             fs.appendFileSync(
               file,
               `\nBASELINE (outside timing)\n${documentOf(baseline)}\n`,
@@ -747,10 +771,18 @@ describe('Debugger batch wire measurements', () => {
           const started = performance.now();
           try {
             if (name === 'multi_step_variables_direct') {
-              answers.push(await api.getVariables(ids));
+              answers.push(
+                await api.getVariables(ids, {
+                  headers: headersOf(api, 'getVariables'),
+                }),
+              );
               for (let i = 0; i < steps; i++) {
                 answers.push(await api.step('stepOver'));
-                answers.push(await api.getVariables(ids));
+                answers.push(
+                  await api.getVariables(ids, {
+                    headers: headersOf(api, 'getVariables'),
+                  }),
+                );
               }
             } else if (name === 'multi_step_variables') {
               const requests = [
@@ -780,9 +812,18 @@ describe('Debugger batch wire measurements', () => {
               for (let round = 0; round < rounds; round++) {
                 const pending: Promise<IAdtResponse<unknown>>[] = [];
                 if (name === 'multi_step_variables_client')
-                  pending.push(api.getVariables(ids));
+                  pending.push(
+                    api.getVariables(ids, {
+                      headers: headersOf(api, 'getVariables'),
+                    }),
+                  );
                 for (let i = 0; i < (rounds === 1 ? steps : 1); i++) {
-                  pending.push(api.step('stepOver'), api.getVariables(ids));
+                  pending.push(
+                    api.step('stepOver'),
+                    api.getVariables(ids, {
+                      headers: headersOf(api, 'getVariables'),
+                    }),
+                  );
                 }
                 expected = pending.length;
                 // Observe rejections immediately, even if execute itself fails.
@@ -931,7 +972,9 @@ describe('Debugger batch wire measurements', () => {
     async () => {
       if (skipped()) return;
       await startAtBreakpoint();
-      const children = await debuggerApi.getChildVariables(['@LOCALS']);
+      const children = await debuggerApi.getChildVariables(['@LOCALS'], {
+        headers: headersOf(debuggerApi, 'getChildVariables'),
+      });
       const rows = [
         ...documentOf(children).matchAll(
           /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
@@ -974,7 +1017,9 @@ describe('Debugger batch wire measurements', () => {
     async () => {
       if (skipped()) return;
       await startAtBreakpoint();
-      const children = await debuggerApi.getChildVariables(['@LOCALS']);
+      const children = await debuggerApi.getChildVariables(['@LOCALS'], {
+        headers: headersOf(debuggerApi, 'getChildVariables'),
+      });
       const rows = [
         ...documentOf(children).matchAll(
           /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
@@ -996,7 +1041,9 @@ describe('Debugger batch wire measurements', () => {
       const pending = [
         api.step('stepOver'),
         api.getStack(),
-        api.getVariables([id as string]),
+        api.getVariables([id as string], {
+          headers: headersOf(api, 'getVariables'),
+        }),
       ];
       await batch.execute();
       for (const answer of await Promise.all(pending))

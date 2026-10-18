@@ -16,6 +16,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -142,7 +143,7 @@ export class AdtDataElement<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IDataElementConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -164,7 +165,7 @@ export class AdtDataElement<
     const name = this.name(config);
     return answering(
       () =>
-        createDataElement(connection, {
+        createDataElement(connection, options.headers, {
           data_element_name: name,
           package_name: config.packageName as string,
           description: config.description,
@@ -226,7 +227,7 @@ export class AdtDataElement<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -237,6 +238,7 @@ export class AdtDataElement<
       () =>
         updateDataElement(
           connection,
+          options.headers,
           {
             data_element_name: name,
             transport_request: config.transportRequest,
@@ -264,7 +266,7 @@ export class AdtDataElement<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -272,7 +274,7 @@ export class AdtDataElement<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           data_element_name: name,
           transport_request: config.transportRequest,
         }),
@@ -294,7 +296,7 @@ export class AdtDataElement<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -302,7 +304,7 @@ export class AdtDataElement<
     const name = this.name(config);
     return answering(
       () =>
-        deleteDataElement(connection, {
+        deleteDataElement(connection, options.headers, {
           data_element_name: name,
           transport_request: config.transportRequest,
         }),
@@ -314,7 +316,7 @@ export class AdtDataElement<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -322,7 +324,7 @@ export class AdtDataElement<
     const name = this.name(config);
 
     return answering(
-      () => activateDataElement(connection, name),
+      () => activateDataElement(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -331,8 +333,8 @@ export class AdtDataElement<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -342,7 +344,7 @@ export class AdtDataElement<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkDataElement(connection, name, version),
+      () => checkDataElement(connection, options.headers, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

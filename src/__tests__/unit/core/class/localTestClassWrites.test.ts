@@ -9,6 +9,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtLocalTestClass } from '../../../../core/class/AdtLocalTestClass';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -43,7 +44,7 @@ describe('AdtLocalTestClass — writing the tests', () => {
         className: 'ZCL_TESTS',
         source: 'CLASS ltcl DEFINITION FOR TESTING.',
       },
-      { lockHandle: 'HELD-BY-CALLER' },
+      { headers: headersOf(h, 'update'), lockHandle: 'HELD-BY-CALLER' },
     );
 
     expect(calls).toHaveLength(1);
@@ -61,7 +62,11 @@ describe('AdtLocalTestClass — writing the tests', () => {
 
     await h.update(
       { className: 'ZCL_TESTS' },
-      { lockHandle: 'HELD-BY-CALLER', source: '' },
+      {
+        headers: headersOf(h, 'update'),
+        lockHandle: 'HELD-BY-CALLER',
+        source: '',
+      },
     );
 
     expect(calls).toHaveLength(1);
@@ -73,7 +78,10 @@ describe('AdtLocalTestClass — writing the tests', () => {
     const { conn, calls } = makeConn();
     const h = new AdtLocalTestClass(conn, createLibraryLogger());
 
-    await h.delete({ className: 'ZCL_TESTS' });
+    await h.delete(
+      { className: 'ZCL_TESTS' },
+      { headers: headersOf(h, 'delete') },
+    );
 
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
     expect(calls).toHaveLength(1);

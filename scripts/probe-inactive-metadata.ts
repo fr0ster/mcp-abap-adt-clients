@@ -25,6 +25,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -80,15 +81,20 @@ async function main(): Promise<void> {
   const client = new AdtClient(connection, logger);
   const cls = client.getClass();
   try {
-    await cls.delete({ className: NAME }).catch(() => undefined);
+    await cls
+      .delete({ className: NAME }, { headers: headersOf(cls, 'delete') })
+      .catch(() => undefined);
 
     report(
       'create',
-      await cls.create({
-        className: NAME,
-        packageName: PACKAGE,
-        description: 'inactive metadata probe',
-      }),
+      await cls.create(
+        {
+          className: NAME,
+          packageName: PACKAGE,
+          description: 'inactive metadata probe',
+        },
+        { headers: headersOf(cls, 'create') },
+      ),
     );
 
     say('--- after POST, an empty shell -----------------------------------');
@@ -110,6 +116,7 @@ async function main(): Promise<void> {
       await cls.update(
         { className: NAME },
         {
+          headers: headersOf(cls, 'update'),
           source: [
             `CLASS ${NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.`,
             '  PUBLIC SECTION.',
@@ -138,12 +145,20 @@ async function main(): Promise<void> {
     await versions('versions', cls);
 
     say('--- after activation ----------------------------------------------');
-    report('activate', await cls.activate({ className: NAME }));
+    report(
+      'activate',
+      await cls.activate(
+        { className: NAME },
+        { headers: headersOf(cls, 'activate') },
+      ),
+    );
     report('metadata, no version', await cls.readMetadata({ className: NAME }));
     report('source, active', await cls.read({ className: NAME }, 'active'));
     await versions('versions', cls);
   } finally {
-    await cls.delete({ className: NAME }).catch(() => undefined);
+    await cls
+      .delete({ className: NAME }, { headers: headersOf(cls, 'delete') })
+      .catch(() => undefined);
     await releaseTestConnection(connection);
   }
 }

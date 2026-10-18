@@ -28,6 +28,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -185,20 +186,29 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
         // Idempotent cleanup (impl → amdp → func) of any leftovers.
         const cleanup = async () => {
           try {
-            await dsfi.delete({
-              implementationName: implName,
-              transportRequest,
-            });
+            await dsfi.delete(
+              {
+                implementationName: implName,
+                transportRequest,
+              },
+              { headers: headersOf(dsfi, 'delete') },
+            );
           } catch {
             /* ignore */
           }
           try {
-            await cls.delete({ className: amdpName });
+            await cls.delete(
+              { className: amdpName },
+              { headers: headersOf(cls, 'delete') },
+            );
           } catch {
             /* ignore */
           }
           try {
-            await sf.delete({ scalarFunctionName: funcName, transportRequest });
+            await sf.delete(
+              { scalarFunctionName: funcName, transportRequest },
+              { headers: headersOf(sf, 'delete') },
+            );
           } catch {
             /* ignore */
           }
@@ -208,12 +218,15 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
         try {
           // 1) DSFD signature + activate (a definition activates standalone).
           try {
-            await sf.create({
-              scalarFunctionName: funcName,
-              packageName,
-              transportRequest,
-              description: 'DSFI integration companion function',
-            });
+            await sf.create(
+              {
+                scalarFunctionName: funcName,
+                packageName,
+                transportRequest,
+                description: 'DSFI integration companion function',
+              },
+              { headers: headersOf(sf, 'create') },
+            );
           } catch (e) {
             if (isSkippable(e)) {
               logTestSkip(
@@ -233,7 +246,11 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             expectResult(
               await sf.update(
                 { scalarFunctionName: funcName, transportRequest },
-                { source: sigSource, lockHandle: funcLock },
+                {
+                  headers: headersOf(sf, 'update'),
+                  source: sigSource,
+                  lockHandle: funcLock,
+                },
               ),
               'update scalar function',
             );
@@ -247,24 +264,34 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             testsLogger,
           );
           expectResult(
-            await sf.activate({ scalarFunctionName: funcName }),
+            await sf.activate(
+              { scalarFunctionName: funcName },
+              { headers: headersOf(sf, 'activate') },
+            ),
             'activate scalar function',
           );
 
           // 2) AMDP class (do NOT solo-activate — it activates with the group).
-          await cls.create({
-            className: amdpName,
-            packageName,
-            transportRequest,
-            description: 'DSFI integration AMDP implementation',
-          });
+          await cls.create(
+            {
+              className: amdpName,
+              packageName,
+              transportRequest,
+              description: 'DSFI integration AMDP implementation',
+            },
+            { headers: headersOf(cls, 'create') },
+          );
           const amdpLock = expectResult(
             await cls.lock({ className: amdpName }),
             'lock AMDP class',
           );
           await cls.update(
             { className: amdpName, transportRequest },
-            { source: amdpSource, lockHandle: amdpLock },
+            {
+              headers: headersOf(cls, 'update'),
+              source: amdpSource,
+              lockHandle: amdpLock,
+            },
           );
           await cls.unlock({ className: amdpName }, amdpLock);
           await expectLockReleased(
@@ -276,14 +303,17 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
 
           // 3) DSFI create + implementation update (PUT /source/main JSON).
           try {
-            await dsfi.create({
-              implementationName: implName,
-              scalarFunctionName: funcName,
-              engineValue: 'sqlEngine',
-              packageName,
-              transportRequest,
-              description: 'DSFI integration implementation',
-            });
+            await dsfi.create(
+              {
+                implementationName: implName,
+                scalarFunctionName: funcName,
+                engineValue: 'sqlEngine',
+                packageName,
+                transportRequest,
+                description: 'DSFI integration implementation',
+              },
+              { headers: headersOf(dsfi, 'create') },
+            );
           } catch (e) {
             if (isSkippable(e)) {
               logTestSkip(testsLogger, TEST_LABEL, 'DSFI unsupported here');
@@ -306,7 +336,11 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             expectResult(
               await dsfi.update(
                 { implementationName: implName, transportRequest },
-                { source: implSource, lockHandle: implLock },
+                {
+                  headers: headersOf(dsfi, 'update'),
+                  source: implSource,
+                  lockHandle: implLock,
+                },
               ),
               'update DSFI source',
             );
@@ -329,11 +363,15 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             activation: utilActivationRunId,
           });
           const runId = expectResult(
-            await utils.activateObjectsGroup([
-              { type: 'DSFD/SCF', name: funcName },
-              { type: 'CLAS/OC', name: amdpName },
-              { type: 'DSFI/SFI', name: implName },
-            ]),
+            await utils.activateObjectsGroup(
+              [
+                { type: 'DSFD/SCF', name: funcName },
+                { type: 'CLAS/OC', name: amdpName },
+                { type: 'DSFI/SFI', name: implName },
+              ],
+              undefined,
+              { headers: headersOf(utils, 'activateObjectsGroup') },
+            ),
             'activation run id',
           );
           // The wait is this caller's. `activateObjectsGroup` is the POST and
@@ -378,15 +416,24 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
 
           // 7) Delete the trio.
           const del = expectResult(
-            await dsfi.delete({
-              implementationName: implName,
-              transportRequest,
-            }),
+            await dsfi.delete(
+              {
+                implementationName: implName,
+                transportRequest,
+              },
+              { headers: headersOf(dsfi, 'delete') },
+            ),
             'del',
           );
           expect(del).toBeDefined();
-          await cls.delete({ className: amdpName, transportRequest });
-          await sf.delete({ scalarFunctionName: funcName, transportRequest });
+          await cls.delete(
+            { className: amdpName, transportRequest },
+            { headers: headersOf(cls, 'delete') },
+          );
+          await sf.delete(
+            { scalarFunctionName: funcName, transportRequest },
+            { headers: headersOf(sf, 'delete') },
+          );
 
           logTestSuccess(testsLogger, TEST_LABEL);
         } catch (error) {

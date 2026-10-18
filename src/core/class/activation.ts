@@ -2,6 +2,7 @@
  * Class activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -17,8 +18,15 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateClass(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${CLASS.uri(className)}`;
-  return await activateObjectInSession(connection, objectUri, className, true);
+  return await activateObjectInSession(
+    connection,
+    headers,
+    objectUri,
+    className,
+    true,
+  );
 }

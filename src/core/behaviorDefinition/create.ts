@@ -2,13 +2,14 @@
  * Behavior Definition create operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_BEHAVIOR_DEFINITION } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IBehaviorDefinitionCreateParams } from './types';
 
 /**
@@ -36,6 +37,7 @@ import type { IBehaviorDefinitionCreateParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IBehaviorDefinitionCreateParams,
 ): Promise<IAdtWireResponse> {
   const language = params.language || 'EN';
@@ -59,11 +61,6 @@ export async function create(
     <adtcore:packageRef adtcore:name="${params.package}"/>
 </blue:blueSource>`;
 
-  const headers = {
-    Accept: CT_BEHAVIOR_DEFINITION,
-    'Content-Type': CT_BEHAVIOR_DEFINITION,
-  };
-
   const url = `${BEHAVIOR_DEFINITION.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   // A refusal comes back as the transport's failure, with SAP's answer on it.
@@ -74,6 +71,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

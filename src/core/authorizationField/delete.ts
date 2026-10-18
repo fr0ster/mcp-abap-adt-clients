@@ -2,17 +2,13 @@
  * AuthorizationField (SUSO / AUTH) delete operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 export interface IDeleteAuthorizationFieldParams {
   authorization_field_name: string;
@@ -28,6 +24,7 @@ function objectUri(name: string): string {
  */
 export async function checkDeletion(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
   const uri = objectUri(params.authorization_field_name);
@@ -42,10 +39,7 @@ export async function checkDeletion(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION_CHECK,
-      'Content-Type': CT_DELETION_CHECK,
-    },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -54,6 +48,7 @@ export async function checkDeletion(
  */
 export async function deleteAuthorizationField(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
   const uri = objectUri(params.authorization_field_name);
@@ -73,10 +68,7 @@ export async function deleteAuthorizationField(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION,
-      'Content-Type': CT_DELETION,
-    },
+    headers: requestHeaders(headers),
   });
 
   // The response, as it arrived. This used to replace the server's document

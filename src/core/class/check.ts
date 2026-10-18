@@ -2,15 +2,13 @@
  * Class check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { CLASS } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check class code (syntax, compilation, rules)
@@ -30,6 +28,7 @@ import { CLASS } from '../../endpoints/objects';
  */
 export async function checkClass(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   version: 'active' | 'inactive',
   sourceCode?: string,
@@ -45,6 +44,7 @@ export async function checkClass(
     // Validate hypothetical code (object doesn't need to exist)
     response = await runCheckRunWithSource(
       connection,
+      headers,
       'class',
       className,
       sourceCode,
@@ -56,6 +56,7 @@ export async function checkClass(
     // Validate existing object in SAP (reads from system)
     response = await runCheckRun(
       connection,
+      headers,
       'class',
       className,
       version,
@@ -80,6 +81,7 @@ export async function checkClass(
  */
 export async function checkClassLocalTestClass(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   testClassSource: string,
   version: 'active' | 'inactive' = 'inactive',
@@ -87,6 +89,7 @@ export async function checkClassLocalTestClass(
 ): Promise<IAdtWireResponse> {
   return checkClassInclude(
     connection,
+    headers,
     className,
     testClassSource,
     'testclasses',
@@ -110,6 +113,7 @@ export async function checkClassLocalTestClass(
  */
 export async function checkClassLocalTypes(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   localTypesSource: string,
   version: 'active' | 'inactive' = 'inactive',
@@ -117,6 +121,7 @@ export async function checkClassLocalTypes(
 ): Promise<IAdtWireResponse> {
   return checkClassInclude(
     connection,
+    headers,
     className,
     localTypesSource,
     'implementations',
@@ -140,6 +145,7 @@ export async function checkClassLocalTypes(
  */
 export async function checkClassDefinitions(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   definitionsSource: string,
   version: 'active' | 'inactive' = 'inactive',
@@ -147,6 +153,7 @@ export async function checkClassDefinitions(
 ): Promise<IAdtWireResponse> {
   return checkClassInclude(
     connection,
+    headers,
     className,
     definitionsSource,
     'definitions',
@@ -170,6 +177,7 @@ export async function checkClassDefinitions(
  */
 export async function checkClassMacros(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   macrosSource: string,
   version: 'active' | 'inactive' = 'inactive',
@@ -177,6 +185,7 @@ export async function checkClassMacros(
 ): Promise<IAdtWireResponse> {
   return checkClassInclude(
     connection,
+    headers,
     className,
     macrosSource,
     'macros',
@@ -199,6 +208,7 @@ export async function checkClassMacros(
  */
 async function checkClassInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   includeSource: string,
   includeType: 'implementations' | 'definitions' | 'macros' | 'testclasses',
@@ -225,11 +235,6 @@ async function checkClassInclude(
   </chkrun:checkObject>
 </chkrun:checkObjectList>`;
 
-  const headers = {
-    Accept: ACCEPT_CHECK_MESSAGES,
-    'Content-Type': CT_CHECK_OBJECTS,
-  };
-
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
   const response = await connection.makeAdtRequest({
@@ -237,7 +242,7 @@ async function checkClassInclude(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   return response;

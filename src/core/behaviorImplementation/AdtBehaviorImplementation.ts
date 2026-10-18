@@ -19,6 +19,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -187,7 +188,7 @@ export class AdtBehaviorImplementation<
     config: Omit<IBehaviorImplementationConfig, 'source'> & {
       source?: never;
     },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -315,7 +316,7 @@ export class AdtBehaviorImplementation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -334,6 +335,7 @@ export class AdtBehaviorImplementation<
       () =>
         updateBehaviorImplementation(
           connection,
+          options.headers,
           name,
           source as string,
           options?.lockHandle,
@@ -353,7 +355,7 @@ export class AdtBehaviorImplementation<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return this.class.checkDeletion(
       {
@@ -366,7 +368,7 @@ export class AdtBehaviorImplementation<
 
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -380,7 +382,7 @@ export class AdtBehaviorImplementation<
   /** Activate the implementation class. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     return this.class.activate({ className: this.name(config) }, options);
   }
@@ -388,8 +390,8 @@ export class AdtBehaviorImplementation<
   /** Check the implementation class. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     return this.class.check({ className: this.name(config) }, status, options);
   }

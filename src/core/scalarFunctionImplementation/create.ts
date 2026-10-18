@@ -2,16 +2,14 @@
  * ScalarFunctionImplementation create operations - Low-level functions
  * Metadata-only POST (blues v2 + server-driven content linking to the scalar function).
  */
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_SCALAR_FUNCTION_IMPL,
-  CT_SCALAR_FUNCTION_IMPL,
-} from '../../constants/contentTypes';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type {
   ICreateScalarFunctionImplementationParams,
@@ -32,6 +30,7 @@ export function buildServerDrivenContent(
 
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateScalarFunctionImplementationParams,
 ): Promise<IAdtWireResponse> {
   if (
@@ -76,9 +75,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_SCALAR_FUNCTION_IMPL,
-      'Content-Type': CT_SCALAR_FUNCTION_IMPL,
-    },
+    headers: requestHeaders(headers),
   });
 }

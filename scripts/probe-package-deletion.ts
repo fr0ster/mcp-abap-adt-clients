@@ -12,6 +12,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersFor } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -34,9 +35,13 @@ async function main(): Promise<void> {
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
-    const response = await checkPackageDeletion(connection, {
-      package_name: name,
-    });
+    const response = await checkPackageDeletion(
+      connection,
+      headersFor('AdtPackage.checkDeletion'),
+      {
+        package_name: name,
+      },
+    );
     // biome-ignore lint/suspicious/noConsole: same
     console.log(`status: ${response.status}`);
     // biome-ignore lint/suspicious/noConsole: same

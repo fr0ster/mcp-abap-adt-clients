@@ -1,5 +1,12 @@
 # @mcp-abap-adt/adt-strategies
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](https://github.com/fr0ster/mcp-abap-adt-clients#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 The readings and verdicts for [`@mcp-abap-adt/adt-clients`](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients):
 what an ADT answer becomes, and whether it is a failure — derived from recorded
 ADT answers.
@@ -40,7 +47,7 @@ const requests = client.getRequest({
   searchConfigurations: transportSearchConfigurations,
 });
 
-await client.getPackage().delete({ packageName: 'ZPKG' }, { analyse: analyseDeletion });
+await client.getPackage().delete({ packageName: 'ZPKG' }, { headers, analyse: analyseDeletion });
 ```
 
 ```typescript
@@ -48,7 +55,7 @@ import { analyseActivation, asItCame } from '@mcp-abap-adt/adt-strategies';
 
 const answer = await client
   .getClass()
-  .activate({ className: 'ZCL_X' }, { analyse: analyseActivation });
+  .activate({ className: 'ZCL_X' }, { headers, analyse: analyseActivation });
 
 if (!answer.ok) {
   for (const message of answer.getError().messages) {

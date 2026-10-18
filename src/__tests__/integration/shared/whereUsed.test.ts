@@ -22,6 +22,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -117,10 +118,13 @@ describe('Shared - getWhereUsed', () => {
     const utils = new AdtUtils(connection, testsLogger);
     const scopeXml = expectResult(
       await withAcceptHandling(
-        utils.getWhereUsedScope({
-          object_name: objectName,
-          object_type: objectType,
-        }),
+        utils.getWhereUsedScope(
+          {
+            object_name: objectName,
+            object_type: objectType,
+          },
+          { headers: headersOf(utils, 'getWhereUsedScope') },
+        ),
       ),
       'where-used scope',
     ) as string;
@@ -133,11 +137,14 @@ describe('Shared - getWhereUsed', () => {
     );
     const document = expectResult(
       await withAcceptHandling(
-        utils.getWhereUsed({
-          object_name: objectName,
-          object_type: objectType,
-          scopeXml: scopeXml,
-        }),
+        utils.getWhereUsed(
+          {
+            object_name: objectName,
+            object_type: objectType,
+            scopeXml: scopeXml,
+          },
+          { headers: headersOf(utils, 'getWhereUsed') },
+        ),
       ),
       'where-used search',
     ) as string;
@@ -197,10 +204,13 @@ describe('Shared - getWhereUsed', () => {
     const utils = new AdtUtils(connection, testsLogger);
     const scopeXml = expectResult(
       await withAcceptHandling(
-        utils.getWhereUsedScope({
-          object_name: objectName,
-          object_type: objectType,
-        }),
+        utils.getWhereUsedScope(
+          {
+            object_name: objectName,
+            object_type: objectType,
+          },
+          { headers: headersOf(utils, 'getWhereUsedScope') },
+        ),
       ),
       'where-used scope',
     ) as string;
@@ -233,11 +243,14 @@ describe('Shared - getWhereUsed', () => {
     );
     const document = expectResult(
       await withAcceptHandling(
-        utils.getWhereUsed({
-          object_name: objectName,
-          object_type: objectType,
-          scopeXml: modifiedScope,
-        }),
+        utils.getWhereUsed(
+          {
+            object_name: objectName,
+            object_type: objectType,
+            scopeXml: modifiedScope,
+          },
+          { headers: headersOf(utils, 'getWhereUsed') },
+        ),
       ),
       'where-used search',
     ) as string;
@@ -292,10 +305,18 @@ describe('Shared - getWhereUsed', () => {
 
       const document = expectResult(
         await withAcceptHandling(
-          new AdtUtils(connection, testsLogger).getWhereUsed({
-            object_name: objectName,
-            object_type: objectType,
-          }),
+          new AdtUtils(connection, testsLogger).getWhereUsed(
+            {
+              object_name: objectName,
+              object_type: objectType,
+            },
+            {
+              headers: headersOf(
+                new AdtUtils(connection, testsLogger),
+                'getWhereUsed',
+              ),
+            },
+          ),
         ),
         'where-used for a table',
       ) as string;
@@ -372,10 +393,18 @@ describe('Shared - getWhereUsed', () => {
     // empty name is asked of the server and the server's own refusal comes
     // back inside `IAdtResponse`.
     logTestStep('an empty object name is answered, not thrown', testsLogger);
-    const noName = await new AdtUtils(connection, testsLogger).getWhereUsed({
-      object_name: '',
-      object_type: 'class',
-    });
+    const noName = await new AdtUtils(connection, testsLogger).getWhereUsed(
+      {
+        object_name: '',
+        object_type: 'class',
+      },
+      {
+        headers: headersOf(
+          new AdtUtils(connection, testsLogger),
+          'getWhereUsed',
+        ),
+      },
+    );
     expect(noName.ok).toBe(false);
     expect(noName.ok ? '' : noName.getError().message).toBeTruthy();
   });
@@ -411,10 +440,18 @@ describe('Shared - getWhereUsed', () => {
     // it cannot address is the caller's argument, thrown as itself.
     logTestStep('an empty object type is thrown, not asked', testsLogger);
     await expect(
-      new AdtUtils(connection, testsLogger).getWhereUsed({
-        object_name: 'TEST',
-        object_type: '',
-      }),
+      new AdtUtils(connection, testsLogger).getWhereUsed(
+        {
+          object_name: 'TEST',
+          object_type: '',
+        },
+        {
+          headers: headersOf(
+            new AdtUtils(connection, testsLogger),
+            'getWhereUsed',
+          ),
+        },
+      ),
     ).rejects.toThrow(/object type/);
   });
 
@@ -467,20 +504,26 @@ describe('Shared - getWhereUsed', () => {
     // because `whereUsed` answers the document by default.
     const scope = String(
       (await orThrow(
-        utils.getWhereUsedScope({
-          object_name: objectName,
-          object_type: objectType,
-        }),
+        utils.getWhereUsedScope(
+          {
+            object_name: objectName,
+            object_type: objectType,
+          },
+          { headers: headersOf(utils, 'getWhereUsedScope') },
+        ),
       )) ?? '',
     );
     const document = await orThrow(
-      utils.getWhereUsed({
-        object_name: objectName,
-        object_type: objectType,
-        scopeXml: enableAllTypes
-          ? utils.modifyWhereUsedScope(scope, { enableAll: true })
-          : scope,
-      }),
+      utils.getWhereUsed(
+        {
+          object_name: objectName,
+          object_type: objectType,
+          scopeXml: enableAllTypes
+            ? utils.modifyWhereUsedScope(scope, { enableAll: true })
+            : scope,
+        },
+        { headers: headersOf(utils, 'getWhereUsed') },
+      ),
     );
     const result: IWhereUsedListResult = utilWhereUsedReferences({
       data: String(document),
@@ -563,10 +606,13 @@ describe('Shared - getWhereUsed', () => {
     // member that `IAdtInformationSystem` does not carry.
     const utils = new AdtUtils(connection, testsLogger);
     const document = expectResult(
-      await utils.getWhereUsed({
-        object_name: objectName,
-        object_type: objectType,
-      }),
+      await utils.getWhereUsed(
+        {
+          object_name: objectName,
+          object_type: objectType,
+        },
+        { headers: headersOf(utils, 'getWhereUsed') },
+      ),
       'where-used document',
     );
 
@@ -623,10 +669,13 @@ describe('Shared - getWhereUsed', () => {
     const scopeOf = async (): Promise<string> =>
       String(
         (await orThrow(
-          utils.getWhereUsedScope({
-            object_name: objectName,
-            object_type: objectType,
-          }),
+          utils.getWhereUsedScope(
+            {
+              object_name: objectName,
+              object_type: objectType,
+            },
+            { headers: headersOf(utils, 'getWhereUsedScope') },
+          ),
         )) ?? '',
       );
 
@@ -634,11 +683,14 @@ describe('Shared - getWhereUsed', () => {
       scopeXml?: string,
     ): Promise<IWhereUsedListResult> => {
       const document = await orThrow(
-        utils.getWhereUsed({
-          object_name: objectName,
-          object_type: objectType,
-          ...(scopeXml ? { scopeXml } : {}),
-        }),
+        utils.getWhereUsed(
+          {
+            object_name: objectName,
+            object_type: objectType,
+            ...(scopeXml ? { scopeXml } : {}),
+          },
+          { headers: headersOf(utils, 'getWhereUsed') },
+        ),
       );
       return utilWhereUsedReferences({ data: String(document) } as never);
     };

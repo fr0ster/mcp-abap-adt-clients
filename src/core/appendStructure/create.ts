@@ -2,21 +2,20 @@
  * AppendStructure create operations - Low-level functions
  * Metadata-only POST with base_structure template; source via update().
  */
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_APPEND_STRUCTURE,
-  CT_STRUCTURE,
-} from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateAppendStructureParams } from './types';
 
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateAppendStructureParams,
 ): Promise<IAdtWireResponse> {
   if (!args.append_structure_name || !args.base_object || !args.package_name) {
@@ -56,6 +55,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: { Accept: ACCEPT_APPEND_STRUCTURE, 'Content-Type': CT_STRUCTURE },
+    headers: requestHeaders(headers),
   });
 }

@@ -9,7 +9,6 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
 
@@ -82,18 +81,14 @@ export async function getBehaviorImplementationImplementations(
     options?.withLongPolling,
   );
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

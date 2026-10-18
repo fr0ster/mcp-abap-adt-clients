@@ -2,13 +2,14 @@
  * Package create operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreatePackageParams } from './types';
 
 /**
@@ -16,6 +17,7 @@ import type { ICreatePackageParams } from './types';
  */
 export async function createPackage(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreatePackageParams,
 ): Promise<IAdtWireResponse> {
   const url = PACKAGE.collection;
@@ -85,9 +87,6 @@ export async function createPackage(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_PACKAGE,
-      'Content-Type': CT_PACKAGE,
-    },
+    headers: requestHeaders(headers),
   });
 }

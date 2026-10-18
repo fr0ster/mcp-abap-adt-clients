@@ -9,7 +9,6 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_PACKAGE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { PACKAGE, transportUri } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -27,18 +26,14 @@ export async function getPackage(
     : '';
   const url = `${PACKAGE.uri(packageName)}?version=${version}${longPollingQuery}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_PACKAGE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_PACKAGE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

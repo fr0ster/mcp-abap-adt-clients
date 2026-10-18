@@ -38,6 +38,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { headersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -237,7 +238,9 @@ describe('Response contract - 17.0.0', () => {
 
       const answer = await client
         .getUtils()
-        .fetchNodeStructure('DEVC/K', NEVER_EXISTS);
+        .fetchNodeStructure('DEVC/K', NEVER_EXISTS, {
+          headers: headersOf(client.getUtils(), 'fetchNodeStructure'),
+        });
 
       // The sharpest case in this file, and since 19.0.0 it is a statement
       // about the endpoint rather than about a verdict this package gives.
@@ -326,7 +329,10 @@ describe('Response contract - 17.0.0', () => {
       // means "not activated" is the caller's to decide.
       const unjudged = await client
         .getClass()
-        .activate({ className: NEVER_EXISTS });
+        .activate(
+          { className: NEVER_EXISTS },
+          { headers: headersOf(client.getClass(), 'activate') },
+        );
 
       expect(unjudged.ok).toBe(true);
       if (!unjudged.ok) throw new Error('expected the answer, not a verdict');
@@ -341,9 +347,13 @@ describe('Response contract - 17.0.0', () => {
           ? { origin: 'refusal', message: String(answer?.data ?? '') }
           : verdict;
 
-      const judged = await client
-        .getClass()
-        .activate({ className: NEVER_EXISTS }, { analyse: refusalIsAFailure });
+      const judged = await client.getClass().activate(
+        { className: NEVER_EXISTS },
+        {
+          headers: headersOf(client.getClass(), 'activate'),
+          analyse: refusalIsAFailure,
+        },
+      );
 
       expect(judged.ok).toBe(false);
       if (judged.ok) throw new Error('expected the caller to decide');

@@ -1086,31 +1086,6 @@ export class AdtClient {
       masterLanguage: options?.masterLanguage,
     };
     this.contentTypes = options?.contentTypes;
-    if (options?.enableAcceptCorrection !== undefined) {
-      const {
-        setAcceptCorrectionEnabled,
-        wrapConnectionAcceptNegotiation,
-        getAcceptCorrectionEnabled,
-      } = require('../utils/acceptNegotiation');
-      setAcceptCorrectionEnabled(
-        this.connection,
-        options.enableAcceptCorrection,
-      );
-      const shouldWrap =
-        options.enableAcceptCorrection ??
-        getAcceptCorrectionEnabled(this.connection);
-      if (shouldWrap) {
-        wrapConnectionAcceptNegotiation(this.connection, this.logger);
-      }
-    } else {
-      const {
-        getAcceptCorrectionEnabled,
-        wrapConnectionAcceptNegotiation,
-      } = require('../utils/acceptNegotiation');
-      if (getAcceptCorrectionEnabled(this.connection)) {
-        wrapConnectionAcceptNegotiation(this.connection, this.logger);
-      }
-    }
   }
 
   /**

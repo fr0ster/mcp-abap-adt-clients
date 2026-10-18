@@ -4,13 +4,14 @@
  * Endpoint: PUT /sap/bc/adt/ddic/ddlx/sources/{name}/source/main?lockHandle={lockHandle}
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { METADATA_EXTENSION, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update metadata extension source code
@@ -41,6 +42,7 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
  */
 export async function updateMetadataExtension(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   sourceCode: string,
   lockHandle?: string,
@@ -48,16 +50,11 @@ export async function updateMetadataExtension(
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${writeQuery(lockHandle, transportRequest)}`;
 
-  const headers = {
-    Accept: ACCEPT_SOURCE,
-    'Content-Type': CT_SOURCE,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

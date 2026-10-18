@@ -2,21 +2,20 @@
  * ScalarFunction create operations - Low-level functions
  * Metadata-only POST (no source upload). Use AdtScalarFunction.update() for source.
  */
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_SCALAR_FUNCTION,
-  CT_SCALAR_FUNCTION,
-} from '../../constants/contentTypes';
 import { SCALAR_FUNCTION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateScalarFunctionParams } from './types';
 
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateScalarFunctionParams,
 ): Promise<IAdtWireResponse> {
   if (!args.scalar_function_name || !args.package_name) {
@@ -52,9 +51,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_SCALAR_FUNCTION,
-      'Content-Type': CT_SCALAR_FUNCTION,
-    },
+    headers: requestHeaders(headers),
   });
 }

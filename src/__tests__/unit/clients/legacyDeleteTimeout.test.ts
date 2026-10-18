@@ -8,11 +8,13 @@
  * of the library's, the caller's is the only one there is.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
+import { headersOf } from '../../helpers/adtHeaders';
 
 function recordingConnection() {
   const sent: IAbapRequestOptions[] = [];
@@ -27,7 +29,10 @@ function recordingConnection() {
 }
 
 type Deletable = {
-  delete(config: unknown, options?: { timeout?: number }): Promise<unknown>;
+  delete(
+    config: unknown,
+    options: { headers: IAdtHeaders; timeout?: number },
+  ): Promise<unknown>;
 };
 
 const cases: Array<[string, (c: AdtClientLegacy) => Deletable, unknown]> = [
@@ -56,7 +61,11 @@ describe("legacy delete carries the caller's timeout", () => {
     const { connection, sent } = recordingConnection();
     const client = new AdtClientLegacy(connection);
 
-    await handler(client).delete(config, { timeout: 1234 });
+    const deletable = handler(client);
+    await deletable.delete(config, {
+      headers: headersOf(deletable, 'delete'),
+      timeout: 1234,
+    });
 
     const deletes = sent.filter((r) => r.method === 'DELETE');
     expect(deletes).toHaveLength(1);
@@ -69,7 +78,10 @@ describe("legacy delete carries the caller's timeout", () => {
     const { connection, sent } = recordingConnection();
     const client = new AdtClientLegacy(connection);
 
-    await handler(client).delete(config);
+    const deletable = handler(client);
+    await deletable.delete(config, {
+      headers: headersOf(deletable, 'delete'),
+    });
 
     expect(sent.map((r) => r.timeout)).toEqual(sent.map(() => 0));
   });

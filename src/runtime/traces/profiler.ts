@@ -9,6 +9,7 @@
  */
 
 import type {
+  IAdtHeaders,
   IProfilerTraceDbAccessesOptions,
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
@@ -22,8 +23,8 @@ import {
   ACCEPT_TRACE_CALLTREE,
   ACCEPT_TRACE_FEED,
   ACCEPT_TRACE_XML,
-  CT_TRACE_PARAMETERS,
 } from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type {
@@ -148,6 +149,7 @@ export function buildTraceParametersXml(
 
 export async function createTraceParameters(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   options: IProfilerTraceParameters = {},
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
@@ -157,10 +159,7 @@ export async function createTraceParameters(
     method: 'POST',
     data,
     timeout: 0,
-    headers: {
-      Accept: ACCEPT_TRACE_XML,
-      'Content-Type': CT_TRACE_PARAMETERS,
-    },
+    headers: requestHeaders(headers),
   });
 }
 

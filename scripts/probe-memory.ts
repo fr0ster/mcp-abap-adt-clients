@@ -31,6 +31,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -204,12 +205,18 @@ async function main(): Promise<void> {
   const armed: string[] = [];
 
   try {
-    await cls.create(config);
+    await cls.create(config, { headers: headersOf(cls, 'create') });
     const lock = await cls.lock(config);
     const handle = String(lock.ok ? lock.getResult().value : '');
-    await cls.update(config, { source: SOURCE, lockHandle: handle });
+    await cls.update(config, {
+      headers: headersOf(cls, 'update'),
+      source: SOURCE,
+      lockHandle: handle,
+    });
     await cls.unlock(config, handle);
-    const activated = await cls.activate(config);
+    const activated = await cls.activate(config, {
+      headers: headersOf(cls, 'activate'),
+    });
     out(
       `${CLASS_NAME} in ${packageName}: activate ${activated.ok ? 'ok' : 'FAILED'}`,
     );
@@ -217,10 +224,14 @@ async function main(): Promise<void> {
 
     listener.setSessionType('stateful');
     const uri = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
-    const set = await onListener.setBreakpoints(identity, [
-      { kind: 'line', uri: `${uri}#start=${LINE.before}` },
-      { kind: 'line', uri: `${uri}#start=${LINE.after}` },
-    ]);
+    const set = await onListener.setBreakpoints(
+      identity,
+      [
+        { kind: 'line', uri: `${uri}#start=${LINE.before}` },
+        { kind: 'line', uri: `${uri}#start=${LINE.after}` },
+      ],
+      { headers: headersOf(onListener, 'setBreakpoints') },
+    );
     for (const m of documentOf(set).matchAll(/\bid="([^"]*)"/g))
       armed.push(m[1]);
     out(
@@ -314,7 +325,7 @@ async function main(): Promise<void> {
     for (const bp of armed) await onListener.deleteBreakpoint(identity, bp);
     await onListener.stopListener(identity);
     listener.setSessionType('stateless');
-    if (!keep) await cls.delete(config);
+    if (!keep) await cls.delete(config, { headers: headersOf(cls, 'delete') });
     if (session) {
       session.setSessionType('stateless');
       await closeOwnTestConnection(session);

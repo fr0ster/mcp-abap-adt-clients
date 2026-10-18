@@ -12,6 +12,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { lock } from '../../../../core/behaviorDefinition/lock';
 import { unlock } from '../../../../core/behaviorDefinition/unlock';
 import { update } from '../../../../core/behaviorDefinition/update';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 const LOCK_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><LOCK_HANDLE>LH123</LOCK_HANDLE><CORRNR/></DATA></asx:values></asx:abap>`;
 
@@ -47,7 +48,7 @@ describe('behavior definition namespace URL encoding', () => {
 
   it('update() encodes the namespaced name in the path', async () => {
     const connection = createConnectionMock();
-    await update(connection, {
+    await update(connection, headersFor('AdtBehaviorDefinition.update'), {
       name: NS_NAME,
       sourceCode: 'managed; define behavior for ZX {}',
       lockHandle: 'LH123',

@@ -13,7 +13,6 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 function buildQuery(version?: string, options?: IReadOptions): string {
@@ -31,16 +30,12 @@ export async function getScalarFunctionImplementation(
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const url = `${SCALAR_FUNCTION_IMPLEMENTATION.uri(name)}${buildQuery(version, options)}`;
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: { Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION_IMPL },
-    },
-    { logger },
-  );
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: { Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION_IMPL },
+  });
 }
 
 export async function getScalarFunctionImplementationSource(
@@ -51,18 +46,14 @@ export async function getScalarFunctionImplementationSource(
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(SCALAR_FUNCTION_IMPLEMENTATION.uri(name))}${buildQuery(version, options)}`;
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 export async function getScalarFunctionImplementationTransport(

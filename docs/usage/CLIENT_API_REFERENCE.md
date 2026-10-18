@@ -1,5 +1,12 @@
 # Client API Reference
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](../../README.md#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 This project exposes the following client classes:
 
 - `AdtClient` - high-level CRUD operations for ADT objects.
@@ -54,7 +61,7 @@ const locked = await enhancement.lock(config, { analyse: analyseException });
 if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 try {
-  const written = await enhancement.updateMetadata(config, {
+  const written = await enhancement.updateMetadata(config, { headers,
     source: document, lockHandle, analyse: analyseException,
   });
   if (!written.ok) throw new Error(written.getError().message);
@@ -64,7 +71,7 @@ try {
   });
   if (!unlocked.ok) throw new Error(unlocked.getError().message);
 }
-const activated = await enhancement.activate(config, { analyse: analyseActivation });
+const activated = await enhancement.activate(config, { headers, analyse: analyseActivation });
 if (!activated.ok) throw new Error(activated.getError().message);
 const metadata = await enhancement.readMetadata(config, { analyse: analyseException });
 if (!metadata.ok) throw new Error(metadata.getError().message);
@@ -150,7 +157,7 @@ const created = await client.getEnhancement().create({
   },
   enhancementOption: option['@_enhocore:full_name'],
   enhancementMode: mode === 'static' ? 'S' : 'D',
-});
+}, { headers });
 if (!created.ok) throw new Error(created.getError().message);
 ```
 
@@ -200,7 +207,7 @@ await client.getClass().create({
   className: 'ZCL_TEST',
   packageName: 'ZPACKAGE',
   description: 'Test class',
-});
+}, { headers });
 
 const read = await client.getClass().read({ className: 'ZCL_TEST' });
 ```
@@ -212,7 +219,7 @@ const answer = await client.getFunctionModule().create({
   functionGroupName: 'ZFGROUP',
   functionModuleName: 'ZFM_TEST',
   description: 'Test FM',
-});
+}, { headers });
 
 if (!answer.ok) throw new Error(answer.getError().message);
 console.log(answer.getResult().value);   // the create's document, by default
@@ -233,7 +240,7 @@ await client.getAuthorizationField().create({
   description: 'Test authorization field',
   rollName: 'ZDTEL_AUTH',
   domname: 'ZDOM_AUTH',
-});
+}, { headers });
 
 // Function Include (FUGR/I) — source-bearing, scoped to a function group.
 // Available on all systems (legacy, modern on-prem, cloud).
@@ -244,7 +251,7 @@ await fincl.create({
   functionGroupName: 'ZFGROUP',
   includeName: 'LZFGROUPF01',
   description: 'Forms include',
-});
+}, { headers });
 
 const source = await fincl.read({
   functionGroupName: 'ZFGROUP',
@@ -280,7 +287,7 @@ await toggle.create({
   packageName: 'ZMY_PKG',
   description: 'My feature toggle',
   transportRequest: 'DEVK900123',
-});
+}, { headers });
 
 // The JSON source is a write of its own, under the toggle's lock.
 const toggleLock = await toggle.lock({ featureToggleName: 'ZMY_FEATURE' });
@@ -300,7 +307,7 @@ await toggle.update(
       toggledPackages: ['ZMY_PKG'],
     },
   },
-  { lockHandle: toggleLock.getResult().value },
+  { headers, lockHandle: toggleLock.getResult().value },
 );
 await toggle.unlock(
   { featureToggleName: 'ZMY_FEATURE' },
@@ -329,7 +336,7 @@ await toggle.switchOff(
 // binding info. Call it before switchOn/switchOff when you need to know whether
 // a customising transport is allowed and which package / object URI the change
 // would bind to. Read by featureToggleCheckState:
-const preflight = await toggle.checkState({ featureToggleName: 'ZMY_FEATURE' });
+const preflight = await toggle.checkState({ featureToggleName: 'ZMY_FEATURE' }, undefined, { headers });
 if (preflight.ok) console.log(preflight.getResult().value);
 // { currentState: 'off', transportPackage: 'ZMY_PKG',
 //   transportUri: '/sap/bc/adt/vit/wb/object_type/sf01/object_name/zmy_feature',
@@ -368,11 +375,11 @@ if (sourceDoc.ok) {
 // since 23.0.0 that is an answer, not a thrown "Failed to obtain lock handle".
 const locked = await toggle.lock({ featureToggleName: 'ZMY_FEATURE' });
 const lockHandle = locked.ok ? locked.getResult().value : undefined;
-await toggle.update({ featureToggleName: 'ZMY_FEATURE' }, { lockHandle });
+await toggle.update({ featureToggleName: 'ZMY_FEATURE' }, { headers, lockHandle });
 if (lockHandle) {
   await toggle.unlock({ featureToggleName: 'ZMY_FEATURE' }, lockHandle);
 }
-await toggle.activate({ featureToggleName: 'ZMY_FEATURE' });
+await toggle.activate({ featureToggleName: 'ZMY_FEATURE' }, { headers });
 
 // --- 8. What a feature toggle does not have ---
 // Since 12.0.0 there is no readTransport(), and no getVersions()/
@@ -402,15 +409,15 @@ await include.create({
   packageName: 'ZMY_PACKAGE',
   description: 'Shared form routines',
   transportRequest: 'DEVK900123',
-});
+}, { headers });
 
 const source = await include.read({ includeName: 'ZMY_INCLUDE' });
 await include.update(
   { includeName: 'ZMY_INCLUDE' },
-  { source: '" changed' },
+  { headers, source: '" changed' },
 );
-await include.activate({ includeName: 'ZMY_INCLUDE' });
-await include.delete({ includeName: 'ZMY_INCLUDE' });
+await include.activate({ includeName: 'ZMY_INCLUDE' }, { headers });
+await include.delete({ includeName: 'ZMY_INCLUDE' }, { headers });
 ```
 
 Contract notes:
@@ -497,7 +504,7 @@ await connection.connect();
 // The client answers every document as it arrived (`abapGitDocuments`) and
 // `unlink` answers nothing. The shapes below are readings you ask for, once,
 // when you build it.
-const abapGit = new AdtAbapGitClient(connection, undefined, undefined, {
+const abapGit = new AdtAbapGitClient(connection, undefined, {
   ...abapGitDocuments,
   repos: abapGitRepos,
   errorLog: abapGitErrorLog,
@@ -507,7 +514,7 @@ const abapGit = new AdtAbapGitClient(connection, undefined, undefined, {
 // Probe a remote repo before linking
 const info = await abapGit.checkExternalRepo({
   url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
-});
+}, { headers });
 if (info.ok) {
   console.log(info.getResult().value.accessMode);                    // 'PUBLIC' | 'PRIVATE' | ...
   console.log(info.getResult().value.branches.map((b) => b.name));   // ['HEAD', 'refs/heads/main', ...]
@@ -518,7 +525,7 @@ await abapGit.link({
   package: 'ZMY_PKG',
   url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
   branchName: 'refs/heads/main',
-});
+}, { headers });
 
 // Every member is addressed by what `listRepos` reported: the pull link, the
 // log link, the repository key. A member never looks them up for you.
@@ -538,7 +545,7 @@ const started = await abapGit.pull({
   package: 'ZMY_PKG',
   pullLink: linked.pullLink,
   branchName: 'refs/heads/main',
-});
+}, { headers });
 if (!started.ok) throw new Error(started.getError().message);
 
 // The wait is yours: how long, how often, and what to do when it does not
@@ -575,7 +582,7 @@ if (repo.repositoryId) {
 
 **No `getRepo`, since 23.0.0.** It listed every repository and picked one for a package — a filter over a document, which is a reading, and a "not found" the library composed from its own search. `listRepos` and your own `find` are the same request. For the same reason `unlink` takes the `repositoryId` and `getErrorLog` the `logLink` that `listRepos` reports, instead of a package name each looked up on its own. `abapGitRepos` reads the key verbatim: the reading it replaces turned `000001` into `1`, which is not the key `unlink` is addressed by.
 
-**Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
+**Content-type version.** `link` and `pull` send the `headers` you pass (since 36.0.0). Until then the client chose `application/abapgit.adt.repo.v3+xml` (sapcli parity), or `v4` through a `contentTypeVersion` option that is gone; cloud MDD advertises `v4`.
 
 ### Transport Requests (getRequest())
 
@@ -677,20 +684,20 @@ const entry = entries.find((o) => o.name === 'ZMCP_BLD_FGR_H1');
 // it cannot be removed, and the compiler asks rather than sending an empty
 // value that would remove nothing while answering 200.
 if (entry?.position)
-  await request.removeObject('DEVK905942', { ...entry, position: entry.position });
+  await request.removeObject('DEVK905942', { ...entry, position: entry.position }, { headers });
 
 // Confirm it: the action's own answer only echoes what it was asked.
 const log = await request.readActionLog('DEVK905942');
 // → "SAPUSER01 deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"
 
 // A task of your own under a shared request, to work in without touching it.
-const task = await request.createTask('DEVK905941', { targetUser: 'SAPUSER01' });
+const task = await request.createTask('DEVK905941', { headers, targetUser: 'SAPUSER01' });
 
 // And the other direction.
-await request.addObject('DEVK907073', { name: 'Z_CL_000001', type: 'CLAS' });
+await request.addObject('DEVK907073', { name: 'Z_CL_000001', type: 'CLAS' }, { headers });
 
 // A task is created without a type; this is how one is given.
-await request.changeTaskType('DEVK907073', 'S'); // Development/Correction
+await request.changeTaskType('DEVK907073', 'S', { headers }); // Development/Correction
 
 // Move entries to another task: addressed at the source, each entry by its
 // position there — from the same listing, read after the last change to the
@@ -699,7 +706,7 @@ const other = entries.find((o) => o.name === 'Z_CL_000002');
 if (other?.position)
   await request.moveObjects('DEVK905942', 'DEVK907073', [
     { ...other, position: other.position },
-  ]);
+  ], { headers });
 ```
 
 Four things worth knowing before the first call, three of them measured
@@ -923,7 +930,7 @@ of it**, and the number is the only thing the response is there to deliver:
 ```typescript
 const created = await client
   .getRequest({ ...transportDocuments, created: transportCreated })
-  .create({ description: 'my change' });
+  .create({ description: 'my change' }, { headers });
 if (!created.ok) throw new Error(created.getError().message);
 
 created.getResult().value.transportNumber;   // 'DEVK900123'
@@ -956,7 +963,7 @@ const edited = addAMethod(String(current.getResult().value));
 const classLock = await cls.lock({ className: 'ZCL_X' });
 if (!classLock.ok) throw new Error(classLock.getError().message);
 const handle = classLock.getResult().value;
-await cls.update({ className: 'ZCL_X' }, { source: edited, lockHandle: handle });
+await cls.update({ className: 'ZCL_X' }, { headers, source: edited, lockHandle: handle });
 await cls.unlock({ className: 'ZCL_X' }, handle);
 
 // A document type. Same shape, different noun: the document goes in
@@ -969,7 +976,7 @@ const patched = patchTheDescription(String(doc.getResult().value), 'new');
 const domainLock = await domain.lock({ domainName: 'ZD' });
 if (!domainLock.ok) throw new Error(domainLock.getError().message);
 const lock = domainLock.getResult().value;
-await domain.updateMetadata({ domainName: 'ZD' }, { source: patched, lockHandle: lock });
+await domain.updateMetadata({ domainName: 'ZD' }, { headers, source: patched, lockHandle: lock });
 await domain.unlock({ domainName: 'ZD' }, lock);
 ```
 
@@ -1006,7 +1013,7 @@ activation now comes back as a success carrying the checklist, and turning that
 into a failure is the `analyse` you pass:
 
 ```typescript
-await client.getClass().activate({ className: 'ZCL_X' }, {
+await client.getClass().activate({ className: 'ZCL_X' }, { headers,
   analyse: (verdict, answer) =>
     /type="E"/.test(String(answer?.data ?? ''))
       ? { origin: 'refusal', message: String(answer?.data) }
@@ -1040,30 +1047,46 @@ Object types differ in the shape of their success body, which is why inferring a
 failure from an unfamiliar one turns working calls into errors — and why the
 judgement moved to the caller, who knows which types they are activating.
 
-### Accept Negotiation
+### Accept Negotiation (removed in 36.0.0)
 
-The client can optionally auto-correct `Accept` headers after a 406 response
-(and `Content-Type` after a 415). It is **off** unless switched on, per client
-as below or with `ADT_ACCEPT_CORRECTION=true`; with no switch a `406`/`415` is
-the call's answer and nothing is sent again (default flipped in 35.0.0):
+A refused request is the call's answer: SAP's `406` (its `Accept` not served)
+or `415` (its `Content-Type` not accepted) comes back like any other status,
+and nothing is corrected, sent again or remembered for a later request.
+**Accept negotiation was removed in 36.0.0** — the retry, the per-connection
+caches, the `enableAcceptCorrection` option, `setAcceptCorrectionEnabled` /
+`getAcceptCorrectionEnabled`, `ADT_ACCEPT_CORRECTION`, `clearAcceptCache`,
+`cachedAccept`, `rememberAccept`, `exemptFromAcceptNegotiation` and
+`getBaseRequest`. A member sends exactly the request it was given, `headers`
+included.
+
+To correct a request yourself, read what SAP named and send it again with the
+pair you choose. Two pure functions over the error are exported:
+
+- `extractSupportedAccept(error)` — the list SAP writes into its `406` body,
+  `Accepted content types: …` (often empty; measured on an on-premise system).
+  It reads no header and no other text.
+- `extractSupportedContentType(error)` — the types a `415` names (its headers
+  and body; unchanged).
 
 ```typescript
-const client = new AdtClient(connection, console, {
-  enableAcceptCorrection: true,
-});
+import { extractSupportedAccept } from '@mcp-abap-adt/adt-clients';
+
+const first = await cls.check(config, undefined, { headers: CHECK_RUN });
+if (!first.ok && first.getError().response?.status === 406) {
+  const accepted = extractSupportedAccept(first.getError());
+  if (accepted.length > 0) {
+    await cls.check(config, undefined, {
+      headers: { ...CHECK_RUN, accept: accepted.join(', ') },
+    });
+  }
+}
 ```
 
-The switch and the corrections it learns belong to **the connection**, not to
-the process. Until 23.0.0 they were module globals: an `Accept` corrected on one
-system was sent to every other, keyed by method and URL alone, and one client's
-`enableAcceptCorrection` switched it for all. This is protocol mechanics — a
-retry with a type the server named — not a reading of SAP's verdict, which is
-why it stays in the library.
+What you learn is yours to keep: nothing in this package stores it.
 
-There is no per-call `Accept` override on the object members: the header each
-member sends is the one its endpoint takes, and negotiation corrects it when a
-system answers `406`. Reading a source without a version (the state right after
-a create) is `read(config, undefined)`.
+A read still takes an optional `accept` (`IReadOptions`); a member taking
+`options.headers` sends the pair you give. Reading a source without a version
+(the state right after a create) is `read(config, undefined)`.
 
 ### AdtUtils (Object Metadata/Source)
 
@@ -1291,7 +1314,7 @@ try {
     // request timed out while the job goes on to finish.
     // analysePublication (@mcp-abap-adt/adt-strategies) reads the job's
     // <SEVERITY> into a failure; without it the document is the answer.
-    { timeout: 300_000, analyse: analysePublication },
+    { headers, timeout: 300_000, analyse: analysePublication },
   );
   if (!answer.ok) throw new Error(answer.getError().message);
 } finally {
@@ -1404,21 +1427,21 @@ await client.getMessageClass().create({
   name: 'ZMY_MSG',
   description: 'My messages',
   packageName: 'ZMY_PKG',
-});
+}, { headers });
 
 await client.getMessageClassMessage().create({
   className: 'ZMY_MSG',
   msgno: '001',
   msgtext: 'Order &1 not found',
   selfExplanatory: true,
-});
+}, { headers });
 
 // Update only the text (other message attributes round-trip unchanged).
 await client.getMessageClassMessage().update({
   className: 'ZMY_MSG',
   msgno: '001',
   msgtext: 'Order &1 does not exist',
-});
+}, { headers });
 
 // Read one message. The answer is the class's document — there is no resource
 // for a single message. analyseMessageClassMessage (@mcp-abap-adt/adt-strategies)
@@ -1434,8 +1457,8 @@ if (msg.ok) console.log(msg.getResult().value);   // the class document
 // Remove a single message, then delete the whole class.
 // `delete` is on the class, not on the contract `getMessageClassMessage()`
 // answers — construct it against the connection you hold.
-await new AdtMessageClassMessage(connection).delete({ className: 'ZMY_MSG', msgno: '001' });
-await client.getMessageClass().delete({ name: 'ZMY_MSG' });
+await new AdtMessageClassMessage(connection).delete({ className: 'ZMY_MSG', msgno: '001' }, { headers });
+await client.getMessageClass().delete({ name: 'ZMY_MSG' }, { headers });
 ```
 
 ### Object version history
@@ -1522,7 +1545,7 @@ to be sent anyway:
 await utils.activateObjectsGroup([
   { name: 'ZCL_MY_CLASS', type: 'CLAS/OC' },
   { name: 'Z_MY_FM', type: 'FUGR/FF', parentName: 'Z_MY_GROUP' },
-]);
+], undefined, { headers });
 ```
 
 ### AdtUtils (Where-used)
@@ -1548,7 +1571,7 @@ const utils = client.getUtils({
 const scope = await utils.getWhereUsedScope({
   object_name: 'ZMY_TABLE',
   object_type: 'table',
-});
+}, { headers });
 if (!scope.ok) throw new Error(scope.getError().message);
 
 // Only structures/tables — not the dozens of other referencing types. SAP
@@ -1561,7 +1584,7 @@ const result = await utils.getWhereUsed({
   object_name: 'ZMY_TABLE',
   object_type: 'table',
   scopeXml,
-});
+}, { headers });
 if (result.ok) {
   const found = result.getResult().value;
   console.log(`Found ${found.totalReferences} references`);
@@ -1675,7 +1698,7 @@ const scheduled = await classExecutor.listRequests();        // ITraceRequestEnt
 
 // The request id is in `Location` and nowhere else — the default reading,
 // which reads the body, answers ''.
-const requestId = await classExecutor.scheduleTrace({
+const requestId = await classExecutor.scheduleTrace({ headers,
   description: 'CI trace run',
   sqlTrace: true,
   maxTimeForTracing: 1800,
@@ -2078,7 +2101,7 @@ const listener = new AbapDebugger(listenerConnection, logger);
 // is what pairs an answer row with the request row that made it.
 await listener.setBreakpoints(identity, [
   { kind: 'line', uri: `${sourceUri}#start=12`, clientId: 'loop-line' },
-]);
+], { headers });
 
 const caught = listener.listen(identity, { holdSeconds: 60 });
 // The program runs on a third connection; anything IAdtRunnable will do.
@@ -2094,7 +2117,7 @@ debugConnection.setSessionType('stateful');   // a new connection, for this debu
 const session = new AbapDebugger(debugConnection, logger);
 await session.attach(identity, debuggeeId!, { server });
 await session.getStack();
-await session.getChildVariables(['@ROOT']);
+await session.getChildVariables(['@ROOT'], { headers });
 await session.step('stepOver');
 await session.stepToLine('stepRunToLine', `${sourceUri}#start=20`);
 // The program finishing is answered 500 debuggeeEnded; analyseDebuggeeEnd

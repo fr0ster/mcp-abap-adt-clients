@@ -2,17 +2,13 @@
  * Package delete operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IDeletePackageParams } from './types';
 
 /**
@@ -23,6 +19,7 @@ import type { IDeletePackageParams } from './types';
  */
 export async function checkPackageDeletion(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeletePackageParams,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${PACKAGE.uri(params.package_name)}`;
@@ -35,17 +32,12 @@ export async function checkPackageDeletion(
   <del:object adtcore:uri="${objectUri}"/>
 </del:checkRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION_CHECK,
-    'Content-Type': CT_DELETION_CHECK,
-  };
-
   return await connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -55,6 +47,7 @@ export async function checkPackageDeletion(
  */
 export async function deletePackage(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeletePackageParams,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${PACKAGE.uri(params.package_name)}`;
@@ -78,17 +71,12 @@ export async function deletePackage(
   </del:object>
 </del:deletionRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION,
-    'Content-Type': CT_DELETION,
-  };
-
   const response = await connection.makeAdtRequest({
     url: deletionUrl,
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   // The response, as it arrived. This used to replace the server's document

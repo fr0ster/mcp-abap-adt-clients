@@ -15,6 +15,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -141,7 +142,7 @@ export class AdtAuthorizationField<
     config: Omit<IAuthorizationFieldConfig, 'source'> & {
       source?: never;
     },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -163,7 +164,7 @@ export class AdtAuthorizationField<
     const name = this.name(config);
     return answering(
       () =>
-        createAuthorizationField(connection, {
+        createAuthorizationField(connection, options.headers, {
           authorization_field_name: name,
           description: config.description,
           package_name: config.packageName ?? '',
@@ -223,7 +224,7 @@ export class AdtAuthorizationField<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -234,6 +235,7 @@ export class AdtAuthorizationField<
       () =>
         updateAuthorizationField(
           connection,
+          options.headers,
           {
             authorization_field_name: name,
             description: config.description,
@@ -273,7 +275,7 @@ export class AdtAuthorizationField<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -281,7 +283,7 @@ export class AdtAuthorizationField<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           authorization_field_name: name,
           transport_request: config.transportRequest,
         }),
@@ -303,7 +305,7 @@ export class AdtAuthorizationField<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -311,7 +313,7 @@ export class AdtAuthorizationField<
     const name = this.name(config);
     return answering(
       () =>
-        deleteAuthorizationField(connection, {
+        deleteAuthorizationField(connection, options.headers, {
           authorization_field_name: name,
           transport_request: config.transportRequest,
         }),
@@ -323,7 +325,7 @@ export class AdtAuthorizationField<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -331,7 +333,7 @@ export class AdtAuthorizationField<
     const name = this.name(config);
 
     return answering(
-      () => activateAuthorizationField(connection, name),
+      () => activateAuthorizationField(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -340,8 +342,8 @@ export class AdtAuthorizationField<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -351,7 +353,7 @@ export class AdtAuthorizationField<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkAuthorizationField(connection, name, version),
+      () => checkAuthorizationField(connection, options.headers, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

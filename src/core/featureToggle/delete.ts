@@ -2,17 +2,13 @@
  * Feature Toggle (FTG2/FT) delete operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IDeleteFeatureToggleParams } from './types';
 
 function objectUri(name: string): string {
@@ -24,6 +20,7 @@ function objectUri(name: string): string {
  */
 export async function checkDeletion(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
   const uri = objectUri(params.feature_toggle_name);
@@ -38,10 +35,7 @@ export async function checkDeletion(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION_CHECK,
-      'Content-Type': CT_DELETION_CHECK,
-    },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -50,6 +44,7 @@ export async function checkDeletion(
  */
 export async function deleteFeatureToggle(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IDeleteFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
   const uri = objectUri(params.feature_toggle_name);
@@ -69,10 +64,7 @@ export async function deleteFeatureToggle(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      Accept: ACCEPT_DELETION,
-      'Content-Type': CT_DELETION,
-    },
+    headers: requestHeaders(headers),
   });
 
   // The response, as it arrived. This used to replace the server's document

@@ -12,6 +12,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -149,7 +150,7 @@ export class AdtAccessControl<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IAccessControlConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -171,7 +172,7 @@ export class AdtAccessControl<
     const name = this.name(config);
     return answering(
       () =>
-        createAccessControl(connection, {
+        createAccessControl(connection, options.headers, {
           access_control_name: name,
           description: config.description,
           package_name: config.packageName as string,
@@ -261,7 +262,7 @@ export class AdtAccessControl<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -278,6 +279,7 @@ export class AdtAccessControl<
       () =>
         updateAccessControl(
           connection,
+          options.headers,
           {
             access_control_name: name,
             source_code: source as string,
@@ -299,7 +301,7 @@ export class AdtAccessControl<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -307,7 +309,7 @@ export class AdtAccessControl<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           access_control_name: name,
           transport_request: config.transportRequest,
         }),
@@ -329,7 +331,7 @@ export class AdtAccessControl<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -337,7 +339,7 @@ export class AdtAccessControl<
     const name = this.name(config);
     return answering(
       () =>
-        deleteAccessControl(connection, {
+        deleteAccessControl(connection, options.headers, {
           access_control_name: name,
           transport_request: config.transportRequest,
         }),
@@ -349,7 +351,7 @@ export class AdtAccessControl<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -357,7 +359,7 @@ export class AdtAccessControl<
     const name = this.name(config);
 
     return answering(
-      () => activateAccessControl(connection, name),
+      () => activateAccessControl(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -366,8 +368,8 @@ export class AdtAccessControl<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -377,7 +379,14 @@ export class AdtAccessControl<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkAccessControl(connection, name, version, config.source),
+      () =>
+        checkAccessControl(
+          connection,
+          options.headers,
+          name,
+          version,
+          config.source,
+        ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

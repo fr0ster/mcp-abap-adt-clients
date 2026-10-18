@@ -2,17 +2,13 @@
  * Behavior Definition delete operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check if behavior definition can be deleted
@@ -33,6 +29,7 @@ import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
  */
 export async function checkDeletion(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${BEHAVIOR_DEFINITION.uri(name)}`;
@@ -41,11 +38,6 @@ export async function checkDeletion(
     <del:object adtcore:uri="${objectUri}"/>
 </del:checkRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION_CHECK,
-    'Content-Type': CT_DELETION_CHECK,
-  };
-
   const checkUrl = `/sap/bc/adt/deletion/check`;
 
   return await connection.makeAdtRequest({
@@ -53,7 +45,7 @@ export async function checkDeletion(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -79,6 +71,7 @@ export async function checkDeletion(
  */
 export async function deleteBehaviorDefinition(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
@@ -94,11 +87,6 @@ export async function deleteBehaviorDefinition(
     </del:object>
 </del:deletionRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION,
-    'Content-Type': CT_DELETION,
-  };
-
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
   return await connection.makeAdtRequest({
@@ -106,6 +94,6 @@ export async function deleteBehaviorDefinition(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

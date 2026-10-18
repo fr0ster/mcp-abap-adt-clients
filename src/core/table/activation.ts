@@ -2,6 +2,7 @@
  * Table activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -14,8 +15,15 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateTable(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   tableName: string,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${TABLE.uri(tableName)}`;
-  return await activateObjectInSession(connection, objectUri, tableName, true);
+  return await activateObjectInSession(
+    connection,
+    headers,
+    objectUri,
+    tableName,
+    true,
+  );
 }

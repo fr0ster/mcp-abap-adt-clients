@@ -2,13 +2,14 @@
  * Table create operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_TABLE, CT_TABLE } from '../../constants/contentTypes';
 import { TABLE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateTableParams } from './types';
 
 /**
@@ -18,6 +19,7 @@ import type { ICreateTableParams } from './types';
  */
 export async function createTable(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateTableParams,
 ): Promise<IAdtWireResponse> {
   const masterSystem = params.masterSystem || '';
@@ -41,11 +43,6 @@ export async function createTable(
 
 </blue:blueSource>`;
 
-  const headers = {
-    Accept: ACCEPT_TABLE,
-    'Content-Type': CT_TABLE,
-  };
-
   // A refusal comes back as the transport's failure, with SAP's answer on it.
   // It used to be rewrapped in a new Error carrying the text alone, which
   // dropped the response the caller's `analyse` reads.
@@ -54,6 +51,6 @@ export async function createTable(
     method: 'POST',
     timeout: 0,
     data: tableXml,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

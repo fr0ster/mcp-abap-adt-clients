@@ -42,6 +42,7 @@ import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
+import { headersOf } from '../../../helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -375,18 +376,26 @@ describe('ABAP debugger (AbapDebugger)', () => {
       description: 'Debugger integration probe',
       ...(transportRequest ? { transportRequest } : {}),
     };
-    const created = await cls.create(config);
+    const created = await cls.create(config, {
+      headers: headersOf(cls, 'create'),
+    });
     if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
       throw new Error(`probe create: ${created.getError().message}`);
     }
     const lock = await cls.lock(config);
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
     const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, { source: SOURCE, lockHandle });
+    const written = await cls.update(config, {
+      headers: headersOf(cls, 'update'),
+      source: SOURCE,
+      lockHandle,
+    });
     await cls.unlock(config, lockHandle);
     if (!written.ok)
       throw new Error(`probe write: ${written.getError().message}`);
-    const activated = await cls.activate(config);
+    const activated = await cls.activate(config, {
+      headers: headersOf(cls, 'activate'),
+    });
     if (!activated.ok)
       throw new Error(`probe activate: ${activated.getError().message}`);
     logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
@@ -416,11 +425,19 @@ describe('ABAP debugger (AbapDebugger)', () => {
     if (!testCase?.params?.keep_probe) {
       await new AdtClient(listenerConnection, connectionLogger)
         .getClass()
-        .delete({
-          className: CLASS_NAME,
-          packageName,
-          ...(transportRequest ? { transportRequest } : {}),
-        });
+        .delete(
+          {
+            className: CLASS_NAME,
+            packageName,
+            ...(transportRequest ? { transportRequest } : {}),
+          },
+          {
+            headers: headersOf(
+              new AdtClient(listenerConnection, connectionLogger).getClass(),
+              'delete',
+            ),
+          },
+        );
     }
     await closeOwnTestConnection(triggerConnection);
     await closeOwnTestConnection(listenerConnection);
@@ -439,6 +456,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
       ];
       const answer = await listenerApi.setBreakpoints(identity, all, {
+        headers: headersOf(listenerApi, 'setBreakpoints'),
         validationOnly: true,
       });
       const document = documentOf(answer);
@@ -461,11 +479,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'arms a line and an exception breakpoint; the line comes back in its include',
     async () => {
       if (skipped()) return;
-      const answer = await listenerApi.setBreakpoints(identity, [
-        { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
-        { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.catch}` },
-        { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
-      ]);
+      const answer = await listenerApi.setBreakpoints(
+        identity,
+        [
+          { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
+          { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.catch}` },
+          { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
+        ],
+        { headers: headersOf(listenerApi, 'setBreakpoints') },
+      );
       expect(answer.ok).toBe(true);
       const ids = [
         ...documentOf(answer).matchAll(/<breakpoint\b[^>]*\bid="([^"]*)"/g),
@@ -526,13 +548,17 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      const root = await debuggerApi.getChildVariables(['@ROOT']);
+      const root = await debuggerApi.getChildVariables(['@ROOT'], {
+        headers: headersOf(debuggerApi, 'getChildVariables'),
+      });
       expect(root.ok).toBe(true);
       const scopes = [
         ...documentOf(root).matchAll(/<CHILD_ID>([^<]*)<\/CHILD_ID>/g),
       ].map((m) => m[1]);
       expect(scopes).toContain('@LOCALS');
-      const all = await debuggerApi.getChildVariables(scopes);
+      const all = await debuggerApi.getChildVariables(scopes, {
+        headers: headersOf(debuggerApi, 'getChildVariables'),
+      });
       expect(all.ok).toBe(true);
       const locals = values(documentOf(all));
       expect(locals.get('LV_TOTAL')).toBe('0');
@@ -546,7 +572,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      const answer = await debuggerApi.getVariables(['LV_TOTAL']);
+      const answer = await debuggerApi.getVariables(['LV_TOTAL'], {
+        headers: headersOf(debuggerApi, 'getVariables'),
+      });
       expect(answer.ok).toBe(true);
       expect(values(documentOf(answer)).get('LV_TOTAL')).toBe('0');
     },
@@ -563,7 +591,11 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(top.event).toBe('ADD');
       expect(top.line).toBe(LINE.add);
       const params = values(
-        documentOf(await debuggerApi.getVariables(['IV_A', 'IV_B'])),
+        documentOf(
+          await debuggerApi.getVariables(['IV_A', 'IV_B'], {
+            headers: headersOf(debuggerApi, 'getVariables'),
+          }),
+        ),
       );
       expect(params.get('IV_A')).toBe('0');
       expect(params.get('IV_B')).toBe('1');
@@ -585,9 +617,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(moved.ok).toBe(true);
       // The caller's local is readable from here…
       expect(
-        values(documentOf(await debuggerApi.getVariables(['LV_TOTAL']))).get(
-          'LV_TOTAL',
-        ),
+        values(
+          documentOf(
+            await debuggerApi.getVariables(['LV_TOTAL'], {
+              headers: headersOf(debuggerApi, 'getVariables'),
+            }),
+          ),
+        ).get('LV_TOTAL'),
       ).toBe('0');
       // …and the program still stands in the method.
       expect((await topFrame()).event).toBe('ADD');
@@ -604,9 +640,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const top = await topFrame();
       expect(top.event).toBe('IF_OO_ADT_CLASSRUN~MAIN');
       expect(
-        values(documentOf(await debuggerApi.getVariables(['LV_TOTAL']))).get(
-          'LV_TOTAL',
-        ),
+        values(
+          documentOf(
+            await debuggerApi.getVariables(['LV_TOTAL'], {
+              headers: headersOf(debuggerApi, 'getVariables'),
+            }),
+          ),
+        ).get('LV_TOTAL'),
       ).toBe('1');
     },
     STEP_TIMEOUT,
@@ -647,9 +687,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toMatch(/reachedWatchpoints/);
       expect(
-        values(documentOf(await debuggerApi.getVariables(['LV_TOTAL']))).get(
-          'LV_TOTAL',
-        ),
+        values(
+          documentOf(
+            await debuggerApi.getVariables(['LV_TOTAL'], {
+              headers: headersOf(debuggerApi, 'getVariables'),
+            }),
+          ),
+        ).get('LV_TOTAL'),
       ).toBe('3');
 
       const deleted = await debuggerApi.deleteWatchpoint(
@@ -669,9 +713,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const written = await debuggerApi.setVariableValue('LV_TOTAL', '100');
       expect(written.ok).toBe(true);
       expect(
-        values(documentOf(await debuggerApi.getVariables(['LV_TOTAL']))).get(
-          'LV_TOTAL',
-        ),
+        values(
+          documentOf(
+            await debuggerApi.getVariables(['LV_TOTAL'], {
+              headers: headersOf(debuggerApi, 'getVariables'),
+            }),
+          ),
+        ).get('LV_TOTAL'),
       ).toBe('100');
     },
     STEP_TIMEOUT,

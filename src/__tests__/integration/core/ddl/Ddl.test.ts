@@ -18,6 +18,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -136,10 +137,13 @@ describe('View (using AdtClient)', () => {
             `DDL source ${ddlName}`,
           );
           if (existing.present !== true) return { success: true };
-          const removed = await client.getDdl().delete({
-            ddlName,
-            transportRequest: tester.getTransportRequest(),
-          });
+          const removed = await client.getDdl().delete(
+            {
+              ddlName,
+              transportRequest: tester.getTransportRequest(),
+            },
+            { headers: headersOf(client.getDdl(), 'delete') },
+          );
           if (!removed.ok) {
             testsLogger.warn?.(
               `could not remove leftover ${ddlName}: ${removed.getError().message}`,

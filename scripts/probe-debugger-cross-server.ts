@@ -35,6 +35,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -178,13 +179,17 @@ async function main(): Promise<void> {
     description: 'Debugger cross-server probe',
     ...(transportRequest ? { transportRequest } : {}),
   };
-  await cls.create(config);
+  await cls.create(config, { headers: headersOf(cls, 'create') });
   const lock = await cls.lock(config);
   const lockHandle = String(lock.ok ? lock.getResult().value : '');
-  await cls.update(config, { source: SOURCE, lockHandle });
+  await cls.update(config, {
+    headers: headersOf(cls, 'update'),
+    source: SOURCE,
+    lockHandle,
+  });
   await cls.unlock(config, lockHandle);
   out(
-    `probe ${CLASS_NAME} activate: ${(await cls.activate(config)).ok ? 'ok' : 'FAILED'}`,
+    `probe ${CLASS_NAME} activate: ${(await cls.activate(config, { headers: headersOf(cls, 'activate') })).ok ? 'ok' : 'FAILED'}`,
   );
 
   // --deploy: leave the class in place for a breakpoint set elsewhere (an IDE).
@@ -196,12 +201,16 @@ async function main(): Promise<void> {
 
   const armer = new AbapDebugger(setup, quiet, abapDebuggerDocuments);
   setup.setSessionType('stateful');
-  const armed = await armer.setBreakpoints(identity, [
-    {
-      kind: 'line',
-      uri: `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main#start=${BREAK_LINE}`,
-    },
-  ]);
+  const armed = await armer.setBreakpoints(
+    identity,
+    [
+      {
+        kind: 'line',
+        uri: `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main#start=${BREAK_LINE}`,
+      },
+    ],
+    { headers: headersOf(armer, 'setBreakpoints') },
+  );
   const bpId = /\bid="([^"]*)"/.exec(documentOf(armed))?.[1];
   out(`breakpoint at line ${BREAK_LINE}: ${bpId ?? verdict(armed)}`);
 
@@ -267,7 +276,7 @@ async function main(): Promise<void> {
     if (bpId) await armer.deleteBreakpoint(identity, bpId);
     await armer.stopListener(identity);
     setup.setSessionType('stateless');
-    await cls.delete(config);
+    await cls.delete(config, { headers: headersOf(cls, 'delete') });
     await closeOwnTestConnection(setup);
   }
 

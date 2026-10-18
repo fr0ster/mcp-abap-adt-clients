@@ -6,6 +6,7 @@ import { checkAccessControl } from '../../../core/accessControl/check';
 import { checkClass } from '../../../core/class/check';
 import { checkDdl } from '../../../core/ddl/check';
 import { checkFunctionModule } from '../../../core/functionModule/check';
+import { headersFor } from '../../helpers/adtHeaders';
 
 const report = (inner: string): string =>
   `<?xml version="1.0" encoding="UTF-8"?>
@@ -48,14 +49,24 @@ const respondingWith = (body: string) => {
 describe('a check run that finds an error', () => {
   it('comes back from checkClass as the response', async () => {
     const { connection } = respondingWith(withError);
-    const answer = await checkClass(connection, 'ZOK_CL', 'inactive');
+    const answer = await checkClass(
+      connection,
+      headersFor('AdtClass.check'),
+      'ZOK_CL',
+      'inactive',
+    );
     expect(answer.status).toBe(200);
     expect(answer.data).toContain('Field FOO unknown');
   });
 
   it('comes back from checkAccessControl as the response', async () => {
     const { connection } = respondingWith(withError);
-    const answer = await checkAccessControl(connection, 'ZOK_DCL', 'inactive');
+    const answer = await checkAccessControl(
+      connection,
+      headersFor('AdtAccessControl.check'),
+      'ZOK_DCL',
+      'inactive',
+    );
     expect(answer.data).toContain('Field FOO unknown');
   });
 });
@@ -65,6 +76,7 @@ describe('a check run the server did not process', () => {
     const { connection } = respondingWith(notProcessed);
     const answer = await checkFunctionModule(
       connection,
+      headersFor('AdtFunctionModule.check'),
       'ZOK_FG',
       'ZOK_FM',
       'inactive',
@@ -74,7 +86,12 @@ describe('a check run the server did not process', () => {
 
   it('is not retried by checkDdl', async () => {
     const { connection, calls } = respondingWith(notProcessed);
-    const answer = await checkDdl(connection, 'ZOK_DDL', 'inactive');
+    const answer = await checkDdl(
+      connection,
+      headersFor('AdtDdl.check'),
+      'ZOK_DDL',
+      'inactive',
+    );
     expect(answer.data).toContain('does not exist');
     expect(calls).toHaveLength(1);
   });

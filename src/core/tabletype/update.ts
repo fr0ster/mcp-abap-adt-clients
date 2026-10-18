@@ -6,13 +6,14 @@
  * that would be lost if XML were built from scratch.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_TABLE_TYPE } from '../../constants/contentTypes';
 import { TABLE_TYPE } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateTableTypeParams } from './types';
 
 /**
@@ -30,6 +31,7 @@ import type { IUpdateTableTypeParams } from './types';
  */
 export async function updateTableType(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateTableTypeParams,
   document: string,
   lockHandle?: string,
@@ -41,6 +43,6 @@ export async function updateTableType(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: { Accept: CT_TABLE_TYPE, 'Content-Type': CT_TABLE_TYPE },
+    headers: requestHeaders(headers),
   });
 }

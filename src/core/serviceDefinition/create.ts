@@ -3,13 +3,14 @@
  * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_SERVICE_DEFINITION } from '../../constants/contentTypes';
 import { SERVICE_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateServiceDefinitionParams } from './types';
 
@@ -19,6 +20,7 @@ import type { ICreateServiceDefinitionParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateServiceDefinitionParams,
 ): Promise<IAdtWireResponse> {
   const url = `${SERVICE_DEFINITION.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -42,16 +44,11 @@ export async function create(
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </srvd:srvdSource>`;
 
-  const headers = {
-    Accept: CT_SERVICE_DEFINITION,
-    'Content-Type': CT_SERVICE_DEFINITION,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

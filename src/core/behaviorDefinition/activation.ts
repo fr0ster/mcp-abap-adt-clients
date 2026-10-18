@@ -2,6 +2,7 @@
  * Behavior Definition activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -29,12 +30,14 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activate(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   preauditRequested: boolean = true,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${BEHAVIOR_DEFINITION.uri(name)}`;
   return await activateObjectInSession(
     connection,
+    headers,
     objectUri,
     name.toUpperCase(),
     preauditRequested,

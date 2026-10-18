@@ -21,6 +21,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -141,7 +142,7 @@ export class AdtInterface<
   /** Create the interface. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IInterfaceConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -165,6 +166,7 @@ export class AdtInterface<
       () =>
         createInterface(
           connection,
+          options.headers,
           {
             interfaceName: name,
             packageName: config.packageName as string,
@@ -239,7 +241,7 @@ export class AdtInterface<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -256,11 +258,11 @@ export class AdtInterface<
       () =>
         upload(
           connection,
+          options.headers,
           name,
           source as string,
           options?.lockHandle as string,
           config.transportRequest,
-          this.contentTypes?.sourceArtifactContentType(),
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       options?.analyse,
@@ -276,7 +278,7 @@ export class AdtInterface<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -284,7 +286,7 @@ export class AdtInterface<
     const name = config.interfaceName as string;
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           interface_name: name,
           transport_request: config.transportRequest,
         }),
@@ -302,7 +304,7 @@ export class AdtInterface<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -310,7 +312,7 @@ export class AdtInterface<
     const name = config.interfaceName as string;
     return answering(
       () =>
-        deleteInterface(connection, {
+        deleteInterface(connection, options.headers, {
           interface_name: name,
           transport_request: config.transportRequest,
         }),
@@ -322,13 +324,18 @@ export class AdtInterface<
   /** Activate the interface. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
-      () => activateInterface(connection, config.interfaceName as string),
+      () =>
+        activateInterface(
+          connection,
+          options.headers,
+          config.interfaceName as string,
+        ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -337,8 +344,8 @@ export class AdtInterface<
   /** Check the interface. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -350,6 +357,7 @@ export class AdtInterface<
       () =>
         checkInterface(
           connection,
+          options.headers,
           config.interfaceName as string,
           version,
           config.source,

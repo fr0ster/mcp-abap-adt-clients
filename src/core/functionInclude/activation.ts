@@ -2,6 +2,7 @@
  * FunctionInclude (FUGR/I) activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -14,6 +15,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateFunctionInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   groupName: string,
   includeName: string,
 ): Promise<IAdtWireResponse> {
@@ -21,6 +23,7 @@ export async function activateFunctionInclude(
 
   return await activateObjectInSession(
     connection,
+    headers,
     objectUri,
     includeName.toUpperCase(),
     true,

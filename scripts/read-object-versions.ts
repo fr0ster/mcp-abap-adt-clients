@@ -26,6 +26,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   getConfig,
@@ -38,7 +39,6 @@ import {
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
 import type { AdtSourceObjectType } from '../src/core/shared/types';
-import { makeAdtRequestWithAcceptNegotiation } from '../src/utils/acceptNegotiation';
 import { orThrow } from '../src/utils/adtResponse';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
@@ -212,20 +212,14 @@ async function readSource(
         testsLogger.info?.(`URL (${version}): ${url}`);
       }
 
-      const response = await makeAdtRequestWithAcceptNegotiation(
-        connection,
-        {
-          url,
-          method: 'GET',
-          timeout: 0,
-          headers: {
-            Accept: 'text/plain',
-          },
+      const response = await connection.makeAdtRequest({
+        url,
+        method: 'GET',
+        timeout: 0,
+        headers: {
+          Accept: 'text/plain',
         },
-        {
-          logger: testsLogger,
-        },
-      );
+      });
       if (typeof response.data === 'string' && response.data.length > 0) {
         return response.data;
       }
@@ -413,12 +407,13 @@ async function run(): Promise<void> {
       );
     }
     try {
-      await client
-        .getClass()
-        .update(
-          { className: options.objectName, transportRequest },
-          { source: updatedSource },
-        );
+      await client.getClass().update(
+        { className: options.objectName, transportRequest },
+        {
+          headers: headersOf(client.getClass(), 'update'),
+          source: updatedSource,
+        },
+      );
     } catch (error) {
       logHttpError(error, 'Update');
       throw error;
@@ -435,7 +430,12 @@ async function run(): Promise<void> {
 
     testsLogger.info?.('Activating...');
     try {
-      await client.getClass().activate({ className: options.objectName });
+      await client
+        .getClass()
+        .activate(
+          { className: options.objectName },
+          { headers: headersOf(client.getClass(), 'activate') },
+        );
     } catch (error) {
       logHttpError(error, 'Activate');
       throw error;
@@ -468,13 +468,19 @@ async function run(): Promise<void> {
   } finally {
     if (updateSucceeded && originalSource) {
       testsLogger.info?.('Restoring original source...');
+      await client.getClass().update(
+        { className: options.objectName, transportRequest },
+        {
+          headers: headersOf(client.getClass(), 'update'),
+          source: originalSource,
+        },
+      );
       await client
         .getClass()
-        .update(
-          { className: options.objectName, transportRequest },
-          { source: originalSource },
+        .activate(
+          { className: options.objectName },
+          { headers: headersOf(client.getClass(), 'activate') },
         );
-      await client.getClass().activate({ className: options.objectName });
       const restored = await readSource(client, connection, 'active');
       const restoredOk = restored === originalSource;
       testsLogger.info?.(

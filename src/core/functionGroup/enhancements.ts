@@ -7,14 +7,13 @@ import {
   ACCEPT_ENHANCEMENT_OPTIONS,
 } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 
 export async function getFunctionGroupEnhancementElements(
   connection: IAbapConnection,
   name: string,
 ): Promise<IAdtWireResponse> {
   const url = FUNCTION_GROUP.enhancementElements(name);
-  return makeAdtRequestWithAcceptNegotiation(connection, {
+  return connection.makeAdtRequest({
     url,
     method: 'GET',
     timeout: 0,
@@ -27,7 +26,7 @@ export async function getFunctionGroupEnhancementOptions(
   name: string,
 ): Promise<IAdtWireResponse> {
   const url = FUNCTION_GROUP.enhancementOptions(name);
-  return makeAdtRequestWithAcceptNegotiation(connection, {
+  return connection.makeAdtRequest({
     url,
     method: 'GET',
     timeout: 0,

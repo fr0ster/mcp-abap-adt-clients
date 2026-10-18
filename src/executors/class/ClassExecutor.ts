@@ -1,6 +1,7 @@
 import type {
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IAdtRunnable,
   IClassExecuteOptions,
@@ -112,7 +113,8 @@ export class ClassExecutor<
   }
 
   scheduleTrace<E extends IAdtError = IAdtError>(
-    options?: IProfilerTraceParameters & IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IProfilerTraceParameters &
+      IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['scheduled']>, E>> {
     return this.scheduling.scheduleTrace(options);
   }

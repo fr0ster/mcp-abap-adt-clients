@@ -40,6 +40,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersFor } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -203,12 +204,16 @@ async function main(): Promise<void> {
       // can be watched from both sides.
       try {
         const started = Date.now();
-        const wire = await createClass(connection, {
-          class_name: className,
-          package_name: PACKAGE,
-          description: 'Activation probe (safe to delete)',
-          transport_request: TRANSPORT || undefined,
-        });
+        const wire = await createClass(
+          connection,
+          headersFor('AdtClass.create'),
+          {
+            class_name: className,
+            package_name: PACKAGE,
+            description: 'Activation probe (safe to delete)',
+            transport_request: TRANSPORT || undefined,
+          },
+        );
         report('POST /sap/bc/adt/oo/classes', wire, Date.now() - started);
       } catch (error) {
         reportFailure('POST /sap/bc/adt/oo/classes', error);
@@ -234,6 +239,7 @@ async function main(): Promise<void> {
         const started = Date.now();
         const wire = await updateClass(
           connection,
+          headersFor('AdtClass.update'),
           className,
           SOURCE(className),
           handle,
@@ -255,7 +261,11 @@ async function main(): Promise<void> {
       say(`    POST sent at ${stamp()}`);
       const started = Date.now();
       try {
-        const wire = await activateClass(connection, className);
+        const wire = await activateClass(
+          connection,
+          headersFor('AdtClassMemberBase.activate'),
+          className,
+        );
         const ms = Date.now() - started;
         say(`    answer back at ${stamp()}`);
         report('POST /sap/bc/adt/activation?method=activate', wire, ms);
@@ -267,10 +277,14 @@ async function main(): Promise<void> {
       await inactiveList(connection);
     } else if (step === 'delete') {
       try {
-        const wire = await deleteClass(connection, {
-          class_name: className,
-          transport_request: TRANSPORT || undefined,
-        });
+        const wire = await deleteClass(
+          connection,
+          headersFor('AdtClass.delete'),
+          {
+            class_name: className,
+            transport_request: TRANSPORT || undefined,
+          },
+        );
         report('DELETE the class', wire);
       } catch (error) {
         reportFailure('DELETE the class', error);
