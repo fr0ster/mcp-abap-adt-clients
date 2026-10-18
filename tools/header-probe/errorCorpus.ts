@@ -8,6 +8,7 @@
  *     `environment.system` from it.
  *
  * Run:
+ *   npm run header:discovery:next          # the full run: the system's header corpus
  *   npm run header:discovery:next -- --from discovery --headers corpus
  *   npm run header:discovery:next -- --from clients --headers none
  *   npm run header:discovery:next -- --from clients --headers bogus
@@ -15,11 +16,18 @@
  *   npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
  *   npm run header:discovery:next -- --render <corpus.json> [<corpus.json> …]
  *
- * `--from` (required): `discovery` probes every `app:collection` of
+ * Without flags: the authorization check; phase 1, both sources in every
+ * mode on the probe name; phase 2, for the endpoints still unknown only,
+ * existing objects (found read-only by the repository search) for the reads
+ * and the header probe's temporary-object cycle for the writes (it needs
+ * `default_package` and `default_transport` in test-config.yaml); then
+ * `.header-probe/header-corpus-<timestamp>.{json,md}`, with each phase's time.
+ *
+ * `--from` (with `--headers`, one run): `discovery` probes every `app:collection` of
  * `/sap/bc/adt/discovery` (GET, plus POST where it lists `app:accept`);
  * `clients` probes every endpoint the adt-clients members build, recorded by
  * calling each member against a connection that sends nothing.
- * `--headers` (required): `corpus` sends the prepared pair (the collection's
+ * `--headers`: `corpus` sends the prepared pair (the collection's
  * own `app:accept` types, or pairs.ts); `none` sends no Accept and no
  * Content-Type; `bogus` sends `application/x-header-probe` as both.
  * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
@@ -62,7 +70,14 @@ import {
   SOURCES,
   type Source,
 } from './corpus';
-import { runCorpus } from './corpusRun';
+import { runCorpus, runFull } from './corpusRun';
+import { runWriteCycle } from './writeCycle';
+
+// The helpers load `.env` when imported; nothing else here reads it.
+const {
+  getEnvironmentConfig,
+} = require('../../src/__tests__/helpers/test-helper');
+
 import { Interrupt } from './ledger';
 
 const OUT_DIR = path.resolve(__dirname, '../../.header-probe');
@@ -109,9 +124,9 @@ function parseArgs(argv: readonly string[]): IArgs {
       break;
     } else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (!args.summary && !args.render && (!args.from || !args.headers))
+  if (Boolean(args.from) !== Boolean(args.headers))
     throw new Error(
-      'both --from discovery|clients and --headers corpus|none|bogus are required',
+      '--from discovery|clients and --headers corpus|none|bogus go together (neither: the full run)',
     );
   return args;
 }
@@ -166,6 +181,32 @@ async function main(): Promise<number> {
       'interrupted: waiting for the request in flight, then cleaning up',
     );
   });
+  const open = async () =>
+    onTheWire(
+      await createTestConnection(createConnectionLogger(), {
+        ownSession: true,
+      }),
+    );
+  if (!args.from) {
+    // The full run: the header corpus of the system.
+    const environment = getEnvironmentConfig();
+    const { exitCode } = await runFull({
+      open,
+      close: (connection) => closeOwnTestConnection(connection),
+      interrupt,
+      outDir: OUT_DIR,
+      clientOptions: (connection) =>
+        resolveSystemContext(connection, system === 'cloud'),
+      out: { progress, loud },
+      writeCycle: (cycle) =>
+        runWriteCycle({
+          ...cycle,
+          packageName: String(environment.default_package ?? ''),
+          transportRequest: String(environment.default_transport ?? ''),
+        }),
+    });
+    return exitCode;
+  }
   const { exitCode } = await runCorpus({
     // The connection's logon is the first request: a 401 or 403 there is
     // the Oops, and nothing else is sent.

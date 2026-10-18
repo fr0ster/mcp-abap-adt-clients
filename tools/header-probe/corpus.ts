@@ -542,6 +542,8 @@ export interface ICorpus {
   removals: IRemoval[];
   /** Every request one at a time (`--sequential`), no envelope. */
   sequential?: boolean;
+  /** Phase 2 of a full run: real objects in place of the probe name. */
+  phase?: 2;
   /** Every envelope: parts, bytes, wall time from send to answer. */
   envelopes?: IEnvelopeTiming[];
   /** Every poisoned envelope: how it was split, what caused it. */
@@ -760,6 +762,38 @@ export interface IEndpointNeeds {
   namedContentType: string[];
   /** Where the pair table names a header the system ignores here. */
   tableNotes: string[];
+  /** The raw texts of the answers behind it (the named lists, else the SAP message). */
+  texts: string[];
+}
+
+/** `needs` from the two verdicts. */
+export function needsFrom(
+  accept: IHeaderVerdict,
+  contentType: IHeaderVerdict,
+): Needs {
+  const a = accept.verdict === 'checked';
+  const c = contentType.verdict === 'checked';
+  if (a && c) return 'both';
+  if (a) return 'accept';
+  if (c) return 'content-type';
+  if (
+    accept.verdict === 'not checked' &&
+    (contentType.verdict === 'not checked' || contentType.verdict === 'no body')
+  )
+    return 'neither';
+  return 'unknown';
+}
+
+/** The raw text of an answer: what the error names, else the SAP message, else a dump's text. */
+export function rawText(row: ICorpusRow | undefined): string | undefined {
+  if (!row) return undefined;
+  return (
+    [row.named.acceptedText, row.named.supportedText]
+      .filter(Boolean)
+      .join(' / ') ||
+    row.sapMessage ||
+    (row.status === 500 ? dumpText(row.body) : undefined)
+  );
 }
 
 /** The endpoint a bogus row probes: its member, or its collection and method. */
@@ -909,24 +943,11 @@ export function classifyNeeds(
       : pair.accept?.skipped
         ? judge(pair.accept, 415)
         : ({ verdict: 'no body' } as IHeaderVerdict);
-    const a = accept.verdict === 'checked';
-    const c = contentType.verdict === 'checked';
     const detail = [
       verdictText('Accept', accept),
       verdictText('Content-Type', contentType),
     ].join('; ');
-    const needs: Needs =
-      a && c
-        ? 'both'
-        : a
-          ? 'accept'
-          : c
-            ? 'content-type'
-            : accept.verdict === 'not checked' &&
-                (contentType.verdict === 'not checked' ||
-                  contentType.verdict === 'no body')
-              ? 'neither'
-              : 'unknown';
+    const needs = needsFrom(accept, contentType);
     const table = (pair.accept ?? pair.contentType)?.pair;
     const tableNotes: string[] = [];
     if (table?.accept && accept.verdict === 'not checked')
@@ -963,6 +984,13 @@ export function classifyNeeds(
         ? typesNamed(pair.contentType).contentType
         : [],
       tableNotes,
+      texts: [
+        ...new Set(
+          [pair.accept, pair.contentType, absent]
+            .map((row) => rawText(row))
+            .filter((text): text is string => Boolean(text)),
+        ),
+      ],
     });
   }
   return out.sort((x, y) => x.endpoint.localeCompare(y.endpoint));
@@ -1394,5 +1422,240 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
       ),
       '',
     );
+  return lines.join('\n');
+}
+
+// --- the header corpus: one file per system ----------------------------------
+
+/** One piece of evidence about an endpoint's headers. */
+export interface IEvidence {
+  /** `METHOD path[?_action=…]`. */
+  endpoint: string;
+  source: Source;
+  phase: 1 | 2;
+  /** The member or collection the evidence came from. */
+  who: string;
+  accept: IHeaderVerdict;
+  contentType: IHeaderVerdict;
+  namedAccept: string[];
+  namedContentType: string[];
+  /** Status and raw text. */
+  text: string;
+}
+
+/** The evidence a `needs` classification carries, per endpoint. */
+export function evidenceOf(
+  entries: readonly IEndpointNeeds[],
+  source: Source,
+  phase: 1 | 2,
+): IEvidence[] {
+  return entries.map((entry) => {
+    const split = entry.endpoint.indexOf(' — ');
+    const endpoint =
+      split === -1 ? entry.endpoint : entry.endpoint.slice(split + 3);
+    const who = split === -1 ? source : entry.endpoint.slice(0, split);
+    return {
+      endpoint,
+      source,
+      phase,
+      who,
+      accept: entry.accept,
+      contentType: entry.contentType,
+      namedAccept: entry.namedAccept,
+      namedContentType: entry.namedContentType,
+      text: [entry.detail, ...entry.texts].join(' | '),
+    };
+  });
+}
+
+const RANK: Record<IHeaderVerdict['verdict'], number> = {
+  checked: 3,
+  'not checked': 2,
+  unknown: 1,
+  'no body': 0,
+};
+
+/**
+ * Several verdicts on one header of one endpoint: `checked` if any request
+ * was refused for it, else `not checked` if any got through, else unknown
+ * (reasons kept), else no body. A request with a body outranks one without.
+ */
+export function mergeVerdicts(
+  verdicts: readonly IHeaderVerdict[],
+): IHeaderVerdict {
+  let best: IHeaderVerdict = { verdict: 'no body' };
+  const reasons = new Set<string>();
+  for (const verdict of verdicts) {
+    if (verdict.verdict === 'unknown' && verdict.reason)
+      reasons.add(verdict.reason);
+    if (RANK[verdict.verdict] > RANK[best.verdict]) best = verdict;
+  }
+  if (best.verdict === 'unknown')
+    return { ...best, reason: [...reasons].slice(0, 3).join('; ') };
+  return best;
+}
+
+export interface IHeaderCorpusEntry {
+  endpoint: string;
+  needs: Needs;
+  accept: IHeaderVerdict;
+  contentType: IHeaderVerdict;
+  /** The acceptable Accept values the system named. */
+  namedAccept: string[];
+  /** The acceptable Content-Type values the system named. */
+  namedContentType: string[];
+  /** What discovery lists as the body's type. */
+  discoveryContentType: string[];
+  /** The pair table's pairs of the members that send it. */
+  pairs: string[];
+  /** Which phase settled it, or why nothing did. */
+  settledBy: 'phase 1' | 'phase 2' | 'unsettled';
+  /** Who said what: status and raw text. */
+  evidence: string[];
+}
+
+/** The header corpus: per endpoint, everything the phases found. */
+export function buildHeaderCorpus(
+  evidence: readonly IEvidence[],
+  extras: {
+    discoveryContentType: ReadonlyMap<string, readonly string[]>;
+    pairs: ReadonlyMap<string, readonly string[]>;
+  },
+): IHeaderCorpusEntry[] {
+  const by = new Map<string, IEvidence[]>();
+  for (const item of evidence)
+    by.set(item.endpoint, [...(by.get(item.endpoint) ?? []), item]);
+  const entries: IHeaderCorpusEntry[] = [];
+  for (const [endpoint, items] of by) {
+    const merged = (of: readonly IEvidence[]) => ({
+      accept: mergeVerdicts(of.map((item) => item.accept)),
+      contentType: mergeVerdicts(of.map((item) => item.contentType)),
+    });
+    const all = merged(items);
+    const first = merged(items.filter((item) => item.phase === 1));
+    const needs = needsFrom(all.accept, all.contentType);
+    const settledBy =
+      needs === 'unknown'
+        ? 'unsettled'
+        : needsFrom(first.accept, first.contentType) === needs
+          ? 'phase 1'
+          : 'phase 2';
+    entries.push({
+      endpoint,
+      needs,
+      accept: all.accept,
+      contentType: all.contentType,
+      namedAccept: [...new Set(items.flatMap((item) => item.namedAccept))],
+      namedContentType: [
+        ...new Set(items.flatMap((item) => item.namedContentType)),
+      ],
+      discoveryContentType: [
+        ...(extras.discoveryContentType.get(endpoint) ?? []),
+      ],
+      pairs: [...(extras.pairs.get(endpoint) ?? [])],
+      settledBy,
+      evidence: items.map(
+        (item) =>
+          `phase ${item.phase} ${item.source} ${item.who}: ${item.text}`,
+      ),
+    });
+  }
+  return entries.sort((x, y) => x.endpoint.localeCompare(y.endpoint));
+}
+
+/** Counts per `needs` value. */
+export function needsCounts(
+  entries: readonly { needs: Needs }[],
+): Record<Needs, number> {
+  const counts = Object.fromEntries(NEEDS.map((n) => [n, 0])) as Record<
+    Needs,
+    number
+  >;
+  for (const entry of entries) counts[entry.needs]++;
+  return counts;
+}
+
+export interface IHeaderCorpusFile {
+  startedAt: string;
+  finishedAt?: string;
+  /** Wall time per phase, in ms. */
+  phases: { name: string; ms: number }[];
+  totalMs: number;
+  /** Per `needs` value, after phase 1 alone and after phase 2. */
+  counts: { phase1: Record<Needs, number>; phase2: Record<Needs, number> };
+  entries: IHeaderCorpusEntry[];
+  /** The raw corpora beside it. */
+  corpora: string[];
+  /** What phase 2's write cycle created and removed (or could not). */
+  removals: IRemoval[];
+  /** Phase 2's read objects: per object type, the name found or why none. */
+  objects: { handler: string; type?: string; name?: string; reason?: string }[];
+  error?: string;
+}
+
+/** The header corpus as Markdown: the timing, the counts, a table per `needs` value. */
+export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
+  const lines = [
+    '# Header corpus',
+    '',
+    `Started ${file.startedAt}${file.finishedAt ? `, finished ${file.finishedAt}` : ''}; total ${Math.round(file.totalMs / 1000)} s.`,
+    '',
+  ];
+  if (file.error) lines.push(`**The run stopped:** ${cell(file.error)}`, '');
+  lines.push('## Time', '', '| phase | s |', '|---|---|');
+  for (const phase of file.phases)
+    lines.push(`| ${cell(phase.name)} | ${(phase.ms / 1000).toFixed(1)} |`);
+  lines.push(
+    '',
+    '## needs',
+    '',
+    '| needs | after phase 1 | after phase 2 |',
+    '|---|---|---|',
+  );
+  for (const value of NEEDS)
+    lines.push(
+      `| ${value} | ${file.counts.phase1[value]} | ${file.counts.phase2[value]} |`,
+    );
+  for (const value of NEEDS) {
+    const of = file.entries.filter((entry) => entry.needs === value);
+    lines.push('', `## needs: ${value} (${of.length})`, '');
+    if (!of.length) {
+      lines.push('None.');
+      continue;
+    }
+    lines.push(
+      '| endpoint | Accept named | Content-Type named | discovery Content-Type | pair table | settled by | evidence |',
+      '|---|---|---|---|---|---|---|',
+    );
+    for (const entry of of)
+      lines.push(
+        `| ${cell(entry.endpoint)} | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+      );
+  }
+  lines.push('', '## Phase 2 objects', '');
+  if (!file.objects.length) lines.push('None needed.');
+  for (const object of file.objects)
+    lines.push(
+      `- ${cell(object.handler)}${object.type ? ` (${object.type})` : ''}: ${object.name ? `\`${object.name}\`` : cell(object.reason)}`,
+    );
+  lines.push('', '## Left behind', '');
+  const left = file.removals.filter((removal) => !removal.removed);
+  if (!file.removals.length) lines.push('Phase 2 created nothing.');
+  else if (!left.length)
+    lines.push(
+      `Nothing: all ${file.removals.length} temporary objects removed.`,
+    );
+  else
+    for (const removal of left)
+      lines.push(
+        `- **NOT REMOVED** ${cell(removal.label)}: ${cell(removal.detail)}`,
+      );
+  lines.push(
+    '',
+    '## Raw corpora',
+    '',
+    ...file.corpora.map((f) => `- ${f}`),
+    '',
+  );
   return lines.join('\n');
 }

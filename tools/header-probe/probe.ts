@@ -105,10 +105,15 @@ const loud = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
-interface IArgs {
+export interface IArgs {
   only?: string[];
   operation?: string;
   sequential: boolean;
+  /**
+   * The bogus Content-Type before the bogus Accept (the error corpus's
+   * phase 2); the known pair keeps its place.
+   */
+  contentTypeFirst?: boolean;
   compare?: [string, string];
 }
 
@@ -128,7 +133,7 @@ function parseArgs(argv: readonly string[]): IArgs {
 
 type ICall = ICallOn<AdtClient>;
 
-class Probe {
+export class Probe {
   readonly rows: IOperationRow[] = [];
   readonly names: string[] = [];
   private readonly direct: AdtClient;
@@ -218,11 +223,12 @@ class Probe {
     const known = knownPair(input.handler, input.member);
     if (!known) return undefined;
     const wanted = this.wanted(input.objectType, input.member);
+    const ordered = input.kinds ?? PROBE_KINDS;
     const kinds = plannedKinds(
       this.args,
       input.objectType,
       input.member,
-      input.kinds ?? PROBE_KINDS,
+      this.args.contentTypeFirst ? contentTypeFirst(ordered) : ordered,
     );
     if (!kinds.length) return undefined;
     const calls: ICall[] = [];
@@ -806,6 +812,18 @@ class Probe {
   }
 }
 
+/** The same probes, the bad Content-Type moved before the bad Accept. */
+function contentTypeFirst(kinds: readonly ProbeKind[]): ProbeKind[] {
+  const out = [...kinds];
+  const accept = out.indexOf('badAccept');
+  const contentType = out.indexOf('badContentType');
+  if (accept !== -1 && contentType !== -1 && contentType > accept) {
+    out[accept] = 'badContentType';
+    out[contentType] = 'badAccept';
+  }
+  return out;
+}
+
 const isSuccess = (status: number | undefined): boolean =>
   status !== undefined && status >= 200 && status < 300;
 
@@ -833,7 +851,7 @@ function writeReport(report: IProbeReport): string[] {
   return [`${base}.json`, `${base}.md`];
 }
 
-function randomRun(): string {
+export function randomRun(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let run = '';
   for (let i = 0; i < 4; i++)
@@ -942,10 +960,11 @@ async function main(): Promise<void> {
   if (interrupt.requested) process.exit(130);
 }
 
-main().then(
-  () => process.exit(0),
-  (error: unknown) => {
-    loud(`header probe: ${message(error)}`);
-    process.exit(1);
-  },
-);
+if (require.main === module)
+  main().then(
+    () => process.exit(0),
+    (error: unknown) => {
+      loud(`header probe: ${message(error)}`);
+      process.exit(1);
+    },
+  );

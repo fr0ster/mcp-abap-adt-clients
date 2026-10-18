@@ -40,7 +40,7 @@ import {
   stats,
   wireNote,
 } from '../../../../tools/header-probe/corpus';
-import { runCorpus } from '../../../../tools/header-probe/corpusRun';
+import { runCorpus, runFull } from '../../../../tools/header-probe/corpusRun';
 import { Interrupt } from '../../../../tools/header-probe/ledger';
 import {
   clientsOn,
@@ -55,6 +55,7 @@ import {
   LEGACY_PAIRS,
 } from '../../../../tools/header-probe/pairs';
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
+import { evidenceOfRows } from '../../../../tools/header-probe/writeCycle';
 
 const SAMPLE = path.resolve(
   __dirname,
@@ -1442,5 +1443,149 @@ describe('a poisoned write', () => {
     expect(fs.readFileSync(files[1], 'utf8')).toContain(
       'Poisoned writes whose object exists after them: POST /sap/bc/adt/probe/c1.',
     );
+  });
+});
+
+describe('the full run', () => {
+  it('phase 1 on the probe name, phase 2 on an existing object, one header corpus with the time of each phase', async () => {
+    const real = 'CL_REAL_ONE';
+    const classRead = `/sap/bc/adt/oo/classes/${real.toLowerCase()}`;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.url.startsWith(
+          '/sap/bc/adt/repository/informationsystem/search',
+        )
+      )
+        return {
+          status: 200,
+          body: `<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:name="${real}" adtcore:type="CLAS/OC"/></adtcore:objectReferences>`,
+        };
+      // The real class checks Accept; the probe name is not found.
+      if (request.url === classRead)
+        return request.headers.accept === PROBE_TYPE
+          ? {
+              status: 406,
+              body: NOT_ACCEPTABLE('application/vnd.sap.adt.oo.classes.v4+xml'),
+            }
+          : { status: 200, body: '<class/>' };
+      return { status: 404 };
+    });
+    const dir = tempDir();
+    const cycles: string[][] = [];
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: dir,
+      clientOptions: async () => ({}),
+      out: output().out,
+      writeCycle: async ({ unknown }) => {
+        cycles.push([...unknown]);
+        return { evidence: [], removals: [] };
+      },
+    });
+    expect(result.exitCode).toBe(0);
+    const file = result.file as NonNullable<typeof result.file>;
+    expect(file.phases.map((phase) => phase.name.split(':')[0])).toEqual([
+      'phase 1',
+      'phase 2',
+      'phase 2',
+    ]);
+    expect(file.totalMs).toBeGreaterThan(0);
+    const entry = file.entries.find(
+      (e) => e.endpoint === 'GET /sap/bc/adt/oo/classes/{name}',
+    );
+    expect(entry?.needs).toBe('accept');
+    expect(entry?.settledBy).toBe('phase 2');
+    expect(entry?.namedAccept).toEqual([
+      'application/vnd.sap.adt.oo.classes.v4+xml',
+    ]);
+    expect(file.counts.phase2.accept).toBeGreaterThan(
+      file.counts.phase1.accept,
+    );
+    expect(file.objects).toContainEqual({
+      handler: 'getClass()',
+      type: 'CLAS',
+      name: real,
+    });
+    // The writes still unknown went to the cycle, and only those.
+    expect(cycles).toHaveLength(1);
+    expect(cycles[0].every((key) => /— (POST|PUT|DELETE) /.test(key))).toBe(
+      true,
+    );
+    // Phase 2 reads are GETs only: nothing written on the real object.
+    expect(
+      system.seen.some(
+        (s) => s.url.includes(real.toLowerCase()) && s.method !== 'GET',
+      ),
+    ).toBe(false);
+    const names = fs.readdirSync(dir);
+    expect(names.some((n) => /^header-corpus-.*\.json$/.test(n))).toBe(true);
+    expect(
+      names.some((n) => /^corpus-clients-bogus-phase2-.*\.json$/.test(n)),
+    ).toBe(true);
+    expect(
+      fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
+    ).toContain('| accept |');
+  });
+
+  it('a 401 at the logon is the Oops, and nothing runs', async () => {
+    const { lines, out } = output();
+    const result = await runFull({
+      open: async () => {
+        throw Object.assign(new Error('refused'), { cause: { status: 401 } });
+      },
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(lines).toEqual(['Oops: no authorization (401)']);
+  });
+});
+
+describe('the write cycle evidence', () => {
+  it('judges the bad probes of the temporary objects, for the wanted members only', () => {
+    const answer = (
+      probe: 'known' | 'badAccept' | 'badContentType',
+      status: number,
+    ) => ({
+      probe,
+      sent: { accept: 'a', contentType: 'c' },
+      mode: 'batched',
+      requests: [{ method: 'POST', path: '/sap/bc/adt/oo/classes' }],
+      status,
+      supportedAccept:
+        status === 406 ? ['application/vnd.sap.adt.oo.classes.v4+xml'] : [],
+      supportedContentType: [],
+    });
+    const evidence = evidenceOfRows(
+      [
+        {
+          objectType: 'class',
+          member: 'create',
+          probes: [
+            answer('known', 201),
+            answer('badContentType', 415),
+            answer('badAccept', 406),
+          ],
+        },
+        {
+          objectType: 'class',
+          member: 'check',
+          probes: [answer('known', 200)],
+        },
+      ],
+      new Set(['getClass().create']),
+    );
+    expect(evidence).toHaveLength(1);
+    expect(evidence[0].endpoint).toBe('POST /sap/bc/adt/oo/classes');
+    expect(evidence[0].accept.verdict).toBe('checked');
+    expect(evidence[0].contentType.verdict).toBe('checked');
+    expect(evidence[0].namedAccept).toEqual([
+      'application/vnd.sap.adt.oo.classes.v4+xml',
+    ]);
   });
 });

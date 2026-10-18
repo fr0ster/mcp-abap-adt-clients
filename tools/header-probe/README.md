@@ -104,13 +104,15 @@ not in the npm package.
 ## Prepare
 
 As for the header probe: `.env` with the SAP connection and
-`src/__tests__/helpers/test-config.yaml`, of which only `environment.system`
-is read. No package and no transport are needed: nothing is created on
-purpose.
+`src/__tests__/helpers/test-config.yaml`. The single runs (`--from`) read only
+`environment.system`. The full run's phase 2 also needs `default_package` and
+`default_transport`: its write cycle creates temporary objects there and
+deletes them again.
 
 ## Run
 
 ```bash
+npm run header:discovery:next                     # the full run: the system's header corpus
 npm run header:discovery:next -- --from discovery --headers corpus
 npm run header:discovery:next -- --from discovery --headers none
 npm run header:discovery:next -- --from discovery --headers bogus
@@ -133,6 +135,39 @@ system named in any of the runs; the header corpus — per endpoint, side by
 side, what discovery (or the pair table) lists and what the 406s and 415s of
 the none and bogus runs named; and, for each bogus run, what each endpoint
 needs.
+
+## The full run
+
+`npm run header:discovery:next` with no flags gives the connected system's
+header corpus, everything batched and poisoned envelopes split:
+
+1. **The authorization check** (below).
+2. **Phase 1, the probe name:** discovery and clients, each in corpus, none
+   and bogus (corpus for the comparison column). It settles every endpoint
+   whose `needs` it can.
+3. **Phase 2, real objects, for the clients endpoints still `unknown` only:**
+   - **reads** (`GET` with the object's name in the path): one existing
+     object per object type, found read-only by the repository's quick search
+     (`query=*`, the first hit), is named in place of the probe name; each
+     such read goes with a bogus Accept, then with none, in envelopes.
+     Nothing is created. A handler with no search type, or a type the search
+     finds nothing of, stays unknown with that reason.
+   - **writes**: the header probe's temporary-object cycle, only for the
+     object types whose write members are still unknown (the modern client's;
+     the legacy client's writes stay as phase 1 left them). The bogus
+     Content-Type goes first, then the bogus Accept; the ledger holds every
+     object before its create is sent, locks are released in a `finally`, the
+     state is read after every write probe.
+   What phase 2 cannot settle stays `unknown`, with its reason.
+4. **`header-corpus-<timestamp>.json` and `.md`**, one per run of the system:
+   per endpoint (method, path pattern, `_action`) its `needs`, the Accept and
+   Content-Type values the system named, the Content-Type discovery lists, the
+   pair table's pairs, which phase settled it, and the evidence (status and
+   raw text); the time of each phase and the total; the `needs` counts after
+   phase 1 and after phase 2; phase 2's objects; what was left behind. The raw
+   corpora of every run are written beside it as usual. Verdicts of several
+   members on one endpoint merge: `checked` wins over `not checked`, which
+   wins over `unknown`.
 
 ## What it does
 

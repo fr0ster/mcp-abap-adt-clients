@@ -191,41 +191,61 @@ const PROBE_TEXT = 'Error corpus probe';
  * answers every `…Name`, `name` and `…Id` with the probe name, and a string
  * where a string is read. Never thenable.
  */
-export const UNIVERSAL: unknown = new Proxy(
-  {},
-  {
-    get(_target, key) {
-      if (key === Symbol.toPrimitive) return () => PROBE_NAME;
-      if (typeof key !== 'string') return undefined;
-      if (key === 'then' || key === 'toJSON') return undefined;
-      if (key === 'packageName' || key === 'superPackage') return PROBE_PACKAGE;
-      if (key === 'name' || key.endsWith('Name') || key.endsWith('_name'))
-        return PROBE_NAME;
-      if (key === 'id' || key.endsWith('Id') || key.endsWith('_id'))
-        return PROBE_NAME;
-      if (['description', 'msgtext', 'text', 'label'].includes(key))
-        return PROBE_TEXT;
-      if (['source', 'sourceCode', 'content', 'xml', 'code'].includes(key))
-        return FIXED_TEXT;
-      if (key === 'msgno') return '001';
-      // A name the address needs, where a type is part of it.
-      if (key === 'transportNumber') return PROBE_NAME;
-      if (key === 'enhancementType') return 'enhoxhb';
-      if (key === 'object_type' || key === 'objectType') return 'program';
-      if (key === 'toString' || key === 'valueOf') return () => PROBE_NAME;
-      const fromString = (PROBE_NAME as unknown as Record<string, unknown>)[
-        key
-      ];
-      if (typeof fromString === 'function') return fromString.bind(PROBE_NAME);
-      return undefined;
+function universalFor(objectName: string): unknown {
+  return new Proxy(
+    {},
+    {
+      get(_target, key) {
+        if (key === Symbol.toPrimitive) return () => objectName;
+        if (typeof key !== 'string') return undefined;
+        if (key === 'then' || key === 'toJSON') return undefined;
+        if (key === 'packageName' || key === 'superPackage')
+          return PROBE_PACKAGE;
+        if (key === 'name' || key.endsWith('Name') || key.endsWith('_name'))
+          return objectName;
+        if (key === 'id' || key.endsWith('Id') || key.endsWith('_id'))
+          return objectName;
+        if (['description', 'msgtext', 'text', 'label'].includes(key))
+          return PROBE_TEXT;
+        if (['source', 'sourceCode', 'content', 'xml', 'code'].includes(key))
+          return FIXED_TEXT;
+        if (key === 'msgno') return '001';
+        // A name the address needs, where a type is part of it.
+        if (key === 'transportNumber') return objectName;
+        if (key === 'enhancementType') return 'enhoxhb';
+        if (key === 'object_type' || key === 'objectType') return 'program';
+        if (key === 'toString' || key === 'valueOf') return () => objectName;
+        const fromString = (objectName as unknown as Record<string, unknown>)[
+          key
+        ];
+        if (typeof fromString === 'function')
+          return fromString.bind(objectName);
+        return undefined;
+      },
     },
-  },
-);
+  );
+}
+
+const universals = new Map<string, unknown>();
+
+/** The universal value naming `name`: what a member gets in place of every config and name. */
+export function universal(name: string): unknown {
+  let value = universals.get(name);
+  if (value === undefined) {
+    value = universalFor(name);
+    universals.set(name, value);
+  }
+  return value;
+}
+
+export const UNIVERSAL: unknown = universal(PROBE_NAME);
 
 /** The options a member is given: the headers, the strategy's reading. */
 export interface IMemberOptions {
   headers?: IAdtHeaders;
   analyse: IAnalyse;
+  /** The object every name argument names: the probe name unless given (a real object, phase 2). */
+  name?: string;
 }
 
 /** What one argument of a member gets, or why the member cannot be called without a real object. */
@@ -245,7 +265,7 @@ export function argumentFor(
     };
   if (lower === 'objects' || lower.endsWith('objects'))
     return { value: [{ type: 'PROG/P', name: PROBE_NAME }] };
-  return { value: UNIVERSAL };
+  return { value: options.name ? universal(options.name) : UNIVERSAL };
 }
 
 /** How many requests one recording may issue before it is stopped (a polling member). */

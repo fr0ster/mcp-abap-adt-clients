@@ -28,11 +28,13 @@ import {
   authorizationVerdict,
   type BogusHeader,
   bogusHeaders,
+  buildHeaderCorpus,
   classifyNeeds,
   contentTypeNotSent,
   discoveryProbes,
   dumpText,
   emptyNamed,
+  evidenceOf,
   FIXED_TEXT,
   fakeBody,
   type HeadersMode,
@@ -40,12 +42,16 @@ import {
   type ICorpus,
   type ICorpusRow,
   type IDiscoveryProbe,
+  type IEvidence,
+  type IHeaderCorpusFile,
   type ISplit,
   isWrite,
+  needsCounts,
   PROBE_NAME,
   parseDiscovery,
   readCorpusAnswer,
   renderCorpusMarkdown,
+  renderHeaderCorpus,
   rowKey,
   type Source,
   wireNote,
@@ -67,7 +73,7 @@ import {
   recordMembers,
   UNIVERSAL,
 } from './members';
-import { type IRemoval, PROBE_TYPE } from './record';
+import { endpointKey, type IRemoval, PROBE_TYPE } from './record';
 
 /** How many probes go in one envelope (each write probe brings its read). */
 export const ENVELOPE_PROBES = 25;
@@ -935,7 +941,7 @@ export function writeCorpus(corpus: ICorpus, outDir: string): string[] {
   fs.mkdirSync(outDir, { recursive: true });
   const base = path.join(
     outDir,
-    `corpus-${corpus.source}-${corpus.headers}-${stamp()}`,
+    `corpus-${corpus.source}-${corpus.headers}${corpus.phase ? `-phase${corpus.phase}` : ''}-${stamp()}`,
   );
   fs.writeFileSync(`${base}.json`, `${JSON.stringify(corpus, null, 2)}\n`);
   fs.writeFileSync(`${base}.md`, renderCorpusMarkdown(corpus));
@@ -1075,4 +1081,443 @@ async function runOn(
       out.loud(`!!!   ${removal.label}: ${removal.detail}`);
   }
   return { exitCode: input.interrupt.requested ? 130 : 0, files, corpus };
+}
+
+// --- phase 2: existing objects for the reads still unknown -------------------
+
+/**
+ * The repository search type of each handler whose objects a phase-2 read
+ * can name with one existing object's name; the legacy client's the same.
+ */
+export const SEARCH_TYPES: Readonly<Record<string, string>> = {
+  'getClass()': 'CLAS',
+  'getLocalTestClass()': 'CLAS',
+  'getLocalTypes()': 'CLAS',
+  'getLocalDefinitions()': 'CLAS',
+  'getLocalMacros()': 'CLAS',
+  'getProgram()': 'PROG',
+  'getInclude()': 'PROG/I',
+  'getInterface()': 'INTF',
+  'getDomain()': 'DOMA',
+  'getDataElement()': 'DTEL',
+  'getStructure()': 'TABL/DS',
+  'getTable()': 'TABL/DT',
+  'getTableType()': 'TTYP',
+  'getDdl()': 'DDLS',
+  'getFunctionGroup()': 'FUGR',
+  'getPackage()': 'DEVC',
+  'getMessageClass()': 'MSAG',
+  'getAccessControl()': 'DCLS',
+  'getTransformation()': 'XSLT',
+  'getServiceDefinition()': 'SRVD',
+  'getServiceBinding()': 'SRVB',
+  'getBehaviorDefinition()': 'BDEF',
+  'getMetadataExtension()': 'DDLX',
+  'getEnhancement()': 'ENHO',
+  'getAuthorizationField()': 'AUTH',
+};
+
+const modern = (handler: string) => handler.replace(/^legacy /, '');
+
+/** The first object name a quick search answered. */
+export function firstHitName(body: string): string | undefined {
+  const marker = 'adtcore:name="';
+  const at = body.indexOf(marker);
+  if (at === -1) return undefined;
+  const end = body.indexOf('"', at + marker.length);
+  return end === -1 ? undefined : body.slice(at + marker.length, end);
+}
+
+export interface IRealReadsInput {
+  connection: IAbapConnection;
+  clientOptions: ClientOptions;
+  interrupt: Interrupt;
+  out: IOutput;
+  outDir: string;
+  /** The needs keys (`handler.member — endpoint`) phase 1 left unknown. */
+  unknown: ReadonlySet<string>;
+  envelopeProbes?: number;
+}
+
+/**
+ * Phase 2's reads: every GET member still unknown is sent again on an
+ * existing object of its type, found read-only by the repository's quick
+ * search — once with a bogus Accept, once with none, in envelopes. Nothing
+ * is created; nothing needs removing.
+ */
+export async function runRealReads(input: IRealReadsInput): Promise<{
+  evidence: IEvidence[];
+  objects: IHeaderCorpusFile['objects'];
+  files: string[];
+}> {
+  const { members } = await recordMembers();
+  const candidates = members.filter((member) => {
+    const [request] = member.requests;
+    return (
+      member.call &&
+      !member.skipped &&
+      member.requests.length === 1 &&
+      request.method === 'GET' &&
+      request.path.includes('{name}') &&
+      input.unknown.has(
+        `${member.handler}.${member.member} — ${endpointKey(request)}`,
+      )
+    );
+  });
+  const objects: IHeaderCorpusFile['objects'] = [];
+  const handlers = [...new Set(candidates.map((member) => member.handler))];
+  const types = new Map<string, string>();
+  for (const handler of handlers) {
+    const type = SEARCH_TYPES[modern(handler)];
+    if (type) types.set(handler, type);
+    else
+      objects.push({
+        handler,
+        reason:
+          'no repository search type: its objects cannot be named by one name',
+      });
+  }
+  const direct: ITarget = { base: input.connection, parts: false };
+  const onBatch = (batch: IAbapConnection): ITarget => ({
+    base: batch,
+    parts: true,
+  });
+  const plainClients = (on: ITarget) =>
+    clientsOn(traced(on.base, { parts: on.parts }), input.clientOptions);
+  // One search per type, read-only, in one envelope.
+  const distinct = [...new Set(types.values())];
+  const searches = await runCalls({
+    calls: distinct.map(
+      (type) => (on: ITarget, analyse: IAnalyse) =>
+        Promise.resolve(
+          (
+            plainClients(on).adt.getUtils() as unknown as {
+              search: (criteria: unknown, options: unknown) => Promise<unknown>;
+            }
+          ).search(
+            { query: '*', objectType: type, maxResults: 1 },
+            { analyse },
+          ),
+        ),
+    ),
+    batched: true,
+    connection: input.connection,
+    direct,
+    onBatch,
+    interrupt: input.interrupt,
+  });
+  const names = new Map<string, string | undefined>();
+  for (const [index, type] of distinct.entries())
+    names.set(type, firstHitName(String(searches[index]?.wire?.data ?? '')));
+  for (const [handler, type] of types) {
+    const name = names.get(type);
+    objects.push(
+      name
+        ? { handler, type, name }
+        : { handler, type, reason: 'the search found no object of this type' },
+    );
+  }
+  const specs = new Map(
+    handlerSpecs(plainClients(direct)).map((spec) => [spec.label, spec]),
+  );
+  const meter: IMeter = { envelopes: [] };
+  const corpora: ICorpus[] = [];
+  for (const mode of ['bogus', 'none'] as const) {
+    const corpus: ICorpus = {
+      source: 'clients',
+      headers: mode,
+      phase: 2,
+      startedAt: new Date().toISOString(),
+      rows: [],
+      removals: [],
+      envelopes: meter.envelopes,
+    };
+    const planned: IPlanned<ITarget>[] = [];
+    for (const member of candidates) {
+      const type = types.get(member.handler);
+      const name = type ? names.get(type) : undefined;
+      const spec = specs.get(member.handler);
+      const call = member.call;
+      if (!name || !spec || !call) continue;
+      const [request] = member.requests;
+      const row: ICorpusRow = {
+        source: 'clients',
+        group: member.handler,
+        label: member.member,
+        endpoint: request,
+        requests: member.requests,
+        onWire: [],
+        named: emptyNamed(),
+        ...(mode === 'bogus' ? { bogus: 'accept' as const } : {}),
+        ...(member.pair ? { pair: { ...member.pair } } : {}),
+        asked: askedFor(
+          mode,
+          member.pair,
+          false,
+          mode === 'bogus' ? 'accept' : undefined,
+        ),
+      };
+      corpus.rows.push(row);
+      planned.push({
+        row,
+        call: (on, analyse) =>
+          call(
+            spec.of(
+              clientsOn(
+                traced(on.base, {
+                  shape: headerShape(
+                    mode,
+                    on.parts,
+                    mode === 'bogus' ? 'accept' : undefined,
+                  ),
+                  parts: on.parts,
+                }),
+                input.clientOptions,
+              ),
+            ) as never,
+            { headers: headersFor(mode, member), analyse, name },
+          ),
+      });
+    }
+    if (planned.length) {
+      input.out.progress(
+        `phase 2 reads, ${mode}: ${planned.length} probes on existing objects`,
+      );
+      const run = new Run<ITarget>(
+        input.connection,
+        mode,
+        direct,
+        onBatch,
+        input.interrupt,
+        input.out,
+        meter,
+        false,
+        input.envelopeProbes ?? ENVELOPE_PROBES,
+      );
+      try {
+        await run.all(planned);
+      } finally {
+        corpus.splits = run.splits;
+      }
+    }
+    corpus.finishedAt = new Date().toISOString();
+    corpora.push(corpus);
+  }
+  const [bogus, none] = corpora;
+  bogus.needs = classifyNeeds(bogus.rows, none.rows);
+  const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
+  return { evidence: evidenceOf(bogus.needs, 'clients', 2), objects, files };
+}
+
+// --- the full run: one command, the system's header corpus -------------------
+
+export interface IWriteCycleInput {
+  connection: IAbapConnection;
+  clientOptions: ClientOptions;
+  interrupt: Interrupt;
+  /** The needs keys (`handler.member — endpoint`) of the writes still unknown. */
+  unknown: ReadonlySet<string>;
+}
+
+export interface IWriteCycleResult {
+  evidence: IEvidence[];
+  removals: IRemoval[];
+  error?: string;
+}
+
+export interface IFullRunInput
+  extends Omit<ICorpusRunInput, 'source' | 'mode' | 'connection'> {
+  /**
+   * Phase 2's writes: the temporary-object cycle for the write members still
+   * unknown. Given by the command line, which holds the test config.
+   */
+  writeCycle?: (input: IWriteCycleInput) => Promise<IWriteCycleResult>;
+}
+
+const PHASE1: readonly { source: Source; mode: HeadersMode }[] = [
+  { source: 'discovery', mode: 'corpus' },
+  { source: 'discovery', mode: 'none' },
+  { source: 'discovery', mode: 'bogus' },
+  { source: 'clients', mode: 'corpus' },
+  { source: 'clients', mode: 'none' },
+  { source: 'clients', mode: 'bogus' },
+];
+
+/**
+ * The full run: the authorization check; phase 1, every source in every
+ * mode on the probe name; phase 2, for the endpoints still unknown only,
+ * existing objects for the reads and the temporary-object cycle for the
+ * writes; then one header corpus file, with each phase's time.
+ */
+export async function runFull(
+  input: IFullRunInput,
+): Promise<{ exitCode: number; files: string[]; file?: IHeaderCorpusFile }> {
+  const started = performance.now();
+  const startedAt = new Date().toISOString();
+  const { out } = input;
+  if (!input.open) throw new Error('runFull needs open()');
+  let connection: IAbapConnection;
+  try {
+    connection = await input.open();
+  } catch (error) {
+    const status = statusOfError(error);
+    if (status === 401 || status === 403) {
+      out.progress(`Oops: no authorization (${status})`);
+      return { exitCode: 2, files: [] };
+    }
+    throw error;
+  }
+  try {
+    const authorized = await readDiscovery(connection);
+    if (!authorized.ok) {
+      out.progress(authorized.line);
+      return { exitCode: authorized.exitCode, files: [] };
+    }
+    const phases: IHeaderCorpusFile['phases'] = [];
+    const timed = async <R>(name: string, body: () => Promise<R>) => {
+      const at = performance.now();
+      try {
+        return await body();
+      } finally {
+        phases.push({ name, ms: performance.now() - at });
+      }
+    };
+    const files: string[] = [];
+    const corpora = new Map<string, ICorpus>();
+    let error: string | undefined;
+    await timed('phase 1: the probe name, every source and mode', async () => {
+      for (const { source, mode } of PHASE1) {
+        if (input.interrupt.requested) break;
+        out.progress(`phase 1: ${source} ${mode}`);
+        const result = await runOn(connection, { ...input, source, mode });
+        files.push(...result.files);
+        if (result.corpus) corpora.set(`${source} ${mode}`, result.corpus);
+        if (result.corpus?.error) error ??= result.corpus.error;
+      }
+    });
+    const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
+    const needs1 = {
+      discovery: classifyNeeds(
+        rowsOf('discovery bogus'),
+        rowsOf('discovery none'),
+      ),
+      clients: classifyNeeds(rowsOf('clients bogus'), rowsOf('clients none')),
+    };
+    const evidence: IEvidence[] = [
+      ...evidenceOf(needs1.discovery, 'discovery', 1),
+      ...evidenceOf(needs1.clients, 'clients', 1),
+    ];
+    const unknown = needs1.clients.filter((entry) => entry.needs === 'unknown');
+    const unknownReads = new Set(
+      unknown
+        .filter((entry) => entry.endpoint.includes(' — GET '))
+        .map((entry) => entry.endpoint),
+    );
+    const unknownWrites = new Set(
+      unknown
+        .filter((entry) => /— (POST|PUT|DELETE) /.test(entry.endpoint))
+        .map((entry) => entry.endpoint),
+    );
+    let objects: IHeaderCorpusFile['objects'] = [];
+    let removals: IRemoval[] = [];
+    if (!input.interrupt.requested && unknownReads.size)
+      await timed(
+        `phase 2: reads on existing objects (${unknownReads.size} unknown)`,
+        async () => {
+          const reads = await runRealReads({
+            connection,
+            clientOptions: await input.clientOptions(connection),
+            interrupt: input.interrupt,
+            out,
+            outDir: input.outDir,
+            unknown: unknownReads,
+            ...(input.envelopeProbes
+              ? { envelopeProbes: input.envelopeProbes }
+              : {}),
+          });
+          evidence.push(...reads.evidence);
+          objects = reads.objects;
+          files.push(...reads.files);
+        },
+      );
+    if (!input.interrupt.requested && unknownWrites.size && input.writeCycle) {
+      const cycle = input.writeCycle;
+      await timed(
+        `phase 2: writes on temporary objects (${unknownWrites.size} unknown)`,
+        async () => {
+          const writes = await cycle({
+            connection,
+            clientOptions: await input.clientOptions(connection),
+            interrupt: input.interrupt,
+            unknown: unknownWrites,
+          });
+          evidence.push(...writes.evidence);
+          removals = writes.removals;
+          if (writes.error) error ??= writes.error;
+        },
+      );
+    }
+    const discoveryContentType = new Map<string, string[]>();
+    for (const collection of corpora.get('discovery corpus')?.collections ?? [])
+      if (collection.accept.length)
+        discoveryContentType.set(`POST ${collection.href}`, collection.accept);
+    const pairs = new Map<string, string[]>();
+    for (const row of rowsOf('clients corpus')) {
+      if (!row.endpoint || !row.pair) continue;
+      const key = endpointKey(row.endpoint);
+      const text = `${row.group}.${row.label}: ${[
+        row.pair.accept ? `Accept ${row.pair.accept}` : '',
+        row.pair.contentType ? `Content-Type ${row.pair.contentType}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ')}`;
+      pairs.set(key, [...new Set([...(pairs.get(key) ?? []), text])]);
+    }
+    const extras = { discoveryContentType, pairs };
+    const entries = buildHeaderCorpus(evidence, extras);
+    const file: IHeaderCorpusFile = {
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      phases,
+      totalMs: performance.now() - started,
+      counts: {
+        phase1: needsCounts(
+          buildHeaderCorpus(
+            evidence.filter((item) => item.phase === 1),
+            extras,
+          ),
+        ),
+        phase2: needsCounts(entries),
+      },
+      entries,
+      corpora: files,
+      removals,
+      objects,
+      ...(input.interrupt.requested
+        ? { error: 'interrupted (SIGINT)' }
+        : error
+          ? { error }
+          : {}),
+    };
+    fs.mkdirSync(input.outDir, { recursive: true });
+    const base = path.join(input.outDir, `header-corpus-${stamp()}`);
+    fs.writeFileSync(`${base}.json`, `${JSON.stringify(file, null, 2)}\n`);
+    fs.writeFileSync(`${base}.md`, renderHeaderCorpus(file));
+    for (const written of [`${base}.json`, `${base}.md`]) out.progress(written);
+    const left = removals.filter((removal) => !removal.removed);
+    if (left.length) {
+      out.loud(
+        `\n!!! ${left.length} temporary object(s) could not be removed — delete them by hand:`,
+      );
+      for (const removal of left)
+        out.loud(`!!!   ${removal.label}: ${removal.detail}`);
+    }
+    return {
+      exitCode: input.interrupt.requested ? 130 : 0,
+      files: [...files, `${base}.json`, `${base}.md`],
+      file,
+    };
+  } finally {
+    await input.close?.(connection);
+  }
 }
