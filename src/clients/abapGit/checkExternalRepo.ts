@@ -1,16 +1,17 @@
-import type { IAbapGitExternalRepoCredentials } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapGitExternalRepoCredentials,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
-  CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
-} from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { buildExternalRepoInfoBody } from './xmlBuilder';
 
 export async function checkExternalRepo(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: IAbapGitExternalRepoCredentials,
 ): Promise<IAdtWireResponse> {
   // Phase Z confirmed: request/response use DIFFERENT media-type families.
@@ -20,10 +21,7 @@ export async function checkExternalRepo(
     method: 'POST',
     url: '/sap/bc/adt/abapgit/externalrepoinfo',
     timeout: 0,
-    headers: {
-      'Content-Type': CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
-      Accept: ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
-    },
+    headers: requestHeaders(headers),
     data: buildExternalRepoInfoBody(args),
   });
 }

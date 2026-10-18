@@ -36,6 +36,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -338,7 +339,9 @@ async function main(): Promise<void> {
     const b = await createTestConnection(logger);
     try {
       const clsA = new AdtClient(a, logger).getClass();
-      const created = await clsA.create(config);
+      const created = await clsA.create(config, {
+        headers: headersOf(clsA, 'create'),
+      });
       say(
         created.ok
           ? '  first   create    ok'
@@ -346,7 +349,9 @@ async function main(): Promise<void> {
       );
       await contend(clsA, new AdtClient(b, logger).getClass(), config);
       if (!keep) {
-        const deleted = await clsA.delete(config);
+        const deleted = await clsA.delete(config, {
+          headers: headersOf(clsA, 'delete'),
+        });
         say(
           deleted.ok
             ? `
@@ -366,7 +371,9 @@ ${CLASS_NAME} NOT deleted: ${deleted.getError().message}`,
   const first = await createTestConnection(logger);
   try {
     const cls = new AdtClient(first, logger).getClass();
-    const created = await cls.create(config);
+    const created = await cls.create(config, {
+      headers: headersOf(cls, 'create'),
+    });
     say(
       created.ok
         ? '  first   create    ok'
@@ -389,7 +396,9 @@ ${CLASS_NAME} NOT deleted: ${deleted.getError().message}`,
         : '\nthe second session was refused — see the step above',
     );
     if (!keep) {
-      const deleted = await cls.delete(config);
+      const deleted = await cls.delete(config, {
+        headers: headersOf(cls, 'delete'),
+      });
       say(
         deleted.ok
           ? `\n${CLASS_NAME} deleted`

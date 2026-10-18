@@ -5,13 +5,14 @@
  * This preserves all SAP-managed fields that would be lost if XML were built from scratch.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_DOMAIN } from '../../constants/contentTypes';
 import { DOMAIN } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateDomainParams } from './types';
 
 /**
@@ -32,6 +33,7 @@ import type { IUpdateDomainParams } from './types';
  */
 export async function updateDomain(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: IUpdateDomainParams,
   document: string,
   lockHandle?: string,
@@ -43,9 +45,6 @@ export async function updateDomain(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: {
-      Accept: ACCEPT_DOMAIN,
-      'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
-    },
+    headers: requestHeaders(headers),
   });
 }

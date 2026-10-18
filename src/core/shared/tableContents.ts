@@ -9,12 +9,14 @@
  * This function works only for on-premise systems with basic authentication.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DATA_PREVIEW } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IGetTableContentsParams } from './types';
 
 const ACCEPT_HEADER = ACCEPT_DATA_PREVIEW;
@@ -57,6 +59,7 @@ export async function getTableColumns(
  */
 export async function getTableContents(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IGetTableContentsParams,
 ): Promise<IAdtWireResponse> {
   const tableName = params.table_name.toUpperCase();
@@ -69,9 +72,6 @@ export async function getTableContents(
     // read as "do not abort". How long to wait is the caller's.
     timeout: 0,
     data: params.sql_query,
-    headers: {
-      Accept: ACCEPT_HEADER,
-      'Content-Type': 'text/plain; charset=utf-8',
-    },
+    headers: requestHeaders(headers),
   });
 }

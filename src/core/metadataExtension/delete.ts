@@ -4,11 +4,13 @@
  * Endpoint: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { METADATA_EXTENSION } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Delete a metadata extension
@@ -26,20 +28,17 @@ import { METADATA_EXTENSION } from '../../endpoints/objects';
  */
 export async function deleteMetadataExtension(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   transportRequest: string | undefined,
 ): Promise<IAdtWireResponse> {
   const url = `${METADATA_EXTENSION.uri(name)}${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
-
-  const headers = {
-    Accept: 'application/xml',
-  };
 
   return connection.makeAdtRequest({
     method: 'DELETE',
     url,
     timeout: 0,
     data: undefined,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

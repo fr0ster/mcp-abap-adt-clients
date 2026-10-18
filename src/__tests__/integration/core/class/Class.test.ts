@@ -18,6 +18,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -133,10 +134,13 @@ describe('Class (using AdtClient)', () => {
               try {
                 // Use BaseTester's config resolver to get transport request (allows overriding global params)
                 const transportRequest = tester.getTransportRequest();
-                await cleanupClient.getClass().delete({
-                  className,
-                  transportRequest,
-                });
+                await cleanupClient.getClass().delete(
+                  {
+                    className,
+                    transportRequest,
+                  },
+                  { headers: headersOf(cleanupClient.getClass(), 'delete') },
+                );
                 await new Promise((resolve) => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
                 testsLogger.warn(

@@ -1,5 +1,4 @@
 import { withCallTimeout } from '../../utils/callTimeout';
-import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   getClassEnhancementElements,
   getClassEnhancementOptions,
@@ -34,6 +33,7 @@ import type {
   IAdtDeletable,
   IAdtEnhancementHost,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -48,19 +48,15 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
-import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
-import { checkClass, checkClassLocalTestClass } from './check';
+import { checkClass } from './check';
 import { create as createClass } from './create';
 import { checkDeletion, deleteClass } from './delete';
-import { lockClass } from './lock';
 import { getClassSource } from './read';
 import { activateClassTestClasses } from './testclasses';
 import { classDocuments, type IClassConfig, type IClassResults } from './types';
-import { unlockClass } from './unlock';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
 
@@ -170,7 +166,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IClassConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -203,6 +199,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       () =>
         createClass(
           connection,
+          options.headers,
           {
             class_name: config.className as string,
             package_name: config.packageName as string,
@@ -220,7 +217,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
             template_xml: config.classTemplate,
           },
           this.logger,
-          this.contentTypes,
         ),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
@@ -266,7 +262,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -292,11 +288,11 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       () =>
         updateClass(
           connection,
+          options.headers,
           config.className as string,
           source as string,
           options?.lockHandle,
           config.transportRequest,
-          this.contentTypes?.sourceArtifactContentType(),
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       options?.analyse,
@@ -308,14 +304,14 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
@@ -331,7 +327,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -341,7 +337,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // delete, and it leaves the session mode alone.
     return answering(
       () =>
-        deleteClass(connection, {
+        deleteClass(connection, options.headers, {
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
@@ -355,8 +351,8 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -373,6 +369,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       () =>
         checkClass(
           connection,
+          options.headers,
           config.className as string,
           version,
           config.source,

@@ -84,6 +84,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersFor, headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -255,12 +256,15 @@ async function main(): Promise<void> {
       say('  already there');
     } else {
       say(`  absent — creating it in ${packageName}`);
-      const created = await client.getFunctionGroup().create({
-        functionGroupName: group,
-        packageName,
-        description: 'Probe: is activation synchronous',
-        transportRequest,
-      });
+      const created = await client.getFunctionGroup().create(
+        {
+          functionGroupName: group,
+          packageName,
+          description: 'Probe: is activation synchronous',
+          transportRequest,
+        },
+        { headers: headersOf(client.getFunctionGroup(), 'create') },
+      );
       say(`  create ok=${created.ok}`);
       if (!created.ok) {
         say(`  create refused: ${created.getError().message}`);
@@ -284,12 +288,15 @@ async function main(): Promise<void> {
       say(`  ${include} is already there and is left exactly as it is`);
       say('  (nothing is written into an include this probe did not create)');
     } else {
-      const madeInclude = await client.getFunctionInclude().create({
-        functionGroupName: group,
-        includeName: include,
-        description: 'Probe include',
-        transportRequest,
-      });
+      const madeInclude = await client.getFunctionInclude().create(
+        {
+          functionGroupName: group,
+          includeName: include,
+          description: 'Probe include',
+          transportRequest,
+        },
+        { headers: headersOf(client.getFunctionInclude(), 'create') },
+      );
       // **Only a create that succeeded earns the right to delete.** Setting
       // this before the call meant a refused create still armed the cleanup,
       // and the cleanup would then remove an include this run did not make.
@@ -321,7 +328,11 @@ async function main(): Promise<void> {
     let wire: Awaited<ReturnType<typeof activateFunctionGroup>> | undefined;
     let threw: Error | undefined;
     try {
-      wire = await activateFunctionGroup(connection, group);
+      wire = await activateFunctionGroup(
+        connection,
+        headersFor('AdtFunctionGroup.activate'),
+        group,
+      );
     } catch (error) {
       threw = error as Error;
     }
@@ -375,7 +386,11 @@ async function main(): Promise<void> {
       for (const entry of rawEntries(await inactiveXml(connection), group)) {
         say(`  ${entry.replace(/\s+/g, ' ')}`);
       }
-      const again = await activateFunctionGroup(connection, group);
+      const again = await activateFunctionGroup(
+        connection,
+        headersFor('AdtFunctionGroup.activate'),
+        group,
+      );
       const body = String(again.data ?? '');
       say(`  second activation: status ${again.status}`);
       say(`  body: ${body.replace(/\s+/g, ' ').slice(0, 600)}`);
@@ -395,7 +410,12 @@ async function main(): Promise<void> {
         return { type, name };
       });
       say(`  sending: ${refs.map((r) => `${r.type} ${r.name}`).join(', ')}`);
-      const runWire = await activateObjectsGroup(connection, refs, false);
+      const runWire = await activateObjectsGroup(
+        connection,
+        headersFor('AdtUtils.activateObjectsGroup'),
+        refs,
+        false,
+      );
       const runHeaders = (runWire.headers ?? {}) as Record<string, string>;
       say(`  status ${runWire.status}`);
       say(`  Location: ${runHeaders.location ?? '(none)'}`);
@@ -466,18 +486,25 @@ async function main(): Promise<void> {
       const probeInclude = `L${group}Z98`.toUpperCase();
       for (let n = 1; n <= CYCLES; n += 1) {
         const before = new Set(await inactiveNames(connection));
-        const made = await client.getFunctionInclude().create({
-          functionGroupName: group,
-          includeName: probeInclude,
-          description: 'Probe include (created and deleted per cycle)',
-          transportRequest,
-        });
+        const made = await client.getFunctionInclude().create(
+          {
+            functionGroupName: group,
+            includeName: probeInclude,
+            description: 'Probe include (created and deleted per cycle)',
+            transportRequest,
+          },
+          { headers: headersOf(client.getFunctionInclude(), 'create') },
+        );
         const appeared = (await inactiveNames(connection)).filter(
           (name) => !before.has(name),
         );
 
         const t0 = Date.now();
-        const answer = await activateFunctionGroup(connection, group);
+        const answer = await activateFunctionGroup(
+          connection,
+          headersFor('AdtFunctionGroup.activate'),
+          group,
+        );
         const postMs = Date.now() - t0;
         const executed =
           /activationExecuted="([^"]*)"/.exec(String(answer.data ?? ''))?.[1] ??
@@ -530,7 +557,10 @@ async function main(): Promise<void> {
         // is to activate what it wrote, not the container.
         const includeAnswer = await client
           .getFunctionInclude()
-          .activate({ functionGroupName: group, includeName: probeInclude });
+          .activate(
+            { functionGroupName: group, includeName: probeInclude },
+            { headers: headersOf(client.getFunctionInclude(), 'activate') },
+          );
         const afterInclude = stillListed(
           await inactiveNames(connection),
           group,
@@ -551,17 +581,24 @@ async function main(): Promise<void> {
         // under that name, and deleting it would be this probe destroying an
         // object it never owned.
         if (made.ok) {
-          const removed = await client.getFunctionInclude().delete({
-            functionGroupName: group,
-            includeName: probeInclude,
-            transportRequest,
-          });
+          const removed = await client.getFunctionInclude().delete(
+            {
+              functionGroupName: group,
+              includeName: probeInclude,
+              transportRequest,
+            },
+            { headers: headersOf(client.getFunctionInclude(), 'delete') },
+          );
           if (!removed.ok) {
             say(
               `           cleanup: delete refused — ${removed.getError().message}`,
             );
           }
-          await activateFunctionGroup(connection, group);
+          await activateFunctionGroup(
+            connection,
+            headersFor('AdtFunctionGroup.activate'),
+            group,
+          );
         } else {
           say('           cleanup: nothing to remove, the create was refused');
         }
@@ -638,17 +675,24 @@ async function main(): Promise<void> {
   } finally {
     if (weCreatedTheInclude) {
       say(`[cleanup] removing ${include}, which this run created`);
-      const removed = await client.getFunctionInclude().delete({
-        functionGroupName: group,
-        includeName: include,
-        transportRequest,
-      });
+      const removed = await client.getFunctionInclude().delete(
+        {
+          functionGroupName: group,
+          includeName: include,
+          transportRequest,
+        },
+        { headers: headersOf(client.getFunctionInclude(), 'delete') },
+      );
       say(`  delete ok=${removed.ok}`);
       if (!removed.ok) say(`  refused: ${removed.getError().message}`);
       // Deleting an include regenerates `SAPL<group>` in its turn, so the
       // group is activated once more — otherwise the tidy-up leaves behind the
       // very thing it was tidying.
-      const settled = await activateFunctionGroup(connection, group);
+      const settled = await activateFunctionGroup(
+        connection,
+        headersFor('AdtFunctionGroup.activate'),
+        group,
+      );
       say(`  group activated again: status ${settled.status}`);
       const left = stillListed(await inactiveNames(connection), group);
       say(`  list on the way out: ${left.join(', ') || '(clear)'}`);

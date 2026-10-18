@@ -2,17 +2,13 @@
  * Where-used operations for ABAP objects
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_WHERE_USED_RESULT,
-  ACCEPT_WHERE_USED_SCOPE,
-  CT_WHERE_USED_REQUEST,
-  CT_WHERE_USED_SCOPE,
-} from '../../constants/contentTypes';
 import { buildObjectUri } from '../../utils/activationUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
@@ -196,6 +192,7 @@ export function whereUsedObjectUri(
  */
 export async function getWhereUsedScope(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IGetWhereUsedScopeParams,
 ): Promise<IAdtWireResponse> {
   const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
@@ -208,10 +205,7 @@ export async function getWhereUsedScope(
     method: 'POST',
     timeout: 0,
     data: scopeRequestBody,
-    headers: {
-      'Content-Type': CT_WHERE_USED_SCOPE,
-      Accept: ACCEPT_WHERE_USED_SCOPE,
-    },
+    headers: requestHeaders(headers),
   });
 }
 
@@ -231,6 +225,7 @@ export async function getWhereUsedScope(
  */
 export async function getWhereUsed(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IGetWhereUsedParams,
 ): Promise<IAdtWireResponse> {
   const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
@@ -264,9 +259,6 @@ export async function getWhereUsed(
     method: 'POST',
     timeout: 0,
     data: searchRequestBody,
-    headers: {
-      'Content-Type': CT_WHERE_USED_REQUEST,
-      Accept: ACCEPT_WHERE_USED_RESULT,
-    },
+    headers: requestHeaders(headers),
   });
 }

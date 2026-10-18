@@ -3,11 +3,13 @@
  * encodes the name itself (through the registry's seg), so a module that
  * encoded it first sent `%252fnsp%252fzenh` — `/NSP/` encoded twice.
  */
+
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { activateEnhancement } from '../../../../core/enhancement/activation';
 import { lockEnhancement } from '../../../../core/enhancement/lock';
 import { getEnhancementMetadata } from '../../../../core/enhancement/read';
 import { unlockEnhancement } from '../../../../core/enhancement/unlock';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function connection() {
   return {
@@ -40,7 +42,12 @@ describe('a namespaced enhancement is encoded once', () => {
   });
   it('activation names it once in the object reference', async () => {
     const c = connection();
-    await activateEnhancement(c, 'enhoxhb', '/NSP/ZENH');
+    await activateEnhancement(
+      c,
+      headersFor('AdtEnhancement.activate'),
+      'enhoxhb',
+      '/NSP/ZENH',
+    );
     expect(bodyOf(c)).toContain(ONCE);
     expect(bodyOf(c)).not.toContain('%252');
   });

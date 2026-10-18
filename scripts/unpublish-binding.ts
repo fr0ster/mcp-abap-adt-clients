@@ -14,6 +14,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
         },
         // The job takes ~133 seconds; the 120s default is under that, and this
         // script exists precisely for a binding that would not let go.
-        { timeout: 300_000 },
+        { headers: headersOf(bindings, 'update'), timeout: 300_000 },
       );
       say(
         answer.ok

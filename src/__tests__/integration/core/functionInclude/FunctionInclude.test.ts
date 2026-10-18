@@ -18,6 +18,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -240,12 +241,15 @@ describe('FunctionInclude (using AdtClient)', () => {
               );
             } else {
               try {
-                await client.getFunctionGroup().create({
-                  functionGroupName,
-                  packageName,
-                  description: 'Shared FUGR for FunctionInclude tests',
-                  transportRequest,
-                });
+                await client.getFunctionGroup().create(
+                  {
+                    functionGroupName,
+                    packageName,
+                    description: 'Shared FUGR for FunctionInclude tests',
+                    transportRequest,
+                  },
+                  { headers: headersOf(client.getFunctionGroup(), 'create') },
+                );
               } catch (_createErr) {
                 // Cloud can 404 the post-create read; retry once.
                 await new Promise((r) => setTimeout(r, 5000));

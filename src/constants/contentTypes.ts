@@ -1,3 +1,5 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+
 /**
  * Centralized ADT content type constants
  *
@@ -40,6 +42,21 @@ export const CT_ACTIVATION = 'application/vnd.sap.adt.activation+xml';
 
 // Validation
 export const ACCEPT_VALIDATION = 'application/vnd.sap.as+xml';
+
+/**
+ * The pairs of the requests that are not a member taking `options.headers`
+ * (interfaces-adt 19.0.0) but share a wire function with one: a `validate`
+ * that runs the check run, `activateTestClasses`. Those keep their own
+ * headers; the members that take `headers` send the caller's.
+ */
+export const CHECK_RUN_HEADERS: IAdtHeaders = {
+  accept: ACCEPT_CHECK_MESSAGES,
+  contentType: CT_CHECK_OBJECTS,
+};
+export const ACTIVATION_HEADERS: IAdtHeaders = {
+  accept: ACCEPT_ACTIVATION,
+  contentType: CT_ACTIVATION,
+};
 
 /**
  * What a publication job answers, asked for the way Eclipse asks.

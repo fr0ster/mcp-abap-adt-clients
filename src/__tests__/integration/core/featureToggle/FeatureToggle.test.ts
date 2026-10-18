@@ -25,6 +25,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { featureToggleDocuments } from '../../../../core/featureToggle/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -281,7 +282,9 @@ describe('FeatureToggle (using AdtClient)', () => {
         logger: testsLogger,
       });
       const config = buildConfig(testCase, resolver);
-      await client.getFeatureToggle().create(config);
+      await client.getFeatureToggle().create(config, {
+        headers: headersOf(client.getFeatureToggle(), 'create'),
+      });
       return null;
     } catch (error: any) {
       return `Failed to create feature toggle for domain test: ${error.message}`;
@@ -311,12 +314,15 @@ describe('FeatureToggle (using AdtClient)', () => {
           cleanup.objectExists
         ) {
           try {
-            await client.getFeatureToggle().delete({
-              featureToggleName,
-              transportRequest: resolveTransportRequest(
-                testCase.params.transport_request,
-              ),
-            });
+            await client.getFeatureToggle().delete(
+              {
+                featureToggleName,
+                transportRequest: resolveTransportRequest(
+                  testCase.params.transport_request,
+                ),
+              },
+              { headers: headersOf(client.getFeatureToggle(), 'delete') },
+            );
             testsLogger.info?.(
               `Pre-existing feature toggle ${featureToggleName} deleted before test`,
             );
@@ -469,7 +475,9 @@ describe('FeatureToggle (using AdtClient)', () => {
         // asserted below are strategies the test passes.
         const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
-          await handler.checkState({ featureToggleName }),
+          await handler.checkState({ featureToggleName }, undefined, {
+            headers: headersOf(handler, 'checkState'),
+          }),
           'checkState',
         );
         expect(typeof state.customizingTransportAllowed).toBe('boolean');

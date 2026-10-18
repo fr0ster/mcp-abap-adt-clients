@@ -1,3 +1,4 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -9,12 +10,14 @@ import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
  */
 export async function checkTransformation(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   transformationName: string,
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtWireResponse> {
   const response = await runCheckRun(
     connection,
+    headers,
     'transformation',
     transformationName,
     version,

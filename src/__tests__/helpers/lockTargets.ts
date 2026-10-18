@@ -18,6 +18,7 @@ import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { AdtClient } from '../../clients/AdtClient';
 import type { IDataElementConfig } from '../../core/dataElement';
 import type { IDomainConfig } from '../../core/domain';
+import { headersOf } from './adtHeaders';
 
 const {
   dataElementDocumentFor,
@@ -91,7 +92,10 @@ export async function recreateActiveDomain(
     transportRequest: config.transportRequest,
   };
   await removeLeftover(domain, key, config.domainName);
-  mustSucceed(await domain.create(config), `create ${config.domainName}`);
+  mustSucceed(
+    await domain.create(config, { headers: headersOf(domain, 'create') }),
+    `create ${config.domainName}`,
+  );
   const shell = await readDocumentForUpdate(
     () => domain.readMetadata({ domainName: config.domainName }),
     `read ${config.domainName} after create`,
@@ -128,11 +132,14 @@ export async function recreateActiveDataElement(
   };
   await removeLeftover(element, key, config.dataElementName);
   mustSucceed(
-    await element.create({
-      ...config,
-      typeKind: 'domain',
-      typeName: domainName,
-    } as IDataElementConfig),
+    await element.create(
+      {
+        ...config,
+        typeKind: 'domain',
+        typeName: domainName,
+      } as IDataElementConfig,
+      { headers: headersOf(element, 'create') },
+    ),
     `create ${config.dataElementName}`,
   );
   const shell = await readDocumentForUpdate(

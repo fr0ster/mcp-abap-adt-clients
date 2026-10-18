@@ -2,16 +2,14 @@
  * FunctionModule create operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_FUNCTION_MODULE } from '../../constants/contentTypes';
 import { FUNCTION_GROUP, FUNCTION_MODULE } from '../../endpoints/objects';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFunctionModuleParams } from './types';
 
 /**
@@ -20,6 +18,7 @@ import type { ICreateFunctionModuleParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateFunctionModuleParams,
 ): Promise<IAdtWireResponse> {
   const url = `${FUNCTION_MODULE.collection(params.functionGroupName)}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
@@ -44,9 +43,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      'Content-Type': CT_FUNCTION_MODULE,
-      Accept: CT_FUNCTION_MODULE,
-    },
+    headers: requestHeaders(headers),
   });
 }

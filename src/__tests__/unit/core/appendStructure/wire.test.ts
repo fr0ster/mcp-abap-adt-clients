@@ -5,6 +5,7 @@ import type {
 import { getAppendStructureSource } from '../../../../core/appendStructure/read';
 import { unlockAppendStructure } from '../../../../core/appendStructure/unlock';
 import { updateAppendStructure } from '../../../../core/appendStructure/update';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function cap() {
   const c: { url?: string; method?: string; headers?: Record<string, string> } =
@@ -31,6 +32,7 @@ describe('appendStructure wire', () => {
     const { c, conn } = cap();
     await updateAppendStructure(
       conn,
+      headersFor('AdtAppendStructure.update'),
       {
         append_structure_name: 'ZOK_S_APPEND',
         source_code: 'extend type ...',

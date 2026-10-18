@@ -2,17 +2,15 @@
  * Domain check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { DOMAIN } from '../../endpoints/objects';
 import { runCheckRun } from '../../utils/checkRun';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check domain syntax
@@ -27,6 +25,7 @@ import { runCheckRun } from '../../utils/checkRun';
  */
 export async function checkDomainSyntax(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   domainName: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
@@ -51,11 +50,6 @@ export async function checkDomainSyntax(
   </chkrun:checkObject>
 </chkrun:checkObjectList>`;
 
-    const headers = {
-      Accept: ACCEPT_CHECK_MESSAGES,
-      'Content-Type': CT_CHECK_OBJECTS,
-    };
-
     const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
     response = await connection.makeAdtRequest({
@@ -63,12 +57,13 @@ export async function checkDomainSyntax(
       method: 'POST',
       timeout: 0,
       data: xmlBody,
-      headers,
+      headers: requestHeaders(headers),
     });
   } else {
     // Check saved version (without XML content)
     response = await runCheckRun(
       connection,
+      headers,
       'domain',
       domainName,
       version,

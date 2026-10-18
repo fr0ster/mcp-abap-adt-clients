@@ -5,6 +5,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
@@ -34,12 +35,15 @@ describe('AdtAppendStructure handler', () => {
   it('create() only POSTs metadata (no lock/update) with a valid baseObject', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const as = new AdtAppendStructure(conn);
-    await as.create({
-      appendStructureName: 'ZOK_S',
-      baseObject: 'ZBASE',
-      packageName: 'ZPKG',
-      description: 'd',
-    });
+    await as.create(
+      {
+        appendStructureName: 'ZOK_S',
+        baseObject: 'ZBASE',
+        packageName: 'ZPKG',
+        description: 'd',
+      },
+      { headers: headersOf(as, 'create') },
+    );
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/structures');
@@ -99,7 +103,11 @@ describe('AdtAppendStructure handler', () => {
     const as = new AdtAppendStructure(conn);
     await as.update(
       { appendStructureName: 'ZOK_X' },
-      { source: 'new source', lockHandle: 'LOCK_HANDLE_42' },
+      {
+        headers: headersOf(as, 'update'),
+        source: 'new source',
+        lockHandle: 'LOCK_HANDLE_42',
+      },
     );
 
     // One request, and it is the write. No lock, no check, no readiness poll:

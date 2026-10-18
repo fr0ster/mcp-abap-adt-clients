@@ -22,6 +22,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { headersOf } from '../../helpers/adtHeaders';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import type { RequestSpec } from './manifest';
 import {
@@ -323,6 +324,17 @@ const EXTRA_REQUESTS: Record<string, string> = {
  */
 const VERB_NOT_REACHED: Record<string, string> = {};
 
+/** The object members that take `options.headers` (interfaces-adt 19.0.0). */
+const HEADER_MEMBERS = new Set([
+  'create',
+  'update',
+  'updateMetadata',
+  'delete',
+  'checkDeletion',
+  'check',
+  'activate',
+]);
+
 /** The content URI `getVersionSource` is handed, and must fetch. */
 const VERSION_CONTENT_URI = '/sap/bc/adt/guard/versions/1';
 
@@ -393,6 +405,10 @@ async function invoke(
   config: Record<string, unknown>,
 ): Promise<void> {
   const fn = handler[method] as (...args: unknown[]) => Promise<unknown>;
+  // Since 36.0.0 the members that take `options.headers` require them.
+  const headers = HEADER_MEMBERS.has(method)
+    ? { headers: headersOf(handler, method) }
+    : undefined;
   switch (method) {
     case 'unlock':
       await fn.call(handler, config, 'GUARD-LOCK');
@@ -401,7 +417,7 @@ async function invoke(
       await fn.call(handler, VERSION_CONTENT_URI);
       return;
     case 'check':
-      await fn.call(handler, config, 'inactive');
+      await fn.call(handler, config, 'inactive', headers);
       return;
     case 'update':
     case 'updateMetadata':
@@ -412,12 +428,13 @@ async function invoke(
       // `sourceCode` and `xmlContent` side by side, an ABAP line for the text
       // writes and an element for the document ones, and the handler chose.
       await fn.call(handler, config, {
+        ...headers,
         source: String(config.source ?? '" guard'),
         lockHandle: 'GUARD-LOCK',
       });
       return;
     default:
-      await fn.call(handler, config);
+      await fn.call(handler, config, headers);
   }
 }
 
@@ -467,9 +484,12 @@ async function invokeWithOptions(
   handler: Record<string, unknown>,
   method: string,
   config: Record<string, unknown>,
-  options: Record<string, unknown>,
+  given: Record<string, unknown>,
 ): Promise<void> {
   const fn = handler[method] as (...args: unknown[]) => Promise<unknown>;
+  const options = HEADER_MEMBERS.has(method)
+    ? { headers: headersOf(handler, method), ...given }
+    : given;
   switch (method) {
     case 'unlock':
       await fn.call(handler, config, 'GUARD-LOCK');

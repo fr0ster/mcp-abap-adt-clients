@@ -1,13 +1,11 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  ACCEPT_FEATURE_TOGGLE_METADATA,
-  CT_FEATURE_TOGGLE_METADATA,
-} from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFeatureToggleParams } from './types';
 import { buildFeatureToggleXml } from './xmlBuilder';
 
@@ -18,6 +16,7 @@ import { buildFeatureToggleXml } from './xmlBuilder';
  */
 export async function updateFeatureToggle(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateFeatureToggleParams,
   lockHandle?: string,
   _logger?: ILogger,
@@ -30,19 +29,7 @@ export async function updateFeatureToggle(
     method: 'PUT',
     url: `${FEATURE_TOGGLE.uri(params.feature_toggle_name)}`,
     timeout: 0,
-    headers: {
-      'Content-Type': CT_FEATURE_TOGGLE_METADATA,
-      Accept: ACCEPT_FEATURE_TOGGLE_METADATA,
-      // No `X-sap-adt-sessiontype` here. A write is stateless — Eclipse sends
-      // it that way, carrying only `lockHandle` and `corrNr` — and the header
-      // was set on the request while the connection's own mode was stateless,
-      // so the connector never knew: measured , this PUT went out
-      // labelled stateful without the `sap-adt-request-id` the connector adds
-      // in that mode. What the server takes during a request that runs inside
-      // the session is held by that session, which is what
-      // `stateful covers the lock request, not the window` removed everywhere
-      // else.
-    },
+    headers: requestHeaders(headers),
     params: query,
     data: xml,
   });

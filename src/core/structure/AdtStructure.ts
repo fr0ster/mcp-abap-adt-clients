@@ -15,6 +15,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -142,7 +143,7 @@ export class AdtStructure<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IStructureConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -164,7 +165,7 @@ export class AdtStructure<
     const name = this.name(config);
     return answering(
       () =>
-        createStructure(connection, {
+        createStructure(connection, options.headers, {
           structureName: name,
           packageName: config.packageName as string,
           transportRequest: config.transportRequest,
@@ -254,7 +255,7 @@ export class AdtStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -266,6 +267,7 @@ export class AdtStructure<
       () =>
         upload(
           connection,
+          options.headers,
           {
             structureName: name,
             ddlCode: source as string,
@@ -287,7 +289,7 @@ export class AdtStructure<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -295,7 +297,7 @@ export class AdtStructure<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           structure_name: name,
           transport_request: config.transportRequest,
         }),
@@ -317,7 +319,7 @@ export class AdtStructure<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -325,7 +327,7 @@ export class AdtStructure<
     const name = this.name(config);
     return answering(
       () =>
-        deleteStructure(connection, {
+        deleteStructure(connection, options.headers, {
           structure_name: name,
           transport_request: config.transportRequest,
         }),
@@ -337,7 +339,7 @@ export class AdtStructure<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -345,7 +347,7 @@ export class AdtStructure<
     const name = this.name(config);
 
     return answering(
-      () => activateStructure(connection, name),
+      () => activateStructure(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -354,8 +356,8 @@ export class AdtStructure<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -366,7 +368,14 @@ export class AdtStructure<
 
     return answering(
       () =>
-        checkStructure(connection, name, version, config.source, this.logger),
+        checkStructure(
+          connection,
+          options.headers,
+          name,
+          version,
+          config.source,
+          this.logger,
+        ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

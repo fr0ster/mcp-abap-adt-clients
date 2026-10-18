@@ -11,13 +11,14 @@
  * target. Elsewhere this request fails for a reason no header can fix.
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateIncludeParams } from './types';
 
@@ -26,8 +27,8 @@ export const CT_INCLUDE = 'application/vnd.sap.adt.programs.includes.v2+xml';
 
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateIncludeParams,
-  contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
   // Every value below is escaped before it reaches an attribute. A description
   // with an apostrophe or an ampersand — "R&D", "the caller's include" — would
@@ -50,18 +51,11 @@ export async function create(
   const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${name}" adtcore:type="PROG/I" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${pkg}"/>
 </include:abapInclude>`;
-
-  const ct = contentTypes?.includeCreate();
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers: {
-      // Eclipse sends no Accept here, only the content type; both were
-      // accepted in the captured exchange.
-      Accept: ct?.accept || CT_INCLUDE,
-      'Content-Type': ct?.contentType || CT_INCLUDE,
-    },
+    headers: requestHeaders(headers),
   });
 }

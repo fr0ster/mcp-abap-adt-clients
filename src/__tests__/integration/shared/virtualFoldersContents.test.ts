@@ -18,6 +18,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -98,7 +99,9 @@ class VirtualFoldersContentsObject
   ): Promise<IAdtResponse<string>> {
     return this.client
       .getUtils()
-      .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams);
+      .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams, {
+        headers: headersOf(this.client.getUtils(), 'getVirtualFoldersContents'),
+      });
   }
 
   readMetadata() {

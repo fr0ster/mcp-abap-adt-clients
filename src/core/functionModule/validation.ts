@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 
 /**
@@ -88,6 +89,7 @@ export async function validateFunctionModuleSource(
     // Live validation with artifacts (code not saved to SAP)
     response = await runCheckRunWithSource(
       connection,
+      CHECK_RUN_HEADERS,
       objectType,
       objectName,
       sourceCode,
@@ -98,6 +100,7 @@ export async function validateFunctionModuleSource(
     // Validate existing object in SAP (without artifacts)
     response = await runCheckRun(
       connection,
+      CHECK_RUN_HEADERS,
       objectType,
       objectName,
       version,

@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { updateTableType } from '../../../core/tabletype/update';
+import { headersFor } from '../../helpers/adtHeaders';
 
 const DOCUMENT =
   '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -28,6 +29,7 @@ it('lets the refusal through with its response attached', async () => {
   await expect(
     updateTableType(
       refusingTheWrite(),
+      headersFor('AdtDdicTableType.updateMetadata'),
       { tabletype_name: 'ZOK_TT' } as never,
       DOCUMENT,
     ),

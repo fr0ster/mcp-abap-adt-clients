@@ -21,9 +21,11 @@
  * V4 is asserted to carry NO query string, because that is how it was measured
  * working and sending it there was never measured at all.
  */
+
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../../clients/AdtClient';
+import { headersOf } from '../../../helpers/adtHeaders';
 
 interface Issued {
   url: string;
@@ -55,13 +57,16 @@ describe('the publication job', () => {
   });
 
   it('names the service in the query string for OData V2', async () => {
-    await binding().update({
-      bindingName: 'ZSB_X',
-      desiredPublicationState: 'published',
-      serviceType: 'odatav2',
-      serviceName: 'ZSB_X_SRV',
-      serviceVersion: '0001',
-    });
+    await binding().update(
+      {
+        bindingName: 'ZSB_X',
+        desiredPublicationState: 'published',
+        serviceType: 'odatav2',
+        serviceName: 'ZSB_X_SRV',
+        serviceVersion: '0001',
+      },
+      { headers: headersOf(binding(), 'update') },
+    );
 
     expect(issued).toHaveLength(1);
     expect(issued[0].url).toContain('/businessservices/odatav2/publishjobs');
@@ -72,13 +77,16 @@ describe('the publication job', () => {
   });
 
   it('carries the same query string on the V2 unpublish job', async () => {
-    await binding().update({
-      bindingName: 'ZSB_X',
-      desiredPublicationState: 'unpublished',
-      serviceType: 'odatav2',
-      serviceName: 'zsb_x_srv',
-      serviceVersion: '0002',
-    });
+    await binding().update(
+      {
+        bindingName: 'ZSB_X',
+        desiredPublicationState: 'unpublished',
+        serviceType: 'odatav2',
+        serviceName: 'zsb_x_srv',
+        serviceVersion: '0002',
+      },
+      { headers: headersOf(binding(), 'update') },
+    );
 
     expect(issued[0].url).toContain('/businessservices/odatav2/unpublishjobs');
     // Upper-cased on the wire, as the name is in the repository.
@@ -89,11 +97,14 @@ describe('the publication job', () => {
   });
 
   it('sends no query string for OData V4', async () => {
-    await binding().update({
-      bindingName: 'ZSB_X',
-      desiredPublicationState: 'published',
-      serviceType: 'odatav4',
-    });
+    await binding().update(
+      {
+        bindingName: 'ZSB_X',
+        desiredPublicationState: 'published',
+        serviceType: 'odatav4',
+      },
+      { headers: headersOf(binding(), 'update') },
+    );
 
     expect(issued).toHaveLength(1);
     expect(issued[0].url).toContain('/businessservices/odatav4/publishjobs');
@@ -106,11 +117,14 @@ describe('the publication job', () => {
     // caller error, and the type says so first; this is the runtime half for a
     // consumer who reached it through `as never` or plain JavaScript.
     await expect(
-      binding().update({
-        bindingName: 'ZSB_X',
-        desiredPublicationState: 'published',
-        serviceType: 'odatav2',
-      } as never),
+      binding().update(
+        {
+          bindingName: 'ZSB_X',
+          desiredPublicationState: 'published',
+          serviceType: 'odatav2',
+        } as never,
+        { headers: headersOf(binding(), 'update') },
+      ),
     ).rejects.toThrow(/needs serviceName and serviceVersion/);
 
     // Refused here, not by the server answering that an unnamed service is absent.

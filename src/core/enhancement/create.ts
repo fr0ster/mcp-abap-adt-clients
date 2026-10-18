@@ -2,14 +2,15 @@
  * Enhancement create operations - Low-level functions
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import {
   ENHANCEMENT_TYPE_CODES,
@@ -69,17 +70,13 @@ function buildCreateXml(
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateEnhancementParams,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const url = `${getEnhancementBaseUrl(args.enhancement_type)}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const metadataXml = buildCreateXml(args, args.masterSystem, args.responsible);
-
-  const headers = {
-    Accept: ENHANCEMENT_CONTENT_TYPES[args.enhancement_type],
-    'Content-Type': ENHANCEMENT_CONTENT_TYPES[args.enhancement_type],
-  };
 
   if (debugEnabled) {
     logger?.debug?.(`[DEBUG] Creating enhancement - URL: ${url}`);
@@ -98,7 +95,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: metadataXml,
-      headers,
+      headers: requestHeaders(headers),
     });
     return response;
   } catch (error: unknown) {

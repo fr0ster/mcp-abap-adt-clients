@@ -6,6 +6,7 @@ import {
   checkDeletion,
   deleteAppendStructure,
 } from '../../../../core/appendStructure/delete';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function capConn() {
   const calls: Array<{ data?: string }> = [];
@@ -27,7 +28,9 @@ function capConn() {
 describe('appendStructure delete', () => {
   it('checkDeletion uses the lower-cased structures URI', async () => {
     const { calls, conn } = capConn();
-    await checkDeletion(conn, { append_structure_name: 'ZOK_S_APPEND' });
+    await checkDeletion(conn, headersFor('AdtAppendStructure.checkDeletion'), {
+      append_structure_name: 'ZOK_S_APPEND',
+    });
     expect(calls[0].data).toContain(
       'adtcore:uri="/sap/bc/adt/ddic/structures/zok_s_append"',
     );
@@ -35,7 +38,7 @@ describe('appendStructure delete', () => {
 
   it('delete uses the lower-cased structures URI', async () => {
     const { calls, conn } = capConn();
-    await deleteAppendStructure(conn, {
+    await deleteAppendStructure(conn, headersFor('AdtAppendStructure.delete'), {
       append_structure_name: 'ZOK_S_APPEND',
     });
     expect(calls[0].data).toContain(

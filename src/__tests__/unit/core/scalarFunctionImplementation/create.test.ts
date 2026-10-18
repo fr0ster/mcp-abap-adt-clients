@@ -3,6 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { create } from '../../../../core/scalarFunctionImplementation/create';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function mockConn(cap: {
   url?: string;
@@ -32,14 +33,18 @@ describe('scalarFunctionImplementation create', () => {
       data?: string;
       headers?: Record<string, string>;
     } = {};
-    await create(mockConn(cap), {
-      implementation_name: 'zok_test_func_sql',
-      scalar_function_name: 'zok_test_func',
-      package_name: 'zok_test',
-      description: 'SF SQL Impl',
-      masterSystem: 'SID',
-      responsible: 'DEVELOPER',
-    });
+    await create(
+      mockConn(cap),
+      headersFor('AdtScalarFunctionImplementation.create'),
+      {
+        implementation_name: 'zok_test_func_sql',
+        scalar_function_name: 'zok_test_func',
+        package_name: 'zok_test',
+        description: 'SF SQL Impl',
+        masterSystem: 'SID',
+        responsible: 'DEVELOPER',
+      },
+    );
     expect(cap.url).toBe('/sap/bc/adt/ddic/dsfi');
     expect(cap.headers?.['Content-Type']).toBe(
       'application/vnd.sap.adt.blues.v2+xml',
@@ -60,14 +65,18 @@ describe('scalarFunctionImplementation create', () => {
 
   it('honors engine_value=amdpEngine and encodes corrNr', async () => {
     const cap: { url?: string; data?: string } = {};
-    await create(mockConn(cap as any), {
-      implementation_name: 'zi',
-      scalar_function_name: 'zf',
-      package_name: 'zp',
-      description: 'd',
-      engine_value: 'amdpEngine',
-      transport_request: 'TRLK9 1',
-    });
+    await create(
+      mockConn(cap as any),
+      headersFor('AdtScalarFunctionImplementation.create'),
+      {
+        implementation_name: 'zi',
+        scalar_function_name: 'zf',
+        package_name: 'zp',
+        description: 'd',
+        engine_value: 'amdpEngine',
+        transport_request: 'TRLK9 1',
+      },
+    );
     expect(cap.url).toBe('/sap/bc/adt/ddic/dsfi?corrNr=TRLK9%201');
     const m = cap.data?.match(/serverdriven\.content\.v1\+json">([^<]+)</);
     expect(Buffer.from(m![1], 'base64').toString('utf-8')).toBe(

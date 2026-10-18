@@ -16,6 +16,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure } from '../../../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0" encoding="utf-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/messageclass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZTEST_MSG" adtcore:description="d"><mc:messages><mc:message mc:msgno="001" mc:msgtext="existing"/></mc:messages></mc:messageClass>`;
@@ -72,11 +73,19 @@ describe('message-class cleanup after a refused PUT', () => {
 
     expect(
       expectFailure(
-        await new AdtMessageClassMessage(connection, logger).update({
-          className: 'ZTEST_MSG',
-          msgno: '001',
-          msgtext: 'changed',
-        }),
+        await new AdtMessageClassMessage(connection, logger).update(
+          {
+            className: 'ZTEST_MSG',
+            msgno: '001',
+            msgtext: 'changed',
+          },
+          {
+            headers: headersOf(
+              new AdtMessageClassMessage(connection, logger),
+              'update',
+            ),
+          },
+        ),
         'update whose save the server refused',
       ).message,
     ).toMatch(/save refused/);
@@ -98,10 +107,18 @@ describe('message-class cleanup after a refused PUT', () => {
 
     expect(
       expectFailure(
-        await new AdtMessageClassMessage(connection, logger).delete({
-          className: 'ZTEST_MSG',
-          msgno: '001',
-        }),
+        await new AdtMessageClassMessage(connection, logger).delete(
+          {
+            className: 'ZTEST_MSG',
+            msgno: '001',
+          },
+          {
+            headers: headersOf(
+              new AdtMessageClassMessage(connection, logger),
+              'delete',
+            ),
+          },
+        ),
         'delete whose save the server refused',
       ).message,
     ).toMatch(/save refused/);

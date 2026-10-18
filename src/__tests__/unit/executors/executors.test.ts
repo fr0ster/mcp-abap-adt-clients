@@ -21,6 +21,7 @@ import {
   ProgramExecutor,
   programExecutorDocuments,
 } from '../../../executors/program/ProgramExecutor';
+import { headersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 
 const LOCATION = '/sap/bc/adt/runtime/traces/abaptraces/parameters/P1';
@@ -84,7 +85,14 @@ describe.each([
       EMPTY_FEED,
     );
     // The request id is in Location, not the body: the document is empty.
-    expect(expectResult(await executor.scheduleTrace(), 'scheduled')).toBe('');
+    expect(
+      expectResult(
+        await executor.scheduleTrace({
+          headers: headersOf(executor, 'scheduleTrace'),
+        }),
+        'scheduled',
+      ),
+    ).toBe('');
     expect(c.makeAdtRequest).toHaveBeenCalledTimes(5);
     expect(
       (c.makeAdtRequest as jest.Mock).mock.calls.some((call) =>
@@ -105,7 +113,10 @@ describe.each([
       await executor.listProcessTypes(refuse),
       await executor.listRequests(refuse),
       await executor.getRequestsByUri('/uri', refuse),
-      await executor.scheduleTrace(refuse),
+      await executor.scheduleTrace({
+        ...refuse,
+        headers: headersOf(executor, 'scheduleTrace'),
+      }),
     ];
     expect(answers.every((a) => !a.ok)).toBe(true);
   });
@@ -124,9 +135,14 @@ describe('the scheduling readings, given at construction', () => {
       { name: '/uri/a', description: 'A' },
     ]);
     expect(expectResult(await executor.listRequests(), 'requests')).toEqual([]);
-    expect(expectResult(await executor.scheduleTrace(), 'scheduled')).toBe(
-      LOCATION,
-    );
+    expect(
+      expectResult(
+        await executor.scheduleTrace({
+          headers: headersOf(executor, 'scheduleTrace'),
+        }),
+        'scheduled',
+      ),
+    ).toBe(LOCATION);
   });
 
   // It used to throw 'Trace scheduling returned no request id'. That SAP did
@@ -141,6 +157,13 @@ describe('the scheduling readings, given at construction', () => {
       ...programExecutorDocuments,
       scheduled: traceSchedulingProfilerId,
     });
-    expect(expectResult(await executor.scheduleTrace(), 'scheduled')).toBe('');
+    expect(
+      expectResult(
+        await executor.scheduleTrace({
+          headers: headersOf(executor, 'scheduleTrace'),
+        }),
+        'scheduled',
+      ),
+    ).toBe('');
   });
 });

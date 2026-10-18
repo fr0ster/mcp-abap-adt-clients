@@ -6,11 +6,11 @@
  * 2. Group activation: /sap/bc/adt/activation/runs (for multiple objects)
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_ACTIVATION } from '../constants/contentTypes';
 import { getEnhancementUri } from '../core/enhancement/types';
 import {
   ACCESS_CONTROL,
@@ -39,6 +39,7 @@ import {
   TABLE_TYPE,
   TRANSFORMATION,
 } from '../endpoints/objects';
+import { requestHeaders } from './requestHeaders';
 
 /**
  * Build object URI from name and type
@@ -233,6 +234,7 @@ export function buildObjectUri(
  */
 export async function activateObjectInSession(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objectUri: string,
   objectName: string,
   preaudit: boolean = true,
@@ -244,17 +246,12 @@ export async function activateObjectInSession(
   <adtcore:objectReference adtcore:uri="${objectUri}" adtcore:name="${objectName}"/>
 </adtcore:objectReferences>`;
 
-  const headers = {
-    'Content-Type': CT_ACTIVATION,
-    Accept: 'application/xml',
-  };
-
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: activationXml,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   // The answer, as it arrived. ADT returns 200 even on a failed activation

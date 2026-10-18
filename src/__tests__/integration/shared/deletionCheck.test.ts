@@ -29,6 +29,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { headersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -84,7 +85,10 @@ describe('Shared - the deletion check, per type', () => {
       ask: async () => {
         const answer = await client
           .getInclude()
-          .checkDeletion({ includeName: NEVER_EXISTS });
+          .checkDeletion(
+            { includeName: NEVER_EXISTS },
+            { headers: headersOf(client.getInclude(), 'checkDeletion') },
+          );
         return answer.ok
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
@@ -93,9 +97,12 @@ describe('Shared - the deletion check, per type', () => {
     {
       label: 'DDLX metadata extension',
       ask: async () => {
-        const answer = await client
-          .getMetadataExtension()
-          .checkDeletion({ name: NEVER_EXISTS });
+        const answer = await client.getMetadataExtension().checkDeletion(
+          { name: NEVER_EXISTS },
+          {
+            headers: headersOf(client.getMetadataExtension(), 'checkDeletion'),
+          },
+        );
         return answer.ok
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
@@ -106,7 +113,10 @@ describe('Shared - the deletion check, per type', () => {
       ask: async () => {
         const answer = await client
           .getRequest()
-          .checkDeletion({ transportNumber: NEVER_EXISTS });
+          .checkDeletion(
+            { transportNumber: NEVER_EXISTS },
+            { headers: headersOf(client.getRequest(), 'checkDeletion') },
+          );
         return answer.ok
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
@@ -150,7 +160,10 @@ describe('Shared - the deletion check, per type', () => {
 
     const answer = await client
       .getClass()
-      .checkDeletion({ className: NEVER_EXISTS });
+      .checkDeletion(
+        { className: NEVER_EXISTS },
+        { headers: headersOf(client.getClass(), 'checkDeletion') },
+      );
 
     // A class is one of the twenty-six the service is known to resolve, so this
     // is the control: whatever the three above do, this one has to answer, and

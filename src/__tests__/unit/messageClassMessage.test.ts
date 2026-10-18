@@ -5,6 +5,7 @@ import type {
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
 import { parseMessageClass } from '../../core/messageClass/xml';
 import { noopLogger } from '../../utils/noopLogger';
+import { headersOf } from '../helpers/adtHeaders';
 import { expectResult } from '../helpers/contract';
 
 // Two-message class: 001 + 002. Both are needed for the delete test so we can
@@ -63,7 +64,10 @@ describe('AdtMessageClassMessage', () => {
   it('update does LOCK_MSG + class LOCK + PUT(full class, lockhandle) + UNLOCK + UNLOCK_ALL', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    await m.update({ className: 'ZT', msgno: '001', msgtext: 'NEW' });
+    await m.update(
+      { className: 'ZT', msgno: '001', msgtext: 'NEW' },
+      { headers: headersOf(m, 'update') },
+    );
     const urls = calls.map((c) => `${c.method} ${c.url}`);
     expect(urls.some((u) => u.includes('/messages/001?_action=LOCK_MSG'))).toBe(
       true,
@@ -88,12 +92,15 @@ describe('AdtMessageClassMessage', () => {
   it('appends &corrNr= on the class PUT when transportRequest is set', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    await m.update({
-      className: 'ZT',
-      msgno: '001',
-      msgtext: 'NEW',
-      transportRequest: 'DEVK900001',
-    });
+    await m.update(
+      {
+        className: 'ZT',
+        msgno: '001',
+        msgtext: 'NEW',
+        transportRequest: 'DEVK900001',
+      },
+      { headers: headersOf(m, 'update') },
+    );
     const put = calls.find((c) => c.method === 'PUT');
     expect(put.url).toContain('lockHandle=');
     expect(put.url).toContain('&corrNr=DEVK900001');
@@ -102,11 +109,14 @@ describe('AdtMessageClassMessage', () => {
   it('delete appends &corrNr= on the class PUT when transportRequest is set', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    await m.delete({
-      className: 'ZT',
-      msgno: '001',
-      transportRequest: 'DEVK900001',
-    });
+    await m.delete(
+      {
+        className: 'ZT',
+        msgno: '001',
+        transportRequest: 'DEVK900001',
+      },
+      { headers: headersOf(m, 'delete') },
+    );
     const put = calls.find((c) => c.method === 'PUT');
     expect(put.url).toContain('lockHandle=');
     expect(put.url).toContain('&corrNr=DEVK900001');
@@ -115,7 +125,10 @@ describe('AdtMessageClassMessage', () => {
   it('delete: <mc:deletedmessages> for target + lockhandle; kept messages in <mc:messages>; correct lock chain; no HTTP DELETE', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    await m.delete({ className: 'ZT', msgno: '001' });
+    await m.delete(
+      { className: 'ZT', msgno: '001' },
+      { headers: headersOf(m, 'delete') },
+    );
 
     const urls = calls.map((c) => `${c.method} ${c.url}`);
     // Lock chain mirrors create/update: LOCK_MSG + class LOCK (msgNo + onSave) + UNLOCK + UNLOCK_ALL
@@ -172,13 +185,16 @@ describe('AdtMessageClassMessage', () => {
   it('upsert with selfExplanatory+description: PUT body emits mc:selfexplainatory and adtcore:description', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    await m.update({
-      className: 'ZT',
-      msgno: '001',
-      msgtext: 'NEW',
-      selfExplanatory: true,
-      description: 'X',
-    });
+    await m.update(
+      {
+        className: 'ZT',
+        msgno: '001',
+        msgtext: 'NEW',
+        selfExplanatory: true,
+        description: 'X',
+      },
+      { headers: headersOf(m, 'update') },
+    );
     const put = calls.find((c) => c.method === 'PUT');
     const body = String(put.data);
     expect(body).toContain('mc:selfexplainatory="true"');
@@ -190,7 +206,10 @@ describe('AdtMessageClassMessage', () => {
     const { conn, calls } = recorder(CLASS_XML_WITH_FLAGS);
     const m = new AdtMessageClassMessage(conn, noopLogger);
     // Update only msgtext — selfExplanatory and description not specified
-    await m.update({ className: 'ZT', msgno: '001', msgtext: 'UPDATED' });
+    await m.update(
+      { className: 'ZT', msgno: '001', msgtext: 'UPDATED' },
+      { headers: headersOf(m, 'update') },
+    );
     const put = calls.find((c) => c.method === 'PUT');
     const body = String(put.data);
     expect(body).toContain('mc:msgtext="UPDATED"');
@@ -203,13 +222,16 @@ describe('AdtMessageClassMessage', () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
     // 003 does not exist in CLASS_XML — it will be pushed as a new message
-    await m.create({
-      className: 'ZT',
-      msgno: '003',
-      msgtext: 'BRAND NEW',
-      selfExplanatory: false,
-      description: 'New message desc',
-    });
+    await m.create(
+      {
+        className: 'ZT',
+        msgno: '003',
+        msgtext: 'BRAND NEW',
+        selfExplanatory: false,
+        description: 'New message desc',
+      },
+      { headers: headersOf(m, 'create') },
+    );
     const put = calls.find((c) => c.method === 'PUT');
     const body = String(put.data);
     expect(body).toContain('mc:msgno="003"');

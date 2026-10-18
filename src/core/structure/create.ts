@@ -3,13 +3,14 @@
  * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_STRUCTURE } from '../../constants/contentTypes';
 import { STRUCTURE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateStructureParams } from './types';
 
 /**
@@ -18,6 +19,7 @@ import type { ICreateStructureParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateStructureParams,
 ): Promise<IAdtWireResponse> {
   const createUrl = `${STRUCTURE.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
@@ -38,17 +40,11 @@ export async function create(
   <adtcore:packageRef adtcore:name="${params.packageName.toUpperCase()}"/>
 </blue:blueSource>`;
 
-  const headers = {
-    Accept:
-      'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml',
-    'Content-Type': CT_STRUCTURE,
-  };
-
   return connection.makeAdtRequest({
     url: createUrl,
     method: 'POST',
     timeout: 0,
     data: structureXml,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

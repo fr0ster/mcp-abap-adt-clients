@@ -2,13 +2,14 @@
  * Class include files operations (local types, definitions, macros)
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update class local types include (implementations)
@@ -25,20 +26,20 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
  */
 export async function updateClassLocalTypes(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   localTypesSource: string,
   lockHandle?: string,
   transportRequest?: string,
-  sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   return updateClassInclude(
     connection,
+    headers,
     className,
     localTypesSource,
     'implementations',
     lockHandle,
     transportRequest,
-    sourceContentType,
   );
 }
 
@@ -57,20 +58,20 @@ export async function updateClassLocalTypes(
  */
 export async function updateClassDefinitions(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   definitionsSource: string,
   lockHandle?: string,
   transportRequest?: string,
-  sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   return updateClassInclude(
     connection,
+    headers,
     className,
     definitionsSource,
     'definitions',
     lockHandle,
     transportRequest,
-    sourceContentType,
   );
 }
 
@@ -90,20 +91,20 @@ export async function updateClassDefinitions(
  */
 export async function updateClassMacros(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   macrosSource: string,
   lockHandle?: string,
   transportRequest?: string,
-  sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   return updateClassInclude(
     connection,
+    headers,
     className,
     macrosSource,
     'macros',
     lockHandle,
     transportRequest,
-    sourceContentType,
   );
 }
 
@@ -120,29 +121,23 @@ export async function updateClassMacros(
  */
 async function updateClassInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   includeSource: string,
   includeType: 'implementations' | 'definitions' | 'macros',
   lockHandle?: string,
   transportRequest?: string,
-  sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   // Empty source is legitimate: PUTting it is how an include is emptied.
   // Only a missing argument is an error.
 
   const url = `${CLASS_INCLUDE.uri(className, includeType)}${writeQuery(lockHandle, transportRequest)}`;
 
-  const contentType = sourceContentType || CT_SOURCE;
-  const headers = {
-    'Content-Type': contentType,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: includeSource,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

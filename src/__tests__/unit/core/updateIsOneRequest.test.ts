@@ -7,6 +7,7 @@ import { updateDomain } from '../../../core/domain/update';
 import { updatePackage } from '../../../core/package/update';
 import { updateTableType } from '../../../core/tabletype/update';
 import { updateTransport } from '../../../core/transport/update';
+import { headersFor } from '../../helpers/adtHeaders';
 
 /**
  * An update is the write.
@@ -45,6 +46,7 @@ describe('the five DDIC-shaped updates', () => {
     const { connection, methods, bodies } = recording();
     await updateDomain(
       connection,
+      headersFor('AdtDomain.updateMetadata'),
       { domain_name: 'ZOK_DOM' } as never,
       DOCUMENT,
     );
@@ -56,6 +58,7 @@ describe('the five DDIC-shaped updates', () => {
     const { connection, methods, bodies } = recording();
     await updatePackage(
       connection,
+      headersFor('AdtPackage.updateMetadata'),
       { package_name: 'ZOK_PKG' } as never,
       DOCUMENT,
       'LOCK',
@@ -68,6 +71,7 @@ describe('the five DDIC-shaped updates', () => {
     const { connection, methods, bodies } = recording();
     await updateDataElement(
       connection,
+      headersFor('AdtDataElement.updateMetadata'),
       { data_element_name: 'ZOK_DTEL' } as never,
       DOCUMENT,
     );
@@ -79,6 +83,7 @@ describe('the five DDIC-shaped updates', () => {
     const { connection, methods, bodies } = recording();
     await updateTableType(
       connection,
+      headersFor('AdtDdicTableType.updateMetadata'),
       { tabletype_name: 'ZOK_TT' } as never,
       DOCUMENT,
     );
@@ -88,7 +93,12 @@ describe('the five DDIC-shaped updates', () => {
 
   it('updateTransport sends the write and nothing else', async () => {
     const { connection, methods, bodies } = recording();
-    await updateTransport(connection, 'ZOKK900001', DOCUMENT);
+    await updateTransport(
+      connection,
+      headersFor('AdtRequest.updateMetadata'),
+      'ZOKK900001',
+      DOCUMENT,
+    );
     expect(methods).toEqual(['PUT']);
     expect(bodies[0]).toBe(DOCUMENT);
   });

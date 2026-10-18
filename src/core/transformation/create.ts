@@ -1,10 +1,11 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_TRANSFORMATION } from '../../constants/contentTypes';
 import { TRANSFORMATION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateTransformationParams } from './types';
 
@@ -14,6 +15,7 @@ import type { ICreateTransformationParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateTransformationParams,
 ): Promise<IAdtWireResponse> {
   const url = `${TRANSFORMATION.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -37,16 +39,11 @@ export async function create(
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </trans:transformation>`;
 
-  const headers = {
-    Accept: CT_TRANSFORMATION,
-    'Content-Type': CT_TRANSFORMATION,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

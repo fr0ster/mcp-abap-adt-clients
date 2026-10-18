@@ -4,13 +4,14 @@
  * Endpoint: POST /sap/bc/adt/ddic/ddlx/sources
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_METADATA_EXTENSION } from '../../constants/contentTypes';
 import { METADATA_EXTENSION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IMetadataExtensionCreateParams } from './types';
 
 /**
@@ -33,6 +34,7 @@ import type { IMetadataExtensionCreateParams } from './types';
  */
 export async function createMetadataExtension(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IMetadataExtensionCreateParams,
 ): Promise<IAdtWireResponse> {
   const url = METADATA_EXTENSION.collection;
@@ -68,11 +70,6 @@ export async function createMetadataExtension(
 
 </ddlxsources:ddlxSource>`;
 
-  const headers = {
-    Accept: CT_METADATA_EXTENSION,
-    'Content-Type': CT_METADATA_EXTENSION,
-  };
-
   const queryParams = params.transportRequest
     ? { corrNr: params.transportRequest }
     : undefined;
@@ -82,7 +79,7 @@ export async function createMetadataExtension(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
     params: queryParams,
   });
 }

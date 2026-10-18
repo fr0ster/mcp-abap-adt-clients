@@ -6,11 +6,12 @@
  * This function works only for on-premise systems with basic authentication.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_DATA_PREVIEW, CT_SOURCE } from '../../constants/contentTypes';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IGetSqlQueryParams } from './types';
 
 /**
@@ -28,6 +29,7 @@ import type { IGetSqlQueryParams } from './types';
  */
 export async function getSqlQuery(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IGetSqlQueryParams,
 ): Promise<IAdtWireResponse> {
   const rowNumber = params.row_number || 100;
@@ -40,9 +42,6 @@ export async function getSqlQuery(
     // read as "do not abort". How long to wait is the caller's.
     timeout: 0,
     data: params.sql_query,
-    headers: {
-      'Content-Type': CT_SOURCE,
-      Accept: ACCEPT_DATA_PREVIEW,
-    },
+    headers: requestHeaders(headers),
   });
 }

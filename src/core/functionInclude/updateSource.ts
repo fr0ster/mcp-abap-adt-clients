@@ -5,16 +5,14 @@
  * Does NOT lock/unlock — assumes the object is already locked.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_SOURCE,
-  ACCEPT_SOURCE_UTF8,
-} from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Upload function include source code (low-level; uses an existing lockHandle).
@@ -24,16 +22,14 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
  */
 export async function uploadFunctionIncludeSource(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   groupName: string,
   includeName: string,
   sourceCode: string,
   lockHandle: string | undefined,
-  unicode: boolean,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(FUNCTION_INCLUDE.uri(groupName, includeName))}${writeQuery(lockHandle, transportRequest)}`;
-
-  const contentType = unicode ? ACCEPT_SOURCE_UTF8 : ACCEPT_SOURCE;
 
   // The answer is returned rather than discarded: what a write becomes is the
   // consumer's result strategy to decide, and a function that swallowed it left
@@ -43,18 +39,6 @@ export async function uploadFunctionIncludeSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: {
-      'Content-Type': contentType,
-      Accept: ACCEPT_SOURCE,
-      // No `X-sap-adt-sessiontype` here. A write is stateless — Eclipse sends
-      // it that way, carrying only `lockHandle` and `corrNr` — and the header
-      // was set on the request while the connection's own mode was stateless,
-      // so the connector never knew: measured , this PUT went out
-      // labelled stateful without the `sap-adt-request-id` the connector adds
-      // in that mode. What the server takes during a request that runs inside
-      // the session is held by that session, which is what
-      // `stateful covers the lock request, not the window` removed everywhere
-      // else.
-    },
+    headers: requestHeaders(headers),
   });
 }

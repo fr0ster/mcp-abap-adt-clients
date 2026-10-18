@@ -29,6 +29,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -49,7 +50,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
-import { deleteTransport } from './delete';
+import { checkTransportDeletion, deleteTransport } from './delete';
 import { listTransports, requestTransportSearchConfigurations } from './list';
 import {
   addObjectToTransport,
@@ -144,7 +145,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITransportConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -152,7 +153,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     this.logger?.info?.('Creating transport request');
     return answering(
       () =>
-        createTransport(connection, {
+        createTransport(connection, options.headers, {
           transport_type:
             config.transportType === 'customizing'
               ? 'customizing'
@@ -261,7 +262,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -270,7 +271,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
     this.logger?.info?.('Updating transport request:', number);
     return answering(
-      () => updateTransport(connection, number, options?.source as string),
+      () =>
+        updateTransport(
+          connection,
+          options.headers,
+          number,
+          options?.source as string,
+        ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,
@@ -305,7 +312,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -313,7 +320,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     const number = this.number(config);
 
     return answering(
-      () => getTransport(connection, number),
+      () => checkTransportDeletion(connection, options.headers, number),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -323,7 +330,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -332,7 +339,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
     this.logger?.info?.('Deleting transport request:', number);
     return answering(
-      () => deleteTransport(connection, number),
+      () => deleteTransport(connection, options.headers, number),
       this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
       options?.analyse,
     );
@@ -377,7 +384,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   async removeObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
     object: IAbapObjectEntry & { position: string },
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['removedObject']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -385,7 +392,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       `Removing ${object.type} ${object.name} from transport request ${transportNumber}`,
     );
     return answering(
-      () => removeObjectFromTransport(connection, transportNumber, object),
+      () =>
+        removeObjectFromTransport(
+          connection,
+          options.headers,
+          transportNumber,
+          object,
+        ),
       this.results.removedObject as IResultStrategy<
         ReturnType<R['removedObject']>
       >,
@@ -437,7 +450,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     sourceTask: string,
     targetNumber: string,
     objects: readonly (IAbapObjectEntry & { position: string })[],
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['movedObjects']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -448,6 +461,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       () =>
         moveObjectsBetweenTransports(
           connection,
+          options.headers,
           sourceTask,
           targetNumber,
           objects,
@@ -476,7 +490,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   async addObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
     object: IAbapObjectEntry,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['addedObject']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -484,7 +498,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       `Adding ${object.type} ${object.name} to transport request ${transportNumber}`,
     );
     return answering(
-      () => addObjectToTransport(connection, transportNumber, object),
+      () =>
+        addObjectToTransport(
+          connection,
+          options.headers,
+          transportNumber,
+          object,
+        ),
       this.results.addedObject as IResultStrategy<ReturnType<R['addedObject']>>,
       options?.analyse,
     );
@@ -508,7 +528,9 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    */
   async createTask<E extends IAdtError = IAdtError>(
     transportNumber: string,
-    options: { targetUser: string } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & {
+      targetUser: string;
+    } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['createdTask']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -518,7 +540,12 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     );
     return answering(
       () =>
-        createTransportTask(connection, transportNumber, options.targetUser),
+        createTransportTask(
+          connection,
+          options.headers,
+          transportNumber,
+          options.targetUser,
+        ),
       this.results.createdTask as IResultStrategy<ReturnType<R['createdTask']>>,
       options?.analyse,
     );
@@ -593,13 +620,14 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   async changeTaskType<E extends IAdtError = IAdtError>(
     taskNumber: string,
     type: AdtTaskType,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['taskTypeChanged']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(`Changing the type of task ${taskNumber} to`, type);
     return answering(
-      () => changeTransportTaskType(connection, taskNumber, type),
+      () =>
+        changeTransportTaskType(connection, options.headers, taskNumber, type),
       this.results.taskTypeChanged as IResultStrategy<
         ReturnType<R['taskTypeChanged']>
       >,

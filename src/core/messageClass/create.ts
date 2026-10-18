@@ -2,11 +2,13 @@
  * Message class create operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateMessageClassParams } from './types';
 import { buildMessageClassXml } from './xml';
 
@@ -20,6 +22,7 @@ const BASE = MESSAGE_CLASS.collection;
  */
 export async function createMessageClass(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateMessageClassParams,
 ): Promise<IAdtWireResponse> {
   // Emit BOTH adtcore:language and adtcore:masterLanguage (like domain/class),
@@ -46,8 +49,6 @@ export async function createMessageClass(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      'Content-Type': 'application/xml',
-    },
+    headers: requestHeaders(headers),
   });
 }

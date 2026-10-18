@@ -4,9 +4,11 @@
  * when sourceCode is passed. This is the invariant behind removing the dead
  * source_code create-param — source is written by update(), as in Eclipse ADT.
  */
+
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtServiceDefinition } from '../../../core/serviceDefinition/AdtServiceDefinition';
+import { headersOf } from '../../helpers/adtHeaders';
 import { createTestsLogger } from '../../helpers/testLogger';
 
 const logger: ILogger = createTestsLogger();
@@ -42,7 +44,7 @@ describe('AdtServiceDefinition.create is metadata-only', () => {
       packageName: 'ZPKG',
       description: 'meta only',
     };
-    await handler.create(config);
+    await handler.create(config, { headers: headersOf(handler, 'create') });
 
     // @ts-expect-error a create carries no source: the POST has no body for it
     void (() => handler.create({ ...config, source: UNIQUE_SOURCE }));

@@ -2,13 +2,14 @@
  * View update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { DDL_SOURCE, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update view DDL source code
@@ -21,6 +22,7 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
  */
 export async function updateDdl(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   ddlName: string,
   ddlSource: string,
   lockHandle?: string,
@@ -28,16 +30,11 @@ export async function updateDdl(
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(DDL_SOURCE.uri(ddlName))}${writeQuery(lockHandle, transportRequest)}`;
 
-  const headers = {
-    'Content-Type': CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: ddlSource,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

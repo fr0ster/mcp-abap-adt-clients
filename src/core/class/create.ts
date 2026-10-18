@@ -2,16 +2,16 @@
  * Class create operations - Low-level functions
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { CT_CLASS } from '../../constants/contentTypes';
 import { CLASS } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -24,9 +24,9 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateClassParams,
   logger?: ILogger,
-  contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
@@ -80,12 +80,6 @@ export async function create(
 
 </class:abapClass>`;
 
-  const ct = contentTypes?.classCreate();
-  const headers = {
-    Accept: ct?.accept || CT_CLASS,
-    'Content-Type': ct?.contentType || CT_CLASS,
-  };
-
   // Log request details for debugging authorization issues
   if (debugEnabled) {
     logger?.debug?.(`[DEBUG] Creating class - URL: ${url}`);
@@ -104,7 +98,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: metadataXml,
-      headers,
+      headers: requestHeaders(headers),
     });
     return response;
   } catch (error: unknown) {

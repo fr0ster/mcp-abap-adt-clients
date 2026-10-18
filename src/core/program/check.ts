@@ -2,6 +2,7 @@
  * Program check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -13,6 +14,7 @@ import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
  */
 export async function checkProgram(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   programName: string,
   version: CheckRunVersion = 'active',
   sourceCode?: string,
@@ -20,6 +22,7 @@ export async function checkProgram(
 ): Promise<IAdtWireResponse> {
   const response = await runCheckRun(
     connection,
+    headers,
     'program',
     programName,
     version,

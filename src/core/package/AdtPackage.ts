@@ -21,6 +21,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -155,7 +156,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IPackageConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **No guard here, unlike every other create.**
     //
@@ -171,7 +172,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        createPackage(connection, {
+        createPackage(connection, options.headers, {
           package_name: name,
           super_package: config.superPackage as string,
           description: config.description,
@@ -246,7 +247,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -278,6 +279,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
       () =>
         updatePackage(
           connection,
+          options.headers,
           fields,
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata`; the fields above describe a create.
@@ -300,7 +302,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -308,7 +310,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        checkPackageDeletion(connection, {
+        checkPackageDeletion(connection, options.headers, {
           package_name: name,
           transport_request: config.transportRequest,
         }),
@@ -338,7 +340,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -346,7 +348,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const name = this.name(config);
     return answering(
       () =>
-        deletePackage(connection, {
+        deletePackage(connection, options.headers, {
           package_name: name,
           transport_request: config.transportRequest,
         }),
@@ -358,8 +360,8 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   /** Check the package. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -369,7 +371,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkPackage(connection, name, version),
+      () => checkPackage(connection, options.headers, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

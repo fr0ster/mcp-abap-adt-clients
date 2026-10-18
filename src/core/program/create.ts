@@ -2,14 +2,14 @@
  * Program create operations - Low-level functions
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CT_PROGRAM } from '../../constants/contentTypes';
 import { PROGRAM } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateProgramParams } from './types';
 
 /**
@@ -78,8 +78,8 @@ START-OF-SELECTION.
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateProgramParams,
-  contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.programName);
@@ -100,17 +100,11 @@ export async function create(
   <adtcore:packageRef adtcore:name="${args.packageName}"/>
 </program:abapProgram>`;
 
-  const ct = contentTypes?.programCreate();
-  const headers = {
-    Accept: ct?.accept || CT_PROGRAM,
-    'Content-Type': ct?.contentType || CT_PROGRAM,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

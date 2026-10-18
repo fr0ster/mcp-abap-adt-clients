@@ -6,6 +6,7 @@ import { getScalarFunctionImplementationSource } from '../../../../core/scalarFu
 import { unlockScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/unlock';
 import { updateScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/update';
 import { updateScalarFunctionImplementationMetadata } from '../../../../core/scalarFunctionImplementation/updateMetadata';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function cap() {
   const c: { url?: string; method?: string; headers?: Record<string, string> } =
@@ -32,6 +33,7 @@ describe('scalarFunctionImplementation wire', () => {
     const { c, conn } = cap();
     await updateScalarFunctionImplementation(
       conn,
+      headersFor('AdtScalarFunctionImplementation.update'),
       {
         implementation_name: 'ZOK_IMPL',
         source_code: 'x',
@@ -50,6 +52,7 @@ describe('scalarFunctionImplementation wire', () => {
     const { c, conn } = cap();
     await updateScalarFunctionImplementationMetadata(
       conn,
+      headersFor('AdtScalarFunctionImplementation.updateMetadata'),
       {
         implementation_name: 'ZOK_IMPL',
         source_code: '<blues/>',

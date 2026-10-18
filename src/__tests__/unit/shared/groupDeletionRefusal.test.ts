@@ -18,6 +18,7 @@ import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /** What ADT answers when the objects were not deleted. */
 const NOT_DELETED =
@@ -70,7 +71,9 @@ describe('deleteObjectsGroup', () => {
   it('answers the document as it came when no analyse is given', async () => {
     const utils = new AdtUtils(answering(NOT_DELETED), logger);
 
-    const response = await utils.deleteObjectsGroup(ONE_PACKAGE);
+    const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
+      headers: headersOf(utils, 'deleteObjectsGroup'),
+    });
 
     // The library reads no verdict into a 200: the document is the answer, and
     // `isDeleted="false"` is in it for whoever reads it.
@@ -83,6 +86,7 @@ describe('deleteObjectsGroup', () => {
     const utils = new AdtUtils(answering(NOT_DELETED), logger);
 
     const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
+      headers: headersOf(utils, 'deleteObjectsGroup'),
       analyse: analyseDeletion,
     });
 
@@ -106,7 +110,10 @@ describe('deleteObjectsGroup', () => {
     const response = await utils.deleteObjectsGroup(
       [{ name: 'ZGONE', type: 'CLAS/OC' }],
       undefined,
-      { analyse: analyseDeletion },
+      {
+        headers: headersOf(utils, 'deleteObjectsGroup'),
+        analyse: analyseDeletion,
+      },
     );
 
     expect(response.ok).toBe(true);
@@ -117,7 +124,9 @@ describe('checkDeletionGroup', () => {
   it('answers a result when the objects cannot be deleted', async () => {
     const utils = new AdtUtils(answering(NOT_DELETABLE), logger);
 
-    const response = await utils.checkDeletionGroup(ONE_PACKAGE);
+    const response = await utils.checkDeletionGroup(ONE_PACKAGE, {
+      headers: headersOf(utils, 'checkDeletionGroup'),
+    });
 
     // The distinction this file exists for. "No, because it contains 2 objects"
     // is what a caller runs the check to find out; making it a failure would put
@@ -142,7 +151,12 @@ describe('the package URI the group operations ask about', () => {
       }),
     } as unknown as IAbapConnection;
 
-    await new AdtUtils(connection, logger).checkDeletionGroup(ONE_PACKAGE);
+    await new AdtUtils(connection, logger).checkDeletionGroup(ONE_PACKAGE, {
+      headers: headersOf(
+        new AdtUtils(connection, logger),
+        'checkDeletionGroup',
+      ),
+    });
 
     // `DEVC/K` fell through 40 mapped types to a fallback that lowercases the
     // type code, producing `/sap/bc/adt/devc/k/…`. ADT answers that address with

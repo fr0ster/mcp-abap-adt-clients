@@ -10,6 +10,7 @@ import type {
   IAbapDebugger,
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IDebuggerBreakpoint,
   IDebuggerBreakpointSync,
@@ -158,12 +159,15 @@ export class AbapDebugger<
   async setBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     breakpoints: readonly IDebuggerBreakpoint[],
-    options?: { validationOnly?: boolean } & IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & {
+      validationOnly?: boolean;
+    } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
     return answering(
       () =>
         setBreakpoints(
           this.connection,
+          options.headers,
           identity,
           breakpoints,
           options?.validationOnly,
@@ -268,10 +272,10 @@ export class AbapDebugger<
 
   async getChildVariables<E extends IAdtError = IAdtError>(
     parentIds: readonly string[],
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'variables'>, E>> {
     return answering(
-      () => getChildVariables(this.connection, parentIds),
+      () => getChildVariables(this.connection, options.headers, parentIds),
       this.reading('variables'),
       options?.analyse,
     );
@@ -279,10 +283,10 @@ export class AbapDebugger<
 
   async getVariables<E extends IAdtError = IAdtError>(
     variableIds: readonly string[],
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'variables'>, E>> {
     return answering(
-      () => getVariables(this.connection, variableIds),
+      () => getVariables(this.connection, options.headers, variableIds),
       this.reading('variables'),
       options?.analyse,
     );
@@ -407,10 +411,10 @@ export class AbapDebugger<
   async syncBreakpoints<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     sync: IDebuggerBreakpointSync,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
     return answering(
-      () => syncBreakpoints(this.connection, identity, sync),
+      () => syncBreakpoints(this.connection, options.headers, identity, sync),
       this.reading('breakpoints'),
       options?.analyse,
     );
@@ -462,10 +466,10 @@ export class AbapDebugger<
 
   async setDebuggerSettings<E extends IAdtError = IAdtError>(
     settings: IDebuggerSettings,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'settings'>, E>> {
     return answering(
-      () => setDebuggerSettings(this.connection, settings),
+      () => setDebuggerSettings(this.connection, options.headers, settings),
       this.reading('settings'),
       options?.analyse,
     );

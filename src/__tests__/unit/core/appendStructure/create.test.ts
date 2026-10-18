@@ -3,6 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { create } from '../../../../core/appendStructure/create';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function mockConn(capture: {
   url?: string;
@@ -32,7 +33,7 @@ describe('appendStructure create', () => {
       data?: string;
       headers?: Record<string, string>;
     } = {};
-    await create(mockConn(cap), {
+    await create(mockConn(cap), headersFor('AdtAppendStructure.create'), {
       append_structure_name: 'zac_s_append',
       base_object: 'zac_shr_appstru',
       package_name: 'zac_shr_pkg',
@@ -56,12 +57,16 @@ describe('appendStructure create', () => {
 
   it('works identically for a table base (same base_structure key)', async () => {
     const cap: { data?: string } = {};
-    await create(mockConn(cap as any), {
-      append_structure_name: 'zac_s_append_t',
-      base_object: 'zac_shr_apptabl',
-      package_name: 'zac_shr_pkg',
-      description: 'Test',
-    });
+    await create(
+      mockConn(cap as any),
+      headersFor('AdtAppendStructure.create'),
+      {
+        append_structure_name: 'zac_s_append_t',
+        base_object: 'zac_shr_apptabl',
+        package_name: 'zac_shr_pkg',
+        description: 'Test',
+      },
+    );
     expect(cap.data).toContain(
       '<adtcore:adtProperty adtcore:key="base_structure">ZAC_SHR_APPTABL</adtcore:adtProperty>',
     );

@@ -13,9 +13,20 @@
  */
 
 import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
-import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtHeaders,
+  IObjectReference,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
 import { utilDocuments } from '../src/core/shared/utilResultSet';
+
+// Since 36.0.0 a request's Accept and Content-Type are the caller's
+// (`options.headers`): the member sends exactly this pair. These are the ones
+// 35.0.0 chose for itself on a modern system.
+const GROUP_ACTIVATION: IAdtHeaders = {
+  accept: 'application/xml',
+  contentType: 'application/xml',
+};
 
 const statusIn = (document: string): string =>
   /runs:status="([^"]*)"/.exec(document)?.[1] ?? '';
@@ -30,7 +41,9 @@ export async function activateAGroup(
     activation: utilActivationRunId,
   });
 
-  const started = await utils.activateObjectsGroup(objects);
+  const started = await utils.activateObjectsGroup(objects, undefined, {
+    headers: GROUP_ACTIVATION,
+  });
   if (!started.ok) throw new Error(started.getError().message);
   const runId = started.getResult().value;
   if (!runId) throw new Error('the start carried no run id');

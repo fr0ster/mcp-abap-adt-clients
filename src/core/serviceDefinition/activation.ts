@@ -2,11 +2,13 @@
  * ServiceDefinition activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { SERVICE_DEFINITION } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Build activation XML payload
@@ -28,22 +30,18 @@ function buildActivationXml(serviceDefinitionName: string): string {
  */
 export async function activateServiceDefinition(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   serviceDefinitionName: string,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   const xmlBody = buildActivationXml(serviceDefinitionName);
-
-  const headers = {
-    Accept: 'application/xml',
-    'Content-Type': 'application/xml',
-  };
 
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   return response;

@@ -19,6 +19,7 @@ import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -174,24 +175,30 @@ describe('ServiceBinding (using AdtClient)', () => {
 
             if (active.present === true) {
               try {
-                await client.getServiceBinding().update({
-                  bindingName,
-                  desiredPublicationState: 'unpublished',
-                  serviceType,
-                  serviceName,
-                  serviceVersion,
-                });
+                await client.getServiceBinding().update(
+                  {
+                    bindingName,
+                    desiredPublicationState: 'unpublished',
+                    serviceType,
+                    serviceName,
+                    serviceVersion,
+                  },
+                  { headers: headersOf(client.getServiceBinding(), 'update') },
+                );
               } catch {
                 // best-effort: deletion may still work if state is already unpublished
               }
             }
 
-            await client.getServiceBinding().delete({
-              bindingName,
-              transportRequest: resolveTransportRequest(
-                params.transport_request,
-              ),
-            });
+            await client.getServiceBinding().delete(
+              {
+                bindingName,
+                transportRequest: resolveTransportRequest(
+                  params.transport_request,
+                ),
+              },
+              { headers: headersOf(client.getServiceBinding(), 'delete') },
+            );
             await new Promise((resolve) => setTimeout(resolve, 2000));
           } catch (error: any) {
             if (error?.response?.status === 404) {
@@ -326,23 +333,26 @@ describe('ServiceBinding (using AdtClient)', () => {
     };
 
     try {
-      await client.getPackage().create({
-        packageName: testSubpackage,
-        superPackage: parentPackage,
-        description: `ServiceBinding test package ${testSubpackage}`,
-        softwareComponent: parentSoftwareComponent,
-        packageType: parentPackageType,
-        transportLayer: parentTransportLayer,
-        applicationComponent: parentApplicationComponent,
-        responsible: parentResponsible,
-        // **A package on a transport layer has to record changes.** Without
-        // this the create is refused with `TR 432`, "Change recording must be
-        // activated for package …", and the only symptom here was the package
-        // never becoming readable. It inherits the parent's setting where the
-        // parent states one, and a transport layer means yes either way.
-        recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
-        transportRequest: resolveTransportRequest(params.transport_request),
-      });
+      await client.getPackage().create(
+        {
+          packageName: testSubpackage,
+          superPackage: parentPackage,
+          description: `ServiceBinding test package ${testSubpackage}`,
+          softwareComponent: parentSoftwareComponent,
+          packageType: parentPackageType,
+          transportLayer: parentTransportLayer,
+          applicationComponent: parentApplicationComponent,
+          responsible: parentResponsible,
+          // **A package on a transport layer has to record changes.** Without
+          // this the create is refused with `TR 432`, "Change recording must be
+          // activated for package …", and the only symptom here was the package
+          // never becoming readable. It inherits the parent's setting where the
+          // parent states one, and a transport layer means yes either way.
+          recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
+          transportRequest: resolveTransportRequest(params.transport_request),
+        },
+        { headers: headersOf(client.getPackage(), 'create') },
+      );
     } catch (error: any) {
       // Package create may return 404/409 when package was created but not readable yet.
       const status = error?.response?.status;

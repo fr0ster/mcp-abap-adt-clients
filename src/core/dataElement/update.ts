@@ -2,13 +2,14 @@
  * DataElement update operations — one PUT of the document the caller built.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_DATA_ELEMENT } from '../../constants/contentTypes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateDataElementParams } from './types';
 
 /**
@@ -26,6 +27,7 @@ import type { IUpdateDataElementParams } from './types';
  */
 export async function updateDataElement(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateDataElementParams,
   document: string,
   lockHandle?: string,
@@ -37,10 +39,6 @@ export async function updateDataElement(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: {
-      Accept: ACCEPT_DATA_ELEMENT,
-      'Content-Type':
-        'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8',
-    },
+    headers: requestHeaders(headers),
   });
 }

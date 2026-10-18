@@ -4,15 +4,16 @@
  * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { CT_INTERFACE } from '../../constants/contentTypes';
 import { INTERFACE } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateInterfaceParams } from './types';
 
 /**
@@ -39,6 +40,7 @@ ENDINTERFACE.`;
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateInterfaceParams,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -66,18 +68,13 @@ export async function create(
 
   const url = `${INTERFACE.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
-  const headers = {
-    'Content-Type': CT_INTERFACE,
-    Accept: CT_INTERFACE,
-  };
-
   try {
     const response = await connection.makeAdtRequest({
       url,
       method: 'POST',
       timeout: 0,
       data: payload,
-      headers,
+      headers: requestHeaders(headers),
     });
 
     // No status test here: a non-2xx already arrives as the transport's

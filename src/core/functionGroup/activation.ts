@@ -2,17 +2,20 @@
  * FunctionGroup activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Activate function group
  */
 export async function activateFunctionGroup(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   functionGroupName: string,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${FUNCTION_GROUP.uri(functionGroupName)}`;
@@ -29,10 +32,7 @@ export async function activateFunctionGroup(
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers: {
-      'Content-Type': 'application/xml',
-      Accept: 'application/xml',
-    },
+    headers: requestHeaders(headers),
   });
   return response;
 }

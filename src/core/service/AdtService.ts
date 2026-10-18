@@ -1,5 +1,4 @@
 import type {
-  GeneratedServiceType,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -7,6 +6,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -28,24 +28,15 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
-  ACCEPT_CHECK_MESSAGES,
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  ACCEPT_PUBLICATION_JOB,
   ACCEPT_TRANSPORT_CHECK,
-  CT_CHECK_OBJECTS,
-  CT_DELETION,
-  CT_DELETION_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import {
-  buildQueryString,
-  encodeSapObjectName,
-} from '../../utils/internalUtils';
+import { buildQueryString } from '../../utils/internalUtils';
 import { lockHandleOf } from '../../utils/lockHandle';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
@@ -163,6 +154,7 @@ export class AdtServiceBinding<
   }
 
   private async publishByServiceType(
+    headers: IAdtHeaders,
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
     // **The caller's, when they give one — else none.** A publication job is
@@ -206,10 +198,7 @@ export class AdtServiceBinding<
       // passed one: `0` is what the wires read as "do not abort".
       timeout: timeout ?? 0,
       data: xml,
-      headers: {
-        Accept: ACCEPT_PUBLICATION_JOB,
-        'Content-Type': 'application/xml',
-      },
+      headers: requestHeaders(headers),
       // `sap-cancel-on-close: true` is what Eclipse adds and this does not, on
       // purpose. It tells the server to abandon the job when the connection
       // goes, and this library's caller is far likelier to give up before 133
@@ -219,6 +208,7 @@ export class AdtServiceBinding<
   }
 
   private async unpublishByServiceType(
+    headers: IAdtHeaders,
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
     // **The caller's, when they give one — else none.** A publication job is
@@ -261,10 +251,7 @@ export class AdtServiceBinding<
       // passed one: `0` is what the wires read as "do not abort".
       timeout: timeout ?? 0,
       data: xml,
-      headers: {
-        Accept: ACCEPT_PUBLICATION_JOB,
-        'Content-Type': 'application/xml',
-      },
+      headers: requestHeaders(headers),
       // `sap-cancel-on-close: true` is what Eclipse adds and this does not, on
       // purpose. It tells the server to abandon the job when the connection
       // goes, and this library's caller is far likelier to give up before 133
@@ -314,7 +301,7 @@ export class AdtServiceBinding<
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IServiceBindingConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -342,7 +329,7 @@ export class AdtServiceBinding<
     const bindingVariant = config.bindingVariant;
     return answering(
       () =>
-        this.createRequest(connection, {
+        this.createRequest(connection, options.headers, {
           bindingName: name,
           packageName,
           description: description as string,
@@ -435,7 +422,7 @@ export class AdtServiceBinding<
     // caller could not see it. The parameter is contravariant, so the class
     // still satisfies `IAdtUpdatable`.
     config: IServiceBindingPublicationConfig,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -487,7 +474,7 @@ export class AdtServiceBinding<
           };
 
     return answering(
-      () => this.updateRequest(connection, publication),
+      () => this.updateRequest(connection, options.headers, publication),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       // A publication change IS this member's write, and the job reports its
       // outcome as `SEVERITY` inside a 200. Reading it is the caller's:
@@ -581,7 +568,7 @@ export class AdtServiceBinding<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -589,7 +576,7 @@ export class AdtServiceBinding<
     const name = this.name(config);
 
     return answering(
-      () => this.deletionCheckRequest(connection, name),
+      () => this.deletionCheckRequest(connection, options.headers, name),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -599,7 +586,7 @@ export class AdtServiceBinding<
 
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -608,7 +595,7 @@ export class AdtServiceBinding<
 
     return answering(
       () =>
-        this.deleteRequest(connection, {
+        this.deleteRequest(connection, options.headers, {
           bindingName: name,
           transportRequest: config.transportRequest,
         }),
@@ -625,7 +612,7 @@ export class AdtServiceBinding<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -634,7 +621,7 @@ export class AdtServiceBinding<
 
     return answering(
       () =>
-        this.activateRequest(connection, {
+        this.activateRequest(connection, options.headers, {
           bindingName: name,
           preauditRequested: true,
         }),
@@ -646,8 +633,8 @@ export class AdtServiceBinding<
   /** Check the binding. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -656,7 +643,11 @@ export class AdtServiceBinding<
     const version = status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => this.checkRequest(connection, { bindingName: name, version }),
+      () =>
+        this.checkRequest(connection, options.headers, {
+          bindingName: name,
+          version,
+        }),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );
@@ -720,6 +711,7 @@ export class AdtServiceBinding<
   /** ADT's generic deletion check, over this binding's URI. */
   private async deletionCheckRequest(
     connection: IAbapConnection,
+    headers: IAdtHeaders,
     name: string,
   ): Promise<IAdtWireResponse> {
     return connection.makeAdtRequest({
@@ -730,10 +722,7 @@ export class AdtServiceBinding<
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${SERVICE_BINDING.uri(name)}"/>
 </del:checkRequest>`,
-      headers: {
-        Accept: ACCEPT_DELETION_CHECK,
-        'Content-Type': CT_DELETION_CHECK,
-      },
+      headers: requestHeaders(headers),
     });
   }
 
@@ -755,6 +744,7 @@ export class AdtServiceBinding<
 
   private async createRequest(
     connection: IAbapConnection,
+    headers: IAdtHeaders,
     params: ICreateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     // The language, the master system and the author come from what the caller
@@ -779,12 +769,7 @@ export class AdtServiceBinding<
       method: 'POST',
       timeout: 0,
       data: this.buildServiceBindingCreateXml(createParams),
-      headers: {
-        Accept:
-          'application/vnd.sap.adt.businessservices.servicebinding.v1+xml, application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
-        'Content-Type':
-          'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
-      },
+      headers: requestHeaders(headers),
       params: queryParams,
     });
   }
@@ -825,6 +810,7 @@ export class AdtServiceBinding<
    */
   private async updateRequest(
     connection: IAbapConnection,
+    headers: IAdtHeaders,
     params: IServiceBindingPublicationParams,
   ): Promise<IAdtWireResponse> {
     if (params.desiredPublicationState === 'unchanged') {
@@ -858,12 +844,14 @@ export class AdtServiceBinding<
 
     return params.desiredPublicationState === 'published'
       ? this.publishByServiceType(
+          headers,
           serviceType as 'odatav2' | 'odatav4',
           params.bindingName,
           params.timeout,
           service,
         )
       : this.unpublishByServiceType(
+          headers,
           serviceType as 'odatav2' | 'odatav4',
           params.bindingName,
           params.timeout,
@@ -873,6 +861,7 @@ export class AdtServiceBinding<
 
   private async deleteRequest(
     connection: IAbapConnection,
+    headers: IAdtHeaders,
     params: IDeleteServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     return connection.makeAdtRequest({
@@ -880,15 +869,13 @@ export class AdtServiceBinding<
       method: 'POST',
       timeout: 0,
       data: this.buildDeletionXml(params),
-      headers: {
-        Accept: ACCEPT_DELETION,
-        'Content-Type': CT_DELETION,
-      },
+      headers: requestHeaders(headers),
     });
   }
 
   private async checkRequest(
     connection: IAbapConnection,
+    headers: IAdtHeaders,
     params: ICheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     const version = params.version ?? 'inactive';
@@ -900,15 +887,13 @@ export class AdtServiceBinding<
       method: 'POST',
       timeout: 0,
       data: xml,
-      headers: {
-        Accept: ACCEPT_CHECK_MESSAGES,
-        'Content-Type': CT_CHECK_OBJECTS,
-      },
+      headers: requestHeaders(headers),
     });
   }
 
   private async activateRequest(
     connection: IAbapConnection,
+    headers: IAdtHeaders,
     params: IActivateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     const preauditRequested =
@@ -921,10 +906,7 @@ export class AdtServiceBinding<
       method: 'POST',
       timeout: 0,
       data: xml,
-      headers: {
-        Accept: 'application/xml',
-        'Content-Type': 'application/xml',
-      },
+      headers: requestHeaders(headers),
     });
   }
 

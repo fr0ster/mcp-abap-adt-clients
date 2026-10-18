@@ -4,6 +4,7 @@
  * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -27,6 +28,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateMetadataExtension(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   preaudit: boolean = true,
 ): Promise<IAdtWireResponse> {
@@ -34,6 +36,7 @@ export async function activateMetadataExtension(
 
   return activateObjectInSession(
     connection,
+    headers,
     objectUri,
     name.toUpperCase(),
     preaudit,

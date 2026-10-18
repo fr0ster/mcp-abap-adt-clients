@@ -7,6 +7,7 @@
 
 import type {
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
@@ -27,7 +28,7 @@ export class AdtFunctionGroupLegacy<
 > extends AdtFunctionGroup<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = config.functionGroupName as string;
 
@@ -36,6 +37,7 @@ export class AdtFunctionGroupLegacy<
       () =>
         deleteObjectDirect(
           withCallTimeout(this.connection, options?.timeout),
+          options.headers,
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

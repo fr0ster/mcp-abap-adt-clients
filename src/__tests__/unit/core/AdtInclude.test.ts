@@ -10,6 +10,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtInclude } from '../../../core/include';
+import { headersOf } from '../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../helpers/contract';
 
 const LOCK_XML = `<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH1</LOCK_HANDLE></DATA></asx:values></asx:abap>`;
@@ -50,10 +51,13 @@ describe('AdtInclude', () => {
   describe('the create document', () => {
     it('escapes every user value, so a quote or an ampersand cannot break it', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create({
-        ...BASE,
-        description: 'R&D "quoted" <tagged>',
-      });
+      await new AdtInclude(connection, logger).create(
+        {
+          ...BASE,
+          description: 'R&D "quoted" <tagged>',
+        },
+        { headers: headersOf(new AdtInclude(connection, logger), 'create') },
+      );
 
       const body = String(
         calls.find((c) => c.url === '/sap/bc/adt/programs/includes')?.data,
@@ -68,7 +72,9 @@ describe('AdtInclude', () => {
 
     it('is an include document, not a program one', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create(BASE);
+      await new AdtInclude(connection, logger).create(BASE, {
+        headers: headersOf(new AdtInclude(connection, logger), 'create'),
+      });
 
       const body = String(calls[0]?.data);
       expect(body).toContain('include:abapInclude');
@@ -85,7 +91,10 @@ describe('AdtInclude', () => {
       // No source: `createInclude` reads the description, package, transport
       // and master language, and nothing else. Passing it here said a create
       // writes a source, which it does not.
-      await new AdtInclude(connection, logger).create({ ...BASE });
+      await new AdtInclude(connection, logger).create(
+        { ...BASE },
+        { headers: headersOf(new AdtInclude(connection, logger), 'create') },
+      );
 
       expect(calls.some((c) => c.url.includes('/activation'))).toBe(false);
     });
@@ -94,7 +103,10 @@ describe('AdtInclude', () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
         { includeName: 'ZMY_INC' },
-        { source: '" only in options' },
+        {
+          headers: headersOf(new AdtInclude(connection, logger), 'update'),
+          source: '" only in options',
+        },
       );
 
       const put = calls.find((c) => c.method === 'PUT');
@@ -105,7 +117,10 @@ describe('AdtInclude', () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
         { includeName: 'ZMY_INC' },
-        { source: '" code' },
+        {
+          headers: headersOf(new AdtInclude(connection, logger), 'update'),
+          source: '" code',
+        },
       );
 
       expect(calls.some((c) => c.url.includes('/activation'))).toBe(false);
@@ -116,7 +131,11 @@ describe('AdtInclude', () => {
       expectResult(
         await new AdtInclude(connection, logger).update(
           { includeName: 'ZMY_INC' },
-          { source: '" code', lockHandle: 'CALLER_HANDLE' },
+          {
+            headers: headersOf(new AdtInclude(connection, logger), 'update'),
+            source: '" code',
+            lockHandle: 'CALLER_HANDLE',
+          },
         ),
         'update with a caller-held lock',
       );
@@ -137,7 +156,10 @@ describe('AdtInclude', () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
         { includeName: 'ZMY_INC' },
-        { source: '' },
+        {
+          headers: headersOf(new AdtInclude(connection, logger), 'update'),
+          source: '',
+        },
       );
 
       const put = calls.find((c) => c.method === 'PUT');
@@ -169,9 +191,14 @@ describe('AdtInclude', () => {
       );
 
       const failure = expectFailure(
-        await new AdtInclude(connection, logger).activate({
-          includeName: 'ZMY_INC',
-        }),
+        await new AdtInclude(connection, logger).activate(
+          {
+            includeName: 'ZMY_INC',
+          },
+          {
+            headers: headersOf(new AdtInclude(connection, logger), 'activate'),
+          },
+        ),
         'an activation the server refuses',
       );
 
@@ -188,9 +215,15 @@ describe('AdtInclude', () => {
     it('addresses /programs/includes, never /programs/programs', async () => {
       const { connection, calls } = createConnection();
       const include = new AdtInclude(connection, logger);
-      await include.create({ ...BASE });
+      await include.create(
+        { ...BASE },
+        { headers: headersOf(include, 'create') },
+      );
       await include.readMetadata({ includeName: 'ZMY_INC' });
-      await include.delete({ includeName: 'ZMY_INC' });
+      await include.delete(
+        { includeName: 'ZMY_INC' },
+        { headers: headersOf(include, 'delete') },
+      );
 
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) {

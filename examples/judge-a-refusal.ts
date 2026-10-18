@@ -13,8 +13,20 @@
  * crude, because its shape is not the point.
  */
 
-import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtHeaders,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
+
+// Since 36.0.0 a request's Accept and Content-Type are the caller's
+// (`options.headers`): the member sends exactly this pair. These are the ones
+// 35.0.0 chose for itself on a modern system.
+const ACTIVATION: IAdtHeaders = {
+  accept: 'application/xml',
+  contentType: 'application/vnd.sap.adt.activation+xml',
+};
 
 export const activationRefusal: IAnalyse<IAdtError> = (verdict, answer) => {
   const document = String(answer?.data ?? '');
@@ -31,12 +43,12 @@ export async function judgeARefusal(
 
   // Without a strategy: the exchange, as it happened. A checklist saying the
   // class was not activated is still an answer, and `ok` is true.
-  const unjudged = await cls.activate({ className });
+  const unjudged = await cls.activate({ className }, { headers: ACTIVATION });
 
   // With yours: the same exchange, now a failure carrying the document.
   const judged = await cls.activate(
     { className },
-    { analyse: activationRefusal },
+    { headers: ACTIVATION, analyse: activationRefusal },
   );
 
   return { unjudged: unjudged.ok, judged: judged.ok };

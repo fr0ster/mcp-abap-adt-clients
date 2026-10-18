@@ -20,6 +20,7 @@ import type {
   IAdtAbapGitClientOptions,
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtResponse,
   IAnalyse,
   IResultStrategy,
@@ -57,32 +58,33 @@ export class AdtAbapGitClient<
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
-  private readonly contentTypeVersion: 'v3' | 'v4';
   private readonly results: R;
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
-    options?: IAdtAbapGitClientOptions,
+    // `contentTypeVersion` chose the type `link` and `pull` sent. Since 36.0.0
+    // those take the caller's `headers`, so nothing here reads it any more;
+    // the parameter stays because the contract's options still carry it.
+    _options?: IAdtAbapGitClientOptions,
     // The one cast in this file, and it is on the default. See AdtClass.
     results: R = abapGitDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
-    this.contentTypeVersion = options?.contentTypeVersion ?? 'v3';
     this.results = results;
   }
 
   /** Link a package to a repository. */
   async link<E extends IAdtError = IAdtError>(
     args: IAbapGitLinkArgs,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     this.logger?.debug?.(
       `AdtAbapGitClient.link: package=${args.package} url=${args.url}`,
     );
     return answering(
-      () => linkRepo(this.connection, args, this.contentTypeVersion),
+      () => linkRepo(this.connection, options.headers, args),
       this.results.linked as IResultStrategy<void>,
       options?.analyse as IAnalyse<E> | undefined,
     );
@@ -97,11 +99,11 @@ export class AdtAbapGitClient<
    */
   async pull<E extends IAdtError = IAdtError>(
     args: IAbapGitPullArgs,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['pulled']>, E>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
     return answering(
-      () => pullRepo(this.connection, args, this.contentTypeVersion),
+      () => pullRepo(this.connection, options.headers, args),
       this.results.pulled as IResultStrategy<ReturnType<R['pulled']>>,
       options?.analyse as IAnalyse<E> | undefined,
     );
@@ -148,10 +150,10 @@ export class AdtAbapGitClient<
   /** What an external repository offers, before linking anything to it. */
   async checkExternalRepo<E extends IAdtError = IAdtError>(
     args: IAbapGitExternalRepoCredentials,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['externalRepo']>, E>> {
     return answering(
-      () => checkExternalRepo(this.connection, args),
+      () => checkExternalRepo(this.connection, options.headers, args),
       this.results.externalRepo as IResultStrategy<
         ReturnType<R['externalRepo']>
       >,

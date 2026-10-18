@@ -43,6 +43,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersFor } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -140,10 +141,14 @@ async function removeIt(
   transportRequest: string,
 ): Promise<void> {
   try {
-    const wire = await deleteDomain(connection, {
-      domain_name: name,
-      transport_request: transportRequest || undefined,
-    });
+    const wire = await deleteDomain(
+      connection,
+      headersFor('AdtDomain.delete'),
+      {
+        domain_name: name,
+        transport_request: transportRequest || undefined,
+      },
+    );
     say(`[cleanup] ${name}: delete answered ${wire.status}`);
   } catch (error) {
     say(`[cleanup] ${name}: delete threw — ${(error as Error).message}`);
@@ -193,7 +198,7 @@ async function main(): Promise<void> {
       const started = Date.now();
       report(
         'POST /sap/bc/adt/ddic/domains',
-        await createDomain(connection, {
+        await createDomain(connection, headersFor('AdtDomain.create'), {
           domain_name: A,
           package_name: packageName,
           description: 'Probe: no type in the create body',
@@ -220,7 +225,7 @@ async function main(): Promise<void> {
       const started = Date.now();
       report(
         'POST /sap/bc/adt/activation (A)',
-        await activateDomain(connection, A),
+        await activateDomain(connection, headersFor('AdtDomain.activate'), A),
         Date.now() - started,
       );
     } catch (error) {
@@ -260,7 +265,7 @@ async function main(): Promise<void> {
       const started = Date.now();
       report(
         'POST /sap/bc/adt/activation (B)',
-        await activateDomain(connection, B),
+        await activateDomain(connection, headersFor('AdtDomain.activate'), B),
         Date.now() - started,
       );
     } catch (error) {

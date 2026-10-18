@@ -4,6 +4,7 @@
  * Uses standard ABAP check run endpoint
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -27,6 +28,7 @@ import { runCheckRun } from '../../utils/checkRun';
  */
 export async function checkMetadataExtension(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,
@@ -37,6 +39,7 @@ export async function checkMetadataExtension(
 
   return runCheckRun(
     connection,
+    headers,
     objectType,
     objectName,
     version,

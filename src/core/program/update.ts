@@ -2,9 +2,10 @@
  * Program update operations - low-level functions for AdtProgram
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { PROGRAM, sourceUri } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Upload program source code (low-level - uses existing lockHandle)
@@ -13,6 +14,7 @@ import { PROGRAM, sourceUri } from '../../endpoints/objects';
  */
 export async function uploadProgramSource(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   programName: string,
   sourceCode: string,
   lockHandle: string,
@@ -24,16 +26,11 @@ export async function uploadProgramSource(
     url += `&corrNr=${corrNr}`;
   }
 
-  const headers = {
-    'Content-Type': CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

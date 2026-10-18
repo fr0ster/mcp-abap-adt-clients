@@ -2,17 +2,13 @@
  * Group Deletion operations - delete multiple objects with session support
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DELETION,
-  ACCEPT_DELETION_CHECK,
-  CT_DELETION,
-  CT_DELETION_CHECK,
-} from '../../constants/contentTypes';
 import { buildObjectUri } from '../../utils/activationUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IObjectReference } from './types';
 
 /**
@@ -46,6 +42,7 @@ import type { IObjectReference } from './types';
  */
 export async function checkDeletionGroup(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objects: IObjectReference[],
 ): Promise<IAdtWireResponse> {
   const checkUrl = `/sap/bc/adt/deletion/check`;
@@ -62,17 +59,12 @@ export async function checkDeletionGroup(
 ${objectElements}
 </del:checkRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION_CHECK,
-    'Content-Type': CT_DELETION_CHECK,
-  };
-
   return connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -108,6 +100,7 @@ ${objectElements}
  */
 export async function deleteObjectsGroup(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objects: IObjectReference[],
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
@@ -131,11 +124,6 @@ export async function deleteObjectsGroup(
 ${objectElements}
 </del:deletionRequest>`;
 
-  const headers = {
-    Accept: ACCEPT_DELETION,
-    'Content-Type': CT_DELETION,
-  };
-
   // The answer as it came. ADT answers **200** and reports per object —
   // `del:isDeleted="false"` with a `del:message` for one it kept — so the status
   // is not the verdict, and neither is this function: `analyseDeletion` in
@@ -145,6 +133,6 @@ ${objectElements}
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

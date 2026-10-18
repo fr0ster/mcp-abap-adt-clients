@@ -2,17 +2,17 @@
  * FunctionModule check operations
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtContentTypes,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { FUNCTION_MODULE } from '../../endpoints/objects';
 import type { CheckRunVersion } from '../../utils/checkRun';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Build check run XML payload for function module
@@ -65,6 +65,7 @@ function buildCheckRunXml(
  */
 export async function checkFunctionModule(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   functionGroupName: string,
   functionModuleName: string,
   version: 'active' | 'inactive',
@@ -78,10 +79,6 @@ export async function checkFunctionModule(
     sourceCode,
     contentTypes?.sourceArtifactContentType(),
   );
-  const headers = {
-    Accept: ACCEPT_CHECK_MESSAGES,
-    'Content-Type': CT_CHECK_OBJECTS,
-  };
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
   const response = await connection.makeAdtRequest({
@@ -89,7 +86,7 @@ export async function checkFunctionModule(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 
   return response;

@@ -2,11 +2,13 @@
  * Group Activation operations - activate multiple objects with session support
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { buildObjectUri } from '../../utils/activationUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IObjectReference } from './types';
 
 /**
@@ -94,6 +96,7 @@ export async function getActivationResults(
  */
 export async function activateObjectsGroup(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objects: IObjectReference[],
   preauditRequested: boolean = false,
 ): Promise<IAdtWireResponse> {
@@ -113,16 +116,11 @@ export async function activateObjectsGroup(
 ${objectReferences}
 </adtcore:objectReferences>`;
 
-  const headers = {
-    Accept: 'application/xml',
-    'Content-Type': 'application/xml',
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

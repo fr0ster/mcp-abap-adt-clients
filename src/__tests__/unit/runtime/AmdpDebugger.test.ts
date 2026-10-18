@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /**
  * Each member sends the request Eclipse ADT sends — read from its
@@ -101,6 +102,7 @@ describe('AmdpDebugger', () => {
   it('getDataPreview posts text/plain — empty without a SELECT, the SELECT otherwise', async () => {
     const whole = setup({ status: 200, data: '', headers: {} });
     await whole.debugger_.getDataPreview({
+      headers: headersOf(whole.debugger_, 'getDataPreview'),
       rowNumber: 100,
       sessionId: 'dbhost:30103:263414',
       debuggerId: MAIN_ID,
@@ -117,6 +119,7 @@ describe('AmdpDebugger', () => {
 
     const select = setup({ status: 200, data: '', headers: {} });
     await select.debugger_.getDataPreview({
+      headers: headersOf(select.debugger_, 'getDataPreview'),
       sessionId: 'dbhost:30103:263414',
       debuggerId: MAIN_ID,
       debuggeeId: DEBUGGEE,

@@ -2,6 +2,7 @@
  * Structure check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -16,6 +17,7 @@ import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
  */
 export async function checkStructure(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   structureName: string,
   version: CheckRunVersion = 'active',
   sourceCode?: string,
@@ -23,6 +25,7 @@ export async function checkStructure(
 ): Promise<IAdtWireResponse> {
   const response = await runCheckRun(
     connection,
+    headers,
     'structure',
     structureName,
     version,

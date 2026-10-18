@@ -37,6 +37,7 @@ import {
   getSystemInformation,
   isModernAdtSystem,
 } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /** A refusal the provider raised before SAP was asked. */
 function refused(): AuthRefusedError {
@@ -96,11 +97,19 @@ describe('a message-class write (chain)', () => {
     );
 
     await expect(
-      new AdtMessageClassMessage(connection, noopLogger).update({
-        className: 'ZT',
-        msgno: '001',
-        msgtext: 'NEW',
-      }),
+      new AdtMessageClassMessage(connection, noopLogger).update(
+        {
+          className: 'ZT',
+          msgno: '001',
+          msgtext: 'NEW',
+        },
+        {
+          headers: headersOf(
+            new AdtMessageClassMessage(connection, noopLogger),
+            'update',
+          ),
+        },
+      ),
     ).rejects.toBe(thrown);
 
     expect(calls.some((c) => c.includes('_action=UNLOCK_ALL'))).toBe(true);
@@ -118,11 +127,19 @@ describe('a message-class write (chain)', () => {
     );
 
     await expect(
-      new AdtMessageClassMessage(connection, noopLogger).update({
-        className: 'ZT',
-        msgno: '001',
-        msgtext: 'NEW',
-      }),
+      new AdtMessageClassMessage(connection, noopLogger).update(
+        {
+          className: 'ZT',
+          msgno: '001',
+          msgtext: 'NEW',
+        },
+        {
+          headers: headersOf(
+            new AdtMessageClassMessage(connection, noopLogger),
+            'update',
+          ),
+        },
+      ),
     ).rejects.toBe(thrown);
 
     expect(calls.some((c) => c.includes('_action=UNLOCK_ALL'))).toBe(true);
@@ -141,11 +158,14 @@ describe('a class create', () => {
     } as unknown as IAbapConnection;
 
     await expect(
-      new AdtClass(connection, noopLogger).create({
-        className: 'ZCL_T',
-        packageName: 'ZP',
-        description: 'd',
-      }),
+      new AdtClass(connection, noopLogger).create(
+        {
+          className: 'ZCL_T',
+          packageName: 'ZP',
+          description: 'd',
+        },
+        { headers: headersOf(new AdtClass(connection, noopLogger), 'create') },
+      ),
     ).rejects.toBe(thrown);
   });
 });

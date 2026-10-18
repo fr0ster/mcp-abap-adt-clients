@@ -19,6 +19,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IProgramConfig } from '../../../../core/program';
 import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -127,10 +128,13 @@ describe('Program (using AdtClient)', () => {
                 libraryLogger,
                 systemContext,
               );
-              await cleanupClient.getProgram().delete({
-                programName,
-                transportRequest,
-              });
+              await cleanupClient.getProgram().delete(
+                {
+                  programName,
+                  transportRequest,
+                },
+                { headers: headersOf(cleanupClient.getProgram(), 'delete') },
+              );
               await new Promise((resolve) => setTimeout(resolve, 3000));
             } catch (cleanupError: any) {
               return {

@@ -1,12 +1,10 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_FEATURE_TOGGLE_CHECK_RESULT,
-  CT_FEATURE_TOGGLE_CHECK_PARAMETERS,
-} from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * `POST …/check` — the toggle's current state and what changing it would
@@ -18,6 +16,7 @@ import { FEATURE_TOGGLE } from '../../endpoints/objects';
  */
 export async function checkFeatureToggleState(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   opts?: { userSpecific?: boolean },
 ): Promise<IAdtWireResponse> {
@@ -28,10 +27,7 @@ export async function checkFeatureToggleState(
     method: 'POST',
     url: `${FEATURE_TOGGLE.uri(name)}/check`,
     timeout: 0,
-    headers: {
-      'Content-Type': CT_FEATURE_TOGGLE_CHECK_PARAMETERS,
-      Accept: ACCEPT_FEATURE_TOGGLE_CHECK_RESULT,
-    },
+    headers: requestHeaders(headers),
     data: JSON.stringify(body),
   });
 }

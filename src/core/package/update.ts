@@ -2,13 +2,14 @@
  * Package update operations — one PUT of the document the caller built.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdatePackageParams } from './types';
 
 /**
@@ -26,6 +27,7 @@ import type { IUpdatePackageParams } from './types';
  */
 export async function updatePackage(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdatePackageParams,
   document: string,
   lockHandle: string,
@@ -40,6 +42,6 @@ export async function updatePackage(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: { 'Content-Type': CT_PACKAGE, Accept: ACCEPT_PACKAGE },
+    headers: requestHeaders(headers),
   });
 }

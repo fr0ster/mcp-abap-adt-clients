@@ -20,6 +20,7 @@
  * wired and with the parameter erased. Objects and numbers cannot be confused
  * by either the runtime or the compiler.
  */
+
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -29,6 +30,7 @@ import { AdtClient } from '../../../clients/AdtClient';
 import { classDocuments } from '../../../core/class/types';
 import { featureToggleDocuments } from '../../../core/featureToggle/types';
 import { functionIncludeDocuments } from '../../../core/functionInclude/types';
+import { headersOf } from '../../helpers/adtHeaders';
 
 const logger = {
   log: jest.fn(),
@@ -72,7 +74,10 @@ describe('an injected reading reaches the caller as its own type', () => {
 
     const source = await cls.read({ className: 'ZCL_X' });
     const metadata = await cls.readMetadata({ className: 'ZCL_X' });
-    const deletable = await cls.checkDeletion({ className: 'ZCL_X' });
+    const deletable = await cls.checkDeletion(
+      { className: 'ZCL_X' },
+      { headers: headersOf(cls, 'checkDeletion') },
+    );
 
     if (!source.ok || !metadata.ok || !deletable.ok) {
       throw new Error('expected results');
@@ -94,13 +99,19 @@ describe('an injected reading reaches the caller as its own type', () => {
       metadataUpdated: () => ({ wrote: 'document' }) as const,
     });
 
-    const wroteSource = await toggle.update({
-      featureToggleName: 'ZFT',
-      source: { rollout: { defaultEnabledFor: 'none' } },
-    } as never);
-    const wroteDocument = await toggle.updateMetadata({
-      featureToggleName: 'ZFT',
-    });
+    const wroteSource = await toggle.update(
+      {
+        featureToggleName: 'ZFT',
+        source: { rollout: { defaultEnabledFor: 'none' } },
+      } as never,
+      { headers: headersOf(toggle, 'update') },
+    );
+    const wroteDocument = await toggle.updateMetadata(
+      {
+        featureToggleName: 'ZFT',
+      },
+      { headers: headersOf(toggle, 'updateMetadata') },
+    );
 
     if (!wroteSource.ok || !wroteDocument.ok)
       throw new Error('expected results');
@@ -120,13 +131,16 @@ describe('an injected reading reaches the caller as its own type', () => {
 
     const source = await include.update(
       { functionGroupName: 'ZFG', includeName: 'LZFGF01' },
-      { source: '* code' },
+      { headers: headersOf(include, 'update'), source: '* code' },
     );
-    const document = await include.updateMetadata({
-      functionGroupName: 'ZFG',
-      includeName: 'LZFGF01',
-      description: 'x',
-    });
+    const document = await include.updateMetadata(
+      {
+        functionGroupName: 'ZFG',
+        includeName: 'LZFGF01',
+        description: 'x',
+      },
+      { headers: headersOf(include, 'updateMetadata') },
+    );
 
     if (!source.ok || !document.ok) throw new Error('expected results');
     const a: string = source.getResult().value;

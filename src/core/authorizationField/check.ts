@@ -2,16 +2,14 @@
  * AuthorizationField (SUSO / AUTH) check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_AUTHORIZATION_FIELD,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
+import { CT_AUTHORIZATION_FIELD } from '../../constants/contentTypes';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check authorization field via /sap/bc/adt/checkruns?reporters=abapCheckRun.
@@ -25,6 +23,7 @@ import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
  */
 export async function checkAuthorizationField(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
@@ -56,10 +55,7 @@ export async function checkAuthorizationField(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_CHECK_MESSAGES,
-      'Content-Type': CT_CHECK_OBJECTS,
-    },
+    headers: requestHeaders(headers),
   });
 
   return response;

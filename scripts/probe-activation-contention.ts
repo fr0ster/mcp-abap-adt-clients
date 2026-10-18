@@ -26,6 +26,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -113,7 +114,9 @@ async function main(): Promise<void> {
     const clsA = new AdtClient(a, logger).getClass();
     const clsB = new AdtClient(b, logger).getClass();
 
-    const created = await clsA.create(config);
+    const created = await clsA.create(config, {
+      headers: headersOf(clsA, 'create'),
+    });
     note(
       `A     create    ${
         created.ok

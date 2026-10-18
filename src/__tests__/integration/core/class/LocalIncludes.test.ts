@@ -25,6 +25,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -103,14 +104,22 @@ describe('Class local includes (using BaseTester)', () => {
         return { success: true, created: false };
       }
 
-      await client.getClass().create({
-        className: config.className,
-        packageName: config.packageName,
-        transportRequest: config.transportRequest,
-        description: config.description || `Test class ${config.className}`,
-      });
+      await client.getClass().create(
+        {
+          className: config.className,
+          packageName: config.packageName,
+          transportRequest: config.transportRequest,
+          description: config.description || `Test class ${config.className}`,
+        },
+        { headers: headersOf(client.getClass(), 'create') },
+      );
 
-      await client.getClass().activate({ className: config.className });
+      await client
+        .getClass()
+        .activate(
+          { className: config.className },
+          { headers: headersOf(client.getClass(), 'activate') },
+        );
       return { success: true, created: true };
     } catch (error: any) {
       return {
@@ -301,12 +310,15 @@ describe('Class local includes (using BaseTester)', () => {
 
         if (shouldCleanup) {
           try {
-            await client.getClass().delete({
-              className: parentInfo.className,
-              transportRequest: resolveTransportRequest(
-                tc?.params?.transport_request,
-              ),
-            });
+            await client.getClass().delete(
+              {
+                className: parentInfo.className,
+                transportRequest: resolveTransportRequest(
+                  tc?.params?.transport_request,
+                ),
+              },
+              { headers: headersOf(client.getClass(), 'delete') },
+            );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
               `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
@@ -378,12 +390,15 @@ describe('Class local includes (using BaseTester)', () => {
 
         if (shouldCleanup) {
           try {
-            await client.getClass().delete({
-              className: parentInfo.className,
-              transportRequest: resolveTransportRequest(
-                tc?.params?.transport_request,
-              ),
-            });
+            await client.getClass().delete(
+              {
+                className: parentInfo.className,
+                transportRequest: resolveTransportRequest(
+                  tc?.params?.transport_request,
+                ),
+              },
+              { headers: headersOf(client.getClass(), 'delete') },
+            );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
               `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
@@ -455,12 +470,15 @@ describe('Class local includes (using BaseTester)', () => {
 
         if (shouldCleanup) {
           try {
-            await client.getClass().delete({
-              className: parentInfo.className,
-              transportRequest: resolveTransportRequest(
-                tc?.params?.transport_request,
-              ),
-            });
+            await client.getClass().delete(
+              {
+                className: parentInfo.className,
+                transportRequest: resolveTransportRequest(
+                  tc?.params?.transport_request,
+                ),
+              },
+              { headers: headersOf(client.getClass(), 'delete') },
+            );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
               `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
@@ -532,12 +550,15 @@ describe('Class local includes (using BaseTester)', () => {
 
         if (shouldCleanup) {
           try {
-            await client.getClass().delete({
-              className: parentInfo.className,
-              transportRequest: resolveTransportRequest(
-                tc?.params?.transport_request,
-              ),
-            });
+            await client.getClass().delete(
+              {
+                className: parentInfo.className,
+                transportRequest: resolveTransportRequest(
+                  tc?.params?.transport_request,
+                ),
+              },
+              { headers: headersOf(client.getClass(), 'delete') },
+            );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
               `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,

@@ -2,13 +2,14 @@
  * View create operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_VIEW, CT_VIEW } from '../../constants/contentTypes';
 import { DDL_SOURCE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateDdlParams } from './types';
 
 /**
@@ -16,6 +17,7 @@ import type { ICreateDdlParams } from './types';
  */
 async function createDDLSObject(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateDdlParams,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
@@ -40,17 +42,12 @@ async function createDDLSObject(
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 </ddl:ddlSource>`;
 
-  const headers = {
-    Accept: ACCEPT_VIEW,
-    'Content-Type': CT_VIEW,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -61,11 +58,12 @@ async function createDDLSObject(
  */
 export async function createDdl(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateDdlParams,
 ): Promise<IAdtWireResponse> {
   if (!params.ddl_name || !params.package_name) {
     throw new Error('Missing required parameters: ddl_name and package_name');
   }
 
-  return createDDLSObject(connection, params);
+  return createDDLSObject(connection, headers, params);
 }

@@ -26,6 +26,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -259,7 +260,9 @@ async function readStop(debuggerApi: AbapDebugger): Promise<void> {
   );
   const frames = parseStack(stack.body);
   const root = await call('variables', 'list the scopes', () =>
-    debuggerApi.getChildVariables(['@ROOT']),
+    debuggerApi.getChildVariables(['@ROOT'], {
+      headers: headersOf(debuggerApi, 'getChildVariables'),
+    }),
   );
   const scopes = [
     ...root.body.matchAll(
@@ -270,7 +273,11 @@ async function readStop(debuggerApi: AbapDebugger): Promise<void> {
     ? await call(
         'variables',
         `read ${scopes.length} scope${scopes.length === 1 ? '' : 's'}`,
-        () => debuggerApi.getChildVariables(scopes.map((s) => s.id)),
+        () =>
+          debuggerApi.getChildVariables(
+            scopes.map((s) => s.id),
+            { headers: headersOf(debuggerApi, 'getChildVariables') },
+          ),
       )
     : { ok: true, body: '' };
 
@@ -388,7 +395,7 @@ async function deployProbeClass(
     description: 'Debugger probe',
   };
   const created = await call('create', `${CLASS_NAME} in ${packageName}`, () =>
-    cls.create(config),
+    cls.create(config, { headers: headersOf(cls, 'create') }),
   );
   if (!created.ok && !/exist/i.test(created.body)) return false;
   const lock = await cls.lock(config);
@@ -398,11 +405,19 @@ async function deployProbeClass(
   }
   const lockHandle = String(lock.getResult().value ?? '');
   const written = await call('write', 'source with markers', () =>
-    cls.update(config, { source: SOURCE, lockHandle }),
+    cls.update(config, {
+      headers: headersOf(cls, 'update'),
+      source: SOURCE,
+      lockHandle,
+    }),
   );
   await cls.unlock(config, lockHandle);
   if (!written.ok) return false;
-  return (await call('activate', CLASS_NAME, () => cls.activate(config))).ok;
+  return (
+    await call('activate', CLASS_NAME, () =>
+      cls.activate(config, { headers: headersOf(cls, 'activate') }),
+    )
+  ).ok;
 }
 
 async function main(): Promise<void> {
@@ -488,11 +503,14 @@ async function main(): Promise<void> {
       `${breakpoints.length} breakpoints, nothing armed`,
       () =>
         debuggerApi.setBreakpoints(identity, breakpoints, {
+          headers: headersOf(debuggerApi, 'setBreakpoints'),
           validationOnly: true,
         }),
     );
     const armed = await call('arm', `${breakpoints.length} breakpoints`, () =>
-      debuggerApi.setBreakpoints(identity, breakpoints),
+      debuggerApi.setBreakpoints(identity, breakpoints, {
+        headers: headersOf(debuggerApi, 'setBreakpoints'),
+      }),
     );
     const owned = [
       ...armed.body.matchAll(/<breakpoint\b[^>]*\bid="([^"]*)"/g),
@@ -672,9 +690,15 @@ async function main(): Promise<void> {
     if (!keep) {
       section('Teardown');
       await call('delete', CLASS_NAME, () =>
-        new AdtClient(debuggerConnection, quietLogger)
-          .getClass()
-          .delete({ className: CLASS_NAME, packageName }),
+        new AdtClient(debuggerConnection, quietLogger).getClass().delete(
+          { className: CLASS_NAME, packageName },
+          {
+            headers: headersOf(
+              new AdtClient(debuggerConnection, quietLogger).getClass(),
+              'delete',
+            ),
+          },
+        ),
       );
     }
     await closeOwnTestConnection(triggerConnection);

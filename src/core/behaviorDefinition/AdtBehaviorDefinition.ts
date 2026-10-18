@@ -12,6 +12,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -156,7 +157,7 @@ export class AdtBehaviorDefinition<
     config: Omit<IBehaviorDefinitionConfig, 'source'> & {
       source?: never;
     },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -178,7 +179,7 @@ export class AdtBehaviorDefinition<
     const name = this.name(config);
     return answering(
       () =>
-        createBehaviorDefinition(connection, {
+        createBehaviorDefinition(connection, options.headers, {
           name,
           package: config.packageName as string,
           description: config.description as string,
@@ -277,7 +278,7 @@ export class AdtBehaviorDefinition<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -292,7 +293,7 @@ export class AdtBehaviorDefinition<
 
     return answering(
       () =>
-        updateBehaviorDefinition(connection, {
+        updateBehaviorDefinition(connection, options.headers, {
           name,
           sourceCode: source as string,
           lockHandle: options?.lockHandle,
@@ -312,14 +313,14 @@ export class AdtBehaviorDefinition<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
     return answering(
-      () => checkDeletion(connection, name),
+      () => checkDeletion(connection, options.headers, name),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -338,14 +339,20 @@ export class AdtBehaviorDefinition<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
     return answering(
-      () => deleteBehaviorDefinition(connection, name, config.transportRequest),
+      () =>
+        deleteBehaviorDefinition(
+          connection,
+          options.headers,
+          name,
+          config.transportRequest,
+        ),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -354,7 +361,7 @@ export class AdtBehaviorDefinition<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -362,7 +369,7 @@ export class AdtBehaviorDefinition<
     const name = this.name(config);
 
     return answering(
-      () => activateBehaviorDefinition(connection, name),
+      () => activateBehaviorDefinition(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -371,8 +378,8 @@ export class AdtBehaviorDefinition<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -385,6 +392,7 @@ export class AdtBehaviorDefinition<
       () =>
         checkBehaviorDefinition(
           connection,
+          options.headers,
           name,
           'abapCheckRun',
           '',

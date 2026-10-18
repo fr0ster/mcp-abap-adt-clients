@@ -2,13 +2,15 @@
  * Class update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE, sourceUri } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update class source code (low-level function)
@@ -22,11 +24,11 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
  */
 export async function updateClass(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   className: string,
   sourceCode: string,
   lockHandle?: string,
   transportRequest?: string,
-  sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   // **No lock handle is not this library's verdict.** It used to throw here, and
   // an update without a lock is a thing ADT judges: it answers its own refusal,
@@ -34,18 +36,12 @@ export async function updateClass(
   // parameter is simply left off the URL rather than sent empty.
   const url = `${sourceUri(CLASS.uri(className))}${writeQuery(lockHandle, transportRequest)}`;
 
-  const contentType = sourceContentType || CT_SOURCE;
-  const headers = {
-    'Content-Type': contentType,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 

@@ -16,6 +16,7 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   getConfig,
@@ -102,11 +103,14 @@ async function testLongPollingRead() {
         console.log(`  Creating domain: ${testDomainName}`);
         console.log(`  Using package: ${packageName}`);
         const createStartTime = Date.now();
-        await client.getDomain().create({
-          domainName: testDomainName,
-          packageName: packageName,
-          description: 'Test domain for long polling',
-        });
+        await client.getDomain().create(
+          {
+            domainName: testDomainName,
+            packageName: packageName,
+            description: 'Test domain for long polling',
+          },
+          { headers: headersOf(client.getDomain(), 'create') },
+        );
         const createTime = Date.now() - createStartTime;
         console.log(`  ✓ Domain created in ${createTime}ms`);
 
@@ -150,7 +154,12 @@ async function testLongPollingRead() {
 
         // Cleanup
         console.log(`  Cleaning up...`);
-        await client.getDomain().delete({ domainName: testDomainName });
+        await client
+          .getDomain()
+          .delete(
+            { domainName: testDomainName },
+            { headers: headersOf(client.getDomain(), 'delete') },
+          );
         console.log(`  ✓ Domain deleted\n`);
       } catch (error: any) {
         console.error(`  ✗ Test failed:`, error.message);
@@ -161,7 +170,12 @@ async function testLongPollingRead() {
 
         // Try cleanup
         try {
-          await client.getDomain().delete({ domainName: testDomainName });
+          await client
+            .getDomain()
+            .delete(
+              { domainName: testDomainName },
+              { headers: headersOf(client.getDomain(), 'delete') },
+            );
         } catch (cleanupError) {
           console.error(`  Failed to cleanup:`, cleanupError);
         }
@@ -178,11 +192,14 @@ async function testLongPollingRead() {
         console.log(`  Creating domain: ${testDomainName2}`);
         console.log(`  Using package: ${packageName}`);
         const createStartTime2 = Date.now();
-        await client.getDomain().create({
-          domainName: testDomainName2,
-          packageName: packageName,
-          description: 'Test domain for long polling comparison',
-        });
+        await client.getDomain().create(
+          {
+            domainName: testDomainName2,
+            packageName: packageName,
+            description: 'Test domain for long polling comparison',
+          },
+          { headers: headersOf(client.getDomain(), 'create') },
+        );
         const createTime2 = Date.now() - createStartTime2;
         console.log(`  ✓ Domain created in ${createTime2}ms`);
 
@@ -236,7 +253,12 @@ async function testLongPollingRead() {
         }
 
         // Cleanup
-        await client.getDomain().delete({ domainName: testDomainName2 });
+        await client
+          .getDomain()
+          .delete(
+            { domainName: testDomainName2 },
+            { headers: headersOf(client.getDomain(), 'delete') },
+          );
         console.log(`  ✓ Domain deleted\n`);
       } catch (error: any) {
         console.error(`  ✗ Test failed:`, error.message);
@@ -256,7 +278,12 @@ async function testLongPollingRead() {
           }
         }
         try {
-          await client.getDomain().delete({ domainName: testDomainName2 });
+          await client
+            .getDomain()
+            .delete(
+              { domainName: testDomainName2 },
+              { headers: headersOf(client.getDomain(), 'delete') },
+            );
         } catch (cleanupError) {
           console.error(`  Failed to cleanup:`, cleanupError);
         }

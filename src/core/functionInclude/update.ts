@@ -6,17 +6,15 @@
  * with ?lockHandle=...).
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  ACCEPT_FUNCTION_INCLUDE,
-  CT_FUNCTION_INCLUDE,
-} from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFunctionIncludeParams } from './types';
 import { buildFunctionIncludeXml } from './xmlBuilder';
 
@@ -31,6 +29,7 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  */
 export async function updateFunctionInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateFunctionIncludeParams,
   lockHandle?: string,
   logger?: ILogger,
@@ -52,9 +51,6 @@ export async function updateFunctionInclude(
     method: 'PUT',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_FUNCTION_INCLUDE,
-      'Content-Type': CT_FUNCTION_INCLUDE,
-    },
+    headers: requestHeaders(headers),
   });
 }

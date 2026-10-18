@@ -17,6 +17,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
@@ -150,7 +151,7 @@ export abstract class AdtClassMemberBase<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -159,7 +160,8 @@ export abstract class AdtClassMemberBase<
     // required argument is the caller's mistake, and it throws.
 
     return answering(
-      () => activateClass(connection, config.className as string),
+      () =>
+        activateClass(connection, options.headers, config.className as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );

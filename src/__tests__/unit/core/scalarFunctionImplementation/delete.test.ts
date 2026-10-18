@@ -6,6 +6,7 @@ import {
   checkDeletion,
   deleteScalarFunctionImplementation,
 } from '../../../../core/scalarFunctionImplementation/delete';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function capConn() {
   const calls: Array<{ data?: string }> = [];
@@ -27,7 +28,11 @@ function capConn() {
 describe('scalarFunctionImplementation delete', () => {
   it('checkDeletion uses the lower-cased dsfi URI', async () => {
     const { calls, conn } = capConn();
-    await checkDeletion(conn, { implementation_name: 'ZOK_IMPL' });
+    await checkDeletion(
+      conn,
+      headersFor('AdtScalarFunctionImplementation.checkDeletion'),
+      { implementation_name: 'ZOK_IMPL' },
+    );
     expect(calls[0].data).toContain(
       'adtcore:uri="/sap/bc/adt/ddic/dsfi/zok_impl"',
     );
@@ -35,9 +40,13 @@ describe('scalarFunctionImplementation delete', () => {
 
   it('delete uses the lower-cased dsfi URI', async () => {
     const { calls, conn } = capConn();
-    await deleteScalarFunctionImplementation(conn, {
-      implementation_name: 'ZOK_IMPL',
-    });
+    await deleteScalarFunctionImplementation(
+      conn,
+      headersFor('AdtScalarFunctionImplementation.delete'),
+      {
+        implementation_name: 'ZOK_IMPL',
+      },
+    );
     expect(calls[0].data).toContain(
       'adtcore:uri="/sap/bc/adt/ddic/dsfi/zok_impl"',
     );

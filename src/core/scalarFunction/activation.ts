@@ -1,8 +1,10 @@
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { SCALAR_FUNCTION } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 function buildActivationXml(name: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -13,6 +15,7 @@ function buildActivationXml(name: string): string {
 
 export async function activateScalarFunction(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
@@ -21,7 +24,7 @@ export async function activateScalarFunction(
     method: 'POST',
     timeout: 0,
     data: buildActivationXml(name),
-    headers: { Accept: 'application/xml', 'Content-Type': 'application/xml' },
+    headers: requestHeaders(headers),
   });
   return response;
 }

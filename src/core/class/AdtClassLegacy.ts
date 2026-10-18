@@ -14,6 +14,7 @@
 
 import type {
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
@@ -36,7 +37,7 @@ export class AdtClassLegacy<
    */
   override async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // Low-level mode: caller owns the session
 
@@ -51,7 +52,7 @@ export class AdtClassLegacy<
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = config.className as string;
 
@@ -60,6 +61,7 @@ export class AdtClassLegacy<
       () =>
         deleteObjectDirect(
           withCallTimeout(this.connection, options?.timeout),
+          options.headers,
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

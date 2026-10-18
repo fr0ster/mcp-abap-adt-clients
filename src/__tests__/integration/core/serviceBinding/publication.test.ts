@@ -58,6 +58,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { headersOf } from '../../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -259,7 +260,11 @@ describe('Service binding publication (deliberate runs)', () => {
             }
           : { serviceType: 'odatav4' as const }),
       },
-      { timeout: c.timeoutMs, analyse: analysePublication },
+      {
+        headers: headersOf(bindings, 'update'),
+        timeout: c.timeoutMs,
+        analyse: analysePublication,
+      },
     );
     const spent = Math.round((Date.now() - started) / 1000);
 

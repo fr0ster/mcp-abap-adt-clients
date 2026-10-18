@@ -13,6 +13,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { transportObjectEntries } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -83,6 +84,7 @@ async function main(): Promise<void> {
       from,
       to,
       picked.map((e) => ({ ...e, position: e.position as string })),
+      { headers: headersOf(request, 'moveObjects') },
     );
     if (moved.ok) {
       const wire = moved.getResult().value;

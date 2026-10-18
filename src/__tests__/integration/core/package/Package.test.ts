@@ -17,6 +17,7 @@ import type { IPackageConfig } from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -170,7 +171,10 @@ describe('Package (using AdtClient)', () => {
                 packageName: cfg.packageName,
                 transportRequest: cfg.transportRequest,
               },
-              { analyse: analyseDeletion },
+              {
+                headers: headersOf(client.getPackage(), 'delete'),
+                analyse: analyseDeletion,
+              },
             ),
             `delete package ${cfg.packageName}`,
           );

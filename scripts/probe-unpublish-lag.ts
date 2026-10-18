@@ -12,6 +12,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -45,13 +46,16 @@ async function main(): Promise<void> {
     );
 
     const started = Date.now();
-    const answer = await bindings.update({
-      bindingName,
-      desiredPublicationState: 'unpublished',
-      serviceType: serviceType as 'odatav2' | 'odatav4',
-      serviceName,
-      serviceVersion,
-    });
+    const answer = await bindings.update(
+      {
+        bindingName,
+        desiredPublicationState: 'unpublished',
+        serviceType: serviceType as 'odatav2' | 'odatav4',
+        serviceName,
+        serviceVersion,
+      },
+      { headers: headersOf(bindings, 'update') },
+    );
     // biome-ignore lint/suspicious/noConsole: same
     console.log(
       `unpublish answered after ${Date.now() - started}ms: ` +

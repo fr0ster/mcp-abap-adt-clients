@@ -25,6 +25,7 @@ import * as path from 'node:path';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -167,10 +168,10 @@ async function main(): Promise<void> {
 
     if (args.includes('--delete')) {
       out(
-        `delete ${CLASS_NAME}: ${verdict(await adt.getClass().delete(classConfig))}`,
+        `delete ${CLASS_NAME}: ${verdict(await adt.getClass().delete(classConfig, { headers: headersOf(adt.getClass(), 'delete') }))}`,
       );
       out(
-        `delete ${DDL_NAME}: ${verdict(await adt.getDdl().delete(ddlConfig))}`,
+        `delete ${DDL_NAME}: ${verdict(await adt.getDdl().delete(ddlConfig, { headers: headersOf(adt.getDdl(), 'delete') }))}`,
       );
       return;
     }
@@ -181,22 +182,26 @@ async function main(): Promise<void> {
 
     // Shells first, then the bodies: neither source compiles without the other.
     const ddl = adt.getDdl();
-    out(`create ${DDL_NAME}: ${verdict(await ddl.create(ddlConfig))}`);
+    out(
+      `create ${DDL_NAME}: ${verdict(await ddl.create(ddlConfig, { headers: headersOf(ddl, 'create') }))}`,
+    );
     const ddlLock = await ddl.lock(ddlConfig);
     if (!ddlLock.ok) throw new Error(`lock ${DDL_NAME}: ${verdict(ddlLock)}`);
     const ddlHandle = String(ddlLock.getResult().value ?? '');
     out(
-      `write ${DDL_NAME}: ${verdict(await ddl.update(ddlConfig, { source: DDL_SOURCE, lockHandle: ddlHandle }))}`,
+      `write ${DDL_NAME}: ${verdict(await ddl.update(ddlConfig, { headers: headersOf(ddl, 'update'), source: DDL_SOURCE, lockHandle: ddlHandle }))}`,
     );
     await ddl.unlock(ddlConfig, ddlHandle);
 
     const cls = adt.getClass();
-    out(`create ${CLASS_NAME}: ${verdict(await cls.create(classConfig))}`);
+    out(
+      `create ${CLASS_NAME}: ${verdict(await cls.create(classConfig, { headers: headersOf(cls, 'create') }))}`,
+    );
     const clsLock = await cls.lock(classConfig);
     if (!clsLock.ok) throw new Error(`lock ${CLASS_NAME}: ${verdict(clsLock)}`);
     const clsHandle = String(clsLock.getResult().value ?? '');
     out(
-      `write ${CLASS_NAME}: ${verdict(await cls.update(classConfig, { source: CLASS_SOURCE, lockHandle: clsHandle }))}`,
+      `write ${CLASS_NAME}: ${verdict(await cls.update(classConfig, { headers: headersOf(cls, 'update'), source: CLASS_SOURCE, lockHandle: clsHandle }))}`,
     );
     await cls.unlock(classConfig, clsHandle);
 
@@ -206,10 +211,14 @@ async function main(): Promise<void> {
       ...utilDocuments,
       activation: wireItself,
     });
-    const started = await utils.activateObjectsGroup([
-      { type: 'DDLS/DF', name: DDL_NAME },
-      { type: 'CLAS/OC', name: CLASS_NAME },
-    ]);
+    const started = await utils.activateObjectsGroup(
+      [
+        { type: 'DDLS/DF', name: DDL_NAME },
+        { type: 'CLAS/OC', name: CLASS_NAME },
+      ],
+      undefined,
+      { headers: headersOf(utils, 'activateObjectsGroup') },
+    );
     const wire = started.ok ? started.getResult().value : undefined;
     const location = String(
       wire?.headers?.location ?? wire?.headers?.Location ?? '',

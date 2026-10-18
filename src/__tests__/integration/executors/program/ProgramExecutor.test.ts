@@ -15,6 +15,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
 import {
@@ -338,7 +339,10 @@ describe('ProgramExecutor (integration)', () => {
         );
         const programExecutor = programRunner;
         const profilerId = expectResult(
-          await programExecutor.scheduleTrace(profilerParameters),
+          await programExecutor.scheduleTrace({
+            ...profilerParameters,
+            headers: headersOf(programExecutor, 'scheduleTrace'),
+          }),
           'scheduled trace',
         );
         const result = {

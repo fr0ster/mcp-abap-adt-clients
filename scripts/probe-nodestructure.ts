@@ -15,6 +15,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { readNodeStructure } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
+import { headersFor } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
     for (const name of packages) {
       const root = await fetchNodeStructure(
         connection,
+        headersFor('AdtUtils.fetchNodeStructure'),
         'DEVC/K',
         name,
         undefined,

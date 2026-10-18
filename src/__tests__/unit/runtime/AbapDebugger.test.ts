@@ -17,6 +17,7 @@ import {
   executeBatchRequest,
   readListenerConflict,
 } from '../../../runtime/debugger/abap';
+import { headersOf } from '../../helpers/adtHeaders';
 
 /**
  * Each member sends the request the measured sequence sends
@@ -63,10 +64,14 @@ describe('AbapDebugger', () => {
 
   it('a line breakpoint carries its condition', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setBreakpoints(identity, [
-      { kind: 'line', uri: '/x/source/main#start=3', condition: 'lv_i > 2' },
-      { kind: 'exception', exceptionClass: 'CX_X' },
-    ]);
+    await debugger_.setBreakpoints(
+      identity,
+      [
+        { kind: 'line', uri: '/x/source/main#start=3', condition: 'lv_i > 2' },
+        { kind: 'exception', exceptionClass: 'CX_X' },
+      ],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
+    );
     expect(sent().data).toContain(
       '<breakpoint kind="line" adtcore:uri="/x/source/main#start=3" condition="lv_i &gt; 2"/>',
     );
@@ -77,18 +82,22 @@ describe('AbapDebugger', () => {
 
   it('clientId is sent on every kind and escaped', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setBreakpoints(identity, [
-      { kind: 'line', uri: '/x/source/main#start=3', clientId: 'a<1>' },
-      { kind: 'exception', exceptionClass: 'CX_X', clientId: 'b"2' },
-      { kind: 'statement', statement: 'COMMIT WORK', clientId: 'c&3' },
-      {
-        kind: 'message',
-        msgId: 'XX',
-        msgNo: '001',
-        msgTy: 'E',
-        clientId: 'd4',
-      },
-    ]);
+    await debugger_.setBreakpoints(
+      identity,
+      [
+        { kind: 'line', uri: '/x/source/main#start=3', clientId: 'a<1>' },
+        { kind: 'exception', exceptionClass: 'CX_X', clientId: 'b"2' },
+        { kind: 'statement', statement: 'COMMIT WORK', clientId: 'c&3' },
+        {
+          kind: 'message',
+          msgId: 'XX',
+          msgNo: '001',
+          msgTy: 'E',
+          clientId: 'd4',
+        },
+      ],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
+    );
     const body = sent().data as string;
     expect(body).toContain('clientId="a&lt;1&gt;"');
     expect(body).toContain('clientId="b&quot;2"');
@@ -98,12 +107,16 @@ describe('AbapDebugger', () => {
 
   it('clientId is sent through syncBreakpoints as well', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.syncBreakpoints(identity, {
-      scope: 'full',
-      breakpoints: [
-        { kind: 'exception', exceptionClass: 'CX_X', clientId: 'k1' },
-      ],
-    });
+    await debugger_.syncBreakpoints(
+      identity,
+      {
+        scope: 'full',
+        breakpoints: [
+          { kind: 'exception', exceptionClass: 'CX_X', clientId: 'k1' },
+        ],
+      },
+      { headers: headersOf(debugger_, 'syncBreakpoints') },
+    );
     expect(sent().data).toContain(
       '<breakpoint kind="exception" exceptionClass="CX_X" clientId="k1"/>',
     );
@@ -120,9 +133,11 @@ describe('AbapDebugger', () => {
       'utf8',
     );
     const { debugger_ } = setup({ status: 200, data: recorded, headers: {} });
-    const answer = await debugger_.setBreakpoints(identity, [
-      { kind: 'line', uri: '/x/source/main#start=5', clientId: 'client-1' },
-    ]);
+    const answer = await debugger_.setBreakpoints(
+      identity,
+      [{ kind: 'line', uri: '/x/source/main#start=5', clientId: 'client-1' }],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
+    );
     expect(answer.ok).toBe(true);
     if (!answer.ok) return;
     const rows = [
@@ -141,9 +156,11 @@ describe('AbapDebugger', () => {
 
   it('no clientId attribute when none is set', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setBreakpoints(identity, [
-      { kind: 'line', uri: '/x/source/main#start=3' },
-    ]);
+    await debugger_.setBreakpoints(
+      identity,
+      [{ kind: 'line', uri: '/x/source/main#start=3' }],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
+    );
     expect(sent().data).not.toContain('clientId');
   });
 
@@ -154,7 +171,9 @@ describe('AbapDebugger', () => {
       exceptionClass: 'CX_X',
       condition: 'a = 1',
     } as unknown as IDebuggerBreakpoint;
-    const answer = await debugger_.setBreakpoints(identity, [smuggled]);
+    const answer = await debugger_.setBreakpoints(identity, [smuggled], {
+      headers: headersOf(debugger_, 'setBreakpoints'),
+    });
     expect(answer.ok).toBe(false);
     if (!answer.ok) {
       expect(answer.getError().message).toMatch(/condition/);
@@ -169,10 +188,14 @@ describe('AbapDebugger', () => {
       exceptionClass: 'CX_X',
       condition: 'a = 1',
     } as unknown as IDebuggerBreakpoint;
-    const answer = await debugger_.syncBreakpoints(identity, {
-      scope: 'full',
-      breakpoints: [smuggled],
-    });
+    const answer = await debugger_.syncBreakpoints(
+      identity,
+      {
+        scope: 'full',
+        breakpoints: [smuggled],
+      },
+      { headers: headersOf(debugger_, 'syncBreakpoints') },
+    );
     expect(answer.ok).toBe(false);
     if (!answer.ok) {
       expect(answer.getError().message).toMatch(/condition/);
@@ -182,10 +205,14 @@ describe('AbapDebugger', () => {
 
   it('syncBreakpoints full replaces the set; an empty set clears it', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.syncBreakpoints(identity, {
-      scope: 'full',
-      breakpoints: [],
-    });
+    await debugger_.syncBreakpoints(
+      identity,
+      {
+        scope: 'full',
+        breakpoints: [],
+      },
+      { headers: headersOf(debugger_, 'syncBreakpoints') },
+    );
     expect(sent().url).toBe('/sap/bc/adt/debugger/breakpoints');
     expect(sent().method).toBe('POST');
     expect(sent().data).toContain('<syncScope mode="full"/>');
@@ -194,16 +221,23 @@ describe('AbapDebugger', () => {
 
   it('syncBreakpoints partial names each object', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.syncBreakpoints(identity, {
-      scope: 'partial',
-      objects: ['/sap/bc/adt/oo/classes/zcl_a', '/sap/bc/adt/oo/classes/zcl_b'],
-      breakpoints: [
-        {
-          kind: 'line',
-          uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=3',
-        },
-      ],
-    });
+    await debugger_.syncBreakpoints(
+      identity,
+      {
+        scope: 'partial',
+        objects: [
+          '/sap/bc/adt/oo/classes/zcl_a',
+          '/sap/bc/adt/oo/classes/zcl_b',
+        ],
+        breakpoints: [
+          {
+            kind: 'line',
+            uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=3',
+          },
+        ],
+      },
+      { headers: headersOf(debugger_, 'syncBreakpoints') },
+    );
     expect(sent().data).toContain(
       '<syncScope mode="partial"><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_a"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_b"/></syncScope>',
     );
@@ -214,6 +248,7 @@ describe('AbapDebugger', () => {
     await debugger_.setBreakpoints(
       { ...identity, terminalId: 'T"&1', ideId: 'I<"2' },
       [{ kind: 'statement', statement: 'RAISE' }],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
     );
     expect(sent().data).toContain('terminalId="T&quot;&amp;1"');
     expect(sent().data).toContain('ideId="I&lt;&quot;2"');
@@ -221,15 +256,19 @@ describe('AbapDebugger', () => {
 
   it('setBreakpoints posts the user-mode set without a syncScope', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setBreakpoints(identity, [
-      {
-        kind: 'line',
-        uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
-      },
-      { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
-      { kind: 'statement', statement: 'RAISE' },
-      { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
-    ]);
+    await debugger_.setBreakpoints(
+      identity,
+      [
+        {
+          kind: 'line',
+          uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
+        },
+        { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
+        { kind: 'statement', statement: 'RAISE' },
+        { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
+      ],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
+    );
 
     const request = sent();
     expect(request.url).toBe('/sap/bc/adt/debugger/breakpoints');
@@ -258,7 +297,7 @@ describe('AbapDebugger', () => {
     await debugger_.setBreakpoints(
       identity,
       [{ kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' }],
-      { validationOnly: true },
+      { headers: headersOf(debugger_, 'setBreakpoints'), validationOnly: true },
     );
     expect(sent().data).toContain(
       'exceptionClass="CX_SY_ZERODIVIDE" validationOnly="true"/>',
@@ -334,12 +373,16 @@ describe('AbapDebugger', () => {
 
   it('a terminal identity arms breakpoints without requestUser', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setBreakpoints(terminal, [
-      {
-        kind: 'line',
-        uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
-      },
-    ]);
+    await debugger_.setBreakpoints(
+      terminal,
+      [
+        {
+          kind: 'line',
+          uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
+        },
+      ],
+      { headers: headersOf(debugger_, 'setBreakpoints') },
+    );
     expect(sent().data).toContain(
       'debuggingMode="terminal" scope="external" terminalId="EC80D3662BADB8CD21C70406E0E96D4C" ideId="7194D729E68FDAF6E185C7E5124CC900"',
     );
@@ -394,7 +437,9 @@ describe('AbapDebugger', () => {
 
   it('getChildVariables sends the hierarchy rows in the ChildVariables type', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.getChildVariables(['@ROOT']);
+    await debugger_.getChildVariables(['@ROOT'], {
+      headers: headersOf(debugger_, 'getChildVariables'),
+    });
     const request = sent();
     expect(request.url).toBe('/sap/bc/adt/debugger?method=getChildVariables');
     expect(request.headers?.['Content-Type']).toContain(
@@ -407,7 +452,9 @@ describe('AbapDebugger', () => {
 
   it('getVariables sends one row per id in the Variables type', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.getVariables(['LT_ITEMS[3]-MATNR']);
+    await debugger_.getVariables(['LT_ITEMS[3]-MATNR'], {
+      headers: headersOf(debugger_, 'getVariables'),
+    });
     const request = sent();
     expect(request.url).toBe('/sap/bc/adt/debugger?method=getVariables');
     expect(request.headers?.['Content-Type']).toContain(
@@ -535,7 +582,10 @@ describe('AbapDebugger', () => {
 
   it('settings left out are sent empty, so the server keeps them; the conditional ones are left out', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setDebuggerSettings({});
+    await debugger_.setDebuggerSettings(
+      {},
+      { headers: headersOf(debugger_, 'setDebuggerSettings') },
+    );
     expect(sent().url).toBe('/sap/bc/adt/debugger?method=setDebuggerSettings');
     expect(sent().headers).toMatchObject({
       'Content-Type': 'application/xml',
@@ -548,12 +598,15 @@ describe('AbapDebugger', () => {
 
   it('true and false are sent as given, the conditional ones only when set', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.setDebuggerSettings({
-      systemDebugging: true,
-      createExceptionObject: false,
-      updateDebugging: true,
-      showDataAging: false,
-    });
+    await debugger_.setDebuggerSettings(
+      {
+        systemDebugging: true,
+        createExceptionObject: false,
+        updateDebugging: true,
+        showDataAging: false,
+      },
+      { headers: headersOf(debugger_, 'setDebuggerSettings') },
+    );
     expect(sent().data).toContain(
       'systemDebugging="true" createExceptionObject="false" backgroundRFC="" sharedObjectDebugging="" updateDebugging="true" showDataAging="false"',
     );
@@ -565,9 +618,12 @@ describe('AbapDebugger', () => {
       data: '<dbg:settings systemDebugging="true"/>',
       headers: {},
     });
-    const answer = await debugger_.setDebuggerSettings({
-      systemDebugging: true,
-    });
+    const answer = await debugger_.setDebuggerSettings(
+      {
+        systemDebugging: true,
+      },
+      { headers: headersOf(debugger_, 'setDebuggerSettings') },
+    );
     expect(answer.ok && answer.getResult().value).toBe(
       '<dbg:settings systemDebugging="true"/>',
     );

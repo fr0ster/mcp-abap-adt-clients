@@ -5,6 +5,7 @@
  * URI — measured, there is nothing include-specific about it.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -14,10 +15,12 @@ import { includeUrl } from './lock';
 
 export async function activateInclude(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   includeName: string,
 ): Promise<IAdtWireResponse> {
   return activateObjectInSession(
     connection,
+    headers,
     includeUrl(includeName),
     includeName,
     true,

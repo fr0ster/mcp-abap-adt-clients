@@ -5,6 +5,7 @@ import type {
 import { parseMessageClass } from '../../core/messageClass';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
+import { headersOf } from '../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="D"><adtcore:packageRef adtcore:name="ZP"/></mc:messageClass>`;
@@ -70,7 +71,10 @@ describe('AdtMessageClass', () => {
       }),
       noopLogger,
     );
-    await mc.create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    await mc.create(
+      { name: 'ZT', description: 'D', packageName: 'ZP' },
+      { headers: headersOf(mc, 'create') },
+    );
     expect(seen.url).toContain('/sap/bc/adt/messageclass');
     expect(seen.method).toBe('POST');
     expect(String(seen.data)).toContain('adtcore:type="MSAG/N"');
@@ -86,15 +90,21 @@ describe('AdtMessageClass', () => {
         }),
         noopLogger,
       );
-    await make().create({
-      name: 'ZT',
-      description: 'D',
-      packageName: 'ZP',
-      transportRequest: 'DEVK900001',
-    });
+    await make().create(
+      {
+        name: 'ZT',
+        description: 'D',
+        packageName: 'ZP',
+        transportRequest: 'DEVK900001',
+      },
+      { headers: headersOf(make(), 'create') },
+    );
     expect(seen.url).toBe('/sap/bc/adt/messageclass?corrNr=DEVK900001');
 
-    await make().create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    await make().create(
+      { name: 'ZT', description: 'D', packageName: 'ZP' },
+      { headers: headersOf(make(), 'create') },
+    );
     expect(seen.url).not.toContain('corrNr');
   });
 
@@ -108,10 +118,13 @@ describe('AdtMessageClass', () => {
           headers: {},
         }) as IAdtWireResponse,
     );
-    await new AdtMessageClass(c, noopLogger).delete({
-      name: 'ZT',
-      transportRequest: 'DEVK900001',
-    });
+    await new AdtMessageClass(c, noopLogger).delete(
+      {
+        name: 'ZT',
+        transportRequest: 'DEVK900001',
+      },
+      { headers: headersOf(new AdtMessageClass(c, noopLogger), 'delete') },
+    );
     const del = calls.find((x) => x.url === '/sap/bc/adt/deletion/delete');
     expect(String(del?.data)).toContain(
       '<del:transportNumber>DEVK900001</del:transportNumber>',
@@ -124,7 +137,14 @@ describe('AdtMessageClass', () => {
     );
     await new AdtMessageClass(c, noopLogger).updateMetadata(
       { name: 'ZT', transportRequest: 'DEVK900001' },
-      { source: CLASS_XML_WITH_MSG, lockHandle: 'LOCK_HANDLE_42' },
+      {
+        headers: headersOf(
+          new AdtMessageClass(c, noopLogger),
+          'updateMetadata',
+        ),
+        source: CLASS_XML_WITH_MSG,
+        lockHandle: 'LOCK_HANDLE_42',
+      },
     );
     const put = calls.find((x) => x.method === 'PUT');
     expect(put?.url).toContain('lockHandle=LOCK_HANDLE_42');
@@ -156,7 +176,10 @@ describe('AdtMessageClass', () => {
       }),
       noopLogger,
     );
-    await mc.create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    await mc.create(
+      { name: 'ZT', description: 'D', packageName: 'ZP' },
+      { headers: headersOf(mc, 'create') },
+    );
     // both adtcore:language and adtcore:masterLanguage default to EN
     expect(String(seen.data)).toContain('adtcore:language="EN"');
     expect(String(seen.data)).toContain('adtcore:masterLanguage="EN"');
@@ -171,12 +194,15 @@ describe('AdtMessageClass', () => {
       }),
       noopLogger,
     );
-    await mc.create({
-      name: 'ZT',
-      description: 'D',
-      packageName: 'ZP',
-      masterLanguage: 'DE',
-    });
+    await mc.create(
+      {
+        name: 'ZT',
+        description: 'D',
+        packageName: 'ZP',
+        masterLanguage: 'DE',
+      },
+      { headers: headersOf(mc, 'create') },
+    );
     expect(String(seen.data)).toContain('adtcore:language="DE"');
     expect(String(seen.data)).toContain('adtcore:masterLanguage="DE"');
   });
@@ -191,7 +217,10 @@ describe('AdtMessageClass', () => {
       noopLogger,
       { masterLanguage: 'DE' },
     );
-    await mc.create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    await mc.create(
+      { name: 'ZT', description: 'D', packageName: 'ZP' },
+      { headers: headersOf(mc, 'create') },
+    );
     expect(String(seen.data)).toContain('adtcore:language="DE"');
     expect(String(seen.data)).toContain('adtcore:masterLanguage="DE"');
   });
@@ -248,7 +277,11 @@ describe('AdtMessageClass', () => {
     const document = CLASS_XML_WITH_MSG.replace('"OLD"', '"NEW"');
     await mc.updateMetadata(
       { name: 'ZT' },
-      { source: document, lockHandle: 'LOCK_HANDLE_42' },
+      {
+        headers: headersOf(mc, 'updateMetadata'),
+        source: document,
+        lockHandle: 'LOCK_HANDLE_42',
+      },
     );
 
     expect(calls).toHaveLength(1);
@@ -279,7 +312,10 @@ describe('AdtMessageClass', () => {
 
     // Two members, one request each. Whether to ask before deleting is the
     // consumer's call, and it can read the answer to it.
-    await mc.checkDeletion({ name: 'ZT' });
+    await mc.checkDeletion(
+      { name: 'ZT' },
+      { headers: headersOf(mc, 'checkDeletion') },
+    );
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/deletion/check');
@@ -287,7 +323,7 @@ describe('AdtMessageClass', () => {
       'adtcore:uri="/sap/bc/adt/messageclass/zt"',
     );
 
-    await mc.delete({ name: 'ZT' });
+    await mc.delete({ name: 'ZT' }, { headers: headersOf(mc, 'delete') });
     expect(calls).toHaveLength(2);
     // The deletion service, not a direct DELETE on the object.
     expect(calls[1].method).toBe('POST');
@@ -316,7 +352,11 @@ describe('AdtMessageClass', () => {
       expectFailure(
         await mc.updateMetadata(
           { name: 'ZT' },
-          { source: CLASS_XML_WITH_MSG, lockHandle: 'LOCK_HANDLE_42' },
+          {
+            headers: headersOf(mc, 'updateMetadata'),
+            source: CLASS_XML_WITH_MSG,
+            lockHandle: 'LOCK_HANDLE_42',
+          },
         ),
         'update whose PUT the server refused',
       ).message,

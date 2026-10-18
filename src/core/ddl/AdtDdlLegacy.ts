@@ -9,6 +9,7 @@
 import type {
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
@@ -26,7 +27,7 @@ export class AdtDdlLegacy<
 > extends AdtDdl<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = config.ddlName as string;
 
@@ -35,6 +36,7 @@ export class AdtDdlLegacy<
       () =>
         deleteObjectDirect(
           withCallTimeout(this.connection, options?.timeout),
+          options.headers,
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

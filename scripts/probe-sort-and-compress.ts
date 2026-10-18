@@ -14,6 +14,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { transportObjectEntries } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -90,20 +91,28 @@ async function main(): Promise<void> {
           say(`${task}: ${entry.type} ${entry.name} has no position`);
           continue;
         }
-        const removed = await request.removeObject(task, {
-          ...entry,
-          position: entry.position,
-        });
+        const removed = await request.removeObject(
+          task,
+          {
+            ...entry,
+            position: entry.position,
+          },
+          { headers: headersOf(request, 'removeObject') },
+        );
         say(
           `${task}: remove ${entry.type} ${entry.name}@${entry.position}:`,
           removed.ok ? 'ok' : removed.getError().message,
         );
         if (!removed.ok) continue;
-        const added = await request.addObject(moveTo, {
-          name: entry.name,
-          type: entry.type,
-          pgmid: entry.pgmid,
-        });
+        const added = await request.addObject(
+          moveTo,
+          {
+            name: entry.name,
+            type: entry.type,
+            pgmid: entry.pgmid,
+          },
+          { headers: headersOf(request, 'addObject') },
+        );
         say(
           `${moveTo}: add ${entry.type} ${entry.name}:`,
           added.ok ? 'ok' : added.getError().message,

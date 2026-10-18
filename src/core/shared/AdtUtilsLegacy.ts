@@ -13,6 +13,7 @@
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import {
   AdtObjectErrorCodes,
   type IAdtAnalyseOptions,
@@ -22,6 +23,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
+import { requestHeaders } from '../../utils/requestHeaders';
 import { AdtUtils } from './AdtUtils';
 import type {
   IGetSqlQueryParams,
@@ -59,7 +61,7 @@ export class AdtUtilsLegacy<
   override async activateObjectsGroup<E extends IAdtError = IAdtError>(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
@@ -82,10 +84,7 @@ ${objectReferences}
           method: 'POST',
           timeout: 0,
           data: xmlBody,
-          headers: {
-            Accept: 'application/xml',
-            'Content-Type': 'application/xml',
-          },
+          headers: requestHeaders(options.headers),
         }),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
@@ -122,14 +121,14 @@ ${objectReferences}
 
   override async getTableContents<E extends IAdtError = IAdtError>(
     _params: IGetTableContentsParams,
-    _options?: IAdtAnalyseOptions<E>,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['contents']>, E>> {
     return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
   override async getSqlQuery<E extends IAdtError = IAdtError>(
     _params: IGetSqlQueryParams,
-    _options?: IAdtAnalyseOptions<E>,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['query']>, E>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
   }

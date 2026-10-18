@@ -23,6 +23,7 @@ import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -315,10 +316,13 @@ describe('DataElement (using AdtClient)', () => {
             isCloud: isCloudSystem,
             logger: testsLogger,
           });
-          await client.getDomain().delete({
-            domainName: domainName,
-            transportRequest: cleanupResolver.getTransportRequest(),
-          });
+          await client.getDomain().delete(
+            {
+              domainName: domainName,
+              transportRequest: cleanupResolver.getTransportRequest(),
+            },
+            { headers: headersOf(client.getDomain(), 'delete') },
+          );
         } catch (cleanupError) {
           // Log but don't fail - cleanup errors are silent
           testsLogger.warn?.(

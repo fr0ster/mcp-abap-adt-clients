@@ -15,6 +15,7 @@
 import { readNodeStructure } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { headersFor } from '../../src/__tests__/helpers/adtHeaders';
 import { fetchNodeStructure } from '../../src/core/shared/nodeStructure';
 
 const bodyOf = (data: unknown): string =>
@@ -36,6 +37,7 @@ export async function functionGroupChildren(
 
   const root = await fetchNodeStructure(
     connection,
+    headersFor('AdtUtils.fetchNodeStructure'),
     'FUGR/F',
     name,
     '000000',
@@ -48,6 +50,7 @@ export async function functionGroupChildren(
 
   const children = await fetchNodeStructure(
     connection,
+    headersFor('AdtUtils.fetchNodeStructure'),
     'FUGR/F',
     name,
     wanted.nodeId,

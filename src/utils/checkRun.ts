@@ -2,14 +2,11 @@
  * Shared check run utilities
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../constants/contentTypes';
 import {
   ACCESS_CONTROL,
   CLASS,
@@ -29,6 +26,7 @@ import {
   TABLE,
   TRANSFORMATION,
 } from '../endpoints/objects';
+import { requestHeaders } from './requestHeaders';
 
 /**
  * Get ADT URI for object type
@@ -173,6 +171,7 @@ export function buildCheckRunXmlWithSource(
  */
 export async function runCheckRun(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objectType: string,
   objectName: string,
   version: CheckRunVersion = 'active',
@@ -190,11 +189,6 @@ export async function runCheckRun(
       )
     : buildCheckRunXml(objectUri, version);
 
-  const headers = {
-    Accept: ACCEPT_CHECK_MESSAGES,
-    'Content-Type': CT_CHECK_OBJECTS,
-  };
-
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
 
   return connection.makeAdtRequest({
@@ -202,7 +196,7 @@ export async function runCheckRun(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -223,6 +217,7 @@ export async function runCheckRun(
  */
 export async function runCheckRunWithSource(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   objectType: string,
   objectName: string,
   sourceCode: string,
@@ -238,11 +233,6 @@ export async function runCheckRunWithSource(
     artifactContentType,
   );
 
-  const headers = {
-    Accept: ACCEPT_CHECK_MESSAGES,
-    'Content-Type': CT_CHECK_OBJECTS,
-  };
-
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
 
   return connection.makeAdtRequest({
@@ -250,6 +240,6 @@ export async function runCheckRunWithSource(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

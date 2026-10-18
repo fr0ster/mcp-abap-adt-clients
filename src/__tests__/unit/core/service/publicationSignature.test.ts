@@ -11,11 +11,13 @@
  * build if that call starts compiling again. There is no runtime half — the
  * point is what a consumer's editor tells them before they run anything.
  */
+
 import type { IAdtUpdatable } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../../clients/AdtClient';
 import type { IServiceBindingPublicationConfig } from '../../../../core/service/types';
+import { headersOf } from '../../../helpers/adtHeaders';
 
 const connection = {
   setSessionType: () => {},
@@ -65,11 +67,14 @@ async function _onlyTypeChecked(
   // @ts-expect-error the contract requires the binding, the state and the protocol
   void (await contract.update({ desiredPublicationState: 'published' }));
 
-  void (await contract.update({
-    bindingName: 'ZAC_SRVB01',
-    desiredPublicationState: 'published',
-    serviceType: 'odatav4',
-  }));
+  void (await contract.update(
+    {
+      bindingName: 'ZAC_SRVB01',
+      desiredPublicationState: 'published',
+      serviceType: 'odatav4',
+    },
+    { headers: headersOf(contract, 'update') },
+  ));
 
   // The whole of it: the binding, the state, and the protocol that selects the
   // endpoint. ~133s on the systems measured, so the timeout is the caller's.
@@ -79,7 +84,7 @@ async function _onlyTypeChecked(
       desiredPublicationState: 'published',
       serviceType: 'odatav4',
     },
-    { timeout: 300_000 },
+    { headers: headersOf(bindings, 'update'), timeout: 300_000 },
   ));
 
   // @ts-expect-error serviceType selects the endpoint and is required
@@ -88,12 +93,15 @@ async function _onlyTypeChecked(
     desiredPublicationState: 'published',
   }));
 
-  void (await bindings.update({
-    bindingName: 'ZAC_SRVB01',
-    // @ts-expect-error 'unchanged' is not a request; do not call update at all
-    desiredPublicationState: 'unchanged',
-    serviceType: 'odatav4',
-  }));
+  void (await bindings.update(
+    {
+      bindingName: 'ZAC_SRVB01',
+      // @ts-expect-error 'unchanged' is not a request; do not call update at all
+      desiredPublicationState: 'unchanged',
+      serviceType: 'odatav4',
+    },
+    { headers: headersOf(bindings, 'update') },
+  ));
 
   // @ts-expect-error bindingName says which object; there is nothing to publish without it
   void (await bindings.update({

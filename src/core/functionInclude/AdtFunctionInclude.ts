@@ -19,6 +19,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -166,15 +167,12 @@ export class AdtFunctionInclude<
   }
 
   /**
-   * Resolve source artifact content type — used both for the source-aware
-   * checkrun payload and for the unicode flag of the source upload.
+   * Resolve source artifact content type — for the source-aware checkrun
+   * payload. The source upload's own `Content-Type` is the caller's since
+   * 36.0.0.
    */
   private sourceArtifactContentType(): string {
     return this.contentTypes?.sourceArtifactContentType() ?? 'text/plain';
-  }
-
-  private isUnicode(): boolean {
-    return this.sourceArtifactContentType().includes('utf-8');
   }
 
   /**
@@ -202,7 +200,7 @@ export class AdtFunctionInclude<
   /** Create the include, and write and activate its source if any was given. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IFunctionIncludeConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -211,7 +209,12 @@ export class AdtFunctionInclude<
     // missing, which is the one thing checked before the request goes out.
     this.names(config);
     return answering(
-      () => createFunctionInclude(connection, this.buildCreateParams(config)),
+      () =>
+        createFunctionInclude(
+          connection,
+          options.headers,
+          this.buildCreateParams(config),
+        ),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
     );
@@ -290,7 +293,7 @@ export class AdtFunctionInclude<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -303,6 +306,7 @@ export class AdtFunctionInclude<
       () =>
         updateFunctionInclude(
           connection,
+          options.headers,
           params,
           options?.lockHandle,
           this.logger,
@@ -327,7 +331,7 @@ export class AdtFunctionInclude<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -344,11 +348,11 @@ export class AdtFunctionInclude<
       () =>
         uploadFunctionIncludeSource(
           connection,
+          options.headers,
           group,
           include,
           source as string,
           options?.lockHandle,
-          this.isUnicode(),
           config.transportRequest,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
@@ -365,14 +369,19 @@ export class AdtFunctionInclude<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.names(config);
     return answering(
-      () => checkDeletion(connection, this.buildDeleteParams(config)),
+      () =>
+        checkDeletion(
+          connection,
+          options.headers,
+          this.buildDeleteParams(config),
+        ),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -387,14 +396,19 @@ export class AdtFunctionInclude<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.names(config);
     return answering(
-      () => deleteFunctionInclude(connection, this.buildDeleteParams(config)),
+      () =>
+        deleteFunctionInclude(
+          connection,
+          options.headers,
+          this.buildDeleteParams(config),
+        ),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -403,7 +417,7 @@ export class AdtFunctionInclude<
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -411,7 +425,8 @@ export class AdtFunctionInclude<
     const { group, include } = this.names(config);
 
     return answering(
-      () => activateFunctionInclude(connection, group, include),
+      () =>
+        activateFunctionInclude(connection, options.headers, group, include),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -420,8 +435,8 @@ export class AdtFunctionInclude<
   /** Check the include. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -434,6 +449,7 @@ export class AdtFunctionInclude<
       () =>
         checkFunctionInclude(
           connection,
+          options.headers,
           group,
           include,
           version,

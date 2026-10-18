@@ -2,10 +2,12 @@
  * Enhancement check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { requestHeaders } from '../../utils/requestHeaders';
 import {
   type EnhancementType,
   getEnhancementUri,
@@ -22,6 +24,7 @@ import {
  */
 export async function checkEnhancement(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICheckEnhancementParams,
 ): Promise<IAdtWireResponse> {
   const {
@@ -65,17 +68,12 @@ export async function checkEnhancement(
   </chkrun:objectSets>${artifactsXml}
 </chkrun:checkRunRequest>`;
 
-  const headers = {
-    Accept: 'application/vnd.sap.adt.checkrun.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkrun.v1+xml',
-  };
-
   return connection.makeAdtRequest({
     url: checkUrl,
     method: 'POST',
     timeout: 0,
     data: xmlPayload,
-    headers,
+    headers: requestHeaders(headers),
   });
 }
 
@@ -91,12 +89,13 @@ export async function checkEnhancement(
  */
 export async function check(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   enhancementType: EnhancementType,
   enhancementName: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtWireResponse> {
-  return checkEnhancement(connection, {
+  return checkEnhancement(connection, headers, {
     enhancement_name: enhancementName,
     enhancement_type: enhancementType,
     version,

@@ -25,6 +25,7 @@ import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { headersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import { expectLockReleased } from '../../helpers/lockReleased';
 import {
@@ -198,10 +199,13 @@ describe('Group Activation (Shared)', () => {
       if (structureCreated && structureName) {
         try {
           logTestStep('cleanup: delete structure', testsLogger);
-          await client.getStructure().delete({
-            structureName: structureName,
-            transportRequest: transportRequest,
-          });
+          await client.getStructure().delete(
+            {
+              structureName: structureName,
+              transportRequest: transportRequest,
+            },
+            { headers: headersOf(client.getStructure(), 'delete') },
+          );
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
           );
@@ -215,10 +219,13 @@ describe('Group Activation (Shared)', () => {
       if (dataElementCreated && dataElementName) {
         try {
           logTestStep('cleanup: delete data element', testsLogger);
-          await client.getDataElement().delete({
-            dataElementName: dataElementName,
-            transportRequest: transportRequest,
-          });
+          await client.getDataElement().delete(
+            {
+              dataElementName: dataElementName,
+              transportRequest: transportRequest,
+            },
+            { headers: headersOf(client.getDataElement(), 'delete') },
+          );
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
           );
@@ -232,10 +239,13 @@ describe('Group Activation (Shared)', () => {
       if (domainCreated && domainName) {
         try {
           logTestStep('cleanup: delete domain', testsLogger);
-          await client.getDomain().delete({
-            domainName: domainName,
-            transportRequest: transportRequest,
-          });
+          await client.getDomain().delete(
+            {
+              domainName: domainName,
+              transportRequest: transportRequest,
+            },
+            { headers: headersOf(client.getDomain(), 'delete') },
+          );
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
           );
@@ -298,21 +308,30 @@ describe('Group Activation (Shared)', () => {
           () =>
             client
               .getStructure()
-              .delete({ structureName: structureName!, transportRequest }),
+              .delete(
+                { structureName: structureName!, transportRequest },
+                { headers: headersOf(client.getStructure(), 'delete') },
+              ),
         ],
         [
           'data element',
           () =>
             client
               .getDataElement()
-              .delete({ dataElementName: dataElementName!, transportRequest }),
+              .delete(
+                { dataElementName: dataElementName!, transportRequest },
+                { headers: headersOf(client.getDataElement(), 'delete') },
+              ),
         ],
         [
           'domain',
           () =>
             client
               .getDomain()
-              .delete({ domainName: domainName!, transportRequest }),
+              .delete(
+                { domainName: domainName!, transportRequest },
+                { headers: headersOf(client.getDomain(), 'delete') },
+              ),
         ],
       ] as const) {
         try {
@@ -380,13 +399,17 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDomain().create({
-            domainName: domainName,
-            packageName: packageName,
-            description:
-              testCase.params.description || `Test domain for group activation`,
-            transportRequest: transportRequest,
-          });
+          await client.getDomain().create(
+            {
+              domainName: domainName,
+              packageName: packageName,
+              description:
+                testCase.params.description ||
+                `Test domain for group activation`,
+              transportRequest: transportRequest,
+            },
+            { headers: headersOf(client.getDomain(), 'create') },
+          );
           domainCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -429,15 +452,18 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDataElement().create({
-            dataElementName: dataElementName,
-            packageName: packageName,
-            description:
-              testCase.params.description ||
-              `Test data element for group activation`,
-            typeKind: testCase.params.data_element_type_kind || 'domain',
-            transportRequest: transportRequest,
-          });
+          await client.getDataElement().create(
+            {
+              dataElementName: dataElementName,
+              packageName: packageName,
+              description:
+                testCase.params.description ||
+                `Test data element for group activation`,
+              typeKind: testCase.params.data_element_type_kind || 'domain',
+              transportRequest: transportRequest,
+            },
+            { headers: headersOf(client.getDataElement(), 'create') },
+          );
           dataElementCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -483,14 +509,17 @@ define structure ${structureName} {
  mandt : abap.clnt;
  test_field : ${dataElementName};
 }`;
-        await client.getStructure().create({
-          structureName: structureName,
-          packageName: packageName,
-          description:
-            testCase.params.description ||
-            `Test structure for group activation`,
-          transportRequest: transportRequest,
-        });
+        await client.getStructure().create(
+          {
+            structureName: structureName,
+            packageName: packageName,
+            description:
+              testCase.params.description ||
+              `Test structure for group activation`,
+            transportRequest: transportRequest,
+          },
+          { headers: headersOf(client.getStructure(), 'create') },
+        );
         structureCreated = true;
         await new Promise((resolve) =>
           setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -511,7 +540,10 @@ define structure ${structureName} {
               source: structureDdlCode,
               transportRequest: transportRequest,
             },
-            { lockHandle: structureLockHandle },
+            {
+              headers: headersOf(structureHandler, 'update'),
+              lockHandle: structureLockHandle,
+            },
           );
         } finally {
           await structureHandler.unlock({ structureName }, structureLockHandle);
@@ -548,7 +580,9 @@ define structure ${structureName} {
           activation: utilActivationRunId,
         });
         const runId = expectResult(
-          await utils.activateObjectsGroup(objectsToActivate, false),
+          await utils.activateObjectsGroup(objectsToActivate, false, {
+            headers: headersOf(utils, 'activateObjectsGroup'),
+          }),
           'activation run id',
         );
         expect(runId).toBeTruthy();

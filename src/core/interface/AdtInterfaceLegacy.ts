@@ -6,6 +6,7 @@
 
 import type {
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
@@ -26,7 +27,7 @@ export class AdtInterfaceLegacy<
 > extends AdtInterface<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = config.interfaceName as string;
 
@@ -35,6 +36,7 @@ export class AdtInterfaceLegacy<
       () =>
         deleteObjectDirect(
           withCallTimeout(this.connection, options?.timeout),
+          options.headers,
           objectUrl,
           options?.lockHandle,
           config.transportRequest,

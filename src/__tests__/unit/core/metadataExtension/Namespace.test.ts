@@ -21,6 +21,7 @@ import {
 } from '../../../../core/metadataExtension/read';
 import { unlockMetadataExtension } from '../../../../core/metadataExtension/unlock';
 import { updateMetadataExtension } from '../../../../core/metadataExtension/update';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 const LOCK_RESPONSE = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><LOCK_HANDLE>LH123</LOCK_HANDLE><CORRNR/></DATA></asx:values></asx:abap>`;
 
@@ -59,6 +60,7 @@ describe('metadata extension namespace URL encoding', () => {
     const connection = createConnectionMock();
     await updateMetadataExtension(
       connection,
+      headersFor('AdtMetadataExtension.update'),
       NS_NAME,
       '@Metadata.layer: #CUSTOMER\nannotate entity X with {}',
       'LH123',
@@ -70,7 +72,12 @@ describe('metadata extension namespace URL encoding', () => {
 
   it('deleteMetadataExtension() encodes the namespaced name in the path', async () => {
     const connection = createConnectionMock();
-    await deleteMetadataExtension(connection, NS_NAME, undefined);
+    await deleteMetadataExtension(
+      connection,
+      headersFor('AdtMetadataExtension.delete'),
+      NS_NAME,
+      undefined,
+    );
     const url = firstUrl(connection);
     expect(url).toContain(ENCODED);
     expect(url).not.toContain(RAW_SLASHES);
@@ -110,7 +117,11 @@ describe('metadata extension namespace URL encoding', () => {
     // in the body, so this asserts the payload. Same encoding either way, but
     // it is a different claim from the five above, and worth naming as one.
     const connection = createConnectionMock();
-    await activateMetadataExtension(connection, NS_NAME);
+    await activateMetadataExtension(
+      connection,
+      headersFor('AdtMetadataExtension.activate'),
+      NS_NAME,
+    );
     const body = String(
       (connection.makeAdtRequest as jest.Mock).mock.calls[0][0].data,
     );

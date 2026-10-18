@@ -7,16 +7,14 @@
  * matching Eclipse ADT behavior.
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DATA_ELEMENT,
-  CT_DATA_ELEMENT,
-} from '../../constants/contentTypes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateDataElementParams } from './types';
 
 /**
@@ -26,6 +24,7 @@ import type { ICreateDataElementParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   args: ICreateDataElementParams,
 ): Promise<IAdtWireResponse> {
   const url = `${DATA_ELEMENT.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -45,16 +44,11 @@ export async function create(
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </blue:wbobj>`;
 
-  const headers = {
-    Accept: ACCEPT_DATA_ELEMENT,
-    'Content-Type': CT_DATA_ELEMENT,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

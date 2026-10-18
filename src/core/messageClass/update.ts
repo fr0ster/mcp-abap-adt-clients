@@ -2,13 +2,14 @@
  * Message class update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -29,6 +30,7 @@ const BASE = MESSAGE_CLASS.collection;
  */
 export async function updateMessageClass(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   document: string,
   lockHandle: string | undefined,
@@ -40,6 +42,6 @@ export async function updateMessageClass(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
+    headers: requestHeaders(headers),
   });
 }

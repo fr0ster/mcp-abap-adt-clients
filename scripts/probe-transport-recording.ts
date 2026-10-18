@@ -38,6 +38,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -159,7 +160,9 @@ async function main(): Promise<void> {
     // here and the class arrived empty; `@mcp-abap-adt/interfaces@38.0.0`
     // refuses the call, which is how the line was found rather than the object.
     process.stdout.write(`\ncreate ${className} in ${pkg} on ${request}\n`);
-    const created = await cls.create(config);
+    const created = await cls.create(config, {
+      headers: headersOf(cls, 'create'),
+    });
     process.stdout.write(
       created.ok
         ? '  accepted\n'
@@ -185,6 +188,7 @@ async function main(): Promise<void> {
     const updated = await cls.update(
       { ...config, transportRequest: updateRequest ?? request },
       {
+        headers: headersOf(cls, 'update'),
         source: source(className, 'updated'),
         lockHandle: handle,
       },
@@ -197,7 +201,9 @@ async function main(): Promise<void> {
 
     await cls.unlock(config, handle);
     held = undefined;
-    const activated = await cls.activate(config);
+    const activated = await cls.activate(config, {
+      headers: headersOf(cls, 'activate'),
+    });
     process.stdout.write(
       activated.ok
         ? '  activate accepted\n'
@@ -244,11 +250,15 @@ async function main(): Promise<void> {
 
     if (created_ok && !keep) {
       process.stdout.write(`\ndelete ${className}\n`);
-      const check = await cls.checkDeletion(config);
+      const check = await cls.checkDeletion(config, {
+        headers: headersOf(cls, 'checkDeletion'),
+      });
       process.stdout.write(
         `  deletion check: ${check.ok ? 'ok' : check.getError().message}\n`,
       );
-      const deleted = await cls.delete(config);
+      const deleted = await cls.delete(config, {
+        headers: headersOf(cls, 'delete'),
+      });
       process.stdout.write(
         deleted.ok
           ? '  delete accepted\n'

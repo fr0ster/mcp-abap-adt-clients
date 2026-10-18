@@ -29,6 +29,7 @@ import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -239,12 +240,15 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
 
             logTestStep('create', testsLogger);
             expectResult(
-              await client.getClass().create({
-                className: containerClass,
-                packageName,
-                transportRequest,
-                description: `Test container class for ${testClassName}`,
-              }),
+              await client.getClass().create(
+                {
+                  className: containerClass,
+                  packageName,
+                  transportRequest,
+                  description: `Test container class for ${testClassName}`,
+                },
+                { headers: headersOf(client.getClass(), 'create') },
+              ),
               'create the container class',
             );
             testsLogger.info?.('Container class created');
@@ -274,6 +278,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           const containerHandle = String(containerLock);
           expectResult(
             await client.getClass().update(containerConfig, {
+              headers: headersOf(client.getClass(), 'update'),
               source,
               lockHandle: containerHandle,
             }),
@@ -305,12 +310,14 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           const includeHandle = String(includeLock);
           try {
             expectResult(
-              await client
-                .getLocalTestClass()
-                .update(
-                  { className: containerClass, transportRequest },
-                  { source: testClassSource, lockHandle: includeHandle },
-                ),
+              await client.getLocalTestClass().update(
+                { className: containerClass, transportRequest },
+                {
+                  headers: headersOf(client.getLocalTestClass(), 'update'),
+                  source: testClassSource,
+                  lockHandle: includeHandle,
+                },
+              ),
               'write the test class include',
             );
           } finally {
@@ -331,7 +338,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           expectResult(
             await client
               .getClass()
-              .activate({ className: containerClass, transportRequest }),
+              .activate(
+                { className: containerClass, transportRequest },
+                { headers: headersOf(client.getClass(), 'activate') },
+              ),
             'activate the container class',
           );
           testsLogger.info?.('Class activated');
@@ -487,10 +497,13 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             try {
               logTestStep('delete (cleanup)', testsLogger);
               testsLogger.info?.('Cleaning up test class:', containerClass);
-              await client.getClass().delete({
-                className: containerClass,
-                transportRequest,
-              });
+              await client.getClass().delete(
+                {
+                  className: containerClass,
+                  transportRequest,
+                },
+                { headers: headersOf(client.getClass(), 'delete') },
+              );
               testsLogger.info?.('Test class deleted successfully');
             } catch (cleanupError) {
               testsLogger.warn?.('Failed to cleanup test class:', cleanupError);

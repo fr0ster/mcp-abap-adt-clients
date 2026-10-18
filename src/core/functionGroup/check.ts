@@ -2,6 +2,7 @@
  * FunctionGroup check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -25,6 +26,7 @@ import type {
  */
 export async function checkFunctionGroup(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   functionGroupName: string,
   version: 'active' | 'inactive',
   sourceCode?: string,
@@ -39,6 +41,7 @@ export async function checkFunctionGroup(
     // Validate hypothetical code (object doesn't need to exist)
     response = await runCheckRunWithSource(
       connection,
+      headers,
       'function_group',
       functionGroupName,
       sourceCode,
@@ -49,6 +52,7 @@ export async function checkFunctionGroup(
     // Validate existing object in SAP (reads from system)
     response = await runCheckRun(
       connection,
+      headers,
       'function_group',
       functionGroupName,
       version,

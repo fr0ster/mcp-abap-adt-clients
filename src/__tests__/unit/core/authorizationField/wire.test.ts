@@ -5,6 +5,7 @@ import type {
 import { create } from '../../../../core/authorizationField/create';
 import { updateAuthorizationField } from '../../../../core/authorizationField/update';
 import { buildAuthorizationFieldXml } from '../../../../core/authorizationField/xmlBuilder';
+import { headersFor } from '../../../helpers/adtHeaders';
 
 function cap() {
   const c: {
@@ -64,7 +65,7 @@ describe('authorizationField wire', () => {
 
   it('create POSTs that root to the collection URL', async () => {
     const { c, conn } = cap();
-    await create(conn, PARAMS);
+    await create(conn, headersFor('AdtAuthorizationField.create'), PARAMS);
     expect(c.method).toBe('POST');
     expect(c.url).toBe('/sap/bc/adt/aps/iam/auth');
     expect(c.data).toContain('<auth:auth ');
@@ -75,7 +76,12 @@ describe('authorizationField wire', () => {
 
   it('update PUTs that same root with an encoded lockHandle', async () => {
     const { c, conn } = cap();
-    await updateAuthorizationField(conn, PARAMS, 'LH/1');
+    await updateAuthorizationField(
+      conn,
+      headersFor('AdtAuthorizationField.updateMetadata'),
+      PARAMS,
+      'LH/1',
+    );
     expect(c.method).toBe('PUT');
     expect(c.url).toBe('/sap/bc/adt/aps/iam/auth/zac_auth01?lockHandle=LH%2F1');
     expect(c.data).toContain('<auth:auth ');

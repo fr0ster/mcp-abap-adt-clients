@@ -15,6 +15,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IBehaviorImplementationConfig } from '../../../../core/behaviorImplementation';
 import { mainSourceFor } from '../../../../core/behaviorImplementation/AdtBehaviorImplementation';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
@@ -131,10 +132,15 @@ describe('BehaviorImplementation (using AdtClient)', () => {
             `behavior implementation ${className}`,
           );
           if (existing.present !== true) return { success: true };
-          const removed = await client.getBehaviorImplementation().delete({
-            className,
-            transportRequest: tester.getTransportRequest(),
-          });
+          const removed = await client.getBehaviorImplementation().delete(
+            {
+              className,
+              transportRequest: tester.getTransportRequest(),
+            },
+            {
+              headers: headersOf(client.getBehaviorImplementation(), 'delete'),
+            },
+          );
           if (!removed.ok) {
             testsLogger.warn?.(
               `could not remove leftover ${className}: ${removed.getError().message}`,
@@ -257,6 +263,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
                     transportRequest: config.transportRequest,
                   },
                   {
+                    headers: headersOf(bimpl, 'update'),
                     lockHandle: locked,
                     source: mainSourceFor(
                       config.className,

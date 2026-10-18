@@ -2,12 +2,13 @@
  * Transport create operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { ICreateTransportParams } from './types';
 
 /**
@@ -37,6 +38,7 @@ function buildCreateTransportXml(
  */
 export async function createTransport(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: ICreateTransportParams,
 ): Promise<IAdtWireResponse> {
   const username = params.owner as string;
@@ -44,10 +46,6 @@ export async function createTransport(
   const url = TRANSPORT_REQUEST.collection;
 
   const xmlBody = buildCreateTransportXml(params, username);
-  const headers = {
-    Accept: ACCEPT_TRANSPORT,
-    'Content-Type': 'text/plain',
-  };
 
   // The document, as it arrived. What a caller wants out of it is the
   // reading's question. A refusal comes back as the transport's failure, with
@@ -58,6 +56,6 @@ export async function createTransport(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

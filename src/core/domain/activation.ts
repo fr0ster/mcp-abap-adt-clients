@@ -2,6 +2,7 @@
  * Domain activation operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -17,11 +18,13 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateDomain(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   domainName: string,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${DOMAIN.uri(domainName)}`;
   return await activateObjectInSession(
     connection,
+    headers,
     objectUri,
     domainName.toUpperCase(),
     true,

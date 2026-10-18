@@ -23,6 +23,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -145,12 +146,15 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         // Step 1: the include holding the test class
         logTestStep('create include', testsLogger);
         expectResult(
-          await client.getInclude().create({
-            includeName,
-            packageName,
-            transportRequest,
-            description: 'ABAP Unit test include',
-          }),
+          await client.getInclude().create(
+            {
+              includeName,
+              packageName,
+              transportRequest,
+              description: 'ABAP Unit test include',
+            },
+            { headers: headersOf(client.getInclude(), 'create') },
+          ),
           'create include',
         );
         const includeHandle = String(
@@ -158,12 +162,14 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         );
         try {
           expectResult(
-            await client
-              .getInclude()
-              .update(
-                { ...include, transportRequest },
-                { lockHandle: includeHandle, source: params.include_source },
-              ),
+            await client.getInclude().update(
+              { ...include, transportRequest },
+              {
+                headers: headersOf(client.getInclude(), 'update'),
+                lockHandle: includeHandle,
+                source: params.include_source,
+              },
+            ),
             'write the test class',
           );
         } finally {
@@ -173,12 +179,15 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         // Step 2: the report that pulls it in
         logTestStep('create program', testsLogger);
         expectResult(
-          await client.getProgram().create({
-            programName,
-            packageName,
-            transportRequest,
-            description: 'ABAP Unit test report',
-          }),
+          await client.getProgram().create(
+            {
+              programName,
+              packageName,
+              transportRequest,
+              description: 'ABAP Unit test report',
+            },
+            { headers: headersOf(client.getProgram(), 'create') },
+          ),
           'create program',
         );
         const programHandle = String(
@@ -186,12 +195,14 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         );
         try {
           expectResult(
-            await client
-              .getProgram()
-              .update(
-                { ...program, transportRequest },
-                { lockHandle: programHandle, source: params.program_source },
-              ),
+            await client.getProgram().update(
+              { ...program, transportRequest },
+              {
+                headers: headersOf(client.getProgram(), 'update'),
+                lockHandle: programHandle,
+                source: params.program_source,
+              },
+            ),
             'write the report',
           );
         } finally {
@@ -200,11 +211,15 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
 
         logTestStep('activate', testsLogger);
         expectResult(
-          await client.getInclude().activate(include),
+          await client.getInclude().activate(include, {
+            headers: headersOf(client.getInclude(), 'activate'),
+          }),
           'activate include',
         );
         expectResult(
-          await client.getProgram().activate(program),
+          await client.getProgram().activate(program, {
+            headers: headersOf(client.getProgram(), 'activate'),
+          }),
           'activate program',
         );
 
@@ -233,11 +248,17 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
           logTestStep('delete (cleanup)', testsLogger);
           await client
             .getProgram()
-            .delete({ ...program, transportRequest })
+            .delete(
+              { ...program, transportRequest },
+              { headers: headersOf(client.getProgram(), 'delete') },
+            )
             .catch(() => undefined);
           await client
             .getInclude()
-            .delete({ ...include, transportRequest })
+            .delete(
+              { ...include, transportRequest },
+              { headers: headersOf(client.getInclude(), 'delete') },
+            )
             .catch(() => undefined);
         }
         logTestEnd(testsLogger, TITLE);

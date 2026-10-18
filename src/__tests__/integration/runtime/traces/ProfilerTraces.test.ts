@@ -30,6 +30,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
@@ -291,6 +292,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // Location header.
         const requestId = expectResult(
           await classRunner.scheduleTrace({
+            headers: headersOf(classRunner, 'scheduleTrace'),
             description: 'adt-clients integration test',
           }),
           'schedule a trace',
@@ -375,7 +377,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // `runWithProfiling` did both and fixed the order here.
         const classExecutor = classRunner;
         const profilerId = expectResult(
-          await classExecutor.scheduleTrace(),
+          await classExecutor.scheduleTrace({
+            headers: headersOf(classExecutor, 'scheduleTrace'),
+          }),
           'scheduled trace',
         );
         expect(profilerId).toContain(

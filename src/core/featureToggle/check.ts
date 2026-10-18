@@ -2,16 +2,14 @@
  * Feature Toggle check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-  CT_FEATURE_TOGGLE_METADATA,
-} from '../../constants/contentTypes';
+import { CT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check feature toggle via /sap/bc/adt/checkruns?reporters=abapCheckRun.
@@ -22,6 +20,7 @@ import { FEATURE_TOGGLE } from '../../endpoints/objects';
  */
 export async function checkFeatureToggle(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   name: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
@@ -53,10 +52,7 @@ export async function checkFeatureToggle(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_CHECK_MESSAGES,
-      'Content-Type': CT_CHECK_OBJECTS,
-    },
+    headers: requestHeaders(headers),
   });
 
   return response;

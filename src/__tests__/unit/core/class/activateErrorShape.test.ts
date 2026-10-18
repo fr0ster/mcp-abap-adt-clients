@@ -20,6 +20,7 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClass } from '../../../../core/class/AdtClass';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
@@ -45,7 +46,10 @@ describe('activation failure keeps its shape', () => {
     );
 
     const failure = expectFailure(
-      await cls.activate({ className: 'ZCL_X' }),
+      await cls.activate(
+        { className: 'ZCL_X' },
+        { headers: headersOf(cls, 'activate') },
+      ),
       'activate a class the server refuses',
     );
 
@@ -61,7 +65,10 @@ describe('activation failure keeps its shape', () => {
     const cls = new AdtClass(failingWith(500, 'boom'), createLibraryLogger());
 
     const failure = expectFailure(
-      await cls.activate({ className: 'ZCL_X' }),
+      await cls.activate(
+        { className: 'ZCL_X' },
+        { headers: headersOf(cls, 'activate') },
+      ),
       'activate against a server that failed',
     );
 

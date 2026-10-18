@@ -17,6 +17,7 @@
 import { readNodeStructure } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { headersFor } from '../../src/__tests__/helpers/adtHeaders';
 import { fetchNodeStructure } from '../../src/core/shared/nodeStructure';
 
 export interface IWalkedNode {
@@ -65,6 +66,7 @@ export async function walkPackage(
 
   const root = await fetchNodeStructure(
     connection,
+    headersFor('AdtUtils.fetchNodeStructure'),
     'DEVC/K',
     name,
     undefined,
@@ -83,6 +85,7 @@ export async function walkPackage(
     if (isPackageType(typeInfo.objectType)) continue;
     const perType = await fetchNodeStructure(
       connection,
+      headersFor('AdtUtils.fetchNodeStructure'),
       'DEVC/K',
       name,
       typeInfo.nodeId,

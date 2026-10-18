@@ -15,6 +15,7 @@ import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { AdtUtilsLegacy } from '../../../core/shared/AdtUtilsLegacy';
 import { whereUsedObjectUri } from '../../../core/shared/whereUsed';
 import { buildObjectUri } from '../../../utils/activationUtils';
+import { headersOf } from '../../helpers/adtHeaders';
 
 const logger = {
   log: jest.fn(),
@@ -97,14 +98,20 @@ describe('AdtUtils where-used members', () => {
     const { connection, urls } = recording();
     const utils = new AdtUtils(connection, logger);
 
-    await utils.getWhereUsed({
-      object_name: 'ZI_TRAVEL',
-      object_type: 'BDEF/BDO',
-    });
-    await utils.getWhereUsedScope({
-      object_name: 'ZCL_X',
-      object_type: 'class',
-    });
+    await utils.getWhereUsed(
+      {
+        object_name: 'ZI_TRAVEL',
+        object_type: 'BDEF/BDO',
+      },
+      { headers: headersOf(utils, 'getWhereUsed') },
+    );
+    await utils.getWhereUsedScope(
+      {
+        object_name: 'ZCL_X',
+        object_type: 'class',
+      },
+      { headers: headersOf(utils, 'getWhereUsedScope') },
+    );
 
     expect(urls).toEqual([
       `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent('/sap/bc/adt/bo/behaviordefinitions/zi_travel')}`,
@@ -117,10 +124,16 @@ describe('AdtUtils where-used members', () => {
     const utils = new AdtUtils(connection, logger);
 
     await expect(
-      utils.getWhereUsed({ object_name: 'ZX', object_type: 'NOPE/XX' }),
+      utils.getWhereUsed(
+        { object_name: 'ZX', object_type: 'NOPE/XX' },
+        { headers: headersOf(utils, 'getWhereUsed') },
+      ),
     ).rejects.toThrow(/No ADT address is known for object type/);
     await expect(
-      utils.getWhereUsedScope({ object_name: 'ZX', object_type: '' }),
+      utils.getWhereUsedScope(
+        { object_name: 'ZX', object_type: '' },
+        { headers: headersOf(utils, 'getWhereUsedScope') },
+      ),
     ).rejects.toThrow(/object type/);
     expect(urls).toEqual([]);
   });
@@ -132,9 +145,14 @@ describe('AdtUtilsLegacy refusals', () => {
     const utils = new AdtUtilsLegacy(connection, logger);
 
     for (const answer of [
-      await utils.getSqlQuery({ sql_query: 'SELECT * FROM T000' }),
+      await utils.getSqlQuery(
+        { sql_query: 'SELECT * FROM T000' },
+        { headers: headersOf(utils, 'getSqlQuery') },
+      ),
       await utils.getTableColumns('T000'),
-      await utils.getTableContents({ table_name: 'T000' } as never),
+      await utils.getTableContents({ table_name: 'T000' } as never, {
+        headers: headersOf(utils, 'getTableContents'),
+      }),
     ]) {
       expect(answer.ok).toBe(false);
       if (answer.ok) continue;

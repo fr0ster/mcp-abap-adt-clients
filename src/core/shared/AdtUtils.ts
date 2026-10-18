@@ -77,6 +77,7 @@ import type {
   IAdtDiscovery,
   IAdtError,
   IAdtGroupLifecycle,
+  IAdtHeaders,
   IAdtInformationSystem,
   IAdtObjectAccess,
   IAdtOperationOptions,
@@ -275,10 +276,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getVirtualFoldersContents<E extends IAdtError = IAdtError>(
     params: IGetVirtualFoldersContentsParams,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['folders']>, E>> {
     return answering(
-      () => getVirtualFoldersContents(this.connection, params),
+      () => getVirtualFoldersContents(this.connection, options.headers, params),
       this.results.folders as IResultStrategy<ReturnType<R['folders']>>,
       options?.analyse,
     );
@@ -318,14 +319,14 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
     params: IGetWhereUsedScopeParams,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
     // Built before the request: a type where-used cannot address is the
     // caller's argument, not something the server said.
     whereUsedObjectUri(params.object_name, params.object_type);
 
     return answering(
-      () => getWhereUsedScope(this.connection, params),
+      () => getWhereUsedScope(this.connection, options.headers, params),
       this.results.whereUsedScope as IResultStrategy<
         ReturnType<R['whereUsedScope']>
       >,
@@ -410,13 +411,13 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getWhereUsed<E extends IAdtError = IAdtError>(
     params: IGetWhereUsedParams,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
     whereUsedObjectUri(params.object_name, params.object_type);
 
     return answering(
-      () => getWhereUsed(this.connection, params),
+      () => getWhereUsed(this.connection, options.headers, params),
       this.results.whereUsed as IResultStrategy<ReturnType<R['whereUsed']>>,
       options?.analyse,
     );
@@ -451,11 +452,17 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async activateObjectsGroup<E extends IAdtError = IAdtError>(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     addressEvery(objects);
     return answering(
-      () => activateObjectsGroup(this.connection, objects, preauditRequested),
+      () =>
+        activateObjectsGroup(
+          this.connection,
+          options.headers,
+          objects,
+          preauditRequested,
+        ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -508,11 +515,11 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async checkDeletionGroup<E extends IAdtError = IAdtError>(
     objects: IObjectReference[],
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     addressEvery(objects);
     return answering(
-      () => checkDeletionGroup(this.connection, objects),
+      () => checkDeletionGroup(this.connection, options.headers, objects),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -533,12 +540,18 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async deleteObjectsGroup<E extends IAdtError = IAdtError>(
     objects: IObjectReference[],
-    transportRequest?: string,
-    options?: IAdtAnalyseOptions<E>,
+    transportRequest: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     addressEvery(objects);
     return answering(
-      () => deleteObjectsGroup(this.connection, objects, transportRequest),
+      () =>
+        deleteObjectsGroup(
+          this.connection,
+          options.headers,
+          objects,
+          transportRequest,
+        ),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -668,10 +681,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getSqlQuery<E extends IAdtError = IAdtError>(
     params: IGetSqlQueryParams,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['query']>, E>> {
     return answering(
-      () => getSqlQuery(this.connection, params),
+      () => getSqlQuery(this.connection, options.headers, params),
       this.results.query as IResultStrategy<ReturnType<R['query']>>,
       options?.analyse,
     );
@@ -704,10 +717,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getTableContents<E extends IAdtError = IAdtError>(
     params: IGetTableContentsParams,
-    options?: IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['contents']>, E>> {
     return answering(
-      () => getTableContents(this.connection, params),
+      () => getTableContents(this.connection, options.headers, params),
       this.results.contents as IResultStrategy<ReturnType<R['contents']>>,
       options?.analyse,
     );
@@ -749,12 +762,14 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async fetchNodeStructure<E extends IAdtError = IAdtError>(
     parentType: string,
     parentName: string,
-    options?: IGetNodeContentsOptions & IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
+      IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['node']>, E>> {
     return answering(
       () =>
         fetchNodeStructureUtil(
           this.connection,
+          options.headers,
           parentType,
           parentName,
           options?.nodeId,

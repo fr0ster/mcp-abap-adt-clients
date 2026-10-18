@@ -11,6 +11,7 @@ import { exemptFromAcceptNegotiation, getBaseRequest } from '../../index';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { withRequestTrace } from '../../utils/requestTrace';
+import { headersOf } from '../helpers/adtHeaders';
 
 function fixture(statuses = [200, 200]) {
   const send = jest.fn(async (_request: unknown) => ({
@@ -187,7 +188,7 @@ test('debugger records step, stack and variables', async () => {
   const pending = [
     api.step('stepOver'),
     api.getStack(),
-    api.getVariables(['id']),
+    api.getVariables(['id'], { headers: headersOf(api, 'getVariables') }),
   ];
   await batch.execute();
   expect((await Promise.all(pending)).every((r) => r.ok)).toBe(true);
@@ -269,7 +270,7 @@ test.each([
   const pending = [
     method === 'lock' ? domain.lock(config) : domain.unlock(config, 'handle'),
     domain.readMetadata(config),
-    domain.create(config),
+    domain.create(config, { headers: headersOf(domain, 'create') }),
   ];
   await batch.execute();
   await Promise.all(pending);
@@ -432,7 +433,10 @@ test.each([
     { endpoint: 'debugger' },
   );
   const api = new AbapDebugger(batch);
-  const pending = [api.getStack(), api.getVariables(['id'])];
+  const pending = [
+    api.getStack(),
+    api.getVariables(['id'], { headers: headersOf(api, 'getVariables') }),
+  ];
   await batch.execute();
   await Promise.all(pending);
   expect(send).toHaveBeenCalledTimes(1);
@@ -510,11 +514,13 @@ describe('accept negotiation never resends an envelope', () => {
         status,
         statusText: 'Refused',
         headers: {
-          accept: 'multipart/alternative',
-          'x-sap-adt-supported-accept': 'multipart/alternative',
           'x-sap-adt-supported-content-type': 'multipart/alternative',
         },
-        data: '',
+        // SAP names what it accepts in the body of its 406 only.
+        data:
+          status === 406
+            ? '<message lang="EN">The message content is not acceptable. Accepted content types: multipart/alternative</message>'
+            : '',
       },
     });
     const send = jest.fn(async (_request: unknown) => {
@@ -596,7 +602,7 @@ describe('a consumer wrapper over a batch connection', () => {
   }
   const refused406 = <S extends { data: string }>(success: S): S => ({
     ...success,
-    data: '--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 406 Unsupported\r\nAccept: application/corrected+xml\r\n\r\nunsupported\r\n--answer--\r\n',
+    data: '--answer\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 406 Unsupported\r\nContent-Type: application/xml\r\n\r\n<message>The message content is not acceptable. Accepted content types: application/corrected+xml</message>\r\n--answer--\r\n',
   });
 
   it('marked with exemptFromAcceptNegotiation, resends nothing', async () => {
@@ -643,8 +649,9 @@ describe('a forwarding connection over one an AdtClient wrapped', () => {
       response: {
         status: 406,
         statusText: 'Refused',
-        headers: { 'x-sap-adt-supported-accept': 'multipart/alternative' },
-        data: '',
+        headers: {},
+        // SAP names what it accepts in the body of its 406 only.
+        data: '<message lang="EN">The message content is not acceptable. Accepted content types: multipart/alternative</message>',
       },
     });
     const send = jest.fn(async (_request: unknown) => {

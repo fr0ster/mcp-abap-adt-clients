@@ -15,6 +15,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -139,7 +140,7 @@ export class AdtMessageClass<
   /** Create the message class shell. No activation — message classes have none. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IMessageClassConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -163,7 +164,7 @@ export class AdtMessageClass<
     this.logger?.info?.('Creating message class');
     return answering(
       () =>
-        createMessageClass(connection, {
+        createMessageClass(connection, options.headers, {
           name,
           description: config.description as string,
           package_name: config.packageName as string,
@@ -217,7 +218,7 @@ export class AdtMessageClass<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -228,6 +229,7 @@ export class AdtMessageClass<
       () =>
         updateMessageClass(
           connection,
+          options.headers,
           name,
           options?.source as string,
           options?.lockHandle,
@@ -259,7 +261,7 @@ export class AdtMessageClass<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -267,7 +269,7 @@ export class AdtMessageClass<
     const name = this.name(config);
 
     return answering(
-      () => checkDeletion(connection, name),
+      () => checkDeletion(connection, options.headers, name),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -277,7 +279,7 @@ export class AdtMessageClass<
 
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -285,7 +287,13 @@ export class AdtMessageClass<
     const name = this.name(config);
 
     return answering(
-      () => deleteMessageClass(connection, name, config.transportRequest),
+      () =>
+        deleteMessageClass(
+          connection,
+          options.headers,
+          name,
+          config.transportRequest,
+        ),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );

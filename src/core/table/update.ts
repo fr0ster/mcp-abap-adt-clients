@@ -2,13 +2,14 @@
  * Table update operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { sourceUri, TABLE } from '../../endpoints/objects';
-import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
+import { writeQuery } from '../../utils/internalUtils';
+import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateTableParams } from './types';
 
 /**
@@ -20,22 +21,18 @@ import type { IUpdateTableParams } from './types';
  */
 export async function updateTable(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   params: IUpdateTableParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const tableName = params.table_name.toUpperCase();
   const url = `${sourceUri(TABLE.uri(tableName))}${writeQuery(lockHandle, params.transport_request)}`;
 
-  const headers = {
-    'Content-Type': CT_SOURCE,
-    Accept: ACCEPT_SOURCE,
-  };
-
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: 0,
     data: params.ddl_code,
-    headers,
+    headers: requestHeaders(headers),
   });
 }

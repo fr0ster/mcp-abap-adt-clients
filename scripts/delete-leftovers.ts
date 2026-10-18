@@ -18,6 +18,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -36,24 +37,45 @@ const KNOWN: Record<
   (client: AdtClient) => Promise<IAdtResponse<unknown>>
 > = {
   ZAC_INNER_PKG03: (client) =>
-    client.getPackage().delete({ packageName: 'ZAC_INNER_PKG03' }),
+    client
+      .getPackage()
+      .delete(
+        { packageName: 'ZAC_INNER_PKG03' },
+        { headers: headersOf(client.getPackage(), 'delete') },
+      ),
   ZAC_INNER_PKG04: (client) =>
-    client.getPackage().delete({ packageName: 'ZAC_INNER_PKG04' }),
+    client
+      .getPackage()
+      .delete(
+        { packageName: 'ZAC_INNER_PKG04' },
+        { headers: headersOf(client.getPackage(), 'delete') },
+      ),
   ZAC_SRVD01: (client) =>
     client
       .getServiceDefinition()
-      .delete({ serviceDefinitionName: 'ZAC_SRVD01' }),
+      .delete(
+        { serviceDefinitionName: 'ZAC_SRVD01' },
+        { headers: headersOf(client.getServiceDefinition(), 'delete') },
+      ),
   // Not a leftover: a shared fixture whose source drifted from the config.
   // `shared:setup` only creates what is missing, so a shared object that is
   // already there keeps whatever source it was first built with — delete it and
   // let setup rebuild it from the config as it stands now.
   ZAC_SHR_RUN01: (client) =>
-    client.getClass().delete({ className: 'ZAC_SHR_RUN01' }),
+    client
+      .getClass()
+      .delete(
+        { className: 'ZAC_SHR_RUN01' },
+        { headers: headersOf(client.getClass(), 'delete') },
+      ),
   Z_AC_FM03: (client) =>
-    client.getFunctionModule().delete({
-      functionGroupName: 'ZAC_SHR_FUGR',
-      functionModuleName: 'Z_AC_FM03',
-    }),
+    client.getFunctionModule().delete(
+      {
+        functionGroupName: 'ZAC_SHR_FUGR',
+        functionModuleName: 'Z_AC_FM03',
+      },
+      { headers: headersOf(client.getFunctionModule(), 'delete') },
+    ),
 };
 
 async function main(): Promise<void> {

@@ -28,6 +28,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -86,7 +87,9 @@ async function main(): Promise<void> {
   );
 
   try {
-    const created = await cls.create(config);
+    const created = await cls.create(config, {
+      headers: headersOf(cls, 'create'),
+    });
     note(
       `create    ${
         created.ok
@@ -108,6 +111,7 @@ async function main(): Promise<void> {
 
     for (let round = 1; round <= writes; round++) {
       const written = await cls.update(config, {
+        headers: headersOf(cls, 'update'),
         source: source(round),
         lockHandle: handle,
       });
@@ -119,7 +123,9 @@ async function main(): Promise<void> {
       if (!written.ok) break;
 
       if (activating) {
-        const activated = await cls.activate(config);
+        const activated = await cls.activate(config, {
+          headers: headersOf(cls, 'activate'),
+        });
         note(
           `  activate  ${
             activated.ok ? 'ok' : `REFUSED: ${activated.getError().message}`

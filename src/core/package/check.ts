@@ -2,15 +2,13 @@
  * Package check operations
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_CHECK_MESSAGES,
-  CT_CHECK_OBJECTS,
-} from '../../constants/contentTypes';
 import { PACKAGE } from '../../endpoints/objects';
+import { requestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Check package for errors
@@ -25,6 +23,7 @@ import { PACKAGE } from '../../endpoints/objects';
  */
 export async function checkPackage(
   connection: IAbapConnection,
+  headers: IAdtHeaders,
   packageName: string,
   version: 'active' | 'inactive' = 'active',
   xmlContent?: string,
@@ -63,9 +62,6 @@ export async function checkPackage(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: {
-      Accept: ACCEPT_CHECK_MESSAGES,
-      'Content-Type': CT_CHECK_OBJECTS,
-    },
+    headers: requestHeaders(headers),
   });
 }

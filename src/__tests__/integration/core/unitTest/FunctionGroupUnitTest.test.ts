@@ -24,6 +24,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
+import { headersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -147,20 +148,26 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         // Step 1: the group and the module under test
         logTestStep('create group', testsLogger);
         expectResult(
-          await client.getFunctionGroup().create({
-            ...group,
-            packageName,
-            transportRequest,
-            description: 'ABAP Unit test group',
-          }),
+          await client.getFunctionGroup().create(
+            {
+              ...group,
+              packageName,
+              transportRequest,
+              description: 'ABAP Unit test group',
+            },
+            { headers: headersOf(client.getFunctionGroup(), 'create') },
+          ),
           'create group',
         );
         expectResult(
-          await client.getFunctionModule().create({
-            ...module,
-            transportRequest,
-            description: 'ABAP Unit test module',
-          }),
+          await client.getFunctionModule().create(
+            {
+              ...module,
+              transportRequest,
+              description: 'ABAP Unit test module',
+            },
+            { headers: headersOf(client.getFunctionModule(), 'create') },
+          ),
           'create module',
         );
         const moduleHandle = String(
@@ -174,6 +181,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
             await client.getFunctionModule().update(
               { ...module, transportRequest },
               {
+                headers: headersOf(client.getFunctionModule(), 'update'),
                 lockHandle: moduleHandle,
                 source: params.function_module_source,
               },
@@ -187,11 +195,14 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         // Step 2: the include holding the test class
         logTestStep('create test include', testsLogger);
         expectResult(
-          await client.getFunctionInclude().create({
-            ...include,
-            transportRequest,
-            description: 'ABAP Unit tests',
-          }),
+          await client.getFunctionInclude().create(
+            {
+              ...include,
+              transportRequest,
+              description: 'ABAP Unit tests',
+            },
+            { headers: headersOf(client.getFunctionInclude(), 'create') },
+          ),
           'create include',
         );
         const includeHandle = String(
@@ -202,12 +213,14 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         );
         try {
           expectResult(
-            await client
-              .getFunctionInclude()
-              .update(
-                { ...include, transportRequest },
-                { lockHandle: includeHandle, source: params.include_source },
-              ),
+            await client.getFunctionInclude().update(
+              { ...include, transportRequest },
+              {
+                headers: headersOf(client.getFunctionInclude(), 'update'),
+                lockHandle: includeHandle,
+                source: params.include_source,
+              },
+            ),
             'write the test class',
           );
         } finally {
@@ -216,15 +229,21 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
 
         logTestStep('activate', testsLogger);
         expectResult(
-          await client.getFunctionModule().activate(module),
+          await client.getFunctionModule().activate(module, {
+            headers: headersOf(client.getFunctionModule(), 'activate'),
+          }),
           'activate module',
         );
         expectResult(
-          await client.getFunctionInclude().activate(include),
+          await client.getFunctionInclude().activate(include, {
+            headers: headersOf(client.getFunctionInclude(), 'activate'),
+          }),
           'activate include',
         );
         expectResult(
-          await client.getFunctionGroup().activate(group),
+          await client.getFunctionGroup().activate(group, {
+            headers: headersOf(client.getFunctionGroup(), 'activate'),
+          }),
           'activate group',
         );
 
@@ -264,7 +283,10 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
           logTestStep('delete (cleanup)', testsLogger);
           await client
             .getFunctionGroup()
-            .delete({ ...group, transportRequest })
+            .delete(
+              { ...group, transportRequest },
+              { headers: headersOf(client.getFunctionGroup(), 'delete') },
+            )
             .catch(() => undefined);
         }
         logTestEnd(testsLogger, TITLE);

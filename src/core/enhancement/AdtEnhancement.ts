@@ -16,6 +16,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -178,7 +179,7 @@ export class AdtEnhancement<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IEnhancementConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -203,6 +204,7 @@ export class AdtEnhancement<
       () =>
         createEnhancement(
           connection,
+          options.headers,
           {
             enhancement_name: name,
             enhancement_type: type,
@@ -285,13 +287,14 @@ export class AdtEnhancement<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
         updateEnhancementMetadata(
           connection,
+          options.headers,
           this.enhancementType(config),
           this.name(config),
           options?.source as string,
@@ -343,7 +346,7 @@ export class AdtEnhancement<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -361,6 +364,7 @@ export class AdtEnhancement<
       () =>
         updateEnhancement(
           connection,
+          options.headers,
           type,
           name,
           source as string,
@@ -382,7 +386,7 @@ export class AdtEnhancement<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -390,7 +394,7 @@ export class AdtEnhancement<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           enhancement_name: name,
           enhancement_type: this.enhancementType(config),
           transport_request: config.transportRequest,
@@ -413,7 +417,7 @@ export class AdtEnhancement<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -421,7 +425,7 @@ export class AdtEnhancement<
     const name = this.name(config);
     return answering(
       () =>
-        deleteEnhancement(connection, {
+        deleteEnhancement(connection, options.headers, {
           enhancement_name: name,
           enhancement_type: this.enhancementType(config),
           transport_request: config.transportRequest,
@@ -434,7 +438,7 @@ export class AdtEnhancement<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -442,7 +446,13 @@ export class AdtEnhancement<
     const name = this.name(config);
 
     return answering(
-      () => activateEnhancement(connection, this.enhancementType(config), name),
+      () =>
+        activateEnhancement(
+          connection,
+          options.headers,
+          this.enhancementType(config),
+          name,
+        ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -451,8 +461,8 @@ export class AdtEnhancement<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -465,6 +475,7 @@ export class AdtEnhancement<
       () =>
         checkEnhancementSource(
           connection,
+          options.headers,
           this.enhancementType(config),
           name,
           version,

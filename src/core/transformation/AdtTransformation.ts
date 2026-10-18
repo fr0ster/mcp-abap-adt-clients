@@ -12,6 +12,7 @@ import type {
   IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -149,7 +150,7 @@ export class AdtTransformation<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITransformationConfig, 'source'> & { source?: never },
-    options?: IAdtCreateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
     //
@@ -171,7 +172,7 @@ export class AdtTransformation<
     const name = this.name(config);
     return answering(
       () =>
-        createTransformation(connection, {
+        createTransformation(connection, options.headers, {
           transformation_name: name,
           transformation_type: config.transformationType,
           package_name: config.packageName as string,
@@ -269,7 +270,7 @@ export class AdtTransformation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -286,6 +287,7 @@ export class AdtTransformation<
       () =>
         updateTransformation(
           connection,
+          options.headers,
           {
             transformation_name: name,
             source_code: source as string,
@@ -307,7 +309,7 @@ export class AdtTransformation<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -315,7 +317,7 @@ export class AdtTransformation<
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(connection, {
+        checkDeletion(connection, options.headers, {
           transformation_name: name,
           transport_request: config.transportRequest,
         }),
@@ -337,7 +339,7 @@ export class AdtTransformation<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -345,7 +347,7 @@ export class AdtTransformation<
     const name = this.name(config);
     return answering(
       () =>
-        deleteTransformation(connection, {
+        deleteTransformation(connection, options.headers, {
           transformation_name: name,
           transport_request: config.transportRequest,
         }),
@@ -357,7 +359,7 @@ export class AdtTransformation<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    options?: IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -365,7 +367,7 @@ export class AdtTransformation<
     const name = this.name(config);
 
     return answering(
-      () => activateTransformation(connection, name),
+      () => activateTransformation(connection, options.headers, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       options?.analyse,
     );
@@ -374,8 +376,8 @@ export class AdtTransformation<
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    status?: string,
-    options?: IAdtOperationOptions<E>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -385,7 +387,14 @@ export class AdtTransformation<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkTransformation(connection, name, version, config.source),
+      () =>
+        checkTransformation(
+          connection,
+          options.headers,
+          name,
+          version,
+          config.source,
+        ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );
