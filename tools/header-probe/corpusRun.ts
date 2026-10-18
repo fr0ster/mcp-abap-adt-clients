@@ -777,16 +777,23 @@ async function runClients(ctx: IContext): Promise<void> {
         row,
         call: (on, analyse) => {
           // Into the ledger before the write is sent, whatever follows.
-          if (write && readable)
-            ctx.register(`clients ${member.handler}`, () => ({
-              label: `clients: ${member.handler} ${PROBE_NAME} (written by ${member.member})`,
+          // The legacy client's object is the modern client's: one entry,
+          // read and deleted through the modern handler (measured: the legacy
+          // package read answered nothing, so its entry could not be checked).
+          if (write && readable) {
+            const owner = specs.get(modern(member.handler)) ?? spec;
+            const ownerOf = (clients: IClients) =>
+              owner.of(clients) as IHandler;
+            ctx.register(`clients ${owner.label}`, () => ({
+              label: `clients: ${owner.label} ${PROBE_NAME} (written by ${member.handler}.${member.member})`,
               remove: clientsRemoval(
                 once,
-                (target) => handlerOf(clientsAt(target, undefined, true)),
-                handlerOf(reference),
-                member.handler,
+                (target) => ownerOf(clientsAt(target, undefined, true)),
+                ownerOf(reference),
+                owner.label,
               ),
             }));
+          }
           return call(handlerOf(clientsAt(on, bogus)) as never, {
             headers,
             analyse,

@@ -930,6 +930,13 @@ describe('a clients run', () => {
       (r) => r.group === 'getClass()' && r.label === 'lock',
     );
     expect(lock?.skipped).toMatch(/takes no locks/);
+    // The legacy client's writes share the modern handler's ledger entry.
+    expect(
+      result.corpus?.removals.some((r) =>
+        r.label.startsWith('clients: legacy '),
+      ),
+    ).toBe(false);
+    expect(result.corpus?.removals.every((r) => r.removed)).toBe(true);
   });
 });
 
