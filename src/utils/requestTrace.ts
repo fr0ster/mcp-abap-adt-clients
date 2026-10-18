@@ -66,10 +66,12 @@ export function requestOf(
  * every other part's failure — the last part's winning, a request never sent
  * on its own. The object carries the envelope's own request instead, set by
  * the batch connection that sent it.
+ *
+ * Kept in a `WeakSet` rather than under a symbol on the error: a transport may
+ * reject with a frozen error, which takes no property, and the mark must hold
+ * on it all the same — the parts settle with that failure as it came.
  */
-const ENVELOPE_FAILURE = Symbol.for(
-  '@mcp-abap-adt/adt-clients/requestTrace/envelopeFailure',
-);
+const envelopeFailures = new WeakSet<object>();
 
 /**
  * Mark `error` as a batch envelope's failure, so the trace leaves it as it
@@ -77,19 +79,12 @@ const ENVELOPE_FAILURE = Symbol.for(
  * its one caller.
  */
 export function markEnvelopeFailure(error: unknown): void {
-  if (error === null || typeof error !== 'object') return;
-  Reflect.defineProperty(error, ENVELOPE_FAILURE, {
-    value: true,
-    enumerable: false,
-    configurable: false,
-  });
+  if (error !== null && typeof error === 'object') envelopeFailures.add(error);
 }
 
 function isEnvelopeFailure(error: unknown): boolean {
   return (
-    error !== null &&
-    typeof error === 'object' &&
-    (error as Record<symbol, unknown>)[ENVELOPE_FAILURE] === true
+    error !== null && typeof error === 'object' && envelopeFailures.has(error)
   );
 }
 

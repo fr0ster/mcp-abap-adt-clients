@@ -34,7 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   last part — a request never sent on its own. The failure now carries the
   envelope's `POST …/batch` as its `request`, and the trace leaves it as it
   came. The "not sent because an earlier batch envelope failed" error, shared by
-  every unsent part, is left as it came too: it names no part.
+  every unsent part, is left as it came too: it names no part. A failure that
+  takes no property — a frozen error — reaches every part and `execute()` as it
+  came, without the envelope's `request`; the trace no longer turns it into a
+  `TypeError`.
 
 ## [34.2.0] - 2026-10-16
 
