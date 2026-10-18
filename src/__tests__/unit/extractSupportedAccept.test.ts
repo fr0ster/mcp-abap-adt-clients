@@ -12,6 +12,7 @@ import {
   extractSupportedAccept,
   rememberAccept,
 } from '../../index';
+import { getAcceptCorrectionEnabled } from '../../utils/acceptNegotiation';
 
 describe('extractSupportedAccept (package root)', () => {
   it('reads the supported types from a response header', () => {
@@ -106,5 +107,64 @@ describe('cachedAccept / rememberAccept (package root)', () => {
     expect(cachedAccept(connection, request)).toBe(
       'application/vnd.sap.adt.t.v3+xml',
     );
+  });
+});
+
+describe('correction is off unless switched on', () => {
+  const request = {
+    method: 'GET',
+    url: '/sap/bc/adt/other',
+    headers: { Accept: 'application/xml' },
+  } as unknown as IAbapRequestOptions;
+  const saved = process.env.ADT_ACCEPT_CORRECTION;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ADT_ACCEPT_CORRECTION;
+    else process.env.ADT_ACCEPT_CORRECTION = saved;
+  });
+
+  function refusing406(): { connection: IAbapConnection; calls: () => number } {
+    let calls = 0;
+    const connection = {
+      makeAdtRequest: async () => {
+        calls++;
+        const error: any = new Error('406');
+        error.response = {
+          status: 406,
+          headers: { 'x-sap-adt-supported-accept': 'application/vnd.x+xml' },
+        };
+        throw error;
+      },
+    } as unknown as IAbapConnection;
+    return { connection, calls: () => calls };
+  }
+
+  it('an AdtClient with no switch sends a 406 request once', async () => {
+    delete process.env.ADT_ACCEPT_CORRECTION;
+    const { connection, calls } = refusing406();
+    new AdtClient(connection);
+    await expect(connection.makeAdtRequest(request)).rejects.toThrow('406');
+    expect(calls()).toBe(1);
+    expect(getAcceptCorrectionEnabled(connection)).toBe(false);
+  });
+
+  it('ADT_ACCEPT_CORRECTION=true switches it on, any other value leaves it off', async () => {
+    process.env.ADT_ACCEPT_CORRECTION = 'true';
+    const on = refusing406();
+    new AdtClient(on.connection);
+    await expect(on.connection.makeAdtRequest(request)).rejects.toThrow('406');
+    expect(on.calls()).toBe(2);
+
+    process.env.ADT_ACCEPT_CORRECTION = '1';
+    const off = refusing406();
+    new AdtClient(off.connection);
+    await expect(off.connection.makeAdtRequest(request)).rejects.toThrow('406');
+    expect(off.calls()).toBe(1);
+  });
+
+  it('cachedAccept reads the cache with the switch off', () => {
+    const { connection } = refusing406();
+    new AdtClient(connection, undefined, { enableAcceptCorrection: false });
+    rememberAccept(connection, request, 'application/vnd.x+xml');
+    expect(cachedAccept(connection, request)).toBe('application/vnd.x+xml');
   });
 });

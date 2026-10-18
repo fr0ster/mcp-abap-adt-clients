@@ -24,7 +24,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [34.3.0] - 2026-10-18
+## [35.0.0] - 2026-10-18
+
+### Changed (breaking)
+
+- Accept negotiation is **off by default**. Without an explicit switch the
+  library corrects and resends nothing: a `406` (Accept) or `415`
+  (Content-Type) is the call's answer, as any other status. The switches are
+  unchanged: the `enableAcceptCorrection` option, `setAcceptCorrectionEnabled`
+  and the `ADT_ACCEPT_CORRECTION` environment variable; the variable now turns
+  correction on only when it is exactly `true` (unset or any other value leaves
+  it off, where only `false` turned it off before). This covers the direct
+  `makeAdtRequestWithAcceptNegotiation` calls inside the read members too.
+- `cachedAccept` (below) reads the cache whatever the switch says.
+
+**Migration.** A consumer that relied on the default being on must either
+switch it on explicitly (`new AdtClient(connection, logger, {
+enableAcceptCorrection: true })`, or `ADT_ACCEPT_CORRECTION=true`), or correct
+the request itself: read the `406` with `extractSupportedAccept(error)`, keep
+the result with `rememberAccept(connection, request, accept)`, and send the
+request again. See `docs/usage/MIGRATION-35.md`.
 
 ### Added
 
@@ -34,11 +53,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `406` itself, since a batch connection is exempt from accept negotiation,
   parses the answer the same way. Its behaviour is unchanged.
 - `cachedAccept(connection, request)` and `rememberAccept(connection, request,
-  accept)` are exported: a read and a write of the connection's accept cache
-  that accept negotiation itself uses, under the same key (method and URL).
-  A correction learned by the batch path is then served to a request through an
-  `AdtClient` on the same connection, and the other way round. Negotiation's own
-  behaviour and switches are unchanged.
+  accept)` are exported: a plain read (whatever the switch says) and a write
+  of the connection's accept cache that accept negotiation itself uses, under
+  the same key (method and URL).
+  A correction a consumer learns on a batch part can then be served to a request
+  through an `AdtClient` with correction on over the same connection, and one
+  the non-batch path learned can be read back.
 
 ## [34.2.1] - 2026-10-18
 

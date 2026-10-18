@@ -73,7 +73,8 @@ Use the real handles and inspect activation messages, including `type="E"`.
 The transport provides no transaction or rollback; callers own recovery and
 cleanup after partial failures.
 
-Accept negotiation never corrects or resends an envelope or its parts. A batch
+Accept negotiation never corrects or resends an envelope or its parts. (Since
+35.0.0 it corrects nothing anywhere unless switched on.) A batch
 connection is exempt from it: an `AdtClient` built over one does not wrap it,
 whatever `enableAcceptCorrection` it is given, and a member that negotiates by
 itself sends through it once. On a connection an `AdtClient` wrapped with
@@ -98,13 +99,14 @@ duplicates. It is the reading accept negotiation applies to a `406` itself.
 
 The corrected Accept is remembered where negotiation remembers its own: the
 connection's accept cache, keyed by method and URL. `cachedAccept(connection,
-request)` (exported) returns the Accept negotiation would send for that request
-on that connection — what a `406` taught it or `rememberAccept` stored — or
-`undefined` when there is none or correction is switched off for the
-connection. `rememberAccept(connection, request, accept)` (exported) stores
+request)` (exported) returns the Accept stored for that request's method and
+URL on that connection — what a `406` taught negotiation or `rememberAccept`
+stored — or `undefined` when there is none. It is a plain read of the cache and
+ignores the correction switch, so a consumer that corrects requests itself can
+use it while negotiation is off. `rememberAccept(connection, request, accept)` (exported) stores
 `accept` for the request's method and URL on the connection and returns nothing;
 a later request through an `AdtClient` with correction on over the same
-connection sends it. Both read and write that cache only, so a correction
+connection sends it (with correction off, only the consumer's own code reads it). Both read and write that cache only, so a correction
 learned on either path serves both. A batch is yours, and so is
 what SAP answered to each of its parts. The envelope request itself still goes
 through the connection's own handling — credential renewal, CSRF recovery and

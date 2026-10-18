@@ -834,19 +834,27 @@ Some ADT endpoints return `406` when the `Accept` header does not match the
 system's supported media types. The client retries once with a type the `406`
 names, and remembers it for that endpoint.
 
-**It is on unless you turn it off** — per client, or for the process:
+**It is off unless you turn it on** (since 35.0.0) — per client, or for the
+process. Without a switch a `406` or `415` is the call's answer and nothing is
+sent again:
 
 ```typescript
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 const client = new AdtClient(connection, console, {
-  enableAcceptCorrection: false,
+  enableAcceptCorrection: true,
 });
 ```
 
 ```bash
-ADT_ACCEPT_CORRECTION=false npm test
+ADT_ACCEPT_CORRECTION=true npm test
 ```
+
+The variable turns it on only when it is exactly `true`. To correct requests
+yourself instead, read a `406` with `extractSupportedAccept(error)` and keep
+the result in the connection's cache with `rememberAccept(connection, request,
+accept)`; `cachedAccept(connection, request)` reads it back, whatever the
+switch says. See [batch](docs/usage/BATCH.md).
 
 **The state is the connection's** since 23.0.0: the remembered types and the
 switch live on the connection object. They used to be module globals, so a
@@ -1021,6 +1029,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[34.x → 35.0.0](docs/usage/MIGRATION-35.md)** — accept negotiation is off by default: a `406`/`415` is the call's answer unless you switch it on.
 - **[33.x → 34.0.0](docs/usage/MIGRATION-34.md)** — a batch corrects and resends nothing: a part's `406`/`415` is that call's answer.
 - **[32.x → 33.0.0](docs/usage/MIGRATION-33.md)** — a credential the provider refused before SAP was asked rejects with the connection's refusal as it came; a `401` SAP refused it with comes back carrying that response.
 - **[31.x → 32.0.0](docs/usage/MIGRATION-32.md)** — interfaces-adt 18, three enhancement subtypes, subtype-specific create fields, two new result slots for enhancement hosts, and `metadataUpdated` for enhancement document writes.

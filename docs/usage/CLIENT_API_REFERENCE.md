@@ -1042,7 +1042,10 @@ judgement moved to the caller, who knows which types they are activating.
 
 ### Accept Negotiation
 
-The client can optionally auto-correct `Accept` headers after a 406 response:
+The client can optionally auto-correct `Accept` headers after a 406 response
+(and `Content-Type` after a 415). It is **off** unless switched on, per client
+as below or with `ADT_ACCEPT_CORRECTION=true`; with no switch a `406`/`415` is
+the call's answer and nothing is sent again (default flipped in 35.0.0):
 
 ```typescript
 const client = new AdtClient(connection, console, {

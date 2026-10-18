@@ -101,13 +101,17 @@ export function setAcceptCorrectionEnabled(
   stateOf(connection).enabled = enabled;
 }
 
-/** This connection's switch, or the `ADT_ACCEPT_CORRECTION` default. */
+/**
+ * This connection's switch, else the `ADT_ACCEPT_CORRECTION` default. Off
+ * unless explicitly on: the environment variable turns it on only when it is
+ * exactly `true`; unset, or any other value, leaves it off.
+ */
 export function getAcceptCorrectionEnabled(
   connection: IAbapConnection,
 ): boolean {
   const enabled = stateOf(connection).enabled;
   if (enabled !== undefined) return enabled;
-  return process.env.ADT_ACCEPT_CORRECTION !== 'false';
+  return process.env.ADT_ACCEPT_CORRECTION === 'true';
 }
 
 export function extractSupportedAccept(error: unknown): string[] {
@@ -193,16 +197,16 @@ function buildCacheKey(request: IAbapRequestOptions): string {
 }
 
 /**
- * The Accept this connection's negotiation would send for `request`: what it
- * learned from a `406` (or was given by `rememberAccept`) for the same method
- * and URL, or `undefined` when it has none or correction is switched off for
- * the connection. A plain read of the per-connection cache.
+ * The Accept stored for `request`'s method and URL on this connection: what a
+ * `406` taught negotiation or `rememberAccept` stored, or `undefined` when
+ * there is none. A plain read of the per-connection cache, whatever the
+ * correction switch says, so a consumer that corrects requests itself can read
+ * it while negotiation is off.
  */
 export function cachedAccept(
   connection: IAbapConnection,
   request: IAbapRequestOptions,
 ): string | undefined {
-  if (!getAcceptCorrectionEnabled(connection)) return undefined;
   return stateOf(connection).accept.get(buildCacheKey(request));
 }
 
