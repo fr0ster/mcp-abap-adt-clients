@@ -47,6 +47,7 @@ import {
   wireNote,
 } from '../../../../tools/header-probe/corpus';
 import {
+  outputDir,
   removalOutcome,
   runCorpus,
   runFull,
@@ -2418,5 +2419,19 @@ describe('endpoint existence', () => {
     });
     expect(by.get('GET /b')?.exists).toBe('unknown');
     expect(rows).toHaveLength(5);
+  });
+});
+
+describe('the output folder', () => {
+  it('is <os temp dir>/mcp-abap-adt-clients/header-probe by default, --out overrides it; both absolute and created', () => {
+    expect(outputDir()).toBe(
+      path.join(os.tmpdir(), 'mcp-abap-adt-clients', 'header-probe'),
+    );
+    expect(fs.existsSync(outputDir())).toBe(true);
+    const chosen = path.join(tempDir(), 'nested', 'out');
+    expect(outputDir(chosen)).toBe(chosen);
+    expect(fs.existsSync(chosen)).toBe(true);
+    const relative = path.relative(process.cwd(), path.join(tempDir(), 'rel'));
+    expect(path.isAbsolute(outputDir(relative))).toBe(true);
   });
 });

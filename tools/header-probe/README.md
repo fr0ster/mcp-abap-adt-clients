@@ -20,7 +20,8 @@ deletes them again.
 
 ```bash
 npm run header:discovery                     # the full run: the system's header corpus
-npm run header:discovery -- --isolate .header-probe/header-corpus-<ts>.json
+npm run header:discovery -- --isolate /tmp/mcp-abap-adt-clients/header-probe/header-corpus-<ts>.json
+npm run header:discovery -- --out <dir>        # write there instead
 npm run header:discovery -- --from discovery --headers corpus
 npm run header:discovery -- --from discovery --headers none
 npm run header:discovery -- --from discovery --headers bogus
@@ -296,7 +297,16 @@ Deliberate, and left as they are:
 
 ## The corpus
 
-Two files in `.header-probe/` (gitignored: they hold the system's answers):
+**Where the output goes.** Everything a run writes — the corpora, the header
+corpus files, the summaries — goes to `<os temp dir>/mcp-abap-adt-clients/header-probe`
+(`path.join(os.tmpdir(), 'mcp-abap-adt-clients', 'header-probe')`, created
+when missing), outside the repository, so removing a worktree keeps them;
+`--out <dir>` writes elsewhere. The run prints the absolute folder at the end.
+`.header-probe/` in the repository is no longer written (its `.gitignore` line
+stays for old checkouts). The files hold the system's answers: they are never
+committed.
+
+Two files per run:
 
 - `corpus-<source>-<headers>-<timestamp>.json` — every row: the endpoint and
   its source, the headers asked for, the Accept and Content-Type that went on

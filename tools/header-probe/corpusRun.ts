@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type { IAdtHeaders, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -1054,6 +1055,19 @@ export async function readDiscovery(
 }
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
+
+/**
+ * Where a run writes: `--out`, else `<os temp dir>/mcp-abap-adt-clients/
+ * header-probe` — outside the worktree, so removing one keeps the corpora.
+ * Absolute; created when missing.
+ */
+export function outputDir(given?: string): string {
+  const dir = path.resolve(
+    given ?? path.join(os.tmpdir(), 'mcp-abap-adt-clients', 'header-probe'),
+  );
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 export function writeCorpus(corpus: ICorpus, outDir: string): string[] {
   fs.mkdirSync(outDir, { recursive: true });

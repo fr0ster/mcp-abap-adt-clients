@@ -21,7 +21,7 @@
  * existing objects (found read-only by the repository search) for the reads
  * and the header probe's temporary-object cycle for the writes (it needs
  * `default_package` and `default_transport` in test-config.yaml); then
- * `.header-probe/header-corpus-<timestamp>.{json,md}`, with each phase's time.
+ * `<out>/header-corpus-<timestamp>.{json,md}`, with each phase's time.
  *
  * `--from` (with `--headers`, one run): `discovery` probes every `app:collection` of
  * `/sap/bc/adt/discovery` (GET, plus POST where it lists `app:accept`);
@@ -33,6 +33,9 @@
  * `--isolate <corpus.json>[,<corpus.json>]` sends alone, from the start,
  * every call an earlier run's group split found poisoning envelopes (a header
  * corpus file stands for the corpora it lists); the rest is batched as usual.
+ * `--out <dir>` writes there instead of the default folder,
+ * `<os temp dir>/mcp-abap-adt-clients/header-probe` (created when missing);
+ * the run prints the absolute folder at the end.
  * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
  * (clients) or href (discovery) contains one of the texts.
  * `--sequential` sends every request on its own, no envelope (to compare
@@ -46,9 +49,9 @@
  * `GET /sap/bc/adt/discovery`: a 401 or 403 at either prints
  * `Oops: no authorization (<status>)` and exits 2, sending nothing more.
  *
- * Output: `.header-probe/corpus-<source>-<headers>-<timestamp>.json` (every
+ * Output (in `<out>`, below): `corpus-<source>-<headers>-<timestamp>.json` (every
  * answer, bodies whole) and `.md` (a table per endpoint group, the summary).
- * The directory is gitignored: the corpus holds system answers.
+ * The corpus holds system answers: it stays out of the repository.
  *
  * More in tools/header-probe/README.md.
  */
@@ -74,17 +77,14 @@ import {
   SOURCES,
   type Source,
 } from './corpus';
-import { runCorpus, runFull } from './corpusRun';
+import { outputDir, runCorpus, runFull } from './corpusRun';
+import { Interrupt } from './ledger';
 import { runWriteCycle } from './writeCycle';
 
 // The helpers load `.env` when imported; nothing else here reads it.
 const {
   getEnvironmentConfig,
 } = require('../../src/__tests__/helpers/test-helper');
-
-import { Interrupt } from './ledger';
-
-const OUT_DIR = path.resolve(__dirname, '../../.header-probe');
 
 const progress = (line: string): void => {
   process.stdout.write(`${line}\n`);
@@ -101,6 +101,7 @@ interface IArgs {
   sequential?: boolean;
   only?: string[];
   isolate?: string[];
+  out?: string;
 }
 
 function parseArgs(argv: readonly string[]): IArgs {
@@ -119,6 +120,8 @@ function parseArgs(argv: readonly string[]): IArgs {
       args.headers = value;
     } else if (arg === '--sequential') {
       args.sequential = true;
+    } else if (arg === '--out') {
+      args.out = argv[++i];
     } else if (arg === '--isolate') {
       args.isolate = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--only') {
@@ -161,6 +164,15 @@ const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
+  const OUT_DIR = outputDir(args.out);
+  try {
+    return await run(args, OUT_DIR);
+  } finally {
+    progress(`output: ${OUT_DIR}`);
+  }
+}
+
+async function run(args: IArgs, OUT_DIR: string): Promise<number> {
   if (args.summary) {
     const corpora = args.summary.map(
       (file) => JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus,
