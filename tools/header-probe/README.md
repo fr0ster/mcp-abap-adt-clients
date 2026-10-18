@@ -1,6 +1,6 @@
 # Header probe
 
-`npm run probe:headers` asks a system how it answers each member's request
+`npm run header:discovery` asks a system how it answers each member's request
 headers. It is a developer tool for collecting information: it is not run in
 CI, and it is not part of the npm package (`tools/` is outside `src/`, so
 nothing here reaches `dist/`, and `files` does not list it).
@@ -17,11 +17,11 @@ nothing here reaches `dist/`, and `files` does not list it).
 ## Run
 
 ```bash
-npm run probe:headers
-npm run probe:headers -- --only class,domain   # these object types only
-npm run probe:headers -- --operation update    # this member only
-npm run probe:headers -- --sequential          # every request on its own, no batch
-npm run probe:headers -- --compare <batched.json> <sequential.json>
+npm run header:discovery
+npm run header:discovery -- --only class,domain   # these object types only
+npm run header:discovery -- --operation update    # this member only
+npm run header:discovery -- --sequential          # every request on its own, no batch
+npm run header:discovery -- --compare <batched.json> <sequential.json>
 ```
 
 `--only` takes object types: `class`, `interface`, `program`, `include`,

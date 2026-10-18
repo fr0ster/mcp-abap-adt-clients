@@ -57,5 +57,5 @@ profiler-probe/
 # Probe output: raw ADT answers captured by integration tests, per run.
 refusal-visibility-evidence.json
 
-# Header probe reports (npm run probe:headers): system answers, never committed
+# Header probe reports (npm run header:discovery): system answers, never committed
 .header-probe/

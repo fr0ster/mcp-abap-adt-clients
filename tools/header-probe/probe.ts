@@ -10,11 +10,11 @@
  *     created in it, on that transport, and deleted again.
  *
  * Run:
- *   npm run probe:headers
- *   npm run probe:headers -- --only class,domain      # these object types only
- *   npm run probe:headers -- --operation update       # this member only
- *   npm run probe:headers -- --sequential             # one request at a time, no batch
- *   npm run probe:headers -- --compare <batched.json> <sequential.json>
+ *   npm run header:discovery
+ *   npm run header:discovery -- --only class,domain      # these object types only
+ *   npm run header:discovery -- --operation update       # this member only
+ *   npm run header:discovery -- --sequential             # one request at a time, no batch
+ *   npm run header:discovery -- --compare <batched.json> <sequential.json>
  *
  * `--only` takes object types (class, interface, program, include, domain,
  * dataElement, structure, table, tableType, ddl, functionGroup,
