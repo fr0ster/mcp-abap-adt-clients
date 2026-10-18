@@ -68,6 +68,7 @@ import {
   rowKey,
   type Source,
   wireNote,
+  withContrast,
   writeCheck,
 } from './corpus';
 import {
@@ -1867,7 +1868,22 @@ export async function runFull(
       ]);
     }
     const extras = { discoveryContentType, pairs, existence, knownWorking };
-    const entries = buildHeaderCorpus(evidence, extras);
+    // The contrast rule on phase 2's evidence: an unnamed 406 is checked when
+    // another Accept got a 2xx or a 404 on the endpoint, in any phase.
+    const contrasted = [
+      ...evidence.filter((item) => item.phase === 1),
+      ...withContrast(
+        evidence.filter((item) => item.phase === 2),
+        [
+          ...rowsOf('clients none'),
+          ...rowsOf('clients corpus'),
+          ...rowsOf('discovery none'),
+          ...rowsOf('discovery corpus'),
+          ...phase2Rows,
+        ],
+      ),
+    ];
+    const entries = buildHeaderCorpus(contrasted, extras);
     file = {
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -1876,7 +1892,7 @@ export async function runFull(
       counts: {
         phase1: needsCounts(
           buildHeaderCorpus(
-            evidence.filter((item) => item.phase === 1),
+            contrasted.filter((item) => item.phase === 1),
             extras,
           ),
         ),

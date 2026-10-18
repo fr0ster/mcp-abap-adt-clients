@@ -35,6 +35,7 @@ import {
   type ICorpus,
   type ICorpusRow,
   isolationKeys,
+  judge,
   namedPerEndpoint,
   needsLines,
   notSent,
@@ -46,6 +47,7 @@ import {
   stats,
   t100Of,
   wireNote,
+  withContrast,
 } from '../../../../tools/header-probe/corpus';
 import {
   defaultOutputDir,
@@ -885,7 +887,12 @@ describe('what each endpoint needs', () => {
       bogusRow('c', 'content-type', 415, {
         named: { ...emptyNamed(), supportedContentType: ['application/c+xml'] },
       }),
-      bogusRow('b', 'accept', 406),
+      bogusRow('b', 'accept', 406, {
+        named: {
+          ...emptyNamed(),
+          acceptedText: 'Accepted content types: application/b+xml',
+        },
+      }),
       bogusRow('b', 'content-type', 415),
       bogusRow('n', 'accept', 200, {
         pair: { accept: 'application/n+xml', contentType: 'application/n+xml' },
@@ -1035,7 +1042,12 @@ describe('the header corpus', () => {
         }),
       ]),
       at('bogus', [
-        row({ ...base, bogus: 'accept', status: 406 }),
+        row({
+          ...base,
+          bogus: 'accept',
+          status: 406,
+          named: { ...emptyNamed(), supportedAccept: ['application/x+xml'] },
+        }),
         row({
           ...base,
           bogus: 'content-type',
@@ -1048,7 +1060,7 @@ describe('the header corpus', () => {
       ]),
     ]);
     expect(md).toContain(
-      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  |  | application/vnd.probe.thing+xml | both (Accept: checked (406); Content-Type: checked (415)) |',
+      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  | application/x+xml | application/vnd.probe.thing+xml | both (Accept: checked (406); Content-Type: checked (415)) |',
     );
   });
 });
@@ -2705,6 +2717,7 @@ describe('every phase counts', () => {
             endpoint: update,
             status: 406,
             sapType: 'ExceptionResourceNotAcceptable',
+            body: '<exc:exception><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">044</entry></properties></exc:exception>',
           }),
         ],
         removals: [],
@@ -2897,5 +2910,172 @@ describe('the write cycle verdicts', () => {
         406,
       ).verdict,
     ).toBe('checked');
+  });
+});
+
+const t100Body = (id: string, no: string) =>
+  `<exc:exception><properties><entry key="T100KEY-ID">${id}</entry><entry key="T100KEY-NO">${no}</entry></properties></exc:exception>`;
+
+describe('a 406 is checked only when it names the Accept', () => {
+  it('T100 044 or a list: checked; 037, another T100 or none: unknown with its T100', () => {
+    const at = (extra: Partial<ICorpusRow>) =>
+      judge(row({ bogus: 'accept', status: 406, ...extra }), 406);
+    expect(at({ body: t100Body('SADT_RESOURCE', '044') }).verdict).toBe(
+      'checked',
+    );
+    expect(
+      at({ named: { ...emptyNamed(), supportedAccept: ['application/a+xml'] } })
+        .verdict,
+    ).toBe('checked');
+    expect(
+      at({
+        named: {
+          ...emptyNamed(),
+          acceptedText: 'Accepted content types: application/a+xml',
+        },
+      }).verdict,
+    ).toBe('checked');
+    expect(at({})).toEqual({
+      verdict: 'unknown',
+      status: 406,
+      reason: '406 without a list (no T100): not necessarily the Accept',
+      unnamed406: true,
+    });
+    expect(at({ body: t100Body('SADT_RESOURCE', '037') }).reason).toBe(
+      '406 generic (T100 037): not necessarily the Accept',
+    );
+    expect(at({ body: t100Body('SWB_TOOL', '012') })).toEqual({
+      verdict: 'unknown',
+      status: 406,
+      reason:
+        '406 without a list (T100 SWB_TOOL 012): not necessarily the Accept',
+      unnamed406: true,
+    });
+  });
+
+  it('an unnamed 406 is checked by contrast in classifyNeeds, with its T100 in the reason', () => {
+    const needs = classifyNeeds(
+      [row({ label: 'q', bogus: 'accept', status: 406 })],
+      [row({ label: 'q', status: 200 })],
+    );
+    expect(needs[0].accept).toEqual({
+      verdict: 'checked',
+      status: 406,
+      reason: '406 without a list (no T100), inferred from the contrast',
+    });
+  });
+});
+
+describe('the contrast on the write cycle and the update measurement', () => {
+  const answer = (
+    probe: 'known' | 'badAccept' | 'badContentType',
+    status: number,
+  ) => ({
+    probe,
+    sent: { accept: 'a', contentType: 'c' },
+    mode: 'batched',
+    requests: [
+      { method: 'PUT', path: '/sap/bc/adt/oo/classes/{name}/source/main' },
+    ],
+    status,
+    ...(status === 406 ? { body: t100Body('SADT_RESOURCE', '037') } : {}),
+    supportedAccept: [],
+    supportedContentType: [],
+  });
+  const cycle = (known: number) =>
+    evidenceOfRows(
+      [
+        {
+          objectType: 'class',
+          member: 'update',
+          probes: [answer('known', known), answer('badAccept', 406)],
+        },
+      ],
+      new Set(['getClass().update']),
+    )[0];
+
+  it('the cycle: a 406/037 to the bogus Accept beside a 2xx or a 404 to the known one is checked', () => {
+    expect(cycle(200).accept).toEqual({
+      verdict: 'checked',
+      status: 406,
+      reason: '037, inferred from the contrast',
+    });
+    expect(cycle(404).accept.verdict).toBe('checked');
+    expect(cycle(500).accept.verdict).toBe('unknown');
+  });
+
+  it('phase 2 evidence: an unnamed 406 is checked when another row of the endpoint got a 2xx or a 404 without the bogus Accept', () => {
+    const endpoint = 'PUT /sap/bc/adt/oo/classes/{name}/source/main';
+    const path = '/sap/bc/adt/oo/classes/{name}/source/main';
+    const item = {
+      endpoint,
+      source: 'clients' as const,
+      phase: 2 as const,
+      who: 'getClass().update (update measurement, temporary object)',
+      accept: judge(
+        row({
+          bogus: 'accept',
+          status: 406,
+          body: t100Body('SADT_RESOURCE', '037'),
+        }),
+        406,
+      ),
+      contentType: { verdict: 'unknown' as const, reason: 'x' },
+      namedAccept: [],
+      namedContentType: [],
+      text: 'x',
+    };
+    const known = row({ endpoint: { method: 'PUT', path }, status: 200 });
+    expect(withContrast([item], [known])[0].accept.verdict).toBe('checked');
+    // The bogus Accept's own 2xx elsewhere is no contrast.
+    expect(
+      withContrast([item], [{ ...known, bogus: 'accept' }])[0].accept.verdict,
+    ).toBe('unknown');
+    // A refused answer is no contrast.
+    expect(
+      withContrast([item], [{ ...known, status: 500 }])[0].accept.verdict,
+    ).toBe('unknown');
+  });
+
+  it("a full run: the update measurement's 406/037 is checked by the write cycle's known answer", async () => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 500, body: 'dump' },
+    );
+    const update = {
+      method: 'PUT',
+      path: '/sap/bc/adt/oo/classes/{name}/source/main',
+    };
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      writeCycle: async () => ({
+        evidence: [],
+        rows: [row({ endpoint: update, status: 200 })],
+        removals: [],
+      }),
+      updateMeasure: async () => ({
+        updates: [
+          { type: 'class', member: 'update', status: 406, applied: false },
+        ],
+        rows: [
+          row({
+            endpoint: update,
+            bogus: 'accept',
+            status: 406,
+            body: t100Body('SADT_RESOURCE', '037'),
+          }),
+        ],
+        removals: [],
+      }),
+    });
+    const entry = result.file?.entries.find(
+      (e) => e.endpoint === 'PUT /sap/bc/adt/oo/classes/{name}/source/main',
+    );
+    expect(entry?.accept.verdict).toBe('checked');
   });
 });

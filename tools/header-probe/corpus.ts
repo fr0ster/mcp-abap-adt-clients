@@ -860,8 +860,11 @@ export interface IHeaderVerdict {
   verdict: 'checked' | 'not checked' | 'unknown' | 'no body';
   status?: number;
   reason?: string;
-  /** A 406 with SAP's generic text (T100 SADT_RESOURCE 037). */
-  generic037?: boolean;
+  /**
+   * A 406 that names no accepted type (no T100 044, no list): the Accept may
+   * not be what it refused. Checked only by contrast.
+   */
+  unnamed406?: boolean;
 }
 
 /** The T100 key of a SAP exception body, if it carries one. */
@@ -882,23 +885,69 @@ export function t100Of(
 }
 
 /**
- * A 406 that says nothing of the Accept: SAP's generic default text
- * (`CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id: T100
- * SADT_RESOURCE 037, "The message content is not acceptable"), with no list
- * of accepted types. From reading SAP's code: the search raises it for an
- * invalid `objectType` parameter, whatever the Accept. Only 044, "Accepted
- * content types: …", names the types and points at the Accept.
+ * Whether a 406 names what the Accept should be: T100 SADT_RESOURCE 044,
+ * "Accepted content types: …", or a list of accepted types. Only then does
+ * the 406 point at the Accept. Any other 406 — SAP's generic default text
+ * (`CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id: T100 SADT_RESOURCE
+ * 037, which the search raises for an invalid `objectType` whatever the
+ * Accept), another T100 or none — says nothing of it.
  */
-export function isGeneric037(row: ICorpusRow): boolean {
+export function namesAccepted(row: ICorpusRow): boolean {
   const key = t100Of(row.body);
   return (
-    row.status === 406 &&
-    key?.id === 'SADT_RESOURCE' &&
-    key.no === '037' &&
-    // A row built from the write cycle's answers carries no named lists.
-    !row.named?.acceptedText &&
-    !row.named?.supportedAccept.length &&
-    !(row.body ?? '').includes('Accepted content types')
+    (key?.id === 'SADT_RESOURCE' && key.no === '044') ||
+    // A row built from the write cycle's answers may carry no named lists.
+    Boolean(row.named?.acceptedText) ||
+    Boolean(row.named?.supportedAccept.length) ||
+    (row.body ?? '').includes('Accepted content types')
+  );
+}
+
+/** The T100 key of a 406 that names nothing, for its reason. */
+function unnamedReason(row: ICorpusRow): string {
+  const key = t100Of(row.body);
+  if (key?.id === 'SADT_RESOURCE' && key.no === '037')
+    return '406 generic (T100 037): not necessarily the Accept';
+  return `406 without a list (${key ? `T100 ${key.id} ${key.no}` : 'no T100'}): not necessarily the Accept`;
+}
+
+/** An unnamed 406 made `checked` by the contrast: another Accept got a 2xx or a 404 on the endpoint. */
+export function byContrast(verdict: IHeaderVerdict): IHeaderVerdict {
+  return {
+    verdict: 'checked',
+    status: 406,
+    reason: verdict.reason?.startsWith('406 generic (T100 037)')
+      ? '037, inferred from the contrast'
+      : `${verdict.reason?.slice(0, verdict.reason.indexOf(':')) ?? '406'}, inferred from the contrast`,
+  };
+}
+
+/** Whether a row shows another Accept than the bogus one reaching the resource: a 2xx or a 404. */
+export function isContrast(row: ICorpusRow): boolean {
+  return (
+    row.bogus !== 'accept' &&
+    row.status !== undefined &&
+    ((row.status >= 200 && row.status < 300) || row.status === 404)
+  );
+}
+
+/**
+ * The contrast rule on evidence built outside {@link classifyNeeds} (the
+ * write cycle, the update measurement, the reads): an unnamed 406 is
+ * `checked` when a row of the same endpoint is a contrast.
+ */
+export function withContrast(
+  evidence: readonly IEvidence[],
+  rows: readonly ICorpusRow[],
+): IEvidence[] {
+  const contrast = new Set<string>();
+  for (const row of rows)
+    if (row.endpoint && isContrast(row))
+      contrast.add(endpointKey(row.endpoint));
+  return evidence.map((item) =>
+    item.accept.unnamed406 && contrast.has(item.endpoint)
+      ? { ...item, accept: byContrast(item.accept) }
+      : item,
   );
 }
 
@@ -1024,12 +1073,12 @@ export function judge(
       verdict: 'unknown',
       reason: `no answer: ${row.failure ?? 'nothing came back'}`,
     };
-  if (row.status === refusal && refusal === 406 && isGeneric037(row))
+  if (row.status === refusal && refusal === 406 && !namesAccepted(row))
     return {
       verdict: 'unknown',
       status: 406,
-      reason: '406 generic (T100 037): not necessarily the Accept',
-      generic037: true,
+      reason: unnamedReason(row),
+      unnamed406: true,
     };
   if (row.status === refusal) return { verdict: 'checked', status: row.status };
   if (row.status >= 200 && row.status < 300)
@@ -1086,12 +1135,7 @@ export function classifyNeeds(
   }
   const contrast = new Set<string>();
   for (const row of evidence)
-    if (
-      !row.bogus &&
-      row.status !== undefined &&
-      ((row.status >= 200 && row.status < 300) || row.status === 404)
-    )
-      contrast.add(needsKey(row));
+    if (!row.bogus && isContrast(row)) contrast.add(needsKey(row));
   const missing = new Map<string, ICorpusRow>();
   for (const row of [...rows, ...evidence])
     if (isAcceptHeaderMissing(row) && !missing.has(needsKey(row)))
@@ -1099,15 +1143,11 @@ export function classifyNeeds(
   const out: IEndpointNeeds[] = [];
   for (const [endpoint, pair] of by) {
     let accept = judge(pair.accept, 406);
-    // A generic 406/037 to the bogus Accept, while another Accept (none, or
-    // the client's own) got a 2xx or a 404 on the same endpoint: the Accept
-    // made the difference after all.
-    if (accept.generic037 && contrast.has(endpoint))
-      accept = {
-        verdict: 'checked',
-        status: 406,
-        reason: '037, inferred from the contrast',
-      };
+    // A 406 naming nothing to the bogus Accept, while another Accept (none,
+    // or the client's own) got a 2xx or a 404 on the same endpoint: the
+    // Accept made the difference after all.
+    if (accept.unnamed406 && contrast.has(endpoint))
+      accept = byContrast(accept);
     const absent = missing.get(endpoint);
     if (accept.verdict !== 'checked' && absent)
       accept = {

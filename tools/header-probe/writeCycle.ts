@@ -11,8 +11,13 @@ import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../../src/clients/AdtClient';
 import { sapErrorIn } from '../../src/utils/adtErrors';
 import type { ICapture } from './capture';
-import type { ICorpusRow, IEvidence, IHeaderVerdict } from './corpus';
-import { emptyNamed, judge } from './corpus';
+import type {
+  BogusHeader,
+  ICorpusRow,
+  IEvidence,
+  IHeaderVerdict,
+} from './corpus';
+import { byContrast, emptyNamed, judge } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
 import {
@@ -72,10 +77,24 @@ export function verdictOf(
       sapType: answer.sapType,
       body: answer.body,
       failure: answer.failure,
+      named: {
+        ...emptyNamed(),
+        ...(answer.acceptedText ? { acceptedText: answer.acceptedText } : {}),
+        supportedAccept: answer.supportedAccept,
+        supportedContentType: answer.supportedContentType,
+      },
     } as ICorpusRow,
     refusal,
   );
 }
+
+/** Which header a cycle probe put the probe type in, if any. */
+const bogusOfProbe = (kind: IProbeAnswer['probe']): BogusHeader | undefined =>
+  kind === 'badAccept'
+    ? 'accept'
+    : kind === 'badContentType'
+      ? 'content-type'
+      : undefined;
 
 /** The evidence of the cycle's rows, for the wanted `handler.member` only. */
 export function evidenceOfRows(
@@ -94,7 +113,16 @@ export function evidenceOfRows(
     const known = of('known') ?? row.probes[0];
     const request = known?.requests[known.requests.length - 1];
     if (!request) continue;
-    const accept = verdictOf(of('badAccept'), 406);
+    let accept = verdictOf(of('badAccept'), 406);
+    // The cycle's own contrast: the known Accept got a 2xx or a 404 where the
+    // bogus one got a 406 naming nothing.
+    const knownStatus = of('known')?.status;
+    if (
+      accept.unnamed406 &&
+      knownStatus !== undefined &&
+      ((knownStatus >= 200 && knownStatus < 300) || knownStatus === 404)
+    )
+      accept = byContrast(accept);
     const contentType = verdictOf(of('badContentType'), 415);
     const text = (answer: IProbeAnswer | undefined) =>
       answer
@@ -136,6 +164,9 @@ export function rowsOfCycle(rows: readonly IOperationRow[]): ICorpusRow[] {
         requests: answer.requests,
         onWire: [],
         named: emptyNamed(),
+        ...(bogusOfProbe(answer.probe)
+          ? { bogus: bogusOfProbe(answer.probe) }
+          : {}),
         ...(answer.status !== undefined ? { status: answer.status } : {}),
         ...(answer.sapType ? { sapType: answer.sapType } : {}),
         ...(answer.body !== undefined ? { body: answer.body } : {}),
@@ -417,6 +448,8 @@ export async function measureUpdates(
                 requests: [],
                 onWire: [],
                 named: emptyNamed(),
+                // The update went with the probe type as Accept.
+                bogus: 'accept',
                 ...(status !== undefined ? { status } : {}),
                 ...(updated.wire
                   ? { body: String(updated.wire.data ?? '') }

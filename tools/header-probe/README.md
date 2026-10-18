@@ -214,8 +214,8 @@ header corpus, everything batched and poisoned envelopes split:
 
 ### knownWorking
 
-Where SAP's 406 names nothing (T100 `SADT_RESOURCE` 037, "The message
-content is not acceptable", with no list), the header corpus says which
+Where SAP's 406 names nothing (no T100 044 and no list — the generic 037,
+"The message content is not acceptable", above all), the header corpus says which
 Accept works from what the client sends today: `knownWorking` lists, per
 endpoint, every corpus-mode answer — `<member>: Accept <what went on the
 wire> → <status>`, marked `(works)` on a 2xx — from phase 1 (the probe name)
@@ -378,19 +378,26 @@ Per header, from its bogus request:
 
 | verdict | when |
 |---|---|
-| `checked` | 406 for Accept — but not a 406 with SAP's generic text (T100 `SADT_RESOURCE` 037, below) —, 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
+| `checked` | 406 for Accept only when it names the Accept (T100 `SADT_RESOURCE` 044 or a list of accepted types, below), 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
 | `not checked` | a 2xx: the resource never compares the header |
 | `unknown` | anything else — 401, 403, 404, 405 (`method not implemented`), 500 (`dump or router`, with the dump's short text), any other status with its SAP exception |
 
-A 406 with T100 `SADT_RESOURCE` **037** ("The message content is not
-acceptable", no list) does not say the Accept was refused: 037 is the default
-text of `CX_ADT_RES_NOT_ACCEPTABLE` raised without a text id (from reading
-SAP's code: the search raises it for an invalid `objectType`, whatever the
-Accept — measured). Only **044** ("Accepted content types: …") names the
-types and points at the Accept. So a bogus Accept answered 406/037 is
-`unknown` (`406 generic (T100 037): not necessarily the Accept`) — unless the
-same endpoint answered a 2xx or a 404 to another Accept (none, or the client's
-own): then it is `checked (037, inferred from the contrast)`.
+A 406 points at the Accept only when it names it: T100 `SADT_RESOURCE`
+**044** ("Accepted content types: …") or a list of accepted types. Any other
+406 does not say the Accept was refused. **037** ("The message content is not
+acceptable", no list) is the default text of `CX_ADT_RES_NOT_ACCEPTABLE`
+raised without a text id (from reading SAP's code: the search raises it for an
+invalid `objectType`, whatever the Accept — measured); a 406 with another
+T100 or none says no more. So a bogus Accept answered by such a 406 is
+`unknown` — `406 generic (T100 037): not necessarily the Accept`, or `406
+without a list (T100 <id> <no> | no T100): not necessarily the Accept` —
+unless the same endpoint answered a 2xx or a 404 to another Accept (none, or
+the client's own): then it is `checked (037, inferred from the contrast)` (or
+`(406 without a list (…), inferred from the contrast)`). The contrast holds in
+every phase: in phase 1 per member; in the write cycle the known probe's
+answer beside its bogus-Accept probe; and for the write cycle, the update
+measurement and the reads of phase 2, any answer on the same endpoint, in any
+phase, that did not carry the bogus Accept.
 
 The probe's own arguments must build a real request: a stand-in value that a
 real call never sends (`undefined`, an object type that is not an ADT type
