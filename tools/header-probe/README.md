@@ -158,7 +158,10 @@ needs.
      `Z_HPEC_NO_PACKAGE`), which no system has. A member that cannot be
      recorded or sent that way is a `skipped: <reason>` row: it needs a URI
      an earlier answer handed out, the server assigns its key, it sends a
-     `LOCK`, it polls, the debuggers need a live session, … A method that
+     `LOCK`, it polls, the debuggers need a live session, …; in corpus mode also the
+     ABAP Unit run-status read (`getStatus`), which with a valid Accept waits
+     for the run it names to finish (measured 2026-10-18: 307 s for one
+     request on a run id that does not exist). A method that
      answers no promise is a helper and is listed under `notMembers`.
 3. **The headers** (`--headers`). A request without a body gets no
    Content-Type in any mode; in corpus mode the pair's value is recorded as

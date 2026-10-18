@@ -523,6 +523,17 @@ async function runClients(ctx: IContext): Promise<void> {
   for (const member of members) {
     const spec = specs.get(member.handler);
     const call = member.call;
+    // With the corpus Accept the run-status read waits for the run it names
+    // (long polling): measured 307 s for one request on a run id that does
+    // not exist, 2026-10-18. Without it, or with a bogus one, it answers at once.
+    if (
+      ctx.mode === 'corpus' &&
+      !member.skipped &&
+      member.member === 'getStatus' &&
+      member.handler.endsWith('TestRunner()')
+    )
+      member.skipped =
+        'skipped: with the corpus Accept it waits for the ABAP Unit run it names to finish (long polling; measured 307 s on a run id that does not exist)';
     const hasBody = member.hasBody === true;
     const kinds: (BogusHeader | undefined)[] =
       ctx.mode === 'bogus' && call && spec && !member.skipped
