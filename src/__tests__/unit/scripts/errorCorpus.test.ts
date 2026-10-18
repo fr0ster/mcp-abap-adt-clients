@@ -74,6 +74,7 @@ import {
   evidenceOfRows,
   measureUpdates,
   runWriteCycle,
+  verdictOf,
 } from '../../../../tools/header-probe/writeCycle';
 
 const SAMPLE = path.resolve(
@@ -2872,5 +2873,29 @@ describe('a 406 with T100 SADT_RESOURCE 037', () => {
     expect(needs.f.needs).toBe('accept');
     expect(needs.n.needs).toBe('unknown');
     expect(t100Of(exc037)).toEqual({ id: 'SADT_RESOURCE', no: '037' });
+  });
+});
+
+describe('the write cycle verdicts', () => {
+  it('judge a bad probe that carries no named lists (a 406/037 included)', () => {
+    const body =
+      '<exc:exception><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">037</entry></properties></exc:exception>';
+    const answer = {
+      probe: 'badAccept' as const,
+      sent: { accept: 'a', contentType: 'c' },
+      mode: 'batched',
+      requests: [],
+      status: 406,
+      body,
+      supportedAccept: [],
+      supportedContentType: [],
+    };
+    expect(verdictOf(answer, 406).verdict).toBe('unknown');
+    expect(
+      verdictOf(
+        { ...answer, body: 'Accepted content types: application/xml' },
+        406,
+      ).verdict,
+    ).toBe('checked');
   });
 });

@@ -895,8 +895,10 @@ export function isGeneric037(row: ICorpusRow): boolean {
     row.status === 406 &&
     key?.id === 'SADT_RESOURCE' &&
     key.no === '037' &&
-    !row.named.acceptedText &&
-    !row.named.supportedAccept.length
+    // A row built from the write cycle's answers carries no named lists.
+    !row.named?.acceptedText &&
+    !row.named?.supportedAccept.length &&
+    !(row.body ?? '').includes('Accepted content types')
   );
 }
 
