@@ -23,6 +23,7 @@
     "packages/*/src/**/*",
     "examples/**/*",
     "scripts/**/*",
+    "tools/header-probe/**/*",
     "src/**/*"
   ],
   "exclude": ["node_modules", "dist"]
