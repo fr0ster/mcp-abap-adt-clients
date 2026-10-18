@@ -15,7 +15,7 @@
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -551,14 +551,32 @@ function classNameOf(node: ts.Node): string | undefined {
   return undefined;
 }
 
-/** A member's name, written as an identifier, a string or a computed literal. */
-function memberName(name: ts.PropertyName | undefined): string | undefined {
+/**
+ * Computed member names the type checker could not resolve, as
+ * `file: class [expression]`. Any entry fails the scan: a name it cannot read
+ * is a member it cannot check.
+ */
+const unresolvedNames: string[] = [];
+
+/**
+ * A member's name: an identifier, a string, or a computed name the type
+ * checker resolves to a string literal type (`[key]` with
+ * `const key = 'create' as const` included). A computed name of a symbol type
+ * names no contract method. Anything else is recorded in `unresolvedNames`.
+ */
+function memberName(
+  name: ts.PropertyName | undefined,
+  checker: ts.TypeChecker,
+  where: string,
+): string | undefined {
   if (!name) return undefined;
   if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
   if (ts.isComputedPropertyName(name)) {
-    const e = name.expression;
-    if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e))
-      return e.text;
+    const type = checker.getTypeAtLocation(name.expression);
+    if (type.isStringLiteral()) return type.value;
+    if (type.flags & (ts.TypeFlags.UniqueESSymbol | ts.TypeFlags.ESSymbol))
+      return undefined;
+    unresolvedNames.push(`${where} [${name.expression.getText()}]`);
   }
   return undefined;
 }
@@ -571,11 +589,16 @@ function memberName(name: ts.PropertyName | undefined): string | undefined {
  * as well. A method alone was all this used to accept, so a function field
  * passed uncovered.
  */
-function implementedName(member: ts.ClassElement): string | undefined {
-  if (ts.isMethodDeclaration(member) && member.body)
-    return memberName(member.name);
-  if (ts.isGetAccessorDeclaration(member) && member.body)
-    return memberName(member.name);
+function implementedName(
+  member: ts.ClassElement,
+  checker: ts.TypeChecker,
+  where: string,
+): string | undefined {
+  // Every computed name is resolved, whatever the member is, so none is left
+  // unread.
+  const name = memberName(member.name, checker, where);
+  if (ts.isMethodDeclaration(member) && member.body) return name;
+  if (ts.isGetAccessorDeclaration(member) && member.body) return name;
   if (ts.isPropertyDeclaration(member) && member.initializer) {
     const value = member.initializer;
     const literal =
@@ -585,13 +608,20 @@ function implementedName(member: ts.ClassElement): string | undefined {
       value.kind === ts.SyntaxKind.TrueKeyword ||
       value.kind === ts.SyntaxKind.FalseKeyword ||
       value.kind === ts.SyntaxKind.NullKeyword;
-    return literal ? undefined : memberName(member.name);
+    return literal ? undefined : name;
   }
   return undefined;
 }
 
+let declared: string[] | undefined;
+
 /** Every class method in `src` (tests excluded) named like a header member. */
 function declaredImplementations(): string[] {
+  declared ??= scanImplementations();
+  return declared;
+}
+
+function scanImplementations(): string[] {
   const root = join(__dirname, '..', '..');
   const files: string[] = [];
   const walk = (dir: string) => {
@@ -607,21 +637,31 @@ function declaredImplementations(): string[] {
 
   const names = new Set<string>(HEADER_MEMBERS);
   const found: string[] = [];
+  // A program, not bare source files: a computed name is resolved by the type
+  // checker, which needs the declarations it refers to.
+  const program = ts.createProgram(files, {
+    noEmit: true,
+    skipLibCheck: true,
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.CommonJS,
+    moduleResolution: ts.ModuleResolutionKind.Node10,
+    strict: true,
+    esModuleInterop: true,
+  });
+  const checker = program.getTypeChecker();
+  unresolvedNames.length = 0;
   for (const file of files) {
-    const source = ts.createSourceFile(
-      file,
-      readFileSync(file, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true,
-    );
+    const source = program.getSourceFile(file);
+    if (!source) continue;
     const visit = (node: ts.Node) => {
       const className = classNameOf(node);
       if (
         className &&
         (ts.isClassDeclaration(node) || ts.isClassExpression(node))
       ) {
+        const where = `${relative(root, file)}: ${className}`;
         for (const member of node.members) {
-          const name = implementedName(member);
+          const name = implementedName(member, checker, where);
           if (name && names.has(name)) found.push(`${className}.${name}`);
         }
       }
@@ -639,6 +679,17 @@ describe('the table covers every implementation', () => {
       (impl) => !reached.has(impl) && !(impl in NOT_A_HEADERS_MEMBER),
     );
     expect(missing).toEqual([]);
+  });
+
+  it('every computed member name in a scanned class resolves', () => {
+    declaredImplementations();
+    expect({
+      'computed member names the scan cannot resolve to a string or a symbol (make them a string literal type, or cover them)':
+        unresolvedNames,
+    }).toEqual({
+      'computed member names the scan cannot resolve to a string or a symbol (make them a string literal type, or cover them)':
+        [],
+    });
   });
 
   it('every exclusion still names a declared method', () => {
