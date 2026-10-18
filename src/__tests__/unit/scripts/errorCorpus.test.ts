@@ -17,9 +17,11 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   current,
+  gate,
   type ICapture,
   onTheWire,
   runCalls,
+  send,
   traced,
 } from '../../../../tools/header-probe/capture';
 import {
@@ -252,8 +254,12 @@ describe('the authorization check', () => {
       out,
     });
     expect(result.exitCode).toBe(1);
-    expect(lines).toEqual(['The discovery read answered 403']);
-    expect(fs.readdirSync(dir)).toEqual([]);
+    expect(lines[0]).toBe('The discovery read answered 403');
+    // The report is always written, marked with what ended the run.
+    expect(result.corpus.error).toBe(
+      'failed: The discovery read answered 403 (discovery none)',
+    );
+    expect(fs.readdirSync(dir)).toHaveLength(2);
   });
 
   it('prints the status of any other refusal and stops', async () => {
@@ -269,8 +275,11 @@ describe('the authorization check', () => {
       out,
     });
     expect(result.exitCode).toBe(1);
-    expect(lines).toEqual(['The discovery read answered 500']);
+    expect(lines[0]).toBe('The discovery read answered 500');
     expect(system.seen).toHaveLength(1);
+    expect(result.corpus.endedBy).toMatch(
+      /^failed: The discovery read answered 500/,
+    );
   });
 });
 
@@ -566,7 +575,9 @@ describe('what goes on the wire', () => {
         }),
       ) as IAbapConnection & { disconnect?: () => Promise<void> };
       await connection.connect();
-      const shaped = traced(connection, { shape: headerShape('none', false) });
+      const shaped = traced(gate(connection, {}), {
+        shape: headerShape('none', false),
+      });
       const send = async (request: IAbapRequestOptions): Promise<ICapture> => {
         const capture: ICapture = { requests: [] };
         await current.run(capture, () => shaped.makeAdtRequest(request));
@@ -1423,10 +1434,14 @@ describe('the logon is the authorization check', () => {
       out,
     });
     expect(result.exitCode).toBe(2);
-    expect(lines).toEqual([`Oops: no authorization (${status})`]);
+    expect(lines[lines.length - 1]).toBe(`Oops: no authorization (${status})`);
     expect(opened).toBe(1);
     expect(asked).toBe(false);
-    expect(fs.readdirSync(dir)).toEqual([]);
+    // Nothing else was sent; the report is written, marked.
+    expect(result.corpus.error).toBe(
+      `stopped: authorization (${status}, logon) at logon`,
+    );
+    expect(fs.readdirSync(dir)).toHaveLength(2);
   });
 });
 
@@ -1589,7 +1604,10 @@ describe('the full run', () => {
       out,
     });
     expect(result.exitCode).toBe(2);
-    expect(lines).toEqual(['Oops: no authorization (401)']);
+    expect(lines[lines.length - 1]).toBe('Oops: no authorization (401)');
+    expect(result.file?.endedBy).toBe(
+      'stopped: authorization (401, logon) at logon',
+    );
   });
 });
 
@@ -1726,7 +1744,7 @@ describe('phase 2 writes', () => {
       return { status: 200 };
     });
     const result = await runWriteCycle({
-      connection: system.connection,
+      connection: gate(system.connection, {}),
       clientOptions: {},
       interrupt: new Interrupt(),
       unknown: new Set([
@@ -2026,5 +2044,267 @@ describe('a stop in any phase of the full run', () => {
     );
     expect(result.exitCode).toBe(130);
     expect(result.file?.error).toBe('interrupted (SIGINT)');
+  });
+});
+
+/** The source of every tools/header-probe file but the gate's own module, comments removed. */
+function toolSources(): { file: string; text: string }[] {
+  const dir = path.resolve(__dirname, '../../../../tools/header-probe');
+  return fs
+    .readdirSync(dir)
+    .filter((name) => name.endsWith('.ts') && name !== 'capture.ts')
+    .map((name) => {
+      const raw = fs.readFileSync(path.join(dir, name), 'utf8');
+      // Block and line comments out: a comment may name what code may not do.
+      let text = '';
+      for (let i = 0; i < raw.length; i++) {
+        if (raw.startsWith('/*', i)) {
+          const end = raw.indexOf('*/', i + 2);
+          i = end === -1 ? raw.length : end + 1;
+          continue;
+        }
+        if (raw.startsWith('//', i) && raw[i - 1] !== ':') {
+          const end = raw.indexOf('\n', i);
+          i = end === -1 ? raw.length : end - 1;
+          continue;
+        }
+        text += raw[i];
+      }
+      return { file: name, text };
+    });
+}
+
+/** Every request in tools/header-probe goes through the gate (capture.ts): what a scan can see. */
+function gateViolations(
+  sources: readonly { file: string; text: string }[],
+): string[] {
+  const found: string[] = [];
+  for (const { file, text } of sources) {
+    const lines = text.split('\n');
+    const say = (index: number, why: string) =>
+      found.push(`${file}:${index + 1}: ${why}`);
+    const tracedNames = new Set(
+      [...text.matchAll(/const (\w+) = traced\(/g)].map((m) => m[1]),
+    );
+    for (const [index, line] of lines.entries()) {
+      if (
+        /\.makeAdtRequest\s*[(<]/.test(line) ||
+        /makeAdtRequest\.(call|apply|bind)/.test(line)
+      )
+        say(
+          index,
+          'makeAdtRequest outside the gate (use send() on a gated or traced connection)',
+        );
+      if (/new\s+AdtBatchConnection\s*\(/.test(line))
+        say(index, 'an envelope built outside the gate (runCalls builds it)');
+      if (/\bgetSystemInformation\s*\(/.test(line))
+        say(index, 'getSystemInformation outside the gate');
+      for (const match of line.matchAll(/\bclientsOn\(\s*([\w.]*)/g)) {
+        if (/export function clientsOn\(/.test(line)) continue;
+        const argument = match[1];
+        const next = argument ? argument : (lines[index + 1] ?? '').trim();
+        if (!(next.startsWith('traced') || tracedNames.has(argument)))
+          say(index, 'clientsOn on a connection that is not traced');
+      }
+      if (
+        /new\s+Adt(Client|ClientLegacy|RuntimeClient|Executor|ExecutorLegacy|AbapGitClient)\s*\(/.test(
+          line,
+        )
+      ) {
+        const inClientsOn =
+          file === 'members.ts' && /^\s+\w+: new Adt/.test(line);
+        const inProbeClient =
+          file === 'probe.ts' && /return new AdtClient\(connection,/.test(line);
+        if (!inClientsOn && !inProbeClient)
+          say(index, 'a client built outside clientsOn / Probe.client');
+      }
+      if (
+        /\bresolveSystemContext\(/.test(line) &&
+        !/\bimport\b|resolveSystemContext,$/.test(line)
+      ) {
+        const context = lines
+          .slice(Math.max(0, index - 2), index + 1)
+          .join(' ');
+        if (
+          !(
+            /resolveSystemContext\(gated\b/.test(line) ||
+            /clientOptions/.test(context)
+          )
+        )
+          say(index, 'the system context read off the gate');
+      }
+      if (
+        /\bcreateTestConnection\(/.test(line) &&
+        !/\bimport\b|createTestConnection,$/.test(line)
+      ) {
+        const context = lines
+          .slice(Math.max(0, index - 3), index + 1)
+          .join(' ');
+        if (!/\bopen\b|gateConnect\(/.test(context))
+          say(index, 'a connection opened outside gateConnect');
+      }
+    }
+  }
+  return found;
+}
+
+describe('the gate', () => {
+  it('is the one way any request leaves tools/header-probe', () => {
+    expect(gateViolations(toolSources())).toEqual([]);
+  });
+
+  it('the scan sees a direct call', () => {
+    const sources = [
+      ...toolSources(),
+      {
+        file: 'added.ts',
+        text: 'export const x = (c: any) => c.makeAdtRequest({ url: "/x" });\n',
+      },
+    ];
+    expect(gateViolations(sources)).toEqual([
+      'added.ts:1: makeAdtRequest outside the gate (use send() on a gated or traced connection)',
+    ]);
+  });
+
+  it('traced, clientsOn and runCalls refuse a connection that is not gated', () => {
+    const raw = fakeSystem(() => ({ status: 200 })).connection;
+    expect(() => traced(raw)).toThrow(/does not send through the gate/);
+    expect(() => clientsOn(raw)).toThrow(/does not send through the gate/);
+    expect(() => traced(gate(raw, {}))).not.toThrow();
+  });
+
+  it('asks the interrupt before every request; its cleanup sibling does not', async () => {
+    const system = fakeSystem(() => ({ status: 200 }));
+    const interrupt = new Interrupt();
+    const gated = gate(system.connection, { interrupt });
+    interrupt.stop();
+    expect(() =>
+      gated.makeAdtRequest({ url: '/x', method: 'GET', timeout: 0 }),
+    ).toThrow(Interrupted);
+    await gated
+      .cleanup()
+      .makeAdtRequest({ url: '/x', method: 'GET', timeout: 0 });
+    expect(system.seen.map((s) => s.url)).toEqual(['/x']);
+  });
+});
+
+describe('the run decides its exit once, from its state', () => {
+  it('the system context goes through the gate: a 401 there is the authorization stop', async () => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : request.url === '/sap/bc/adt/core/http/systeminformation'
+          ? { status: 401 }
+          : { status: 404 },
+    );
+    const { lines, out } = output();
+    const result = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async (connection) => {
+        // What resolveSystemContext does on cloud.
+        await send(connection, {
+          url: '/sap/bc/adt/core/http/systeminformation',
+          method: 'GET',
+          timeout: 0,
+        }).catch(() => undefined);
+        return {};
+      },
+      out,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(lines[lines.length - 1]).toMatch(
+      /^Oops: authorization problem \(401, .*\) at GET \/sap\/bc\/adt\/core\/http\/systeminformation/,
+    );
+    expect(
+      system.seen.some((s) => s.url.startsWith('/sap/bc/adt/probe/')),
+    ).toBe(false);
+  });
+
+  it('Ctrl-C during the discovery read: the system context is not sent, exit 130, the report marked', async () => {
+    const interrupt = new Interrupt();
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery') {
+        interrupt.stop();
+        return { status: 200, body: DISCOVERY };
+      }
+      return { status: 404 };
+    });
+    const result = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt,
+      outDir: tempDir(),
+      clientOptions: async (connection) => {
+        await send(connection, {
+          url: '/sap/bc/adt/core/http/systeminformation',
+          method: 'GET',
+          timeout: 0,
+        });
+        return {};
+      },
+      out: output().out,
+    });
+    expect(result.exitCode).toBe(130);
+    expect(result.corpus.endedBy).toBe('interrupted (SIGINT)');
+    expect(system.seen.map((s) => s.url)).toEqual(['/sap/bc/adt/discovery']);
+  });
+
+  it('a later discovery read that fails: exit 1, in the full report, no later run', async () => {
+    let reads = 0;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return ++reads === 3
+          ? { status: 500 }
+          : { status: 200, body: DISCOVERY };
+      return { status: 404 };
+    });
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toBe(
+      'failed: The discovery read answered 500 (discovery none)',
+    );
+    expect(
+      system.seen.filter((s) => s.url === '/sap/bc/adt/discovery'),
+    ).toHaveLength(3);
+  });
+
+  it.each([
+    'single',
+    'full',
+  ] as const)('the first discovery read failing after Ctrl-C (%s run): exit 130, the report written', async (kind) => {
+    const interrupt = new Interrupt();
+    const system = fakeSystem(() => {
+      interrupt.stop();
+      return { status: 500 };
+    });
+    const dir = tempDir();
+    const common = {
+      interrupt,
+      outDir: dir,
+      clientOptions: async () => ({}),
+      out: output().out,
+    };
+    const result =
+      kind === 'single'
+        ? await runCorpus({
+            ...common,
+            connection: system.connection,
+            source: 'discovery',
+            mode: 'none',
+          })
+        : await runFull({ ...common, open: async () => system.connection });
+    expect(result.exitCode).toBe(130);
+    expect(fs.readdirSync(dir).length).toBeGreaterThan(0);
   });
 });

@@ -542,6 +542,8 @@ export interface ICorpus {
   sequential?: boolean;
   /** Phase 2 of a full run: real objects in place of the probe name. */
   phase?: 2;
+  /** What ended the run: `complete`, `interrupted (SIGINT)`, `stopped: authorization (…)`, `failed: …`. */
+  endedBy?: string;
   /** Every envelope: parts, bytes, wall time from send to answer. */
   envelopes?: IEnvelopeTiming[];
   /** Every poisoned envelope: how it was split, what caused it. */
@@ -1665,6 +1667,8 @@ export interface IHeaderCorpusFile {
   corpora: string[];
   /** What phase 2's write cycle created and removed (or could not). */
   removals: IRemoval[];
+  /** What ended the run. */
+  endedBy?: string;
   /** Phase 2's read objects: per object type, the name found or why none. */
   objects: { handler: string; type?: string; name?: string; reason?: string }[];
   error?: string;

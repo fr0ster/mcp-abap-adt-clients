@@ -15,12 +15,18 @@ import type {
 import type { AdtClient } from '../../src/clients/AdtClient';
 import { ACCEPT_DISCOVERY } from '../../src/constants/contentTypes';
 import {
+  cleanupOf,
+  gate,
+  gateConnect,
   type ICallOn,
   type ICapture,
   type IEnvelopeTiming,
   type IMeter,
+  LogonRefused,
   message,
   runCalls,
+  send,
+  statusOfError,
   traced,
   watchAnswers,
 } from './capture';
@@ -89,20 +95,6 @@ import {
 export const ENVELOPE_PROBES = 25;
 
 type ClientOptions = ConstructorParameters<typeof AdtClient>[2];
-
-/** The status a failed request carries, if any. */
-export const statusOfError = (error: unknown): number | undefined => {
-  const candidate = error as {
-    response?: { status?: unknown };
-    status?: unknown;
-    cause?: unknown;
-  } | null;
-  const status = candidate?.response?.status ?? candidate?.status;
-  if (typeof status === 'number') return status;
-  // The connection's logon wraps the 401 in its own refusal (measured:
-  // `AuthRefusedError`, the axios error with the status as its cause).
-  return candidate?.cause ? statusOfError(candidate.cause) : undefined;
-};
 
 /** A raw request's answer, handed to `analyse` as a member's would be. */
 function answered(
@@ -507,7 +499,10 @@ export interface IAuthStop {
 }
 
 /** Watches every answer for an authorization problem; the first stops the run. */
-export function guardAuthorization(interrupt: Interrupt): {
+export function guardAuthorization(
+  interrupt: Interrupt,
+  onStop?: (stop: IAuthStop) => void,
+): {
   stop: () => IAuthStop | undefined;
   release: () => void;
 } {
@@ -527,8 +522,9 @@ export function guardAuthorization(interrupt: Interrupt): {
         ),
       ),
     };
+    onStop?.(stopped);
     // Nothing new goes out; what is in flight finishes, the cleanup runs.
-    interrupt.stop();
+    interrupt.stop('authorization');
   });
   return { stop: () => stopped, release };
 }
@@ -549,8 +545,10 @@ export function discoveryRemoval(
   connection: IAbapConnection,
   uri: string,
 ): () => Promise<{ removed: boolean | 'unknown'; detail: string }> {
+  // Cleanup: through the gate's cleanup sibling, past a stop.
+  const cleanup = cleanupOf(connection);
   const request = () =>
-    connection.makeAdtRequest({
+    send(cleanup, {
       url: uri,
       method: 'GET',
       timeout: 0,
@@ -574,7 +572,7 @@ export function discoveryRemoval(
     const headers = pairOf('getUtils()', 'deleteObjectsGroup') as IAdtHeaders;
     const body = `<?xml version="1.0" encoding="UTF-8"?><del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">\n  <del:object adtcore:uri="${uri}">\n    <del:transportNumber/>\n  </del:object>\n</del:deletionRequest>`;
     const deleted = await statusOf(
-      connection.makeAdtRequest({
+      send(cleanup, {
         url: '/sap/bc/adt/deletion/delete',
         method: 'POST',
         timeout: 0,
@@ -673,16 +671,19 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
             remove: discoveryRemoval(ctx.connection, uri),
           }));
         return answered(
-          traced(on.base, {
-            shape: headerShape(ctx.mode, on.parts, probe.bogus),
-            parts: on.parts,
-          }).makeAdtRequest({
-            url: collection.href,
-            method: probe.method,
-            timeout: 0,
-            ...(probe.body !== undefined ? { data: probe.body } : {}),
-            headers: headersOf(probe.asked),
-          }),
+          send(
+            traced(on.base, {
+              shape: headerShape(ctx.mode, on.parts, probe.bogus),
+              parts: on.parts,
+            }),
+            {
+              url: collection.href,
+              method: probe.method,
+              timeout: 0,
+              ...(probe.body !== undefined ? { data: probe.body } : {}),
+              headers: headersOf(probe.asked),
+            },
+          ),
           analyse,
         );
       },
@@ -691,7 +692,7 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
     if (write) {
       entry.read = (on, analyse) =>
         answered(
-          traced(on.base, { parts: on.parts }).makeAdtRequest({
+          send(traced(on.base, { parts: on.parts }), {
             url: uri,
             method: 'GET',
             timeout: 0,
@@ -783,12 +784,13 @@ async function runClients(ctx: IContext): Promise<void> {
     base: batch,
     parts: true,
   });
+  // Cleanup and unlocks: through the gate's cleanup sibling, past a stop.
   const once = (call: ICallOn<ITarget>) =>
     runCalls({
       calls: [call],
       batched: false,
       connection: ctx.connection,
-      direct,
+      direct: { base: cleanupOf(ctx.connection), parts: false },
       onBatch,
     }).then(([capture]) => capture);
   const reference = clientsAt(direct, undefined, true);
@@ -1019,7 +1021,7 @@ export async function readDiscovery(
   let document = '';
   try {
     // Traced: the authorization watcher sees this read too.
-    const wire = await traced(connection).makeAdtRequest({
+    const wire = await send(connection, {
       url: '/sap/bc/adt/discovery',
       method: 'GET',
       timeout: 0,
@@ -1048,7 +1050,7 @@ export function writeCorpus(corpus: ICorpus, outDir: string): string[] {
 }
 
 export interface ICorpusRunInput {
-  /** The connection, already open (tests). */
+  /** The connection, already open (tests). The run puts it behind its gate. */
   connection?: IAbapConnection;
   /**
    * Opens the connection: its logon is the first request of the run, and a
@@ -1061,7 +1063,7 @@ export interface ICorpusRunInput {
   mode: HeadersMode;
   interrupt: Interrupt;
   outDir: string;
-  /** Read after the authorization check: on cloud it asks the system. */
+  /** Read after the discovery read, on the gate: on cloud it asks the system. */
   clientOptions: (connection: IAbapConnection) => Promise<ClientOptions>;
   out: IOutput;
   /** Every request one at a time, no envelope. */
@@ -1070,69 +1072,157 @@ export interface ICorpusRunInput {
   only?: string[];
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
   envelopeProbes?: number;
-  /** The run's authorization guard (set by runCorpus / runFull). */
-  auth?: { stop: () => IAuthStop | undefined };
+}
+
+/** What the run met: the record the end decides the exit from. */
+export interface IRunState {
+  /** The authorization stop (a logon refusal included). */
+  stop?: IAuthStop;
+  /** Any other failure: a failed discovery read, an error the run met. */
+  failure?: string;
+}
+
+/** What ended the run, as its reports say it. */
+export function endedBy(state: IRunState, interrupt: Interrupt): string {
+  if (interrupt.reason === 'sigint') return 'interrupted (SIGINT)';
+  if (state.stop)
+    return `stopped: authorization (${state.stop.status}, ${state.stop.kind}) at ${state.stop.endpoint}`;
+  if (state.failure) return `failed: ${state.failure}`;
+  return 'complete';
 }
 
 /**
- * The run: the authorization check first — 401 or 403 prints the Oops and
- * sends nothing more —, then every probe, the cleanup in a `finally`, and
- * the two files.
+ * The exit code, decided here and nowhere else, from what the run met:
+ * Ctrl-C 130, an authorization stop 2, any other failure 1, else 0.
+ */
+export function exitCodeOf(state: IRunState, interrupt: Interrupt): number {
+  if (interrupt.reason === 'sigint') return 130;
+  if (state.stop) return 2;
+  if (state.failure) return 1;
+  return 0;
+}
+
+/**
+ * One run: the logon through the gate, the body on the gated connection,
+ * the report — always written, marked with what ended the run —, the line
+ * that says it, and the exit code from the run's state.
+ */
+async function runWith(
+  input: Pick<
+    ICorpusRunInput,
+    'connection' | 'open' | 'close' | 'interrupt' | 'out'
+  >,
+  body: (connection: IAbapConnection, state: IRunState) => Promise<void>,
+  report: (state: IRunState, ended: string) => string[],
+): Promise<{ exitCode: number; files: string[]; state: IRunState }> {
+  const state: IRunState = {};
+  const auth = guardAuthorization(input.interrupt, (stop) => {
+    state.stop ??= stop;
+  });
+  let raw = input.connection;
+  try {
+    if (!raw) {
+      if (!input.open) throw new Error('the run needs a connection or open()');
+      raw = await gateConnect(input.open, input.interrupt);
+    }
+    await body(gate(raw, { interrupt: input.interrupt }), state);
+  } catch (error) {
+    if (error instanceof LogonRefused)
+      state.stop ??= { status: error.status, kind: 'logon', endpoint: 'logon' };
+    else if (!(error instanceof Interrupted)) {
+      state.failure ??= message(error);
+      input.out.loud(`The run stopped: ${state.failure}`);
+    }
+  } finally {
+    auth.release();
+  }
+  let files: string[] = [];
+  try {
+    files = report(state, endedBy(state, input.interrupt));
+  } finally {
+    if (raw && input.close && !input.connection) await input.close(raw);
+  }
+  if (state.stop && input.interrupt.reason !== 'sigint')
+    input.out.progress(
+      state.stop.kind === 'logon'
+        ? `Oops: no authorization (${state.stop.status})`
+        : authorizationLine(state.stop),
+    );
+  return { exitCode: exitCodeOf(state, input.interrupt), files, state };
+}
+
+const newCorpus = (
+  input: Pick<ICorpusRunInput, 'source' | 'mode' | 'sequential'>,
+): ICorpus => ({
+  source: input.source,
+  headers: input.mode,
+  startedAt: new Date().toISOString(),
+  rows: [],
+  removals: [],
+  envelopes: [],
+  ...(input.sequential ? { sequential: true } : {}),
+});
+
+/** Marks a corpus with what ended it, and writes it. */
+function finishCorpus(
+  corpus: ICorpus,
+  ended: string,
+  input: Pick<ICorpusRunInput, 'outDir' | 'out'>,
+): string[] {
+  corpus.endedBy = ended;
+  if (ended !== 'complete') corpus.error = ended;
+  corpus.finishedAt = new Date().toISOString();
+  const files = writeCorpus(corpus, input.outDir);
+  for (const file of files) input.out.progress(file);
+  return files;
+}
+
+/**
+ * The run of one source in one headers mode: the logon, the discovery read,
+ * every probe, the cleanup in a `finally`, and the two files.
  */
 export async function runCorpus(
   input: ICorpusRunInput,
-): Promise<{ exitCode: number; files: string[]; corpus?: ICorpus }> {
-  let connection = input.connection;
-  if (!connection) {
-    if (!input.open) throw new Error('runCorpus needs a connection or open()');
-    try {
-      connection = await input.open();
-    } catch (error) {
-      const status = statusOfError(error);
-      if (status === 401 || status === 403) {
-        input.out.progress(`Oops: no authorization (${status})`);
-        return { exitCode: 2, files: [] };
-      }
-      throw error;
-    }
-  }
-  const auth = guardAuthorization(input.interrupt);
-  try {
-    return await runOn(connection, { ...input, auth });
-  } finally {
-    auth.release();
-    if (input.close && !input.connection) await input.close(connection);
-  }
+): Promise<{ exitCode: number; files: string[]; corpus: ICorpus }> {
+  let result: { corpus: ICorpus; files: string[] } | undefined;
+  const { exitCode, files } = await runWith(
+    input,
+    async (connection, state) => {
+      result = await runOn(connection, input, state);
+    },
+    (_state, ended) => {
+      if (result) return result.files;
+      // Nothing ran (the logon was refused, or Ctrl-C came first): the
+      // report still says so.
+      const corpus = newCorpus(input);
+      result = { corpus, files: finishCorpus(corpus, ended, input) };
+      return result.files;
+    },
+  );
+  return { exitCode, files, corpus: result?.corpus ?? newCorpus(input) };
 }
 
+/**
+ * One source in one mode on the gated connection. It records what it met
+ * in `state`; it never decides the exit.
+ */
 async function runOn(
   connection: IAbapConnection,
   input: ICorpusRunInput,
-): Promise<{ exitCode: number; files: string[]; corpus?: ICorpus }> {
+  state: IRunState,
+): Promise<{ corpus: ICorpus; files: string[] }> {
   const { out } = input;
-  const corpus: ICorpus = {
-    source: input.source,
-    headers: input.mode,
-    startedAt: new Date().toISOString(),
-    rows: [],
-    removals: [],
-    envelopes: [],
-    ...(input.sequential ? { sequential: true } : {}),
-  };
+  const corpus = newCorpus(input);
   const discovery = await readDiscovery(connection);
   if (!discovery.ok) {
-    const stop = input.auth?.stop();
-    if (!stop) {
+    if (!state.stop) {
+      state.failure ??= `${discovery.line} (${input.source} ${input.mode})`;
       out.progress(discovery.line);
-      return { exitCode: discovery.exitCode, files: [] };
     }
-    // An authorization stop at the discovery read: the report says so.
-    corpus.error = `stopped: authorization (${stop.status}, ${stop.kind}) at ${stop.endpoint}`;
-    corpus.finishedAt = new Date().toISOString();
-    const files = writeCorpus(corpus, input.outDir);
-    for (const file of files) out.progress(file);
-    out.progress(authorizationLine(stop));
-    return { exitCode: 2, files, corpus };
+    return {
+      corpus,
+      files: finishCorpus(corpus, endedBy(state, input.interrupt), input),
+    };
   }
   const meter: IMeter = { envelopes: corpus.envelopes as IEnvelopeTiming[] };
   const registered = new Set<string>();
@@ -1166,18 +1256,12 @@ async function runOn(
     );
   } catch (error) {
     if (!(error instanceof Interrupted)) {
-      corpus.error = message(error);
-      out.loud(`The run stopped: ${corpus.error}`);
+      state.failure ??= message(error);
+      out.loud(`The run stopped: ${message(error)}`);
     }
   }
-  const stop = input.auth?.stop();
-  if (stop)
-    corpus.error = `stopped: authorization (${stop.status}, ${stop.kind}) at ${stop.endpoint}`;
-  else if (input.interrupt.requested) corpus.error = 'interrupted (SIGINT)';
   if (input.mode === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
-  corpus.finishedAt = new Date().toISOString();
-  const files = writeCorpus(corpus, input.outDir);
-  for (const file of files) out.progress(file);
+  const files = finishCorpus(corpus, endedBy(state, input.interrupt), input);
   const created = corpus.rows.filter((row) => row.afterWrite?.exists === true);
   if (created.length) {
     out.loud(`\n!!! ${created.length} write probe(s) created the probe name:`);
@@ -1196,11 +1280,7 @@ async function runOn(
         `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
       );
   }
-  if (stop) {
-    out.progress(authorizationLine(stop));
-    return { exitCode: 2, files, corpus };
-  }
-  return { exitCode: input.interrupt.requested ? 130 : 0, files, corpus };
+  return { corpus, files };
 }
 
 // --- phase 2: existing objects for the reads still unknown -------------------
@@ -1451,7 +1531,7 @@ export interface IWriteCycleResult {
 }
 
 export interface IFullRunInput
-  extends Omit<ICorpusRunInput, 'source' | 'mode' | 'connection'> {
+  extends Omit<ICorpusRunInput, 'source' | 'mode'> {
   /**
    * Phase 2's writes: the temporary-object cycle for the write members still
    * unknown. Given by the command line, which holds the test config.
@@ -1469,10 +1549,11 @@ const PHASE1: readonly { source: Source; mode: HeadersMode }[] = [
 ];
 
 /**
- * The full run: the authorization check; phase 1, every source in every
- * mode on the probe name; phase 2, for the endpoints still unknown only,
- * existing objects for the reads and the temporary-object cycle for the
- * writes; then one header corpus file, with each phase's time.
+ * The full run: the logon and the discovery read; phase 1, every source in
+ * every mode on the probe name; phase 2, for the endpoints still unknown
+ * only, existing objects for the reads and the temporary-object cycle for
+ * the writes; then one header corpus file, with each phase's time — always
+ * written, marked with what ended the run.
  */
 export async function runFull(
   input: IFullRunInput,
@@ -1480,72 +1561,52 @@ export async function runFull(
   const started = performance.now();
   const startedAt = new Date().toISOString();
   const { out } = input;
-  if (!input.open) throw new Error('runFull needs open()');
-  let connection: IAbapConnection;
-  try {
-    connection = await input.open();
-  } catch (error) {
-    const status = statusOfError(error);
-    if (status === 401 || status === 403) {
-      out.progress(`Oops: no authorization (${status})`);
-      return { exitCode: 2, files: [] };
-    }
-    throw error;
-  }
-  const auth = guardAuthorization(input.interrupt);
-  try {
-    const authorized = await readDiscovery(connection);
-    if (!authorized.ok && !auth.stop()) {
-      out.progress(authorized.line);
-      return { exitCode: authorized.exitCode, files: [] };
-    }
-    // Stopped (an authorization problem, Ctrl-C): no phase starts; the
-    // report is still written.
-    const stopped = () => Boolean(auth.stop()) || input.interrupt.requested;
-    const phases: IHeaderCorpusFile['phases'] = [];
-    const timed = async (name: string, body: () => Promise<void>) => {
+  const phases: IHeaderCorpusFile['phases'] = [];
+  const files: string[] = [];
+  const corpora = new Map<string, ICorpus>();
+  const evidence: IEvidence[] = [];
+  let objects: IHeaderCorpusFile['objects'] = [];
+  let removals: IRemoval[] = [];
+  let file: IHeaderCorpusFile | undefined;
+  const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
+
+  const body = async (connection: IAbapConnection, state: IRunState) => {
+    const stopped = () =>
+      Boolean(state.stop) ||
+      Boolean(state.failure) ||
+      input.interrupt.requested;
+    const timed = async (name: string, run: () => Promise<void>) => {
       const at = performance.now();
       try {
-        await body();
+        await run();
       } catch (thrown) {
-        // A stop inside a phase ends the phase, not the report.
+        // A stop inside a phase ends the phase; the run's state says why.
         if (!(thrown instanceof Interrupted)) throw thrown;
       } finally {
         phases.push({ name, ms: performance.now() - at });
       }
     };
-    const files: string[] = [];
-    const corpora = new Map<string, ICorpus>();
-    let error: string | undefined;
-    if (!stopped())
-      await timed(
-        'phase 1: the probe name, every source and mode',
-        async () => {
-          for (const { source, mode } of PHASE1) {
-            if (stopped()) break;
-            out.progress(`phase 1: ${source} ${mode}`);
-            const result = await runOn(connection, {
-              ...input,
-              source,
-              mode,
-              auth,
-              // An authorization stop is said once, at the end of the full run.
-              out: {
-                ...out,
-                progress: (line) =>
-                  line.startsWith('Oops: authorization')
-                    ? undefined
-                    : out.progress(line),
-              },
-            });
-            files.push(...result.files);
-            if (result.corpus) corpora.set(`${source} ${mode}`, result.corpus);
-            if (result.corpus?.error) error ??= result.corpus.error;
-            if (result.exitCode === 2) break;
-          }
-        },
-      );
-    const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
+    const authorized = await readDiscovery(connection);
+    if (!authorized.ok) {
+      if (!state.stop) {
+        state.failure ??= authorized.line;
+        out.progress(authorized.line);
+      }
+      return;
+    }
+    await timed('phase 1: the probe name, every source and mode', async () => {
+      for (const { source, mode } of PHASE1) {
+        if (stopped()) break;
+        out.progress(`phase 1: ${source} ${mode}`);
+        const result = await runOn(
+          connection,
+          { ...input, source, mode },
+          state,
+        );
+        files.push(...result.files);
+        corpora.set(`${source} ${mode}`, result.corpus);
+      }
+    });
     const needs1 = {
       discovery: classifyNeeds(
         rowsOf('discovery bogus'),
@@ -1553,10 +1614,10 @@ export async function runFull(
       ),
       clients: classifyNeeds(rowsOf('clients bogus'), rowsOf('clients none')),
     };
-    const evidence: IEvidence[] = [
+    evidence.push(
       ...evidenceOf(needs1.discovery, 'discovery', 1),
       ...evidenceOf(needs1.clients, 'clients', 1),
-    ];
+    );
     const unknown = needs1.clients.filter((entry) => entry.needs === 'unknown');
     const unknownReads = new Set(
       unknown
@@ -1568,8 +1629,6 @@ export async function runFull(
         .filter((entry) => /— (POST|PUT|DELETE) /.test(entry.endpoint))
         .map((entry) => entry.endpoint),
     );
-    let objects: IHeaderCorpusFile['objects'] = [];
-    let removals: IRemoval[] = [];
     if (!stopped() && unknownReads.size)
       await timed(
         `phase 2: reads on existing objects (${unknownReads.size} unknown)`,
@@ -1590,8 +1649,8 @@ export async function runFull(
           files.push(...reads.files);
         },
       );
-    if (!stopped() && unknownWrites.size && input.writeCycle) {
-      const cycle = input.writeCycle;
+    const cycle = input.writeCycle;
+    if (!stopped() && unknownWrites.size && cycle)
       await timed(
         `phase 2: writes on temporary objects (${unknownWrites.size} unknown)`,
         async () => {
@@ -1603,10 +1662,12 @@ export async function runFull(
           });
           evidence.push(...writes.evidence);
           removals = writes.removals;
-          if (writes.error) error ??= writes.error;
+          if (writes.error) state.failure ??= writes.error;
         },
       );
-    }
+  };
+
+  const report = (_state: IRunState, ended: string): string[] => {
     const discoveryContentType = new Map<string, string[]>();
     for (const collection of corpora.get('discovery corpus')?.collections ?? [])
       if (collection.accept.length)
@@ -1625,7 +1686,7 @@ export async function runFull(
     }
     const extras = { discoveryContentType, pairs };
     const entries = buildHeaderCorpus(evidence, extras);
-    const file: IHeaderCorpusFile = {
+    file = {
       startedAt,
       finishedAt: new Date().toISOString(),
       phases,
@@ -1640,18 +1701,11 @@ export async function runFull(
         phase2: needsCounts(entries),
       },
       entries,
-      corpora: files,
+      corpora: [...files],
       removals,
       objects,
-      ...(auth.stop()
-        ? {
-            error: `stopped: authorization (${auth.stop()?.status}, ${auth.stop()?.kind}) at ${auth.stop()?.endpoint}`,
-          }
-        : input.interrupt.requested
-          ? { error: 'interrupted (SIGINT)' }
-          : error
-            ? { error }
-            : {}),
+      endedBy: ended,
+      ...(ended !== 'complete' ? { error: ended } : {}),
     };
     fs.mkdirSync(input.outDir, { recursive: true });
     const base = path.join(input.outDir, `header-corpus-${stamp()}`);
@@ -1668,15 +1722,13 @@ export async function runFull(
           `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
         );
     }
-    const stop = auth.stop();
-    if (stop) out.progress(authorizationLine(stop));
-    return {
-      exitCode: stop ? 2 : input.interrupt.requested ? 130 : 0,
-      files: [...files, `${base}.json`, `${base}.md`],
-      file,
-    };
-  } finally {
-    auth.release();
-    await input.close?.(connection);
-  }
+    return [...files, `${base}.json`, `${base}.md`];
+  };
+
+  const result = await runWith(input, body, report);
+  return {
+    exitCode: result.exitCode,
+    files: result.files,
+    ...(file ? { file } : {}),
+  };
 }

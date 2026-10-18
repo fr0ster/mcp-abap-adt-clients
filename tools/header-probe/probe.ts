@@ -51,10 +51,14 @@ import {
 import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../../src/clients/AdtClient';
 import {
+  cleanupOf,
+  gate,
+  gateConnect,
   type ICallOn,
   type ICapture,
   message,
   runCalls,
+  throughGate,
   traced,
 } from './capture';
 import {
@@ -141,6 +145,8 @@ export class Probe {
   readonly rows: IOperationRow[] = [];
   readonly names: string[] = [];
   private readonly direct: AdtClient;
+  /** For what releases or removes: the gate's cleanup sibling, past a stop. */
+  private readonly cleanupDirect: AdtClient;
 
   constructor(
     private readonly connection: IAbapConnection,
@@ -152,9 +158,12 @@ export class Probe {
     private readonly interrupt: Interrupt,
   ) {
     this.direct = this.client(traced(connection));
+    this.cleanupDirect = this.client(traced(cleanupOf(connection)));
   }
 
   private client(connection: IAbapConnection): AdtClient {
+    if (!throughGate(connection))
+      throw new Error('Probe: the connection does not send through the gate');
     return new AdtClient(connection, undefined, this.clientOptions);
   }
 
@@ -169,7 +178,7 @@ export class Probe {
       calls,
       batched,
       connection: this.connection,
-      direct: this.direct,
+      direct: gated ? this.direct : this.cleanupDirect,
       onBatch: (batch) => this.client(traced(batch)),
       interrupt: gated ? this.interrupt : undefined,
     });
@@ -903,13 +912,14 @@ async function main(): Promise<void> {
   });
 
   const interrupt = new Interrupt();
-  const connection = await createTestConnection(createConnectionLogger(), {
-    ownSession: true,
-  });
-  const clientOptions = await resolveSystemContext(
-    connection,
-    system === 'cloud',
+  const raw = await gateConnect(
+    () => createTestConnection(createConnectionLogger(), { ownSession: true }),
+    interrupt,
   );
+  // Every request of the probe goes through the gate.
+  const gated = gate(raw, { interrupt });
+  const connection = gated;
+  const clientOptions = await resolveSystemContext(gated, system === 'cloud');
   const probe = new Probe(
     connection,
     clientOptions,
@@ -966,7 +976,7 @@ async function main(): Promise<void> {
     }
   }
   await finish();
-  await closeOwnTestConnection(connection);
+  await closeOwnTestConnection(raw);
   if (interrupt.requested) process.exit(130);
 }
 

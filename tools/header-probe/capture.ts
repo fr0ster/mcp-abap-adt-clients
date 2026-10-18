@@ -215,20 +215,9 @@ export function traced(
     body?: (request: IAbapRequestOptions) => unknown;
   } = {},
 ): IAbapConnection {
-  const wrapper: Record<string | symbol, unknown> = {};
-  const seen = new Set<string | symbol>();
-  for (
-    let level: object | null = connection;
-    level && level !== Object.prototype;
-    level = Object.getPrototypeOf(level)
-  ) {
-    for (const key of Reflect.ownKeys(level)) {
-      if (seen.has(key) || key === 'constructor') continue;
-      seen.add(key);
-      const value = Reflect.get(connection, key);
-      if (typeof value === 'function') wrapper[key] = value.bind(connection);
-    }
-  }
+  assertGated(connection, 'traced');
+  const wrapper = forwarding(connection);
+  wrapper[GATE] = true;
   wrapper.makeAdtRequest = (request: IAbapRequestOptions) => {
     const given = { ...(request.headers ?? {}) } as Record<string, unknown>;
     const headers = options.shape ? options.shape(given, request) : given;
@@ -237,6 +226,8 @@ export function traced(
       ...request,
       headers,
       ...(hasBody && options.body ? { data: options.body(request) } : {}),
+      // Recorded here; the gate below does not record it again.
+      [RECORDED]: true,
     } as IAbapRequestOptions;
     const capture = current.getStore();
     if (capture) {
@@ -252,18 +243,170 @@ export function traced(
         capture.onWire.push(partHeadersOf(sent));
       }
     }
-    return connection.makeAdtRequest(sent).then(
-      (wire) => {
-        notify(wire, request);
-        return wire;
-      },
-      (error: unknown) => {
-        notify((error as { response?: unknown } | null)?.response, request);
-        throw error;
-      },
-    );
+    const answer = connection.makeAdtRequest(sent);
+    // An envelope part's answer never passes the gate on its own: it is
+    // watched here. Every other answer the gate below watches.
+    return options.parts ? watched(answer, request) : answer;
   };
   return wrapper as unknown as IAbapConnection;
+}
+
+// --- the gate: every request the script sends --------------------------------
+
+/** Marks a gate, and whatever sends only through one (a traced wrapper, an envelope over a gate). */
+const GATE = Symbol('error-corpus gate');
+/** Marks a connection that sends nothing (the clients recording). */
+const SILENT = Symbol('error-corpus silent');
+/** Marks a request `traced` already recorded. */
+const RECORDED = Symbol('error-corpus recorded');
+
+/** A connection's own methods, bound, on a plain object of its own. */
+function forwarding(
+  connection: IAbapConnection,
+): Record<string | symbol, unknown> {
+  const wrapper: Record<string | symbol, unknown> = {};
+  const seen = new Set<string | symbol>();
+  for (
+    let level: object | null = connection;
+    level && level !== Object.prototype;
+    level = Object.getPrototypeOf(level)
+  ) {
+    for (const key of Reflect.ownKeys(level)) {
+      if (seen.has(key) || key === 'constructor') continue;
+      seen.add(key);
+      const value = Reflect.get(connection, key);
+      if (typeof value === 'function') wrapper[key] = value.bind(connection);
+    }
+  }
+  return wrapper;
+}
+
+/** Whether a connection sends only through a gate (or sends nothing). */
+export function throughGate(connection: unknown): boolean {
+  const marked = connection as Record<symbol, unknown> | null;
+  return Boolean(marked && (marked[GATE] === true || marked[SILENT] === true));
+}
+
+function assertGated(connection: unknown, who: string): void {
+  if (!throughGate(connection))
+    throw new Error(`${who}: the connection does not send through the gate`);
+}
+
+/** Marks a connection that sends nothing, so it may be traced. */
+export function silent<T extends object>(connection: T): T {
+  (connection as Record<symbol, unknown>)[SILENT] = true;
+  return connection;
+}
+
+function watched<T>(
+  answer: Promise<T>,
+  request: IAbapRequestOptions,
+): Promise<T> {
+  return answer.then(
+    (wire) => {
+      notify(wire, request);
+      return wire;
+    },
+    (error: unknown) => {
+      notify((error as { response?: unknown } | null)?.response, request);
+      throw error;
+    },
+  );
+}
+
+/** A gate, and its sibling for cleanup and unlocks. */
+export interface IGated extends IAbapConnection {
+  /** The same gate, without the interrupt check: for cleanup and unlocks only. */
+  cleanup(): IAbapConnection;
+}
+
+/**
+ * The gate every request of the run goes through. Before sending, it asks
+ * the interrupt (Ctrl-C, or an authorization stop) — except on its cleanup
+ * sibling, which removes and unlocks after a stop. It watches every answer
+ * for authorization (the run's guard), and records the request into the
+ * call that issued it, unless `traced` already did.
+ */
+export function gate(
+  connection: IAbapConnection,
+  options: { interrupt?: Interrupt },
+  forCleanup = false,
+): IGated {
+  const wrapper = forwarding(connection);
+  wrapper[GATE] = true;
+  wrapper.makeAdtRequest = (request: IAbapRequestOptions) => {
+    if (!forCleanup) options.interrupt?.check();
+    const capture = current.getStore();
+    if (capture && !(request as unknown as Record<symbol, unknown>)[RECORDED])
+      capture.requests.push({
+        method: request.method,
+        url: request.url,
+        params: request.params,
+        headers: { ...(request.headers ?? {}) },
+        hasBody: request.data !== undefined && request.data !== null,
+      });
+    return watched(connection.makeAdtRequest(request), request);
+  };
+  wrapper.cleanup = () => gate(connection, options, true);
+  return wrapper as unknown as IGated;
+}
+
+/** A gate's cleanup sibling (also through what forwards to a gate). */
+export function cleanupOf(connection: IAbapConnection): IAbapConnection {
+  const cleanup = (connection as Partial<IGated>).cleanup;
+  if (typeof cleanup !== 'function')
+    throw new Error('cleanupOf: the connection is not a gate');
+  return cleanup.call(connection);
+}
+
+/** One request, through a gate (or what sends only through one). */
+export function send<T = unknown, D = unknown>(
+  connection: IAbapConnection,
+  request: IAbapRequestOptions,
+): Promise<IAdtWireResponse<T, D>> {
+  assertGated(connection, 'send');
+  return connection.makeAdtRequest<T, D>(request);
+}
+
+/** The status a failed request carries, if any. */
+export const statusOfError = (error: unknown): number | undefined => {
+  const candidate = error as {
+    response?: { status?: unknown };
+    status?: unknown;
+    cause?: unknown;
+  } | null;
+  const status = candidate?.response?.status ?? candidate?.status;
+  if (typeof status === 'number') return status;
+  // The connection's logon wraps the 401 in its own refusal (measured:
+  // `AuthRefusedError`, the axios error with the status as its cause).
+  return candidate?.cause ? statusOfError(candidate.cause) : undefined;
+};
+
+/** The logon refused the credential: 401 or 403 at `connect()`. */
+export class LogonRefused extends Error {
+  constructor(readonly status: number) {
+    super(`the logon answered ${status}`);
+    this.name = 'LogonRefused';
+  }
+}
+
+/**
+ * The logon, through the gate: the interrupt is asked first, and a 401 or
+ * 403 from `connect()` becomes {@link LogonRefused}. The connection's own
+ * requests during the logon are its own.
+ */
+export async function gateConnect(
+  open: () => Promise<IAbapConnection>,
+  interrupt: Interrupt,
+): Promise<IAbapConnection> {
+  interrupt.check();
+  try {
+    return await open();
+  } catch (error) {
+    const status = statusOfError(error);
+    if (status === 401 || status === 403) throw new LogonRefused(status);
+    throw error;
+  }
 }
 
 /**
@@ -358,6 +501,7 @@ export async function runCalls<T>(input: {
     });
     return captures;
   }
+  assertGated(input.connection, 'runCalls');
   const ids: number[] = [];
   const batch = new AdtBatchConnection(
     input.meter
@@ -365,6 +509,8 @@ export async function runCalls<T>(input: {
       : input.connection,
     { endpoint: 'communication' },
   );
+  // The envelope goes out through the gate below it.
+  (batch as unknown as Record<symbol, unknown>)[GATE] = true;
   const target = input.onBatch(batch);
   const pending = calls.map((call, i) => invoke(target, call, captures[i]));
   // A member may record its request a few turns after it was called.

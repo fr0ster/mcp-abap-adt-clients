@@ -23,7 +23,14 @@ import { AdtExecutorLegacy } from '../../src/clients/AdtExecutorLegacy';
 import { AdtRuntimeClient } from '../../src/clients/AdtRuntimeClient';
 import { AbapDebugger } from '../../src/runtime/debugger/AbapDebugger';
 import { AmdpDebugger } from '../../src/runtime/debugger/AmdpDebugger';
-import { current, type ICapture, message, traced } from './capture';
+import {
+  current,
+  type ICapture,
+  message,
+  silent,
+  throughGate,
+  traced,
+} from './capture';
 import { FIXED_TEXT, PROBE_HANDLE, PROBE_NAME, PROBE_PACKAGE } from './corpus';
 import { knownPair, legacyPair } from './pairs';
 import { endpointOf, type ISentRequest } from './record';
@@ -42,6 +49,8 @@ export function clientsOn(
   connection: IAbapConnection,
   options?: ConstructorParameters<typeof AdtClient>[2],
 ): IClients {
+  if (!throughGate(connection))
+    throw new Error('clientsOn: the connection does not send through the gate');
   return {
     adt: new AdtClient(connection, undefined, options),
     legacy: new AdtClientLegacy(connection, undefined, options),
@@ -273,7 +282,7 @@ export const RECORDING_LIMIT = 10;
 
 /** A connection that sends nothing: every request answers an empty 200. */
 export function recordingConnection(): IAbapConnection {
-  return {
+  return silent({
     connect: async () => {},
     getBaseUrl: async () => 'http://recording.invalid',
     getSessionId: () => null,
@@ -293,7 +302,7 @@ export function recordingConnection(): IAbapConnection {
         data: '' as T,
       } as IAdtWireResponse<T, D>;
     },
-  } as IAbapConnection;
+  } as IAbapConnection);
 }
 
 /** One member of the clients source. */

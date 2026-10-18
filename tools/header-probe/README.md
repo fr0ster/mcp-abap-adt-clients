@@ -178,7 +178,7 @@ header corpus, everything batched and poisoned envelopes split:
    (from the connection's code, not measured here). A 401 or 403 there —
    the connection's `AuthRefusedError` carrying the 401, or the 403 itself —
    prints `Oops: no authorization (<status>)` and exits with 2; nothing else
-   is sent and no file is written. Then `GET /sap/bc/adt/discovery`, watched
+   is sent, and the report says `stopped: authorization (<status>, logon)`. Then `GET /sap/bc/adt/discovery`, watched
    like every other request: an authorization problem there (below) is the
    authorization stop, its report written and marked; any other non-2xx — a
    403 that is not an authorization refusal included — prints the status and
@@ -285,6 +285,27 @@ header corpus, everything batched and poisoned envelopes split:
    time. There is no timer and no timeout of the script's own. Ctrl-C stops
    new requests (asked before each envelope and request),
    the one in flight finishes, and the `finally` cleanup runs.
+
+## One gate, one exit
+
+Every request the error corpus (and the header probe) sends goes through one
+gate, `gate()` in `capture.ts`: the logon (`gateConnect`), the system
+context, every discovery read, every probe and envelope, the state reads,
+the cleanup and the unlocks. Before sending, the gate asks the interrupt
+(Ctrl-C, or an authorization stop); it watches every answer for an
+authorization problem; and it records the request into the call that
+issued it. Only the cleanup and the unlocks bypass the interrupt check,
+through the gate's cleanup sibling (`cleanupOf`). `traced`, `clientsOn`,
+`runCalls` and the probe's clients refuse a connection that does not send
+through a gate, and a unit test scans `tools/header-probe/` for a request
+sent any other way.
+
+The exit code is decided in one place (`exitCodeOf`), at the end, from what
+the run met: Ctrl-C 130; an authorization stop (the logon's refusal
+included) 2; any other failure — a failed discovery read in any phase
+included — 1; else 0. Phases and runs only record what they met. The report
+is always written, marked (`endedBy`) with what ended the run: `complete`,
+`interrupted (SIGINT)`, `stopped: authorization (…)` or `failed: …`.
 
 ## The corpus
 

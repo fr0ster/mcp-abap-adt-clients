@@ -88,9 +88,17 @@ export class Interrupted extends Error {
  */
 export class Interrupt {
   private stopped = false;
+  private why?: 'sigint' | 'authorization';
 
-  stop(): void {
+  /** Stops the run; the first reason given is the one kept. */
+  stop(reason: 'sigint' | 'authorization' = 'sigint'): void {
     this.stopped = true;
+    this.why ??= reason;
+  }
+
+  /** Why the run was stopped: Ctrl-C, or an authorization problem. */
+  get reason(): 'sigint' | 'authorization' | undefined {
+    return this.why;
   }
 
   get requested(): boolean {
