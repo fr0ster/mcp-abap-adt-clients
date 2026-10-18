@@ -21,7 +21,7 @@ import { AdtClientLegacy } from './AdtClientLegacy';
 export async function createAdtClient(
   connection: IAbapConnection,
   logger?: ILogger,
-  options?: IAdtClientOptions,
+  options?: Omit<IAdtClientOptions, 'enableAcceptCorrection'>,
 ): Promise<AdtClient> {
   const isModern = await isModernAdtSystem(connection);
   return isModern

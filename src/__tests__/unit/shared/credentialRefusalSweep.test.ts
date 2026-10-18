@@ -23,7 +23,6 @@ import { AdtClass } from '../../../core/class/AdtClass';
 import { AdtMessageClassMessage } from '../../../core/messageClass/AdtMessageClassMessage';
 import { chain } from '../../../core/shared/chain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
-import { makeAdtRequestWithAcceptNegotiation } from '../../../utils/acceptNegotiation';
 import {
   answering,
   failed,
@@ -340,15 +339,6 @@ describe('catches that already let it through', () => {
     ['discovery', (c: IAbapConnection) => fetchDiscoveryEndpoints(c)],
     ['system information', (c: IAbapConnection) => getSystemInformation(c)],
     ['modern ADT probe', (c: IAbapConnection) => isModernAdtSystem(c)],
-    [
-      'accept negotiation',
-      (c: IAbapConnection) =>
-        makeAdtRequestWithAcceptNegotiation(c, {
-          method: 'GET',
-          url: '/x',
-          timeout: 0,
-        }),
-    ],
   ])('%s rejects with the same object', async (_, run) => {
     const thrown = refused();
     await expect(run(refusing(thrown))).rejects.toBe(thrown);

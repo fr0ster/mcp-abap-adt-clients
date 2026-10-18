@@ -97,11 +97,7 @@ export class AdtRuntimeClient {
   protected readonly connection: IAbapConnection;
   protected readonly logger: ILogger;
 
-  constructor(
-    connection: IAbapConnection,
-    logger?: ILogger,
-    options?: { enableAcceptCorrection?: boolean },
-  ) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
     // is the caller's, through the `analyse` they pass.
@@ -112,31 +108,6 @@ export class AdtRuntimeClient {
       warn: () => {},
       error: () => {},
     };
-    if (options?.enableAcceptCorrection !== undefined) {
-      const {
-        setAcceptCorrectionEnabled,
-        wrapConnectionAcceptNegotiation,
-        getAcceptCorrectionEnabled,
-      } = require('../utils/acceptNegotiation');
-      setAcceptCorrectionEnabled(
-        this.connection,
-        options.enableAcceptCorrection,
-      );
-      const shouldWrap =
-        options.enableAcceptCorrection ??
-        getAcceptCorrectionEnabled(this.connection);
-      if (shouldWrap) {
-        wrapConnectionAcceptNegotiation(this.connection, this.logger);
-      }
-    } else {
-      const {
-        getAcceptCorrectionEnabled,
-        wrapConnectionAcceptNegotiation,
-      } = require('../utils/acceptNegotiation');
-      if (getAcceptCorrectionEnabled(this.connection)) {
-        wrapConnectionAcceptNegotiation(this.connection, this.logger);
-      }
-    }
   }
 
   // ============================================================================

@@ -39,7 +39,6 @@ import {
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
 import type { AdtSourceObjectType } from '../src/core/shared/types';
-import { makeAdtRequestWithAcceptNegotiation } from '../src/utils/acceptNegotiation';
 import { orThrow } from '../src/utils/adtResponse';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
@@ -213,20 +212,14 @@ async function readSource(
         testsLogger.info?.(`URL (${version}): ${url}`);
       }
 
-      const response = await makeAdtRequestWithAcceptNegotiation(
-        connection,
-        {
-          url,
-          method: 'GET',
-          timeout: 0,
-          headers: {
-            Accept: 'text/plain',
-          },
+      const response = await connection.makeAdtRequest({
+        url,
+        method: 'GET',
+        timeout: 0,
+        headers: {
+          Accept: 'text/plain',
         },
-        {
-          logger: testsLogger,
-        },
-      );
+      });
       if (typeof response.data === 'string' && response.data.length > 0) {
         return response.data;
       }

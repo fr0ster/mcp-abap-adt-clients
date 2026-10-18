@@ -15,7 +15,6 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { clearAcceptCache } from '../../../utils/acceptNegotiation';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -127,18 +126,13 @@ describe('Shared - read Accept headers', () => {
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      // The run shares one connection, and what it learned lives on it.
-      clearAcceptCache(connection);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
         isCloudSystem,
       );
       const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, {
-          ...systemContext,
-          enableAcceptCorrection: false,
-        });
+        await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;

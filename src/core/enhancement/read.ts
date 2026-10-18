@@ -12,7 +12,6 @@ import {
   ACCEPT_TRANSPORT,
   ENHANCEMENT_CONTENT_TYPES,
 } from '../../constants/contentTypes';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 import {
   type EnhancementType,
@@ -42,18 +41,14 @@ export async function getEnhancementMetadata(
     url += '?withLongPolling=true';
   }
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ENHANCEMENT_CONTENT_TYPES[enhancementType],
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ENHANCEMENT_CONTENT_TYPES[enhancementType],
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -88,18 +83,14 @@ export async function getEnhancementSource(
     url += '&withLongPolling=true';
   }
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

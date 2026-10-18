@@ -51,7 +51,6 @@ import {
   TABLE,
   TABLE_TYPE,
 } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
@@ -75,18 +74,14 @@ export async function objectSourceWire(
   }
 
   const acceptHeader = options?.accept ?? 'text/plain';
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url: uri,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: acceptHeader,
-      },
+  return connection.makeAdtRequest({
+    url: uri,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: acceptHeader,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -118,18 +113,14 @@ export async function objectMetadataWire(
     uri += `?${params.join('&')}`;
   }
   const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url: uri,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: acceptHeader,
-      },
+  return connection.makeAdtRequest({
+    url: uri,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: acceptHeader,
     },
-    { logger },
-  );
+  });
 }
 
 export function getObjectMetadataUri(

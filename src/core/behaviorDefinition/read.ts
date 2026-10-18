@@ -17,7 +17,6 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -52,16 +51,12 @@ export async function read(
     Accept: options?.accept ?? CT_BEHAVIOR_DEFINITION,
   };
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers,
-    },
-    { logger },
-  );
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers,
+  });
 }
 
 /**
@@ -95,16 +90,12 @@ export async function readSource(
     Accept: options?.accept ?? ACCEPT_SOURCE,
   };
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers,
-    },
-    { logger },
-  );
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers,
+  });
 }
 
 /**

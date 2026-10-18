@@ -626,7 +626,7 @@ export function getConnectionOptions():
 export async function createTestAdtClient(
   connection: IAbapConnection,
   logger: ILogger,
-  options?: IAdtClientOptions,
+  options?: Omit<IAdtClientOptions, 'enableAcceptCorrection'>,
 ): Promise<{ client: AdtClient; isLegacy: boolean }> {
   if (isLegacyEnvironment()) {
     const client = new AdtClientLegacy(connection, logger, options);

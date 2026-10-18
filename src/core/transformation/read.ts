@@ -13,7 +13,6 @@ import {
   TRANSFORMATION,
   transportUri,
 } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -36,18 +35,14 @@ export async function getTransformation(
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
   const url = `${TRANSFORMATION.uri(transformationName)}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_TRANSFORMATION,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_TRANSFORMATION,
     },
-    { logger },
-  );
+  });
 }
 
 /**
@@ -70,18 +65,14 @@ export async function getTransformationSource(
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
   const url = `${sourceUri(TRANSFORMATION.uri(transformationName))}${query}`;
 
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: options?.accept ?? ACCEPT_SOURCE,
-      },
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: {
+      Accept: options?.accept ?? ACCEPT_SOURCE,
     },
-    { logger },
-  );
+  });
 }
 
 /**

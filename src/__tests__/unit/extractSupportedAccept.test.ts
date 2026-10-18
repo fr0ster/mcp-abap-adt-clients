@@ -1,18 +1,14 @@
 /**
  * `extractSupportedAccept` imported from the package root, the way a consumer
- * does: a `406` names the acceptable media types in a header or in its body.
+ * does: a `406` names the acceptable media types in its body.
+ *
+ * And, since 36.0.0, what nothing does with them: accept negotiation is gone,
+ * so a `406` is the call's answer, nothing is sent again, and nothing learned
+ * from it reaches a later request.
  */
-import type {
-  IAbapConnection,
-  IAbapRequestOptions,
-} from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  AdtClient,
-  cachedAccept,
-  extractSupportedAccept,
-  rememberAccept,
-} from '../../index';
-import { getAcceptCorrectionEnabled } from '../../utils/acceptNegotiation';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { AdtClient, extractSupportedAccept } from '../../index';
 
 /**
  * SAP's own 406, as measured on an on-premise system: the exception document,
@@ -91,124 +87,79 @@ describe('extractSupportedAccept (package root)', () => {
   });
 });
 
-describe('cachedAccept / rememberAccept (package root)', () => {
-  const request = {
-    method: 'GET',
-    url: '/sap/bc/adt/things',
-    headers: { Accept: 'application/xml' },
-  } as unknown as IAbapRequestOptions;
-
-  function connectionAnswering(
-    sent: Array<string | undefined>,
-    first406?: string,
-  ): IAbapConnection {
-    let calls = 0;
-    return {
-      makeAdtRequest: async (r: IAbapRequestOptions) => {
-        calls++;
-        sent.push((r.headers as Record<string, string>)?.Accept);
-        if (first406 && calls === 1) {
-          const error: any = new Error('406');
-          error.response = {
-            status: 406,
-            headers: {},
-            data: sap406(first406),
-          };
-          throw error;
-        }
-        return { status: 200, headers: {}, data: '' };
-      },
-    } as unknown as IAbapConnection;
-  }
-
-  it('a remembered Accept is sent by a later request of an AdtClient', async () => {
-    const sent: Array<string | undefined> = [];
-    const connection = connectionAnswering(sent);
-    new AdtClient(connection, undefined, { enableAcceptCorrection: true });
-
-    rememberAccept(connection, request, 'application/vnd.sap.adt.t.v2+xml');
-    await connection.makeAdtRequest(request);
-
-    expect(sent).toEqual(['application/vnd.sap.adt.t.v2+xml']);
-  });
-
-  it('a correction made by the non-batch path is returned', async () => {
-    const sent: Array<string | undefined> = [];
-    const connection = connectionAnswering(
-      sent,
-      'application/vnd.sap.adt.t.v3+xml',
-    );
-    new AdtClient(connection, undefined, { enableAcceptCorrection: true });
-    expect(cachedAccept(connection, request)).toBeUndefined();
-
-    await connection.makeAdtRequest(request);
-
-    expect(sent).toEqual([
-      'application/xml',
-      'application/vnd.sap.adt.t.v3+xml',
-    ]);
-    expect(cachedAccept(connection, request)).toBe(
-      'application/vnd.sap.adt.t.v3+xml',
-    );
-  });
-});
-
-describe('correction is off unless switched on', () => {
-  const request = {
-    method: 'GET',
-    url: '/sap/bc/adt/other',
-    headers: { Accept: 'application/xml' },
-  } as unknown as IAbapRequestOptions;
+describe('a 406 is the answer, and nothing is remembered', () => {
   const saved = process.env.ADT_ACCEPT_CORRECTION;
   afterEach(() => {
     if (saved === undefined) delete process.env.ADT_ACCEPT_CORRECTION;
     else process.env.ADT_ACCEPT_CORRECTION = saved;
   });
 
-  function refusing406(): { connection: IAbapConnection; calls: () => number } {
-    let calls = 0;
+  /** A connection whose first request SAP answers 406, naming a type. */
+  function answering406First() {
+    const sent: Array<{ method: string; url: string; headers: unknown }> = [];
     const connection = {
-      makeAdtRequest: async () => {
-        calls++;
-        const error: any = new Error('406');
-        error.response = {
-          status: 406,
-          headers: {},
-          data: sap406('application/vnd.x+xml'),
-        };
-        throw error;
+      connect: async () => {},
+      getBaseUrl: async () => 'https://example',
+      getSessionId: () => null,
+      setSessionType: () => {},
+      makeAdtRequest: async (request: {
+        method: string;
+        url: string;
+        headers?: Record<string, string>;
+      }) => {
+        sent.push({
+          method: request.method,
+          url: request.url,
+          headers: { ...request.headers },
+        });
+        if (sent.length === 1) {
+          const error = Object.assign(new Error('406'), {
+            response: {
+              status: 406,
+              headers: {},
+              data: sap406('application/vnd.sap.adt.corrected.v9+xml'),
+            },
+          });
+          throw error;
+        }
+        return { status: 200, statusText: 'OK', headers: {}, data: '' };
       },
     } as unknown as IAbapConnection;
-    return { connection, calls: () => calls };
+    return { connection, sent };
   }
 
-  it('an AdtClient with no switch sends a 406 request once', async () => {
-    delete process.env.ADT_ACCEPT_CORRECTION;
-    const { connection, calls } = refusing406();
-    new AdtClient(connection);
-    await expect(connection.makeAdtRequest(request)).rejects.toThrow('406');
-    expect(calls()).toBe(1);
-    expect(getAcceptCorrectionEnabled(connection)).toBe(false);
-  });
-
-  it('ADT_ACCEPT_CORRECTION=true switches it on, any other value leaves it off', async () => {
+  it('a member sends exactly its pair after the same request was answered 406', async () => {
+    // The old switch, set: nothing reads it any more.
     process.env.ADT_ACCEPT_CORRECTION = 'true';
-    const on = refusing406();
-    new AdtClient(on.connection);
-    await expect(on.connection.makeAdtRequest(request)).rejects.toThrow('406');
-    expect(on.calls()).toBe(2);
+    const { connection, sent } = answering406First();
+    const cls = new AdtClient(connection).getClass();
+    const config = {
+      className: 'ZCL_GUARD',
+      packageName: '$TMP',
+      description: 'guard',
+    };
+    const first: IAdtHeaders = {
+      accept: 'application/x-test-accept-first',
+      contentType: 'application/x-test-ct-first',
+    };
+    const second: IAdtHeaders = {
+      accept: 'application/x-test-accept-second',
+      contentType: 'application/x-test-ct-second',
+    };
 
-    process.env.ADT_ACCEPT_CORRECTION = '1';
-    const off = refusing406();
-    new AdtClient(off.connection);
-    await expect(off.connection.makeAdtRequest(request)).rejects.toThrow('406');
-    expect(off.calls()).toBe(1);
-  });
+    const refused = await cls.create(config, { headers: first });
+    expect(refused.ok).toBe(false);
+    // Sent once: no retry with the type the 406 named.
+    expect(sent).toHaveLength(1);
 
-  it('cachedAccept reads the cache with the switch off', () => {
-    const { connection } = refusing406();
-    new AdtClient(connection, undefined, { enableAcceptCorrection: false });
-    rememberAccept(connection, request, 'application/vnd.x+xml');
-    expect(cachedAccept(connection, request)).toBe('application/vnd.x+xml');
+    await cls.create(config, { headers: second });
+
+    expect(sent).toHaveLength(2);
+    expect(sent[1]?.method).toBe(sent[0]?.method);
+    expect(sent[1]?.url).toBe(sent[0]?.url);
+    expect(sent[1]?.headers).toEqual({
+      Accept: second.accept,
+      'Content-Type': second.contentType,
+    });
   });
 });

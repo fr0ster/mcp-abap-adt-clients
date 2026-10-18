@@ -38,9 +38,7 @@ describe('AdtRuntimeClient factory pattern', () => {
       error: jest.fn(),
     };
 
-    const client = new AdtRuntimeClient(connection, logger, {
-      enableAcceptCorrection: false,
-    });
+    const client = new AdtRuntimeClient(connection, logger);
     return { client, connection };
   }
 

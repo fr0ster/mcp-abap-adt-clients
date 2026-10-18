@@ -42,9 +42,7 @@ async function main() {
   const connection = await createTestConnection(createConnectionLogger());
   // Already open: `createTestConnection` connects before returning.
   try {
-    const runtime = new AdtRuntimeClient(connection, undefined, {
-      enableAcceptCorrection: true,
-    });
+    const runtime = new AdtRuntimeClient(connection);
     const sm = runtime.getSystemMessages();
 
     if (!messageId) {

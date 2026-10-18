@@ -1066,7 +1066,7 @@ export class AdtClient {
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
-    options?: IAdtClientOptions,
+    options?: Omit<IAdtClientOptions, 'enableAcceptCorrection'>,
   ) {
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
@@ -1086,31 +1086,6 @@ export class AdtClient {
       masterLanguage: options?.masterLanguage,
     };
     this.contentTypes = options?.contentTypes;
-    if (options?.enableAcceptCorrection !== undefined) {
-      const {
-        setAcceptCorrectionEnabled,
-        wrapConnectionAcceptNegotiation,
-        getAcceptCorrectionEnabled,
-      } = require('../utils/acceptNegotiation');
-      setAcceptCorrectionEnabled(
-        this.connection,
-        options.enableAcceptCorrection,
-      );
-      const shouldWrap =
-        options.enableAcceptCorrection ??
-        getAcceptCorrectionEnabled(this.connection);
-      if (shouldWrap) {
-        wrapConnectionAcceptNegotiation(this.connection, this.logger);
-      }
-    } else {
-      const {
-        getAcceptCorrectionEnabled,
-        wrapConnectionAcceptNegotiation,
-      } = require('../utils/acceptNegotiation');
-      if (getAcceptCorrectionEnabled(this.connection)) {
-        wrapConnectionAcceptNegotiation(this.connection, this.logger);
-      }
-    }
   }
 
   /**

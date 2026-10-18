@@ -129,7 +129,7 @@ export class AdtClientLegacy extends AdtClient {
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
-    options?: IAdtClientOptions,
+    options?: Omit<IAdtClientOptions, 'enableAcceptCorrection'>,
   ) {
     super(connection, logger, {
       ...options,

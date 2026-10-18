@@ -28,9 +28,6 @@ export * from './index.readings';
 export * from './index.runtime';
 export * from './index.ws';
 export {
-  cachedAccept,
-  exemptFromAcceptNegotiation,
   extractSupportedAccept,
-  getBaseRequest,
-  rememberAccept,
-} from './utils/acceptNegotiation';
+  extractSupportedContentType,
+} from './utils/supportedMediaTypes';

@@ -538,6 +538,58 @@ describe('a request carries exactly the headers its caller gave', () => {
   }
 });
 
+/** A class's name: its own, or the variable a class expression is bound to. */
+function classNameOf(node: ts.Node): string | undefined {
+  if (ts.isClassDeclaration(node)) return node.name?.text ?? '(anonymous)';
+  if (ts.isClassExpression(node)) {
+    if (node.name) return node.name.text;
+    const parent = node.parent;
+    if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name))
+      return parent.name.text;
+    return '(anonymous)';
+  }
+  return undefined;
+}
+
+/** A member's name, written as an identifier, a string or a computed literal. */
+function memberName(name: ts.PropertyName | undefined): string | undefined {
+  if (!name) return undefined;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  if (ts.isComputedPropertyName(name)) {
+    const e = name.expression;
+    if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e))
+      return e.text;
+  }
+  return undefined;
+}
+
+/**
+ * The contract method a class member can implement, if any: a method with a
+ * body, a getter (it answers the function), or a field holding a value that is
+ * not a plain literal — an arrow function, a function expression, or any
+ * expression such as `create = this.makeCreate()`, which implements `create`
+ * as well. A method alone was all this used to accept, so a function field
+ * passed uncovered.
+ */
+function implementedName(member: ts.ClassElement): string | undefined {
+  if (ts.isMethodDeclaration(member) && member.body)
+    return memberName(member.name);
+  if (ts.isGetAccessorDeclaration(member) && member.body)
+    return memberName(member.name);
+  if (ts.isPropertyDeclaration(member) && member.initializer) {
+    const value = member.initializer;
+    const literal =
+      ts.isStringLiteral(value) ||
+      ts.isNumericLiteral(value) ||
+      ts.isNoSubstitutionTemplateLiteral(value) ||
+      value.kind === ts.SyntaxKind.TrueKeyword ||
+      value.kind === ts.SyntaxKind.FalseKeyword ||
+      value.kind === ts.SyntaxKind.NullKeyword;
+    return literal ? undefined : memberName(member.name);
+  }
+  return undefined;
+}
+
 /** Every class method in `src` (tests excluded) named like a header member. */
 function declaredImplementations(): string[] {
   const root = join(__dirname, '..', '..');
@@ -563,16 +615,14 @@ function declaredImplementations(): string[] {
       true,
     );
     const visit = (node: ts.Node) => {
-      if (ts.isClassDeclaration(node) && node.name) {
+      const className = classNameOf(node);
+      if (
+        className &&
+        (ts.isClassDeclaration(node) || ts.isClassExpression(node))
+      ) {
         for (const member of node.members) {
-          if (
-            ts.isMethodDeclaration(member) &&
-            member.body &&
-            ts.isIdentifier(member.name) &&
-            names.has(member.name.text)
-          ) {
-            found.push(`${node.name.text}.${member.name.text}`);
-          }
+          const name = implementedName(member);
+          if (name && names.has(name)) found.push(`${className}.${name}`);
         }
       }
       ts.forEachChild(node, visit);

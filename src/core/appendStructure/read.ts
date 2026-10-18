@@ -9,7 +9,6 @@ import {
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { STRUCTURE, sourceUri, transportUri } from '../../endpoints/objects';
-import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import type { IReadOptions } from '../shared/types';
 
 function buildQuery(version?: string, options?: IReadOptions): string {
@@ -27,16 +26,12 @@ export async function getAppendStructure(
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const url = `${STRUCTURE.uri(name)}${buildQuery(version, options)}`;
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: { Accept: options?.accept ?? ACCEPT_APPEND_STRUCTURE },
-    },
-    { logger },
-  );
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: { Accept: options?.accept ?? ACCEPT_APPEND_STRUCTURE },
+  });
 }
 
 export async function getAppendStructureSource(
@@ -47,16 +42,12 @@ export async function getAppendStructureSource(
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(STRUCTURE.uri(name))}${buildQuery(version, options)}`;
-  return makeAdtRequestWithAcceptNegotiation(
-    connection,
-    {
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: { Accept: options?.accept ?? ACCEPT_SOURCE },
-    },
-    { logger },
-  );
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: { Accept: options?.accept ?? ACCEPT_SOURCE },
+  });
 }
 
 export async function getAppendStructureTransport(
