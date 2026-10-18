@@ -20,6 +20,7 @@ deletes them again.
 
 ```bash
 npm run header:discovery                     # the full run: the system's header corpus
+npm run header:discovery -- --isolate .header-probe/header-corpus-<ts>.json
 npm run header:discovery -- --from discovery --headers corpus
 npm run header:discovery -- --from discovery --headers none
 npm run header:discovery -- --from discovery --headers bogus
@@ -31,6 +32,10 @@ npm run header:discovery -- --summary <corpus.json> [<corpus.json> …]
 npm run header:discovery -- --render <corpus.json> [<corpus.json> …]
 ```
 
+`--isolate <corpus.json>[,<corpus.json>]` sends alone, from the start, every
+call an earlier run's group split found poisoning envelopes (its `causes`; a
+header corpus file stands for the corpora it lists); every other call is
+batched and split as usual. Without it the run is unchanged.
 Both `--from` and `--headers` are required. `--only <text>[,<text>]` keeps
 the endpoints whose `handler.member` (clients) or href (discovery) contains one
 of the texts. `--render` recomputes a saved

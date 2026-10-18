@@ -32,6 +32,7 @@ import {
   headerShape,
   type ICorpus,
   type ICorpusRow,
+  isolationKeys,
   namedPerEndpoint,
   needsLines,
   notSent,
@@ -2331,5 +2332,42 @@ describe('the command', () => {
       'utf8',
     );
     expect(probe.includes('require.main')).toBe(false);
+  });
+});
+
+describe('--isolate', () => {
+  it('sends alone from the start the calls an earlier run found poisoning; the rest batched, no split', async () => {
+    const bad = '/sap/bc/adt/probe/c17';
+    const once = async (isolate?: ReadonlySet<string>) => {
+      const system = dumpingSystem(manyCollections(29), bad);
+      const { corpus } = await runCorpus({
+        connection: system.connection,
+        source: 'discovery',
+        mode: 'none',
+        interrupt: new Interrupt(),
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: output().out,
+        envelopeProbes: 29,
+        ...(isolate ? { isolate } : {}),
+      });
+      return { corpus, system };
+    };
+    const first = await once();
+    expect(first.corpus.splits?.[0].causes).toEqual([`GET ${bad}`]);
+    const keys = isolationKeys([first.corpus]);
+    const second = await once(keys);
+    expect(second.corpus.splits).toEqual([]);
+    expect(second.corpus.envelopes).toHaveLength(1);
+    const row = second.corpus.rows.find((r) => r.endpoint?.path === bad);
+    expect(row?.ran).toBe(
+      'sequential: isolated: an earlier run found it poisoning its envelope (--isolate)',
+    );
+    expect(row?.status).toBe(500);
+    for (const r of second.corpus.rows)
+      if (r.endpoint?.path !== bad) {
+        expect(r.ran).toBe('batched');
+        expect(r.status).toBe(404);
+      }
   });
 });

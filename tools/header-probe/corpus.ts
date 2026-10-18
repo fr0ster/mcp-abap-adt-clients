@@ -703,6 +703,36 @@ export function rowKey(row: ICorpusRow): string {
     : `${endpoint}${row.corpusType ? ` [${row.corpusType}]` : ''}`;
 }
 
+/** The calls the group split of earlier runs found poisoning envelopes. */
+export function isolationKeys(
+  corpora: readonly Pick<ICorpus, 'splits'>[],
+): Set<string> {
+  const keys = new Set<string>();
+  for (const corpus of corpora)
+    for (const split of corpus.splits ?? [])
+      for (const cause of split.causes) keys.add(cause);
+  return keys;
+}
+
+/**
+ * Whether a row is one of those calls: its row key, or — a discovery row —
+ * its endpoint whatever corpus type it carries.
+ */
+export function isIsolated(
+  row: ICorpusRow,
+  keys: ReadonlySet<string>,
+): boolean {
+  if (keys.has(rowKey(row))) return true;
+  if (row.source !== 'discovery' || !row.endpoint) return false;
+  const endpoint = endpointKey(row.endpoint);
+  for (const key of keys) {
+    const bracket = key.indexOf(' [');
+    if ((bracket === -1 ? key : key.slice(0, bracket)) === endpoint)
+      return true;
+  }
+  return false;
+}
+
 /** Rows per status, in status order. */
 export function rowsByStatus(
   rows: readonly ICorpusRow[],

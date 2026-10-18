@@ -30,6 +30,9 @@
  * `--headers`: `corpus` sends the prepared pair (the collection's
  * own `app:accept` types, or pairs.ts); `none` sends no Accept and no
  * Content-Type; `bogus` sends `application/x-header-probe` as both.
+ * `--isolate <corpus.json>[,<corpus.json>]` sends alone, from the start,
+ * every call an earlier run's group split found poisoning envelopes (a header
+ * corpus file stands for the corpora it lists); the rest is batched as usual.
  * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
  * (clients) or href (discovery) contains one of the texts.
  * `--sequential` sends every request on its own, no envelope (to compare
@@ -65,6 +68,7 @@ import {
   HEADERS_MODES,
   type HeadersMode,
   type ICorpus,
+  isolationKeys,
   renderCorpusMarkdown,
   renderNamedSummary,
   SOURCES,
@@ -96,6 +100,7 @@ interface IArgs {
   render?: string[];
   sequential?: boolean;
   only?: string[];
+  isolate?: string[];
 }
 
 function parseArgs(argv: readonly string[]): IArgs {
@@ -114,6 +119,8 @@ function parseArgs(argv: readonly string[]): IArgs {
       args.headers = value;
     } else if (arg === '--sequential') {
       args.sequential = true;
+    } else if (arg === '--isolate') {
+      args.isolate = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--only') {
       args.only = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--render') {
@@ -129,6 +136,25 @@ function parseArgs(argv: readonly string[]): IArgs {
       '--from discovery|clients and --headers corpus|none|bogus go together (neither: the full run)',
     );
   return args;
+}
+
+/**
+ * The calls earlier runs' splits found poisoning envelopes: from corpus
+ * files, or from a header corpus file (through the corpora it lists).
+ */
+function isolateFrom(files: readonly string[]): Set<string> {
+  const corpora: ICorpus[] = [];
+  for (const file of files) {
+    const read = JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus & {
+      corpora?: string[];
+    };
+    if (Array.isArray(read.corpora) && !Array.isArray(read.rows)) {
+      for (const listed of read.corpora)
+        if (listed.endsWith('.json') && fs.existsSync(listed))
+          corpora.push(JSON.parse(fs.readFileSync(listed, 'utf8')) as ICorpus);
+    } else corpora.push(read);
+  }
+  return isolationKeys(corpora);
 }
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
@@ -181,6 +207,8 @@ async function main(): Promise<number> {
       'interrupted: waiting for the request in flight, then cleaning up',
     );
   });
+  const isolate = args.isolate ? isolateFrom(args.isolate) : undefined;
+  if (isolate) progress(`--isolate: ${isolate.size} call(s) go alone`);
   const open = async () =>
     onTheWire(
       await createTestConnection(createConnectionLogger(), {
@@ -192,6 +220,7 @@ async function main(): Promise<number> {
     const environment = getEnvironmentConfig();
     const { exitCode } = await runFull({
       open,
+      ...(isolate ? { isolate } : {}),
       close: (connection) => closeOwnTestConnection(connection),
       interrupt,
       outDir: OUT_DIR,
@@ -226,6 +255,7 @@ async function main(): Promise<number> {
     out: { progress, loud },
     sequential: args.sequential === true,
     ...(args.only ? { only: args.only } : {}),
+    ...(isolate ? { isolate } : {}),
   });
   return exitCode;
 }

@@ -53,6 +53,7 @@ import {
   type IEvidence,
   type IHeaderCorpusFile,
   type ISplit,
+  isIsolated,
   isWrite,
   needsCounts,
   PROBE_NAME,
@@ -400,6 +401,18 @@ class Run<T> {
   }
 }
 
+/** Sends alone, from the start, each call an earlier run found poisoning envelopes. */
+function isolateKnown(
+  planned: readonly { row: ICorpusRow; sequential?: string }[],
+  keys: ReadonlySet<string> | undefined,
+): void {
+  if (!keys?.size) return;
+  for (const entry of planned)
+    if (!entry.sequential && isIsolated(entry.row, keys))
+      entry.sequential =
+        'isolated: an earlier run found it poisoning its envelope (--isolate)';
+}
+
 /**
  * A poisoned envelope: more than one part, and every part — the reads after
  * the writes included — answered 500 with the same text.
@@ -612,6 +625,8 @@ interface IContext {
   sequential: boolean;
   only?: string[];
   envelopeProbes: number;
+  /** The calls an earlier run found poisoning envelopes: each is sent alone. */
+  isolate?: ReadonlySet<string>;
   /** Adds a ledger entry once per key, before the write it covers is sent. */
   register: (key: string, entry: () => ILedgerEntry) => void;
 }
@@ -707,6 +722,7 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
     return entry;
   });
   ctx.corpus.rows.push(...planned.map((entry) => entry.row));
+  isolateKnown(planned, ctx.isolate);
   for (const [index, probe] of probes.entries())
     if (probe.skipped) planned[index].row.skipped = probe.skipped;
   const sent = planned.filter((_entry, index) => !probes[index].skipped);
@@ -941,6 +957,7 @@ async function runClients(ctx: IContext): Promise<void> {
           });
         }
       };
+      isolateKnown([entry], ctx.isolate);
       planned.push(entry);
     }
   }
@@ -1069,6 +1086,8 @@ export interface ICorpusRunInput {
   sequential?: boolean;
   /** Keep only the endpoints whose `handler.member` or href contains one of these. */
   only?: string[];
+  /** The calls an earlier run's split found poisoning envelopes (`--isolate`): each is sent alone from the start. */
+  isolate?: ReadonlySet<string>;
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
   envelopeProbes?: number;
 }
@@ -1242,6 +1261,7 @@ async function runOn(
       sequential: input.sequential === true,
       ...(input.only ? { only: input.only } : {}),
       envelopeProbes: input.envelopeProbes ?? ENVELOPE_PROBES,
+      ...(input.isolate ? { isolate: input.isolate } : {}),
       register: (key, entry) => {
         if (registered.has(key)) return;
         registered.add(key);
@@ -1336,6 +1356,8 @@ export interface IRealReadsInput {
   /** The needs keys (`handler.member — endpoint`) phase 1 left unknown. */
   unknown: ReadonlySet<string>;
   envelopeProbes?: number;
+  /** As for phase 1: the calls known to poison envelopes go alone. */
+  isolate?: ReadonlySet<string>;
 }
 
 /**
@@ -1479,6 +1501,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
           ),
       });
     }
+    isolateKnown(planned, input.isolate);
     if (planned.length) {
       input.out.progress(
         `phase 2 reads, ${mode}: ${planned.length} probes on existing objects`,
@@ -1642,6 +1665,7 @@ export async function runFull(
             ...(input.envelopeProbes
               ? { envelopeProbes: input.envelopeProbes }
               : {}),
+            ...(input.isolate ? { isolate: input.isolate } : {}),
           });
           evidence.push(...reads.evidence);
           objects = reads.objects;
