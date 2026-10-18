@@ -133,9 +133,19 @@ async function main(): Promise<number> {
   if (args.render) {
     // From the saved corpus, nothing sent: `needs` recomputed, the .md
     // written again beside the .json.
-    for (const file of args.render) {
-      const corpus = JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus;
-      if (corpus.headers === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
+    // A none corpus of the same source among the files adds its evidence.
+    const corpora = args.render.map(
+      (file) => JSON.parse(fs.readFileSync(file, 'utf8')) as ICorpus,
+    );
+    for (const [index, file] of args.render.entries()) {
+      const corpus = corpora[index];
+      if (corpus.headers === 'bogus')
+        corpus.needs = classifyNeeds(
+          corpus.rows,
+          corpora
+            .filter((c) => c.source === corpus.source && c.headers === 'none')
+            .flatMap((c) => c.rows),
+        );
       fs.writeFileSync(file, `${JSON.stringify(corpus, null, 2)}\n`);
       const md = file.replace(/\.json$/, '.md');
       fs.writeFileSync(md, renderCorpusMarkdown(corpus));

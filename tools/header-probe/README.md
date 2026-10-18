@@ -221,32 +221,46 @@ Two files in `.header-probe/` (gitignored: they hold the system's answers):
   Content-Type values named per endpoint, the writes that created the probe
   name, and the cleanup.
 
-A bogus run also classifies each endpoint by what it **needs**. The
-classification is **provisional**: when SAP checks Accept and Content-Type
-relative to processing — and so which answers show that a header was ignored
-— is still being settled from the ABAP REST framework. The raw rows are kept
-as SAP answered them; `--render` recomputes `needs` from them.
+A bogus run also classifies each endpoint by what it **needs**. The rules
+follow the order in which SAP's ADT REST framework handles a request, as read
+from its code (class and method names from that reading): logon (401),
+authorization (403, `S_ADT_RES`), the CSRF check (403, in
+`CL_REST_HTTP_HANDLER`), routing (`CL_REST_ROUTER`: 404, or 500 when the
+handler class cannot be created) and method dispatch (405,
+`cx_adt_res_meth_not_supported`, in `CL_ADT_REST_RESOURCE`) all run before any
+header is read. There is no central header check: Content-Type is checked
+(415) only when the resource reads its body through
+`CL_ADT_REST_COMP_CNT_HANDLER` (`DESERIALIZE`), Accept (406) only when it
+writes its body through it (`SERIALIZE` → `check_cnt_type_is_supported`) or
+calls that check itself; with no Accept at all that check answers 400
+`acceptHeaderMissing`. A 500 is a router failure or a dump, at any point.
 
+Per header, from its bogus request:
+
+| verdict | when |
+|---|---|
+| `checked` | 406 for Accept, 415 for Content-Type; for Accept also a 400 `acceptHeaderMissing` to a request without Accept (a `none` run of the same source, given with `--render` or `--summary`, or a bogus Content-Type row) |
+| `not checked` | a 2xx: the resource never compares the header |
+| `unknown` | anything else — 401, 403, 404, 405 (`method not implemented`), 500 (`dump or router`, with the dump's short text), any other status with its SAP exception |
 
 | needs | when |
 |---|---|
-| `accept` | the bogus Accept got 406 |
-| `content-type` | the bogus Content-Type got 415 |
-| `both` | both happened |
-| `neither` | the bogus Accept was ignored, and the bogus Content-Type too or there is no body |
-| `unknown` | anything else: a header could not be judged (the status and the SAP exception are given) |
-
-A bogus header counts as **ignored** only when its request got a 2xx, or a
-4xx whose SAP exception is a content error about the request itself — the
-handler read the body or the parameters and refused them, so the header had
-been let through: `ExceptionInvalidData`, `ExceptionParameterNotFound`,
-`ExceptionResourceBadRequest`, `ElementInfoBadRequest`,
-`NoIdentifierFormattingPossible`. A 404 (the probe name), a 405, a 5xx, any
-other 4xx or no answer shows nothing about the header: it is unknown.
+| `accept`, `content-type`, `both` | what is `checked` |
+| `neither` | both `not checked`, or Accept `not checked` and no body |
+| `unknown` | anything else |
 
 The summary lists the endpoints per `needs` value with the values the system
-named, and notes where the pair table lists a header the system ignores (or a
-Content-Type for a request without a body): the pair table is not the truth.
+named, and notes where the pair table lists a header the resource does not
+check (or a Content-Type for a request without a body): the pair table is not
+the truth. `--render` recomputes `needs` from saved corpora.
+
+**An envelope whose parts all answer the same 500 is sent again, one probe at
+a time.** Measured 2026-10-18: one part's dump answered for every part of its
+envelope with the same error page, while each part sent alone got its own
+answer (in the discovery bogus run, 304 of 1517 probes differed between the
+batched and the sequential run, all of them a batched 500). Such a row is
+marked `sequential: every part of envelope N answered the same 500: …`, and
+`inEnvelope` keeps what the envelope said.
 
 Nothing but progress and the paths goes to stdout; no secret, cookie or token
 is written anywhere — of the request and answer headers only Accept and

@@ -303,6 +303,11 @@ export async function runCalls<T>(input: {
         },
         (error: unknown) => {
           capture.failure = message(error);
+          // A member that threw on SAP's answer still carries it.
+          const wire = (error as { response?: IAdtWireResponse } | null)
+            ?.response;
+          if (!capture.wire && wire && typeof wire.status === 'number')
+            capture.wire = wire;
         },
       ),
     );

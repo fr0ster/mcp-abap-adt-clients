@@ -519,6 +519,8 @@ export interface ICorpusRow {
   afterWrite?: IWriteCheck;
   /** `skipped: <reason>`: the row was not sent. */
   skipped?: string;
+  /** Sent again on its own: what its envelope answered first. */
+  inEnvelope?: string;
   /** Batched: the envelope it went out in (see {@link ICorpus.envelopes}). */
   envelope?: number;
   /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
@@ -734,7 +736,7 @@ export const NEEDS: readonly Needs[] = [
 
 /** What one bogus request says about its header. */
 export interface IHeaderVerdict {
-  verdict: 'needed' | 'ignored' | 'unjudged' | 'no body';
+  verdict: 'checked' | 'not checked' | 'unknown' | 'no body';
   status?: number;
   reason?: string;
 }
@@ -762,52 +764,92 @@ export function needsKey(row: ICorpusRow): string {
     : endpoint;
 }
 
-/**
- * The SAP exceptions that are a content error about the request itself: the
- * handler read the request — its body or its parameters — and refused what
- * it found, so the header had already been let through. A 4xx with any other
- * exception (or none) does not show that.
- */
-export const CONTENT_ERRORS: readonly string[] = [
-  'ExceptionInvalidData',
-  'ExceptionParameterNotFound',
-  'ExceptionResourceBadRequest',
-  'ElementInfoBadRequest',
-  'NoIdentifierFormattingPossible',
-];
+/** The short text of a 500: SAP's error page or a plain-text handler failure. */
+export function dumpText(body: string | undefined): string | undefined {
+  if (!body) return undefined;
+  let text = body;
+  for (const [open, close] of [
+    ['<style', '</style>'],
+    ['<script', '</script>'],
+  ]) {
+    for (;;) {
+      const at = text.indexOf(open);
+      if (at === -1) break;
+      const end = text.indexOf(close, at);
+      text =
+        text.slice(0, at) + (end === -1 ? '' : text.slice(end + close.length));
+    }
+  }
+  let plain = '';
+  let inTag = false;
+  for (const char of text) {
+    if (char === '<') inTag = true;
+    else if (char === '>') {
+      inTag = false;
+      plain += ' ';
+    } else if (!inTag) plain += char;
+  }
+  plain = plain.split(/\s+/).join(' ').trim();
+  const marker = 'Internal Server Error';
+  const at = plain.indexOf(marker);
+  if (at !== -1) plain = plain.slice(at + marker.length);
+  const time = plain.indexOf('Server time');
+  if (time !== -1) plain = plain.slice(0, time);
+  plain = plain.trim();
+  return plain ? plain.slice(0, 200) : undefined;
+}
+
+/** Whether an answer is the Accept check's `acceptHeaderMissing`: a 400 for a request without Accept. */
+export function isAcceptHeaderMissing(row: ICorpusRow): boolean {
+  return (
+    row.status === 400 &&
+    ((row.body ?? '').includes('acceptHeaderMissing') ||
+      (row.sapMessage ?? '').includes('Accept header missing'))
+  );
+}
 
 /**
- * What a bogus request says about the header it carried: `needed` when it
- * was refused for it (406 for Accept, 415 for Content-Type); `ignored` only
- * on a 2xx, or a 4xx whose SAP exception is one of {@link CONTENT_ERRORS};
- * anything else — a 404 on the fake name, a 405, a 500, another 4xx, no
- * answer — is `unjudged`, with the status and the SAP exception type.
+ * What a bogus request says about the header it carried, by the order of
+ * SAP's ADT REST framework (read from its code: logon, authorization, CSRF,
+ * routing and method dispatch all come before any header is read; the 415
+ * and the 406 are raised by `CL_ADT_REST_COMP_CNT_HANDLER` when the resource
+ * reads or writes its body through it):
+ * - `checked`: 406 for Accept, 415 for Content-Type;
+ * - `not checked`: a 2xx — the resource never compared the header;
+ * - `unknown`: anything else, which comes before or without a header check —
+ *   405 `method not implemented`, 500 `dump or router` (with the dump's
+ *   short text), any other status with its SAP exception.
  */
 export function judge(
   row: ICorpusRow | undefined,
   refusal: 406 | 415,
 ): IHeaderVerdict {
   if (!row) return { verdict: 'no body' };
-  if (row.skipped) return { verdict: 'unjudged', reason: row.skipped };
+  if (row.skipped) return { verdict: 'unknown', reason: row.skipped };
   if (row.status === undefined)
     return {
-      verdict: 'unjudged',
+      verdict: 'unknown',
       reason: `no answer: ${row.failure ?? 'nothing came back'}`,
     };
-  if (row.status === refusal) return { verdict: 'needed', status: row.status };
+  if (row.status === refusal) return { verdict: 'checked', status: row.status };
   if (row.status >= 200 && row.status < 300)
-    return { verdict: 'ignored', status: row.status };
-  if (
-    row.status >= 400 &&
-    row.status < 500 &&
-    row.status !== 404 &&
-    row.status !== 405 &&
-    row.sapType &&
-    CONTENT_ERRORS.includes(row.sapType)
-  )
-    return { verdict: 'ignored', status: row.status };
+    return { verdict: 'not checked', status: row.status };
+  if (row.status === 405)
+    return {
+      verdict: 'unknown',
+      status: 405,
+      reason: '405 method not implemented',
+    };
+  if (row.status === 500) {
+    const text = dumpText(row.body);
+    return {
+      verdict: 'unknown',
+      status: 500,
+      reason: `500 dump or router${text ? `: ${text}` : ''}`,
+    };
+  }
   return {
-    verdict: 'unjudged',
+    verdict: 'unknown',
     status: row.status,
     reason: `${row.status} ${row.sapType ?? '(no SAP exception)'}`,
   };
@@ -816,12 +858,20 @@ export function judge(
 const verdictText = (name: string, verdict: IHeaderVerdict): string =>
   verdict.verdict === 'no body'
     ? `${name}: no body`
-    : verdict.verdict === 'unjudged'
+    : verdict.verdict === 'unknown'
       ? `${name}: unknown (${verdict.reason})`
       : `${name}: ${verdict.verdict} (${verdict.status})`;
 
-/** Per endpoint of a bogus run: which headers it needs, and what the system named. */
-export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
+/**
+ * Per endpoint of a bogus run: which headers it needs, and what the system
+ * named. `evidence`: rows of other runs of the same source (a `none` run);
+ * a 400 `acceptHeaderMissing` there, or on a bogus row sent without Accept,
+ * shows the Accept check too.
+ */
+export function classifyNeeds(
+  rows: readonly ICorpusRow[],
+  evidence: readonly ICorpusRow[] = [],
+): IEndpointNeeds[] {
   const by = new Map<
     string,
     { accept?: ICorpusRow; contentType?: ICorpusRow }
@@ -834,52 +884,52 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
     else entry.accept ??= row;
     by.set(key, entry);
   }
+  const missing = new Map<string, ICorpusRow>();
+  for (const row of [...rows, ...evidence])
+    if (isAcceptHeaderMissing(row) && !missing.has(needsKey(row)))
+      missing.set(needsKey(row), row);
   const out: IEndpointNeeds[] = [];
   for (const [endpoint, pair] of by) {
-    const accept = judge(pair.accept, 406);
+    let accept = judge(pair.accept, 406);
+    const absent = missing.get(endpoint);
+    if (accept.verdict !== 'checked' && absent)
+      accept = {
+        verdict: 'checked',
+        status: 400,
+        reason: '400 acceptHeaderMissing without Accept',
+      };
     const contentType = pair.contentType
       ? judge(pair.contentType, 415)
       : pair.accept?.skipped
         ? judge(pair.accept, 415)
         : ({ verdict: 'no body' } as IHeaderVerdict);
-    const a = accept.verdict === 'needed';
-    const c = contentType.verdict === 'needed';
-    let needs: Needs;
-    let detail: string;
-    if (a && c) {
-      needs = 'both';
-      detail = '406 and 415';
-    } else if (a || c) {
-      needs = a ? 'accept' : 'content-type';
-      detail = [
-        verdictText('Accept', accept),
-        verdictText('Content-Type', contentType),
-      ].join('; ');
-    } else if (
-      accept.verdict === 'ignored' &&
-      (contentType.verdict === 'ignored' || contentType.verdict === 'no body')
-    ) {
-      needs = 'neither';
-      detail = [
-        verdictText('Accept', accept),
-        verdictText('Content-Type', contentType),
-      ].join('; ');
-    } else {
-      needs = 'unknown';
-      detail = [
-        verdictText('Accept', accept),
-        verdictText('Content-Type', contentType),
-      ].join('; ');
-    }
+    const a = accept.verdict === 'checked';
+    const c = contentType.verdict === 'checked';
+    const detail = [
+      verdictText('Accept', accept),
+      verdictText('Content-Type', contentType),
+    ].join('; ');
+    const needs: Needs =
+      a && c
+        ? 'both'
+        : a
+          ? 'accept'
+          : c
+            ? 'content-type'
+            : accept.verdict === 'not checked' &&
+                (contentType.verdict === 'not checked' ||
+                  contentType.verdict === 'no body')
+              ? 'neither'
+              : 'unknown';
     const table = (pair.accept ?? pair.contentType)?.pair;
     const tableNotes: string[] = [];
-    if (table?.accept && accept.verdict === 'ignored')
+    if (table?.accept && accept.verdict === 'not checked')
       tableNotes.push(
-        `the pair table lists Accept ${table.accept}; a bogus Accept was answered ${accept.status}`,
+        `the pair table lists Accept ${table.accept}; the resource does not check Accept (a bogus one got ${accept.status})`,
       );
-    if (table?.contentType && contentType.verdict === 'ignored')
+    if (table?.contentType && contentType.verdict === 'not checked')
       tableNotes.push(
-        `the pair table lists Content-Type ${table.contentType}; a bogus Content-Type was answered ${contentType.status}`,
+        `the pair table lists Content-Type ${table.contentType}; the resource does not check Content-Type (a bogus one got ${contentType.status})`,
       );
     // Discovery's types are a POST body's: on its GET they are no claim.
     const source = (pair.accept ?? pair.contentType)?.source;
@@ -897,7 +947,12 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
       detail,
       accept,
       contentType,
-      namedAccept: pair.accept ? typesNamed(pair.accept).accept : [],
+      namedAccept: [
+        ...new Set([
+          ...(pair.accept ? typesNamed(pair.accept).accept : []),
+          ...(absent ? typesNamed({ ...absent, status: 406 }).accept : []),
+        ]),
+      ],
       namedContentType: pair.contentType
         ? typesNamed(pair.contentType).contentType
         : [],
@@ -909,10 +964,7 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
 
 /** The summary of a bogus run: endpoints per `needs`, with the values named. */
 export function needsLines(entries: readonly IEndpointNeeds[]): string[] {
-  const lines: string[] = [
-    '**Provisional.** When SAP checks Accept and Content-Type relative to processing — and so which answers show a header was ignored — is being settled from the ABAP REST framework; the classification may change. The raw rows above are what SAP answered.',
-    '',
-  ];
+  const lines: string[] = [];
   lines.push('| needs | endpoints |', '|---|---|');
   for (const value of NEEDS)
     lines.push(
@@ -1092,8 +1144,8 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
   }
 
   if (corpus.headers === 'bogus') {
-    lines.push('', '### What each endpoint needs (provisional)', '');
-    lines.push(...needsLines(classifyNeeds(corpus.rows)));
+    lines.push('', '### What each endpoint needs', '');
+    lines.push(...needsLines(corpus.needs ?? classifyNeeds(corpus.rows)));
   }
 
   lines.push(
@@ -1178,13 +1230,16 @@ export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
         add(`${corpus.headers} content-type`, types.contentType);
         named.set(key, entry);
       }
+    const evidence = of
+      .filter((c) => c.headers === 'none')
+      .flatMap((c) => c.rows);
     for (const corpus of of.filter((c) => c.headers === 'bogus'))
-      for (const entry of classifyNeeds(corpus.rows))
+      for (const entry of classifyNeeds(corpus.rows, evidence))
         needs.set(entry.endpoint, `${entry.needs} (${entry.detail})`);
     lines.push(
       `## The header corpus: ${source}`,
       '',
-      `| endpoint | ${source === 'discovery' ? 'discovery lists' : 'the pair table lists'} | none: Accept named | none: Content-Type named | bogus: Accept named | bogus: Content-Type named | needs (bogus, provisional) |`,
+      `| endpoint | ${source === 'discovery' ? 'discovery lists' : 'the pair table lists'} | none: Accept named | none: Content-Type named | bogus: Accept named | bogus: Content-Type named | needs (bogus) |`,
       '|---|---|---|---|---|---|---|',
     );
     for (const key of [...listed.keys()].sort()) {
@@ -1284,9 +1339,16 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
   lines.push(...headerCorpusLines(corpora));
   for (const corpus of corpora.filter((c) => c.headers === 'bogus'))
     lines.push(
-      `## What each endpoint needs (provisional): ${corpus.source}`,
+      `## What each endpoint needs: ${corpus.source}`,
       '',
-      ...needsLines(classifyNeeds(corpus.rows)),
+      ...needsLines(
+        classifyNeeds(
+          corpus.rows,
+          corpora
+            .filter((c) => c.source === corpus.source && c.headers === 'none')
+            .flatMap((c) => c.rows),
+        ),
+      ),
       '',
     );
   return lines.join('\n');

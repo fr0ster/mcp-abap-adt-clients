@@ -19,6 +19,7 @@ import {
   current,
   type ICapture,
   onTheWire,
+  runCalls,
   traced,
 } from '../../../../tools/header-probe/capture';
 import {
@@ -807,7 +808,9 @@ describe('what each endpoint needs', () => {
     extra: Partial<ICorpusRow> = {},
   ) => row({ label, bogus, status, ...extra });
 
-  it('classifies accept, content-type, both, neither and unknown, and checks the pair table', () => {
+  it("classifies accept, content-type, both, neither and unknown, by the order of SAP's REST framework", () => {
+    const dump =
+      '<html><head><style>x{}</style></head><body>Application Server Error 500 Internal Server Error Dereferencing of the NULL reference Server time: 1</body></html>';
     const rows = [
       bogusRow('a', 'accept', 406, {
         named: {
@@ -816,7 +819,7 @@ describe('what each endpoint needs', () => {
         },
       }),
       bogusRow('a', 'content-type', 200),
-      bogusRow('c', 'accept', 400),
+      bogusRow('c', 'accept', 200),
       bogusRow('c', 'content-type', 415, {
         named: { ...emptyNamed(), supportedContentType: ['application/c+xml'] },
       }),
@@ -825,19 +828,30 @@ describe('what each endpoint needs', () => {
       bogusRow('n', 'accept', 200, {
         pair: { accept: 'application/n+xml', contentType: 'application/n+xml' },
       }),
-      bogusRow('n', 'content-type', 400, { sapType: 'ExceptionInvalidData' }),
-      bogusRow('x', 'accept', 500),
-      bogusRow('x', 'content-type', 200),
-      bogusRow('y', 'accept', 400, { sapType: 'uriMappingError' }),
+      bogusRow('n', 'content-type', 201),
+      // A content error is no proof the header was let through.
+      bogusRow('i', 'accept', 400, { sapType: 'ExceptionInvalidData' }),
+      bogusRow('i', 'content-type', 200),
+      bogusRow('x', 'accept', 500, { body: dump }),
+      bogusRow('m', 'accept', 405),
       bogusRow('u', 'accept', 404),
-      bogusRow('u', 'content-type', 404),
       bogusRow('g', 'accept', 200, {
         pair: { contentType: 'application/g+xml' },
       }),
       row({ label: 's', skipped: 'skipped: needs a URI' }),
+      bogusRow('h', 'accept', 400, { sapType: 'ExceptionResourceBadRequest' }),
+    ];
+    // A none run's 400 acceptHeaderMissing shows the Accept check.
+    const none = [
+      row({
+        label: 'h',
+        status: 400,
+        sapMessage:
+          'Request could not be understood by the server due to malformed syntax: Accept header missing',
+      }),
     ];
     const needs = Object.fromEntries(
-      classifyNeeds(rows).map((entry) => [
+      classifyNeeds(rows, none).map((entry) => [
         entry.endpoint.split('.')[1].split(' ')[0],
         entry,
       ]),
@@ -849,19 +863,19 @@ describe('what each endpoint needs', () => {
     expect(needs.b.needs).toBe('both');
     expect(needs.n.needs).toBe('neither');
     expect(needs.n.detail).toBe(
-      'Accept: ignored (200); Content-Type: ignored (400)',
+      'Accept: not checked (200); Content-Type: not checked (201)',
     );
-    // A 500 shows nothing about the header; a 4xx outside the content errors neither.
+    expect(needs.n.tableNotes).toEqual([
+      'the pair table lists Accept application/n+xml; the resource does not check Accept (a bogus one got 200)',
+      'the pair table lists Content-Type application/n+xml; the resource does not check Content-Type (a bogus one got 201)',
+    ]);
+    expect(needs.i.needs).toBe('unknown');
+    expect(needs.i.detail).toContain('400 ExceptionInvalidData');
     expect(needs.x.needs).toBe('unknown');
     expect(needs.x.detail).toBe(
-      'Accept: unknown (500 (no SAP exception)); Content-Type: ignored (200)',
+      'Accept: unknown (500 dump or router: Dereferencing of the NULL reference); Content-Type: no body',
     );
-    expect(needs.y.needs).toBe('unknown');
-    expect(needs.y.detail).toContain('400 uriMappingError');
-    expect(needs.n.tableNotes).toEqual([
-      'the pair table lists Accept application/n+xml; a bogus Accept was answered 200',
-      'the pair table lists Content-Type application/n+xml; a bogus Content-Type was answered 400',
-    ]);
+    expect(needs.m.detail).toContain('405 method not implemented');
     expect(needs.u.needs).toBe('unknown');
     expect(needs.u.detail).toContain('404 (no SAP exception)');
     expect(needs.g.needs).toBe('neither');
@@ -870,6 +884,10 @@ describe('what each endpoint needs', () => {
     ]);
     expect(needs.s.needs).toBe('unknown');
     expect(needs.s.detail).toContain('skipped: needs a URI');
+    expect(needs.h.needs).toBe('accept');
+    expect(needs.h.accept.reason).toBe(
+      '400 acceptHeaderMissing without Accept',
+    );
     const md = needsLines(classifyNeeds(rows)).join('\n');
     expect(md).toContain('| both | 1 |');
     expect(md).toContain('#### needs: accept');
@@ -961,7 +979,7 @@ describe('the header corpus', () => {
       ]),
     ]);
     expect(md).toContain(
-      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  |  | application/vnd.probe.thing+xml | both (406 and 415) |',
+      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  |  | application/vnd.probe.thing+xml | both (Accept: checked (406); Content-Type: checked (415)) |',
     );
   });
 });
@@ -1048,5 +1066,56 @@ describe('a refused corpus pair', () => {
       ]),
     );
     expect(refused.map((r) => r.label)).toEqual(['b', 'c']);
+  });
+});
+
+describe('a call that throws on the answer', () => {
+  it('keeps the answer it threw with', async () => {
+    const wire = { status: 404, statusText: '', headers: {}, data: 'gone' };
+    const [capture] = await runCalls({
+      calls: [
+        async () => {
+          throw Object.assign(
+            new Error('Request failed with status code 404'),
+            {
+              response: wire,
+            },
+          );
+        },
+      ],
+      batched: false,
+      connection: recordingConnection(),
+      direct: undefined,
+      onBatch: () => undefined,
+    });
+    expect(capture.wire).toBe(wire);
+    expect(capture.failure).toBe('Request failed with status code 404');
+  });
+});
+
+describe('an envelope whose parts all answer the same 500', () => {
+  it('is sent again one by one, and the row keeps what the envelope said', async () => {
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      // One part's dump answers for every part of the envelope.
+      return request.part ? { status: 500, body: 'dump' } : { status: 404 };
+    });
+    const result = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    for (const r of result.corpus?.rows ?? []) {
+      expect(r.status).toBe(404);
+      expect(r.inEnvelope).toBe('500 in envelope 1');
+      expect(r.ran).toMatch(
+        /^sequential: every part of envelope 1 answered the same 500/,
+      );
+    }
   });
 });

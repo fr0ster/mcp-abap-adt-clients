@@ -31,6 +31,7 @@ import {
   classifyNeeds,
   contentTypeNotSent,
   discoveryProbes,
+  dumpText,
   emptyNamed,
   FIXED_TEXT,
   fakeBody,
@@ -232,26 +233,31 @@ class Run<T> {
         `  envelope ${chunk + 1}/${chunks}: ${part.length} probes`,
       );
       await this.send(part, true, () => 'batched');
-      // The envelope itself was refused: its probes go one by one.
+      // The envelope itself was refused, or one part's dump answered for
+      // every part (measured: all parts of an envelope got the same 500
+      // page, while each sent alone got its own answer): one by one.
       const failed = part.filter(
         (entry) =>
           entry.row.status === undefined &&
           (entry.row.failure ?? '').startsWith('the envelope failed'),
       );
-      if (failed.length && failed.length === part.length) {
-        const why = failed[0].row.failure ?? '';
-        this.out.progress(
-          `  the envelope failed; its ${failed.length} probes go one by one`,
-        );
-        for (const entry of failed) {
-          entry.row.failure = undefined;
-          entry.row.named = emptyNamed();
+      const poisoned =
+        part.length > 1 && part.every((entry) => entry.row.status === 500);
+      if (poisoned || (failed.length && failed.length === part.length)) {
+        const first = part[0].row;
+        const envelopeId = first.envelope ?? '?';
+        const said = first.sapMessage ?? dumpText(first.body);
+        const why = poisoned
+          ? `every part of envelope ${envelopeId} answered the same 500${said ? `: ${said}` : ''}`
+          : `the envelope carrying it failed (${first.failure ?? ''})`;
+        this.out.progress(`  ${why}; its ${part.length} probes go one by one`);
+        for (const entry of part) {
+          entry.row.inEnvelope = poisoned
+            ? `500 in envelope ${envelopeId}`
+            : (entry.row.failure ?? 'failed');
+          resetAnswer(entry.row);
         }
-        await this.send(
-          failed,
-          false,
-          () => `sequential: the envelope carrying it failed (${why})`,
-        );
+        await this.send(part, false, () => `sequential: ${why}`);
       }
     }
     const alone = planned.filter((entry) => entry.sequential);
@@ -264,6 +270,25 @@ class Run<T> {
       await this.send([entry], false, (e) => `sequential: ${e.sequential}`);
     }
   }
+}
+
+/** Clears what a row's first answer filled in, before it is sent again. */
+function resetAnswer(row: ICorpusRow): void {
+  for (const key of [
+    'status',
+    'sapType',
+    'sapMessage',
+    'responseContentType',
+    'body',
+    'failure',
+    'afterWrite',
+    'envelope',
+    'ms',
+    'wireNote',
+  ] as const)
+    delete row[key];
+  row.named = emptyNamed();
+  row.onWire = [];
 }
 
 /** A raw request's status, an error's included. */
