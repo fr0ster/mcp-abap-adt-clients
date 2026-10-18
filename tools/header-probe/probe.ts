@@ -128,23 +128,39 @@ interface ICapture {
 
 const current = new AsyncLocalStorage<ICapture>();
 
-/** The connection a client is built on, recording each request into the call that issued it. */
+/**
+ * The connection a client is built on, recording each request into the call
+ * that issued it.
+ *
+ * A plain object of its own, not a `Proxy`: the client installs its request
+ * trace by assigning `makeAdtRequest` on the connection it is given, and a
+ * proxy without a `set` trap would pass that assignment to the connection
+ * below and call itself.
+ */
 function traced(connection: IAbapConnection): IAbapConnection {
-  return new Proxy(connection, {
-    get(target, property, receiver) {
-      if (property === 'makeAdtRequest')
-        return (request: IAbapRequestOptions) => {
-          current.getStore()?.requests.push({
-            method: request.method,
-            url: request.url,
-            params: request.params,
-          });
-          return target.makeAdtRequest(request);
-        };
-      const value = Reflect.get(target, property, receiver);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
+  const wrapper: Record<string | symbol, unknown> = {};
+  const seen = new Set<string | symbol>();
+  for (
+    let level: object | null = connection;
+    level && level !== Object.prototype;
+    level = Object.getPrototypeOf(level)
+  ) {
+    for (const key of Reflect.ownKeys(level)) {
+      if (seen.has(key) || key === 'constructor') continue;
+      seen.add(key);
+      const value = Reflect.get(connection, key);
+      if (typeof value === 'function') wrapper[key] = value.bind(connection);
+    }
+  }
+  wrapper.makeAdtRequest = (request: IAbapRequestOptions) => {
+    current.getStore()?.requests.push({
+      method: request.method,
+      url: request.url,
+      params: request.params,
+    });
+    return connection.makeAdtRequest(request);
+  };
+  return wrapper as unknown as IAbapConnection;
 }
 
 type ICall = (client: AdtClient, analyse: IAnalyse) => Promise<unknown>;
