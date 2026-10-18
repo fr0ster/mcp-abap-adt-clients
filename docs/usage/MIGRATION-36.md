@@ -140,7 +140,12 @@ nothing else. Until 35.x it also read five headers and every `type/subtype` in
 the body, which answered two fragments of the exception's namespace URI
 (`www.sap.com/abapxml`, `types/communicationframework`) for every `406`. A
 consumer that fed it a `406` carrying the types in a header gets `[]` now.
-`extractSupportedContentType` (`415`) is unchanged.
+`extractSupportedContentType` (`415`) was unchanged in 36.0.0; since 36.0.1
+it reads only SAP's list the same way — `Supported Media Types: …` in the
+`415` body (measured on an on-premise system), no header and no other text.
+Until then it answered the `415`'s own `content-type` (`application/xml`, the
+error document's type) and the two namespace fragments before the type SAP
+named.
 
 ## The completed pairs, measured
 

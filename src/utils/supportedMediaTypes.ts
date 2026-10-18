@@ -24,19 +24,34 @@ import type { HttpError } from '@mcp-abap-adt/interfaces-network';
  */
 const ACCEPTED_CONTENT_TYPES = 'Accepted content types:';
 
+/**
+ * The text SAP's 415 puts before the types it accepts as a body.
+ *
+ * Measured on an on-premise system: SAP answers a 415 with its exception
+ * document (`content-type: application/xml`, the document's own type), whose
+ * message reads "Unsupported Media Type. Supported Media Types: …" — or a bare
+ * "Unsupported Media Type". Only that list is read. Until 36.0.0 the parser
+ * also read the response's headers and every `type/subtype` in the body, so it
+ * answered `application/xml` and two fragments of the document's namespace URI
+ * before the type SAP named.
+ */
+const SUPPORTED_MEDIA_TYPES = 'Supported Media Types:';
+
 /** Where the list after the marker ends: the element, an attribute or the line. */
 const LIST_ENDS = ['<', '"', '\n'];
 
-export function extractSupportedAccept(error: unknown): string[] {
-  const e = error as HttpError;
-  const data = e?.response?.data;
-  const text =
-    typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
+/** The body of a refusal as text. */
+function bodyText(error: unknown): string {
+  const data = (error as HttpError)?.response?.data;
+  return typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
+}
 
+/** Every type listed after `marker` in `text`, in order, each once. */
+function listedAfter(text: string, marker: string): string[] {
   const types = new Set<string>();
-  let at = text.indexOf(ACCEPTED_CONTENT_TYPES);
+  let at = text.indexOf(marker);
   while (at !== -1) {
-    const start = at + ACCEPTED_CONTENT_TYPES.length;
+    const start = at + marker.length;
     let end = text.length;
     for (const stop of LIST_ENDS) {
       const found = text.indexOf(stop, start);
@@ -46,47 +61,18 @@ export function extractSupportedAccept(error: unknown): string[] {
       const type = entry.trim();
       if (type) types.add(type);
     }
-    at = text.indexOf(ACCEPTED_CONTENT_TYPES, end);
+    at = text.indexOf(marker, end);
   }
   return Array.from(types);
 }
 
+export function extractSupportedAccept(error: unknown): string[] {
+  return listedAfter(bodyText(error), ACCEPTED_CONTENT_TYPES);
+}
+
 export function extractSupportedContentType(error: unknown): string[] {
-  const e = error as HttpError;
-  if (e?.response?.status !== 415) {
+  if ((error as HttpError)?.response?.status !== 415) {
     return [];
   }
-
-  const types = new Set<string>();
-  const headers = (e?.response?.headers || {}) as Record<string, unknown>;
-  const headerCandidates = [
-    headers['content-type'],
-    headers['x-sap-adt-supported-content-type'],
-    headers['supported-content-type'],
-  ];
-
-  for (const value of headerCandidates) {
-    if (typeof value === 'string') {
-      value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .forEach((entry) => {
-          types.add(entry);
-        });
-    }
-  }
-
-  const data = e?.response?.data;
-  const text =
-    typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
-  if (text) {
-    const matches =
-      text.match(/[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+(?:;[^,\s]+)?/g) || [];
-    for (const match of matches) {
-      types.add(match);
-    }
-  }
-
-  return Array.from(types).filter(Boolean);
+  return listedAfter(bodyText(error), SUPPORTED_MEDIA_TYPES);
 }
