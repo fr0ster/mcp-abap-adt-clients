@@ -28,8 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - `docs/usage/SAP_HEADER_CHECKS.md`: when SAP's ADT REST framework checks `Accept`
   and `Content-Type`, what a `401`/`403`/`404`/`405`/`500`/`415`/`406` says about the
-  headers, and that a `406` on a write usually comes after the write (read from SAP's
-  ABAP sources and measured on an on-premise system).
+  headers, and that a `406` on a write may come after the work, which may or may not
+  have been rolled back (read from SAP's ABAP sources and measured on an on-premise
+  system).
 
 ## [36.0.1] - 2026-10-18
 

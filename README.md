@@ -944,8 +944,8 @@ included.
 
 To correct a request yourself, read what SAP named and send it again with the
 pair you choose. When SAP checks each header, and what a request has already
-done when it answers `406` or `415` (a `406` on a write usually comes after the
-write), is in [When SAP checks `Accept` and `Content-Type`](docs/usage/SAP_HEADER_CHECKS.md). Two pure functions over the error are exported:
+done when it answers `406` or `415` (a `406` on a write may come after the
+work, which may or may not have been rolled back), is in [When SAP checks `Accept` and `Content-Type`](docs/usage/SAP_HEADER_CHECKS.md). Two pure functions over the error are exported:
 
 - `extractSupportedAccept(error)` — the list SAP writes into its `406` body,
   `Accepted content types: …` (often empty; measured on an on-premise system).
