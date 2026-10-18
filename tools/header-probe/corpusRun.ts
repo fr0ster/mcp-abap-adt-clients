@@ -1580,6 +1580,15 @@ export interface IFullRunInput
    * unknown. Given by the command line, which holds the test config.
    */
   writeCycle?: (input: IWriteCycleInput) => Promise<IWriteCycleResult>;
+  /**
+   * Phase 2's update measurement: per object type, an update with a bogus
+   * Accept on a temporary object, and whether it took effect.
+   */
+  updateMeasure?: (input: Omit<IWriteCycleInput, 'unknown'>) => Promise<{
+    updates: IHeaderCorpusFile['updates'];
+    removals: IRemoval[];
+    error?: string;
+  }>;
 }
 
 const PHASE1: readonly { source: Source; mode: HeadersMode }[] = [
@@ -1612,6 +1621,7 @@ export async function runFull(
   let removals: IRemoval[] = [];
   let file: IHeaderCorpusFile | undefined;
   const phase2Rows: ICorpusRow[] = [];
+  let updates: IHeaderCorpusFile['updates'] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
 
   const body = async (connection: IAbapConnection, state: IRunState) => {
@@ -1707,8 +1717,23 @@ export async function runFull(
             unknown: unknownWrites,
           });
           evidence.push(...writes.evidence);
-          removals = writes.removals;
+          removals = [...removals, ...writes.removals];
           if (writes.error) state.failure ??= writes.error;
+        },
+      );
+    const measure = input.updateMeasure;
+    if (!stopped() && measure)
+      await timed(
+        'phase 2: updates with a bogus Accept, applied or not',
+        async () => {
+          const measured = await measure({
+            connection,
+            clientOptions: await input.clientOptions(connection),
+            interrupt: input.interrupt,
+          });
+          updates = measured.updates;
+          removals = [...removals, ...measured.removals];
+          if (measured.error) state.failure ??= measured.error;
         },
       );
   };
@@ -1754,6 +1779,7 @@ export async function runFull(
       corpora: [...files],
       removals,
       objects,
+      updates,
       endedBy: ended,
       ...(ended !== 'complete' ? { error: ended } : {}),
     };

@@ -71,6 +71,14 @@ header corpus, everything batched and poisoned envelopes split:
      Content-Type goes first, then the bogus Accept; the ledger holds every
      object before its create is sent, locks are released in a `finally`, the
      state is read after every write probe.
+   - **the update measurement**: per object type of the write cycle, on a
+     temporary object of its own: the content read (the source, or the
+     metadata), an update changing it sent with a bogus Accept under a lock
+     released in a `finally`, the content read again. Applied = the two
+     contents' hashes differ; the content itself is never kept or printed.
+     The ledger holds the object before its create is sent, and the cleanup
+     removes it. The header corpus lists, per type, the update's answer and
+     whether it was applied.
    What phase 2 cannot settle stays `unknown`, with its reason.
 4. **`header-corpus-<timestamp>.json` and `.md`**, one per run of the system:
    per endpoint (method, path pattern, `_action`) its `needs`, the Accept and

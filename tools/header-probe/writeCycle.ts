@@ -6,17 +6,29 @@
  * read after every write probe.
  */
 
+import { createHash } from 'node:crypto';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtClient } from '../../src/clients/AdtClient';
+import { sapErrorIn } from '../../src/utils/adtErrors';
+import type { ICapture } from './capture';
 import type { ICorpusRow, IEvidence, IHeaderVerdict } from './corpus';
 import { judge } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
-import { Interrupted, Ledger, withCleanup } from './ledger';
-import { LOCAL_INCLUDES, OBJECT_SPECS } from './objects';
+import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
+import {
+  type IObjectSpec,
+  type ISpecContext,
+  LOCAL_INCLUDES,
+  OBJECT_SPECS,
+} from './objects';
+import { knownPair } from './pairs';
 import { Probe, randomRun } from './probe';
 import {
   endpointKey,
   type IOperationRow,
   type IProbeAnswer,
   type IRemoval,
+  PROBE_TYPE,
 } from './record';
 
 /** The handler a probe row belongs to. */
@@ -165,4 +177,218 @@ export async function runWriteCycle(
     removals,
     ...(error ? { error } : {}),
   };
+}
+
+// --- the update measurement ------------------------------------------------
+
+/** One object type's update, sent with a bogus Accept: did it take effect? */
+export interface IUpdateMeasure {
+  type: string;
+  member: 'update' | 'updateMetadata';
+  /** The update's answer. */
+  status?: number;
+  sapType?: string;
+  /** Whether the content read after differs from the content read before (hashes only). */
+  applied: boolean | 'unknown';
+  note?: string;
+}
+
+/** The text a type's source takes as a comment line, appended to change it. */
+export function changedSource(type: string, source: string): string {
+  if (type === 'transformation')
+    return `${source}\n<!-- error corpus update -->\n`;
+  const ddlLike = [
+    'structure',
+    'table',
+    'ddl',
+    'serviceDefinition',
+    'accessControl',
+    'metadataExtension',
+  ];
+  if (ddlLike.includes(type)) return `${source}\n// error corpus update\n`;
+  return `${source}\n* error corpus update\n`;
+}
+
+/** A metadata document with its description changed. */
+export function changedMetadata(document: string): string {
+  const marker = 'adtcore:description="';
+  const at = document.indexOf(marker);
+  if (at === -1) return document;
+  const end = document.indexOf('"', at + marker.length);
+  return `${document.slice(0, at + marker.length)}Error corpus updated${document.slice(end)}`;
+}
+
+/** A hash of content: what the measurement compares; the content itself is never kept. */
+export const hashOf = (content: string): string =>
+  createHash('sha256').update(content).digest('hex');
+
+/**
+ * Per object type of the write cycle, on a temporary object: create it,
+ * read its content, send its update (source, or metadata) changed and with a
+ * bogus Accept under a lock released in a `finally`, read the content again,
+ * and compare the two hashes. The ledger holds the object before its create
+ * is sent; the cleanup removes it.
+ */
+export async function measureUpdates(
+  input: Omit<IWriteCycleInput, 'unknown'> & {
+    packageName: string;
+    transportRequest: string;
+    /** The types to measure; all of the cycle's when absent. */
+    only?: readonly string[];
+  },
+): Promise<{
+  updates: IUpdateMeasure[];
+  removals: IRemoval[];
+  error?: string;
+}> {
+  const removals: IRemoval[] = [];
+  const updates: IUpdateMeasure[] = [];
+  const ledger = new Ledger((removal) => removals.push(removal));
+  const context = {
+    packageName: input.packageName,
+    transportRequest: input.transportRequest,
+  };
+  const probe = new Probe(
+    input.connection,
+    input.clientOptions,
+    { sequential: true },
+    ledger,
+    context,
+    randomRun(),
+    input.interrupt,
+  );
+  let error: string | undefined;
+  const statusOf = (capture: ICapture) => capture.wire?.status;
+  const okOf = (capture: ICapture) => {
+    const status = statusOf(capture);
+    return status !== undefined && status >= 200 && status < 300;
+  };
+  const bodyOf = (capture: ICapture) =>
+    typeof capture.wire?.data === 'string' ? capture.wire.data : undefined;
+  try {
+    await withCleanup(ledger, async () => {
+      for (const spec of OBJECT_SPECS) {
+        if (input.only && !input.only.includes(spec.type)) continue;
+        input.interrupt.check();
+        const member = spec.write === 'source' ? 'update' : 'updateMetadata';
+        const row: IUpdateMeasure = {
+          type: spec.type,
+          member,
+          applied: 'unknown',
+        };
+        updates.push(row);
+        const ctx: ISpecContext = { ...context };
+        if (spec.needs) {
+          const parentSpec = OBJECT_SPECS.find(
+            (s) => s.type === (spec.needs === 'ddl' ? 'ddl' : 'functionGroup'),
+          ) as IObjectSpec;
+          const parent = probe.name(
+            { code: `${spec.code[0]}${parentSpec.code[0]}` },
+            'Q',
+          );
+          const made = await probe.dependency(
+            parentSpec,
+            parent,
+            spec.needs === 'ddl' ? parentSpec.source?.(parent, ctx) : undefined,
+          );
+          if (!made) {
+            row.note = `its ${spec.needs} could not be created and activated`;
+            continue;
+          }
+          ctx.parent = parent;
+        }
+        const name = probe.name(spec, 'U');
+        const config = spec.config(name, ctx);
+        probe.remember(spec, name, ctx);
+        const pair = (m: string) => knownPair(spec.handler, m) as IAdtHeaders;
+        const handle = (client: AdtClient) => spec.handle(client);
+        const created = await probe.direct1((client, analyse) =>
+          Promise.resolve(
+            handle(client).create?.(config, {
+              headers: pair('create'),
+              analyse,
+            }),
+          ),
+        );
+        if (!okOf(created)) {
+          row.note = `the create answered ${statusOf(created) ?? created.failure}`;
+          continue;
+        }
+        const read = () =>
+          probe.direct1((client, analyse) =>
+            Promise.resolve(
+              spec.write === 'source'
+                ? handle(client).read?.(config, 'inactive', { analyse })
+                : handle(client).readMetadata?.(config, { analyse }),
+            ),
+          );
+        const before = await read();
+        const content = bodyOf(before);
+        if (!okOf(before) || content === undefined) {
+          row.note = `the read before answered ${statusOf(before) ?? before.failure}`;
+          continue;
+        }
+        const changed =
+          spec.write === 'source'
+            ? changedSource(spec.type, spec.source?.(name, ctx) ?? content)
+            : changedMetadata(content);
+        const locked = await probe.direct1((client, analyse) =>
+          Promise.resolve(handle(client).lock?.(config, { analyse })),
+        );
+        const result = locked.result as
+          | { ok?: boolean; getResult?: () => { value: unknown } }
+          | undefined;
+        const lockHandle =
+          result?.ok && result.getResult ? result.getResult().value : undefined;
+        if (typeof lockHandle !== 'string' || !lockHandle) {
+          row.note = `the lock answered ${statusOf(locked) ?? locked.failure}`;
+          continue;
+        }
+        await withLock(
+          lockHandle,
+          // Released after an interrupt too: unlocking is cleanup.
+          (held) =>
+            probe.direct1(
+              (client, analyse) =>
+                Promise.resolve(
+                  handle(client).unlock?.(config, held, { analyse }),
+                ),
+              false,
+            ),
+          async (held) => {
+            const updated = await probe.direct1((client, analyse) =>
+              Promise.resolve(
+                handle(client)[member]?.(config, {
+                  headers: {
+                    accept: PROBE_TYPE,
+                    contentType: pair(member).contentType,
+                  },
+                  source: changed,
+                  lockHandle: held,
+                  analyse,
+                }),
+              ),
+            );
+            const status = statusOf(updated);
+            if (status !== undefined) row.status = status;
+            const sapType = updated.wire
+              ? sapErrorIn(String(updated.wire.data ?? ''))?.adtType
+              : undefined;
+            if (sapType) row.sapType = sapType;
+          },
+        );
+        const after = await read();
+        const later = bodyOf(after);
+        if (!okOf(after) || later === undefined) {
+          row.note = `the read after answered ${statusOf(after) ?? after.failure}`;
+          continue;
+        }
+        row.applied = hashOf(later) !== hashOf(content);
+      }
+    });
+  } catch (thrown) {
+    if (!(thrown instanceof Interrupted))
+      error = thrown instanceof Error ? thrown.message : String(thrown);
+  }
+  return { updates, removals, ...(error ? { error } : {}) };
 }

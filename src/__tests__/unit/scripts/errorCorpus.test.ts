@@ -68,6 +68,7 @@ import {
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
 import {
   evidenceOfRows,
+  measureUpdates,
   runWriteCycle,
 } from '../../../../tools/header-probe/writeCycle';
 
@@ -1550,6 +1551,12 @@ describe('the full run', () => {
         cycles.push([...unknown]);
         return { evidence: [], removals: [] };
       },
+      updateMeasure: async () => ({
+        updates: [
+          { type: 'class', member: 'update', status: 406, applied: true },
+        ],
+        removals: [],
+      }),
     });
     expect(result.exitCode).toBe(0);
     const file = result.file as NonNullable<typeof result.file>;
@@ -1557,6 +1564,10 @@ describe('the full run', () => {
       'phase 1',
       'phase 2',
       'phase 2',
+      'phase 2',
+    ]);
+    expect(file.updates).toEqual([
+      { type: 'class', member: 'update', status: 406, applied: true },
     ]);
     expect(file.totalMs).toBeGreaterThan(0);
     const entry = file.entries.find(
@@ -1595,6 +1606,9 @@ describe('the full run', () => {
     expect(
       fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
     ).toContain('| accept |');
+    expect(
+      fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
+    ).toContain('| class | update | 406 | yes |');
   });
 
   it('a 401 at the logon is the Oops, and nothing runs', async () => {
@@ -2433,5 +2447,84 @@ describe('the output folder', () => {
     expect(fs.existsSync(chosen)).toBe(true);
     const relative = path.relative(process.cwd(), path.join(tempDir(), 'rel'));
     expect(path.isAbsolute(outputDir(relative))).toBe(true);
+  });
+});
+
+describe('the update measurement', () => {
+  const classSystem = (applies: boolean) => {
+    const sources = new Map<string, string>();
+    let locks = 0;
+    let unlocks = 0;
+    const system = fakeSystem((request) => {
+      const { method, url } = request;
+      const name = url.split('/')[6]?.split('?')[0]?.toLowerCase();
+      if (method === 'POST' && url === '/sap/bc/adt/oo/classes') {
+        const match = /adtcore:name="([^"]+)"/.exec(request.body);
+        if (match)
+          sources.set(match[1].toLowerCase(), 'CLASS x DEFINITION. ENDCLASS.');
+        return { status: 201 };
+      }
+      if (url.includes('_action=LOCK')) {
+        locks++;
+        return {
+          status: 200,
+          body: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>',
+        };
+      }
+      if (url.includes('_action=UNLOCK')) {
+        unlocks++;
+        return { status: 200 };
+      }
+      if (url === '/sap/bc/adt/deletion/delete') {
+        for (const n of [...sources.keys()])
+          if (request.body.toLowerCase().includes(n)) sources.delete(n);
+        return { status: 200 };
+      }
+      if (name && url.startsWith('/sap/bc/adt/oo/classes/')) {
+        if (!sources.has(name)) return { status: 404 };
+        if (method === 'PUT') {
+          if (applies) sources.set(name, request.body);
+          return { status: 406, body: NOT_ACCEPTABLE('text/plain') };
+        }
+        return url.includes('/source/main')
+          ? { status: 200, body: sources.get(name) ?? '' }
+          : { status: 200, body: `<class:abapClass adtcore:name="${name}"/>` };
+      }
+      return { status: 404 };
+    });
+    return { system, sources, counts: () => ({ locks, unlocks }) };
+  };
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])('an update the system applies despite its 406 (%s) is recorded applied: %s; unlocked, cleaned, no content kept', async (applies, applied) => {
+    const { system, sources, counts } = classSystem(applies);
+    const result = await measureUpdates({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      only: ['class'],
+    });
+    expect(result.updates).toEqual([
+      expect.objectContaining({
+        type: 'class',
+        member: 'update',
+        status: 406,
+        applied,
+      }),
+    ]);
+    expect(counts().locks).toBe(1);
+    expect(counts().unlocks).toBe(1);
+    expect(sources.size).toBe(0);
+    expect(result.removals.every((r) => r.removed === true)).toBe(true);
+    // Hashes only: neither content reaches the record.
+    expect(JSON.stringify(result)).not.toContain('error corpus update');
+    expect(JSON.stringify(result)).not.toContain('ENDCLASS');
+    // The update went with the bogus Accept.
+    const put = system.seen.find((s) => s.method === 'PUT');
+    expect(put?.headers.accept).toBe(PROBE_TYPE);
   });
 });

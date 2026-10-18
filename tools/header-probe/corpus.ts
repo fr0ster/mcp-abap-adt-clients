@@ -1790,6 +1790,15 @@ export interface IHeaderCorpusFile {
   removals: IRemoval[];
   /** What ended the run. */
   endedBy?: string;
+  /** Phase 2's update measurement: per object type, the update's answer to a bogus Accept and whether it took effect. */
+  updates?: {
+    type: string;
+    member: string;
+    status?: number;
+    sapType?: string;
+    applied: boolean | 'unknown';
+    note?: string;
+  }[];
   /** Phase 2's read objects: per object type, the name found or why none. */
   objects: { handler: string; type?: string; name?: string; reason?: string }[];
   error?: string;
@@ -1843,6 +1852,20 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
     for (const entry of of)
       lines.push(
         `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+      );
+  }
+  lines.push('', '## Updates with a bogus Accept', '');
+  if (!file.updates?.length) lines.push('Not measured.');
+  else {
+    lines.push(
+      'Per object type, on a temporary object: the content read, an update changing it sent with a bogus Accept, the content read again; applied = the two hashes differ.',
+      '',
+      '| type | member | update answer | applied |',
+      '|---|---|---|---|',
+    );
+    for (const update of file.updates)
+      lines.push(
+        `| ${cell(update.type)} | ${update.member} | ${update.status ?? '—'}${update.sapType ? ` ${cell(update.sapType)}` : ''} | ${update.applied === 'unknown' ? `unknown${update.note ? ` (${cell(update.note)})` : ''}` : update.applied ? 'yes' : 'no'} |`,
       );
   }
   lines.push('', '## Phase 2 objects', '');

@@ -79,7 +79,7 @@ import {
 } from './corpus';
 import { outputDir, runCorpus, runFull } from './corpusRun';
 import { Interrupt } from './ledger';
-import { runWriteCycle } from './writeCycle';
+import { measureUpdates, runWriteCycle } from './writeCycle';
 
 // The helpers load `.env` when imported; nothing else here reads it.
 const {
@@ -242,6 +242,12 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
       writeCycle: (cycle) =>
         runWriteCycle({
           ...cycle,
+          packageName: String(environment.default_package ?? ''),
+          transportRequest: String(environment.default_transport ?? ''),
+        }),
+      updateMeasure: (measure) =>
+        measureUpdates({
+          ...measure,
           packageName: String(environment.default_package ?? ''),
           transportRequest: String(environment.default_transport ?? ''),
         }),
