@@ -523,6 +523,8 @@ export interface ICorpusRow {
   settled?: { depth: number; path: string };
   /** A single call whose own 500 poisoned its group: the cause of a poisoning. */
   poisonCause?: boolean;
+  /** Request parameters a stand-in argument produced: the request is not what a real call sends. */
+  standIn?: string[];
   /** The headers mode of the run the row came from (a full run's rows). */
   headersMode?: HeadersMode;
   /** Batched: the envelope it went out in (see {@link ICorpus.envelopes}). */

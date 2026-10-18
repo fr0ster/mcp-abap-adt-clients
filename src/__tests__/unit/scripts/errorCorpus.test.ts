@@ -62,6 +62,7 @@ import {
   prototypeMembers,
   recordingConnection,
   recordMembers,
+  standInParameters,
 } from '../../../../tools/header-probe/members';
 import {
   KNOWN_PAIRS,
@@ -2778,5 +2779,44 @@ describe('knownWorking', () => {
         s.headers.accept !== PROBE_TYPE,
     );
     expect(corpusRead).toBeDefined();
+  });
+});
+
+describe('stand-in arguments', () => {
+  it('spots a parameter a stand-in produced', () => {
+    expect(
+      standInParameters([
+        { url: '/x?query=undefined&objectType=program&maxResults=1' },
+        {
+          url: '/y?objectType=PROG/P&lockHandle=H',
+          params: { profilerId: undefined },
+        },
+      ]),
+    ).toEqual([
+      'query=undefined',
+      'objectType=program',
+      'profilerId=undefined',
+    ]);
+  });
+
+  it('the search goes as a real call does; what still carries a stand-in is marked', async () => {
+    const { members } = await recordMembers();
+    const of = (handler: string, member: string) =>
+      members.find((m) => m.handler === handler && m.member === member);
+    expect(of('getUtils()', 'search')?.standIn).toBeUndefined();
+    expect(of('getProgram()', 'update')?.standIn).toBeUndefined();
+    const marked = members
+      .filter((m) => m.standIn && !m.skipped)
+      .map((m) => `${m.handler}.${m.member}: ${m.standIn?.join(', ')}`);
+    // Left marked: a profiler id the system assigns; a service version the
+    // service binding's internal publish helpers take positionally.
+    expect(marked).toEqual([
+      'getServiceBinding().publishByServiceType: serviceversion=undefined',
+      'getServiceBinding().unpublishByServiceType: serviceversion=undefined',
+      'getClassExecutor().runWithProfiler: profilerId=undefined',
+      'getProgramExecutor().runWithProfiler: profilerId=undefined',
+      'legacy getClassExecutor().runWithProfiler: profilerId=undefined',
+      'legacy getProgramExecutor().runWithProfiler: profilerId=undefined',
+    ]);
   });
 });

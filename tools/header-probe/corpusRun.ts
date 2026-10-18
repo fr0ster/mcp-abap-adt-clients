@@ -851,6 +851,7 @@ async function runClients(ctx: IContext): Promise<void> {
           : {}),
         ...(member.pair ? { pair: { ...member.pair } } : {}),
         ...(bogus ? { bogus } : {}),
+        ...(member.standIn ? { standIn: member.standIn } : {}),
       };
       ctx.corpus.rows.push(row);
       if (member.skipped || !call || !spec) {
