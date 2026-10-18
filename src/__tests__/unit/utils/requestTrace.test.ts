@@ -23,7 +23,11 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answering as compose } from '../../../utils/adtResponse';
-import { requestOf, withRequestTrace } from '../../../utils/requestTrace';
+import {
+  markEnvelopeFailure,
+  requestOf,
+  withRequestTrace,
+} from '../../../utils/requestTrace';
 import { rawDocument } from '../../../utils/resultStrategy';
 
 /** An activation checklist carrying an error-severity message. */
@@ -175,5 +179,45 @@ describe('the request an answer arrived on', () => {
     withRequestTrace(connection);
 
     expect(connection.makeAdtRequest).toBe(once);
+  });
+});
+
+describe('a batch envelope failure', () => {
+  // One object, rejected to every part of the envelope: a part that wrote its
+  // own request onto it would name itself on every other part's failure.
+  const throwing = (error: unknown): IAbapConnection =>
+    ({
+      makeAdtRequest: async () => {
+        throw error;
+      },
+    }) as unknown as IAbapConnection;
+  const part = {
+    url: '/sap/bc/adt/ddic/domains/z_part',
+    method: 'GET',
+  } as Parameters<IAbapConnection['makeAdtRequest']>[0];
+
+  it('is rethrown as it came, with nothing written onto it', async () => {
+    const envelope = { method: 'POST', url: '/sap/bc/adt/communication/batch' };
+    const failure = Object.assign(new Error('envelope failed'), {
+      request: envelope,
+    });
+    markEnvelopeFailure(failure);
+
+    await expect(
+      withRequestTrace(throwing(failure)).makeAdtRequest(part),
+    ).rejects.toBe(failure);
+    expect(failure.request).toBe(envelope);
+  });
+
+  it('is told apart from an ordinary failure, which is still annotated', async () => {
+    const failure = new Error('refused') as Error & { request?: unknown };
+
+    await expect(
+      withRequestTrace(throwing(failure)).makeAdtRequest(part),
+    ).rejects.toBe(failure);
+    expect(failure.request).toEqual({
+      method: 'GET',
+      url: '/sap/bc/adt/ddic/domains/z_part',
+    });
   });
 });
