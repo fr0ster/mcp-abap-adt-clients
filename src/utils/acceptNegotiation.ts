@@ -193,6 +193,33 @@ function buildCacheKey(request: IAbapRequestOptions): string {
 }
 
 /**
+ * The Accept this connection's negotiation would send for `request`: what it
+ * learned from a `406` (or was given by `rememberAccept`) for the same method
+ * and URL, or `undefined` when it has none or correction is switched off for
+ * the connection. A plain read of the per-connection cache.
+ */
+export function cachedAccept(
+  connection: IAbapConnection,
+  request: IAbapRequestOptions,
+): string | undefined {
+  if (!getAcceptCorrectionEnabled(connection)) return undefined;
+  return stateOf(connection).accept.get(buildCacheKey(request));
+}
+
+/**
+ * Store a corrected Accept for `request`'s method and URL on this connection,
+ * as the negotiation's own `406` branch does: a later request through the
+ * connection's negotiation sends it. A plain write of the per-connection cache.
+ */
+export function rememberAccept(
+  connection: IAbapConnection,
+  request: IAbapRequestOptions,
+  accept: string,
+): void {
+  stateOf(connection).accept.set(buildCacheKey(request), accept);
+}
+
+/**
  * The connection's request as it was before an `AdtClient` with correction on
  * wrapped it: accept negotiation corrects and resends nothing. The
  * connection's own handling (credential, CSRF, session) is untouched.

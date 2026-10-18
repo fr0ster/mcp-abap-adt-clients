@@ -86,7 +86,26 @@ and is negotiated like any other; mark it with `exemptFromAcceptNegotiation(wrap
 (exported by the package) and it is exempt too. When the batch connection wraps
 a forwarder of yours over a connection an `AdtClient` wrapped, forward through
 `getBaseRequest(thatConnection)` (exported): the envelope then bypasses that
-connection's accept negotiation and is sent once. A batch is yours, and so is
+connection's accept negotiation and is sent once. To correct a part that SAP
+answered with `406` yourself, read the acceptable formats from that answer with
+`extractSupportedAccept(error)` (exported): it takes the error the `406` came
+as — any value; one without a response yields an empty list — and returns the
+supported media types as a `string[]`. It reads them from the response headers
+`accept`, `x-sap-adt-supported-accept`, `x-sap-adt-accept`, `supported-accept`
+and `accept-supported` (comma-separated), and from every `type/subtype`
+(with an optional `;parameter`) found in the response body, without
+duplicates. It is the reading accept negotiation applies to a `406` itself.
+
+The corrected Accept is remembered where negotiation remembers its own: the
+connection's accept cache, keyed by method and URL. `cachedAccept(connection,
+request)` (exported) returns the Accept negotiation would send for that request
+on that connection — what a `406` taught it or `rememberAccept` stored — or
+`undefined` when there is none or correction is switched off for the
+connection. `rememberAccept(connection, request, accept)` (exported) stores
+`accept` for the request's method and URL on the connection and returns nothing;
+a later request through an `AdtClient` with correction on over the same
+connection sends it. Both read and write that cache only, so a correction
+learned on either path serves both. A batch is yours, and so is
 what SAP answered to each of its parts. The envelope request itself still goes
 through the connection's own handling — credential renewal, CSRF recovery and
 session — as every request does: that is about the connection to the endpoint,

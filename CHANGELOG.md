@@ -24,6 +24,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [34.3.0] - 2026-10-18
+
+### Added
+
+- `extractSupportedAccept(error)` is exported: the acceptable media types a
+  `406` answer names, read from its response headers and body exactly as accept
+  negotiation reads them. A consumer that corrects a batch part answered with
+  `406` itself, since a batch connection is exempt from accept negotiation,
+  parses the answer the same way. Its behaviour is unchanged.
+- `cachedAccept(connection, request)` and `rememberAccept(connection, request,
+  accept)` are exported: a read and a write of the connection's accept cache
+  that accept negotiation itself uses, under the same key (method and URL).
+  A correction learned by the batch path is then served to a request through an
+  `AdtClient` on the same connection, and the other way round. Negotiation's own
+  behaviour and switches are unchanged.
+
 ## [34.2.1] - 2026-10-18
 
 ### Fixed
