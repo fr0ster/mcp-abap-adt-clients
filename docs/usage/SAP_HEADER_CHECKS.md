@@ -60,7 +60,8 @@ Each statement carries one of three tags:
 
 | Answer | What it says about the headers |
 |---|---|
-| `401`, `403` (authorization, CSRF) | Nothing. It comes before any header is read. *Code.* |
+| `401` | Nothing. The ICF logon comes before any ADT code. *Inference*; *Measured*: the same GET answers `401` without credentials and `406` with them. |
+| `403` (authorization, CSRF) | Nothing. It comes before any header is read. *Code.* |
 | `404` from the router (no route) | Nothing. It comes before any header is read. *Code.* |
 | `404` from the resource (no such object) | Nothing about the headers. It may come before or after a check. *Inference.* |
 | `405` | Nothing. The method is not implemented; it comes from dispatch, before any header is read. *Code.* |
@@ -95,6 +96,6 @@ These are deductions from the findings above. *Inference*, unless tagged otherwi
 
 - **To learn the acceptable types, a request has to reach the resource's check.** A request on an object that does not exist often ends with `404` first. Many `GET`s, though, answer `406` even on a name that does not exist. *Measured.*
 - **A `415` from the checking handler means the body was refused before it was deserialized.** That does not prove nothing happened earlier in the resource.
-- **A `406` on a write does not say whether the write left a lasting change.** The work may have run before the check. It may then have been committed, as the class create and the DELETE above show, or rolled back, as the domain create above suggests. Read the object's state before sending a write again after a `406`.
+- **A `406` on a write does not say whether the write left a lasting change.** The work may have run before the check, and it may then have been rolled back, as the domain create above suggests, or not. Read the object's state before sending a write again after a `406`.
 - **An unusual header that gets a `2xx` proves neither that the header is right nor that the resource ignores it.**
 - **`extractSupportedAccept(error)` and `extractSupportedContentType(error)`** read the two lists described above, and nothing else.
