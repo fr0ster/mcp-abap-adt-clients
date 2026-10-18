@@ -26,7 +26,7 @@ Consumer code  ── result sets (at construction), analyse (per call)
     -> core/* object modules + core/shared (AdtUtils)
     -> runtime/* endpoint functions
     -> executors/* (execution, trace scheduling)
-      -> utils/* cross-cutting helpers (answering, the caller's timeout, accept negotiation, lock handle)
+      -> utils/* cross-cutting helpers (answering, the caller's timeout, the 406/415 parsers, lock handle)
         -> IAbapConnection.makeAdtRequest(...) / IWebSocketTransport
           -> SAP ADT endpoints
 ```
@@ -93,7 +93,7 @@ src/
     adtResponse.ts            # answering(): request + reading + analyse
     resultStrategy.ts         # rawDocument, nothing, wireItself
     lockHandle.ts             # lockHandleOf: the handle a LOCK answered, '' if none
-    acceptNegotiation.ts      # 406 recovery, state per connection
+    supportedMediaTypes.ts    # the 406 / 415 parsers (no negotiation since 36.0.0)
     activationUtils.ts        # buildObjectUri, shared by group activation, deletion, where-used
     systemInfo.ts, discoveryEndpoints.ts
     requestTrace.ts, callTimeout.ts, ...
@@ -236,18 +236,14 @@ through the check run, `activateTestClasses`) passes its own constant pair
 the wire, and fails for a class method named like one of the 32 that no row
 reaches.
 
-## Accept Negotiation (406 Recovery)
+## Refused media types (406 / 415)
 
-`src/utils/acceptNegotiation.ts` provides optional request retry for ADT `406 Not Acceptable` cases:
-- Can wrap `connection.makeAdtRequest` once per connection.
-- Extracts the supported accept values from the `Accepted content types: …`
-  list in SAP's `406` body, and nothing else (since 36.0.0; no header).
-- Retries once with corrected `Accept` and caches per `METHOD + URL`. Switched
-  on, a cached type replaces the `Accept` / `Content-Type` a member was given
-  in `options.headers` on later requests to that method and URL.
-- Off unless the constructor option `enableAcceptCorrection` is `true`, `setAcceptCorrectionEnabled` was called, or the env var `ADT_ACCEPT_CORRECTION` is exactly `true` (the default was on until 35.0.0).
-- `cachedAccept` / `rememberAccept` read and write the same per-connection cache, whatever the switch says.
-- The caches and the switch are the connection's (kept on it under a symbol, forwarded by the call-timeout proxy). Until 23.0.0 they were module globals, so a correction learned on one system was sent to every other.
+There is no accept negotiation since 36.0.0: nothing wraps a connection,
+retries a refused request or remembers a type for a later one. A `406` or `415`
+is the call's answer. `src/utils/supportedMediaTypes.ts` holds the two pure
+parsers a consumer that corrects requests itself uses —
+`extractSupportedAccept` (the `Accepted content types: …` list in SAP's `406`
+body, nothing else) and `extractSupportedContentType` (`415`, unchanged).
 
 ## Error and Response Handling
 

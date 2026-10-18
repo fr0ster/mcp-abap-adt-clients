@@ -159,7 +159,7 @@ npm install @mcp-abap-adt/adt-clients
    - `createAdtExecutor(connection)` picks `AdtExecutor` or `AdtExecutorLegacy` by system version, like `createAdtClient`; the legacy one differs only in the test runner
 
 4. **AdtAbapGitClient**
-   - Standalone: `new AdtAbapGitClient(connection, logger, options?, results?)`
+   - Standalone: `new AdtAbapGitClient(connection, logger?, results?)` (the options argument, `contentTypeVersion`, was removed in 36.0.0)
    - `link`, `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo` — one request each; `pull` does not wait
 
 5. **AdtClientsWS**
@@ -883,7 +883,9 @@ still takes an optional `accept` (`IReadOptions`).
 - `AdtContentTypesBase` / `AdtContentTypesModern` still answer pairs for some
   creates (`classCreate()`, `programCreate()`, …), which you can pass as
   `headers`; the members themselves no longer read the `contentTypes` option
-  for them, nor `contentTypeVersion` for abapGit's `link` and `pull`.
+  for them. It (and `unicode`) still decides the artifact type inside a
+  check-run document and a class's `readMetadata` `Accept`. abapGit's
+  `contentTypeVersion` option is removed.
 
 The pairs 35.0.0 chose for itself, for the samples below (a modern system):
 
@@ -901,6 +903,10 @@ const SOURCE: IAdtHeaders = {
 const ACTIVATION: IAdtHeaders = {
   accept: 'application/xml',
   contentType: 'application/vnd.sap.adt.activation+xml',
+};
+const CHECK_RUN: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.checkmessages+xml',
+  contentType: 'application/vnd.sap.adt.checkobjects+xml',
 };
 const DELETION: IAdtHeaders = {
   accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
@@ -924,48 +930,42 @@ const FUNCTION_MODULE_DOCUMENT: IAdtHeaders = {
 };
 ```
 
-### Accept Negotiation
+### Accept Negotiation (removed in 36.0.0)
 
-Some ADT endpoints return `406` when the `Accept` header does not match the
-system's supported media types. The client retries once with a type the `406`
-names, and remembers it for that endpoint.
+A refused request is the call's answer: SAP's `406` (its `Accept` not served)
+or `415` (its `Content-Type` not accepted) comes back like any other status,
+and nothing is corrected, sent again or remembered for a later request.
+**Accept negotiation was removed in 36.0.0** — the retry, the per-connection
+caches, the `enableAcceptCorrection` option, `setAcceptCorrectionEnabled` /
+`getAcceptCorrectionEnabled`, `ADT_ACCEPT_CORRECTION`, `clearAcceptCache`,
+`cachedAccept`, `rememberAccept`, `exemptFromAcceptNegotiation` and
+`getBaseRequest`. A member sends exactly the request it was given, `headers`
+included.
 
-**It is off unless you turn it on** (since 35.0.0) — per client, or for the
-process. Without a switch a `406` or `415` is the call's answer and nothing is
-sent again:
+To correct a request yourself, read what SAP named and send it again with the
+pair you choose. Two pure functions over the error are exported:
+
+- `extractSupportedAccept(error)` — the list SAP writes into its `406` body,
+  `Accepted content types: …` (often empty; measured on an on-premise system).
+  It reads no header and no other text.
+- `extractSupportedContentType(error)` — the types a `415` names (its headers
+  and body; unchanged).
 
 ```typescript
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { extractSupportedAccept } from '@mcp-abap-adt/adt-clients';
 
-const client = new AdtClient(connection, console, {
-  enableAcceptCorrection: true,
-});
+const first = await cls.check(config, undefined, { headers: CHECK_RUN });
+if (!first.ok && first.getError().response?.status === 406) {
+  const accepted = extractSupportedAccept(first.getError());
+  if (accepted.length > 0) {
+    await cls.check(config, undefined, {
+      headers: { ...CHECK_RUN, accept: accepted.join(', ') },
+    });
+  }
+}
 ```
 
-```bash
-ADT_ACCEPT_CORRECTION=true npm test
-```
-
-The variable turns it on only when it is exactly `true`. Switched on, it is the
-one thing that changes a member's `headers`: the request answered `406` or
-`415` is sent once more with the type SAP named, and that type — or one stored
-with `rememberAccept` — replaces the given `Accept` / `Content-Type` on later
-requests to the same method and URL on that connection. Off, the pair you pass
-is what is sent.
-
-`extractSupportedAccept(error)` reads only the list SAP writes into its `406`
-body — `Accepted content types: …`, often empty (measured on an on-premise
-system); since 36.0.0 it reads no header and no other text. To correct requests
-yourself instead, read a `406` with `extractSupportedAccept(error)` and keep
-the result in the connection's cache with `rememberAccept(connection, request,
-accept)`; `cachedAccept(connection, request)` reads it back, whatever the
-switch says. See [batch](docs/usage/BATCH.md).
-
-**The state is the connection's** since 23.0.0: the remembered types and the
-switch live on the connection object. They used to be module globals, so a
-header learned on one system was sent to every other, and one client's switch
-changed it for all. Two connections to two systems in one process no longer
-share anything.
+What you learn is yours to keep: nothing in this package stores it.
 
 ### Handler classes exported directly
 
@@ -1274,9 +1274,9 @@ See [domain and debugger examples](docs/usage/BATCH.md).
 
 `execute()` also sends follow-up envelopes for requests member continuations
 record during settlement (up to 100 envelopes, then all remaining requests
-reject). Nothing in a batch is corrected or sent again: a batch connection is
-exempt from accept negotiation, so a part's `401`, `406` or `415` is that call's
-answer, and a `406`/`415` to the envelope reaches `execute()` as it came. The
+reject). Nothing in a batch is corrected or sent again — nothing anywhere is,
+since 36.0.0 — so a part's `401`, `406` or `415` is that call's answer, and a
+`406`/`415` to the envelope reaches `execute()` as it came. The
 connection's own handling of the envelope request — credential renewal, CSRF
 recovery, session — stays. Explicit session switches apply to the next recording;
 LOCK/UNLOCK run in stateful envelopes; other ordinary members run stateless.

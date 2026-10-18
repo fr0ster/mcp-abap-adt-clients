@@ -504,7 +504,7 @@ await connection.connect();
 // The client answers every document as it arrived (`abapGitDocuments`) and
 // `unlink` answers nothing. The shapes below are readings you ask for, once,
 // when you build it.
-const abapGit = new AdtAbapGitClient(connection, undefined, undefined, {
+const abapGit = new AdtAbapGitClient(connection, undefined, {
   ...abapGitDocuments,
   repos: abapGitRepos,
   errorLog: abapGitErrorLog,
@@ -582,7 +582,7 @@ if (repo.repositoryId) {
 
 **No `getRepo`, since 23.0.0.** It listed every repository and picked one for a package — a filter over a document, which is a reading, and a "not found" the library composed from its own search. `listRepos` and your own `find` are the same request. For the same reason `unlink` takes the `repositoryId` and `getErrorLog` the `logLink` that `listRepos` reports, instead of a package name each looked up on its own. `abapGitRepos` reads the key verbatim: the reading it replaces turned `000001` into `1`, which is not the key `unlink` is addressed by.
 
-**Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
+**Content-type version.** `link` and `pull` send the `headers` you pass (since 36.0.0). Until then the client chose `application/abapgit.adt.repo.v3+xml` (sapcli parity), or `v4` through a `contentTypeVersion` option that is gone; cloud MDD advertises `v4`.
 
 ### Transport Requests (getRequest())
 
@@ -1047,30 +1047,46 @@ Object types differ in the shape of their success body, which is why inferring a
 failure from an unfamiliar one turns working calls into errors — and why the
 judgement moved to the caller, who knows which types they are activating.
 
-### Accept Negotiation
+### Accept Negotiation (removed in 36.0.0)
 
-The client can optionally auto-correct `Accept` headers after a 406 response
-(and `Content-Type` after a 415). It is **off** unless switched on, per client
-as below or with `ADT_ACCEPT_CORRECTION=true`; with no switch a `406`/`415` is
-the call's answer and nothing is sent again (default flipped in 35.0.0):
+A refused request is the call's answer: SAP's `406` (its `Accept` not served)
+or `415` (its `Content-Type` not accepted) comes back like any other status,
+and nothing is corrected, sent again or remembered for a later request.
+**Accept negotiation was removed in 36.0.0** — the retry, the per-connection
+caches, the `enableAcceptCorrection` option, `setAcceptCorrectionEnabled` /
+`getAcceptCorrectionEnabled`, `ADT_ACCEPT_CORRECTION`, `clearAcceptCache`,
+`cachedAccept`, `rememberAccept`, `exemptFromAcceptNegotiation` and
+`getBaseRequest`. A member sends exactly the request it was given, `headers`
+included.
+
+To correct a request yourself, read what SAP named and send it again with the
+pair you choose. Two pure functions over the error are exported:
+
+- `extractSupportedAccept(error)` — the list SAP writes into its `406` body,
+  `Accepted content types: …` (often empty; measured on an on-premise system).
+  It reads no header and no other text.
+- `extractSupportedContentType(error)` — the types a `415` names (its headers
+  and body; unchanged).
 
 ```typescript
-const client = new AdtClient(connection, console, {
-  enableAcceptCorrection: true,
-});
+import { extractSupportedAccept } from '@mcp-abap-adt/adt-clients';
+
+const first = await cls.check(config, undefined, { headers: CHECK_RUN });
+if (!first.ok && first.getError().response?.status === 406) {
+  const accepted = extractSupportedAccept(first.getError());
+  if (accepted.length > 0) {
+    await cls.check(config, undefined, {
+      headers: { ...CHECK_RUN, accept: accepted.join(', ') },
+    });
+  }
+}
 ```
 
-The switch and the corrections it learns belong to **the connection**, not to
-the process. Until 23.0.0 they were module globals: an `Accept` corrected on one
-system was sent to every other, keyed by method and URL alone, and one client's
-`enableAcceptCorrection` switched it for all. This is protocol mechanics — a
-retry with a type the server named — not a reading of SAP's verdict, which is
-why it stays in the library.
+What you learn is yours to keep: nothing in this package stores it.
 
-There is no per-call `Accept` override on the object members: the header each
-member sends is the one its endpoint takes, and negotiation corrects it when a
-system answers `406`. Reading a source without a version (the state right after
-a create) is `read(config, undefined)`.
+A read still takes an optional `accept` (`IReadOptions`); a member taking
+`options.headers` sends the pair you give. Reading a source without a version
+(the state right after a create) is `read(config, undefined)`.
 
 ### AdtUtils (Object Metadata/Source)
 

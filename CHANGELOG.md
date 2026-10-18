@@ -60,9 +60,36 @@ On `@mcp-abap-adt/interfaces-adt` `^19.0.0`.
   own types.
 - The client options no longer choose those requests' types: `contentTypes` /
   `unicode` for the create of a class, program, include and function group, the
-  function group's `updateMetadata` and the source `Content-Type` of an update,
-  and abapGit's `contentTypeVersion` for `link` and `pull`. The options stay
-  and still choose what they choose elsewhere.
+  function group's `updateMetadata` and the source `Content-Type` of an update.
+  Both options stay, for what they still decide outside those headers: the
+  artifact type inside a check-run document (`check`, and `validate` through
+  the check run) and a class's `readMetadata` `Accept`.
+
+### Removed (breaking)
+
+- **Accept negotiation.** No request is corrected, sent again or remembered:
+  a `406`/`415` is the call's answer. Gone: `enableAcceptCorrection` on
+  `AdtClient`, `AdtClientLegacy`, `createAdtClient` and `AdtRuntimeClient`;
+  `setAcceptCorrectionEnabled`, `getAcceptCorrectionEnabled`,
+  `ADT_ACCEPT_CORRECTION`, `clearAcceptCache`, `cachedAccept`, `rememberAccept`,
+  `wrapConnectionAcceptNegotiation`, `makeAdtRequestWithAcceptNegotiation`.
+  The read members that negotiated directly call the connection's
+  `makeAdtRequest`.
+- **`exemptFromAcceptNegotiation` and `getBaseRequest`.** The mark was read by
+  negotiation alone, and with nothing wrapping a connection
+  `getBaseRequest(connection)` was `connection.makeAdtRequest` bound. A batch
+  sends its envelope through the connection's `makeAdtRequest`; a consumer that
+  forwarded through `getBaseRequest(c)` calls `c.makeAdtRequest`, and one that
+  marked a wrapper drops the call.
+- **abapGit's options.** `AdtAbapGitClient` takes `(connection, logger?,
+  results?)`: `IAdtAbapGitClientOptions` held only `contentTypeVersion`, which
+  chose what `link` and `pull` sent; they send `headers` now.
+
+### Kept
+
+- `extractSupportedAccept` (the `406` body list) and
+  `extractSupportedContentType` (`415`, unchanged): pure functions over an
+  error, for a consumer that corrects a request itself.
 - **`extractSupportedAccept` reads only SAP's list.** SAP's `406` (measured on
   an on-premise system) names the acceptable types only in its body, as
   `Accepted content types: …` (often empty). The parser read five headers and
@@ -77,9 +104,19 @@ Pass `headers: { accept, contentType }` in the options of every call to the
 32 members, and `undefined` for the positional parameter before the options
 where it was optional. To send what 35.0.0 sent, take the pair from the table
 in [`docs/usage/MIGRATION-36.md`](docs/usage/MIGRATION-36.md); for the members
-that sent one header or none, choose the missing value your system accepts. A
+that sent one header or none, the same document lists the completed pairs and
+what an on-premise system answered to each (all accepted; the feature toggle's
+`update` could not be reached there). A
 consumer that read a header-borne `406` with `extractSupportedAccept` gets `[]`
 now: SAP names the types in the body.
+
+A consumer that relied on the correction corrects the request itself: on a
+`406`/`415`, read the types with `extractSupportedAccept` /
+`extractSupportedContentType` and call the member again with the `headers` it
+chooses; nothing in the package keeps that choice. Drop `enableAcceptCorrection`
+and `ADT_ACCEPT_CORRECTION`; replace `getBaseRequest(c)` with
+`c.makeAdtRequest`; drop `exemptFromAcceptNegotiation(…)`; pass the result set
+of `AdtAbapGitClient` as its third argument.
 
 ## [35.0.0] - 2026-10-18
 

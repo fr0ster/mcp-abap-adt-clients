@@ -67,7 +67,6 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       abapGit = new AdtAbapGitClient(
         connection,
         createLibraryLogger(),
-        undefined,
         results,
       );
       hasConfig = true;

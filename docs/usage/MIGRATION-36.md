@@ -69,7 +69,8 @@ changed on the wire whatever you pass:
   a message class message, `updateMetadata` of a message class, and `delete`
   of a metadata extension and a transport request each sent only one of the
   two; they send the whole pair now. The table shows *(none)* where 35.0.0
-  sent nothing — choose the value your system accepts.
+  sent nothing; [the completed pairs, measured](#the-completed-pairs-measured)
+  lists what SAP accepted.
 - **Requests that sent neither send both too:** a transport request's
   `checkDeletion` (a `GET` on the request), and the legacy client's direct
   `DELETE` of a class, interface, program, DDL source, function group and
@@ -80,21 +81,53 @@ changed on the wire whatever you pass:
 - **The client options no longer choose these types.** `contentTypes` (and
   with it `unicode`) used to pick the `create` type of a class, program,
   include and function group, the function group's `updateMetadata` type and
-  the source `Content-Type` of an update; abapGit's `contentTypeVersion` picked
-  the `link` / `pull` type. Those requests send your pair now. The options
-  still exist and still choose what they choose elsewhere (reads, the
-  artifact type inside a check-run document). `AdtContentTypesBase` and
-  `AdtContentTypesModern` still answer pairs (`classCreate()`, `programCreate()`,
-  `functionGroupUpdate()`, …) you can pass as `headers`.
+  the source `Content-Type` of an update. Those requests send your pair now.
+  Both options stay for what they still decide: the artifact type inside a
+  check-run document (`check`, and `validate` through the check run — on a
+  non-Unicode system `text/plain` rather than `text/plain; charset=utf-8`) and
+  a class's `readMetadata` `Accept`. `AdtContentTypesBase` and
+  `AdtContentTypesModern` still answer pairs (`classCreate()`,
+  `programCreate()`, `functionGroupUpdate()`, …) you can pass as `headers`.
+- **abapGit's options are gone.** `contentTypeVersion` picked the `link` /
+  `pull` type; `AdtAbapGitClient` is now `new AdtAbapGitClient(connection,
+  logger?, results?)` — pass the result set third, where it was fourth.
 - **An enhancement's `create` and `updateMetadata`** chose the type from the
   subtype: `enhsxsb` `application/vnd.sap.adt.enh.enhs.v2+xml`, `enhoxhb`
   `application/vnd.sap.adt.enh.enhoxhb.v4+xml`, `enhoxhh`
   `application/vnd.sap.adt.enh.enhoxhh.v3+xml` (both headers).
-- **Accept correction, when you switch it on**, still corrects: after a
-  `406`/`415` it sends the request once more with the type SAP named, and that
-  type replaces the pair on later requests to the same method and URL on that
-  connection. It is off by default (35.0.0); off, the pair you pass is what is
-  sent.
+- **Accept negotiation is gone** (below): nothing replaces the pair, ever.
+
+## Accept negotiation is removed
+
+Until 35.x a client could be switched to answer a `406` (or `415`) by sending
+the request again with the type SAP named, and to put that type on later
+requests to the same method and URL. 36.0.0 removes it: a `406`/`415` is the
+call's answer, nothing is sent again, nothing is remembered.
+
+| removed | what to do |
+|---|---|
+| `enableAcceptCorrection` (on `AdtClient`, `AdtClientLegacy`, `createAdtClient`, `AdtRuntimeClient`), `setAcceptCorrectionEnabled`, `getAcceptCorrectionEnabled`, `ADT_ACCEPT_CORRECTION` | drop them; correct the request yourself (below) |
+| `cachedAccept`, `rememberAccept`, `clearAcceptCache` | keep the type you chose in your own code and pass it as `headers` |
+| `getBaseRequest(connection)` | `connection.makeAdtRequest(…)` — nothing wraps a connection any more |
+| `exemptFromAcceptNegotiation(connection)` | drop the call: there is nothing to be exempt from |
+
+To correct a request yourself, read what SAP named and call the member again:
+
+```typescript
+import { extractSupportedAccept } from '@mcp-abap-adt/adt-clients';
+
+const first = await cls.check(config, undefined, { headers: CHECK_RUN });
+if (!first.ok && first.getError().response?.status === 406) {
+  const accepted = extractSupportedAccept(first.getError());
+  if (accepted.length > 0) {
+    await cls.check(config, undefined, {
+      headers: { ...CHECK_RUN, accept: accepted.join(', ') },
+    });
+  }
+}
+```
+
+`extractSupportedContentType(error)` does the same for a `415`.
 
 ## `extractSupportedAccept` reads SAP's list only
 
@@ -106,6 +139,28 @@ the body, which answered two fragments of the exception's namespace URI
 (`www.sap.com/abapxml`, `types/communicationframework`) for every `406`. A
 consumer that fed it a `406` carrying the types in a header gets `[]` now.
 `extractSupportedContentType` (`415`) is unchanged.
+
+## The completed pairs, measured
+
+Measured on an on-premise system (2026-10-18), with temporary objects created
+in a test package, deleted and removed from their transport afterwards. Every
+request below that sent one header or none before 36.0.0 was sent with the pair
+the table shows, and SAP accepted it:
+
+| member | Accept | Content-Type | SAP answered |
+|---|---|---|---|
+| function group `create` | `application/vnd.sap.adt.functions.groups.v3+xml` | `application/vnd.sap.adt.functions.groups.v3+xml` | `200` |
+| message class `create` | `application/xml` | `application/xml` | `201` |
+| message class `updateMetadata` | `application/vnd.sap.adt.mc.messageclass+xml` | `application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8` | `200` |
+| message class message `create` / `update` / `delete` (the `PUT`) | `application/vnd.sap.adt.mc.messageclass+xml` | `application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8` | `200` each |
+| metadata extension `delete` | `application/xml` | `application/xml` | `200` |
+| transport request `checkDeletion` (`GET`) | `application/vnd.sap.adt.transportorganizer.v1+xml` | `application/vnd.sap.adt.transportorganizer.v1+xml` | `200` |
+| transport request `delete` | `application/vnd.sap.adt.transportorganizer.v1+xml` | `application/vnd.sap.adt.transportorganizer.v1+xml` | `2xx` (an emptied request and task) |
+| legacy direct `DELETE`: class, interface, program, DDL source, function group, function module | `application/xml` | `application/xml` | `200` each |
+| feature toggle `update` | `application/vnd.sap.adt.toggle.content.v2+json` | `application/vnd.sap.adt.toggle.content.v2+json` | not measured: the system refuses to create a toggle (`403`) |
+
+The legacy `DELETE`s were sent through `AdtClientLegacy` against that (modern)
+system, which serves the same direct `DELETE`.
 
 ## The pairs 35.0.0 sent
 

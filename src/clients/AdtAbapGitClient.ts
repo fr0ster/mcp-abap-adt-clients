@@ -3,7 +3,7 @@
  *
  * Standalone top-level class — NOT a factory on AdtClient (which is
  * reserved for IAdtObject<Config, State> implementations only).
- * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, options).
+ * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, results?).
  *
  * Implements IAdtAbapGitClient. HTTP operations are delegated to
  * low-level functions in ./abapGit/*; this class owns the options,
@@ -17,7 +17,6 @@ import type {
   IAbapGitPullArgs,
   IAbapGitUnlinkArgs,
   IAdtAbapGitClient,
-  IAdtAbapGitClientOptions,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtHeaders,
@@ -63,10 +62,8 @@ export class AdtAbapGitClient<
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
-    // `contentTypeVersion` chose the type `link` and `pull` sent. Since 36.0.0
-    // those take the caller's `headers`, so nothing here reads it any more;
-    // the parameter stays because the contract's options still carry it.
-    _options?: IAdtAbapGitClientOptions,
+    // The options (`contentTypeVersion`, which chose what `link` and `pull`
+    // sent) are gone since 36.0.0: those members send the caller's `headers`.
     // The one cast in this file, and it is on the default. See AdtClass.
     results: R = abapGitDocuments as unknown as R,
   ) {

@@ -80,86 +80,36 @@ Use the real handles and inspect activation messages, including `type="E"`.
 The transport provides no transaction or rollback; callers own recovery and
 cleanup after partial failures.
 
-Accept negotiation never corrects or resends an envelope or its parts. (Since
-35.0.0 it corrects nothing anywhere unless switched on.) A batch
-connection is exempt from it: an `AdtClient` built over one does not wrap it,
-whatever `enableAcceptCorrection` it is given, and a member that negotiates by
-itself sends through it once. On a connection an `AdtClient` wrapped with
-correction on, a `406` or `415` answered to the envelope reaches `execute()` and
-every part of that envelope as it came. A part's own `401`, `406` or `415` is
-that part's answer like any other status; nothing reads it, corrects it or
-sends it again. A connection of your own that members send through instead of
-the batch connection — a per-call wrapper over it, say — is a different object
-and is negotiated like any other; mark it with `exemptFromAcceptNegotiation(wrapper)`
-(exported by the package) and it is exempt too. When the batch connection wraps
-a forwarder of yours over a connection an `AdtClient` wrapped, forward through
-`getBaseRequest(thatConnection)` (exported): the envelope then bypasses that
-connection's accept negotiation and is sent once. To correct a part that SAP
-answered with `406` yourself, read the acceptable formats from that answer with
-`extractSupportedAccept(error)` (exported): it takes the error the `406` came
-as — any value; one without a response yields an empty list — and returns the
-supported media types as a `string[]`. Since 36.0.0 it reads only the list SAP
-writes into the body of its `406` — the exception message ends `Accepted
-content types: …`, comma-separated, and the list is often empty (measured on an
-on-premise system) — without duplicates, and no header: SAP's `406` names the
-types in its body only. Until 35.x it also scanned the headers and every
-`type/subtype` in the body, so each `406` answered two fragments of the
-exception's namespace URI as types. It is the reading accept negotiation
-applies to a `406` itself.
+Nothing corrects or resends an envelope or its parts: accept negotiation was
+removed in 36.0.0. A `406` or `415` answered to the envelope reaches `execute()`
+and every part of that envelope as it came; a part's own `401`, `406` or `415`
+is that part's answer like any other status. The envelope is sent through the
+connection's own `makeAdtRequest`, once. (`exemptFromAcceptNegotiation` and
+`getBaseRequest`, which kept a wrapped connection's negotiation off the
+envelope, are gone with it: a forwarder of yours forwards through the
+connection's `makeAdtRequest`.)
 
-The corrected Accept is remembered where negotiation remembers its own: the
-connection's accept cache, keyed by method and URL. `cachedAccept(connection,
-request)` (exported) returns the Accept stored for that request's method and
-URL on that connection — what a `406` taught negotiation or `rememberAccept`
-stored — or `undefined` when there is none. It is a plain read of the cache and
-ignores the correction switch, so a consumer that corrects requests itself can
-use it while negotiation is off. `rememberAccept(connection, request, accept)` (exported) stores
-`accept` for the request's method and URL on the connection and returns nothing;
-a later request through an `AdtClient` with correction on over the same
-connection sends it (with correction off, only the consumer's own code reads it). Both read and write that cache only, so a correction
-learned on either path serves both. A batch is yours, and so is
-what SAP answered to each of its parts. The envelope request itself still goes
-through the connection's own handling — credential renewal, CSRF recovery and
-session — as every request does: that is about the connection to the endpoint,
-not about what the parts answered.
+To correct a part that SAP answered with `406` yourself, read the acceptable
+formats from that answer with `extractSupportedAccept(error)` (exported): it
+takes the error the `406` came as — any value; one without a response yields an
+empty list — and returns the supported media types as a `string[]`. It reads
+only the list SAP writes into the body of its `406` — the exception message
+ends `Accepted content types: …`, comma-separated, and the list is often empty
+(measured on an on-premise system) — without duplicates, and no header. Until
+35.x it also scanned the headers and every `type/subtype` in the body, so each
+`406` answered two fragments of the exception's namespace URI as types.
+Record the part again with the `headers` you choose; nothing in this package
+remembers the correction for you. A batch is yours, and so is what SAP answered
+to each of its parts. The envelope request itself still goes through the
+connection's own handling — credential renewal, CSRF recovery and session — as
+every request does: that is about the connection to the endpoint, not about
+what the parts answered.
 
-At an attached debugger stop, use the attached connection and its stateful session:
-
-```typescript
-import { AbapDebugger, AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
-
-const batch = new AdtBatchConnection(debugConnection, { endpoint: 'debugger' });
-const debuggerApi = new AbapDebugger(batch);
-const pending = [
-  // Debugger recordings default to the attached stateful session.
-  debuggerApi.step('stepOver'),
-  debuggerApi.getStack(),
-  debuggerApi.getVariables(variableIds, { headers }), // IDs obtained at the stop.
-];
-await batch.execute();
-const answers = await Promise.all(pending);
-for (const answer of answers) {
-  if (!answer.ok) throw new Error(answer.getError().message);
-}
-```
-
-`execute()` returns the last outer wire response. Empty execution returns a synthetic
-`{ status: 204, statusText: 'Empty batch', headers: {}, data: '' }` without sending.
-Recorded request promises receive inner responses, in order: 2xx resolves; other
-statuses reject with an Error carrying `response: { status, statusText, headers,
-data }`, matching direct HTTP failure handling. Members keep their usual
-`IAdtResponse` and strategy behavior. Envelope/parse failures stop execution immediately and reject `execute()` and
-parts in the failed envelope. Every part of that envelope rejects with the same
-object and message, and its `request` is the envelope's own
-(`{ method: 'POST', url: '/sap/bc/adt/communication/batch' }`, or the debugger's
-batch URL), not any part's; a failure that takes no property, a frozen one,
-reaches every part as it came, without it. Unsent runs and queued follow-ups reject with a
-library error saying the request was not sent because an earlier envelope failed;
 that error carries the cause, without a SAP response and without a `request` of
 its own. Missing parts reject with a part-count error. A count
 mismatch also rejects `execute()`. Attach rejection handlers before execution when
 using raw connection promises. Each execute sends follow-up envelopes for requests recorded during settlement
-by member continuations; accept negotiation records none. It yields one event-loop turn
+by member continuations. It yields one event-loop turn
 after settling each envelope to let member continuations record requests. It
 returns the last outer response once that queue is empty. A limit of 100 envelopes
 rejects execution and all remaining requests rather than looping forever.

@@ -280,11 +280,9 @@ export const ACCEPT_FEATURE_TOGGLE_SOURCE = CT_FEATURE_TOGGLE_SOURCE;
 export const MESSAGE_CLASS_UPDATE_CONTENT_TYPE =
   'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
 
-// abapGit (/sap/bc/adt/abapgit/*)
-// Envelope for the repository entity (sapcli parity: v3; v4 advertised
-// in discovery but kept opt-in via IAdtAbapGitClientOptions.contentTypeVersion).
-export const CT_ABAPGIT_REPO_V3 = 'application/abapgit.adt.repo.v3+xml';
-export const CT_ABAPGIT_REPO_V4 = 'application/abapgit.adt.repo.v4+xml';
+// abapGit (/sap/bc/adt/abapgit/*). `link` and `pull` send the caller's
+// `headers` since 36.0.0 (until then `application/abapgit.adt.repo.v3+xml`,
+// or v4 through the removed `contentTypeVersion` option).
 
 // Accept for the repo list (sapcli uses v2; v4 advertised in discovery).
 export const ACCEPT_ABAPGIT_REPOS_V2 = 'application/abapgit.adt.repos.v2+xml';

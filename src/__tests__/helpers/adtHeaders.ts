@@ -7,7 +7,10 @@
  * implementations sent before 36.0.0 (recorded from 35.0.0 against a stub
  * connection), so a live run asks SAP exactly what it asked before. Where a
  * request carried only one of the two headers, or neither, the missing value
- * is completed here — marked below, and not measured against a system.
+ * is completed here — marked below. Measured on an on-premise system
+ * (2026-10-18): every completed pair was accepted (2xx), except the feature
+ * toggle's `update`, which that system cannot reach (it refuses to create a
+ * toggle, 403).
  *
  * Before 36.0.0 a few members read the client's `contentTypes` provider
  * (the legacy client sets `AdtContentTypesBase`); `headersOf` does the same,
