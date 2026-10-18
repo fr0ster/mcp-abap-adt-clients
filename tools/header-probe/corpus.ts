@@ -52,12 +52,8 @@ export type AuthorizationVerdict =
 export function authorizationVerdict(
   status: number | undefined,
 ): AuthorizationVerdict {
-  if (status === 401 || status === 403)
-    return {
-      go: false,
-      exitCode: 2,
-      line: `Oops: no authorization (${status})`,
-    };
+  // A 401 or an authorization 403 is the run's authorization stop (the
+  // watcher sees this read as it sees every other); this says the rest.
   if (status === undefined)
     return {
       go: false,
@@ -611,6 +607,25 @@ export const isWrite = (method: string): boolean =>
 
 // --- authorization -----------------------------------------------------------
 
+/**
+ * The SAP exception types that decide a 403 is the user's authorization:
+ * those of `cx_adt_res_no_authority` / `cx_adt_res_no_authorization` (from
+ * reading SAP's code), by their names. Another type that only mentions
+ * authorization (measured: `ExceptionNoToggleAuthorization`, "Package
+ * failure occurs for toggle …") is decided by its text.
+ */
+export function isAuthorizationType(type: string): boolean {
+  const lower = type.toLowerCase();
+  return [
+    'noauthority',
+    'noauthorization',
+    'noauthorisation',
+    'notauthorized',
+    'notauthorised',
+    'unauthorized',
+  ].some((words) => lower.includes(words));
+}
+
 /** A 403 text that names a refusal of the user's authorization. */
 export const AUTHORIZATION_TEXTS: readonly string[] = [
   'not authorized',
@@ -659,10 +674,12 @@ export function authorizationProblem(
     return { status: 403, kind: 'CSRF' };
   const text = (refusal?.message ?? body).toLowerCase();
   const type = refusal?.adtType ?? '';
-  const named =
-    /authori[sz]/i.test(type) ||
-    AUTHORIZATION_TEXTS.some((words) => text.includes(words));
-  if (!named) return undefined;
+  // The type decides first: an authorization type is a stop, whatever the
+  // text says ("not authorized to modify this package" included).
+  if (isAuthorizationType(type)) return { status: 403, kind: type };
+  // Otherwise the text decides — unless it is about the object, not the user.
+  if (!AUTHORIZATION_TEXTS.some((words) => text.includes(words)))
+    return undefined;
   if (OBJECT_TEXTS.some((words) => text.includes(words))) return undefined;
   return { status: 403, kind: type || 'authorization' };
 }

@@ -46,7 +46,7 @@ import {
   runCorpus,
   runFull,
 } from '../../../../tools/header-probe/corpusRun';
-import { Interrupt } from '../../../../tools/header-probe/ledger';
+import { Interrupt, Interrupted } from '../../../../tools/header-probe/ledger';
 import {
   clientsOn,
   DEBUGGERS,
@@ -196,11 +196,22 @@ function output() {
   };
 }
 
+const AUTH_EXCEPTION = (type: string, message: string) =>
+  `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="${type}"/><message lang="EN">${message}</message></exc:exception>`;
+
 describe('the authorization check', () => {
   it.each([
-    401, 403,
-  ])('stops at %i with the Oops, exit 2, and sends nothing more', async (status) => {
-    const system = fakeSystem(() => ({ status }));
+    [401, '', 'no SAP exception'],
+    [
+      403,
+      AUTH_EXCEPTION(
+        'ExceptionResourceNoAuthorization',
+        'You are not authorized',
+      ),
+      'ExceptionResourceNoAuthorization',
+    ],
+  ])('a %i at the discovery read stops the run: the Oops, exit 2, nothing more sent, the report marked', async (status, body, kind) => {
+    const system = fakeSystem(() => ({ status, body }));
     const dir = tempDir();
     const { lines, out } = output();
     let asked = false;
@@ -217,10 +228,31 @@ describe('the authorization check', () => {
       out,
     });
     expect(result.exitCode).toBe(2);
-    expect(lines).toEqual([`Oops: no authorization (${status})`]);
+    expect(lines[lines.length - 1]).toBe(
+      `Oops: authorization problem (${status}, ${kind}) at GET /sap/bc/adt/discovery — fix it and run again`,
+    );
     expect(system.seen).toHaveLength(1);
     expect(system.seen[0].url).toBe('/sap/bc/adt/discovery');
     expect(asked).toBe(false);
+    expect(result.corpus?.error).toMatch(/^stopped: authorization/);
+    expect(fs.readdirSync(dir)).toHaveLength(2);
+  });
+
+  it('a 403 that is not an authorization refusal is a status, not a stop', async () => {
+    const system = fakeSystem(() => ({ status: 403, body: 'Forbidden' }));
+    const dir = tempDir();
+    const { lines, out } = output();
+    const result = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: dir,
+      clientOptions: async () => ({}),
+      out,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(lines).toEqual(['The discovery read answered 403']);
     expect(fs.readdirSync(dir)).toEqual([]);
   });
 
@@ -1852,5 +1884,147 @@ describe('an authorization problem', () => {
     expect(fs.readFileSync(result.files[1], 'utf8')).toContain(
       'stopped: authorization',
     );
+  });
+});
+
+describe('an authorization type decides first', () => {
+  it('"not authorized to modify this package" with an authorization type is a stop', () => {
+    expect(
+      authorizationProblem({
+        status: 403,
+        data: AUTH_EXCEPTION(
+          'ExceptionResourceNoAuthorization',
+          'You are not authorized to modify this package',
+        ),
+        headers: {},
+      }),
+    ).toEqual({ status: 403, kind: 'ExceptionResourceNoAuthorization' });
+    // A type that only mentions authorization is decided by its text.
+    expect(
+      authorizationProblem({
+        status: 403,
+        data: AUTH_EXCEPTION(
+          'ExceptionNoToggleAuthorization',
+          'Package failure occurs for toggle Z_HPEC_PROBE',
+        ),
+        headers: {},
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe('a stop in any phase of the full run', () => {
+  const full = (
+    answer: (request: ISeen) => Answer,
+    writeCycle?: Parameters<typeof runFull>[0]['writeCycle'],
+    interrupt = new Interrupt(),
+  ) => {
+    const system = fakeSystem(answer);
+    const dir = tempDir();
+    const { lines, out } = output();
+    return runFull({
+      open: async () => system.connection,
+      interrupt,
+      outDir: dir,
+      clientOptions: async () => ({}),
+      out,
+      ...(writeCycle ? { writeCycle } : {}),
+    }).then((result) => ({ result, lines, dir, system }));
+  };
+  const denied = { status: 401 };
+  const search = (request: ISeen) =>
+    request.url.startsWith('/sap/bc/adt/repository/informationsystem/search')
+      ? {
+          status: 200,
+          body: '<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:name="CL_REAL_ONE"/></adtcore:objectReferences>',
+        }
+      : undefined;
+
+  it('at the first discovery read: the report, marked, exit 2', async () => {
+    const { result, lines, dir } = await full(() => denied);
+    expect(result.exitCode).toBe(2);
+    expect(result.file?.error).toMatch(/^stopped: authorization \(401/);
+    expect(result.file?.phases).toEqual([]);
+    expect(lines[lines.length - 1]).toMatch(
+      /^Oops: authorization problem \(401, .*\) at GET \/sap\/bc\/adt\/discovery/,
+    );
+    expect(
+      fs.readdirSync(dir).some((n) => n.startsWith('header-corpus-')),
+    ).toBe(true);
+  });
+
+  it("at a later run's discovery read: no later run, exit 2", async () => {
+    let reads = 0;
+    const { result, system } = await full((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return ++reads >= 3 ? denied : { status: 200, body: DISCOVERY };
+      return { status: 404 };
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.file?.error).toMatch(/^stopped: authorization \(401/);
+    // The third read (the second run's) stopped it: no fourth.
+    expect(
+      system.seen.filter((s) => s.url === '/sap/bc/adt/discovery'),
+    ).toHaveLength(3);
+  });
+
+  it('in phase 2 reads: the report, exit 2', async () => {
+    const { result } = await full((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      const hit = search(request);
+      if (hit) return hit;
+      if (request.url.includes('cl_real_one')) return denied;
+      return { status: 404 };
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.file?.error).toMatch(/^stopped: authorization \(401/);
+    expect(result.file?.phases.map((p) => p.name.split(':')[0])).toEqual([
+      'phase 1',
+      'phase 2',
+    ]);
+  });
+
+  it('in phase 2 writes: the report, exit 2', async () => {
+    const { result } = await full(
+      (request) =>
+        request.url === '/sap/bc/adt/discovery'
+          ? { status: 200, body: DISCOVERY }
+          : request.url === '/sap/bc/adt/write-denied'
+            ? denied
+            : { status: 404 },
+      async ({ connection }) => {
+        await traced(connection)
+          .makeAdtRequest({
+            url: '/sap/bc/adt/write-denied',
+            method: 'POST',
+            timeout: 0,
+            data: 'x',
+          })
+          .catch(() => undefined);
+        throw new Interrupted();
+      },
+    );
+    expect(result.exitCode).toBe(2);
+    expect(result.file?.error).toMatch(
+      /^stopped: authorization \(401, .*\) at POST \/sap\/bc\/adt\/write-denied/,
+    );
+  });
+
+  it('Ctrl-C in phase 2: the report, exit 130', async () => {
+    const interrupt = new Interrupt();
+    const { result } = await full(
+      (request) =>
+        request.url === '/sap/bc/adt/discovery'
+          ? { status: 200, body: DISCOVERY }
+          : { status: 404 },
+      async () => {
+        interrupt.stop();
+        throw new Interrupted();
+      },
+      interrupt,
+    );
+    expect(result.exitCode).toBe(130);
+    expect(result.file?.error).toBe('interrupted (SIGINT)');
   });
 });

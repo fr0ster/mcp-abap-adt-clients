@@ -178,8 +178,12 @@ header corpus, everything batched and poisoned envelopes split:
    (from the connection's code, not measured here). A 401 or 403 there —
    the connection's `AuthRefusedError` carrying the 401, or the 403 itself —
    prints `Oops: no authorization (<status>)` and exits with 2; nothing else
-   is sent and no file is written. Then `GET /sap/bc/adt/discovery`: a 401
-   or 403 gives the same Oops, any other non-2xx prints the status and stops.
+   is sent and no file is written. Then `GET /sap/bc/adt/discovery`, watched
+   like every other request: an authorization problem there (below) is the
+   authorization stop, its report written and marked; any other non-2xx — a
+   403 that is not an authorization refusal included — prints the status and
+   stops with exit 1. Every later run's discovery read is watched the same
+   way.
 
    **An authorization problem later in the run stops it:** a person fixes it,
    not the script. Every answer is watched — every request and envelope
@@ -192,15 +196,24 @@ header corpus, everything batched and poisoned envelopes split:
    - any 401;
    - a 403 that is a CSRF refusal: `x-csrf-token: Required`, or a body that
      names the CSRF token;
-   - a 403 whose SAP exception type names authorization (`…Authoriz…`), or
-     whose text holds `not authorized`, `not authorised`, `no authorization`,
-     `no authorisation`, `authorization missing`, `missing authorization`,
-     `keine Berechtigung` or `nicht berechtigt` —
-   unless its text is about the object, not the user (`does not exist`,
-   `not found`, `package`, `Paket`): a 403 such as `ExceptionNoToggleAuthorization`
-   "Package failure occurs for toggle …" or `ExceptionResourceNoAccess`
-   "Tunnel is disabled in ATC settings." (both measured on the probe name) is
-   an answer, not a stop. The cleanup's own requests may still be refused:
+   - a 403 whose SAP exception type is an authorization refusal — the types
+     of `cx_adt_res_no_authority` / `cx_adt_res_no_authorization` (from
+     reading SAP's code), recognised by a name holding `NoAuthority`,
+     `NoAuthorization`, `NotAuthorized` or `Unauthorized`. The type decides
+     first: such a 403 is a stop whatever its text says ("You are not
+     authorized to modify this package" included);
+   - for any other type, a 403 whose text holds `not authorized`, `not
+     authorised`, `no authorization`, `no authorisation`, `authorization
+     missing`, `missing authorization`, `keine Berechtigung` or `nicht
+     berechtigt` — unless the text is about the object, not the user (`does
+     not exist`, `not found`, `package`, `Paket`).
+   So a 403 such as `ExceptionNoToggleAuthorization` "Package failure occurs
+   for toggle …" or `ExceptionResourceNoAccess` "Tunnel is disabled in ATC
+   settings." (both measured on the probe name) is an answer, not a stop. A
+   stop in any phase ends that phase and the run, and the report is always
+   written: exit 2 for an authorization stop, 130 for Ctrl-C. As on Ctrl-C,
+   the member call in flight finishes whole — its own chain and its unlocks
+   included — so that no lock is left held. The cleanup's own requests may still be refused:
    each such removal is `removed: unknown <status>`, listed under may remain.
    The connection's own CSRF token refresh is left as it is.
 2. **The endpoints** (`--from`):

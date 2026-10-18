@@ -1018,7 +1018,8 @@ export async function readDiscovery(
   let status: number | undefined;
   let document = '';
   try {
-    const wire = await connection.makeAdtRequest({
+    // Traced: the authorization watcher sees this read too.
+    const wire = await traced(connection).makeAdtRequest({
       url: '/sap/bc/adt/discovery',
       method: 'GET',
       timeout: 0,
@@ -1109,11 +1110,6 @@ async function runOn(
   input: ICorpusRunInput,
 ): Promise<{ exitCode: number; files: string[]; corpus?: ICorpus }> {
   const { out } = input;
-  const discovery = await readDiscovery(connection);
-  if (!discovery.ok) {
-    out.progress(discovery.line);
-    return { exitCode: discovery.exitCode, files: [] };
-  }
   const corpus: ICorpus = {
     source: input.source,
     headers: input.mode,
@@ -1123,6 +1119,21 @@ async function runOn(
     envelopes: [],
     ...(input.sequential ? { sequential: true } : {}),
   };
+  const discovery = await readDiscovery(connection);
+  if (!discovery.ok) {
+    const stop = input.auth?.stop();
+    if (!stop) {
+      out.progress(discovery.line);
+      return { exitCode: discovery.exitCode, files: [] };
+    }
+    // An authorization stop at the discovery read: the report says so.
+    corpus.error = `stopped: authorization (${stop.status}, ${stop.kind}) at ${stop.endpoint}`;
+    corpus.finishedAt = new Date().toISOString();
+    const files = writeCorpus(corpus, input.outDir);
+    for (const file of files) out.progress(file);
+    out.progress(authorizationLine(stop));
+    return { exitCode: 2, files, corpus };
+  }
   const meter: IMeter = { envelopes: corpus.envelopes as IEnvelopeTiming[] };
   const registered = new Set<string>();
   const ledger = new Ledger((removal: IRemoval) => {
@@ -1332,6 +1343,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
   const meter: IMeter = { envelopes: [] };
   const corpora: ICorpus[] = [];
   for (const mode of ['bogus', 'none'] as const) {
+    if (input.interrupt.requested) break;
     const corpus: ICorpus = {
       source: 'clients',
       headers: mode,
@@ -1405,6 +1417,9 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
       );
       try {
         await run.all(planned);
+      } catch (thrown) {
+        if (!(thrown instanceof Interrupted)) throw thrown;
+        corpus.error = 'stopped';
       } finally {
         corpus.splits = run.splits;
       }
@@ -1413,7 +1428,8 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
     corpora.push(corpus);
   }
   const [bogus, none] = corpora;
-  bogus.needs = classifyNeeds(bogus.rows, none.rows);
+  if (!bogus) return { evidence: [], objects, files: [] };
+  bogus.needs = classifyNeeds(bogus.rows, none?.rows ?? []);
   const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
   return { evidence: evidenceOf(bogus.needs, 'clients', 2), objects, files };
 }
@@ -1479,15 +1495,21 @@ export async function runFull(
   const auth = guardAuthorization(input.interrupt);
   try {
     const authorized = await readDiscovery(connection);
-    if (!authorized.ok) {
+    if (!authorized.ok && !auth.stop()) {
       out.progress(authorized.line);
       return { exitCode: authorized.exitCode, files: [] };
     }
+    // Stopped (an authorization problem, Ctrl-C): no phase starts; the
+    // report is still written.
+    const stopped = () => Boolean(auth.stop()) || input.interrupt.requested;
     const phases: IHeaderCorpusFile['phases'] = [];
-    const timed = async <R>(name: string, body: () => Promise<R>) => {
+    const timed = async (name: string, body: () => Promise<void>) => {
       const at = performance.now();
       try {
-        return await body();
+        await body();
+      } catch (thrown) {
+        // A stop inside a phase ends the phase, not the report.
+        if (!(thrown instanceof Interrupted)) throw thrown;
       } finally {
         phases.push({ name, ms: performance.now() - at });
       }
@@ -1495,29 +1517,34 @@ export async function runFull(
     const files: string[] = [];
     const corpora = new Map<string, ICorpus>();
     let error: string | undefined;
-    await timed('phase 1: the probe name, every source and mode', async () => {
-      for (const { source, mode } of PHASE1) {
-        if (input.interrupt.requested) break;
-        out.progress(`phase 1: ${source} ${mode}`);
-        const result = await runOn(connection, {
-          ...input,
-          source,
-          mode,
-          auth,
-          // An authorization stop is said once, at the end of the full run.
-          out: {
-            ...out,
-            progress: (line) =>
-              line.startsWith('Oops: authorization')
-                ? undefined
-                : out.progress(line),
-          },
-        });
-        files.push(...result.files);
-        if (result.corpus) corpora.set(`${source} ${mode}`, result.corpus);
-        if (result.corpus?.error) error ??= result.corpus.error;
-      }
-    });
+    if (!stopped())
+      await timed(
+        'phase 1: the probe name, every source and mode',
+        async () => {
+          for (const { source, mode } of PHASE1) {
+            if (stopped()) break;
+            out.progress(`phase 1: ${source} ${mode}`);
+            const result = await runOn(connection, {
+              ...input,
+              source,
+              mode,
+              auth,
+              // An authorization stop is said once, at the end of the full run.
+              out: {
+                ...out,
+                progress: (line) =>
+                  line.startsWith('Oops: authorization')
+                    ? undefined
+                    : out.progress(line),
+              },
+            });
+            files.push(...result.files);
+            if (result.corpus) corpora.set(`${source} ${mode}`, result.corpus);
+            if (result.corpus?.error) error ??= result.corpus.error;
+            if (result.exitCode === 2) break;
+          }
+        },
+      );
     const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
     const needs1 = {
       discovery: classifyNeeds(
@@ -1543,7 +1570,7 @@ export async function runFull(
     );
     let objects: IHeaderCorpusFile['objects'] = [];
     let removals: IRemoval[] = [];
-    if (!input.interrupt.requested && unknownReads.size)
+    if (!stopped() && unknownReads.size)
       await timed(
         `phase 2: reads on existing objects (${unknownReads.size} unknown)`,
         async () => {
@@ -1563,7 +1590,7 @@ export async function runFull(
           files.push(...reads.files);
         },
       );
-    if (!input.interrupt.requested && unknownWrites.size && input.writeCycle) {
+    if (!stopped() && unknownWrites.size && input.writeCycle) {
       const cycle = input.writeCycle;
       await timed(
         `phase 2: writes on temporary objects (${unknownWrites.size} unknown)`,
@@ -1641,10 +1668,10 @@ export async function runFull(
           `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
         );
     }
-    const stopped = auth.stop();
-    if (stopped) out.progress(authorizationLine(stopped));
+    const stop = auth.stop();
+    if (stop) out.progress(authorizationLine(stop));
     return {
-      exitCode: stopped ? 2 : input.interrupt.requested ? 130 : 0,
+      exitCode: stop ? 2 : input.interrupt.requested ? 130 : 0,
       files: [...files, `${base}.json`, `${base}.md`],
       file,
     };
