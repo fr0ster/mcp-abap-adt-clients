@@ -523,6 +523,8 @@ export interface ICorpusRow {
   settled?: { depth: number; path: string };
   /** A single call whose own 500 poisoned its group: the cause of a poisoning. */
   poisonCause?: boolean;
+  /** The headers mode of the run the row came from (a full run's rows). */
+  headersMode?: HeadersMode;
   /** Batched: the envelope it went out in (see {@link ICorpus.envelopes}). */
   envelope?: number;
   /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
@@ -1705,6 +1707,10 @@ export interface IHeaderCorpusEntry {
   /** Whether the endpoint exists, and the answer that says so. */
   exists: Exists;
   existsBecause: string;
+  /** What the client sends today, and the answer it got (corpus mode, phase 1 and 2). */
+  knownWorking: string[];
+  /** The Accept values the client sends that got a 2xx. */
+  workingAccept: string[];
   /** Who said what: status and raw text. */
   evidence: string[];
 }
@@ -1717,6 +1723,8 @@ export function buildHeaderCorpus(
     pairs: ReadonlyMap<string, readonly string[]>;
     /** Per endpoint, from every row of every run. */
     existence?: ReadonlyMap<string, { exists: Exists; reason: string }>;
+    /** Per endpoint: `who: Accept … → status`. */
+    knownWorking?: ReadonlyMap<string, readonly string[]>;
   },
 ): IHeaderCorpusEntry[] {
   const by = new Map<string, IEvidence[]>();
@@ -1754,6 +1762,16 @@ export function buildHeaderCorpus(
       exists: extras.existence?.get(endpoint)?.exists ?? 'unknown',
       existsBecause:
         extras.existence?.get(endpoint)?.reason ?? 'no answer recorded',
+      knownWorking: [...(extras.knownWorking?.get(endpoint) ?? [])],
+      workingAccept: [
+        ...new Set(
+          (extras.knownWorking?.get(endpoint) ?? [])
+            .filter((text) => text.endsWith(' (works)'))
+            .map((text) =>
+              text.slice(text.indexOf('Accept ') + 7, text.lastIndexOf(' → ')),
+            ),
+        ),
+      ],
       evidence: items.map(
         (item) =>
           `phase ${item.phase} ${item.source} ${item.who}: ${item.text}`,
@@ -1846,12 +1864,12 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
       continue;
     }
     lines.push(
-      '| endpoint | exists | Accept named | Content-Type named | discovery Content-Type | pair table | settled by | evidence |',
-      '|---|---|---|---|---|---|---|---|',
+      '| endpoint | exists | Accept named | Content-Type named | discovery Content-Type | pair table | knownWorking | settled by | evidence |',
+      '|---|---|---|---|---|---|---|---|---|',
     );
     for (const entry of of)
       lines.push(
-        `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+        `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${cell(entry.knownWorking.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
       );
   }
   lines.push('', '## Updates with a bogus Accept', '');

@@ -1508,7 +1508,8 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
   );
   const meter: IMeter = { envelopes: [] };
   const corpora: ICorpus[] = [];
-  for (const mode of ['bogus', 'none'] as const) {
+  // The client's own headers too (corpus): which Accept works on a real object.
+  for (const mode of ['bogus', 'none', 'corpus'] as const) {
     if (input.interrupt.requested) break;
     const corpus: ICorpus = {
       source: 'clients',
@@ -1537,6 +1538,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
         named: emptyNamed(),
         ...(mode === 'bogus' ? { bogus: 'accept' as const } : {}),
         ...(member.pair ? { pair: { ...member.pair } } : {}),
+        headersMode: mode,
         asked: askedFor(
           mode,
           member.pair,
@@ -1594,7 +1596,8 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
     corpus.finishedAt = new Date().toISOString();
     corpora.push(corpus);
   }
-  const [bogus, none] = corpora;
+  const bogus = corpora.find((corpus) => corpus.headers === 'bogus');
+  const none = corpora.find((corpus) => corpus.headers === 'none');
   if (!bogus) return { evidence: [], objects, files: [], rows: [] };
   bogus.needs = classifyNeeds(bogus.rows, none?.rows ?? []);
   const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
@@ -1710,6 +1713,7 @@ export async function runFull(
           state,
         );
         files.push(...result.files);
+        for (const row of result.corpus.rows) row.headersMode = mode;
         corpora.set(`${source} ${mode}`, result.corpus);
       }
     });
@@ -1725,9 +1729,17 @@ export async function runFull(
       ...evidenceOf(needs1.clients, 'clients', 1),
     );
     const unknown = needs1.clients.filter((entry) => entry.needs === 'unknown');
+    // The reads still unknown, and those that need Accept but whose 406
+    // named nothing: a real object shows which Accept works.
     const unknownReads = new Set(
-      unknown
-        .filter((entry) => entry.endpoint.includes(' — GET '))
+      needs1.clients
+        .filter(
+          (entry) =>
+            entry.endpoint.includes(' — GET ') &&
+            (entry.needs === 'unknown' ||
+              ((entry.needs === 'accept' || entry.needs === 'both') &&
+                !entry.namedAccept.length)),
+        )
         .map((entry) => entry.endpoint),
     );
     const unknownWrites = new Set(
@@ -1830,7 +1842,22 @@ export async function runFull(
       ...[...corpora.values()].flatMap((corpus) => corpus.rows),
       ...phase2Rows,
     ]);
-    const extras = { discoveryContentType, pairs, existence };
+    // What the client sends today, and what it got: the corpus-mode answers
+    // of phase 1 (the probe name) and phase 2 (an existing object).
+    const knownWorking = new Map<string, string[]>();
+    for (const row of [...rowsOf('clients corpus'), ...phase2Rows]) {
+      if (row.headersMode !== 'corpus' || !row.endpoint || row.skipped)
+        continue;
+      const accept = row.onWire[0]?.accept;
+      if (!accept) continue;
+      const key = endpointKey(row.endpoint);
+      const status = row.status ?? 'no answer';
+      const text = `${row.group}.${row.label}: Accept ${accept} → ${status}${row.status !== undefined && row.status >= 200 && row.status < 300 ? ' (works)' : ''}`;
+      knownWorking.set(key, [
+        ...new Set([...(knownWorking.get(key) ?? []), text]),
+      ]);
+    }
+    const extras = { discoveryContentType, pairs, existence, knownWorking };
     const entries = buildHeaderCorpus(evidence, extras);
     file = {
       startedAt,

@@ -59,10 +59,12 @@ header corpus, everything batched and poisoned envelopes split:
    and bogus (corpus for the comparison column). It settles every endpoint
    whose `needs` it can.
 3. **Phase 2, real objects, for the clients endpoints still `unknown` only:**
-   - **reads** (`GET` with the object's name in the path): one existing
-     object per object type, found read-only by the repository's quick search
+   - **reads** (`GET` with the object's name in the path) still unknown, or
+     needing Accept with a 406 that named nothing: one existing object per
+     object type, found read-only by the repository's quick search
      (`query=*`, the first hit), is named in place of the probe name; each
-     such read goes with a bogus Accept, then with none, in envelopes.
+     such read goes with a bogus Accept, with none, and with the client's own
+     headers, in envelopes.
      Nothing is created. A handler with no search type, or a type the search
      finds nothing of, stays unknown with that reason.
    - **writes**: the write cycle (the former header probe, below), only for the
@@ -209,6 +211,19 @@ header corpus, everything batched and poisoned envelopes split:
    time. There is no timer and no timeout of the script's own. Ctrl-C stops
    new requests (asked before each envelope and request),
    the one in flight finishes, and the `finally` cleanup runs.
+
+### knownWorking
+
+Where SAP's 406 names nothing (T100 `SADT_RESOURCE` 037, "The message
+content is not acceptable", with no list), the header corpus says which
+Accept works from what the client sends today: `knownWorking` lists, per
+endpoint, every corpus-mode answer — `<member>: Accept <what went on the
+wire> → <status>`, marked `(works)` on a 2xx — from phase 1 (the probe name)
+and from phase 2, which reads such an endpoint (a GET naming an object) on an
+existing object with the client's own headers as well as with a bogus Accept
+and with none. `workingAccept` keeps the Accept values that got a 2xx. The
+pair table (`pairs.ts`) has no row for a member that takes no `headers` —
+most reads —, so its column is empty there by design.
 
 ### Endpoint existence
 

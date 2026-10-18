@@ -2719,3 +2719,64 @@ describe('every phase counts', () => {
     expect(of('POST /sap/bc/adt/oo/classes')?.exists).toBe('yes');
   });
 });
+
+describe('knownWorking', () => {
+  it("reads an endpoint whose 406 named nothing on an existing object, with the client's own headers, and records what worked", async () => {
+    const real = 'CL_REAL_ONE';
+    const probeRead = `/sap/bc/adt/oo/classes/${PROBE_NAME.toLowerCase()}`;
+    const realRead = `/sap/bc/adt/oo/classes/${real.toLowerCase()}`;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.url.startsWith(
+          '/sap/bc/adt/repository/informationsystem/search',
+        )
+      )
+        return {
+          status: 200,
+          body: `<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:name="${real}"/></adtcore:objectReferences>`,
+        };
+      // On the probe name a bogus Accept gets a 406 that names nothing.
+      if (request.url === probeRead)
+        return request.headers.accept === PROBE_TYPE
+          ? {
+              status: 406,
+              body: AUTH_EXCEPTION(
+                'ExceptionResourceNotAcceptable',
+                'The message content is not acceptable',
+              ),
+            }
+          : { status: 404 };
+      if (request.url === realRead)
+        return request.headers.accept === PROBE_TYPE
+          ? { status: 406 }
+          : { status: 200, body: '<class/>' };
+      return { status: 404 };
+    });
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const entry = result.file?.entries.find(
+      (e) => e.endpoint === 'GET /sap/bc/adt/oo/classes/{name}',
+    );
+    expect(entry?.needs).toBe('accept');
+    expect(entry?.namedAccept).toEqual([]);
+    expect(entry?.workingAccept.length).toBeGreaterThan(0);
+    expect(
+      entry?.knownWorking.some((text) => text.endsWith('→ 200 (works)')),
+    ).toBe(true);
+    // The corpus-mode read on the real object went with the client's own Accept.
+    const corpusRead = system.seen.find(
+      (s) =>
+        s.url === realRead &&
+        s.headers.accept &&
+        s.headers.accept !== PROBE_TYPE,
+    );
+    expect(corpusRead).toBeDefined();
+  });
+});
