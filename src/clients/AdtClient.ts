@@ -1066,7 +1066,7 @@ export class AdtClient {
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
-    options?: Omit<IAdtClientOptions, 'enableAcceptCorrection'>,
+    options?: IAdtClientOptions,
   ) {
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means

@@ -19,7 +19,7 @@ and fires its release workflow.
 
 ### Changed
 
-- **`@mcp-abap-adt/interfaces-adt` is `^19.0.0`**, as `adt-clients` 36.0.0
+- **`@mcp-abap-adt/interfaces-adt` is `^20.0.0`**, as `adt-clients` 36.0.0
   declares it (the shared-range rule). Nothing else in this package changed:
   no strategy and no exported type. The README's samples pass `headers` to the
   members that take it since `adt-clients` 36.0.0.

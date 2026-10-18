@@ -1,7 +1,9 @@
 # Migrating to 36.0.0
 
-36.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^19.0.0` and implements its one
-change: **a request's `Accept` and `Content-Type` are the caller's.**
+36.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^20.0.0` and implements what
+its 19.0.0 and 20.0.0 changed: **a request's `Accept` and `Content-Type` are the
+caller's** (19.0.0), and `IAdtClientOptions` has no `enableAcceptCorrection`
+any more (20.0.0), the option this release removes with accept negotiation.
 
 ## What changed
 

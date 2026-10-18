@@ -26,7 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [36.0.0] - 2026-10-18
 
-On `@mcp-abap-adt/interfaces-adt` `^19.0.0`.
+On `@mcp-abap-adt/interfaces-adt` `^20.0.0`: the `options.headers` of its
+19.0.0, and `IAdtClientOptions` without `enableAcceptCorrection` (20.0.0).
 
 ### Changed (breaking)
 
@@ -69,8 +70,8 @@ On `@mcp-abap-adt/interfaces-adt` `^19.0.0`.
 
 - **Accept negotiation.** No request is corrected, sent again or remembered:
   a `406`/`415` is the call's answer. Gone: `enableAcceptCorrection` on
-  `AdtClient`, `AdtClientLegacy`, `createAdtClient` and `AdtRuntimeClient`;
-  `setAcceptCorrectionEnabled`, `getAcceptCorrectionEnabled`,
+  `AdtClient`, `AdtClientLegacy`, `createAdtClient` (from `IAdtClientOptions`,
+  in interfaces-adt 20.0.0) and `AdtRuntimeClient`; `setAcceptCorrectionEnabled`, `getAcceptCorrectionEnabled`,
   `ADT_ACCEPT_CORRECTION`, `clearAcceptCache`, `cachedAccept`, `rememberAccept`,
   `wrapConnectionAcceptNegotiation`, `makeAdtRequestWithAcceptNegotiation`.
   The read members that negotiated directly call the connection's
