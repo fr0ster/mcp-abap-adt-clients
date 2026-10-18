@@ -307,6 +307,24 @@ included — 1; else 0. Phases and runs only record what they met. The report
 is always written, marked (`endedBy`) with what ended the run: `complete`,
 `interrupted (SIGINT)`, `stopped: authorization (…)` or `failed: …`.
 
+## Known limits
+
+Deliberate, and left as they are:
+
+1. **The connection's logon is one call in flight.** The gate asks the
+   interrupt once before `connect()`; on cloud the logon is the preflight
+   plus `establishSession`, and once started it finishes whole. A 403 the
+   transport swallows on the preflight is the connection's own behaviour,
+   not something the gate sees.
+2. **Ctrl-C during the cleanup after an authorization stop exits with 2, not
+   130.** The run had already been stopped by the authorization problem; the
+   first reason a run was stopped for is the one kept.
+3. **The gate guard catches accidental direct requests, not deliberate
+   evasion.** It is a text scan: a `.bind` alias of `makeAdtRequest` or a
+   computed member name gets past it, and it does not scan `capture.ts`, the
+   gate's own module. The runtime refusals (`traced`, `clientsOn`,
+   `runCalls`, the probe's clients) cover what reaches them.
+
 ## The corpus
 
 Two files in `.header-probe/` (gitignored: they hold the system's answers):
