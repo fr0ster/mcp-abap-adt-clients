@@ -1259,6 +1259,18 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
       '',
     );
   }
+  const existence = existencePerEndpoint(corpus.rows);
+  lines.push(
+    '### Endpoint existence',
+    '',
+    '| exists | endpoints |',
+    '|---|---|',
+  );
+  for (const value of ['yes', 'no', 'unknown'] as const)
+    lines.push(
+      `| ${value} | ${[...existence.values()].filter((e) => e.exists === value).length} |`,
+    );
+  lines.push('');
   lines.push('### Counts per status', '');
   const byStatus = rowsByStatus(corpus.rows);
   lines.push('| status | rows |', '|---|---|');
@@ -1536,6 +1548,77 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
 
 // --- the header corpus: one file per system ----------------------------------
 
+// --- endpoint existence -----------------------------------------------------
+
+export type Exists = 'yes' | 'no' | 'unknown';
+
+/**
+ * Whether an answer shows the endpoint exists, by where it came from.
+ * `no`: the router found no route (a 404 with no SAP exception, "No
+ * suitable resource found"), the ICF service is not there (a 404 "Service
+ * cannot be reached"), or the method is not implemented (405). `yes`: any
+ * answer from the resource itself — a 2xx, 400, 406, 415, a 404 the
+ * resource raised (`ExceptionResourceNotFound`: the object is missing, the
+ * endpoint is there), … `unknown`: what comes before the resource or says
+ * nothing of it — 401, an authorization 403, a 500 (a router failure or a
+ * dump), no answer, a skipped row.
+ */
+export function existenceOf(row: ICorpusRow): {
+  exists: Exists;
+  reason: string;
+} {
+  if (row.skipped) return { exists: 'unknown', reason: row.skipped };
+  if (row.status === undefined)
+    return {
+      exists: 'unknown',
+      reason: `no answer: ${row.failure ?? ''}`.trim(),
+    };
+  const body = row.body ?? '';
+  if (row.status === 404 && !row.sapType) {
+    if (body.includes('No suitable resource found'))
+      return {
+        exists: 'no',
+        reason: '404 no route (No suitable resource found)',
+      };
+    if (body.includes('Service cannot be reached'))
+      return { exists: 'no', reason: '404 the ICF service cannot be reached' };
+    return { exists: 'unknown', reason: '404 without a SAP exception' };
+  }
+  if (row.status === 405)
+    return { exists: 'no', reason: '405 method not implemented' };
+  if (row.status === 401) return { exists: 'unknown', reason: '401' };
+  if (row.status === 500)
+    return {
+      exists: 'unknown',
+      reason: `500 ${dumpText(body) ?? 'dump or router'}`,
+    };
+  if (
+    row.status === 403 &&
+    authorizationProblem({ status: 403, data: body, headers: {} })
+  )
+    return { exists: 'unknown', reason: '403 authorization' };
+  return {
+    exists: 'yes',
+    reason: `${row.status}${row.sapType ? ` ${row.sapType}` : ''}`,
+  };
+}
+
+/** Per endpoint over many rows: yes if any answer came from the resource, else no if any said so, else unknown. */
+export function existencePerEndpoint(
+  rows: readonly ICorpusRow[],
+): Map<string, { exists: Exists; reason: string }> {
+  const by = new Map<string, { exists: Exists; reason: string }>();
+  const rank: Record<Exists, number> = { yes: 2, no: 1, unknown: 0 };
+  for (const row of rows) {
+    if (!row.endpoint) continue;
+    const key = endpointKey(row.endpoint);
+    const found = existenceOf(row);
+    const held = by.get(key);
+    if (!held || rank[found.exists] > rank[held.exists]) by.set(key, found);
+  }
+  return by;
+}
+
 /** One piece of evidence about an endpoint's headers. */
 export interface IEvidence {
   /** `METHOD path[?_action=…]`. */
@@ -1619,6 +1702,9 @@ export interface IHeaderCorpusEntry {
   pairs: string[];
   /** Which phase settled it, or why nothing did. */
   settledBy: 'phase 1' | 'phase 2' | 'unsettled';
+  /** Whether the endpoint exists, and the answer that says so. */
+  exists: Exists;
+  existsBecause: string;
   /** Who said what: status and raw text. */
   evidence: string[];
 }
@@ -1629,6 +1715,8 @@ export function buildHeaderCorpus(
   extras: {
     discoveryContentType: ReadonlyMap<string, readonly string[]>;
     pairs: ReadonlyMap<string, readonly string[]>;
+    /** Per endpoint, from every row of every run. */
+    existence?: ReadonlyMap<string, { exists: Exists; reason: string }>;
   },
 ): IHeaderCorpusEntry[] {
   const by = new Map<string, IEvidence[]>();
@@ -1663,6 +1751,9 @@ export function buildHeaderCorpus(
       ],
       pairs: [...(extras.pairs.get(endpoint) ?? [])],
       settledBy,
+      exists: extras.existence?.get(endpoint)?.exists ?? 'unknown',
+      existsBecause:
+        extras.existence?.get(endpoint)?.reason ?? 'no answer recorded',
       evidence: items.map(
         (item) =>
           `phase ${item.phase} ${item.source} ${item.who}: ${item.text}`,
@@ -1727,6 +1818,17 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
     lines.push(
       `| ${value} | ${file.counts.phase1[value]} | ${file.counts.phase2[value]} |`,
     );
+  lines.push(
+    '',
+    '## Endpoint existence',
+    '',
+    '| exists | endpoints |',
+    '|---|---|',
+  );
+  for (const value of ['yes', 'no', 'unknown'] as const)
+    lines.push(
+      `| ${value} | ${file.entries.filter((entry) => entry.exists === value).length} |`,
+    );
   for (const value of NEEDS) {
     const of = file.entries.filter((entry) => entry.needs === value);
     lines.push('', `## needs: ${value} (${of.length})`, '');
@@ -1735,12 +1837,12 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
       continue;
     }
     lines.push(
-      '| endpoint | Accept named | Content-Type named | discovery Content-Type | pair table | settled by | evidence |',
-      '|---|---|---|---|---|---|---|',
+      '| endpoint | exists | Accept named | Content-Type named | discovery Content-Type | pair table | settled by | evidence |',
+      '|---|---|---|---|---|---|---|---|',
     );
     for (const entry of of)
       lines.push(
-        `| ${cell(entry.endpoint)} | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+        `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
       );
   }
   lines.push('', '## Phase 2 objects', '');

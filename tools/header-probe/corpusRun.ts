@@ -43,6 +43,7 @@ import {
   dumpText,
   emptyNamed,
   evidenceOf,
+  existencePerEndpoint,
   FIXED_TEXT,
   fakeBody,
   type HeadersMode,
@@ -1370,6 +1371,7 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
   evidence: IEvidence[];
   objects: IHeaderCorpusFile['objects'];
   files: string[];
+  rows: ICorpusRow[];
 }> {
   const { members } = await recordMembers();
   const candidates = members.filter((member) => {
@@ -1530,10 +1532,15 @@ export async function runRealReads(input: IRealReadsInput): Promise<{
     corpora.push(corpus);
   }
   const [bogus, none] = corpora;
-  if (!bogus) return { evidence: [], objects, files: [] };
+  if (!bogus) return { evidence: [], objects, files: [], rows: [] };
   bogus.needs = classifyNeeds(bogus.rows, none?.rows ?? []);
   const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
-  return { evidence: evidenceOf(bogus.needs, 'clients', 2), objects, files };
+  return {
+    evidence: evidenceOf(bogus.needs, 'clients', 2),
+    objects,
+    files,
+    rows: corpora.flatMap((corpus) => corpus.rows),
+  };
 }
 
 // --- the full run: one command, the system's header corpus -------------------
@@ -1590,6 +1597,7 @@ export async function runFull(
   let objects: IHeaderCorpusFile['objects'] = [];
   let removals: IRemoval[] = [];
   let file: IHeaderCorpusFile | undefined;
+  const phase2Rows: ICorpusRow[] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
 
   const body = async (connection: IAbapConnection, state: IRunState) => {
@@ -1668,6 +1676,7 @@ export async function runFull(
             ...(input.isolate ? { isolate: input.isolate } : {}),
           });
           evidence.push(...reads.evidence);
+          phase2Rows.push(...reads.rows);
           objects = reads.objects;
           files.push(...reads.files);
         },
@@ -1707,7 +1716,11 @@ export async function runFull(
         .join(', ')}`;
       pairs.set(key, [...new Set([...(pairs.get(key) ?? []), text])]);
     }
-    const extras = { discoveryContentType, pairs };
+    const existence = existencePerEndpoint([
+      ...[...corpora.values()].flatMap((corpus) => corpus.rows),
+      ...phase2Rows,
+    ]);
+    const extras = { discoveryContentType, pairs, existence };
     const entries = buildHeaderCorpus(evidence, extras);
     file = {
       startedAt,

@@ -29,6 +29,8 @@ import {
   classifyNeeds,
   discoveryProbes,
   emptyNamed,
+  existenceOf,
+  existencePerEndpoint,
   headerShape,
   type ICorpus,
   type ICorpusRow,
@@ -1561,6 +1563,7 @@ describe('the full run', () => {
     );
     expect(entry?.needs).toBe('accept');
     expect(entry?.settledBy).toBe('phase 2');
+    expect(entry?.exists).toBe('yes');
     expect(entry?.namedAccept).toEqual([
       'application/vnd.sap.adt.oo.classes.v4+xml',
     ]);
@@ -2369,5 +2372,51 @@ describe('--isolate', () => {
         expect(r.ran).toBe('batched');
         expect(r.status).toBe(404);
       }
+  });
+});
+
+describe('endpoint existence', () => {
+  const r = (status: number | undefined, extra: Partial<ICorpusRow> = {}) =>
+    row({ status, ...extra });
+  it('no from a router 404, the ICF service missing, or a 405; yes from the resource; else unknown', () => {
+    expect(
+      existenceOf(r(404, { body: 'No suitable resource found' })).exists,
+    ).toBe('no');
+    expect(
+      existenceOf(
+        r(404, { body: '<html><title>Service cannot be reached</title>' }),
+      ).exists,
+    ).toBe('no');
+    expect(
+      existenceOf(r(405, { sapType: 'ExceptionMethodNotSupported' })).exists,
+    ).toBe('no');
+    // The resource said the object is missing: the endpoint is there.
+    expect(
+      existenceOf(r(404, { sapType: 'ExceptionResourceNotFound' })).exists,
+    ).toBe('yes');
+    for (const status of [200, 400, 406, 415, 409])
+      expect(existenceOf(r(status)).exists).toBe('yes');
+    expect(existenceOf(r(500, { body: 'dump' })).exists).toBe('unknown');
+    expect(existenceOf(r(401)).exists).toBe('unknown');
+    expect(existenceOf(r(undefined, { failure: 'x' })).exists).toBe('unknown');
+  });
+
+  it('per endpoint: any answer from the resource wins; every row is kept', () => {
+    const rows = [
+      r(405, { endpoint: { method: 'GET', path: '/a' } }),
+      r(406, { endpoint: { method: 'GET', path: '/a' } }),
+      // A later "no" does not undo an earlier "yes".
+      r(405, { endpoint: { method: 'GET', path: '/a' } }),
+      r(405, { endpoint: { method: 'POST', path: '/a' } }),
+      r(500, { endpoint: { method: 'GET', path: '/b' } }),
+    ];
+    const by = existencePerEndpoint(rows);
+    expect(by.get('GET /a')?.exists).toBe('yes');
+    expect(by.get('POST /a')).toEqual({
+      exists: 'no',
+      reason: '405 method not implemented',
+    });
+    expect(by.get('GET /b')?.exists).toBe('unknown');
+    expect(rows).toHaveLength(5);
   });
 });

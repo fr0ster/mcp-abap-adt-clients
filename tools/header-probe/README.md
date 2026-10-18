@@ -198,6 +198,20 @@ header corpus, everything batched and poisoned envelopes split:
    new requests (asked before each envelope and request),
    the one in flight finishes, and the `finally` cleanup runs.
 
+### Endpoint existence
+
+Beside `needs`, every endpoint gets `exists: yes | no | unknown`, merged over
+every answer of every run:
+
+| exists | from |
+|---|---|
+| `no` | the router found no route (a 404 with no SAP exception, "No suitable resource found"), the ICF service is not there (a 404 "Service cannot be reached"), or the method is not implemented (a 405, for that method) |
+| `yes` | any answer from the resource itself: a 2xx, 400, 406, 415, 409, a 404 the resource raised (`ExceptionResourceNotFound`: the object is missing, the endpoint is there), … — one such answer is enough |
+| `unknown` | only what comes before the resource or says nothing of it: 401, an authorization 403, a 500, no answer, a skipped row |
+
+Nothing is dropped: every answer stays in the corpus; `exists` only reads
+them.
+
 ## The write cycle (the former header probe)
 
 The former header probe has no command of its own any more; its code
