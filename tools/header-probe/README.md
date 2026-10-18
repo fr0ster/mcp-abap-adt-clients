@@ -61,7 +61,11 @@ row whose member is a chain (a message class message) is marked
 
 Everything the probe may have created goes into a ledger before the create is
 sent; a `finally` deletes it all, on failure and on Ctrl-C too, reports each
-deletion, and lists loudly what could not be deleted. Operations the cycle
+deletion, and lists loudly what could not be deleted. Ctrl-C sends nothing
+new: the request in flight answers first, then the ledger is cleaned as it
+stands (a second Ctrl-C during the cleanup is ignored). A create runs
+whatever `--only`/`--operation` say, since every later step needs its object;
+it is reported only when asked for. Operations the cycle
 cannot run on its own (a debugger session, an abapGit repository, objects
 whose key the server assigns) are reported as `skipped: <reason>`.
 

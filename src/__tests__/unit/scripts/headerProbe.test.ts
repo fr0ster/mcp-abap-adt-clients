@@ -4,7 +4,12 @@
  * system: answers are built by hand in the shape the connection returns them.
  */
 
-import { Ledger, withCleanup } from '../../../../tools/header-probe/ledger';
+import {
+  Interrupt,
+  Interrupted,
+  Ledger,
+  withCleanup,
+} from '../../../../tools/header-probe/ledger';
 import { KNOWN_PAIRS, knownPair } from '../../../../tools/header-probe/pairs';
 import {
   endpointOf,
@@ -14,6 +19,7 @@ import {
   modeDifferences,
   PROBE_TYPE,
   pathCollisions,
+  plannedKinds,
   probePair,
   readAnswer,
   readState,
@@ -428,5 +434,138 @@ describe('the ledger', () => {
     await Promise.all([ledger.cleanup(), ledger.cleanup()]);
     await ledger.cleanup();
     expect(calls).toBe(1);
+  });
+});
+
+describe('the ledger, late entries', () => {
+  it('removes an entry added while the cleanup runs', async () => {
+    const removed: string[] = [];
+    const ledger = new Ledger();
+    const entry = (label: string, then?: () => void) => ({
+      label,
+      remove: async () => {
+        removed.push(label);
+        then?.();
+        return { removed: true, detail: 'deleted' };
+      },
+    });
+    ledger.add(entry('first', () => ledger.add(entry('late'))));
+    const removals = await ledger.cleanup();
+    expect(removed).toEqual(['first', 'late']);
+    expect(removals.map((removal) => removal.label)).toEqual(['first', 'late']);
+  });
+
+  it('removes on the next call what was added after a cleanup finished', async () => {
+    const removed: string[] = [];
+    const ledger = new Ledger();
+    const entry = (label: string) => ({
+      label,
+      remove: async () => {
+        removed.push(label);
+        return { removed: true, detail: 'deleted' };
+      },
+    });
+    ledger.add(entry('first'));
+    await ledger.cleanup();
+    ledger.add(entry('after'));
+    await ledger.cleanup();
+    expect(removed).toEqual(['first', 'after']);
+  });
+});
+
+describe('an interrupt', () => {
+  /**
+   * The run as the driver issues it: every request asks the interrupt first,
+   * a create's object is in the ledger before the create is sent, and it
+   * exists only once the create has answered.
+   */
+  function system() {
+    const exists = new Set<string>();
+    const sent: string[] = [];
+    const interrupt = new Interrupt();
+    const ledger = new Ledger();
+    let answer: (() => void) | undefined;
+    let answering = false;
+    const inFlight = () =>
+      new Promise<void>((resolve) => {
+        const poll = () => (answer ? resolve() : setImmediate(poll));
+        poll();
+      });
+    const create = async (name: string): Promise<void> => {
+      interrupt.check();
+      ledger.add({
+        label: name,
+        remove: async () => {
+          if (!exists.delete(name))
+            return { removed: true, detail: 'not there' };
+          return { removed: true, detail: 'deleted' };
+        },
+      });
+      sent.push(name);
+      await new Promise<void>((resolve) => {
+        answer = () => {
+          answer = undefined;
+          exists.add(name);
+          resolve();
+        };
+        // Once SAP has answered the first, it answers at once: a request that
+        // should not have been sent shows up in `sent` instead of hanging.
+        if (answering) answer();
+      });
+    };
+    return {
+      exists,
+      sent,
+      interrupt,
+      ledger,
+      create,
+      inFlight,
+      answer: () => {
+        answering = true;
+        answer?.();
+      },
+    };
+  }
+
+  it('lets the create in flight answer, sends nothing new, and deletes what it made', async () => {
+    const run = system();
+    const probe = withCleanup(run.ledger, async () => {
+      await run.create('ZHP1');
+      await run.create('ZHP2');
+    });
+    const stopped = expect(probe).rejects.toBeInstanceOf(Interrupted);
+    await run.inFlight();
+    run.interrupt.stop(); // Ctrl-C while ZHP1's create is on the wire
+    run.answer(); // …and only then does SAP answer: ZHP1 now exists
+    await stopped;
+    expect(run.sent).toEqual(['ZHP1']);
+    expect(run.exists.size).toBe(0);
+  });
+});
+
+describe('prerequisites', () => {
+  it('creates the message whatever the filters, so a filtered update has one to work on', () => {
+    const filters = { only: ['messageClass'], operation: 'update' };
+    expect(plannedKinds(filters, 'messageClass', 'create')).toEqual(['known']);
+    expect(plannedKinds(filters, 'messageClassMessage', 'create')).toEqual([
+      'known',
+    ]);
+    expect(plannedKinds(filters, 'messageClassMessage', 'update')).toEqual([
+      'known',
+      'badAccept',
+      'badContentType',
+    ]);
+    expect(plannedKinds(filters, 'messageClassMessage', 'delete')).toEqual([]);
+    expect(plannedKinds(filters, 'class', 'create')).toEqual([]);
+  });
+
+  it('keeps the delete order when the delete is asked for', () => {
+    expect(
+      plannedKinds({ operation: 'delete' }, 'domain', 'delete', [
+        'badAccept',
+        'badContentType',
+        'known',
+      ]),
+    ).toEqual(['badAccept', 'badContentType', 'known']);
   });
 });

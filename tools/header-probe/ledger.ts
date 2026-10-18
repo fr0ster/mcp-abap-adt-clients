@@ -17,6 +17,8 @@ export interface ILedgerEntry {
 
 export class Ledger {
   private readonly entries: ILedgerEntry[] = [];
+  private readonly settled = new Set<ILedgerEntry>();
+  private readonly removals: IRemoval[] = [];
   private running?: Promise<IRemoval[]>;
 
   constructor(
@@ -32,31 +34,72 @@ export class Ledger {
   }
 
   /**
-   * Removes every entry, newest first (a function module before its group), and
-   * reports each. Runs once: a second call — Ctrl-C during the `finally` —
-   * waits for the first.
+   * Removes every entry not removed yet, newest first (a function module
+   * before its group), reports each, and answers every removal so far.
+   *
+   * An entry is tried once. One added while a cleanup runs is removed by that
+   * cleanup; one added after it is removed by the next call. Calls queue
+   * behind each other: a second call — Ctrl-C during the `finally` — waits
+   * for the first, then removes whatever is left.
    */
   cleanup(): Promise<IRemoval[]> {
-    this.running ??= (async () => {
-      const removals: IRemoval[] = [];
-      for (const entry of [...this.entries].reverse()) {
-        let removal: IRemoval;
-        try {
-          const outcome = await entry.remove();
-          removal = { label: entry.label, ...outcome };
-        } catch (error) {
-          removal = {
-            label: entry.label,
-            removed: false,
-            detail: `the removal threw: ${error instanceof Error ? error.message : String(error)}`,
-          };
+    const drain = async (): Promise<IRemoval[]> => {
+      for (;;) {
+        const pending = this.entries.filter(
+          (entry) => !this.settled.has(entry),
+        );
+        if (!pending.length) return [...this.removals];
+        for (const entry of pending.reverse()) {
+          this.settled.add(entry);
+          let removal: IRemoval;
+          try {
+            const outcome = await entry.remove();
+            removal = { label: entry.label, ...outcome };
+          } catch (error) {
+            removal = {
+              label: entry.label,
+              removed: false,
+              detail: `the removal threw: ${error instanceof Error ? error.message : String(error)}`,
+            };
+          }
+          this.removals.push(removal);
+          this.onRemoval(removal);
         }
-        removals.push(removal);
-        this.onRemoval(removal);
       }
-      return removals;
-    })();
+    };
+    this.running = (this.running ?? Promise.resolve([])).then(drain, drain);
     return this.running;
+  }
+}
+
+/** What a request refused after an interrupt throws. */
+export class Interrupted extends Error {
+  constructor() {
+    super('interrupted (SIGINT)');
+    this.name = 'Interrupted';
+  }
+}
+
+/**
+ * The stop signal of a run. After `stop()` no new request goes out: the next
+ * one throws {@link Interrupted}, so the run unwinds once the request in
+ * flight has answered, and its `finally` cleans up the ledger as it then
+ * stands — the object that request created included.
+ */
+export class Interrupt {
+  private stopped = false;
+
+  stop(): void {
+    this.stopped = true;
+  }
+
+  get requested(): boolean {
+    return this.stopped;
+  }
+
+  /** Called before every request the run issues; throws once stopped. */
+  check(): void {
+    if (this.stopped) throw new Interrupted();
   }
 }
 

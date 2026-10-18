@@ -56,7 +56,7 @@ import {
 import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
 import { AdtBatchConnection } from '../../src/batch/AdtBatchConnection';
 import { AdtClient } from '../../src/clients/AdtClient';
-import { Ledger, withCleanup } from './ledger';
+import { Interrupt, Interrupted, Ledger, withCleanup } from './ledger';
 import {
   type IObjectSpec,
   type IProbeable,
@@ -75,11 +75,13 @@ import {
   type IRemoval,
   PROBE_KINDS,
   type ProbeKind,
+  plannedKinds,
   probePair,
   readAnswer,
   readState,
   renderComparison,
   renderMarkdown,
+  wants,
 } from './record';
 
 // The helpers load `.env` when imported; nothing else here reads it.
@@ -180,6 +182,7 @@ class Probe {
     private readonly ledger: Ledger,
     private readonly context: Omit<ISpecContext, 'parent'>,
     private readonly run: string,
+    private readonly interrupt: Interrupt,
   ) {
     this.direct = this.client(traced(connection));
   }
@@ -192,7 +195,10 @@ class Probe {
   async calls(
     calls: ICall[],
     batched = !this.args.sequential,
+    gated = true,
   ): Promise<ICapture[]> {
+    // After Ctrl-C nothing new goes out, except what releases or removes.
+    if (gated) this.interrupt.check();
     const captures = calls.map((): ICapture => ({ requests: [] }));
     const invoke = (client: AdtClient, call: ICall, capture: ICapture) =>
       current.run(capture, () =>
@@ -240,13 +246,7 @@ class Probe {
   }
 
   wanted(type: string, member: string): boolean {
-    const group = type.startsWith('local')
-      ? 'class'
-      : type === 'messageClassMessage'
-        ? 'messageClass'
-        : type;
-    if (this.args.only && !this.args.only.includes(group)) return false;
-    return !this.args.operation || this.args.operation === member;
+    return wants(this.args, type, member);
   }
 
   name(spec: { code: string; functionModule?: boolean }, role: string): string {
@@ -281,8 +281,8 @@ class Probe {
    * The three probes of one operation, each optionally followed by a read of
    * the object's state; the row is recorded when the member is wanted.
    *
-   * Without a wanted member the step still runs once with the known pair, when
-   * the cycle needs it (`required`), and nothing is reported.
+   * Without a wanted member the step still runs once with the known pair when
+   * the cycle needs it (`isPrerequisite`), and nothing is reported.
    */
   async operation(input: {
     objectType: string;
@@ -292,14 +292,18 @@ class Probe {
     call: (kind: ProbeKind, headers: IAdtHeaders) => ICall;
     state?: (kind: ProbeKind) => ICall;
     readState?: (capture: ICapture, kind: ProbeKind) => IObjectState;
-    required?: boolean;
     sequential?: string;
   }): Promise<IProbeAnswer | undefined> {
     const known = knownPair(input.handler, input.member);
     if (!known) return undefined;
     const wanted = this.wanted(input.objectType, input.member);
-    if (!wanted && !input.required) return undefined;
-    const kinds = wanted ? (input.kinds ?? PROBE_KINDS) : (['known'] as const);
+    const kinds = plannedKinds(
+      this.args,
+      input.objectType,
+      input.member,
+      input.kinds ?? PROBE_KINDS,
+    );
+    if (!kinds.length) return undefined;
     const calls: ICall[] = [];
     for (const kind of kinds) {
       calls.push(input.call(kind, probePair(kind, known)));
@@ -338,8 +342,8 @@ class Probe {
   }
 
   /** One call on the plain connection, for a step that is not a probe. */
-  async direct1(call: ICall): Promise<ICapture> {
-    const [capture] = await this.calls([call], false);
+  async direct1(call: ICall, gated = true): Promise<ICapture> {
+    const [capture] = await this.calls([call], false, gated);
     return capture;
   }
 
@@ -354,6 +358,7 @@ class Probe {
             (client, analyse) =>
               spec.handle(client).readMetadata?.(config, { analyse }) ??
               Promise.resolve(),
+            false,
           );
         const before = readState((await read()).wire);
         if (before.exists === false)
@@ -367,6 +372,7 @@ class Probe {
           (client, analyse) =>
             spec.handle(client).delete?.(config, { headers, analyse }) ??
             Promise.resolve(),
+          false,
         );
         const after = readState((await read()).wire);
         if (after.exists === false)
@@ -496,7 +502,6 @@ class Probe {
       objectType: spec.type,
       handler: spec.handler,
       member: 'create',
-      required: true,
       call: (kind, headers) => (client, analyse) =>
         handle(client).create?.(configOf(kind), { headers, analyse }) ??
         Promise.resolve(),
@@ -567,10 +572,12 @@ class Probe {
           });
           if (spec.type === 'class') await this.locals(names.known, lock);
         } finally {
+          // Released after an interrupt too: the lock is this session's.
           await this.direct1(
             (client, analyse) =>
               handle(client).unlock?.(config, lock, { analyse }) ??
               Promise.resolve(),
+            false,
           );
         }
       }
@@ -928,6 +935,7 @@ async function main(): Promise<void> {
     );
   });
 
+  const interrupt = new Interrupt();
   const connection = await createTestConnection(createConnectionLogger(), {
     ownSession: true,
   });
@@ -942,6 +950,7 @@ async function main(): Promise<void> {
     ledger,
     { packageName, transportRequest },
     randomRun(),
+    interrupt,
   );
   report.rows = probe.rows;
 
@@ -958,17 +967,16 @@ async function main(): Promise<void> {
     }
   };
 
-  let interrupted = false;
+  // Ctrl-C stops new requests; the one in flight answers, the run unwinds,
+  // and the `finally` cleans the ledger as it then stands. A second Ctrl-C
+  // while that cleanup runs is ignored.
   process.on('SIGINT', () => {
-    if (interrupted) return;
-    interrupted = true;
-    progress('interrupted: removing the temporary objects');
+    if (interrupt.requested) return;
+    interrupt.stop();
     report.error = 'interrupted (SIGINT)';
-    void ledger
-      .cleanup()
-      .then(finish)
-      .finally(() => closeOwnTestConnection(connection))
-      .finally(() => process.exit(130));
+    progress(
+      'interrupted: waiting for the request in flight, then removing the temporary objects',
+    );
   });
 
   try {
@@ -983,12 +991,14 @@ async function main(): Promise<void> {
           probe.skip(skipped.type, skipped.member, skipped.reason);
     });
   } catch (error) {
-    report.error = message(error);
-    loud(`The probe stopped: ${report.error}`);
+    if (!(error instanceof Interrupted)) {
+      report.error = message(error);
+      loud(`The probe stopped: ${report.error}`);
+    }
   }
-  if (interrupted) return;
   await finish();
   await closeOwnTestConnection(connection);
+  if (interrupt.requested) process.exit(130);
 }
 
 main().then(

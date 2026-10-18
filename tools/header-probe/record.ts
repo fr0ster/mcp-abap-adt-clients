@@ -22,6 +22,56 @@ export const PROBE_KINDS: readonly ProbeKind[] = [
   'badContentType',
 ];
 
+/** What `--only` and `--operation` asked for. */
+export interface IProbeFilters {
+  only?: readonly string[];
+  operation?: string;
+}
+
+/** The `--only` key an object type answers to: its includes and messages go with their parent. */
+export function filterGroup(objectType: string): string {
+  if (objectType.startsWith('local')) return 'class';
+  if (objectType === 'messageClassMessage') return 'messageClass';
+  return objectType;
+}
+
+/** Whether the filters ask for this row. */
+export function wants(
+  filters: IProbeFilters,
+  objectType: string,
+  member: string,
+): boolean {
+  if (filters.only && !filters.only.includes(filterGroup(objectType)))
+    return false;
+  return !filters.operation || filters.operation === member;
+}
+
+/**
+ * Whether the cycle needs this step whatever the filters say: every later
+ * step works on what a create made, so a create always runs — the object's
+ * and a message class message's alike.
+ */
+export function isPrerequisite(_objectType: string, member: string): boolean {
+  return member === 'create';
+}
+
+/**
+ * The probes one step sends: none for an object type `--only` leaves out; all
+ * of them when the row is asked for; the known pair alone when it is only a
+ * prerequisite (and not reported); none otherwise.
+ */
+export function plannedKinds(
+  filters: IProbeFilters,
+  objectType: string,
+  member: string,
+  kinds: readonly ProbeKind[] = PROBE_KINDS,
+): readonly ProbeKind[] {
+  if (filters.only && !filters.only.includes(filterGroup(objectType)))
+    return [];
+  if (wants(filters, objectType, member)) return kinds;
+  return isPrerequisite(objectType, member) ? ['known'] : [];
+}
+
 /** The pair each probe sends, built from the operation's known pair. */
 export function probePair(kind: ProbeKind, known: IAdtHeaders): IAdtHeaders {
   if (kind === 'badAccept') return { ...known, accept: PROBE_TYPE };
