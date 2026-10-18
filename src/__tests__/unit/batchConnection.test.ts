@@ -746,6 +746,35 @@ describe('an envelope that fails as a whole', () => {
     });
   });
 
+  it.each([
+    ['recorded directly', false],
+    ['through the request trace', true],
+  ])('settles every part with a frozen failure as it came (%s)', async (_name, trace) => {
+    // A failure that cannot be written onto: the annotation must not stop the
+    // parts from settling, nor replace what `execute()` throws.
+    const { batch, send } = fixture();
+    const failure = Object.freeze(new Error('offline'));
+    send.mockRejectedValueOnce(failure);
+    const connection = trace ? withRequestTrace(batch) : batch;
+    const outcomes: unknown[] = parts.map(() => 'pending');
+    const settled = parts.map((part, index) =>
+      connection.makeAdtRequest(part).then(
+        (answer: unknown) => {
+          outcomes[index] = answer;
+        },
+        (error: unknown) => {
+          outcomes[index] = error;
+        },
+      ),
+    );
+
+    await expect(batch.execute()).rejects.toBe(failure);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(outcomes).toEqual([failure, failure, failure]);
+    for (const outcome of outcomes) expect(outcome).toBe(failure);
+    await Promise.all(settled);
+  });
+
   it('leaves the "not sent" failure of a later envelope naming no part', async () => {
     const { batch, send } = fixture([200]);
     const failure = new Error('offline');

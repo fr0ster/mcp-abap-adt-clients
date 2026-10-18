@@ -201,13 +201,18 @@ export class AdtBatchConnection implements IAbapConnection {
       // The envelope failed as a whole: every part it carried rejects with
       // this one object. The request that failed is the envelope's own POST,
       // not any part — and no part's trace may write its own over it.
+      // Marked first: the mark cannot fail. The request is written only where
+      // the failure takes it — a frozen one does not, and the parts settle
+      // with it as it came either way.
       if (active.length && !isUnansweredCredentialRefusal(error)) {
-        if (error !== null && typeof error === 'object')
-          (error as { request?: unknown }).request = {
-            method: 'POST',
-            url: BATCH[this.options.endpoint],
-          };
         markEnvelopeFailure(error);
+        if (error !== null && typeof error === 'object')
+          Reflect.defineProperty(error, 'request', {
+            value: { method: 'POST', url: BATCH[this.options.endpoint] },
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
       }
       // The "not sent" failure is one object shared by every unsent part, too.
       if (unsentError !== error) markEnvelopeFailure(unsentError);

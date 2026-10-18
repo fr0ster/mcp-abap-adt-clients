@@ -121,7 +121,8 @@ data }`, matching direct HTTP failure handling. Members keep their usual
 parts in the failed envelope. Every part of that envelope rejects with the same
 object and message, and its `request` is the envelope's own
 (`{ method: 'POST', url: '/sap/bc/adt/communication/batch' }`, or the debugger's
-batch URL), not any part's. Unsent runs and queued follow-ups reject with a
+batch URL), not any part's; a failure that takes no property, a frozen one,
+reaches every part as it came, without it. Unsent runs and queued follow-ups reject with a
 library error saying the request was not sent because an earlier envelope failed;
 that error carries the cause, without a SAP response and without a `request` of
 its own. Missing parts reject with a part-count error. A count
