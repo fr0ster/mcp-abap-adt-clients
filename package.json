@@ -99,6 +99,7 @@
     "package:contents": "npx ts-node scripts/show-package-contents.ts",
     "discovery:markdown": "npx ts-node tools/discovery-to-markdown.ts",
     "header:discovery": "npx ts-node tools/header-probe/probe.ts",
+    "header:discovery:next": "npx ts-node tools/header-probe/errorCorpus.ts",
     "adt:entities": "node tools/adt-object-entities.js",
     "shared:setup": "npx jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/setup",
     "shared:teardown": "npx jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/teardown",

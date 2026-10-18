@@ -38,15 +38,10 @@
  * More in tools/header-probe/README.md.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtHeaders, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  IAbapRequestOptions,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -54,10 +49,19 @@ import {
   resolveSystemContext,
 } from '../../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
-import { AdtBatchConnection } from '../../src/batch/AdtBatchConnection';
 import { AdtClient } from '../../src/clients/AdtClient';
 import {
-  eachInTurn,
+  cleanupOf,
+  gate,
+  gateConnect,
+  type ICallOn,
+  type ICapture,
+  message,
+  runCalls,
+  throughGate,
+  traced,
+} from './capture';
+import {
   Interrupt,
   Interrupted,
   Ledger,
@@ -86,8 +90,10 @@ import {
   probePair,
   readAnswer,
   readState,
+  removalWord,
   renderComparison,
   renderMarkdown,
+  unproven,
   wants,
 } from './record';
 
@@ -105,10 +111,17 @@ const loud = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
-interface IArgs {
+export interface IArgs {
   only?: string[];
   operation?: string;
+  /** Only these rows, `<object type>.<member>`; the cycle's prerequisites still run. */
+  members?: string[];
   sequential: boolean;
+  /**
+   * The bogus Content-Type before the bogus Accept (the error corpus's
+   * phase 2); the known pair keeps its place.
+   */
+  contentTypeFirst?: boolean;
   compare?: [string, string];
 }
 
@@ -126,61 +139,14 @@ function parseArgs(argv: readonly string[]): IArgs {
   return args;
 }
 
-/** What one call captured: its answer and the requests it issued. */
-interface ICapture {
-  wire?: IAdtWireResponse;
-  /** What the member returned. */
-  result?: unknown;
-  failure?: string;
-  requests: { method: string; url: string; params: unknown }[];
-}
+type ICall = ICallOn<AdtClient>;
 
-const current = new AsyncLocalStorage<ICapture>();
-
-/**
- * The connection a client is built on, recording each request into the call
- * that issued it.
- *
- * A plain object of its own, not a `Proxy`: the client installs its request
- * trace by assigning `makeAdtRequest` on the connection it is given, and a
- * proxy without a `set` trap would pass that assignment to the connection
- * below and call itself.
- */
-function traced(connection: IAbapConnection): IAbapConnection {
-  const wrapper: Record<string | symbol, unknown> = {};
-  const seen = new Set<string | symbol>();
-  for (
-    let level: object | null = connection;
-    level && level !== Object.prototype;
-    level = Object.getPrototypeOf(level)
-  ) {
-    for (const key of Reflect.ownKeys(level)) {
-      if (seen.has(key) || key === 'constructor') continue;
-      seen.add(key);
-      const value = Reflect.get(connection, key);
-      if (typeof value === 'function') wrapper[key] = value.bind(connection);
-    }
-  }
-  wrapper.makeAdtRequest = (request: IAbapRequestOptions) => {
-    current.getStore()?.requests.push({
-      method: request.method,
-      url: request.url,
-      params: request.params,
-    });
-    return connection.makeAdtRequest(request);
-  };
-  return wrapper as unknown as IAbapConnection;
-}
-
-type ICall = (client: AdtClient, analyse: IAnalyse) => Promise<unknown>;
-
-const message = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
-
-class Probe {
+export class Probe {
   readonly rows: IOperationRow[] = [];
   readonly names: string[] = [];
   private readonly direct: AdtClient;
+  /** For what releases or removes: the gate's cleanup sibling, past a stop. */
+  private readonly cleanupDirect: AdtClient;
 
   constructor(
     private readonly connection: IAbapConnection,
@@ -192,68 +158,30 @@ class Probe {
     private readonly interrupt: Interrupt,
   ) {
     this.direct = this.client(traced(connection));
+    this.cleanupDirect = this.client(traced(cleanupOf(connection)));
   }
 
   private client(connection: IAbapConnection): AdtClient {
+    if (!throughGate(connection))
+      throw new Error('Probe: the connection does not send through the gate');
     return new AdtClient(connection, undefined, this.clientOptions);
   }
 
   /** Runs the calls in one envelope, or one by one with `--sequential`. */
-  async calls(
+  calls(
     calls: ICall[],
     batched = !this.args.sequential,
     gated = true,
   ): Promise<ICapture[]> {
     // After Ctrl-C nothing new goes out, except what releases or removes.
-    if (gated) this.interrupt.check();
-    const captures = calls.map((): ICapture => ({ requests: [] }));
-    const invoke = (client: AdtClient, call: ICall, capture: ICapture) =>
-      current.run(capture, () =>
-        call(client, (verdict, wire) => {
-          capture.wire = wire;
-          if (
-            !wire &&
-            verdict &&
-            typeof verdict === 'object' &&
-            'message' in verdict
-          )
-            capture.failure = String(verdict.message);
-          return verdict;
-        }).then(
-          (result: unknown) => {
-            capture.result = result;
-          },
-          (error: unknown) => {
-            capture.failure = message(error);
-          },
-        ),
-      );
-    if (!batched) {
-      // Asked before every request, not only before the list.
-      await eachInTurn(calls, gated ? this.interrupt : undefined, (call, i) =>
-        invoke(this.direct, call, captures[i]),
-      );
-      return captures;
-    }
-    const batch = new AdtBatchConnection(this.connection, {
-      endpoint: 'communication',
+    return runCalls({
+      calls,
+      batched,
+      connection: this.connection,
+      direct: gated ? this.direct : this.cleanupDirect,
+      onBatch: (batch) => this.client(traced(batch)),
+      interrupt: gated ? this.interrupt : undefined,
     });
-    const client = this.client(traced(batch));
-    const pending = calls.map((call, i) => invoke(client, call, captures[i]));
-    // A member may record its request a few turns after it was called.
-    for (let turn = 0; turn < 3; turn++)
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    // Ctrl-C while the parts were being recorded: the envelope never leaves.
-    if (gated) this.interrupt.check();
-    try {
-      await batch.execute();
-    } catch (error) {
-      for (const capture of captures)
-        if (!capture.wire)
-          capture.failure ??= `the envelope failed: ${message(error)}`;
-    }
-    await Promise.all(pending);
-    return captures;
   }
 
   wanted(type: string, member: string): boolean {
@@ -308,11 +236,12 @@ class Probe {
     const known = knownPair(input.handler, input.member);
     if (!known) return undefined;
     const wanted = this.wanted(input.objectType, input.member);
+    const ordered = input.kinds ?? PROBE_KINDS;
     const kinds = plannedKinds(
       this.args,
       input.objectType,
       input.member,
-      input.kinds ?? PROBE_KINDS,
+      this.args.contentTypeFirst ? contentTypeFirst(ordered) : ordered,
     );
     if (!kinds.length) return undefined;
     const calls: ICall[] = [];
@@ -390,6 +319,12 @@ class Probe {
           return {
             removed: true,
             detail: `deleted (${deleted.wire?.status ?? 'no status'})`,
+          };
+        // Unreadable: the object may remain, which is not proof of either.
+        if (after.exists === 'unknown')
+          return {
+            removed: 'unknown',
+            detail: `unknown ${after.status ?? 'no answer'}: the delete answered ${deleted.wire?.status ?? deleted.failure ?? 'nothing'}; it may remain`,
           };
         const answer = this.answerOf(
           deleted,
@@ -896,6 +831,18 @@ class Probe {
   }
 }
 
+/** The same probes, the bad Content-Type moved before the bad Accept. */
+function contentTypeFirst(kinds: readonly ProbeKind[]): ProbeKind[] {
+  const out = [...kinds];
+  const accept = out.indexOf('badAccept');
+  const contentType = out.indexOf('badContentType');
+  if (accept !== -1 && contentType !== -1 && contentType > accept) {
+    out[accept] = 'badContentType';
+    out[contentType] = 'badAccept';
+  }
+  return out;
+}
+
 const isSuccess = (status: number | undefined): boolean =>
   status !== undefined && status >= 200 && status < 300;
 
@@ -923,7 +870,7 @@ function writeReport(report: IProbeReport): string[] {
   return [`${base}.json`, `${base}.md`];
 }
 
-function randomRun(): string {
+export function randomRun(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let run = '';
   for (let i = 0; i < 4; i++)
@@ -961,19 +908,18 @@ async function main(): Promise<void> {
   };
   const ledger = new Ledger((removal: IRemoval) => {
     report.removals.push(removal);
-    progress(
-      `  cleanup: ${removal.removed ? 'removed' : 'NOT REMOVED'} ${removal.label}`,
-    );
+    progress(`  cleanup: ${removalWord(removal)} ${removal.label}`);
   });
 
   const interrupt = new Interrupt();
-  const connection = await createTestConnection(createConnectionLogger(), {
-    ownSession: true,
-  });
-  const clientOptions = await resolveSystemContext(
-    connection,
-    system === 'cloud',
+  const raw = await gateConnect(
+    () => createTestConnection(createConnectionLogger(), { ownSession: true }),
+    interrupt,
   );
+  // Every request of the probe goes through the gate.
+  const gated = gate(raw, { interrupt });
+  const connection = gated;
+  const clientOptions = await resolveSystemContext(gated, system === 'cloud');
   const probe = new Probe(
     connection,
     clientOptions,
@@ -988,13 +934,15 @@ async function main(): Promise<void> {
   const finish = async (): Promise<void> => {
     report.finishedAt = new Date().toISOString();
     for (const file of writeReport(report)) progress(file);
-    const left = report.removals.filter((removal) => !removal.removed);
+    const left = unproven(report.removals);
     if (left.length) {
       loud(
-        `\n!!! ${left.length} temporary object(s) could not be removed — delete them by hand:`,
+        `\n!!! ${left.length} temporary object(s) could not be removed or may remain — check and delete them by hand:`,
       );
       for (const removal of left)
-        loud(`!!!   ${removal.label}: ${removal.detail}`);
+        loud(
+          `!!!   ${removalWord(removal)} ${removal.label}: ${removal.detail}`,
+        );
     }
   };
 
@@ -1028,14 +976,15 @@ async function main(): Promise<void> {
     }
   }
   await finish();
-  await closeOwnTestConnection(connection);
+  await closeOwnTestConnection(raw);
   if (interrupt.requested) process.exit(130);
 }
 
-main().then(
-  () => process.exit(0),
-  (error: unknown) => {
-    loud(`header probe: ${message(error)}`);
-    process.exit(1);
-  },
-);
+if (require.main === module)
+  main().then(
+    () => process.exit(0),
+    (error: unknown) => {
+      loud(`header probe: ${message(error)}`);
+      process.exit(1);
+    },
+  );
