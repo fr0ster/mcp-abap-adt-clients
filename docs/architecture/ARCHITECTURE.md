@@ -14,7 +14,7 @@ Primary public entry points:
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^18`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^3`); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
+- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^19`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^3`); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
 - **The library interprets nothing.** Every member makes one ADT request. What the answer becomes is the result strategy the implementation was built with; whether it is a failure is the `analyse` the caller passes with the call. The shipped result sets answer documents as they arrived; the readings and verdicts are in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). Decision 15 in [DECISIONS.md](DECISIONS.md).
 
 ## Layered Structure
@@ -218,12 +218,33 @@ activation and deletion use, so the three cannot disagree (#173). Friendly names
 (`class`, `interface`, `table`, `view`, `functionmodule`, …) map onto type codes;
 a type neither vocabulary knows is thrown before any request.
 
+## A request's own headers
+
+Since 36.0.0 (interfaces-adt 19.0.0) the 32 members whose request sets both
+`Accept` and `Content-Type` take them from `options.headers` (required). The
+member passes the pair to its wire function as the second parameter, and
+`requestHeaders(headers)` (`src/utils/requestHeaders.ts`) is the one place it
+becomes the request's headers — no constant of the member's own, nothing merged
+in, defaulted or replaced. A chain (the message class message's write) gives
+the pair to its main write, the `PUT`; its read, locks and unlocks keep their
+own. A request outside the 32 that shares a wire function with one (`validate`
+through the check run, `activateTestClasses`) passes its own constant pair
+(`CHECK_RUN_HEADERS`, `ACTIVATION_HEADERS`).
+
+`src/__tests__/unit/requestHeaders.test.ts` drives every implementation of the
+32 with a pair no implementation could hold, asserts it is exactly what goes on
+the wire, and fails for a class method named like one of the 32 that no row
+reaches.
+
 ## Accept Negotiation (406 Recovery)
 
 `src/utils/acceptNegotiation.ts` provides optional request retry for ADT `406 Not Acceptable` cases:
 - Can wrap `connection.makeAdtRequest` once per connection.
-- Extracts supported accept values from headers/body.
-- Retries once with corrected `Accept` and caches per `METHOD + URL`.
+- Extracts the supported accept values from the `Accepted content types: …`
+  list in SAP's `406` body, and nothing else (since 36.0.0; no header).
+- Retries once with corrected `Accept` and caches per `METHOD + URL`. Switched
+  on, a cached type replaces the `Accept` / `Content-Type` a member was given
+  in `options.headers` on later requests to that method and URL.
 - Off unless the constructor option `enableAcceptCorrection` is `true`, `setAcceptCorrectionEnabled` was called, or the env var `ADT_ACCEPT_CORRECTION` is exactly `true` (the default was on until 35.0.0).
 - `cachedAccept` / `rememberAccept` read and write the same per-connection cache, whatever the switch says.
 - The caches and the switch are the connection's (kept on it under a symbol, forwarded by the call-timeout proxy). Until 23.0.0 they were module globals, so a correction learned on one system was sent to every other.

@@ -15,6 +15,13 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^19.0.0`**, as `adt-clients` 36.0.0
+  declares it (the shared-range rule). Nothing else in this package changed;
+  the README's samples pass `headers` to the members that take it since
+  `adt-clients` 36.0.0.
+
 ## [0.12.0] - 2026-10-15
 
 ### Changed

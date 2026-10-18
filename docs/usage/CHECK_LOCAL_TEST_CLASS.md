@@ -1,5 +1,12 @@
 # Check Local Test Class
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](../../README.md#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 This guide shows how to validate local test classes using `AdtClient`.
 
 ## Using AdtClient
@@ -40,7 +47,7 @@ const client = new AdtClient(connection);
 const answer = await client.getLocalTestClass().check(
   { className: 'ZCL_MY_CLASS' },
   'inactive',
-  { analyse: analyseCheck },
+  { headers, analyse: analyseCheck },
 );
 
 if (answer.ok) {

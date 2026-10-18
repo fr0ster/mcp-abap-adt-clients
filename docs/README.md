@@ -1,5 +1,12 @@
 # Documentation
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](../README.md#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Quick Start
@@ -97,7 +104,7 @@ const created = await client.getClass().create({
   className: 'ZCL_TEST',
   packageName: 'ZPACKAGE',
   description: 'Test',
-});
+}, { headers });
 if (!created.ok) throw new Error(created.getError().message);
 
 // Utility operations. The search hits are a reading you choose, once.

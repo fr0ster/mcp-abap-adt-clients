@@ -15,6 +15,12 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 >
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
+>
+> **From 35.x?** 36.0.0 (on `interfaces-adt` 19.0.0) makes a request's
+> `Accept` and `Content-Type` yours: 32 members take them as the required
+> `options.headers` and send exactly that pair. See
+> [A request's own headers](#a-requests-own-headers) and
+> [`docs/usage/MIGRATION-36.md`](docs/usage/MIGRATION-36.md).
 
 ## Features
 
@@ -91,7 +97,7 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^18.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^19.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
   | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
@@ -132,7 +138,7 @@ npm install @mcp-abap-adt/adt-clients
    - Factory pattern: `client.getClass()`, `client.getProgram()`, etc.
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
-   - Example: `await client.getClass().create({...})` — the POST, and nothing else
+   - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
@@ -255,11 +261,16 @@ const client = new AdtClient(connection, console);
 
 // One member, one request: this is the POST that makes the class shell.
 // Writing its source and activating it are calls of your own, below.
-await client.getClass().create({
-  className: 'ZCL_TEST',
-  packageName: 'ZPACKAGE',
-  description: 'Test class'
-});
+// The request's Accept and Content-Type are yours (see "A request's own
+// headers" for the pairs).
+await client.getClass().create(
+  {
+    className: 'ZCL_TEST',
+    packageName: 'ZPACKAGE',
+    description: 'Test class',
+  },
+  { headers: CLASS_DOCUMENT },
+);
 
 // The lock window is yours: lock, write, unlock, activate — in the order you
 // choose, each answering its own contract. Deleting works the same way:
@@ -269,10 +280,12 @@ const locked = await client.getClass().lock(target);
 if (locked.ok) {
   // The handle SAP sent — '' if it sent none, which is yours to judge.
   const lockHandle = locked.getResult().value;
-  await client.getClass().update(target, { source, lockHandle });
+  await client
+    .getClass()
+    .update(target, { headers: SOURCE, source, lockHandle });
   await client.getClass().unlock(target, lockHandle);
 }
-await client.getClass().activate(target);
+await client.getClass().activate(target, { headers: ACTIVATION });
 
 // Every member answers a contract: a result or a failure, and the compiler
 // makes you say which you are reading. What the result *is* was chosen when
@@ -296,10 +309,10 @@ if (found.ok) {
 // because they are three requests — and what to do when a system has no
 // /usageReferences/scope sub-resource (some S/4 releases 404 it) is a decision
 // about your system, so it is yours rather than a fallback hidden in here.
-const scope = await utils.getWhereUsedScope({
-  object_name: 'ZMY_TABLE',
-  object_type: 'table',
-});
+const scope = await utils.getWhereUsedScope(
+  { object_name: 'ZMY_TABLE', object_type: 'table' },
+  { headers: WHERE_USED_SCOPE },
+);
 if (!scope.ok) {
   // A refusal is an answer, not an exception flying past. `origin` says which
   // remedy applies: restore the channel, or ask the server something else —
@@ -312,11 +325,10 @@ const narrowed = utils.modifyWhereUsedScope(scope.getResult().value, {
   enableOnly: ['TABL/DS', 'TABL/DT'],  // or disable: ['CLAS/OC']
 });
 
-const answer = await utils.getWhereUsed({
-  object_name: 'ZMY_TABLE',
-  object_type: 'table',
-  scopeXml: narrowed,
-});
+const answer = await utils.getWhereUsed(
+  { object_name: 'ZMY_TABLE', object_type: 'table', scopeXml: narrowed },
+  { headers: WHERE_USED },
+);
 
 // `utilWhereUsedReferences` above is the shape the old member returned,
 // offered by name rather than imposed. Without it, this is the document.
@@ -366,6 +378,7 @@ const programs = executor.getProgramExecutor({
   scheduled: traceSchedulingProfilerId,
 });
 const scheduled = await programs.scheduleTrace({
+  headers: TRACE_PARAMETERS,
   allProceduralUnits: true,
   sqlTrace: true,
   allDbEvents: true,
@@ -397,7 +410,7 @@ import { analyseUnitTest, analyseUnitTestStart, unitTestRunId } from '@mcp-abap-
 const locked = await client.getClass().lock({ className: 'ZCL_UNDER_TEST' });
 await client.getLocalTestClass().update(
   { className: 'ZCL_UNDER_TEST', source: testSource },
-  { lockHandle: locked.getResult().value },
+  { headers: SOURCE, lockHandle: locked.getResult().value },
 );
 await client.getClass().unlock({ className: 'ZCL_UNDER_TEST' }, locked.getResult().value);
 
@@ -466,11 +479,10 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 const client = new AdtClient(connection);
 
-await client.getClass().create({
-  className: 'ZCL_TEST',
-  packageName: 'ZPACKAGE',
-  description: 'Test class'
-});
+await client.getClass().create(
+  { className: 'ZCL_TEST', packageName: 'ZPACKAGE', description: 'Test class' },
+  { headers: CLASS_DOCUMENT },
+);
 
 // Ask the server to hold the read until the object is available. Where the
 // system honours it, this replaces an arbitrary sleep; where it does not, it
@@ -515,7 +527,7 @@ const edited = addAMethod(String(current.getResult().value));
 const locked = await cls.lock(target);
 if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
-await cls.update(target, { source: edited, lockHandle });
+await cls.update(target, { headers: SOURCE, source: edited, lockHandle });
 await cls.unlock(target, lockHandle);
 ```
 
@@ -554,11 +566,14 @@ await client.getBehaviorImplementation().create(
     behaviorDefinition: 'ZOK_I_CDS_TEST',
     description: 'Behavior Implementation for ZOK_I_CDS_TEST',
     transportRequest: 'DEVK900001'
-  }
+  },
+  { headers: CLASS_DOCUMENT },
 );
 // The class shell exists. Its `source/main` — the generated binding to the
 // behavior definition — is `updateMain()`, and activation is `activate()`.
-await client.getBehaviorImplementation().activate({ className: 'ZBP_OK_I_CDS_TEST' });
+await client
+  .getBehaviorImplementation()
+  .activate({ className: 'ZBP_OK_I_CDS_TEST' }, { headers: ACTIVATION });
 ```
 
 ## Developer Tools
@@ -623,11 +638,10 @@ never neither. `client.getUtils()` did since 17.0.0; the per-type handlers do
 now:
 
 ```typescript
-const answer = await client.getClass().create({
-  className: 'ZCL_X',
-  packageName: 'ZP',
-  description: 'x',
-});
+const answer = await client.getClass().create(
+  { className: 'ZCL_X', packageName: 'ZP', description: 'x' },
+  { headers: CLASS_DOCUMENT },
+);
 
 if (answer.ok) {
   answer.getResult().value;   // whatever the reading makes of it
@@ -732,7 +746,10 @@ const requests = client.getRequest({
 // Error strategy: per call.
 await client
   .getPackage()
-  .delete({ packageName: 'ZPKG' }, { analyse: analyseDeletion });
+  .delete(
+    { packageName: 'ZPKG' },
+    { headers: DELETION, analyse: analyseDeletion },
+  );
 ```
 
 ### The reading is yours, and you choose it once
@@ -815,11 +832,14 @@ A member answers one value — what the reading made of the answer — and a fai
 in the other half:
 
 ```typescript
-const answer = await client.getFunctionModule().create({
-  functionGroupName: 'ZFGROUP',
-  functionModuleName: 'ZFM_TEST',
-  description: 'Test FM',
-});
+const answer = await client.getFunctionModule().create(
+  {
+    functionGroupName: 'ZFGROUP',
+    functionModuleName: 'ZFM_TEST',
+    description: 'Test FM',
+  },
+  { headers: FUNCTION_MODULE_DOCUMENT },
+);
 
 if (!answer.ok) throw new Error(answer.getError().message);
 console.log(answer.getResult().value);   // the create's document, by default
@@ -827,6 +847,82 @@ console.log(answer.getResult().value);   // the create's document, by default
 
 There is no chain behind it: `create()` is the POST, and the lock, write,
 unlock and activation around it are calls of your own, each with its own answer.
+
+### A request's own headers
+
+Since 36.0.0 (`@mcp-abap-adt/interfaces-adt` 19.0.0) a member whose request
+sets both `Accept` and `Content-Type` takes them from you, as
+`options.headers: IAdtHeaders` (`{ accept, contentType }`, both required). The
+member sends exactly that pair: it keeps no type of its own for that request,
+and nothing is merged in, defaulted or replaced. The options are required with
+it, and a positional parameter before them that was optional is now
+`T | undefined` — pass `undefined` explicitly.
+
+The 32 members: `link`, `pull`, `checkExternalRepo` (abapGit); `create`,
+`update`, `updateMetadata`, `delete`, `checkDeletion`, `check`, `activate` (the
+object handlers); `checkState` (feature toggle); `removeObject`, `addObject`,
+`createTask`, `changeTaskType`, `moveObjects` (transport request);
+`getWhereUsed`, `getWhereUsedScope`, `getVirtualFoldersContents`,
+`fetchNodeStructure`, `activateObjectsGroup`, `checkDeletionGroup`,
+`deleteObjectsGroup`, `getSqlQuery`, `getTableContents` (`getUtils()`);
+`scheduleTrace` (executors); `setBreakpoints`, `getChildVariables`,
+`getVariables`, `syncBreakpoints`, `setDebuggerSettings` (`AbapDebugger`);
+`getDataPreview` (`AmdpDebugger`). Every other member is unchanged, and a read
+still takes an optional `accept` (`IReadOptions`).
+
+- Members that sent only one of the two before — `create` of a function group,
+  message class and message class message, `update` of a feature toggle and a
+  message class message, `updateMetadata` of a message class, `delete` of a
+  metadata extension and a transport request — send the whole pair now. So do
+  the requests that sent neither: a transport request's `checkDeletion`, and
+  the direct `DELETE` of the legacy client's class, interface, program, DDL
+  source, function group and function module.
+- A message class message's `create`, `update` and `delete` are a chain (read,
+  two locks, the `PUT`, two unlocks): the pair is the `PUT`'s; the chain's own
+  requests keep their types.
+- `AdtContentTypesBase` / `AdtContentTypesModern` still answer pairs for some
+  creates (`classCreate()`, `programCreate()`, …), which you can pass as
+  `headers`; the members themselves no longer read the `contentTypes` option
+  for them, nor `contentTypeVersion` for abapGit's `link` and `pull`.
+
+The pairs 35.0.0 chose for itself, for the samples below (a modern system):
+
+```typescript
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+
+const CLASS_DOCUMENT: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.oo.classes.v4+xml',
+  contentType: 'application/vnd.sap.adt.oo.classes.v4+xml',
+};
+const SOURCE: IAdtHeaders = {
+  accept: 'text/plain',
+  contentType: 'text/plain; charset=utf-8',
+};
+const ACTIVATION: IAdtHeaders = {
+  accept: 'application/xml',
+  contentType: 'application/vnd.sap.adt.activation+xml',
+};
+const DELETION: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
+  contentType: 'application/vnd.sap.adt.deletion.request.v1+xml',
+};
+const WHERE_USED_SCOPE: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml',
+  contentType: 'application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml',
+};
+const WHERE_USED: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
+  contentType: 'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
+};
+const TRACE_PARAMETERS: IAdtHeaders = {
+  accept: 'application/xml',
+  contentType: 'application/xml',
+};
+const FUNCTION_MODULE_DOCUMENT: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.functions.fmodules+xml',
+  contentType: 'application/vnd.sap.adt.functions.fmodules+xml',
+};
+```
 
 ### Accept Negotiation
 
@@ -850,7 +946,16 @@ const client = new AdtClient(connection, console, {
 ADT_ACCEPT_CORRECTION=true npm test
 ```
 
-The variable turns it on only when it is exactly `true`. To correct requests
+The variable turns it on only when it is exactly `true`. Switched on, it is the
+one thing that changes a member's `headers`: the request answered `406` or
+`415` is sent once more with the type SAP named, and that type — or one stored
+with `rememberAccept` — replaces the given `Accept` / `Content-Type` on later
+requests to the same method and URL on that connection. Off, the pair you pass
+is what is sent.
+
+`extractSupportedAccept(error)` reads only the list SAP writes into its `406`
+body — `Accepted content types: …`, often empty (measured on an on-premise
+system); since 36.0.0 it reads no header and no other text. To correct requests
 yourself instead, read a `406` with `extractSupportedAccept(error)` and keep
 the result in the connection's cache with `rememberAccept(connection, request,
 accept)`; `cachedAccept(connection, request)` reads it back, whatever the
@@ -912,7 +1017,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^18.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^19.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -1029,6 +1134,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[35.x → 36.0.0](docs/usage/MIGRATION-36.md)** — a request's `Accept` and `Content-Type` are the caller's: 32 members take the required `options.headers` and send exactly that pair.
 - **[34.x → 35.0.0](docs/usage/MIGRATION-35.md)** — accept negotiation is off by default: a `406`/`415` is the call's answer unless you switch it on.
 - **[33.x → 34.0.0](docs/usage/MIGRATION-34.md)** — a batch corrects and resends nothing: a part's `406`/`415` is that call's answer.
 - **[32.x → 33.0.0](docs/usage/MIGRATION-33.md)** — a credential the provider refused before SAP was asked rejects with the connection's refusal as it came; a `401` SAP refused it with comes back carrying that response.

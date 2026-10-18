@@ -1,5 +1,12 @@
 # Recording batch transport
 
+> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
+> `checkDeletion`, `check`, `activate` and the others listed in
+> [A request's own headers](../../README.md#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.
+> In these samples `headers` stands for that pair, an `IAdtHeaders`
+> (`{ accept, contentType }`); the member sends exactly it.
+
 `AdtBatchConnection` implements `IAbapConnection`. Each member still issues one
 request; the wrapper records it and settles its promise after `execute()`.
 Do not await recorded calls before executing: their answers do not exist yet.
@@ -14,7 +21,7 @@ import { analyseActivation, utilActivationRunId } from '@mcp-abap-adt/adt-strate
 const batch = new AdtBatchConnection(connection, { endpoint: 'communication' });
 const domains = new AdtClient(batch).getDomain();
 // configs: { domainName, packageName, transportRequest, description }[]
-const created = configs.map(config => domains.create(config));
+const created = configs.map(config => domains.create(config, { headers }));
 const locked = configs.map(config => domains.lock(config));
 await batch.execute();
 const handles = await Promise.all(created.map(async (pending, i) => {
@@ -25,7 +32,7 @@ const handles = await Promise.all(created.map(async (pending, i) => {
   return lock.getResult().value;
 }));
 const writes = configs.map((config, i) =>
-  domains.updateMetadata(config, {
+  domains.updateMetadata(config, { headers,
     source: documents[i], // Full domain XML, including datatype CHAR and length 000001.
     lockHandle: handles[i],
   }),
@@ -42,7 +49,7 @@ const utils = new AdtClient(connection).getUtils({
 const started = await utils.activateObjectsGroup(
   configs.map(config => ({ type: 'DOMA', name: config.domainName })),
   false,
-  { analyse: analyseActivation },
+  { headers, analyse: analyseActivation },
 );
 if (!started.ok) throw new Error(started.getError().message);
 const runId = started.getResult().value;
@@ -91,11 +98,14 @@ connection's accept negotiation and is sent once. To correct a part that SAP
 answered with `406` yourself, read the acceptable formats from that answer with
 `extractSupportedAccept(error)` (exported): it takes the error the `406` came
 as — any value; one without a response yields an empty list — and returns the
-supported media types as a `string[]`. It reads them from the response headers
-`accept`, `x-sap-adt-supported-accept`, `x-sap-adt-accept`, `supported-accept`
-and `accept-supported` (comma-separated), and from every `type/subtype`
-(with an optional `;parameter`) found in the response body, without
-duplicates. It is the reading accept negotiation applies to a `406` itself.
+supported media types as a `string[]`. Since 36.0.0 it reads only the list SAP
+writes into the body of its `406` — the exception message ends `Accepted
+content types: …`, comma-separated, and the list is often empty (measured on an
+on-premise system) — without duplicates, and no header: SAP's `406` names the
+types in its body only. Until 35.x it also scanned the headers and every
+`type/subtype` in the body, so each `406` answered two fragments of the
+exception's namespace URI as types. It is the reading accept negotiation
+applies to a `406` itself.
 
 The corrected Accept is remembered where negotiation remembers its own: the
 connection's accept cache, keyed by method and URL. `cachedAccept(connection,
@@ -124,7 +134,7 @@ const pending = [
   // Debugger recordings default to the attached stateful session.
   debuggerApi.step('stepOver'),
   debuggerApi.getStack(),
-  debuggerApi.getVariables(variableIds), // IDs obtained at the stop.
+  debuggerApi.getVariables(variableIds, { headers }), // IDs obtained at the stop.
 ];
 await batch.execute();
 const answers = await Promise.all(pending);
