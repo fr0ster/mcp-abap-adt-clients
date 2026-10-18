@@ -64,7 +64,7 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
 - **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Six members, one request each — `link`, `pull({ package, pullLink })` (starts the pull and does not wait; polling `listRepos` is the caller's), `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo`. The key, pull link and log link come from `listRepos`; there is no `getRepo`. Result set as the fourth constructor argument (`abapGitDocuments` by default). Not a factory on AdtClient — consumers `new` it directly. Available on cloud + modern on-prem (ABAP Platform 2022+).
 
-All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. Optional: `options.enableAcceptCorrection` — `Accept` negotiation on HTTP 406 is on unless it is `false` or `ADT_ACCEPT_CORRECTION=false`; its state lives on the connection.
+All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. Optional: `options.enableAcceptCorrection` — `Accept` negotiation on HTTP 406 (and `Content-Type` on 415) is off unless switched on: the option, `setAcceptCorrectionEnabled`, or `ADT_ACCEPT_CORRECTION=true`; its state lives on the connection.
 
 ### Core Modules (`src/core/`)
 
@@ -112,7 +112,7 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 
 ### Supporting Layers
 
-- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): On HTTP 406, extracts supported content types from response, caches the correct `Accept` per URL, retries once. Wraps `connection.makeAdtRequest`; the caches and the switch are per connection.
+- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): off by default. When switched on, on HTTP 406 extracts supported content types from the response, caches the correct `Accept` per URL and retries once. `extractSupportedAccept`, `cachedAccept` and `rememberAccept` are exported for a consumer that corrects requests itself; the caches and the switch are per connection.
 - **Runtime** (`src/runtime/`): profiler and cross/ST05 traces, application logs, ATC, DDIC activation graph, runtime dumps, feeds, system messages, gateway error log — each in its own subfolder, each with its result set.
 - **Executors** (`src/executors/`): Class/program execution and trace scheduling.
 - **System probes** (`src/utils/systemInfo.ts`, `src/utils/discoveryEndpoints.ts`): `getSystemInformation()`, `isModernAdtSystem()`, `fetchDiscoveryEndpoints()` answer 404/405/501 as an absent endpoint and raise any other failure.
