@@ -358,6 +358,9 @@ describe('the clients source', () => {
     expect(find('getRequest()', 'create')?.skipped).toMatch(
       /^skipped: the server assigns/,
     );
+    expect(find('legacy getClassExecutor()', 'scheduleTrace')?.skipped).toMatch(
+      /^skipped: the server assigns/,
+    );
     expect(find('getClass()', 'getVersionSource')?.skipped).toMatch(
       /^skipped: needs a URI/,
     );

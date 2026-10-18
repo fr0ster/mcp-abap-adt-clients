@@ -404,7 +404,9 @@ export async function recordMembers(): Promise<{
         );
       entry.requests = endpointsOf(capture);
       entry.hasBody = capture.requests.some((request) => request.hasBody);
-      if (NOT_SENT[key]) entry.skipped = `skipped: ${NOT_SENT[key]}`;
+      // The legacy client's member is the modern one's: the same reason.
+      const notSent = NOT_SENT[key.replace(/^legacy /, '')];
+      if (notSent) entry.skipped = `skipped: ${notSent}`;
       else if (!entry.requests.length)
         entry.skipped = capture.failure
           ? `skipped: builds no request from the probe name alone: ${capture.failure}`

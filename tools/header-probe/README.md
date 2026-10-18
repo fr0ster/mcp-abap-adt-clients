@@ -221,7 +221,12 @@ Two files in `.header-probe/` (gitignored: they hold the system's answers):
   Content-Type values named per endpoint, the writes that created the probe
   name, and the cleanup.
 
-A bogus run also classifies each endpoint by what it **needs**:
+A bogus run also classifies each endpoint by what it **needs**. The
+classification is **provisional**: when SAP checks Accept and Content-Type
+relative to processing — and so which answers show that a header was ignored
+— is still being settled from the ABAP REST framework. The raw rows are kept
+as SAP answered them; `--render` recomputes `needs` from them.
+
 
 | needs | when |
 |---|---|

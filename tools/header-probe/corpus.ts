@@ -909,7 +909,10 @@ export function classifyNeeds(rows: readonly ICorpusRow[]): IEndpointNeeds[] {
 
 /** The summary of a bogus run: endpoints per `needs`, with the values named. */
 export function needsLines(entries: readonly IEndpointNeeds[]): string[] {
-  const lines: string[] = [];
+  const lines: string[] = [
+    '**Provisional.** When SAP checks Accept and Content-Type relative to processing — and so which answers show a header was ignored — is being settled from the ABAP REST framework; the classification may change. The raw rows above are what SAP answered.',
+    '',
+  ];
   lines.push('| needs | endpoints |', '|---|---|');
   for (const value of NEEDS)
     lines.push(
@@ -1089,7 +1092,7 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
   }
 
   if (corpus.headers === 'bogus') {
-    lines.push('', '### What each endpoint needs', '');
+    lines.push('', '### What each endpoint needs (provisional)', '');
     lines.push(...needsLines(classifyNeeds(corpus.rows)));
   }
 
@@ -1181,7 +1184,7 @@ export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
     lines.push(
       `## The header corpus: ${source}`,
       '',
-      `| endpoint | ${source === 'discovery' ? 'discovery lists' : 'the pair table lists'} | none: Accept named | none: Content-Type named | bogus: Accept named | bogus: Content-Type named | needs (bogus) |`,
+      `| endpoint | ${source === 'discovery' ? 'discovery lists' : 'the pair table lists'} | none: Accept named | none: Content-Type named | bogus: Accept named | bogus: Content-Type named | needs (bogus, provisional) |`,
       '|---|---|---|---|---|---|---|',
     );
     for (const key of [...listed.keys()].sort()) {
@@ -1281,7 +1284,7 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
   lines.push(...headerCorpusLines(corpora));
   for (const corpus of corpora.filter((c) => c.headers === 'bogus'))
     lines.push(
-      `## What each endpoint needs: ${corpus.source}`,
+      `## What each endpoint needs (provisional): ${corpus.source}`,
       '',
       ...needsLines(classifyNeeds(corpus.rows)),
       '',
