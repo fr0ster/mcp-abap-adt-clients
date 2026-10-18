@@ -59,6 +59,40 @@ export function requestOf(
   return { method: carried.method, url: carried.url };
 }
 
+/**
+ * The mark of a batch envelope's failure: one object, rejected to every part
+ * the envelope carried. Each part's request passes through the trace, and a
+ * part writing its own request onto that shared object would name itself on
+ * every other part's failure — the last part's winning, a request never sent
+ * on its own. The object carries the envelope's own request instead, set by
+ * the batch connection that sent it.
+ */
+const ENVELOPE_FAILURE = Symbol.for(
+  '@mcp-abap-adt/adt-clients/requestTrace/envelopeFailure',
+);
+
+/**
+ * Mark `error` as a batch envelope's failure, so the trace leaves it as it
+ * came. Module-internal (not in the package's index): the batch connection is
+ * its one caller.
+ */
+export function markEnvelopeFailure(error: unknown): void {
+  if (error === null || typeof error !== 'object') return;
+  Reflect.defineProperty(error, ENVELOPE_FAILURE, {
+    value: true,
+    enumerable: false,
+    configurable: false,
+  });
+}
+
+function isEnvelopeFailure(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    (error as Record<symbol, unknown>)[ENVELOPE_FAILURE] === true
+  );
+}
+
 /** Connections already carrying the trace. */
 const traced = new WeakSet<IAbapConnection>();
 
@@ -120,8 +154,11 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
       //
       // A credential refusal SAP was never asked about is not annotated: it is
       // the connection's own object, rethrown to the caller as it came, and
-      // this wrapper does not write onto it.
-      if (isUnansweredCredentialRefusal(error)) throw error;
+      // this wrapper does not write onto it. Nor is a batch envelope's
+      // failure: every part of the envelope rejects with that one object, and
+      // it already names the request that failed — the envelope's own.
+      if (isUnansweredCredentialRefusal(error) || isEnvelopeFailure(error))
+        throw error;
       (error as { request?: unknown }).request = asked;
       throw error;
     }

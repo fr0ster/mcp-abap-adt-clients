@@ -24,6 +24,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [34.2.1] - 2026-10-18
+
+### Fixed
+
+- A batch envelope that fails as a whole names its own request. Every part of
+  the envelope rejects with that one failure, and each part's request trace used
+  to write the part's own request onto it, so every part's failure named the
+  last part — a request never sent on its own. The failure now carries the
+  envelope's `POST …/batch` as its `request`, and the trace leaves it as it
+  came. The "not sent because an earlier batch envelope failed" error, shared by
+  every unsent part, is left as it came too: it names no part.
+
 ## [34.2.0] - 2026-10-16
 
 ### Added

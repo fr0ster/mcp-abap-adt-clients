@@ -10,6 +10,7 @@ import {
   getBaseRequest,
 } from '../utils/acceptNegotiation';
 import { isUnansweredCredentialRefusal } from '../utils/adtResponse';
+import { markEnvelopeFailure } from '../utils/requestTrace';
 import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
 
 type Session = 'stateful' | 'stateless';
@@ -197,6 +198,19 @@ export class AdtBatchConnection implements IAbapConnection {
             'ADT batch request not sent because an earlier batch envelope failed',
             { cause: error },
           );
+      // The envelope failed as a whole: every part it carried rejects with
+      // this one object. The request that failed is the envelope's own POST,
+      // not any part — and no part's trace may write its own over it.
+      if (active.length && !isUnansweredCredentialRefusal(error)) {
+        if (error !== null && typeof error === 'object')
+          (error as { request?: unknown }).request = {
+            method: 'POST',
+            url: BATCH[this.options.endpoint],
+          };
+        markEnvelopeFailure(error);
+      }
+      // The "not sent" failure is one object shared by every unsent part, too.
+      if (unsentError !== error) markEnvelopeFailure(unsentError);
       this.settlementFailure = { error: unsentError };
       for (const part of active) part.reject(error);
       for (const part of pending) part.reject(unsentError);

@@ -118,9 +118,13 @@ Recorded request promises receive inner responses, in order: 2xx resolves; other
 statuses reject with an Error carrying `response: { status, statusText, headers,
 data }`, matching direct HTTP failure handling. Members keep their usual
 `IAdtResponse` and strategy behavior. Envelope/parse failures stop execution immediately and reject `execute()` and
-parts in the failed envelope. Unsent runs and queued follow-ups reject with a
+parts in the failed envelope. Every part of that envelope rejects with the same
+object and message, and its `request` is the envelope's own
+(`{ method: 'POST', url: '/sap/bc/adt/communication/batch' }`, or the debugger's
+batch URL), not any part's. Unsent runs and queued follow-ups reject with a
 library error saying the request was not sent because an earlier envelope failed;
-that error carries the cause, without a SAP response. Missing parts reject with a part-count error. A count
+that error carries the cause, without a SAP response and without a `request` of
+its own. Missing parts reject with a part-count error. A count
 mismatch also rejects `execute()`. Attach rejection handlers before execution when
 using raw connection promises. Each execute sends follow-up envelopes for requests recorded during settlement
 by member continuations; accept negotiation records none. It yields one event-loop turn

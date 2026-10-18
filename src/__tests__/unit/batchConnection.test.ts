@@ -10,6 +10,7 @@ import { AdtClient } from '../../clients/AdtClient';
 import { exemptFromAcceptNegotiation, getBaseRequest } from '../../index';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { withRequestTrace } from '../../utils/requestTrace';
 
 function fixture(statuses = [200, 200]) {
   const send = jest.fn(async (_request: unknown) => ({
@@ -695,5 +696,77 @@ describe('a forwarding connection over one an AdtClient wrapped', () => {
     await batch.execute().catch(() => undefined);
     await part;
     expect(send).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('an envelope that fails as a whole', () => {
+  // Every part goes through the request trace, which writes the part's own
+  // request onto what it throws. The envelope's failure is one object shared
+  // by every part, so each part wrote over the one before it and all of them
+  // ended up naming the last part — a request never sent on its own.
+  const parts = [
+    { method: 'GET', url: '/sap/bc/adt/ddic/domains/z_first', timeout: 0 },
+    { method: 'GET', url: '/sap/bc/adt/ddic/domains/z_second', timeout: 0 },
+    { method: 'GET', url: '/sap/bc/adt/ddic/domains/z_third', timeout: 0 },
+  ];
+
+  it.each([
+    [
+      'an outer 500',
+      () =>
+        Object.assign(new Error('Request failed with status code 500'), {
+          response: { status: 500, statusText: 'Internal', headers: {} },
+        }),
+    ],
+    [
+      'a transport throw',
+      () =>
+        Object.assign(new Error('socket hang up'), {
+          request: { aNativeRequestObject: true },
+        }),
+    ],
+  ])('rejects every part with the same object, naming the envelope POST (%s)', async (_name, make) => {
+    const { batch, send } = fixture();
+    const failure = make();
+    send.mockRejectedValueOnce(failure);
+    const traced = withRequestTrace(batch);
+    const settled = parts.map((part) =>
+      traced.makeAdtRequest(part).catch((error: unknown) => error),
+    );
+
+    await expect(batch.execute()).rejects.toBe(failure);
+    const errors = await Promise.all(settled);
+
+    expect(errors).toEqual([failure, failure, failure]);
+    for (const error of errors) expect(error).toBe(failure);
+    expect(failure.message).toBe(make().message);
+    expect((failure as { request?: unknown }).request).toEqual({
+      method: 'POST',
+      url: '/sap/bc/adt/communication/batch',
+    });
+  });
+
+  it('leaves the "not sent" failure of a later envelope naming no part', async () => {
+    const { batch, send } = fixture([200]);
+    const failure = new Error('offline');
+    const traced = withRequestTrace(batch);
+    const failed = traced.makeAdtRequest(parts[0]).catch((e: unknown) => e);
+    batch.setSessionType('stateful');
+    const lock = { ...parts[1], url: `${parts[1].url}?_action=LOCK` };
+    const unsent = [
+      traced.makeAdtRequest(lock).catch((e: unknown) => e),
+      traced
+        .makeAdtRequest({ ...parts[2], url: `${parts[2].url}?_action=LOCK` })
+        .catch((e: unknown) => e),
+    ];
+    send.mockRejectedValueOnce(failure);
+
+    await expect(batch.execute()).rejects.toBe(failure);
+    expect(await failed).toBe(failure);
+    const [a, b] = (await Promise.all(unsent)) as Error[];
+    expect(a).toBe(b);
+    expect(a.message).toMatch(/not sent/);
+    expect((a as { request?: unknown }).request).toBeUndefined();
+    expect(a.cause).toBe(failure);
   });
 });
