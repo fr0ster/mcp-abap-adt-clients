@@ -57,6 +57,7 @@ import {
   type ISplit,
   isIsolated,
   isWrite,
+  judge,
   needsCounts,
   PROBE_NAME,
   PROBE_PACKAGE,
@@ -1617,6 +1618,8 @@ export interface IWriteCycleInput {
 
 export interface IWriteCycleResult {
   evidence: IEvidence[];
+  /** The cycle's answers as rows, for `exists`. */
+  rows?: ICorpusRow[];
   removals: IRemoval[];
   error?: string;
 }
@@ -1635,6 +1638,7 @@ export interface IFullRunInput
   updateMeasure?: (input: Omit<IWriteCycleInput, 'unknown'>) => Promise<{
     updates: IHeaderCorpusFile['updates'];
     removals: IRemoval[];
+    rows?: ICorpusRow[];
     error?: string;
   }>;
 }
@@ -1765,6 +1769,7 @@ export async function runFull(
             unknown: unknownWrites,
           });
           evidence.push(...writes.evidence);
+          phase2Rows.push(...(writes.rows ?? []));
           removals = [...removals, ...writes.removals];
           if (writes.error) state.failure ??= writes.error;
         },
@@ -1780,6 +1785,24 @@ export async function runFull(
             interrupt: input.interrupt,
           });
           updates = measured.updates;
+          phase2Rows.push(...(measured.rows ?? []));
+          // Each update went with a bogus Accept: evidence for its Accept.
+          for (const row of measured.rows ?? [])
+            if (row.endpoint)
+              evidence.push({
+                endpoint: endpointKey(row.endpoint),
+                source: 'clients',
+                phase: 2,
+                who: `${row.group}.${row.label} (update measurement, temporary object)`,
+                accept: judge(row, 406),
+                contentType: {
+                  verdict: 'unknown',
+                  reason: 'not probed by the update measurement',
+                },
+                namedAccept: [],
+                namedContentType: [],
+                text: `bogus Accept: ${row.status ?? row.failure ?? 'no answer'}${row.sapType ? ` ${row.sapType}` : ''}`,
+              });
           removals = [...removals, ...measured.removals];
           if (measured.error) state.failure ??= measured.error;
         },

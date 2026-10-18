@@ -2552,3 +2552,170 @@ describe('the update measurement', () => {
     expect(put?.headers.accept).toBe(PROBE_TYPE);
   });
 });
+
+describe('a failed unlock', () => {
+  const run = (unlockAnswers: number[]) => {
+    // The class system of the update measurement, its UNLOCK answering as told.
+    const sources = new Map<string, string>();
+    let unlocks = 0;
+    const system = fakeSystem((request) => {
+      const { method, url } = request;
+      const name = url.split('/')[6]?.split('?')[0]?.toLowerCase();
+      if (method === 'POST' && url === '/sap/bc/adt/oo/classes') {
+        const match = /adtcore:name="([^"]+)"/.exec(request.body);
+        if (match)
+          sources.set(match[1].toLowerCase(), 'CLASS x DEFINITION. ENDCLASS.');
+        return { status: 201 };
+      }
+      if (url.includes('_action=LOCK'))
+        return {
+          status: 200,
+          body: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>',
+        };
+      if (url.includes('_action=UNLOCK')) {
+        unlocks++;
+        return { status: unlockAnswers.shift() ?? 200 };
+      }
+      if (url === '/sap/bc/adt/deletion/delete') {
+        for (const n of [...sources.keys()])
+          if (request.body.toLowerCase().includes(n)) sources.delete(n);
+        return { status: 200 };
+      }
+      if (name && url.startsWith('/sap/bc/adt/oo/classes/')) {
+        if (!sources.has(name)) return { status: 404 };
+        if (method === 'PUT')
+          return { status: 406, body: NOT_ACCEPTABLE('text/plain') };
+        return url.includes('/source/main')
+          ? { status: 200, body: sources.get(name) ?? '' }
+          : { status: 200, body: `<class:abapClass adtcore:name="${name}"/>` };
+      }
+      return { status: 404 };
+    });
+    return measureUpdates({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      only: ['class'],
+    }).then((result) => ({ result, unlocks: () => unlocks, sources, system }));
+  };
+
+  it('fails the run, keeps its handle, and the cleanup unlocks again before it deletes', async () => {
+    const { result, unlocks, sources, system } = await run([500]);
+    expect(result.error).toMatch(
+      /^unlock failed: class .*: the unlock answered 500/,
+    );
+    expect(unlocks()).toBe(2);
+    const locked = result.removals.find((r) =>
+      r.label.startsWith('(locked) class'),
+    );
+    expect(locked).toEqual(expect.objectContaining({ removed: true }));
+    // The unlock came before the deletion.
+    const order = system.seen
+      .filter(
+        (s) =>
+          s.url.includes('_action=UNLOCK') ||
+          s.url === '/sap/bc/adt/deletion/delete',
+      )
+      .map((s) => (s.url.includes('UNLOCK') ? 'unlock' : 'delete'));
+    expect(order).toEqual(['unlock', 'unlock', 'delete']);
+    expect(sources.size).toBe(0);
+  });
+
+  it('still refused in the cleanup: MAY REMAIN (locked)', async () => {
+    const { result } = await run([500, 500]);
+    const locked = result.removals.find((r) =>
+      r.label.startsWith('(locked) class'),
+    );
+    expect(locked?.removed).toBe('unknown');
+    expect(locked?.detail).toMatch(
+      /^MAY REMAIN \(locked\): the unlock answered 500 again/,
+    );
+  });
+
+  it('ends the full run failed: exit 1', async () => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 404 },
+    );
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      updateMeasure: async () => ({
+        updates: [],
+        removals: [
+          {
+            label: '(locked) class Z',
+            removed: 'unknown',
+            detail: 'MAY REMAIN (locked): x',
+          },
+        ],
+        error: 'unlock failed: class Z: the unlock answered 500',
+      }),
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toBe(
+      'failed: unlock failed: class Z: the unlock answered 500',
+    );
+  });
+});
+
+describe('every phase counts', () => {
+  it('a resource answer of the write cycle or the update measurement settles exists, and the update its Accept', async () => {
+    let n = 0;
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 500, body: `dump ${n++}` },
+    );
+    const update = {
+      method: 'PUT',
+      path: '/sap/bc/adt/oo/classes/{name}/source/main',
+    };
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      writeCycle: async () => ({
+        evidence: [],
+        rows: [
+          row({
+            endpoint: { method: 'POST', path: '/sap/bc/adt/oo/classes' },
+            status: 415,
+          }),
+        ],
+        removals: [],
+      }),
+      updateMeasure: async () => ({
+        updates: [
+          { type: 'class', member: 'update', status: 406, applied: false },
+        ],
+        rows: [
+          row({
+            endpoint: update,
+            status: 406,
+            sapType: 'ExceptionResourceNotAcceptable',
+          }),
+        ],
+        removals: [],
+      }),
+    });
+    const of = (endpoint: string) =>
+      result.file?.entries.find((e) => e.endpoint === endpoint);
+    // Phase 1 saw only 500s on these.
+    expect(of('PUT /sap/bc/adt/oo/classes/{name}/source/main')?.exists).toBe(
+      'yes',
+    );
+    expect(
+      of('PUT /sap/bc/adt/oo/classes/{name}/source/main')?.accept.verdict,
+    ).toBe('checked');
+    expect(of('POST /sap/bc/adt/oo/classes')?.exists).toBe('yes');
+  });
+});

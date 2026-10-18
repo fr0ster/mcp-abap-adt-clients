@@ -77,7 +77,10 @@ header corpus, everything batched and poisoned envelopes split:
      released in a `finally`, the content read again. Applied = the two
      contents' hashes differ; the content itself is never kept or printed.
      The ledger holds the object before its create is sent, and the cleanup
-     removes it. The header corpus lists, per type, the update's answer and
+     removes it. Every unlock's answer is checked, here and in the write
+     cycle: a failed unlock keeps its handle in the ledger, the cleanup
+     unlocks again before it deletes, and what stays locked is listed loudly
+     as `MAY REMAIN (locked)`; the run then ends `failed` (exit 1). The header corpus lists, per type, the update's answer and
      whether it was applied.
    What phase 2 cannot settle stays `unknown`, with its reason.
 4. **`header-corpus-<timestamp>.json` and `.md`**, one per run of the system:
@@ -219,7 +222,9 @@ every answer of every run:
 | `unknown` | only what comes before the resource or says nothing of it: 401, an authorization 403, a 500, no answer, a skipped row |
 
 Nothing is dropped: every answer stays in the corpus; `exists` only reads
-them.
+them. `exists`, and `needs` where it applies, take the answers of every phase:
+phase 1, the reads on existing objects, the write cycle and the update
+measurement (whose bogus Accept is evidence for the update's Accept).
 
 ## The write cycle (the former header probe)
 

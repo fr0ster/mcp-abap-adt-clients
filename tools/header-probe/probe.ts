@@ -208,6 +208,41 @@ export class Probe {
     return capture;
   }
 
+  /** Every unlock that failed: `<what>: <answer>`. A run with one ends failed. */
+  readonly lockFailures: string[] = [];
+
+  /**
+   * Releases a lock and checks the answer. A failed unlock keeps its handle in
+   * the ledger: the cleanup unlocks again before it deletes (newest first), a
+   * cleanup action, not a probe resend; still refused, it is `MAY REMAIN`.
+   */
+  async release(
+    label: string,
+    unlock: (handle: string) => ICall,
+    held: string,
+  ): Promise<void> {
+    const capture = await this.direct1(unlock(held), false);
+    if (ok(capture)) return;
+    this.lockFailures.push(
+      `${label}: the unlock answered ${capture.wire?.status ?? capture.failure ?? 'nothing'}`,
+    );
+    this.ledger.add({
+      label: `(locked) ${label}`,
+      remove: async () => {
+        const again = await this.direct1(unlock(held), false);
+        return ok(again)
+          ? {
+              removed: true,
+              detail: `unlocked in the cleanup (${again.wire?.status})`,
+            }
+          : {
+              removed: 'unknown',
+              detail: `MAY REMAIN (locked): the unlock answered ${again.wire?.status ?? again.failure ?? 'nothing'} again`,
+            };
+      },
+    });
+  }
+
   /** A ledger entry that deletes `name` with the known delete pair, if it is there. */
   remember(spec: IObjectSpec, name: string, context: ISpecContext): void {
     const config = spec.config(name, context);
@@ -291,11 +326,12 @@ export class Probe {
         handle,
         // Released after an interrupt too: unlocking is cleanup.
         (held) =>
-          this.direct1(
-            (client, analyse) =>
-              spec.handle(client).unlock?.(config, held, { analyse }) ??
+          this.release(
+            `${spec.type} ${name}`,
+            (h) => (client, analyse) =>
+              spec.handle(client).unlock?.(config, h, { analyse }) ??
               Promise.resolve(),
-            false,
+            held,
           ),
         (held) =>
           this.direct1(
@@ -436,11 +472,12 @@ export class Probe {
           lock,
           // Released after an interrupt too: unlocking is cleanup.
           (held) =>
-            this.direct1(
-              (client, analyse) =>
-                handle(client).unlock?.(config, held, { analyse }) ??
+            this.release(
+              `${spec.type} ${names.known}`,
+              (h) => (client, analyse) =>
+                handle(client).unlock?.(config, h, { analyse }) ??
                 Promise.resolve(),
-              false,
+              held,
             ),
           async (held) => {
             if (source === undefined) {

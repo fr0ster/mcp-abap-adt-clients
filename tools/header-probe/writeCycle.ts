@@ -12,7 +12,7 @@ import type { AdtClient } from '../../src/clients/AdtClient';
 import { sapErrorIn } from '../../src/utils/adtErrors';
 import type { ICapture } from './capture';
 import type { ICorpusRow, IEvidence, IHeaderVerdict } from './corpus';
-import { judge } from './corpus';
+import { emptyNamed, judge } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
 import {
@@ -25,6 +25,7 @@ import { knownPair } from './pairs';
 import { Probe, randomRun } from './probe';
 import {
   endpointKey,
+  endpointOf,
   type IOperationRow,
   type IProbeAnswer,
   type IRemoval,
@@ -120,6 +121,30 @@ export function evidenceOfRows(
   return evidence;
 }
 
+/** The cycle's answers as corpus rows: for `exists` (and nothing else) beside phase 1's. */
+export function rowsOfCycle(rows: readonly IOperationRow[]): ICorpusRow[] {
+  const out: ICorpusRow[] = [];
+  for (const row of rows)
+    for (const answer of row.probes) {
+      const request = answer.requests[answer.requests.length - 1];
+      if (!request) continue;
+      out.push({
+        source: 'clients',
+        group: handlerOfRow(row.objectType) ?? row.objectType,
+        label: row.member,
+        endpoint: request,
+        requests: answer.requests,
+        onWire: [],
+        named: emptyNamed(),
+        ...(answer.status !== undefined ? { status: answer.status } : {}),
+        ...(answer.sapType ? { sapType: answer.sapType } : {}),
+        ...(answer.body !== undefined ? { body: answer.body } : {}),
+        ...(answer.failure ? { failure: answer.failure } : {}),
+      });
+    }
+  return out;
+}
+
 /** The cycle, on the types the unknown writes belong to. */
 export async function runWriteCycle(
   input: IWriteCycleInput & { packageName: string; transportRequest: string },
@@ -172,8 +197,11 @@ export async function runWriteCycle(
     if (!(thrown instanceof Interrupted))
       error = thrown instanceof Error ? thrown.message : String(thrown);
   }
+  if (probe.lockFailures.length)
+    error ??= `unlock failed: ${probe.lockFailures.join('; ')}`;
   return {
     evidence: evidenceOfRows(probe.rows, wanted),
+    rows: rowsOfCycle(probe.rows),
     removals,
     ...(error ? { error } : {}),
   };
@@ -239,8 +267,10 @@ export async function measureUpdates(
 ): Promise<{
   updates: IUpdateMeasure[];
   removals: IRemoval[];
+  rows: ICorpusRow[];
   error?: string;
 }> {
+  const rows: ICorpusRow[] = [];
   const removals: IRemoval[] = [];
   const updates: IUpdateMeasure[] = [];
   const ledger = new Ledger((removal) => removals.push(removal));
@@ -348,12 +378,13 @@ export async function measureUpdates(
           lockHandle,
           // Released after an interrupt too: unlocking is cleanup.
           (held) =>
-            probe.direct1(
-              (client, analyse) =>
+            probe.release(
+              `${spec.type} ${name}`,
+              (h) => (client, analyse) =>
                 Promise.resolve(
-                  handle(client).unlock?.(config, held, { analyse }),
+                  handle(client).unlock?.(config, h, { analyse }),
                 ),
-              false,
+              held,
             ),
           async (held) => {
             const updated = await probe.direct1((client, analyse) =>
@@ -371,6 +402,27 @@ export async function measureUpdates(
             );
             const status = statusOf(updated);
             if (status !== undefined) row.status = status;
+            const request = updated.requests[updated.requests.length - 1];
+            if (request)
+              rows.push({
+                source: 'clients',
+                group: spec.handler,
+                label: member,
+                endpoint: endpointOf(
+                  request.method,
+                  request.url,
+                  request.params,
+                  probe.names,
+                ),
+                requests: [],
+                onWire: [],
+                named: emptyNamed(),
+                ...(status !== undefined ? { status } : {}),
+                ...(updated.wire
+                  ? { body: String(updated.wire.data ?? '') }
+                  : {}),
+                ...(updated.failure ? { failure: updated.failure } : {}),
+              });
             const sapType = updated.wire
               ? sapErrorIn(String(updated.wire.data ?? ''))?.adtType
               : undefined;
@@ -390,5 +442,11 @@ export async function measureUpdates(
     if (!(thrown instanceof Interrupted))
       error = thrown instanceof Error ? thrown.message : String(thrown);
   }
-  return { updates, removals, ...(error ? { error } : {}) };
+  if (probe.lockFailures.length)
+    error ??= `unlock failed: ${probe.lockFailures.join('; ')}`;
+  for (const row of rows) {
+    const sapType = sapErrorIn(row.body ?? '')?.adtType;
+    if (sapType) row.sapType = sapType;
+  }
+  return { updates, removals, rows, ...(error ? { error } : {}) };
 }
