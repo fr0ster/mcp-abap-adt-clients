@@ -40,16 +40,24 @@ import {
   type ICorpus,
   type ICorpusRow,
   type IDiscoveryProbe,
+  type ISplit,
   isWrite,
   PROBE_NAME,
   parseDiscovery,
   readCorpusAnswer,
   renderCorpusMarkdown,
+  rowKey,
   type Source,
   wireNote,
   writeCheck,
 } from './corpus';
-import { type Interrupt, Interrupted, Ledger, withCleanup } from './ledger';
+import {
+  type ILedgerEntry,
+  type Interrupt,
+  Interrupted,
+  Ledger,
+  withCleanup,
+} from './ledger';
 import {
   clientsOn,
   handlerSpecs,
@@ -71,9 +79,13 @@ export const statusOfError = (error: unknown): number | undefined => {
   const candidate = error as {
     response?: { status?: unknown };
     status?: unknown;
-  };
+    cause?: unknown;
+  } | null;
   const status = candidate?.response?.status ?? candidate?.status;
-  return typeof status === 'number' ? status : undefined;
+  if (typeof status === 'number') return status;
+  // The connection's logon wraps the 401 in its own refusal (measured:
+  // `AuthRefusedError`, the axios error with the status as its cause).
+  return candidate?.cause ? statusOfError(candidate.cause) : undefined;
 };
 
 /** A raw request's answer, handed to `analyse` as a member's would be. */
@@ -140,6 +152,10 @@ interface IPlanned<T> {
   sequential?: string;
   /** What to do once the answers are in (a lock to release, an object to remove). */
   after?: (probe: ICapture, read?: ICapture) => void;
+  /** The probe writes (POST, PUT, DELETE): never resent by a split. */
+  write?: boolean;
+  /** The last answer to its read, for the poisoning test. */
+  readAnswer?: { status?: number; body: string };
 }
 
 interface IOutput {
@@ -158,6 +174,8 @@ class Run<T> {
     private readonly meter: IMeter,
     /** `--sequential`: nothing in an envelope. */
     private readonly sequential = false,
+    /** Probes per envelope. */
+    private readonly envelopeProbes = ENVELOPE_PROBES,
   ) {}
 
   private fill(planned: IPlanned<T>, probe: ICapture, read?: ICapture): void {
@@ -182,19 +200,36 @@ class Run<T> {
       calls.push(entry.call);
       if (entry.read) calls.push(entry.read);
     }
-    const captures = await runCalls({
-      calls,
-      batched,
-      connection: this.connection,
-      direct: this.direct,
-      onBatch: this.onBatch,
-      interrupt: this.interrupt,
-      meter: this.meter,
-    });
+    const captures: ICapture[] = [];
+    let stopped: unknown;
+    try {
+      await runCalls({
+        calls,
+        batched,
+        connection: this.connection,
+        direct: this.direct,
+        onBatch: this.onBatch,
+        interrupt: this.interrupt,
+        meter: this.meter,
+        captures,
+      });
+    } catch (error) {
+      // Ctrl-C between two requests: what did answer is still recorded.
+      stopped = error;
+    }
     let at = 0;
     for (const entry of planned) {
       const probe = captures[at++];
       const read = entry.read ? captures[at++] : undefined;
+      // A call the interrupt kept from running has nothing to record.
+      if (!probe || (!probe.requests.length && !probe.wire && !probe.failure))
+        break;
+      entry.readAnswer = read
+        ? {
+            status: read.wire?.status,
+            body: String(read.wire?.data ?? ''),
+          }
+        : undefined;
       entry.row.ran = ran(entry);
       const envelope = probe.envelopes?.[0];
       if (envelope !== undefined) {
@@ -204,6 +239,62 @@ class Run<T> {
         )?.msPerPart;
       } else if (probe.ms !== undefined) entry.row.ms = probe.ms;
       this.fill(entry, probe, read);
+    }
+    if (stopped) throw stopped;
+  }
+
+  /** Every poisoned envelope and how it was split. */
+  readonly splits: ISplit[] = [];
+
+  /**
+   * Splits a poisoned envelope's probes into ten groups, in order, and sends
+   * each as an envelope of its own. A group that comes back clean is
+   * settled; one poisoned again is split the same way; a poisoned single
+   * call is sent alone, and its answer — the dump — is its own.
+   */
+  private async settle(
+    entries: readonly IPlanned<T>[],
+    path: readonly string[],
+    depth: number,
+    split: ISplit,
+  ): Promise<void> {
+    const reads: IPlanned<T>[] = [];
+    for (const entry of entries)
+      if (entry.write) {
+        resetAnswer(entry.row);
+        entry.row.failure = 'poisoned, not resent: write';
+        entry.row.settled = { depth, path: path.join(' → ') };
+      } else reads.push(entry);
+    for (const [index, group] of splitInTen(reads).entries()) {
+      this.interrupt.check();
+      const where = [...path, `group ${index + 1}`];
+      for (const entry of group) resetAnswer(entry.row);
+      await this.send(group, true, () => `batched: ${where.join(' → ')}`);
+      if (group.length > 1 && isPoisoned(group)) {
+        await this.settle(group, where, depth + 1, split);
+        continue;
+      }
+      const [only] = group;
+      if (group.length === 1 && only.row.status === 500) {
+        resetAnswer(only.row);
+        split.requestsAlone++;
+        await this.send(
+          group,
+          false,
+          () => `sequential: alone, ${where.join(' → ')}`,
+        );
+        only.row.settled = {
+          depth: depth + 1,
+          path: [...where, 'alone'].join(' → '),
+        };
+        if (only.row.status === 500) {
+          only.row.poisonCause = true;
+          split.causes.push(rowKey(only.row));
+        }
+        continue;
+      }
+      for (const entry of group)
+        entry.row.settled = { depth, path: where.join(' → ') };
     }
   }
 
@@ -222,43 +313,46 @@ class Run<T> {
       return;
     }
     const batchable = planned.filter((entry) => !entry.sequential);
-    const chunks = Math.ceil(batchable.length / ENVELOPE_PROBES);
+    const chunks = Math.ceil(batchable.length / this.envelopeProbes);
     for (let chunk = 0; chunk < chunks; chunk++) {
       this.interrupt.check();
       const part = batchable.slice(
-        chunk * ENVELOPE_PROBES,
-        (chunk + 1) * ENVELOPE_PROBES,
+        chunk * this.envelopeProbes,
+        (chunk + 1) * this.envelopeProbes,
       );
       this.out.progress(
         `  envelope ${chunk + 1}/${chunks}: ${part.length} probes`,
       );
       await this.send(part, true, () => 'batched');
-      // The envelope itself was refused, or one part's dump answered for
-      // every part (measured: all parts of an envelope got the same 500
-      // page, while each sent alone got its own answer): one by one.
-      const failed = part.filter(
-        (entry) =>
-          entry.row.status === undefined &&
-          (entry.row.failure ?? '').startsWith('the envelope failed'),
-      );
-      const poisoned =
-        part.length > 1 && part.every((entry) => entry.row.status === 500);
-      if (poisoned || (failed.length && failed.length === part.length)) {
-        const first = part[0].row;
-        const envelopeId = first.envelope ?? '?';
+      const first = part[0].row;
+      const envelopeId = first.envelope ?? '?';
+      if (isPoisoned(part)) {
+        // One part's dump answered for every part (measured: all parts of an
+        // envelope got the same 500 page, while each sent alone got its own
+        // answer): split until the call that dumps is found.
         const said = first.sapMessage ?? dumpText(first.body);
-        const why = poisoned
-          ? `every part of envelope ${envelopeId} answered the same 500${said ? `: ${said}` : ''}`
-          : `the envelope carrying it failed (${first.failure ?? ''})`;
-        this.out.progress(`  ${why}; its ${part.length} probes go one by one`);
-        for (const entry of part) {
-          entry.row.inEnvelope = poisoned
-            ? `500 in envelope ${envelopeId}`
-            : (entry.row.failure ?? 'failed');
-          resetAnswer(entry.row);
-        }
-        await this.send(part, false, () => `sequential: ${why}`);
+        this.out.progress(
+          `  every part of envelope ${envelopeId} answered the same 500${said ? ` (${said})` : ''}; splitting it`,
+        );
+        const before = this.meter.envelopes.length;
+        const started = performance.now();
+        const split: ISplit = {
+          envelope: envelopeId,
+          parts: part.length,
+          causes: [],
+          envelopes: 0,
+          requestsAlone: 0,
+          ms: 0,
+        };
+        for (const entry of part)
+          entry.row.inEnvelope = `500 in envelope ${envelopeId}`;
+        await this.settle(part, [`env ${envelopeId}`], 1, split);
+        split.envelopes = this.meter.envelopes.length - before;
+        split.ms = performance.now() - started;
+        this.splits.push(split);
       }
+      // An envelope with no answer is not resent: whether the server ran
+      // any of it is unknown. Its parts keep `envelope failed: <reason>`.
     }
     const alone = planned.filter((entry) => entry.sequential);
     if (alone.length) {
@@ -270,6 +364,45 @@ class Run<T> {
       await this.send([entry], false, (e) => `sequential: ${e.sequential}`);
     }
   }
+}
+
+/**
+ * A poisoned envelope: more than one part, and every part — the reads after
+ * the writes included — answered 500 with the same text.
+ */
+export function isPoisoned(
+  entries: readonly {
+    row: ICorpusRow;
+    readAnswer?: { status?: number; body: string };
+  }[],
+): boolean {
+  const answers: { status?: number; body: string }[] = [];
+  for (const entry of entries) {
+    answers.push({ status: entry.row.status, body: entry.row.body ?? '' });
+    if (entry.readAnswer) answers.push(entry.readAnswer);
+  }
+  if (answers.length < 2) return false;
+  const text = (body: string) => dumpText(body) ?? body;
+  const first = text(answers[0].body);
+  return answers.every(
+    (answer) => answer.status === 500 && text(answer.body) === first,
+  );
+}
+
+/**
+ * Ten groups of about a tenth each, in order; never an empty group, so
+ * fewer than ten entries make one group each.
+ */
+export function splitInTen<E>(entries: readonly E[]): E[][] {
+  const groups: E[][] = [];
+  const count = Math.min(10, entries.length);
+  let at = 0;
+  for (let index = 0; index < count; index++) {
+    const size = Math.floor((entries.length - at) / (count - index));
+    groups.push(entries.slice(at, at + size));
+    at += size;
+  }
+  return groups;
 }
 
 /** Clears what a row's first answer filled in, before it is sent again. */
@@ -350,6 +483,9 @@ interface IContext {
   meter: IMeter;
   sequential: boolean;
   only?: string[];
+  envelopeProbes: number;
+  /** Adds a ledger entry once per key, before the write it covers is sent. */
+  register: (key: string, entry: () => ILedgerEntry) => void;
 }
 
 /** Where the calls go: the connection (or the envelope), and whether it is an envelope. */
@@ -394,10 +530,18 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
         : {}),
     };
     const uri = `${collection.href.replace(/\/$/, '')}/${encodeURIComponent(PROBE_NAME.toLowerCase())}`;
+    const write = isWrite(probe.method);
     const entry: IPlanned<ITarget> = {
       row,
-      call: (on, analyse) =>
-        answered(
+      call: (on, analyse) => {
+        // Into the ledger before the write is sent, whatever follows: an
+        // interrupt before the read, a read that fails or says nothing.
+        if (write)
+          ctx.register(`discovery ${uri}`, () => ({
+            label: `discovery: ${uri} (written by ${probe.method} ${collection.href})`,
+            remove: discoveryRemoval(ctx.connection, uri),
+          }));
+        return answered(
           traced(on.base, {
             shape: headerShape(ctx.mode, on.parts, probe.bogus),
             parts: on.parts,
@@ -409,9 +553,11 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
             headers: headersOf(probe.asked),
           }),
           analyse,
-        ),
+        );
+      },
+      write,
     };
-    if (isWrite(probe.method)) {
+    if (write) {
       entry.read = (on, analyse) =>
         answered(
           traced(on.base, { parts: on.parts }).makeAdtRequest({
@@ -423,12 +569,8 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
           analyse,
         );
       entry.after = () => {
-        if (row.afterWrite?.exists !== true) return;
-        ctx.out.loud(`!!! ${probe.method} ${collection.href} created ${uri}`);
-        ctx.ledger.add({
-          label: `discovery: ${uri} (after ${probe.method} ${collection.href})`,
-          remove: discoveryRemoval(ctx.connection, uri),
-        });
+        if (row.afterWrite?.exists === true)
+          ctx.out.loud(`!!! ${probe.method} ${collection.href} created ${uri}`);
       };
     }
     return entry;
@@ -437,7 +579,7 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
   for (const [index, probe] of probes.entries())
     if (probe.skipped) planned[index].row.skipped = probe.skipped;
   const sent = planned.filter((_entry, index) => !probes[index].skipped);
-  await new Run<ITarget>(
+  const run = new Run<ITarget>(
     ctx.connection,
     ctx.mode,
     { base: ctx.connection, parts: false },
@@ -446,7 +588,13 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
     ctx.out,
     ctx.meter,
     ctx.sequential,
-  ).all(sent);
+    ctx.envelopeProbes,
+  );
+  try {
+    await run.all(sent);
+  } finally {
+    ctx.corpus.splits = [...(ctx.corpus.splits ?? []), ...run.splits];
+  }
 }
 
 type IHandler = Record<string, (...args: unknown[]) => unknown>;
@@ -577,8 +725,24 @@ async function runClients(ctx: IContext): Promise<void> {
       const label = `${member.handler}.${member.member}`;
       const entry: IPlanned<ITarget> = {
         row,
-        call: (on, analyse) =>
-          call(handlerOf(clientsAt(on, bogus)) as never, { headers, analyse }),
+        call: (on, analyse) => {
+          // Into the ledger before the write is sent, whatever follows.
+          if (write && readable)
+            ctx.register(`clients ${member.handler}`, () => ({
+              label: `clients: ${member.handler} ${PROBE_NAME} (written by ${member.member})`,
+              remove: clientsRemoval(
+                once,
+                (target) => handlerOf(clientsAt(target, undefined, true)),
+                handlerOf(reference),
+                member.handler,
+              ),
+            }));
+          return call(handlerOf(clientsAt(on, bogus)) as never, {
+            headers,
+            analyse,
+          });
+        },
+        write,
       };
       if (member.requests.length > 1)
         entry.sequential = `a chain of ${member.requests.length} requests, each sent after the answer before`;
@@ -595,18 +759,8 @@ async function runClients(ctx: IContext): Promise<void> {
             exists: 'unknown',
             note: 'the handler reads no object to check',
           };
-        if (row.afterWrite?.exists === true) {
+        if (row.afterWrite?.exists === true)
           ctx.out.loud(`!!! ${label} created ${PROBE_NAME}`);
-          ctx.ledger.add({
-            label: `clients: ${member.handler} ${PROBE_NAME} (after ${member.member})`,
-            remove: clientsRemoval(
-              once,
-              (on) => handlerOf(clientsAt(on, undefined, true)),
-              handlerOf(reference),
-              member.handler,
-            ),
-          });
-        }
         if (locks && row.status !== undefined && row.status < 300) {
           const result = probe.result as
             | { ok?: boolean; getResult?: () => { value: unknown } }
@@ -651,7 +805,7 @@ async function runClients(ctx: IContext): Promise<void> {
       planned.push(entry);
     }
   }
-  await new Run<ITarget>(
+  const run = new Run<ITarget>(
     ctx.connection,
     ctx.mode,
     direct,
@@ -660,7 +814,13 @@ async function runClients(ctx: IContext): Promise<void> {
     ctx.out,
     ctx.meter,
     ctx.sequential,
-  ).all(planned);
+    ctx.envelopeProbes,
+  );
+  try {
+    await run.all(planned);
+  } finally {
+    ctx.corpus.splits = [...(ctx.corpus.splits ?? []), ...run.splits];
+  }
 }
 
 /** Removes the probe object a member's write created: the handler's delete, then a read. */
@@ -739,18 +899,28 @@ export function writeCorpus(corpus: ICorpus, outDir: string): string[] {
 }
 
 export interface ICorpusRunInput {
-  connection: IAbapConnection;
+  /** The connection, already open (tests). */
+  connection?: IAbapConnection;
+  /**
+   * Opens the connection: its logon is the first request of the run, and a
+   * 401 or 403 there is the Oops.
+   */
+  open?: () => Promise<IAbapConnection>;
+  /** Releases what `open` opened. */
+  close?: (connection: IAbapConnection) => Promise<void>;
   source: Source;
   mode: HeadersMode;
   interrupt: Interrupt;
   outDir: string;
   /** Read after the authorization check: on cloud it asks the system. */
-  clientOptions: () => Promise<ClientOptions>;
+  clientOptions: (connection: IAbapConnection) => Promise<ClientOptions>;
   out: IOutput;
   /** Every request one at a time, no envelope. */
   sequential?: boolean;
   /** Keep only the endpoints whose `handler.member` or href contains one of these. */
   only?: string[];
+  /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
+  envelopeProbes?: number;
 }
 
 /**
@@ -761,7 +931,32 @@ export interface ICorpusRunInput {
 export async function runCorpus(
   input: ICorpusRunInput,
 ): Promise<{ exitCode: number; files: string[]; corpus?: ICorpus }> {
-  const { connection, out } = input;
+  let connection = input.connection;
+  if (!connection) {
+    if (!input.open) throw new Error('runCorpus needs a connection or open()');
+    try {
+      connection = await input.open();
+    } catch (error) {
+      const status = statusOfError(error);
+      if (status === 401 || status === 403) {
+        input.out.progress(`Oops: no authorization (${status})`);
+        return { exitCode: 2, files: [] };
+      }
+      throw error;
+    }
+  }
+  try {
+    return await runOn(connection, input);
+  } finally {
+    if (input.close && !input.connection) await input.close(connection);
+  }
+}
+
+async function runOn(
+  connection: IAbapConnection,
+  input: ICorpusRunInput,
+): Promise<{ exitCode: number; files: string[]; corpus?: ICorpus }> {
+  const { out } = input;
   const discovery = await readDiscovery(connection);
   if (!discovery.ok) {
     out.progress(discovery.line);
@@ -777,6 +972,7 @@ export async function runCorpus(
     ...(input.sequential ? { sequential: true } : {}),
   };
   const meter: IMeter = { envelopes: corpus.envelopes as IEnvelopeTiming[] };
+  const registered = new Set<string>();
   const ledger = new Ledger((removal: IRemoval) => {
     corpus.removals.push(removal);
     out.progress(
@@ -790,11 +986,17 @@ export async function runCorpus(
       interrupt: input.interrupt,
       ledger,
       corpus,
-      clientOptions: await input.clientOptions(),
+      clientOptions: await input.clientOptions(connection),
       out,
       meter,
       sequential: input.sequential === true,
       ...(input.only ? { only: input.only } : {}),
+      envelopeProbes: input.envelopeProbes ?? ENVELOPE_PROBES,
+      register: (key, entry) => {
+        if (registered.has(key)) return;
+        registered.add(key);
+        ledger.add(entry());
+      },
     };
     await withCleanup(ledger, () =>
       input.source === 'discovery'

@@ -31,7 +31,8 @@
  * `--summary` reads corpus files and writes, per endpoint, the Accept and
  * Content-Type values the system named in any of them.
  *
- * The first request is `GET /sap/bc/adt/discovery`: 401 or 403 prints
+ * The first request is the connection's own logon (`connect()`), then
+ * `GET /sap/bc/adt/discovery`: a 401 or 403 at either prints
  * `Oops: no authorization (<status>)` and exits 2, sending nothing more.
  *
  * Output: `.header-probe/corpus-<source>-<headers>-<timestamp>.json` (every
@@ -52,7 +53,6 @@ import {
 import { createConnectionLogger } from '../../src/__tests__/helpers/testLogger';
 import { message, onTheWire } from './capture';
 import {
-  authorizationVerdict,
   classifyNeeds,
   HEADERS_MODES,
   type HeadersMode,
@@ -62,7 +62,7 @@ import {
   SOURCES,
   type Source,
 } from './corpus';
-import { runCorpus, statusOfError } from './corpusRun';
+import { runCorpus } from './corpusRun';
 import { Interrupt } from './ledger';
 
 const OUT_DIR = path.resolve(__dirname, '../../.header-probe');
@@ -155,23 +155,6 @@ async function main(): Promise<number> {
   }
   const system = getTargetSystem();
 
-  let connection: Awaited<ReturnType<typeof createTestConnection>>;
-  try {
-    connection = await createTestConnection(createConnectionLogger(), {
-      ownSession: true,
-    });
-  } catch (error) {
-    // The logon itself was refused: the same stop as the discovery read's.
-    const status = statusOfError(error);
-    const verdict = authorizationVerdict(status);
-    if (!verdict.go && (status === 401 || status === 403)) {
-      progress(verdict.line);
-      return verdict.exitCode;
-    }
-    throw error;
-  }
-  onTheWire(connection);
-
   const interrupt = new Interrupt();
   // Ctrl-C stops new requests; the one in flight answers, the run unwinds,
   // and the `finally` cleans the ledger as it then stands. A second Ctrl-C
@@ -183,22 +166,27 @@ async function main(): Promise<number> {
       'interrupted: waiting for the request in flight, then cleaning up',
     );
   });
-  try {
-    const { exitCode } = await runCorpus({
-      connection,
-      source: args.from as Source,
-      mode: args.headers as HeadersMode,
-      interrupt,
-      outDir: OUT_DIR,
-      clientOptions: () => resolveSystemContext(connection, system === 'cloud'),
-      out: { progress, loud },
-      sequential: args.sequential === true,
-      ...(args.only ? { only: args.only } : {}),
-    });
-    return exitCode;
-  } finally {
-    await closeOwnTestConnection(connection);
-  }
+  const { exitCode } = await runCorpus({
+    // The connection's logon is the first request: a 401 or 403 there is
+    // the Oops, and nothing else is sent.
+    open: async () =>
+      onTheWire(
+        await createTestConnection(createConnectionLogger(), {
+          ownSession: true,
+        }),
+      ),
+    close: (connection) => closeOwnTestConnection(connection),
+    source: args.from as Source,
+    mode: args.headers as HeadersMode,
+    interrupt,
+    outDir: OUT_DIR,
+    clientOptions: (connection) =>
+      resolveSystemContext(connection, system === 'cloud'),
+    out: { progress, loud },
+    sequential: args.sequential === true,
+    ...(args.only ? { only: args.only } : {}),
+  });
+  return exitCode;
 }
 
 main().then(

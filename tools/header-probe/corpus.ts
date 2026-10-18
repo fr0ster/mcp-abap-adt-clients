@@ -519,8 +519,12 @@ export interface ICorpusRow {
   afterWrite?: IWriteCheck;
   /** `skipped: <reason>`: the row was not sent. */
   skipped?: string;
-  /** Sent again on its own: what its envelope answered first. */
+  /** Sent again: what its envelope answered first. */
   inEnvelope?: string;
+  /** Split out of a poisoned envelope: the depth and the envelope path it was settled at. */
+  settled?: { depth: number; path: string };
+  /** A single call whose own 500 poisoned its group: the cause of a poisoning. */
+  poisonCause?: boolean;
   /** Batched: the envelope it went out in (see {@link ICorpus.envelopes}). */
   envelope?: number;
   /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
@@ -540,6 +544,8 @@ export interface ICorpus {
   sequential?: boolean;
   /** Every envelope: parts, bytes, wall time from send to answer. */
   envelopes?: IEnvelopeTiming[];
+  /** Every poisoned envelope: how it was split, what caused it. */
+  splits?: ISplit[];
   /** Bogus mode: which headers each endpoint needs. */
   needs?: IEndpointNeeds[];
   /** Methods of the handlers that answer no promise: helpers, not members (clients source). */
@@ -1096,6 +1102,24 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
   }
 
   lines.push('## Summary', '', '### Time', '', ...timingLines(corpus), '');
+  lines.push('### Poisoned envelopes', '');
+  const splits = corpus.splits ?? [];
+  if (!splits.length) lines.push('None.', '');
+  else {
+    lines.push(
+      '| envelope | probes | envelopes the splitting sent | calls sent alone | ms | cause |',
+      '|---|---|---|---|---|---|',
+    );
+    for (const split of splits)
+      lines.push(
+        `| ${split.envelope} | ${split.parts} | ${split.envelopes} | ${split.requestsAlone} | ${Math.round(split.ms)} | ${cell(split.causes.join('; ') || '(none found)')} |`,
+      );
+    lines.push(
+      '',
+      `${splits.length} poisoned envelope(s); the splitting sent ${splits.reduce((n, x) => n + x.envelopes, 0)} envelope(s) and ${splits.reduce((n, x) => n + x.requestsAlone, 0)} call(s) alone, in ${Math.round(splits.reduce((n, x) => n + x.ms, 0))} ms.`,
+      '',
+    );
+  }
   lines.push('### Counts per status', '');
   const byStatus = rowsByStatus(corpus.rows);
   lines.push('| status | rows |', '|---|---|');
@@ -1252,6 +1276,21 @@ export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
     lines.push('');
   }
   return lines;
+}
+
+/** A poisoned envelope and its splitting. */
+export interface ISplit {
+  envelope: number | string;
+  /** Its probes. */
+  parts: number;
+  /** The calls whose own 500 poisoned their group. */
+  causes: string[];
+  /** Envelopes the splitting sent. */
+  envelopes: number;
+  /** Calls sent alone (each a poisoned single). */
+  requestsAlone: number;
+  /** Wall time of the splitting. */
+  ms: number;
 }
 
 /** Total, median and 95th percentile of a list of numbers (nearest rank). */

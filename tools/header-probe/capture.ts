@@ -281,10 +281,13 @@ export async function runCalls<T>(input: {
   interrupt?: Interrupt;
   /** Where the envelopes' timings go. */
   meter?: IMeter;
+  /** Filled in place, so a caller still has them when an interrupt throws. */
+  captures?: ICapture[];
 }): Promise<ICapture[]> {
   const { calls, interrupt } = input;
   interrupt?.check();
-  const captures = calls.map((): ICapture => ({ requests: [] }));
+  const captures = input.captures ?? [];
+  for (const _call of calls) captures.push({ requests: [] });
   const invoke = (target: T, call: ICallOn<T>, capture: ICapture) =>
     current.run(capture, () =>
       call(target, (verdict, wire) => {
@@ -334,14 +337,19 @@ export async function runCalls<T>(input: {
     await new Promise<void>((resolve) => setImmediate(resolve));
   // Ctrl-C while the parts were being recorded: the envelope never leaves.
   interrupt?.check();
+  let refused: unknown;
   try {
     await batch.execute();
   } catch (error) {
-    for (const capture of captures)
-      if (!capture.wire)
-        capture.failure ??= `the envelope failed: ${message(error)}`;
+    refused = error;
   }
   await Promise.all(pending);
+  // The envelope got no answer: every part without one says so, whatever its
+  // member made of the rejection.
+  if (refused !== undefined)
+    for (const capture of captures)
+      if (!capture.wire)
+        capture.failure = `envelope failed: ${message(refused)}`;
   if (input.meter) for (const capture of captures) capture.envelopes = [...ids];
   return captures;
 }

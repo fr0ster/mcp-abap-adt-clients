@@ -136,9 +136,15 @@ needs.
 
 ## What it does
 
-1. **Authorization first.** `GET /sap/bc/adt/discovery`. A 401 or 403 prints
-   `Oops: no authorization (<status>)` and exits with 2; nothing else is sent
-   and no file is written. Any other non-2xx prints the status and stops.
+1. **Authorization first.** The first request of a run is the connection's
+   own logon, `connect()`: on-premise `GET /sap/bc/adt/core/discovery`
+   (measured; on a 403 the connection itself repeats it, four requests in
+   all), on cloud also the session request `/sap/bc/adt/core/http/sessions`
+   (from the connection's code, not measured here). A 401 or 403 there —
+   the connection's `AuthRefusedError` carrying the 401, or the 403 itself —
+   prints `Oops: no authorization (<status>)` and exits with 2; nothing else
+   is sent and no file is written. Then `GET /sap/bc/adt/discovery`: a 401
+   or 403 gives the same Oops, any other non-2xx prints the status and stops.
 2. **The endpoints** (`--from`):
    - `discovery`: every `app:collection` of the document just read — its
      href, its `app:accept` types and its template links with their `type`
@@ -187,16 +193,20 @@ needs.
      for discovery).
 4. **Writes never create on purpose.** Every `POST`, `PUT` and `DELETE` goes
    to the probe name with a fake body: a minimal document of the corpus type,
-   or a fixed text. After every write the probe name is read; if it now
-   exists, the row says so, the object goes into the ledger, the `finally`
-   deletes it, and it is listed loudly at the end. A `LOCK` that a member
-   still answered 2xx is released the same way. No locks are taken.
+   or a fixed text. Before every write is sent, the probe name it may create
+   goes into the ledger (once per object), whatever follows — an interrupt
+   before the read, a read that fails or says nothing; the `finally` reads
+   each entry and deletes what exists, and what could not be deleted is
+   listed loudly. After every write the probe name is read too, and a write
+   that created it is listed loudly. A `LOCK` that a member still answered
+   2xx is released the same way. No locks are taken.
 5. **Batch.** Everything goes in envelopes of 25 probes through
    `AdtBatchConnection` — the members themselves in clients mode,
    `makeAdtRequest` in discovery mode — each write followed by its read in the
    same envelope. A member whose call is a chain of requests runs on its own
-   (`sequential: a chain of …`); so do the probes of an envelope SAP refused
-   whole. Each envelope's part count, bytes and wall time from send to
+   (`sequential: a chain of …`). An envelope that got no answer (a transport
+   failure) is neither split nor resent — whether the server ran any of it
+   is unknown —, and its parts say `envelope failed: <reason>`. Each envelope's part count, bytes and wall time from send to
    answer are recorded with `performance.now()`, and each row carries its
    envelope's id and ms per part; a request sent on its own carries its wall
    time. There is no timer and no timeout of the script's own. Ctrl-C stops
@@ -257,13 +267,22 @@ named, and notes where the pair table lists a header the resource does not
 check (or a Content-Type for a request without a body): the pair table is not
 the truth. `--render` recomputes `needs` from saved corpora.
 
-**An envelope whose parts all answer the same 500 is sent again, one probe at
-a time.** Measured 2026-10-18: one part's dump answered for every part of its
-envelope with the same error page, while each part sent alone got its own
-answer (in the discovery bogus run, 304 of 1517 probes differed between the
-batched and the sequential run, all of them a batched 500). Such a row is
-marked `sequential: every part of envelope N answered the same 500: …`, and
-`inEnvelope` keeps what the envelope said.
+**A poisoned envelope is split until the dumping call is found.** Measured
+2026-10-18: one part's dump answers for every part of its envelope with the
+same error page, while each part sent alone gets its own answer (in the
+discovery bogus run, 304 of 1517 probes differed between the batched and the
+sequential run, all of them a batched 500). An envelope counts as poisoned
+only when every part — the reads after the writes included — answered 500
+with the same text. Its reads are divided, in order, into ten groups of about
+a tenth each (never an empty group, so fewer than ten make one each); each
+group goes as an envelope of its own; a group that comes back clean is
+settled, one poisoned again is split the same way, and a poisoned single
+call is sent alone — its 500 is its own answer, the dump, and it is listed
+as the cause. Its writes are never resent: they are recorded `poisoned, not
+resent: write`. Each probe records where it was settled (`settled`: depth
+and path, e.g. `env 12 → group 3 → group 7`), and `inEnvelope` what the
+envelope said; the summary lists every poisoned envelope, the envelopes and
+the calls alone its splitting needed, its time, and the cause.
 
 Nothing but progress and the paths goes to stdout; no secret, cookie or token
 is written anywhere — of the request and answer headers only Accept and

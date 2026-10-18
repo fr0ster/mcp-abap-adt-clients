@@ -1093,15 +1093,106 @@ describe('a call that throws on the answer', () => {
   });
 });
 
-describe('an envelope whose parts all answer the same 500', () => {
-  it('is sent again one by one, and the row keeps what the envelope said', async () => {
-    const system = fakeSystem((request) => {
-      if (request.url === '/sap/bc/adt/discovery')
-        return { status: 200, body: DISCOVERY };
-      // One part's dump answers for every part of the envelope.
-      return request.part ? { status: 500, body: 'dump' } : { status: 404 };
-    });
-    const result = await runCorpus({
+/** A discovery document of `count` GET-only collections, `/sap/bc/adt/probe/c<n>`. */
+function manyCollections(count: number, withAccept = false): string {
+  let collections = '';
+  for (let n = 1; n <= count; n++)
+    collections += `<app:collection href="/sap/bc/adt/probe/c${n}"><atom:title>C${n}</atom:title>${withAccept ? '<app:accept>application/x+xml</app:accept>' : ''}</app:collection>`;
+  return `<?xml version="1.0" encoding="utf-8"?><app:service xmlns:app="http://www.w3.org/2007/app" xmlns:atom="http://www.w3.org/2005/Atom"><app:workspace><atom:title>Probe</atom:title>${collections}</app:workspace></app:service>`;
+}
+
+const DUMP =
+  '<html><body>Application Server Error 500 Internal Server Error Dereferencing of the NULL reference</body></html>';
+
+/** A system where the part `bad` dumps, and its dump answers for every part of its envelope. */
+function dumpingSystem(document: string, bad: string) {
+  let envelope: string[] = [];
+  const system = fakeSystem((request) => {
+    if (request.url === '/sap/bc/adt/discovery')
+      return { status: 200, body: document };
+    if (request.part && envelope.includes(bad))
+      return { status: 500, body: DUMP };
+    return request.url === bad ? { status: 500, body: DUMP } : { status: 404 };
+  });
+  const make = system.connection.makeAdtRequest.bind(system.connection);
+  (system.connection as { makeAdtRequest: unknown }).makeAdtRequest = (
+    request: IAbapRequestOptions,
+  ) => {
+    // Which parts this envelope carries, before the fake answers them.
+    envelope =
+      request.url === '/sap/bc/adt/communication/batch'
+        ? String(request.data)
+            .split('\r\n')
+            .filter((line) => / HTTP\/1\.1$/.test(line))
+            .map((line) => line.split(' ')[1])
+        : [];
+    return make(request);
+  };
+  return system;
+}
+
+describe('a poisoned envelope', () => {
+  const splitRun = (count: number, badIndex: number) => {
+    const bad = `/sap/bc/adt/probe/c${badIndex}`;
+    const system = dumpingSystem(manyCollections(count), bad);
+    return {
+      bad,
+      system,
+      run: runCorpus({
+        connection: system.connection,
+        source: 'discovery',
+        mode: 'none',
+        interrupt: new Interrupt(),
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: output().out,
+        envelopeProbes: count,
+      }),
+    };
+  };
+
+  it.each([
+    // probes, the bad one, envelopes the splitting sends, calls sent alone
+    [100, 37, 10 + 10, 1],
+    [29, 17, 10 + 3, 1],
+  ])('of %i probes is split in tens until the one dumping call is found', async (count, badIndex, envelopes, alone) => {
+    const { bad, system, run } = splitRun(count, badIndex);
+    const { corpus } = await run;
+    expect(corpus?.splits).toEqual([
+      expect.objectContaining({
+        parts: count,
+        envelopes,
+        requestsAlone: alone,
+        causes: [`GET ${bad}`],
+      }),
+    ]);
+    // One first envelope, then the splitting's.
+    expect(corpus?.envelopes).toHaveLength(1 + envelopes);
+    // Nothing but the dumping call is sent on its own.
+    const direct = system.seen.filter(
+      (s) => !s.part && s.url.startsWith('/sap/bc/adt/probe/'),
+    );
+    expect(direct.map((s) => s.url)).toEqual([bad]);
+    for (const r of corpus?.rows ?? []) {
+      if (r.endpoint?.path === bad) {
+        expect(r.poisonCause).toBe(true);
+        expect(r.status).toBe(500);
+        continue;
+      }
+      expect(r.status).toBe(404);
+      expect(r.settled?.path).toMatch(/^env 1 → group \d+( → group \d+)?$/);
+      expect(r.ran).toMatch(/^batched: env 1 → group/);
+    }
+  });
+
+  it('only when every part answered 500 with the same text: distinct 500s are answers', async () => {
+    let n = 0;
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: manyCollections(5) }
+        : { status: 500, body: `endpoint error ${n++}` },
+    );
+    const { corpus } = await runCorpus({
       connection: system.connection,
       source: 'discovery',
       mode: 'none',
@@ -1110,12 +1201,183 @@ describe('an envelope whose parts all answer the same 500', () => {
       clientOptions: async () => ({}),
       out: output().out,
     });
-    for (const r of result.corpus?.rows ?? []) {
-      expect(r.status).toBe(404);
-      expect(r.inEnvelope).toBe('500 in envelope 1');
-      expect(r.ran).toMatch(
-        /^sequential: every part of envelope 1 answered the same 500/,
-      );
-    }
+    expect(corpus?.splits).toEqual([]);
+    expect(corpus?.envelopes).toHaveLength(1);
+    expect(
+      corpus?.rows.every((r) => r.status === 500 && r.ran === 'batched'),
+    ).toBe(true);
+  });
+
+  it('an envelope with no answer is neither split nor resent', async () => {
+    const system = fakeSystem(() => ({
+      status: 200,
+      body: manyCollections(5),
+    }));
+    const make = system.connection.makeAdtRequest.bind(system.connection);
+    (system.connection as { makeAdtRequest: unknown }).makeAdtRequest = (
+      request: IAbapRequestOptions,
+    ) =>
+      request.url === '/sap/bc/adt/communication/batch'
+        ? Promise.reject(new Error('socket hang up'))
+        : make(request);
+    const { corpus } = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    expect(
+      system.seen.filter((s) => s.url !== '/sap/bc/adt/discovery'),
+    ).toEqual([]);
+    for (const r of corpus?.rows ?? [])
+      expect(r.failure).toBe('envelope failed: socket hang up');
+  });
+
+  it('never resends a write', async () => {
+    const bad = '/sap/bc/adt/probe/c2';
+    const system = dumpingSystem(manyCollections(4, true), bad);
+    const { corpus } = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const posts = system.seen.filter(
+      (s) => s.method === 'POST' && s.url.startsWith('/sap/bc/adt/probe/'),
+    );
+    // Each POST probe went out once, in the first envelope.
+    expect(posts).toHaveLength(4);
+    for (const r of corpus?.rows ?? [])
+      if (r.endpoint?.method === 'POST')
+        expect(r.failure).toBe('poisoned, not resent: write');
+  });
+});
+
+describe('the ledger holds every write before it is sent', () => {
+  it('Ctrl-C during a write that creates: the read never goes, the finally still deletes', async () => {
+    const interrupt = new Interrupt();
+    let exists = false;
+    const uri = `/sap/bc/adt/probe/things/${PROBE_NAME.toLowerCase()}`;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.method === 'POST' &&
+        request.url === '/sap/bc/adt/probe/things'
+      ) {
+        exists = true;
+        interrupt.stop();
+        return { status: 201 };
+      }
+      if (request.url === uri)
+        return exists ? { status: 200, body: PROBE_NAME } : { status: 404 };
+      if (request.url === '/sap/bc/adt/deletion/delete') {
+        exists = false;
+        return { status: 200 };
+      }
+      return { status: 404 };
+    });
+    const { corpus } = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt,
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      sequential: true,
+    });
+    expect(corpus?.error).toBe('interrupted (SIGINT)');
+    expect(exists).toBe(false);
+    expect(corpus?.removals).toEqual([
+      expect.objectContaining({ removed: true }),
+    ]);
+  });
+
+  it('a read that fails after the write: the finally still deletes', async () => {
+    let exists = false;
+    const uri = `/sap/bc/adt/probe/things/${PROBE_NAME.toLowerCase()}`;
+    const system = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.method === 'POST' &&
+        request.url === '/sap/bc/adt/probe/things'
+      ) {
+        exists = true;
+        return { status: 201 };
+      }
+      if (request.url === uri)
+        return exists ? { status: 500 } : { status: 404 };
+      if (request.url === '/sap/bc/adt/deletion/delete') {
+        exists = false;
+        return { status: 200 };
+      }
+      return { status: 404 };
+    });
+    const { corpus } = await runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const post = corpus?.rows.find((r) => r.endpoint?.method === 'POST');
+    expect(post?.afterWrite?.exists).toBe('unknown');
+    expect(exists).toBe(false);
+    expect(corpus?.removals).toEqual([
+      expect.objectContaining({ removed: true }),
+    ]);
+  });
+});
+
+describe('the logon is the authorization check', () => {
+  it.each([
+    // What the connection's connect() throws, measured against a local server.
+    [
+      401,
+      Object.assign(new Error('the user or password was refused'), {
+        cause: { status: 401 },
+      }),
+    ],
+    [
+      403,
+      Object.assign(new Error('Request failed with status code 403'), {
+        status: 403,
+      }),
+    ],
+  ])('a %i at connect prints the Oops and sends nothing else', async (status, thrown) => {
+    let opened = 0;
+    const dir = tempDir();
+    const { lines, out } = output();
+    let asked = false;
+    const result = await runCorpus({
+      open: async () => {
+        opened++;
+        throw thrown;
+      },
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: dir,
+      clientOptions: async () => {
+        asked = true;
+        return {};
+      },
+      out,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(lines).toEqual([`Oops: no authorization (${status})`]);
+    expect(opened).toBe(1);
+    expect(asked).toBe(false);
+    expect(fs.readdirSync(dir)).toEqual([]);
   });
 });
