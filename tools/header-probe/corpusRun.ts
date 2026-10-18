@@ -17,6 +17,8 @@ import { ACCEPT_DISCOVERY } from '../../src/constants/contentTypes';
 import {
   type ICallOn,
   type ICapture,
+  type IEnvelopeTiming,
+  type IMeter,
   message,
   runCalls,
   traced,
@@ -152,6 +154,9 @@ class Run<T> {
     private readonly onBatch: (batch: IAbapConnection) => T,
     private readonly interrupt: Interrupt,
     private readonly out: IOutput,
+    private readonly meter: IMeter,
+    /** `--sequential`: nothing in an envelope. */
+    private readonly sequential = false,
   ) {}
 
   private fill(planned: IPlanned<T>, probe: ICapture, read?: ICapture): void {
@@ -183,18 +188,38 @@ class Run<T> {
       direct: this.direct,
       onBatch: this.onBatch,
       interrupt: this.interrupt,
+      meter: this.meter,
     });
     let at = 0;
     for (const entry of planned) {
       const probe = captures[at++];
       const read = entry.read ? captures[at++] : undefined;
       entry.row.ran = ran(entry);
+      const envelope = probe.envelopes?.[0];
+      if (envelope !== undefined) {
+        entry.row.envelope = envelope;
+        entry.row.ms = this.meter.envelopes.find(
+          (e) => e.id === envelope,
+        )?.msPerPart;
+      } else if (probe.ms !== undefined) entry.row.ms = probe.ms;
       this.fill(entry, probe, read);
     }
   }
 
   /** Sends everything: in envelopes, and what cannot go in one on its own. */
   async all(planned: readonly IPlanned<T>[]): Promise<void> {
+    if (this.sequential) {
+      this.out.progress(`  ${planned.length} probes one by one (--sequential)`);
+      for (const entry of planned) {
+        this.interrupt.check();
+        await this.send([entry], false, (e) =>
+          e.sequential
+            ? `sequential: ${e.sequential}`
+            : 'sequential: --sequential',
+        );
+      }
+      return;
+    }
     const batchable = planned.filter((entry) => !entry.sequential);
     const chunks = Math.ceil(batchable.length / ENVELOPE_PROBES);
     for (let chunk = 0; chunk < chunks; chunk++) {
@@ -230,7 +255,10 @@ class Run<T> {
       }
     }
     const alone = planned.filter((entry) => entry.sequential);
-    if (alone.length) this.out.progress(`  ${alone.length} probes one by one`);
+    if (alone.length) {
+      this.interrupt.check();
+      this.out.progress(`  ${alone.length} probes one by one`);
+    }
     for (const entry of alone) {
       this.interrupt.check();
       await this.send([entry], false, (e) => `sequential: ${e.sequential}`);
@@ -294,6 +322,8 @@ interface IContext {
   corpus: ICorpus;
   clientOptions: ClientOptions;
   out: IOutput;
+  meter: IMeter;
+  sequential: boolean;
 }
 
 /** Where the calls go: the connection (or the envelope), and whether it is an envelope. */
@@ -322,12 +352,15 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
       asked: probe.asked,
       onWire: [],
       named: emptyNamed(),
-      ...(first ? { pair: { accept: first, contentType: first } } : {}),
+      ...(first ? { pair: { contentType: first } } : {}),
       ...(probe.bogus ? { bogus: probe.bogus } : {}),
       ...(probe.corpusType ? { corpusType: probe.corpusType } : {}),
       ...(probe.noCorpusPair ? { noCorpusPair: probe.noCorpusPair } : {}),
       ...(probe.contentTypeNotSent
         ? { contentTypeNotSent: probe.contentTypeNotSent }
+        : {}),
+      ...(ctx.mode !== 'none' && probe.bogus !== 'accept'
+        ? { acceptNote: 'accept: not in discovery' }
         : {}),
     };
     const uri = `${collection.href.replace(/\/$/, '')}/${encodeURIComponent(PROBE_NAME.toLowerCase())}`;
@@ -381,6 +414,8 @@ async function runDiscovery(ctx: IContext, document: string): Promise<void> {
     (batch) => ({ base: batch, parts: true }),
     ctx.interrupt,
     ctx.out,
+    ctx.meter,
+    ctx.sequential,
   ).all(sent);
 }
 
@@ -575,6 +610,8 @@ async function runClients(ctx: IContext): Promise<void> {
     onBatch,
     ctx.interrupt,
     ctx.out,
+    ctx.meter,
+    ctx.sequential,
   ).all(planned);
 }
 
@@ -662,6 +699,8 @@ export interface ICorpusRunInput {
   /** Read after the authorization check: on cloud it asks the system. */
   clientOptions: () => Promise<ClientOptions>;
   out: IOutput;
+  /** Every request one at a time, no envelope. */
+  sequential?: boolean;
 }
 
 /**
@@ -684,7 +723,10 @@ export async function runCorpus(
     startedAt: new Date().toISOString(),
     rows: [],
     removals: [],
+    envelopes: [],
+    ...(input.sequential ? { sequential: true } : {}),
   };
+  const meter: IMeter = { envelopes: corpus.envelopes as IEnvelopeTiming[] };
   const ledger = new Ledger((removal: IRemoval) => {
     corpus.removals.push(removal);
     out.progress(
@@ -700,6 +742,8 @@ export async function runCorpus(
       corpus,
       clientOptions: await input.clientOptions(),
       out,
+      meter,
+      sequential: input.sequential === true,
     };
     await withCleanup(ledger, () =>
       input.source === 'discovery'

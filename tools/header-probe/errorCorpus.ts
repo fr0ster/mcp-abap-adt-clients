@@ -11,6 +11,7 @@
  *   npm run header:discovery:next -- --from discovery --headers corpus
  *   npm run header:discovery:next -- --from clients --headers none
  *   npm run header:discovery:next -- --from clients --headers bogus
+ *   npm run header:discovery:next -- --from discovery --headers bogus --sequential
  *   npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
  *
  * `--from` (required): `discovery` probes every `app:collection` of
@@ -20,6 +21,8 @@
  * `--headers` (required): `corpus` sends the prepared pair (the collection's
  * own `app:accept` types, or pairs.ts); `none` sends no Accept and no
  * Content-Type; `bogus` sends `application/x-header-probe` as both.
+ * `--sequential` sends every request on its own, no envelope (to compare
+ * the time per request with a batched run).
  * `--summary` reads corpus files and writes, per endpoint, the Accept and
  * Content-Type values the system named in any of them.
  *
@@ -68,6 +71,7 @@ interface IArgs {
   from?: Source;
   headers?: HeadersMode;
   summary?: string[];
+  sequential?: boolean;
 }
 
 function parseArgs(argv: readonly string[]): IArgs {
@@ -84,6 +88,8 @@ function parseArgs(argv: readonly string[]): IArgs {
       if (!HEADERS_MODES.includes(value))
         throw new Error(`--headers takes ${HEADERS_MODES.join(', ')}`);
       args.headers = value;
+    } else if (arg === '--sequential') {
+      args.sequential = true;
     } else if (arg === '--summary') {
       args.summary = argv.slice(i + 1);
       break;
@@ -149,6 +155,7 @@ async function main(): Promise<number> {
       outDir: OUT_DIR,
       clientOptions: () => resolveSystemContext(connection, system === 'cloud'),
       out: { progress, loud },
+      sequential: args.sequential === true,
     });
     return exitCode;
   } finally {

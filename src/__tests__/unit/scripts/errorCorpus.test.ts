@@ -36,6 +36,7 @@ import {
   refusedCorpusPairs,
   renderCorpusMarkdown,
   renderNamedSummary,
+  stats,
   wireNote,
 } from '../../../../tools/header-probe/corpus';
 import { runCorpus } from '../../../../tools/header-probe/corpusRun';
@@ -267,7 +268,8 @@ describe('the discovery document', () => {
       for (const method of methods(c.accept)) {
         const skipped = Boolean(notSent(c.href, method));
         none += 1;
-        corpus += skipped || !c.accept.length ? 1 : c.accept.length;
+        corpus +=
+          skipped || method === 'GET' || !c.accept.length ? 1 : c.accept.length;
         bogus += skipped || method === 'GET' ? 1 : 2;
       }
     expect(discoveryProbes(collections, 'none')).toHaveLength(none);
@@ -277,14 +279,17 @@ describe('the discovery document', () => {
 
   it('corpus: a request without a body gets no Content-Type, and the row records the one not sent', () => {
     const corpus = discoveryProbes(parseDiscovery(DISCOVERY), 'corpus');
-    const get = corpus.find((p) => p.method === 'GET' && p.corpusType);
+    const get = corpus.find(
+      (p) =>
+        p.method === 'GET' && p.collection.href === '/sap/bc/adt/probe/things',
+    );
     const post = corpus.find((p) => p.method === 'POST');
-    expect(get?.asked).toEqual({ accept: 'application/vnd.probe.thing+xml' });
+    // app:accept is the body's type: a Content-Type, never an Accept.
+    expect(get?.asked).toEqual({});
     expect(get?.contentTypeNotSent).toBe(
       'not sent: no body (application/vnd.probe.thing+xml)',
     );
     expect(post?.asked).toEqual({
-      accept: 'application/vnd.probe.thing+xml',
       contentType: 'application/vnd.probe.thing+xml',
     });
     expect(post?.contentTypeNotSent).toBeUndefined();
@@ -304,7 +309,7 @@ describe('the discovery document', () => {
       { bogus: 'accept', asked: { accept: PROBE_TYPE, contentType: type } },
       {
         bogus: 'content-type',
-        asked: { accept: type, contentType: PROBE_TYPE },
+        asked: { contentType: PROBE_TYPE },
       },
     ]);
     expect(of('/sap/bc/adt/probe/reads', 'GET')).toEqual([
@@ -455,7 +460,7 @@ describe('what goes on the wire', () => {
     ).toEqual([
       ['GET', '/sap/bc/adt/probe/things', PROBE_TYPE, undefined],
       ['POST', '/sap/bc/adt/probe/things', PROBE_TYPE, type],
-      ['POST', '/sap/bc/adt/probe/things', type, PROBE_TYPE],
+      ['POST', '/sap/bc/adt/probe/things', undefined, PROBE_TYPE],
       ['GET', '/sap/bc/adt/probe/reads', PROBE_TYPE, undefined],
     ]);
     expect(result.corpus?.needs?.map((n) => [n.endpoint, n.needs])).toEqual([
@@ -891,5 +896,113 @@ describe('a clients run', () => {
       (r) => r.group === 'getClass()' && r.label === 'lock',
     );
     expect(lock?.skipped).toMatch(/takes no locks/);
+  });
+});
+
+describe('the header corpus', () => {
+  it('puts the Content-Type discovery lists beside what the none and bogus runs named', () => {
+    const [things] = parseDiscovery(DISCOVERY);
+    const at = (
+      headers: 'corpus' | 'none' | 'bogus',
+      rows: ICorpusRow[],
+    ): ICorpus => ({
+      source: 'discovery',
+      headers,
+      startedAt: '2026-10-18T00:00:00.000Z',
+      rows,
+      removals: [],
+    });
+    const base = {
+      source: 'discovery' as const,
+      group: 'Probe',
+      label: 'Things',
+      endpoint: { method: 'POST', path: '/sap/bc/adt/probe/things' },
+      collection: things,
+    };
+    const md = renderNamedSummary([
+      at('corpus', [row({ ...base, status: 400 })]),
+      at('none', [
+        row({
+          ...base,
+          status: 406,
+          named: {
+            ...emptyNamed(),
+            acceptedText:
+              'Accepted content types: application/vnd.probe.result+xml',
+          },
+        }),
+      ]),
+      at('bogus', [
+        row({ ...base, bogus: 'accept', status: 406 }),
+        row({
+          ...base,
+          bogus: 'content-type',
+          status: 415,
+          named: {
+            ...emptyNamed(),
+            inMessage: ['application/vnd.probe.thing+xml'],
+          },
+        }),
+      ]),
+    ]);
+    expect(md).toContain(
+      '| POST /sap/bc/adt/probe/things | Content-Type application/vnd.probe.thing+xml | application/vnd.probe.result+xml |  |  | application/vnd.probe.thing+xml | both (406 and 415) |',
+    );
+  });
+});
+
+describe('time', () => {
+  const run = (sequential: boolean) =>
+    runCorpus({
+      connection: fakeSystem((request) =>
+        request.url === '/sap/bc/adt/discovery'
+          ? { status: 200, body: DISCOVERY }
+          : { status: 404 },
+      ).connection,
+      source: 'discovery',
+      mode: 'none',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      sequential,
+    });
+
+  it('records each envelope: parts, bytes, ms, ms per part; each row its envelope', async () => {
+    const { corpus } = await run(false);
+    expect(corpus?.envelopes).toHaveLength(1);
+    const [envelope] = corpus?.envelopes ?? [];
+    // Three probes and the read after the POST.
+    expect(envelope.parts).toBe(4);
+    expect(envelope.bytes).toBeGreaterThan(0);
+    expect(envelope.msPerPart).toBeCloseTo(envelope.ms / 4);
+    for (const r of corpus?.rows ?? []) {
+      expect(r.envelope).toBe(envelope.id);
+      expect(r.ms).toBe(envelope.msPerPart);
+    }
+    expect(renderCorpusMarkdown(corpus as ICorpus)).toContain(
+      '| parts per envelope | 1 | 4 | 4 | 4 |',
+    );
+  });
+
+  it('--sequential: no envelope, the wall time of each request', async () => {
+    const { corpus } = await run(true);
+    expect(corpus?.envelopes).toEqual([]);
+    expect(corpus?.sequential).toBe(true);
+    for (const r of corpus?.rows ?? []) {
+      expect(r.envelope).toBeUndefined();
+      expect(typeof r.ms).toBe('number');
+      expect(r.ran).toBe('sequential: --sequential');
+    }
+  });
+
+  it('gives total, median and p95', () => {
+    expect(stats([5, 1, 3, 2, 4])).toEqual({
+      count: 5,
+      total: 15,
+      median: 3,
+      p95: 5,
+    });
+    expect(stats([])).toEqual({ count: 0, total: 0, median: 0, p95: 0 });
   });
 });

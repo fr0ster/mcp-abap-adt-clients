@@ -117,13 +117,18 @@ npm run header:discovery:next -- --from discovery --headers bogus
 npm run header:discovery:next -- --from clients --headers corpus
 npm run header:discovery:next -- --from clients --headers none
 npm run header:discovery:next -- --from clients --headers bogus
+npm run header:discovery:next -- --from discovery --headers bogus --sequential
 npm run header:discovery:next -- --summary <corpus.json> [<corpus.json> …]
 ```
 
-Both `--from` and `--headers` are required. `--summary` reads corpus files
-and writes `summary-<timestamp>.md`: per endpoint, the Accept and
-Content-Type values the system named in any of the runs, and, for each bogus
-run, what each endpoint needs.
+Both `--from` and `--headers` are required. `--sequential` sends every
+request on its own, without envelopes, to compare the time per request with a
+batched run. `--summary` reads corpus files and writes
+`summary-<timestamp>.md`: per endpoint, the Accept and Content-Type values the
+system named in any of the runs; the header corpus — per endpoint, side by
+side, what discovery (or the pair table) lists and what the 406s and 415s of
+the none and bogus runs named; and, for each bogus run, what each endpoint
+needs.
 
 ## What it does
 
@@ -154,9 +159,13 @@ run, what each endpoint needs.
 3. **The headers** (`--headers`). A request without a body gets no
    Content-Type in any mode; in corpus mode the pair's value is recorded as
    `not sent: no body`.
-   - `corpus`: the prepared pair — the collection's own `app:accept` types
-     (one row per type), or `pairs.ts` for the members (the legacy client's
-     rows from MIGRATION-36 as well).
+   - `corpus`: the prepared pair. Discovery: `app:accept` is the type of the
+     request body, so it is a Content-Type only, sent on a request with a
+     body (one row per type); discovery names no Accept, so none is sent and
+     the row says `accept: not in discovery` (measured 2026-10-18: a `POST`
+     sent with the listed type as Accept as well was refused 406, naming a
+     different, result type). Members: `pairs.ts` (the legacy client's rows
+     from MIGRATION-36 as well).
    - `none`: no Accept and no Content-Type. In an envelope part the headers
      are left out and the part carries neither. On a request of its own the
      connection adds its default Accept unless the header is given as
@@ -167,7 +176,8 @@ run, what each endpoint needs.
    - `bogus`: one header per request, so a 406 or a 415 is attributable to
      one header. First request: Accept `application/x-header-probe`,
      Content-Type as in corpus; second request, only with a body:
-     Content-Type `application/x-header-probe`, Accept as in corpus.
+     Content-Type `application/x-header-probe`, Accept as in corpus (none,
+     for discovery).
 4. **Writes never create on purpose.** Every `POST`, `PUT` and `DELETE` goes
    to the probe name with a fake body: a minimal document of the corpus type,
    or a fixed text. After every write the probe name is read; if it now
@@ -179,7 +189,11 @@ run, what each endpoint needs.
    `makeAdtRequest` in discovery mode — each write followed by its read in the
    same envelope. A member whose call is a chain of requests runs on its own
    (`sequential: a chain of …`); so do the probes of an envelope SAP refused
-   whole. Ctrl-C stops new requests (asked before each envelope and request),
+   whole. Each envelope's part count, bytes and wall time from send to
+   answer are recorded with `performance.now()`, and each row carries its
+   envelope's id and ms per part; a request sent on its own carries its wall
+   time. There is no timer and no timeout of the script's own. Ctrl-C stops
+   new requests (asked before each envelope and request),
    the one in flight finishes, and the `finally` cleanup runs.
 
 ## The corpus
@@ -196,7 +210,9 @@ Two files in `.header-probe/` (gitignored: they hold the system's answers):
   `extractSupportedContentType` as returned — batched or sequential, and the
   probe name's state after a write.
 - `corpus-<source>-<headers>-<timestamp>.md` — a table per endpoint group,
-  then the summary: counts per status, every endpoint per status, every 406
+  then the summary: the time (envelopes, parts per envelope, ms per envelope
+  and per part, ms per request sent on its own: count, total, median, p95),
+  counts per status, every endpoint per status, every 406
   and 415 with the types named, every corpus pair refused, the Accept and
   Content-Type values named per endpoint, the writes that created the probe
   name, and the cleanup.

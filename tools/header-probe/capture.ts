@@ -44,6 +44,73 @@ export interface ICapture {
    * from the envelope part the batch writes, or from the transport.
    */
   onWire?: IWireHeaders[];
+  /** The envelope(s) the call's parts went out in (ids of {@link IMeter}). */
+  envelopes?: number[];
+  /** A call sent on its own: wall time from the first send to the answer, in ms. */
+  ms?: number;
+}
+
+/** One envelope as it went out: its parts, its bytes, the wall time from send to answer. */
+export interface IEnvelopeTiming {
+  id: number;
+  parts: number;
+  bytes: number;
+  ms: number;
+  msPerPart: number;
+}
+
+/** Where a run's envelope timings go. */
+export interface IMeter {
+  envelopes: IEnvelopeTiming[];
+}
+
+const PART_MARKER = 'Content-Type: application/http';
+
+/** Counts the parts of an envelope body: one `application/http` header line each. */
+export function partsIn(body: string): number {
+  let count = 0;
+  for (
+    let at = body.indexOf(PART_MARKER);
+    at !== -1;
+    at = body.indexOf(PART_MARKER, at + 1)
+  )
+    count++;
+  return count;
+}
+
+/**
+ * The connection an envelope goes out on, timing each send with
+ * `performance.now()` — no timer of its own — and noting its id in `ids`.
+ */
+function metered(
+  connection: IAbapConnection,
+  meter: IMeter,
+  ids: number[],
+): IAbapConnection {
+  const wrapper = traced(connection);
+  const send = wrapper.makeAdtRequest.bind(wrapper);
+  (wrapper as { makeAdtRequest: unknown }).makeAdtRequest = async (
+    request: IAbapRequestOptions,
+  ) => {
+    const body = request.data == null ? '' : String(request.data);
+    const id = meter.envelopes.length + 1;
+    ids.push(id);
+    const started = performance.now();
+    try {
+      return await send(request);
+    } finally {
+      const ms = performance.now() - started;
+      const parts = partsIn(body);
+      meter.envelopes.push({
+        id,
+        parts,
+        bytes: Buffer.byteLength(body),
+        ms,
+        msPerPart: parts ? ms / parts : ms,
+      });
+    }
+  };
+  return wrapper;
 }
 
 export const current = new AsyncLocalStorage<ICapture>();
@@ -212,6 +279,8 @@ export async function runCalls<T>(input: {
   /** The target the calls run on, recorded into the envelope. */
   onBatch: (batch: IAbapConnection) => T;
   interrupt?: Interrupt;
+  /** Where the envelopes' timings go. */
+  meter?: IMeter;
 }): Promise<ICapture[]> {
   const { calls, interrupt } = input;
   interrupt?.check();
@@ -239,14 +308,20 @@ export async function runCalls<T>(input: {
     );
   if (!input.batched) {
     // Asked before every request, not only before the list.
-    await eachInTurn(calls, interrupt, (call, i) =>
-      invoke(input.direct, call, captures[i]),
-    );
+    await eachInTurn(calls, interrupt, async (call, i) => {
+      const started = performance.now();
+      await invoke(input.direct, call, captures[i]);
+      captures[i].ms = performance.now() - started;
+    });
     return captures;
   }
-  const batch = new AdtBatchConnection(input.connection, {
-    endpoint: 'communication',
-  });
+  const ids: number[] = [];
+  const batch = new AdtBatchConnection(
+    input.meter
+      ? metered(input.connection, input.meter, ids)
+      : input.connection,
+    { endpoint: 'communication' },
+  );
   const target = input.onBatch(batch);
   const pending = calls.map((call, i) => invoke(target, call, captures[i]));
   // A member may record its request a few turns after it was called.
@@ -262,5 +337,6 @@ export async function runCalls<T>(input: {
         capture.failure ??= `the envelope failed: ${message(error)}`;
   }
   await Promise.all(pending);
+  if (input.meter) for (const capture of captures) capture.envelopes = [...ids];
   return captures;
 }

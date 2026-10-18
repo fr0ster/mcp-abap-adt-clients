@@ -11,7 +11,7 @@ import {
   extractSupportedAccept,
   extractSupportedContentType,
 } from '../../src/utils/supportedMediaTypes';
-import type { HeaderShape, IWireHeaders } from './capture';
+import type { HeaderShape, IEnvelopeTiming, IWireHeaders } from './capture';
 import {
   endpointKey,
   headerValue,
@@ -280,8 +280,11 @@ export function discoveryProbes(
       const hasBody = method === 'POST';
       const body = (type?: string) =>
         hasBody ? (mode === 'none' ? FIXED_TEXT : fakeBody(type)) : undefined;
+      // `app:accept` is the type of the request body: a Content-Type only.
+      // Discovery names no Accept (measured: a POST sent with the listed type
+      // as Accept was refused 406, naming a different, result type).
       const pairOf = (type: string | undefined): IAskedHeaders | undefined =>
-        type ? { accept: type, contentType: type } : undefined;
+        type ? { contentType: type } : undefined;
       const notSentNote = (type: string | undefined) => {
         const note = contentTypeNotSent(pairOf(type), hasBody);
         return note ? { contentTypeNotSent: note } : {};
@@ -299,14 +302,18 @@ export function discoveryProbes(
           });
         continue;
       }
-      if (mode === 'none' || !collection.accept.length) {
+      if (mode === 'none' || !collection.accept.length || !hasBody) {
+        const types = collection.accept.join(', ');
         probes.push({
           collection,
           method,
           asked: askedFor(mode, undefined, hasBody),
           body: body(),
-          ...(mode === 'corpus'
+          ...(mode === 'corpus' && !collection.accept.length
             ? { noCorpusPair: 'the collection lists no app:accept' }
+            : {}),
+          ...(mode === 'corpus' && collection.accept.length
+            ? { contentTypeNotSent: `not sent: no body (${types})` }
             : {}),
         });
         continue;
@@ -488,6 +495,8 @@ export interface ICorpusRow {
   pair?: IAskedHeaders;
   /** The pair's Content-Type, not sent because the request has no body. */
   contentTypeNotSent?: string;
+  /** Why no Accept went as the corpus value: `accept: not in discovery`. */
+  acceptNote?: string;
   /** The corpus type this row probes. */
   corpusType?: string;
   /** Why a corpus-mode row has no prepared pair. */
@@ -510,6 +519,10 @@ export interface ICorpusRow {
   afterWrite?: IWriteCheck;
   /** `skipped: <reason>`: the row was not sent. */
   skipped?: string;
+  /** Batched: the envelope it went out in (see {@link ICorpus.envelopes}). */
+  envelope?: number;
+  /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
+  ms?: number;
 }
 
 export interface ICorpus {
@@ -521,6 +534,10 @@ export interface ICorpus {
   collections?: ICollection[];
   rows: ICorpusRow[];
   removals: IRemoval[];
+  /** Every request one at a time (`--sequential`), no envelope. */
+  sequential?: boolean;
+  /** Every envelope: parts, bytes, wall time from send to answer. */
+  envelopes?: IEnvelopeTiming[];
   /** Bogus mode: which headers each endpoint needs. */
   needs?: IEndpointNeeds[];
   /** Methods of the handlers that answer no promise: helpers, not members (clients source). */
@@ -949,7 +966,7 @@ function afterWriteText(check: IWriteCheck | undefined): string {
 /** The Markdown corpus: a table per endpoint group, then the summary. */
 export function renderCorpusMarkdown(corpus: ICorpus): string {
   const lines: string[] = [
-    `# Error corpus: ${corpus.source}, headers ${corpus.headers}`,
+    `# Error corpus: ${corpus.source}, headers ${corpus.headers}${corpus.sequential ? ', sequential' : ''}`,
     '',
     `Started ${corpus.startedAt}${corpus.finishedAt ? `, finished ${corpus.finishedAt}` : ''}. Probe name \`${PROBE_NAME}\`, package \`${PROBE_PACKAGE}\`; bogus type \`${PROBE_TYPE}\`. The full bodies are in the JSON file.`,
     '',
@@ -983,6 +1000,7 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
         row.contentTypeNotSent
           ? `(Content-Type ${row.contentTypeNotSent})`
           : '',
+        row.acceptNote ? `(${row.acceptNote})` : '',
       ]
         .filter(Boolean)
         .join(' ');
@@ -993,7 +1011,8 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
     lines.push('');
   }
 
-  lines.push('## Summary', '', '### Counts per status', '');
+  lines.push('## Summary', '', '### Time', '', ...timingLines(corpus), '');
+  lines.push('### Counts per status', '');
   const byStatus = rowsByStatus(corpus.rows);
   lines.push('| status | rows |', '|---|---|');
   for (const [status, rows] of byStatus)
@@ -1085,6 +1104,136 @@ function namedTable(entries: readonly IEndpointNamed[]): string[] {
   return lines;
 }
 
+/**
+ * The header corpus: per endpoint, side by side, what the source lists (the
+ * discovery Content-Type, or the pair table's pair) and what the 406s and
+ * 415s named in the none and bogus runs.
+ */
+export function headerCorpusLines(corpora: readonly ICorpus[]): string[] {
+  const lines: string[] = [];
+  for (const source of SOURCES) {
+    const of = corpora.filter((corpus) => corpus.source === source);
+    if (!of.length) continue;
+    const listed = new Map<string, string[]>();
+    const named = new Map<string, Record<string, Set<string>>>();
+    const needs = new Map<string, string>();
+    for (const corpus of of)
+      for (const row of corpus.rows) {
+        if (!row.endpoint) continue;
+        const key = needsKey(row);
+        if (!listed.has(key))
+          listed.set(
+            key,
+            source === 'discovery'
+              ? (row.collection?.accept ?? []).map(
+                  (type) => `Content-Type ${type}`,
+                )
+              : [
+                  row.pair?.accept ? `Accept ${row.pair.accept}` : '',
+                  row.pair?.contentType
+                    ? `Content-Type ${row.pair.contentType}`
+                    : '',
+                ].filter(Boolean),
+          );
+        if (corpus.headers === 'corpus') continue;
+        const types = typesNamed(row);
+        const entry = named.get(key) ?? {};
+        const add = (column: string, values: string[]) => {
+          entry[column] ??= new Set();
+          for (const value of values) entry[column].add(value);
+        };
+        add(`${corpus.headers} accept`, types.accept);
+        add(`${corpus.headers} content-type`, types.contentType);
+        named.set(key, entry);
+      }
+    for (const corpus of of.filter((c) => c.headers === 'bogus'))
+      for (const entry of corpus.needs ?? classifyNeeds(corpus.rows))
+        needs.set(entry.endpoint, `${entry.needs} (${entry.detail})`);
+    lines.push(
+      `## The header corpus: ${source}`,
+      '',
+      `| endpoint | ${source === 'discovery' ? 'discovery lists' : 'the pair table lists'} | none: Accept named | none: Content-Type named | bogus: Accept named | bogus: Content-Type named | needs (bogus) |`,
+      '|---|---|---|---|---|---|---|',
+    );
+    for (const key of [...listed.keys()].sort()) {
+      const entry = named.get(key) ?? {};
+      const column = (name: string) => [...(entry[name] ?? [])].join(', ');
+      lines.push(
+        `| ${cell(key)} | ${cell((listed.get(key) ?? []).join('; '))} | ${cell(column('none accept'))} | ${cell(column('none content-type'))} | ${cell(column('bogus accept'))} | ${cell(column('bogus content-type'))} | ${cell(needs.get(key))} |`,
+      );
+    }
+    lines.push('');
+  }
+  return lines;
+}
+
+/** Total, median and 95th percentile of a list of numbers (nearest rank). */
+export function stats(values: readonly number[]): {
+  count: number;
+  total: number;
+  median: number;
+  p95: number;
+} {
+  if (!values.length) return { count: 0, total: 0, median: 0, p95: 0 };
+  const sorted = [...values].sort((a, b) => a - b);
+  const rank = (q: number) =>
+    sorted[
+      Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))
+    ];
+  return {
+    count: sorted.length,
+    total: sorted.reduce((sum, value) => sum + value, 0),
+    median: rank(0.5),
+    p95: rank(0.95),
+  };
+}
+
+const ms = (value: number) => `${Math.round(value)} ms`;
+
+/** The timing summary: envelopes, parts per envelope, ms per envelope and per part; requests sent on their own. */
+export function timingLines(corpus: ICorpus): string[] {
+  const envelopes = corpus.envelopes ?? [];
+  const lines = [
+    '| measure | count | total | median | p95 |',
+    '|---|---|---|---|---|',
+  ];
+  const row = (name: string, values: number[], unit: (v: number) => string) => {
+    const s = stats(values);
+    lines.push(
+      `| ${name} | ${s.count} | ${unit(s.total)} | ${unit(s.median)} | ${unit(s.p95)} |`,
+    );
+  };
+  const count = (v: number) => String(Math.round(v));
+  row(
+    'parts per envelope',
+    envelopes.map((e) => e.parts),
+    count,
+  );
+  row(
+    'bytes per envelope',
+    envelopes.map((e) => e.bytes),
+    count,
+  );
+  row(
+    'ms per envelope',
+    envelopes.map((e) => e.ms),
+    ms,
+  );
+  row(
+    'ms per part',
+    envelopes.flatMap((e) => Array(e.parts).fill(e.msPerPart)),
+    ms,
+  );
+  row(
+    'ms per request sent on its own',
+    corpus.rows
+      .filter((r) => r.envelope === undefined && r.ms !== undefined)
+      .map((r) => r.ms as number),
+    ms,
+  );
+  return lines;
+}
+
 /** The summary over several runs: per endpoint, what the system named in any mode. */
 export function renderNamedSummary(corpora: readonly ICorpus[]): string {
   const lines = [
@@ -1100,6 +1249,7 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
     ...namedTable(namedPerEndpoint(corpora)),
     '',
   ];
+  lines.push(...headerCorpusLines(corpora));
   for (const corpus of corpora.filter((c) => c.headers === 'bogus'))
     lines.push(
       `## What each endpoint needs: ${corpus.source}`,
