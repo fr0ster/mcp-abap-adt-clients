@@ -14,15 +14,35 @@ import {
 } from '../../index';
 import { getAcceptCorrectionEnabled } from '../../utils/acceptNegotiation';
 
+/**
+ * SAP's own 406, as measured on an on-premise system: the exception document,
+ * whose message ends "Accepted content types: …" — the list is often empty —
+ * and no header naming the types. Its namespace URI used to come back from
+ * the parser as two "types" (`www.sap.com/abapxml`,
+ * `types/communicationframework`) on every 406.
+ */
+function sap406(accepted: string): string {
+  const message = `The message content is not acceptable. Accepted content types: ${accepted}`;
+  return (
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
+    '<namespace id="com.sap.adt"/>' +
+    '<type id="ExceptionResourceNotAcceptable"/>' +
+    `<message lang="EN">${message}</message>` +
+    `<localizedMessage lang="EN">${message}</localizedMessage>` +
+    '<properties/></exc:exception>'
+  );
+}
+
 describe('extractSupportedAccept (package root)', () => {
-  it('reads the supported types from a response header', () => {
+  it('reads the types SAP lists after "Accepted content types:"', () => {
     const error = {
       response: {
         status: 406,
-        headers: {
-          'x-sap-adt-supported-accept':
-            'application/vnd.sap.adt.foo.v2+xml, application/vnd.sap.adt.foo.v1+xml',
-        },
+        headers: { 'content-type': 'application/xml' },
+        data: sap406(
+          'application/vnd.sap.adt.foo.v2+xml, application/vnd.sap.adt.foo.v1+xml',
+        ),
       },
     };
     expect(extractSupportedAccept(error)).toEqual([
@@ -31,17 +51,39 @@ describe('extractSupportedAccept (package root)', () => {
     ]);
   });
 
-  it('reads the supported types from the response body', () => {
+  it('answers an empty list when SAP lists none', () => {
+    const error = {
+      response: { status: 406, headers: {}, data: sap406('') },
+    };
+    expect(extractSupportedAccept(error)).toEqual([]);
+  });
+
+  it('never answers a fragment of the exception namespace', () => {
     const error = {
       response: {
         status: 406,
         headers: {},
-        data: 'Supported: application/vnd.sap.adt.bar.v3+xml',
+        data: sap406('application/vnd.sap.as+xml'),
       },
     };
-    expect(extractSupportedAccept(error)).toEqual([
-      'application/vnd.sap.adt.bar.v3+xml',
-    ]);
+    const types = extractSupportedAccept(error);
+    expect(types).toEqual(['application/vnd.sap.as+xml']);
+    expect(types).not.toContain('www.sap.com/abapxml');
+    expect(types).not.toContain('types/communicationframework');
+  });
+
+  it('reads no header: SAP names the types in the body only', () => {
+    const error = {
+      response: {
+        status: 406,
+        headers: {
+          accept: 'application/xml',
+          'x-sap-adt-supported-accept': 'application/vnd.sap.adt.foo.v2+xml',
+        },
+        data: sap406(''),
+      },
+    };
+    expect(extractSupportedAccept(error)).toEqual([]);
   });
 
   it('answers an empty list for an error with no response', () => {
@@ -69,7 +111,8 @@ describe('cachedAccept / rememberAccept (package root)', () => {
           const error: any = new Error('406');
           error.response = {
             status: 406,
-            headers: { 'x-sap-adt-supported-accept': first406 },
+            headers: {},
+            data: sap406(first406),
           };
           throw error;
         }
@@ -130,7 +173,8 @@ describe('correction is off unless switched on', () => {
         const error: any = new Error('406');
         error.response = {
           status: 406,
-          headers: { 'x-sap-adt-supported-accept': 'application/vnd.x+xml' },
+          headers: {},
+          data: sap406('application/vnd.x+xml'),
         };
         throw error;
       },

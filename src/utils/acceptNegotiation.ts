@@ -114,42 +114,43 @@ export function getAcceptCorrectionEnabled(
   return process.env.ADT_ACCEPT_CORRECTION === 'true';
 }
 
+/**
+ * The text SAP's 406 puts before the types it accepts.
+ *
+ * Measured on an on-premise system: SAP answers a 406 with its exception
+ * document, whose message reads "The message content is not acceptable.
+ * Accepted content types: …" — the list is often empty — and no header names
+ * the types. Only that list is read. A scan of the whole body for anything
+ * shaped like `a/b` used to return two fragments of the document's namespace
+ * URI (`www.sap.com/abapxml`, `types/communicationframework`) on every 406.
+ */
+const ACCEPTED_CONTENT_TYPES = 'Accepted content types:';
+
+/** Where the list after the marker ends: the element, an attribute or the line. */
+const LIST_ENDS = ['<', '"', '\n'];
+
 export function extractSupportedAccept(error: unknown): string[] {
-  const types = new Set<string>();
   const e = error as HttpError;
-  const headers = (e?.response?.headers || {}) as Record<string, unknown>;
-  const headerCandidates = [
-    headers.accept,
-    headers['x-sap-adt-supported-accept'],
-    headers['x-sap-adt-accept'],
-    headers['supported-accept'],
-    headers['accept-supported'],
-  ];
-
-  for (const value of headerCandidates) {
-    if (typeof value === 'string') {
-      value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .forEach((entry) => {
-          types.add(entry);
-        });
-    }
-  }
-
   const data = e?.response?.data;
   const text =
     typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
-  if (text) {
-    const matches =
-      text.match(/[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+(?:;[^,\s]+)?/g) || [];
-    for (const match of matches) {
-      types.add(match);
-    }
-  }
 
-  return Array.from(types).filter(Boolean);
+  const types = new Set<string>();
+  let at = text.indexOf(ACCEPTED_CONTENT_TYPES);
+  while (at !== -1) {
+    const start = at + ACCEPTED_CONTENT_TYPES.length;
+    let end = text.length;
+    for (const stop of LIST_ENDS) {
+      const found = text.indexOf(stop, start);
+      if (found !== -1 && found < end) end = found;
+    }
+    for (const entry of text.slice(start, end).split(',')) {
+      const type = entry.trim();
+      if (type) types.add(type);
+    }
+    at = text.indexOf(ACCEPTED_CONTENT_TYPES, end);
+  }
+  return Array.from(types);
 }
 
 export function extractSupportedContentType(error: unknown): string[] {

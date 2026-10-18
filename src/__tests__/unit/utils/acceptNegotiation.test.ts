@@ -204,7 +204,12 @@ describe('negotiation state is per connection', () => {
         if (first) {
           first = false;
           const error: any = new Error('406');
-          error.response = { status: 406, headers: {}, data: supported };
+          // SAP's 406 names what it accepts in its message, and only there.
+          error.response = {
+            status: 406,
+            headers: {},
+            data: `<message lang="EN">The message content is not acceptable. Accepted content types: ${supported}</message>`,
+          };
           throw error;
         }
         return { data: 'ok', status: 200, headers: {} };
