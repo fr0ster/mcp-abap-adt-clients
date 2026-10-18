@@ -26,6 +26,7 @@ import {
   refusedKnownPairs,
   renderMarkdown,
 } from '../../../../tools/header-probe/record';
+import { extractSupportedContentType } from '../../../utils/supportedMediaTypes';
 
 const KNOWN = { accept: 'application/a+xml', contentType: 'application/c+xml' };
 
@@ -116,24 +117,29 @@ describe('readAnswer', () => {
   });
 
   it('reads a 415 with extractSupportedContentType, as it returns', () => {
+    const wire = {
+      status: 415,
+      statusText: 'Unsupported Media Type',
+      headers: { 'content-type': 'application/xml' },
+      data: exception(
+        'Unsupported Media Type. Supported Media Types: application/c+xml',
+        'ExceptionUnsupportedMediaType',
+      ),
+    };
     const read = readAnswer({
       probe: 'badContentType',
       sent: probePair('badContentType', KNOWN),
       mode: 'sequential: --sequential',
       requests: [],
-      wire: {
-        status: 415,
-        statusText: 'Unsupported Media Type',
-        headers: { 'content-type': 'application/xml' },
-        data: exception(
-          'Unsupported media type',
-          'ExceptionUnsupportedMediaType',
-        ),
-      },
+      wire,
     });
     expect(read.status).toBe(415);
     expect(read.sapType).toBe('ExceptionUnsupportedMediaType');
-    expect(read.supportedContentType).toContain('application/xml');
+    // Whatever the parser answers, as it answers it: the probe reports it.
+    expect(read.supportedContentType).toEqual(
+      extractSupportedContentType({ response: wire }),
+    );
+    expect(read.supportedContentType).toContain('application/c+xml');
     expect(read.acceptedText).toBeUndefined();
   });
 
