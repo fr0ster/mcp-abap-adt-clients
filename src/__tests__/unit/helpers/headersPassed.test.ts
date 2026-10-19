@@ -18,8 +18,11 @@ import * as ts from 'typescript';
  * signature declared in library code (`src` outside `src/__tests__`, or an
  * installed package) that has no `headers` parameter: a `Map`'s `delete`, a
  * hash's `update`, a profiler's `delete`.
- * A member taken off its object (`.bind`, `.call`, `.apply`, or `x['update']`)
- * is reported too, since its arguments cannot be seen at the call.
+ * The `headers` must sit in the options argument: the position the resolved
+ * signature gives its `headers` parameter, or, for a call the checker cannot
+ * type, the last of at least two arguments. A member taken off its object
+ * (`.bind`, `.call`, `.apply`, `x['update']`, or destructured) is reported
+ * too, since its arguments cannot be seen at the call.
  */
 
 /** The members that take `options.headers` since 36.0.0 (MIGRATION-36.md). */
@@ -90,14 +93,51 @@ function compilerOptions(): ts.CompilerOptions {
   };
 }
 
-function passesHeaders(call: ts.CallExpression): boolean {
-  return call.arguments.some(
-    (argument) =>
-      ts.isObjectLiteralExpression(argument) &&
-      argument.properties.some(
-        (property) => property.name?.getText() === 'headers',
-      ),
+/** Whether an argument is an object literal that names `headers`. */
+function namesHeaders(argument: ts.Expression | undefined): boolean {
+  // A later spread can still erase it (`{ headers, ...{ headers: undefined } }`):
+  // this catches a forgotten pair, not deliberate evasion.
+  return (
+    argument !== undefined &&
+    ts.isObjectLiteralExpression(argument) &&
+    argument.properties.some(
+      (property) => property.name?.getText() === 'headers',
+    )
   );
+}
+
+/**
+ * The index of the options argument: from the resolved signature, the
+ * parameter whose type carries `headers`. A call the checker cannot type (a
+ * JavaScript helper, an `any` receiver) has none; there the options are the
+ * last of at least two arguments, after the config, as every header member
+ * takes them.
+ */
+function optionsIndex(
+  checker: ts.TypeChecker,
+  call: ts.CallExpression,
+): number | undefined {
+  const signature = checker.getResolvedSignature(call);
+  const index = signature
+    ?.getParameters()
+    .findIndex(
+      (parameter) =>
+        checker
+          .getNonNullableType(
+            checker.getTypeOfSymbolAtLocation(parameter, call),
+          )
+          .getProperty('headers') !== undefined,
+    );
+  if (index !== undefined && index >= 0) return index;
+  return call.arguments.length >= 2 ? call.arguments.length - 1 : undefined;
+}
+
+function passesHeaders(
+  checker: ts.TypeChecker,
+  call: ts.CallExpression,
+): boolean {
+  const index = optionsIndex(checker, call);
+  return index !== undefined && namesHeaders(call.arguments[index]);
 }
 
 /** A resolved signature, declared in library code, that takes no headers. */
@@ -144,7 +184,7 @@ function callsWithoutHeaders(files: readonly string[]): string[] {
         ts.isCallExpression(node) &&
         ts.isPropertyAccessExpression(node.expression) &&
         HEADER_MEMBERS.has(node.expression.name.text) &&
-        !passesHeaders(node) &&
+        !passesHeaders(checker, node) &&
         !takesNoHeaders(checker, node)
       )
         at(node, `${node.expression.name.text}() without headers`);
@@ -161,6 +201,17 @@ function callsWithoutHeaders(files: readonly string[]): string[] {
         HEADER_MEMBERS.has(node.argumentExpression.text)
       )
         at(node, `['${node.argumentExpression.text}']`);
+      // `const { update } = handler`, at any depth: the member leaves its
+      // object, and a later `update(config)` cannot be read as its call.
+      if (
+        ts.isBindingElement(node) &&
+        ts.isObjectBindingPattern(node.parent) &&
+        HEADER_MEMBERS.has((node.propertyName ?? node.name).getText())
+      )
+        at(
+          node,
+          `{ ${(node.propertyName ?? node.name).getText()} } destructured`,
+        );
       ts.forEachChild(node, visit);
     };
     visit(source);
@@ -183,6 +234,9 @@ describe('header members are called with headers', () => {
       writeFileSync(join(dir, name), text);
       return join(dir, name);
     };
+    const program = join(ROOT, 'src', 'core', 'program', 'AdtProgram')
+      .split(sep)
+      .join('/');
     try {
       const found = callsWithoutHeaders([
         file(
@@ -193,6 +247,9 @@ describe('header members are called with headers', () => {
             '  await handler.activate(config, { headers: pair });',
             '  const call = handler.updateMetadata.bind(handler);',
             "  await handler['delete'](config);",
+            '  const { update } = handler;',
+            '  const { inner: { activate: run } } = { inner: handler };',
+            "  await handler.update({ programName: 'Z', headers: pair });",
             '}',
             '',
           ].join('\n'),
@@ -200,10 +257,13 @@ describe('header members are called with headers', () => {
         file(
           'typed.ts',
           [
+            `import { AdtProgram } from '${program}';`,
             'type Handler = { delete(config: unknown, options?: any): Promise<unknown> };',
-            'export async function run(handler: Handler, seen: Map<string, number>) {',
+            'export async function run(handler: Handler, seen: Map<string, number>, typed: AdtProgram) {',
             '  await handler.delete({}, { analyse: true });',
             "  seen.delete('x');",
+            "  await typed.update({ programName: 'Z', headers: pair }, { source: 'x' });",
+            "  await typed.update({ programName: 'Z' }, { source: 'x', headers: pair });",
             '}',
             '',
           ].join('\n'),
@@ -213,7 +273,11 @@ describe('header members are called with headers', () => {
         'helper.js:2 update() without headers',
         'helper.js:4 updateMetadata.bind',
         "helper.js:5 ['delete']",
-        'typed.ts:3 delete() without headers',
+        'helper.js:6 { update } destructured',
+        'helper.js:7 { activate } destructured',
+        'helper.js:8 update() without headers',
+        'typed.ts:4 delete() without headers',
+        'typed.ts:6 update() without headers',
       ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
