@@ -32,10 +32,10 @@ const TEMPLATE = path.join(
 const CONFIG = path.join(ROOT, 'src/__tests__/helpers/test-config.yaml');
 
 /**
- * Top-level keys, read without a YAML parser.
- *
- * A dependency is not worth it for "lines that start in column zero and end in
- * a colon", and this file must run before anything is installed.
+ * Top-level keys, read without a YAML parser: "lines that start in column zero
+ * and end in a colon" need none, and this check works before anything is
+ * installed. The shared entries below need the parser, and are skipped (with
+ * a note) until it is there.
  */
 function sections(file) {
   return sectionsOf(fs.readFileSync(file, 'utf8'));
@@ -53,29 +53,35 @@ function sectionsOf(text) {
 }
 
 /**
- * `shared_dependencies` entries as `collection/NAME`, read line by line: a
- * collection is a two-space key under the section, an entry a four-space
- * `- name:` under it. Commented lines are not entries.
+ * `shared_dependencies` entries as `collection/NAME`, read with the YAML
+ * library the test helper loads the config with — so a quoted key, an anchor,
+ * an alias or a merge key reads as the helper reads it. `null` when the text
+ * cannot be read that way (the library not installed yet, or invalid YAML):
+ * then the entries are not compared, and the caller says so.
  */
 function sharedEntriesOf(text) {
+  let YAML;
+  try {
+    YAML = require('yaml');
+  } catch {
+    return null;
+  }
+  let document;
+  try {
+    document = YAML.parse(text, { merge: true });
+  } catch {
+    return null;
+  }
   const found = new Set();
-  let inShared = false;
-  let collection = '';
-  for (const line of text.split('\n')) {
-    const topLevel = /^([A-Za-z_][A-Za-z0-9_]*):/.exec(line);
-    if (topLevel) {
-      inShared = topLevel[1] === 'shared_dependencies';
-      collection = '';
-      continue;
+  const shared = document?.shared_dependencies;
+  if (!shared || typeof shared !== 'object') return found;
+  for (const [collection, entries] of Object.entries(shared)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (entry && typeof entry.name === 'string') {
+        found.add(`${collection}/${entry.name}`);
+      }
     }
-    if (!inShared) continue;
-    const key = /^ {2}([A-Za-z_][A-Za-z0-9_]*):\s*(#.*)?$/.exec(line);
-    if (key) {
-      collection = key[1];
-      continue;
-    }
-    const entry = /^ {4}- name:\s*["']?([^"'#\s]+)["']?/.exec(line);
-    if (entry && collection) found.add(`${collection}/${entry[1]}`);
   }
   return found;
 }
@@ -86,13 +92,18 @@ function drift(templateText, configText) {
   const inConfig = sectionsOf(configText);
   const sharedTemplate = sharedEntriesOf(templateText);
   const sharedConfig = sharedEntriesOf(configText);
+  const sharedRead = sharedTemplate !== null && sharedConfig !== null;
   return {
     sections: inTemplate.size,
     missing: [...inTemplate].filter((s) => !inConfig.has(s)).sort(),
     extra: [...inConfig].filter((s) => !inTemplate.has(s)).sort(),
-    missingShared: inConfig.has('shared_dependencies')
-      ? [...sharedTemplate].filter((e) => !sharedConfig.has(e)).sort()
-      : [],
+    // Compared only when both files read and the config has the section at
+    // all — a missing section is already reported above.
+    sharedCompared: sharedRead,
+    missingShared:
+      sharedRead && inConfig.has('shared_dependencies')
+        ? [...sharedTemplate].filter((e) => !sharedConfig.has(e)).sort()
+        : [],
   };
 }
 
@@ -114,7 +125,8 @@ function main() {
   if (
     missing.length === 0 &&
     extra.length === 0 &&
-    missingShared.length === 0
+    missingShared.length === 0 &&
+    sharedCompared
   ) {
     console.log(
       `check:config — test-config.yaml carries all ${count} sections and every shared entry the template does.`,
@@ -140,6 +152,12 @@ function main() {
     console.warn(
       `   ${extra.length} section(s) exist locally and not in the template: ${extra.join(', ')}\n` +
         '   Harmless, unless one was renamed upstream and yours is now the old name.\n',
+    );
+  }
+
+  if (!sharedCompared) {
+    console.warn(
+      '   shared_dependencies entries not compared: the YAML library is not installed yet, or a file is not valid YAML.\n',
     );
   }
 

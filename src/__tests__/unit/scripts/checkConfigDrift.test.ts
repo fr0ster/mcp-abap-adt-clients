@@ -57,4 +57,62 @@ describe('check:config', () => {
     expect(result.missing).toEqual([]);
     expect(result.missingShared).toEqual([]);
   });
+
+  it('reads a quoted collection key as the helper does', () => {
+    const config = [
+      'environment:',
+      '  system: "onprem"',
+      'shared_dependencies:',
+      '  "classes":',
+      '    - name: "ZAC_SHR_A"',
+      '    - "name": ZAC_SHR_B',
+      "  'views':",
+      '    - { name: ZAC_SHR_V }',
+      'run_class:',
+      '  test_cases: []',
+      '',
+    ].join('\n');
+    expect(drift(TEMPLATE, config).missingShared).toEqual([]);
+  });
+
+  it('reads an anchored collection and its alias as the helper does', () => {
+    const config = [
+      'environment:',
+      '  system: "onprem"',
+      'shared_dependencies:',
+      '  classes: &shared_classes',
+      '    - name: "ZAC_SHR_A"',
+      '    - name: "ZAC_SHR_B"',
+      '  views:',
+      '    - name: "ZAC_SHR_V"',
+      'run_class:',
+      '  test_cases: []',
+      '',
+    ].join('\n');
+    expect(drift(TEMPLATE, config).missingShared).toEqual([]);
+    const aliased = [
+      'environment:',
+      '  system: "onprem"',
+      'library: &views',
+      '  - name: "ZAC_SHR_V"',
+      'shared_dependencies:',
+      '  classes:',
+      '    - name: "ZAC_SHR_A"',
+      '    - name: "ZAC_SHR_B"',
+      '  views: *views',
+      'run_class:',
+      '  test_cases: []',
+      '',
+    ].join('\n');
+    expect(drift(TEMPLATE, aliased).missingShared).toEqual([]);
+  });
+
+  it('says when it could not compare the entries', () => {
+    const result = drift(
+      TEMPLATE,
+      'shared_dependencies:\n  classes: [unclosed\n',
+    );
+    expect(result.sharedCompared).toBe(false);
+    expect(result.missingShared).toEqual([]);
+  });
 });
