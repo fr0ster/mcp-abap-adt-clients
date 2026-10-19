@@ -270,6 +270,15 @@ describe('integrationHeadersOf', () => {
       'integration/fallback.ts': `import { integrationHeadersOf, TEST_HEADERS } from ${from};\n`,
       'helpers/required.ts': `const h = require(${from});\n`,
       'helpers/dynamic.ts': `const h = import(${from});\n`,
+      'integration/importEquals.ts': `import h = require(${from});\n`,
+      'unit/exportImportEquals.ts': `export import h = require(${from});\n`,
+      // JavaScript files Jest also runs, under the same rules.
+      'integration/required.test.js': `const { headersOf } = require(${from});\n`,
+      'admin/esm.mjs': `import { TEST_HEADERS } from ${from};\n`,
+      'unit/reexport.cjs': `module.exports = require(${from});\n`,
+      'unit/assign.js': `Object.assign(exports, require(${from}));\n`,
+      'unit/property.js': `exports.pair = require(${from}).headersOf;\n`,
+      'unit/ok.js': `const { headersOf } = require(${from});\n`,
       // Allowed: the strict resolver and types; a unit test's own import.
       'integration/ok.ts': `import { integrationHeadersOf } from ${from};\nimport type { X } from ${from};\nimport { type Y } from ${from};\n`,
       'unit/ok.ts': `import { headersOf, TEST_HEADERS } from ${from};\n`,
@@ -291,6 +300,13 @@ describe('integrationHeadersOf', () => {
           'integration/fallback.ts: imports TEST_HEADERS',
           'helpers/required.ts: loads the module at runtime',
           'helpers/dynamic.ts: loads the module at runtime',
+          'integration/importEquals.ts: imports the whole module',
+          'unit/exportImportEquals.ts: re-exports helpers/adtHeaders',
+          'integration/required.test.js: loads the module at runtime',
+          'admin/esm.mjs: imports TEST_HEADERS',
+          'unit/reexport.cjs: re-exports helpers/adtHeaders',
+          'unit/assign.js: re-exports helpers/adtHeaders',
+          'unit/property.js: re-exports helpers/adtHeaders',
         ]
           .map((line) => line.split('/').join(sep))
           .sort(),
@@ -300,6 +316,46 @@ describe('integrationHeadersOf', () => {
     }
   });
 });
+
+/** The files the scan reads: what Jest's `*.test.[tj]s` matches, and `.mjs` / `.cjs`. */
+const SCANNED = ['.ts', '.js', '.mjs', '.cjs'];
+
+/** Whether a CommonJS name starts `exports` or `module.exports`. */
+function isExportsName(node: ts.Node): boolean {
+  const text = node.getText();
+  return (
+    text === 'exports' ||
+    text.startsWith('exports.') ||
+    text === 'module.exports' ||
+    text.startsWith('module.exports.')
+  );
+}
+
+/**
+ * Whether `node` is part of what a CommonJS module exports: the right side
+ * of an assignment to `exports` / `module.exports` (or one of their
+ * properties), or an argument of `Object.assign(exports | module.exports, …)`.
+ */
+function assignedToExports(node: ts.Node): boolean {
+  for (let at: ts.Node = node; at.parent; at = at.parent) {
+    const parent = at.parent;
+    if (
+      ts.isBinaryExpression(parent) &&
+      parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      parent.right === at &&
+      isExportsName(parent.left)
+    )
+      return true;
+    if (
+      ts.isCallExpression(parent) &&
+      parent.expression.getText() === 'Object.assign' &&
+      parent.arguments[0] !== undefined &&
+      isExportsName(parent.arguments[0])
+    )
+      return true;
+  }
+  return false;
+}
 
 /**
  * Under `root` (`src/__tests__`), read with the TypeScript parser:
@@ -315,7 +371,7 @@ function resolverOffenders(root: string): string[] {
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
       entry.isDirectory()
         ? walk(join(dir, entry.name))
-        : entry.name.endsWith('.ts')
+        : SCANNED.some((extension) => entry.name.endsWith(extension))
           ? [join(dir, entry.name)]
           : [],
     );
@@ -333,8 +389,7 @@ function resolverOffenders(root: string): string[] {
       const target = resolve(dirname(path), text);
       return (
         target === definition ||
-        target === `${definition}.ts` ||
-        target === `${definition}.js`
+        SCANNED.some((extension) => target === `${definition}${extension}`)
       );
     };
     const source = ts.createSourceFile(
@@ -342,10 +397,26 @@ function resolverOffenders(root: string): string[] {
       readFileSync(path, 'utf8'),
       ts.ScriptTarget.Latest,
       true,
+      path.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS,
     );
     const visit = (node: ts.Node): void => {
       if (ts.isExportDeclaration(node) && isDefinition(node.moduleSpecifier))
         offences.push(`${file}: re-exports helpers/adtHeaders`);
+      // `import h = require('…')`, and `export import h = require('…')`.
+      if (
+        ts.isImportEqualsDeclaration(node) &&
+        ts.isExternalModuleReference(node.moduleReference) &&
+        isDefinition(node.moduleReference.expression)
+      ) {
+        if (
+          node.modifiers?.some(
+            (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+          )
+        )
+          offences.push(`${file}: re-exports helpers/adtHeaders`);
+        else if (strict && !node.isTypeOnly)
+          offences.push(`${file}: imports the whole module`);
+      }
       if (
         strict &&
         ts.isImportDeclaration(node) &&
@@ -367,14 +438,16 @@ function resolverOffenders(root: string): string[] {
         if (!clause) offences.push(`${file}: imports the module for effect`);
       }
       if (
-        strict &&
         ts.isCallExpression(node) &&
         (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
           (ts.isIdentifier(node.expression) &&
             node.expression.text === 'require')) &&
         isDefinition(node.arguments[0])
-      )
-        offences.push(`${file}: loads the module at runtime`);
+      ) {
+        if (assignedToExports(node))
+          offences.push(`${file}: re-exports helpers/adtHeaders`);
+        else if (strict) offences.push(`${file}: loads the module at runtime`);
+      }
       ts.forEachChild(node, visit);
     };
     visit(source);
