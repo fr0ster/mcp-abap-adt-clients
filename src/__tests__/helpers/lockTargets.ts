@@ -39,7 +39,13 @@ async function deleteOrRaise(
   config: Record<string, unknown>,
   what: string,
 ): Promise<void> {
-  mustSucceed(await handler.delete(config, { analyse: analyseDeletion }), what);
+  mustSucceed(
+    await handler.delete(config, {
+      analyse: analyseDeletion,
+      headers: integrationHeadersOf(handler, 'delete'),
+    }),
+    what,
+  );
 }
 
 /** Remove what a run that died before its cleanup left behind. */

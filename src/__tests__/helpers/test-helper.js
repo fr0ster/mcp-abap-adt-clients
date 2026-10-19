@@ -8,6 +8,9 @@ const path = require('node:path');
 const yaml = require('yaml');
 const dotenv = require('dotenv');
 const { XMLParser } = require('fast-xml-parser');
+// Every member that takes `options.headers` gets the recorded pair; a member
+// with none fails loudly instead of sending a fake one to SAP.
+const { integrationHeadersOf } = require('./adtHeaders');
 
 let cachedConfig = null;
 let configLoadedFrom = null;
@@ -31,7 +34,9 @@ let cachedEnvType = null;
 async function writeAndActivate(handler, config, options, logger) {
   await writeSource(handler, config, options, logger);
   if (typeof handler.activate === 'function') {
-    const activated = await handler.activate(config);
+    const activated = await handler.activate(config, {
+      headers: integrationHeadersOf(handler, 'activate', config),
+    });
     if (activated && activated.ok === false) {
       const failure = activated.getError();
       throw new Error(
@@ -66,17 +71,23 @@ async function writeSource(handler, config, options, logger) {
     // element, a package, a table type, a function group and their neighbours
     // are their own document. Written as a capability question rather than a
     // list of type names, so a new document-only type needs nothing here.
-    const write =
-      typeof handler.update === 'function'
-        ? { call: handler.update.bind(handler), what: 'update' }
-        : {
-            call: handler.updateMetadata.bind(handler),
-            what: 'updateMetadata',
-          };
-    raise(
-      await write.call(config, { ...options, lockHandle: handle }),
-      write.what,
-    );
+    const written = { ...options, lockHandle: handle };
+    if (typeof handler.update === 'function')
+      raise(
+        await handler.update(config, {
+          ...written,
+          headers: integrationHeadersOf(handler, 'update', config),
+        }),
+        'update',
+      );
+    else
+      raise(
+        await handler.updateMetadata(config, {
+          ...written,
+          headers: integrationHeadersOf(handler, 'updateMetadata', config),
+        }),
+        'updateMetadata',
+      );
   } finally {
     if (handle && typeof handler.unlock === 'function') {
       const released = await handler.unlock(config, handle);
@@ -2174,19 +2185,22 @@ async function ensureSharedPackage(client, logger) {
       sharedConfig.transport_request,
     );
     mustSucceed(
-      await client.getPackage().create({
-        packageName,
-        description: 'Shared test dependencies package',
-        superPackage: sharedConfig.super_package,
-        softwareComponent: sharedConfig.software_component,
-        transportLayer: sharedConfig.transport_layer,
-        packageType: 'development',
-        transportRequest,
-        // A transportable software component (HOME on an on-premise system)
-        // refuses a package without change recording (TR432); a local one
-        // (ZLOCAL, LOCAL, $) does not want it. Stated in the config, not guessed.
-        recordChanges: sharedConfig.record_changes === true,
-      }),
+      await client.getPackage().create(
+        {
+          packageName,
+          description: 'Shared test dependencies package',
+          superPackage: sharedConfig.super_package,
+          softwareComponent: sharedConfig.software_component,
+          transportLayer: sharedConfig.transport_layer,
+          packageType: 'development',
+          transportRequest,
+          // A transportable software component (HOME on an on-premise system)
+          // refuses a package without change recording (TR432); a local one
+          // (ZLOCAL, LOCAL, $) does not want it. Stated in the config, not guessed.
+          recordChanges: sharedConfig.record_changes === true,
+        },
+        { headers: integrationHeadersOf(client.getPackage(), 'create') },
+      ),
       `shared package create ${packageName}`,
     );
     logger?.info?.(`Created shared package ${packageName}`);
@@ -2494,7 +2508,10 @@ async function activateSharedFunctionGroup(
 ) {
   const answer = await client
     .getFunctionGroup()
-    .activate({ functionGroupName: name, transportRequest });
+    .activate(
+      { functionGroupName: name, transportRequest },
+      { headers: integrationHeadersOf(client.getFunctionGroup(), 'activate') },
+    );
   if (!answer.ok) {
     logger?.warn?.(
       `Shared function group ${name} could not be activated: ${answer.getError().message}`,
@@ -2825,14 +2842,17 @@ async function ensureSharedDependency(client, type, name, logger) {
   try {
     if (type === 'domains') {
       mustSucceed(
-        await client.getDomain().create({
-          domainName: name,
-          packageName,
-          description: depConfig.description || 'Shared test domain',
-          datatype: depConfig.datatype || 'CHAR',
-          length: depConfig.length || 10,
-          transportRequest,
-        }),
+        await client.getDomain().create(
+          {
+            domainName: name,
+            packageName,
+            description: depConfig.description || 'Shared test domain',
+            datatype: depConfig.datatype || 'CHAR',
+            length: depConfig.length || 10,
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getDomain(), 'create') },
+        ),
         `shared domain create ${name}`,
       );
       // A domain carries no source: create only makes the shell, update fills
@@ -2866,14 +2886,17 @@ async function ensureSharedDependency(client, type, name, logger) {
       );
     } else if (type === 'data_elements') {
       mustSucceed(
-        await client.getDataElement().create({
-          dataElementName: name,
-          packageName,
-          description: depConfig.description || 'Shared test data element',
-          typeKind: depConfig.type_kind || 'domain',
-          typeName: depConfig.domain_name,
-          transportRequest,
-        }),
+        await client.getDataElement().create(
+          {
+            dataElementName: name,
+            packageName,
+            description: depConfig.description || 'Shared test data element',
+            typeKind: depConfig.type_kind || 'domain',
+            typeName: depConfig.domain_name,
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getDataElement(), 'create') },
+        ),
         `shared dataelement create ${name}`,
       );
       const createdElement = await readDocumentForUpdate(
@@ -2897,12 +2920,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       );
     } else if (type === 'structures') {
       mustSucceed(
-        await client.getStructure().create({
-          structureName: name,
-          packageName,
-          description: depConfig.description || 'Shared test structure',
-          transportRequest,
-        }),
+        await client.getStructure().create(
+          {
+            structureName: name,
+            packageName,
+            description: depConfig.description || 'Shared test structure',
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getStructure(), 'create') },
+        ),
         `shared structure create ${name}`,
       );
       if (depConfig.source) {
@@ -2923,12 +2949,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'tables') {
       mustSucceed(
-        await client.getTable().create({
-          tableName: name,
-          packageName,
-          description: depConfig.description || 'Shared test table',
-          transportRequest,
-        }),
+        await client.getTable().create(
+          {
+            tableName: name,
+            packageName,
+            description: depConfig.description || 'Shared test table',
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getTable(), 'create') },
+        ),
         `shared table create ${name}`,
       );
       if (depConfig.source) {
@@ -2949,12 +2978,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'views') {
       mustSucceed(
-        await client.getDdl().create({
-          ddlName: name,
-          packageName,
-          description: depConfig.description || 'Shared test view',
-          transportRequest,
-        }),
+        await client.getDdl().create(
+          {
+            ddlName: name,
+            packageName,
+            description: depConfig.description || 'Shared test view',
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getDdl(), 'create') },
+        ),
         `shared ddl create ${name}`,
       );
       if (depConfig.source) {
@@ -2975,12 +3007,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'programs') {
       mustSucceed(
-        await client.getProgram().create({
-          programName: name,
-          packageName,
-          description: depConfig.description || 'Shared test program',
-          transportRequest,
-        }),
+        await client.getProgram().create(
+          {
+            programName: name,
+            packageName,
+            description: depConfig.description || 'Shared test program',
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getProgram(), 'create') },
+        ),
         `shared program create ${name}`,
       );
       if (depConfig.source) {
@@ -2999,15 +3034,23 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'behavior_definitions') {
       mustSucceed(
-        await client.getBehaviorDefinition().create({
-          name,
-          packageName,
-          rootEntity: depConfig.root_entity || name,
-          implementationType: depConfig.implementation_type || 'Managed',
-          description: depConfig.description || 'Shared test BDEF',
-          source: depConfig.source,
-          transportRequest,
-        }),
+        await client.getBehaviorDefinition().create(
+          {
+            name,
+            packageName,
+            rootEntity: depConfig.root_entity || name,
+            implementationType: depConfig.implementation_type || 'Managed',
+            description: depConfig.description || 'Shared test BDEF',
+            source: depConfig.source,
+            transportRequest,
+          },
+          {
+            headers: integrationHeadersOf(
+              client.getBehaviorDefinition(),
+              'create',
+            ),
+          },
+        ),
         `shared behaviordefinition create ${name}`,
       );
       if (depConfig.source) {
@@ -3028,12 +3071,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'classes') {
       mustSucceed(
-        await client.getClass().create({
-          className: name,
-          packageName,
-          description: depConfig.description || 'Shared test class',
-          transportRequest,
-        }),
+        await client.getClass().create(
+          {
+            className: name,
+            packageName,
+            description: depConfig.description || 'Shared test class',
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getClass(), 'create') },
+        ),
         `shared class create ${name}`,
       );
       if (depConfig.source) {
@@ -3054,13 +3100,18 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'access_controls') {
       mustSucceed(
-        await client.getAccessControl().create({
-          accessControlName: name,
-          packageName,
-          description: depConfig.description || 'Shared test access control',
-          source: depConfig.source,
-          transportRequest,
-        }),
+        await client.getAccessControl().create(
+          {
+            accessControlName: name,
+            packageName,
+            description: depConfig.description || 'Shared test access control',
+            source: depConfig.source,
+            transportRequest,
+          },
+          {
+            headers: integrationHeadersOf(client.getAccessControl(), 'create'),
+          },
+        ),
         `shared accesscontrol create ${name}`,
       );
       if (depConfig.source) {
@@ -3081,12 +3132,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'interfaces') {
       mustSucceed(
-        await client.getInterface().create({
-          interfaceName: name,
-          packageName,
-          description: depConfig.description || 'Shared test interface',
-          transportRequest,
-        }),
+        await client.getInterface().create(
+          {
+            interfaceName: name,
+            packageName,
+            description: depConfig.description || 'Shared test interface',
+            transportRequest,
+          },
+          { headers: integrationHeadersOf(client.getInterface(), 'create') },
+        ),
         `shared interface create ${name}`,
       );
       if (depConfig.source) {
@@ -3108,12 +3162,20 @@ async function ensureSharedDependency(client, type, name, logger) {
     } else if (type === 'function_groups') {
       try {
         mustSucceed(
-          await client.getFunctionGroup().create({
-            functionGroupName: name,
-            packageName,
-            description: depConfig.description || 'Shared test FUGR',
-            transportRequest,
-          }),
+          await client.getFunctionGroup().create(
+            {
+              functionGroupName: name,
+              packageName,
+              description: depConfig.description || 'Shared test FUGR',
+              transportRequest,
+            },
+            {
+              headers: integrationHeadersOf(
+                client.getFunctionGroup(),
+                'create',
+              ),
+            },
+          ),
           `shared functiongroup create ${name}`,
         );
       } catch (createErr) {
@@ -3139,13 +3201,18 @@ async function ensureSharedDependency(client, type, name, logger) {
       ));
     } else if (type === 'function_modules') {
       mustSucceed(
-        await client.getFunctionModule().create({
-          functionModuleName: name,
-          functionGroupName: depConfig.function_group,
-          packageName,
-          description: depConfig.description || 'Shared test FM',
-          transportRequest,
-        }),
+        await client.getFunctionModule().create(
+          {
+            functionModuleName: name,
+            functionGroupName: depConfig.function_group,
+            packageName,
+            description: depConfig.description || 'Shared test FM',
+            transportRequest,
+          },
+          {
+            headers: integrationHeadersOf(client.getFunctionModule(), 'create'),
+          },
+        ),
         `shared functionmodule create ${name}`,
       );
       if (depConfig.source) {
@@ -3170,13 +3237,21 @@ async function ensureSharedDependency(client, type, name, logger) {
       // body is the write that follows. Same two steps as the function module
       // above.
       mustSucceed(
-        await client.getFunctionInclude().create({
-          functionGroupName: depConfig.function_group,
-          includeName: name,
-          description:
-            depConfig.description || 'Shared test function group include',
-          transportRequest,
-        }),
+        await client.getFunctionInclude().create(
+          {
+            functionGroupName: depConfig.function_group,
+            includeName: name,
+            description:
+              depConfig.description || 'Shared test function group include',
+            transportRequest,
+          },
+          {
+            headers: integrationHeadersOf(
+              client.getFunctionInclude(),
+              'create',
+            ),
+          },
+        ),
         `shared functioninclude create ${name}`,
       );
       if (depConfig.source) {
@@ -3198,14 +3273,22 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else if (type === 'service_definitions') {
       mustSucceed(
-        await client.getServiceDefinition().create({
-          serviceDefinitionName: name,
-          packageName,
-          description:
-            depConfig.description || 'Shared test service definition',
-          transportRequest,
-          source: depConfig.source,
-        }),
+        await client.getServiceDefinition().create(
+          {
+            serviceDefinitionName: name,
+            packageName,
+            description:
+              depConfig.description || 'Shared test service definition',
+            transportRequest,
+            source: depConfig.source,
+          },
+          {
+            headers: integrationHeadersOf(
+              client.getServiceDefinition(),
+              'create',
+            ),
+          },
+        ),
         `shared servicedefinition create ${name}`,
       );
       if (depConfig.source && !depConfig.skip_activation) {
@@ -3256,7 +3339,10 @@ async function ensureSharedDependency(client, type, name, logger) {
               `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
             transportRequest,
           },
-          { activateOnCreate: !depConfig.skip_activation },
+          {
+            activateOnCreate: !depConfig.skip_activation,
+            headers: integrationHeadersOf(client.getServiceBinding(), 'create'),
+          },
         ),
         `shared servicebinding create ${name}`,
       );

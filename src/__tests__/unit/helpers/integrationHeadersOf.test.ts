@@ -279,6 +279,9 @@ describe('integrationHeadersOf', () => {
       'unit/assign.js': `Object.assign(exports, require(${from}));\n`,
       'unit/property.js': `exports.pair = require(${from}).headersOf;\n`,
       'unit/ok.js': `const { headersOf } = require(${from});\n`,
+      'helpers/strict.js': `const { integrationHeadersOf } = require(${from});\n`,
+      'helpers/mixed.js': `const { integrationHeadersOf, headersOf } = require(${from});\n`,
+      'helpers/rest.js': `const { integrationHeadersOf, ...rest } = require(${from});\n`,
       // Allowed: the strict resolver and types; a unit test's own import.
       'integration/ok.ts': `import { integrationHeadersOf } from ${from};\nimport type { X } from ${from};\nimport { type Y } from ${from};\n`,
       'unit/ok.ts': `import { headersOf, TEST_HEADERS } from ${from};\n`,
@@ -301,6 +304,8 @@ describe('integrationHeadersOf', () => {
           'helpers/required.ts: loads the module at runtime',
           'helpers/dynamic.ts: loads the module at runtime',
           'integration/importEquals.ts: imports the whole module',
+          'helpers/mixed.js: loads the module at runtime',
+          'helpers/rest.js: loads the module at runtime',
           'unit/exportImportEquals.ts: re-exports helpers/adtHeaders',
           'integration/required.test.js: loads the module at runtime',
           'admin/esm.mjs: imports TEST_HEADERS',
@@ -319,6 +324,30 @@ describe('integrationHeadersOf', () => {
 
 /** The files the scan reads: what Jest's `*.test.[tj]s` matches, and `.mjs` / `.cjs`. */
 const SCANNED = ['.ts', '.js', '.mjs', '.cjs'];
+
+/**
+ * `const { integrationHeadersOf } = require('…')`: a CommonJS file (the
+ * JavaScript `test-helper.js`) taking the strict resolver and nothing else.
+ */
+function takesOnlyStrictResolver(call: ts.CallExpression): boolean {
+  const declaration = call.parent;
+  if (
+    !ts.isVariableDeclaration(declaration) ||
+    declaration.initializer !== call ||
+    !ts.isObjectBindingPattern(declaration.name)
+  )
+    return false;
+  const elements = declaration.name.elements;
+  return (
+    elements.length > 0 &&
+    elements.every(
+      (element) =>
+        !element.dotDotDotToken &&
+        (element.propertyName ?? element.name).getText() ===
+          'integrationHeadersOf',
+    )
+  );
+}
 
 /** Whether a CommonJS name starts `exports` or `module.exports`. */
 function isExportsName(node: ts.Node): boolean {
@@ -446,7 +475,8 @@ function resolverOffenders(root: string): string[] {
       ) {
         if (assignedToExports(node))
           offences.push(`${file}: re-exports helpers/adtHeaders`);
-        else if (strict) offences.push(`${file}: loads the module at runtime`);
+        else if (strict && !takesOnlyStrictResolver(node))
+          offences.push(`${file}: loads the module at runtime`);
       }
       ts.forEachChild(node, visit);
     };
