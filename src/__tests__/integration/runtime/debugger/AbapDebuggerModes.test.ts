@@ -53,7 +53,11 @@ import {
 import { readListenerConflict } from '../../../../runtime/debugger/abap';
 import { rawDocument } from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
+import {
+  CleanupSteps,
+  releaseThenLogOff,
+  withCleanup,
+} from '../../../helpers/cleanupSteps';
 import {
   ensureDebugTarget,
   markerLines,
@@ -363,45 +367,50 @@ class Scope {
    * log-off is reported.
    */
   async close(steps: CleanupSteps): Promise<void> {
-    const quietly = async (what: string, work: () => Promise<unknown>) => {
-      try {
-        await work();
-      } catch (error) {
-        testsLogger.warn?.(
-          `cleanup: ${what}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    };
-    for (const api of this.attached.splice(0)) {
-      await quietly('terminate the debuggee', () =>
-        api.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
-      );
-    }
-    for (const { api, identity, id } of this.armed.splice(0)) {
-      await quietly(`delete breakpoint ${id}`, () =>
-        api.deleteBreakpoint(identity, id),
-      );
-    }
-    // Anything armed under the key that no answer named: an empty full set
-    // clears the key.
-    for (const { api, identity } of this.keys.splice(0)) {
-      await quietly('clear the key', () =>
-        api.syncBreakpoints(
-          identity,
-          { scope: 'full', breakpoints: [] },
-          { headers: integrationHeadersOf(api, 'syncBreakpoints') },
-        ),
-      );
-    }
-    for (const { api, identity } of this.listeners.splice(0)) {
-      await quietly('stop the listener', () => api.stopListener(identity));
-    }
-    for (const run of this.runs.splice(0)) {
-      await within(run, 45_000);
-    }
-    for (const connection of this.sessions.splice(0)) {
-      await steps.logOff('a scope session', connection);
-    }
+    // Every session is logged off, whatever the release did.
+    await releaseThenLogOff(
+      steps,
+      async () => {
+        const quietly = async (what: string, work: () => Promise<unknown>) => {
+          try {
+            await work();
+          } catch (error) {
+            testsLogger.warn?.(
+              `cleanup: ${what}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        };
+        for (const api of this.attached.splice(0)) {
+          await quietly('terminate the debuggee', () =>
+            api.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
+          );
+        }
+        for (const { api, identity, id } of this.armed.splice(0)) {
+          await quietly(`delete breakpoint ${id}`, () =>
+            api.deleteBreakpoint(identity, id),
+          );
+        }
+        // Anything armed under the key that no answer named: an empty full set
+        // clears the key.
+        for (const { api, identity } of this.keys.splice(0)) {
+          await quietly('clear the key', () =>
+            api.syncBreakpoints(
+              identity,
+              { scope: 'full', breakpoints: [] },
+              { headers: integrationHeadersOf(api, 'syncBreakpoints') },
+            ),
+          );
+        }
+        for (const { api, identity } of this.listeners.splice(0)) {
+          await quietly('stop the listener', () => api.stopListener(identity));
+        }
+        for (const run of this.runs.splice(0)) {
+          await within(run, 45_000);
+        }
+      },
+      this.sessions.splice(0),
+      'a scope session',
+    );
   }
 }
 
@@ -595,9 +604,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     // file opened are logged off, and every failure is reported.
     const steps = new CleanupSteps();
     if (listenerApi && identity) {
-      // Nothing may be listening any more; a refusal here is not a failure.
-      await steps.run('stop the listener', () =>
-        listenerApi.stopListener(identity),
+      await steps.run(
+        'stop the listener',
+        () => listenerApi.stopListener(identity),
+        { checkAnswer: true },
       );
     }
     await steps.logOff('the trigger session', triggerConnection);

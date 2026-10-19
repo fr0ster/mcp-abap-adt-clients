@@ -66,6 +66,11 @@ export class CleanupSteps {
     this.failures.push({ step, error });
   }
 
+  /** The failures recorded so far, in order. */
+  recorded(): readonly { step: string; error: unknown }[] {
+    return [...this.failures];
+  }
+
   /** Throw every recorded failure, each named by its step. */
   finish(): void {
     if (this.failures.length === 0) return;
@@ -85,9 +90,34 @@ export class CleanupSteps {
 }
 
 /**
- * Run `work`, then `cleanup` whatever `work` did. A failure of `work` is
- * thrown as it is when the cleanup succeeded, and beside the cleanup's
- * failures when it did not — neither hides the other.
+ * Release what a scope holds, then log off every session it opened — the
+ * log-offs run whatever the release did, and a release that throws is
+ * recorded as a failure of its own.
+ */
+export async function releaseThenLogOff(
+  steps: CleanupSteps,
+  release: () => Promise<void>,
+  sessions: readonly (
+    | (IAbapConnection & { setSessionType?(type: string): void })
+    | undefined
+  )[],
+  label = 'a session',
+): Promise<void> {
+  try {
+    await release();
+  } catch (error) {
+    steps.record('release', error);
+  } finally {
+    for (const session of sessions) await steps.logOff(label, session);
+  }
+}
+
+/**
+ * Run `work`, then `cleanup` whatever `work` did. A cleanup callback that
+ * throws is caught as a failure of its own — it cannot escape the report.
+ * A failure of `work` is thrown as it is when the cleanup succeeded; when the
+ * cleanup failed too, one error carries the test's failure and every cleanup
+ * failure, each named, so neither hides the other.
  */
 export async function withCleanup<T>(
   work: () => Promise<T>,
@@ -100,22 +130,23 @@ export async function withCleanup<T>(
     outcome = { ok: false, error };
   }
   const steps = new CleanupSteps();
-  await cleanup(steps);
+  try {
+    await cleanup(steps);
+  } catch (error) {
+    steps.record('the cleanup', error);
+  }
   if (outcome.ok) {
     steps.finish();
     return outcome.value;
   }
-  try {
-    steps.finish();
-  } catch (cleanupError) {
-    throw new AggregateError(
-      [outcome.error, cleanupError],
-      `the test failed and so did its cleanup — ${
-        outcome.error instanceof Error
-          ? outcome.error.message
-          : String(outcome.error)
-      }; ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-    );
-  }
-  throw outcome.error;
+  const failures = steps.recorded();
+  if (failures.length === 0) throw outcome.error;
+  const message = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
+  throw new AggregateError(
+    [outcome.error, ...failures.map((failure) => failure.error)],
+    `the test failed and so did its cleanup — the test: ${message(outcome.error)}; ${failures
+      .map((failure) => `${failure.step}: ${message(failure.error)}`)
+      .join('; ')}`,
+  );
 }

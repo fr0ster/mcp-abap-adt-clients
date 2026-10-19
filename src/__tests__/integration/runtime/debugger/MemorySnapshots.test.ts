@@ -223,18 +223,24 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     // file opened is logged off, and every failure is reported.
     const steps = new CleanupSteps();
     for (const bp of armed) {
-      await steps.run(`delete breakpoint ${bp}`, () =>
-        listenerApi.deleteBreakpoint(identity, bp),
+      await steps.run(
+        `delete breakpoint ${bp}`,
+        () => listenerApi.deleteBreakpoint(identity, bp),
+        { checkAnswer: true },
       );
     }
     if (attached) {
-      await steps.run('continue the debuggee', () =>
-        debuggerApi.step('stepContinue'),
+      await steps.run(
+        'continue the debuggee',
+        () => debuggerApi.step('stepContinue'),
+        { checkAnswer: true },
       );
     }
     await steps.logOff('the debug session', sessionConnection);
-    await steps.run('stop the listener', () =>
-      listenerApi.stopListener(identity),
+    await steps.run(
+      'stop the listener',
+      () => listenerApi.stopListener(identity),
+      { checkAnswer: true },
     );
     if (run) {
       const pending = run;

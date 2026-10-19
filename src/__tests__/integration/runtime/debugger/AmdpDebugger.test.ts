@@ -251,29 +251,32 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     onSession = new AmdpDebugger(session, connectionLogger);
     onCommands = new AmdpDebugger(commands, connectionLogger);
     // The two name each other: each is ensured written (skip_activation in
-    // the shared config), then both are activated in one group run.
-    await ensureDebugTarget(
+    // the shared config), then both are activated in one group run — unless
+    // both were already at their source and active, and nothing was written.
+    const tf = await ensureDebugTarget(
       commands,
       'views',
       DDL_NAME,
       undefined,
       testsLogger,
     );
-    await ensureDebugTarget(
+    const cls = await ensureDebugTarget(
       commands,
       'classes',
       CLASS_NAME,
       { marker: '-- BP:', names: MARKERS },
       testsLogger,
     );
-    await activateSharedGroup(
-      commands,
-      [
-        { type: 'DDLS/DF', name: DDL_NAME },
-        { type: 'CLAS/OC', name: CLASS_NAME },
-      ],
-      testsLogger,
-    );
+    if (tf.changed || cls.changed) {
+      await activateSharedGroup(
+        commands,
+        [
+          { type: 'DDLS/DF', name: DDL_NAME },
+          { type: 'CLAS/OC', name: CLASS_NAME },
+        ],
+        testsLogger,
+      );
+    }
     logTestStep(`${CLASS_NAME} and ${DDL_NAME} active`, testsLogger);
 
     // The debug session's connection: stateful, for the whole test.
@@ -288,11 +291,15 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     if (commands && mainId) {
       // Release whatever still stands before the stop: a stop does not.
       if (lastBreak && debuggeeId) {
-        await steps.run('release the debuggee', () =>
-          onCommands.deleteDebuggee(mainId, debuggeeId),
+        await steps.run(
+          'release the debuggee',
+          () => onCommands.deleteDebuggee(mainId, debuggeeId),
+          { checkAnswer: true },
         );
       }
-      await steps.run('stop the debug session', () => onCommands.stop(mainId));
+      await steps.run('stop the debug session', () => onCommands.stop(mainId), {
+        checkAnswer: true,
+      });
     }
     if (run) {
       const pending = run;

@@ -50,7 +50,7 @@ export function markerLines(
 /**
  * Make sure a debug target is there, at its configured source and active.
  * Fails naming what is missing: the shared entry, its source, or a marker the
- * test stops at.
+ * test stops at. Answers whether this call wrote it.
  */
 export async function ensureDebugTarget(
   connection: IAbapConnection,
@@ -58,7 +58,7 @@ export async function ensureDebugTarget(
   name: string,
   required: { marker: string; names: readonly string[] } | undefined,
   logger?: ILogger,
-): Promise<void> {
+): Promise<{ changed: boolean }> {
   const source = sharedSource(type, name);
   if (!source) {
     throw new Error(
@@ -74,10 +74,13 @@ export async function ensureDebugTarget(
       );
     }
   }
-  await ensureSharedDependency(
+  const result = (await ensureSharedDependency(
     new AdtClient(connection, logger),
     type,
     name,
     logger,
-  );
+  )) as { changed?: boolean };
+  // `changed`: written by this call. A target already at its source and
+  // active is left as it is — no lock, no write.
+  return { changed: result.changed !== false };
 }

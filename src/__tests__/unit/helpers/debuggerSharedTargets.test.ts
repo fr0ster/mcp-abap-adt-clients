@@ -1,12 +1,17 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as ts from 'typescript';
 import { parse } from 'yaml';
 import { AdtClient } from '../../../clients/AdtClient';
-import { CleanupSteps, withCleanup } from '../../helpers/cleanupSteps';
+import {
+  CleanupSteps,
+  releaseThenLogOff,
+  withCleanup,
+} from '../../helpers/cleanupSteps';
 import { markerLines } from '../../helpers/debuggerTargets';
 
 const {
@@ -104,7 +109,14 @@ describe('debugger tests use shared targets', () => {
 const LOCK_BODY = `<?xml version="1.0" encoding="utf-8"?>
 <asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>SHARED-LOCK</LOCK_HANDLE></DATA></asx:values></asx:abap>`;
 
-function recording(): { connection: IAbapConnection; urls: string[] } {
+/**
+ * A recording connection. `currentSource`, when given, is what the object's
+ * source answers — the system already holding that text.
+ */
+function recording(currentSource?: string): {
+  connection: IAbapConnection;
+  urls: string[];
+} {
   const urls: string[] = [];
   const connection = {
     connect: async () => {},
@@ -116,15 +128,21 @@ function recording(): { connection: IAbapConnection; urls: string[] } {
       url: string;
       params?: Record<string, unknown>;
     }) => {
-      urls.push(`${request.method} ${request.url}`);
-      const locking =
-        /_action=(UN)?LOCK/.test(request.url) ||
-        typeof request.params?._action === 'string';
+      const action =
+        typeof request.params?._action === 'string'
+          ? `?_action=${request.params._action}`
+          : '';
+      urls.push(`${request.method} ${request.url}${action}`);
+      const locking = /_action=(UN)?LOCK/.test(request.url + action);
+      const source =
+        currentSource !== undefined &&
+        request.method === 'GET' &&
+        request.url.includes('/source/main');
       return {
         status: 200,
         statusText: 'OK',
         headers: {},
-        data: locking ? LOCK_BODY : '<x/>',
+        data: locking ? LOCK_BODY : source ? currentSource : '<x/>',
       } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
@@ -232,5 +250,170 @@ describe('CleanupSteps', () => {
         },
       ),
     ).rejects.toThrow(/the test failed.*logoff refused/);
+  });
+});
+
+// --- an unchanged target is left alone ------------------------------------------
+
+describe('ensureSharedDependency leaves a target at its source alone', () => {
+  beforeEach(() => resetSharedDependencyCache());
+
+  const name = () => params('adt_abap_debugger').class_name as string;
+  const configured = () => shared('classes', name())?.source as string;
+  const writes = (urls: string[]) =>
+    urls.filter((u) => /_action=LOCK|^PUT |\/activation/.test(u));
+
+  it('sends no lock, no PUT and no activation when the active source matches', async () => {
+    // The system's copy differs only in line endings and trailing blanks.
+    const held = `${configured().split('\n').join('  \r\n')}\n\n`;
+    const { connection, urls } = recording(held);
+    const result = await ensureSharedDependency(
+      new AdtClient(connection, logger),
+      'classes',
+      name(),
+      logger,
+    );
+    expect(writes(urls)).toEqual([]);
+    expect(result.changed).toBe(false);
+  });
+
+  it('writes and activates when the active source differs', async () => {
+    const { connection, urls } = recording(
+      configured().replace('DO 3 TIMES', 'DO 4 TIMES'),
+    );
+    const result = await ensureSharedDependency(
+      new AdtClient(connection, logger),
+      'classes',
+      name(),
+      logger,
+    );
+    expect(urls.some((u) => u.includes('_action=LOCK'))).toBe(true);
+    expect(urls.some((u) => u.startsWith('PUT '))).toBe(true);
+    expect(urls.some((u) => u.includes('/activation'))).toBe(true);
+    expect(result.changed).toBe(true);
+  });
+});
+
+// --- debugger cleanup reads the answers -------------------------------------------
+
+describe('debugger cleanup steps read their answers', () => {
+  const ANSWERING = new Set([
+    'deleteBreakpoint',
+    'terminateDebuggee',
+    'stopListener',
+    'deleteDebuggee',
+    'stop',
+    'step',
+  ]);
+  const dir = join(__dirname, '..', '..', 'integration', 'runtime', 'debugger');
+
+  it('every steps.run whose action answers { ok } passes checkAnswer: true', () => {
+    const unchecked: string[] = [];
+    let seen = 0;
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.ts'))) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(join(dir, file), 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === 'run' &&
+          node.expression.expression.getText() === 'steps'
+        ) {
+          const action = node.arguments[1];
+          const body =
+            action && ts.isArrowFunction(action) ? action.body : undefined;
+          if (
+            body &&
+            ts.isCallExpression(body) &&
+            ts.isPropertyAccessExpression(body.expression) &&
+            ANSWERING.has(body.expression.name.text)
+          ) {
+            seen++;
+            const options = node.arguments[2];
+            const checked =
+              options !== undefined &&
+              ts.isObjectLiteralExpression(options) &&
+              options.properties.some(
+                (p) =>
+                  ts.isPropertyAssignment(p) &&
+                  p.name.getText() === 'checkAnswer' &&
+                  p.initializer.kind === ts.SyntaxKind.TrueKeyword,
+              );
+            if (!checked) {
+              const { line } = source.getLineAndCharacterOfPosition(
+                node.getStart(),
+              );
+              unchecked.push(`${file}:${line + 1}`);
+            }
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(seen).toBeGreaterThan(10);
+    expect(unchecked).toEqual([]);
+  });
+});
+
+// --- a cleanup that throws ------------------------------------------------------
+
+describe('a cleanup that throws still logs off every session', () => {
+  function session(log: string[], label: string) {
+    return {
+      setSessionType: () => {},
+      isConnected: () => true,
+      disconnect: async () => {
+        log.push(label);
+      },
+    } as unknown as IAbapConnection;
+  }
+
+  it('releaseThenLogOff logs off all sessions after a rejecting release, and withCleanup reports both errors', async () => {
+    const loggedOff: string[] = [];
+    const sessions = [session(loggedOff, 'a'), session(loggedOff, 'b')];
+    const failure = withCleanup(
+      async () => {
+        throw new Error('the test failed');
+      },
+      (steps) =>
+        releaseThenLogOff(
+          steps,
+          async () => {
+            throw new Error('release rejected');
+          },
+          sessions,
+        ),
+    );
+    await expect(failure).rejects.toThrow(
+      /the test: the test failed; release: release rejected/,
+    );
+    expect(loggedOff).toEqual(['a', 'b']);
+  });
+
+  it('withCleanup catches a cleanup callback that rejects', async () => {
+    await expect(
+      withCleanup(
+        async () => {
+          throw new Error('the test failed');
+        },
+        async () => {
+          throw new Error('callback rejected');
+        },
+      ),
+    ).rejects.toThrow(/the test failed.*the cleanup: callback rejected/);
+    await expect(
+      withCleanup(
+        async () => 1,
+        async () => {
+          throw new Error('callback rejected');
+        },
+      ),
+    ).rejects.toThrow('the cleanup: callback rejected');
   });
 });

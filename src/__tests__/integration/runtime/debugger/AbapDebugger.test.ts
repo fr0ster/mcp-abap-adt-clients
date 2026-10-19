@@ -351,18 +351,24 @@ describe('ABAP debugger (AbapDebugger)', () => {
     // file opened is logged off, and every failure is reported.
     const steps = new CleanupSteps();
     for (const id of armed) {
-      await steps.run(`delete breakpoint ${id}`, () =>
-        listenerApi.deleteBreakpoint(identity, id),
+      await steps.run(
+        `delete breakpoint ${id}`,
+        () => listenerApi.deleteBreakpoint(identity, id),
+        { checkAnswer: true },
       );
     }
     if (attached) {
-      await steps.run('terminate the debuggee', () =>
-        debuggerApi.terminateDebuggee(),
+      await steps.run(
+        'terminate the debuggee',
+        () => debuggerApi.terminateDebuggee(),
+        { checkAnswer: true },
       );
     }
     await steps.logOff('the debug session', sessionConnection);
-    await steps.run('stop the listener', () =>
-      listenerApi.stopListener(identity),
+    await steps.run(
+      'stop the listener',
+      () => listenerApi.stopListener(identity),
+      { checkAnswer: true },
     );
     if (run) {
       const pending = run;
@@ -847,8 +853,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
           await holding;
         },
         async (steps) => {
-          await steps.run('stop the holder', () =>
-            holder.stopListener(holderIdentity),
+          await steps.run(
+            'stop the holder',
+            () => holder.stopListener(holderIdentity),
+            { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
         },
@@ -895,9 +903,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
           expect(took.ok).toBe(true);
         },
         async (steps) => {
-          await steps.run('stop the taker', () => taker.stopListener(identity));
-          await steps.run('stop the holder', () =>
-            holder.stopListener(holderIdentity),
+          await steps.run(
+            'stop the taker',
+            () => taker.stopListener(identity),
+            { checkAnswer: true },
+          );
+          await steps.run(
+            'stop the holder',
+            () => holder.stopListener(holderIdentity),
+            { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
         },
@@ -935,11 +949,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
           await holding;
         },
         async (steps) => {
-          await steps.run('stop the listener', () =>
-            listenerApi.stopListener(identity),
+          await steps.run(
+            'stop the listener',
+            () => listenerApi.stopListener(identity),
+            { checkAnswer: true },
           );
-          await steps.run('stop the holder', () =>
-            holder.stopListener(holderIdentity),
+          await steps.run(
+            'stop the holder',
+            () => holder.stopListener(holderIdentity),
+            { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
         },
@@ -976,11 +994,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
           await holding;
         },
         async (steps) => {
-          await steps.run('stop the listener', () =>
-            listenerApi.stopListener(identity),
+          await steps.run(
+            'stop the listener',
+            () => listenerApi.stopListener(identity),
+            { checkAnswer: true },
           );
-          await steps.run('stop the other listener', () =>
-            other.stopListener(sameIde),
+          await steps.run(
+            'stop the other listener',
+            () => other.stopListener(sameIde),
+            { checkAnswer: true },
           );
           await steps.logOff('the other session', otherConnection);
         },
