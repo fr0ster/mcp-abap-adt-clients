@@ -3635,6 +3635,72 @@ describe('members on temporary objects', () => {
     );
   });
 
+  it('activation runs once every lock on the object is released; a lock refusal on it is "blocked by our own lock", no verdict', async () => {
+    const system = objectSystem((request) =>
+      request.url.startsWith('/sap/bc/adt/activation') &&
+      request.body.toLowerCase().includes('/programs/programs/zhp') &&
+      request.headers.accept === PROBE_TYPE
+        ? {
+            status: 403,
+            body: AUTH_EXCEPTION(
+              'ExceptionResourceNoAccess',
+              'User X is currently editing ZHP',
+            ),
+          }
+        : undefined,
+    );
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'program');
+    const on = system.seen.filter((seen) =>
+      `${seen.url} ${seen.body}`
+        .toLowerCase()
+        .includes(`/programs/programs/${name}`),
+    );
+    // Walk the object's requests: a member's activation (after the first
+    // LOCK; the make's own comes before) finds no lock of ours held.
+    let held = false;
+    let locked = false;
+    let activations = 0;
+    for (const seen of on) {
+      if (seen.url.includes('_action=LOCK')) {
+        held = true;
+        locked = true;
+      } else if (
+        seen.url.includes('_action=UNLOCK') ||
+        seen.method === 'DELETE' ||
+        seen.url.includes('/deletion/delete')
+      )
+        held = false;
+      else if (locked && seen.url.startsWith('/sap/bc/adt/activation')) {
+        activations++;
+        expect(held).toBe(false);
+      }
+    }
+    expect(activations).toBeGreaterThan(0);
+    const bogus = JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          /corpus-clients-bogus-[0-9].*\.json$/.test(f),
+        ) as string,
+        'utf8',
+      ),
+    ) as ICorpus;
+    const blocked = bogus.rows.filter(
+      (r) =>
+        r.temporary?.startsWith('program ') &&
+        r.label === 'activate' &&
+        r.bogus === 'accept',
+    );
+    expect(blocked.length).toBeGreaterThan(0);
+    for (const r of blocked) expect(r.blocked).toBe('blocked by our own lock');
+    const entry = file.entries.find(
+      (e) => e.endpoint === 'POST /sap/bc/adt/activation',
+    );
+    expect(entry?.evidence.join(' ')).toContain('blocked by our own lock');
+  });
+
   it('a write gets a real lock handle, is sent once per row and read back', async () => {
     const system = objectSystem();
     const file = (await run(system)).file as NonNullable<
@@ -3843,6 +3909,75 @@ describe('members on temporary objects', () => {
     expect([...held.values()].filter((owner) => owner > 0)).toEqual([]);
   });
 
+  describe('every session the run opens ends with a logoff, on every path', () => {
+    const sessionsOf = (stopAt: (opened: number) => void) => {
+      const opened: unknown[] = [];
+      const closed: unknown[] = [];
+      return {
+        opened,
+        closed,
+        open: async () => {
+          const connection = objectSystem().connection;
+          opened.push(connection);
+          stopAt(opened.length);
+          return onTheWire(connection);
+        },
+        close: async (connection: IAbapConnection) => {
+          closed.push(connection);
+        },
+      };
+    };
+
+    it("a run interrupted while a LOCK member's own session is open", async () => {
+      const interrupt = new Interrupt();
+      // The third session is a LOCK member's own: Ctrl-C comes there.
+      const sessions = sessionsOf((count) => {
+        if (count === 3) interrupt.stop();
+      });
+      const result = await runFull({
+        open: sessions.open,
+        close: sessions.close,
+        interrupt,
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: output().out,
+        temporaryObjects: TEMPORARY,
+      });
+      expect(sessions.opened.length).toBeGreaterThanOrEqual(3);
+      expect(sessions.closed).toHaveLength(sessions.opened.length);
+      for (const connection of sessions.opened)
+        expect(sessions.closed).toContain(connection);
+      expect(result.exitCode).toBe(130);
+      expect(result.file?.endedBy).toBe('interrupted (SIGINT)');
+    });
+
+    it('a run that fails while it works on the temporary objects', async () => {
+      const sessions = sessionsOf(() => undefined);
+      const { out } = output();
+      let reads = 0;
+      const result = await runFull({
+        open: sessions.open,
+        close: sessions.close,
+        interrupt: new Interrupt(),
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: {
+          ...out,
+          progress: (line: string) => {
+            // The third object's reads: the run breaks there.
+            if (/: \d+ reads$/.test(line) && ++reads === 3)
+              throw new Error('the run broke');
+            out.progress(line);
+          },
+        },
+        temporaryObjects: TEMPORARY,
+      });
+      expect(result.exitCode).toBe(1);
+      expect(sessions.opened.length).toBeGreaterThan(1);
+      expect(sessions.closed).toHaveLength(sessions.opened.length);
+    });
+  });
+
   it('without a session to end, a lock that cannot be freed ends the run failed', async () => {
     const held = new Set<string>();
     const system = objectSystem((request) => {
@@ -3964,6 +4099,12 @@ describe('where a member runs', () => {
       });
     expect(step('read', 'GET')).toBe('read');
     expect(step('update', 'PUT')).toBe('write');
+    expect(
+      stepOf({
+        member: 'update',
+        requests: [{ method: 'PUT', path: '/x', lockHandle: true }],
+      }),
+    ).toBe('locked');
     expect(step('activate', 'POST')).toBe('write');
     expect(step('lock', 'POST', 'LOCK')).toBe('lock');
     expect(step('unlock', 'POST', 'UNLOCK')).toBe('lock');

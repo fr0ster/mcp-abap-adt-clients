@@ -98,6 +98,8 @@ export interface ISentRequest {
   path: string;
   /** The query's `_action` (`LOCK`, `UNLOCK`, …), when it has one. */
   action?: string;
+  /** The request carries a lock handle: it runs under a lock on the object. */
+  lockHandle?: true;
 }
 
 /**
@@ -126,6 +128,18 @@ export function endpointOf(
     path: normalizePath(url, names),
   };
   if (action) request.action = action;
+  const fromQueryHandle =
+    query !== -1 &&
+    [...new URLSearchParams(url.slice(query + 1)).keys()].some(
+      (key) => key.toLowerCase() === 'lockhandle',
+    );
+  const fromParamsHandle =
+    params && typeof params === 'object'
+      ? Object.keys(params as Record<string, unknown>).some(
+          (key) => key.toLowerCase() === 'lockhandle',
+        )
+      : false;
+  if (fromQueryHandle || fromParamsHandle) request.lockHandle = true;
   return request;
 }
 

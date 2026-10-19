@@ -638,6 +638,11 @@ export interface ICorpusRow {
   temporary?: string;
   /** What the run did on the object after the row (a lock freed). */
   objectNote?: string;
+  /**
+   * The answer was a lock of ours on the temporary object (403 "currently
+   * editing" / "currently locked"): it says nothing of the headers.
+   */
+  blocked?: string;
   /** Where the member runs: on a temporary object, not coverable (why), or on the probe name. */
   coverage?: string;
   /** `skipped: <reason>`: the row was not sent. */
@@ -695,6 +700,15 @@ export interface ICorpus {
 }
 
 const SAP_PREFIX = 'SAP refused the request: ';
+
+/** Whether an answer is a lock refusal: 403 "currently editing" or "currently locked". */
+export function isLockRefusal(row: ICorpusRow): boolean {
+  if (row.status !== 403) return false;
+  const text = `${row.sapMessage ?? ''} ${row.body ?? ''}`;
+  return (
+    text.includes('currently editing') || text.includes('currently locked')
+  );
+}
 
 /** Fills a row from the answer its call got. */
 export function readCorpusAnswer(
@@ -1325,6 +1339,8 @@ export function judge(
 ): IHeaderVerdict {
   if (!row) return { verdict: 'no body' };
   if (row.skipped) return { verdict: 'unknown', reason: row.skipped };
+  if (row.blocked)
+    return { verdict: 'unknown', status: row.status, reason: row.blocked };
   if (row.status === undefined)
     return {
       verdict: 'unknown',

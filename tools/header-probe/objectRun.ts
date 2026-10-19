@@ -24,6 +24,7 @@ import {
   type HeadersMode,
   headerShape,
   type ICorpusRow,
+  isLockRefusal,
 } from './corpus';
 import type { Interrupt, Ledger } from './ledger';
 import {
@@ -205,10 +206,15 @@ export function coverageOf(
  */
 export const ON_THE_PROBE_NAME: readonly string[] = ['create', 'validate'];
 
-/** What a member does to its object, which decides its place in the order. */
-export type Step = 'read' | 'write' | 'lock' | 'delete';
+/**
+ * What a member does to its object, which decides its place in the order:
+ * `read`; `locked`, a write that carries the lock handle; `lock`, a LOCK or
+ * UNLOCK member; `write`, a write without one (activation, a check), run once
+ * every lock on the object is released; `delete`.
+ */
+export type Step = 'read' | 'locked' | 'write' | 'lock' | 'delete';
 
-/** The step of a member: reads first, then writes under the lock, then lock members, deletes last. */
+/** The step of a member: reads, the writes under the lock, lock members, the other writes, deletes last. */
 export function stepOf(
   member: Pick<IMemberEndpoint, 'member' | 'requests'>,
 ): Step {
@@ -230,6 +236,7 @@ export function stepOf(
   )
     return 'lock';
   if (requests.every((request) => request.method === 'GET')) return 'read';
+  if (requests.some((request) => request.lockHandle)) return 'locked';
   return 'write';
 }
 
@@ -419,6 +426,14 @@ export async function runOnTemporaryObjects<T>(
     await prepare(probe, type, name, context);
     /** The lock handle the next call is given, if any. */
     const lock: { handle?: string } = {};
+    // A 403 "currently editing" on our own object is a lock of ours, not a
+    // verdict on the headers.
+    const send: SendRows<T> = async (plans, batched, connection) => {
+      await input.send(plans, batched, connection);
+      for (const plan of plans)
+        if (isLockRefusal(plan.row))
+          plan.row.blocked = 'blocked by our own lock';
+    };
     const planOf = (member: IMemberEndpoint): IObjectRowPlan<T>[] => {
       const handlerSpec = input.specs.get(member.handler);
       const call = member.call;
@@ -501,11 +516,12 @@ export async function runOnTemporaryObjects<T>(
     const reads = of('read').flatMap((member) => planOf(member));
     if (reads.length) {
       input.progress(`  ${type} ${name}: ${reads.length} reads`);
-      await input.send(reads, true);
+      await send(reads, true);
     }
 
-    // 2. A LOCK on our object, the writes one by one, the UNLOCK.
-    const writes = of('write');
+    // 2. A LOCK on our object, the writes that carry its handle one by one,
+    // the UNLOCK.
+    const writes = of('locked');
     if (writes.length) {
       const held = await takeLock();
       if (!held) {
@@ -517,7 +533,7 @@ export async function runOnTemporaryObjects<T>(
         try {
           for (const plan of writes.flatMap((member) => planOf(member))) {
             input.interrupt.check();
-            await input.send([plan], false);
+            await send([plan], false);
             await readBack(plan.row);
           }
         } finally {
@@ -552,7 +568,7 @@ export async function runOnTemporaryObjects<T>(
           const held = await takeLock();
           if (held) lock.handle = held;
           try {
-            await input.send([plan], false);
+            await send([plan], false);
           } finally {
             delete lock.handle;
           }
@@ -568,14 +584,14 @@ export async function runOnTemporaryObjects<T>(
         };
         if (input.ownSession) {
           await input.ownSession((connection) =>
-            input.send([withHandle], false, connection),
+            send([withHandle], false, connection),
           );
           lockedElsewhere.push(`${member.handler}.${member.member}`);
           plan.row.objectNote =
             'sent on a session of its own, ended after (its logoff frees the lock)';
           continue;
         }
-        await input.send([withHandle], false);
+        await send([withHandle], false);
         if (granted) await release(granted);
         const free = await takeLock();
         if (free) await release(free);
@@ -597,6 +613,14 @@ export async function runOnTemporaryObjects<T>(
         else
           made.object.note = `after ${lockedElsewhere.join(', ')} on sessions of their own (ended), a LOCK answered ${lockRefusal}`;
       }
+      // The writes without a lock handle (activation, a check): an
+      // activation of an object a session of ours still holds is refused
+      // "currently editing" (measured), so they run here, every lock freed.
+      for (const plan of of('write').flatMap((member) => planOf(member))) {
+        input.interrupt.check();
+        await send([plan], false);
+        await readBack(plan.row);
+      }
       for (const member of of('delete')) {
         const ownLock = member.requests.some(
           (request) => request.action === 'LOCK',
@@ -614,7 +638,7 @@ export async function runOnTemporaryObjects<T>(
           const held = ownLock ? undefined : await takeLock();
           if (held) lock.handle = held;
           try {
-            await input.send([plan], false);
+            await send([plan], false);
           } finally {
             delete lock.handle;
           }

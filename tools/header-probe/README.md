@@ -263,13 +263,23 @@ run's normal path, in every mode, each mode with its own objects
   that cannot be made (its create refused) leaves its members skipped with
   the answer that refused it.
 - **The order, per object:** the reads, in envelopes; a LOCK with the known
-  pair, the writes one by one with its real handle — each read back after,
-  never resent —, the UNLOCK; the lock members (a granted lock released; an
-  unlock given a real handle); the deletes last, each on the object, made
-  again first if an earlier delete took it. A classic LOCK checks the Accept
-  after it took the lock (from SAP's code), so a refused lock may hold it:
-  after every LOCK member, whatever it answered, a LOCK with the known pair
-  and an UNLOCK free the object.
+  pair, the writes that carry its handle one by one — each read back after,
+  never resent —, the UNLOCK; the unlock members (each given a real handle);
+  the LOCK members, each on a session of its own that is closed after.
+  Then, once every object got that far: a LOCK and an UNLOCK that show the
+  object free, the writes without a lock handle (activation, a check), the
+  deletes last — each on the object, made again first if an earlier delete
+  took it. A classic LOCK checks the Accept after it took the lock (from
+  SAP's code), so a refused LOCK may hold it with no handle to release it;
+  the logoff that closes its session frees it (measured: a moment after —
+  a LOCK right after was refused, one a second later granted — which the
+  other objects' work passes without a timer). An activation of an object a
+  lock of ours holds is refused 403 "currently editing" (measured); such an
+  answer on our own object is recorded as `blocked by our own lock`, not as a
+  verdict on the headers.
+- **Every session ends with a logoff:** the run's own and each LOCK
+  member's, in a `finally`, on every path — complete, failed, an
+  authorization stop, Ctrl-C.
 - **Cleanup:** every object is in the ledger before its create is sent; the
   cleanup in a `finally` deletes what is left, newest first (an object before
   its parent), and proves each removal by a read that answers 404. A

@@ -215,6 +215,15 @@ describe('endpointOf', () => {
     ).toEqual({
       method: 'PUT',
       path: '/sap/bc/adt/functions/groups/{name}/fmodules/{name}/source/main',
+      // It runs under a lock: the handle is in the query.
+      lockHandle: true,
+    });
+    expect(
+      endpointOf('DELETE', '/sap/bc/adt/x/zhp', { lockHandle: 'h' }, ['ZHP']),
+    ).toEqual({
+      method: 'DELETE',
+      path: '/sap/bc/adt/x/{name}',
+      lockHandle: true,
     });
   });
 
