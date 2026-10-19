@@ -2372,6 +2372,7 @@ export interface IHeaderCorpusFile {
     name?: string;
     parent?: string;
     reason?: string;
+    note?: string;
   }[];
   /** Where every clients member runs: a temporary object, not coverable (why), or the probe name. */
   coverage?: { member: string; coverage: string }[];
@@ -2449,7 +2450,7 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
   if (!file.objects.length) lines.push('None made.');
   for (const object of file.objects)
     lines.push(
-      `- ${cell(object.handler)}${object.type ? ` (${object.type})` : ''}: ${object.name ? `\`${object.name}\`${object.parent ? ` on \`${object.parent}\`` : ''}` : cell(object.reason)}`,
+      `- ${cell(object.handler)}${object.type ? ` (${object.type})` : ''}: ${object.name ? `\`${object.name}\`${object.parent ? ` on \`${object.parent}\`` : ''}` : cell(object.reason)}${object.note ? ` — ${cell(object.note)}` : ''}`,
     );
   if (file.coverage?.length) {
     const counts = new Map<string, number>();

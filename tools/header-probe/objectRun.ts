@@ -14,6 +14,7 @@
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtClient } from '../../src/clients/AdtClient';
+import { sapErrorIn } from '../../src/utils/adtErrors';
 import { type ICallOn, type ICapture, traced } from './capture';
 import {
   askedFor,
@@ -286,6 +287,8 @@ export interface ITemporaryObject {
   name?: string;
   parent?: string;
   reason?: string;
+  /** What the run met on it: a LOCK refused before the deletes. */
+  note?: string;
 }
 
 /** One row as the run plans it: the corpus's runner sends it. */
@@ -348,6 +351,8 @@ export async function runOnTemporaryObjects<T>(
     input.interrupt,
   );
   const objects: ITemporaryObject[] = [];
+  /** Per object, its deletes: run once every object's lock members ran. */
+  const finish: (() => Promise<void>)[] = [];
   const byType = new Map<string, IMemberEndpoint[]>();
   for (const member of input.members) {
     const coverage = coverageOf(member);
@@ -467,13 +472,21 @@ export async function runOnTemporaryObjects<T>(
         note: `the temporary ${type} read back after the write`,
       };
     };
-    const takeLock = async (): Promise<string | undefined> =>
-      lockHandle(
-        await probe.direct1(
-          (client, analyse) =>
-            handle(client).lock?.(config, { analyse }) ?? Promise.resolve(),
-        ),
+    /** The last LOCK's answer when it gave no handle, for the report. */
+    let lockRefusal = '';
+    const takeLock = async (): Promise<string | undefined> => {
+      const capture = await probe.direct1(
+        (client, analyse) =>
+          handle(client).lock?.(config, { analyse }) ?? Promise.resolve(),
       );
+      const held = lockHandle(capture);
+      if (!held) {
+        const body = String(capture.wire?.data ?? '');
+        const error = sapErrorIn(body);
+        lockRefusal = `${capture.wire?.status ?? capture.failure ?? 'nothing'}${error?.adtType ? ` ${error.adtType}` : ''}${error?.message ? `: ${error.message}` : ''}`;
+      }
+      return held;
+    };
     const release = (held: string) =>
       probe.release(
         `${type} ${name}`,
@@ -521,10 +534,18 @@ export async function runOnTemporaryObjects<T>(
     // after — the logoff frees its locks —; a LOCK and an UNLOCK on ours
     // then prove the object free. An unlock is given a real handle, released
     // again if the unlock refused it.
-    for (const member of of('lock')) {
-      const unlocks =
-        member.member === 'unlock' ||
-        member.requests.some((request) => request.action === 'UNLOCK');
+    const lockedElsewhere: string[] = [];
+    // The unlocks first: each takes a LOCK on our session, which a lock
+    // still held by an ended session would refuse.
+    const isUnlock = (member: IMemberEndpoint) =>
+      member.member === 'unlock' ||
+      member.requests.some((request) => request.action === 'UNLOCK');
+    const lockMembers = [
+      ...of('lock').filter(isUnlock),
+      ...of('lock').filter((member) => !isUnlock(member)),
+    ];
+    for (const member of lockMembers) {
+      const unlocks = isUnlock(member);
       for (const plan of planOf(member)) {
         input.interrupt.check();
         if (unlocks) {
@@ -545,52 +566,68 @@ export async function runOnTemporaryObjects<T>(
             granted = lockHandle(capture);
           },
         };
-        if (input.ownSession)
+        if (input.ownSession) {
           await input.ownSession((connection) =>
             input.send([withHandle], false, connection),
           );
-        else {
-          await input.send([withHandle], false);
-          if (granted) await release(granted);
+          lockedElsewhere.push(`${member.handler}.${member.member}`);
+          plan.row.objectNote =
+            'sent on a session of its own, ended after (its logoff frees the lock)';
+          continue;
         }
+        await input.send([withHandle], false);
+        if (granted) await release(granted);
         const free = await takeLock();
         if (free) await release(free);
         else
           probe.lockFailures.push(
-            `${type} ${name}: after ${member.handler}.${member.member} answered ${plan.row.status ?? plan.row.failure ?? 'nothing'}, the object stays locked${input.ownSession ? ' after its session ended' : ' (no session of its own to end)'}`,
+            `${type} ${name}: after ${member.handler}.${member.member} answered ${plan.row.status ?? plan.row.failure ?? 'nothing'}, the object stays locked (no session of its own to end): a LOCK answered ${lockRefusal}`,
           );
-        plan.row.objectNote = input.ownSession
-          ? 'sent on a session of its own, ended after; the object then locked and unlocked'
-          : 'the object then locked and unlocked';
+        plan.row.objectNote = 'the object then locked and unlocked';
       }
     }
-
-    // 4. The deletes, last: each on the object, made again if a delete took it.
-    for (const member of of('delete')) {
-      const ownLock = member.requests.some(
-        (request) => request.action === 'LOCK',
-      );
-      for (const plan of planOf(member)) {
-        input.interrupt.check();
-        const before = readState((await stateRead()).wire);
-        if (
-          before.exists === false &&
-          !(await remake(probe, spec, name, context))
-        ) {
-          plan.row.skipped = `skipped: the temporary ${type} was deleted by an earlier row and could not be made again`;
-          continue;
-        }
-        const held = ownLock ? undefined : await takeLock();
-        if (held) lock.handle = held;
-        try {
-          await input.send([plan], false);
-        } finally {
-          delete lock.handle;
-        }
-        await readBack(plan.row);
-        if (held && plan.row.afterWrite?.exists !== false) await release(held);
+    // 4. The deletes, last — after every type's lock members: the logoff
+    // frees a session's locks a moment after it answered (measured: a LOCK
+    // right after it was refused, one a second later granted), and the other
+    // types' work passes that moment without a timer.
+    finish.push(async () => {
+      if (lockedElsewhere.length) {
+        const free = await takeLock();
+        if (free) await release(free);
+        else
+          made.object.note = `after ${lockedElsewhere.join(', ')} on sessions of their own (ended), a LOCK answered ${lockRefusal}`;
       }
-    }
+      for (const member of of('delete')) {
+        const ownLock = member.requests.some(
+          (request) => request.action === 'LOCK',
+        );
+        for (const plan of planOf(member)) {
+          input.interrupt.check();
+          const before = readState((await stateRead()).wire);
+          if (
+            before.exists === false &&
+            !(await remake(probe, spec, name, context))
+          ) {
+            plan.row.skipped = `skipped: the temporary ${type} was deleted by an earlier row and could not be made again`;
+            continue;
+          }
+          const held = ownLock ? undefined : await takeLock();
+          if (held) lock.handle = held;
+          try {
+            await input.send([plan], false);
+          } finally {
+            delete lock.handle;
+          }
+          await readBack(plan.row);
+          if (held && plan.row.afterWrite?.exists !== false)
+            await release(held);
+        }
+      }
+    });
+  }
+  for (const step of finish) {
+    input.interrupt.check();
+    await step();
   }
   return { objects, failures: probe.lockFailures };
 }
