@@ -24,6 +24,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- `getRequest().create()` sends its owner, and `createTask()` its `targetUser`,
+  in upper case. CTS compares the name as given, and a lower case SAP user name
+  was refused with `SCTS_ADT_MSG 009` ("User … does not exist in the system (or
+  locked)"), measured on premise.
+
 ### Documentation
 
 - `docs/usage/SAP_HEADER_CHECKS.md`: when SAP's ADT REST framework checks `Accept`
@@ -31,6 +38,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   headers, and that a `406` on a write may come after the work, which may or may not
   have been rolled back (read from SAP's ABAP sources and measured on an on-premise
   system).
+- Transport requests (`CLIENT_API_REFERENCE.md` and the member doc comments):
+  a refused `create()` can leave an empty request behind, which the caller
+  deletes; what `moveObjects()`, `changeTaskType()` and `addObject()` require
+  of holder, target and package; and that there is no release member —
+  releasing stays a person's decision.
 
 ## [36.0.1] - 2026-10-18
 

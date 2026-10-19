@@ -20,7 +20,10 @@ function buildCreateTransportXml(
 ): string {
   const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
   const description = args.description || 'Transport request created via MCP';
-  const owner = args.owner || username;
+  // SAP user names are upper case, and CTS compares them as given: a lower
+  // case owner was refused, measured on premise, with SCTS_ADT_MSG 009 "User …
+  // does not exist in the system (or locked)".
+  const owner = (args.owner || username || '').toUpperCase();
   const target = args.target_system?.trim()
     ? `/${args.target_system}/`
     : 'LOCAL';
@@ -34,7 +37,12 @@ function buildCreateTransportXml(
 }
 
 /**
- * Create ABAP transport request
+ * Create ABAP transport request.
+ *
+ * One POST creates the request and its first task together: the document
+ * carries the `tm:request` and, inside it, the `tm:task` with its owner. The
+ * library makes no second call, so it has no point at which to notice a half
+ * done create — see `AdtRequest.create`.
  */
 export async function createTransport(
   connection: IAbapConnection,
