@@ -431,13 +431,16 @@ export async function runOnTemporaryObjects<T>(
     /** LOCK members sent on sessions of their own, whose locks are not yet proven freed. */
     const lockedElsewhere: string[] = [];
     /** The object's metadata as read before a metadata write: its body, written back unchanged. */
-    const metadata: { body?: string } = {};
+    const metadata: { body?: string; status?: string } = {};
     const readMetadataBody = async () => {
       const read = await stateRead();
       metadata.body =
         read.wire && isSuccess(read.wire.status)
           ? String(read.wire.data ?? '')
           : undefined;
+      metadata.status = String(
+        read.wire?.status ?? read.failure ?? 'no answer',
+      );
     };
     // A 403 "currently editing" on our own object is a lock of ours, not a
     // verdict on the headers.
@@ -556,7 +559,14 @@ export async function runOnTemporaryObjects<T>(
             for (const plan of planOf(member)) {
               input.interrupt.check();
               // A metadata write sends the object's metadata back unchanged.
-              if (isMetadataWrite(member)) await readMetadataBody();
+              if (isMetadataWrite(member)) {
+                await readMetadataBody();
+                // No body to write back: not sent.
+                if (metadata.body === undefined) {
+                  plan.row.skipped = `skipped: metadata could not be read (${metadata.status})`;
+                  continue;
+                }
+              }
               await send([plan], false);
               await readBack(plan.row);
             }
@@ -636,8 +646,11 @@ export async function runOnTemporaryObjects<T>(
     finish.push(async () => {
       if (lockedElsewhere.length) {
         const free = await takeLock();
-        if (free) await release(free);
-        else
+        if (free) {
+          await release(free);
+          // Proven free: no session of ours holds it any more.
+          lockedElsewhere.length = 0;
+        } else
           made.object.note = `after ${lockedElsewhere.join(', ')} on sessions of their own (ended), a LOCK answered ${lockRefusal}`;
       }
       // The writes without a lock handle (activation, a check): an
@@ -654,13 +667,18 @@ export async function runOnTemporaryObjects<T>(
         );
         for (const plan of planOf(member)) {
           input.interrupt.check();
-          const before = readState((await stateRead()).wire);
-          if (
-            before.exists === false &&
-            !(await remake(probe, spec, name, context))
-          ) {
-            plan.row.skipped = `skipped: the temporary ${type} was deleted by an earlier row and could not be made again`;
-            continue;
+          // A delete runs only on a name the ledger owns now: one an earlier
+          // row deleted is ours again only through a new create of ours.
+          if (!probe.owns(spec, name)) {
+            const before = readState((await stateRead()).wire);
+            if (before.exists !== false) {
+              plan.row.skipped = `skipped: the name ${name} is there but not ours (an earlier delete took ours)`;
+              continue;
+            }
+            if (!(await remake(probe, spec, name, context))) {
+              plan.row.skipped = `skipped: the temporary ${type} was deleted by an earlier row and could not be made again`;
+              continue;
+            }
           }
           const held = ownLock ? undefined : await takeLock();
           if (held) lock.handle = held;
@@ -674,6 +692,13 @@ export async function runOnTemporaryObjects<T>(
             if (held && plan.row.afterWrite?.exists !== false)
               await release(held);
           }
+          // Proven gone: the object is not ours any more, its entry retires.
+          if (plan.row.afterWrite?.exists === false)
+            probe.retire(
+              spec,
+              name,
+              `deleted by ${member.handler}.${member.member} (read 404 after)`,
+            );
         }
       }
     });

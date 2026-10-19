@@ -20,7 +20,12 @@ import {
   throughGate,
   traced,
 } from './capture';
-import { type Interrupt, type Ledger, withLock } from './ledger';
+import {
+  type ILedgerEntry,
+  type Interrupt,
+  type Ledger,
+  withLock,
+} from './ledger';
 import {
   type IObjectSpec,
   type IProbeable,
@@ -303,10 +308,25 @@ export class Probe {
     return false;
   }
 
+  /** The ledger entry of each object the probe owns, by `<type> <name>`. */
+  private readonly owned = new Map<string, ILedgerEntry>();
+
+  /** Whether the object of `name` is ours now: its ledger entry is live. */
+  owns(spec: IObjectSpec, name: string): boolean {
+    const entry = this.owned.get(`${spec.type} ${name}`);
+    return entry !== undefined && this.ledger.holds(entry);
+  }
+
+  /** A delete proven by a 404: the object is not ours any more, and its entry retires. */
+  retire(spec: IObjectSpec, name: string, detail: string): void {
+    const entry = this.owned.get(`${spec.type} ${name}`);
+    if (entry) this.ledger.retire(entry, detail);
+  }
+
   /** A ledger entry that deletes `name` with the known delete pair, if it is there. */
   remember(spec: IObjectSpec, name: string, context: ISpecContext): void {
     const config = spec.config(name, context);
-    this.ledger.add({
+    const entry: ILedgerEntry = {
       label: `${spec.type} ${name}`,
       remove: async () => {
         const read = () =>
@@ -353,7 +373,9 @@ export class Probe {
           detail: `delete answered ${answer.status ?? answer.failure}${answer.sapMessage ? `: ${answer.sapMessage}` : ''}; the object still reads ${after.status ?? 'unknown'}`,
         };
       },
-    });
+    };
+    this.owned.set(`${spec.type} ${name}`, entry);
+    this.ledger.add(entry);
   }
 
   /** Creates, writes and activates a dependency with known pairs; reports nothing. */

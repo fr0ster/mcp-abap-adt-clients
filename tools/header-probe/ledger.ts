@@ -2,9 +2,9 @@
  * Every temporary object the probe may have created, and the one cleanup that
  * removes them.
  *
- * An entry is added before the create is sent, not after it succeeds: a create
- * refused with 406 may still have created the object, so the removal itself
- * finds out whether there is anything to remove.
+ * The temporary-object runs add an entry once their create answered 2xx
+ * (the object is ours from then on), and retire it once a delete is proven
+ * by a 404: a name made again is ours only through a new entry.
  */
 
 import type { IRemoval } from './record';
@@ -27,6 +27,23 @@ export class Ledger {
 
   add(entry: ILedgerEntry): void {
     this.entries.push(entry);
+  }
+
+  /**
+   * Retires an entry whose object is proven gone (a 404 after a delete):
+   * reported as removed, never tried by the cleanup.
+   */
+  retire(entry: ILedgerEntry, detail: string): void {
+    if (this.settled.has(entry)) return;
+    this.settled.add(entry);
+    const removal: IRemoval = { label: entry.label, removed: true, detail };
+    this.removals.push(removal);
+    this.onRemoval(removal);
+  }
+
+  /** Whether an entry is still the ledger's to remove. */
+  holds(entry: ILedgerEntry): boolean {
+    return this.entries.includes(entry) && !this.settled.has(entry);
   }
 
   get size(): number {

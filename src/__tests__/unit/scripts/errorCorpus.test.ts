@@ -3983,6 +3983,99 @@ describe('members on temporary objects', () => {
     ).toMatch(/^the create answered 500/);
   });
 
+  it('after a delete took our object, a name made again by a failed create is not ours: nothing deletes it, and the run ends failed', async () => {
+    const pathOf = (url: string) => url.split('?')[0].toLowerCase();
+    const programs = /\/sap\/bc\/adt\/programs\/programs\/zhp[a-z0-9]+/;
+    const deletedOnce = new Set<string>();
+    const foreign = new Set<string>();
+    let failedAt = -1;
+    const system = objectSystem((request) => {
+      const path = pathOf(request.url);
+      const named = `${request.url} ${request.body}`
+        .toLowerCase()
+        .match(programs)?.[0];
+      if (request.method === 'GET' && foreign.has(path))
+        return { status: 200, body: '<program/>' };
+      if (
+        named &&
+        (request.method === 'DELETE' || path.includes('/deletion/delete'))
+      ) {
+        deletedOnce.add(named);
+        return undefined;
+      }
+      if (
+        request.method === 'POST' &&
+        path === '/sap/bc/adt/programs/programs'
+      ) {
+        const at = request.body.indexOf('adtcore:name="') + 14;
+        const target = `/sap/bc/adt/programs/programs/${request.body.slice(at, request.body.indexOf('"', at)).toLowerCase()}`;
+        if (deletedOnce.has(target)) {
+          // The make-again fails, and the name now reads as there.
+          foreign.add(target);
+          failedAt = system.seen.length;
+          return { status: 500 };
+        }
+      }
+      return undefined;
+    });
+    const result = await run(system);
+    expect(failedAt).toBeGreaterThan(-1);
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toMatch(
+      /possibly ours, not deleted: program ZHP/,
+    );
+    // Nothing after the failed make-again deletes that name.
+    const after = system.seen.slice(failedAt);
+    expect(
+      after.some(
+        (seen) =>
+          (seen.method === 'DELETE' || seen.url.includes('/deletion/delete')) &&
+          [...foreign].some((path) =>
+            `${seen.url} ${seen.body}`.toLowerCase().includes(path),
+          ),
+      ),
+    ).toBe(false);
+  });
+
+  it('a metadata write whose read fails is not sent', async () => {
+    let failing = true;
+    const system = objectSystem((request) => {
+      const path = request.url.split('?')[0].toLowerCase();
+      // Until a delete of our domain: then its reads answer again.
+      if (
+        (path.includes('/deletion/delete') || request.method === 'DELETE') &&
+        /\/ddic\/domains\/zhp/.test(
+          `${request.url} ${request.body}`.toLowerCase(),
+        )
+      )
+        failing = false;
+      return failing &&
+        request.method === 'GET' &&
+        /^\/sap\/bc\/adt\/ddic\/domains\/zhp[a-z0-9]+$/.test(path) &&
+        system.existing.has(path)
+        ? { status: 500 }
+        : undefined;
+    });
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const rows = corpusOf(file, 'corpus').rows.filter(
+      (r) => r.temporary?.startsWith('domain ') && r.label === 'updateMetadata',
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows)
+      expect(r.skipped).toBe('skipped: metadata could not be read (500)');
+    // No PUT went to the corpus mode's domain.
+    const name = objectOf(file, 'domain');
+    expect(
+      system.seen.some(
+        (seen) =>
+          seen.method === 'PUT' &&
+          seen.url.toLowerCase().startsWith(`/sap/bc/adt/ddic/domains/${name}`),
+      ),
+    ).toBe(false);
+  });
+
   it('a delete row that took the object: it is made again for the next row', async () => {
     const system = objectSystem();
     const file = (await run(system)).file as NonNullable<
@@ -4160,6 +4253,56 @@ describe('members on temporary objects', () => {
       expect(sessions.opened.length).toBeGreaterThan(1);
       expect(sessions.closed).toHaveLength(sessions.opened.length);
     });
+  });
+
+  it('once the proof LOCK and UNLOCK show the object free, a later 423 is an answer, not our lock', async () => {
+    const activated = new Set<string>();
+    const sessions: unknown[] = [];
+    const answer = (request: ISeen) => {
+      const body = request.body.toLowerCase();
+      if (
+        request.url.startsWith('/sap/bc/adt/activation') &&
+        body.includes('/programs/programs/zhp')
+      ) {
+        const at = body.indexOf('/programs/programs/zhp');
+        const program = body.slice(at, at + 40);
+        if (activated.has(program)) return { status: 423 };
+        activated.add(program);
+      }
+      return undefined;
+    };
+    const result = await runFull({
+      open: async () => {
+        const connection = objectSystem(answer).connection;
+        sessions.push(connection);
+        return onTheWire(connection);
+      },
+      close: async () => undefined,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
+    });
+    // LOCK members ran on sessions of their own.
+    expect(sessions.length).toBeGreaterThan(1);
+    const file = result.file as NonNullable<typeof result.file>;
+    const rows = JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          /corpus-clients-corpus-[0-9].*\.json$/.test(f),
+        ) as string,
+        'utf8',
+      ),
+    ).rows as ICorpusRow[];
+    const activation = rows.filter(
+      (r) => r.temporary?.startsWith('program ') && r.label === 'activate',
+    );
+    expect(activation.length).toBeGreaterThan(0);
+    for (const r of activation) {
+      expect(r.status).toBe(423);
+      expect(r.blocked).toBeUndefined();
+    }
   });
 
   it('without a session to end, a lock that cannot be freed ends the run failed', async () => {

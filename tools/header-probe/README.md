@@ -287,6 +287,9 @@ run's normal path, in every mode, each mode with its own objects
   registers nothing; if the name then reads as there it is reported
   `possibly ours, not deleted: <name>` and the run ends `failed` — a person
   decides. The write cycle and the update measurement follow the same rule.
+  A delete proven by a 404 retires the object's ledger entry: a delete row
+  runs only on a name the ledger owns, and a name made again is ours only
+  through a new create of ours that answered 2xx.
 - **Cleanup:** the cleanup in a `finally` deletes what is ours, newest first
   (an object before its parent), and proves each removal by a read that
   answers 404. A temporary object that may remain, or an unlock that failed,
@@ -295,7 +298,8 @@ run's normal path, in every mode, each mode with its own objects
   the UNLOCK, and if that fails, the cleanup's UNLOCK again and the logoff
   of the session — on a throw or Ctrl-C between the LOCK and the UNLOCK too.
 - **A metadata write** (`updateMetadata`) reads the object's metadata first
-  and writes it back unchanged as its body, with the mode's headers (the
+  and writes it back unchanged as its body — not sent, `skipped: metadata
+  could not be read (<status>)`, when the read fails — with the mode's headers (the
   pair, the bogus Content-Type, or none): a PUT with no body carries no
   Content-Type, and SAP refuses it 415 — the probe's doing, not the
   client's. A 423 on our object while a session of ours holds its lock is
