@@ -10,7 +10,8 @@
  * is completed here — marked below. Measured on an on-premise system
  * (2026-10-18): every completed pair was accepted (2xx), except the feature
  * toggle's `update`, which that system cannot reach (it refuses to create a
- * toggle, 403).
+ * toggle, 403). One pair 35.0.0 sent is corrected — marked below: SAP refuses
+ * it (36.0.2).
  *
  * Before 36.0.0 a few members read the client's `contentTypes` provider
  * (the legacy client sets `AdtContentTypesBase`); `headersOf` does the same,
@@ -337,9 +338,11 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
   },
+  // corrected for 36.0.2: 35.0.0 sent application/vnd.sap.adt.checkrun.v1+xml
+  // for both, which SAP refuses (415); this is every other check's pair
   'AdtEnhancement.check': {
-    accept: 'application/vnd.sap.adt.checkrun.v1+xml',
-    contentType: 'application/vnd.sap.adt.checkrun.v1+xml',
+    accept: 'application/vnd.sap.adt.checkmessages+xml',
+    contentType: 'application/vnd.sap.adt.checkobjects+xml',
   },
   'AdtEnhancement.checkDeletion': {
     accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',

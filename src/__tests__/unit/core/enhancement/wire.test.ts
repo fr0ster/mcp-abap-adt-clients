@@ -228,3 +228,64 @@ it.each(
     response,
   );
 });
+
+// The recorded pair is every other check's; 35.0.0's
+// application/vnd.sap.adt.checkrun.v1+xml is refused 415, and the
+// chkrun:checkRunRequest it sent is refused 400 under the checkobjects type
+// (measured on an on-premise system, 2026-10-19).
+it('records the check pair every other handler sends', () => {
+  const { client } = setup();
+  expect(headersOf(client, 'check')).toEqual({
+    accept: 'application/vnd.sap.adt.checkmessages+xml',
+    contentType: 'application/vnd.sap.adt.checkobjects+xml',
+  });
+});
+
+it.each([
+  ['inactive', 'workingArea'],
+  ['active', 'active'],
+] as const)('checks %s through a checkObjectList with the caller pair', async (status, version) => {
+  const { client, request } = setup();
+  await client.check(
+    { enhancementType: 'enhoxhb', enhancementName: 'ZENH' },
+    status,
+    { headers: headersOf(client, 'check') },
+  );
+  expect(request).toHaveBeenCalledTimes(1);
+  const sent = request.mock.calls[0][0];
+  expect(sent.method).toBe('POST');
+  expect(sent.url).toBe('/sap/bc/adt/checkruns?reporters=abapCheckRun');
+  expect(sent.headers).toEqual({
+    Accept: 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+  });
+  const list = parser.parse(sent.data)['chkrun:checkObjectList'];
+  expect(list['chkrun:checkObject']).toEqual({
+    '@_adtcore:uri': '/sap/bc/adt/enhancements/enhoxhb/zenh',
+    '@_chkrun:version': version,
+  });
+});
+
+it('sends a source-code plugin source as a base64 artifact of its checkObject', async () => {
+  const { client, request } = setup();
+  const source = 'ENHANCEMENT 1 ZENH.\nENDENHANCEMENT.';
+  await client.check(
+    { enhancementType: 'enhoxhh', enhancementName: 'ZENH', source },
+    undefined,
+    { headers: headersOf(client, 'check') },
+  );
+  const sent = request.mock.calls[0][0];
+  const object = parser.parse(sent.data)['chkrun:checkObjectList'][
+    'chkrun:checkObject'
+  ];
+  expect(object['@_adtcore:uri']).toBe('/sap/bc/adt/enhancements/enhoxhh/zenh');
+  expect(object['@_chkrun:version']).toBe('workingArea');
+  const artifact = object['chkrun:artifacts']['chkrun:artifact'];
+  expect(artifact['@_chkrun:contentType']).toBe('text/plain; charset=utf-8');
+  expect(artifact['@_chkrun:uri']).toBe(
+    '/sap/bc/adt/enhancements/enhoxhh/zenh/source/main',
+  );
+  expect(
+    Buffer.from(artifact['chkrun:content'], 'base64').toString('utf-8'),
+  ).toBe(source);
+});

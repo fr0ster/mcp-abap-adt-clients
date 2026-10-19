@@ -15,6 +15,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ACCEPT_APPLICATION_LOG_OBJECT,
+  ACCEPT_APPLICATION_LOG_SOURCE,
+} from '../../constants/contentTypes';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type { IGetApplicationLogObjectOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -47,7 +51,7 @@ export async function getApplicationLogObject(
     timeout: 0,
     params,
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_APPLICATION_LOG_OBJECT,
       'X-sap-adt-relation':
         'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/properties',
     },
@@ -83,7 +87,7 @@ export async function getApplicationLogSource(
     timeout: 0,
     params,
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_APPLICATION_LOG_SOURCE,
       'X-sap-adt-relation':
         'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/source',
     },

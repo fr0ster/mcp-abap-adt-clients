@@ -69,6 +69,18 @@ describe('the pair table', () => {
     });
     expect(knownPair('getClass()', 'nothing')).toBeUndefined();
   });
+
+  it('takes the corrected pair where SAP refuses the one 35.0.0 sent', () => {
+    expect(knownPair('getEnhancement()', 'check')).toEqual({
+      accept: 'application/vnd.sap.adt.checkmessages+xml',
+      contentType: 'application/vnd.sap.adt.checkobjects+xml',
+    });
+    expect(
+      KNOWN_PAIRS.find(
+        (p) => p.handler === 'getEnhancement()' && p.member === 'check',
+      )?.from,
+    ).toBe('corrected');
+  });
 });
 
 describe('probePair', () => {

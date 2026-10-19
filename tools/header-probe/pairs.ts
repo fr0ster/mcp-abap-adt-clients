@@ -5,7 +5,9 @@
  * Taken verbatim from docs/usage/MIGRATION-36.md: "The pairs 35.0.0 sent"
  * (the modern client's rows; `from: 'sent'`), with every request that sent one
  * header or none replaced by "The completed pairs, measured"
- * (`from: 'completed'`). Change it only together with that document.
+ * (`from: 'completed'`), and every pair 35.0.0 sent that SAP refuses replaced
+ * by "The corrected pairs, measured" (`from: 'corrected'`). Change it only
+ * together with that document.
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
@@ -17,7 +19,7 @@ export interface IKnownPair {
   readonly accept: string;
   readonly contentType: string;
   /** Which table of MIGRATION-36 the pair comes from. */
-  readonly from: 'sent' | 'completed';
+  readonly from: 'sent' | 'completed' | 'corrected';
 }
 
 export const KNOWN_PAIRS: readonly IKnownPair[] = [
@@ -496,9 +498,9 @@ export const KNOWN_PAIRS: readonly IKnownPair[] = [
   {
     handler: 'getEnhancement()',
     member: 'check',
-    accept: 'application/vnd.sap.adt.checkrun.v1+xml',
-    contentType: 'application/vnd.sap.adt.checkrun.v1+xml',
-    from: 'sent',
+    accept: 'application/vnd.sap.adt.checkmessages+xml',
+    contentType: 'application/vnd.sap.adt.checkobjects+xml',
+    from: 'corrected',
   },
   {
     handler: 'getEnhancement()',

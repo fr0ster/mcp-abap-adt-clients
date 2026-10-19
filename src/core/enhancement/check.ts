@@ -37,11 +37,19 @@ export async function checkEnhancement(
   const objectUri = getEnhancementUri(enhancement_type, enhancement_name);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
 
-  // Build check run request
-  const checkUrl = `/sap/bc/adt/checkruns`;
+  // The document every other handler's check sends (`buildCheckRunXml`), with
+  // the reporter in the query. Until 36.0.1 this sent a
+  // `chkrun:checkRunRequest` with the reporter inside it, the type of the
+  // recorded pair `application/vnd.sap.adt.checkrun.v1+xml`. SAP refuses that
+  // pair `415` ("Supported Media Types: application/vnd.sap.adt.checkobjects+xml")
+  // and answers `400` "System expected the element
+  // '{http://www.sap.com/adt/checkrun}checkObjectList'" to the document under
+  // the checkobjects type. With this document and the checkmessages /
+  // checkobjects pair it answers `200` (`workingArea` and `active` both
+  // processed), with the source too. Measured on an on-premise system,
+  // 2026-10-19.
+  const checkUrl = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
-  // Build check run XML with or without source code artifacts
-  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   let artifactsXml = '';
   if (source_code && supportsSourceCode(enhancement_type)) {
     // Include source code for live validation (base64 encoded)
@@ -49,24 +57,16 @@ export async function checkEnhancement(
     artifactsXml = `
     <chkrun:artifacts>
       <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="${objectUri}/source/main">
-        ${base64Source}
+        <chkrun:content>${base64Source}</chkrun:content>
       </chkrun:artifact>
-    </chkrun:artifacts>`;
+    </chkrun:artifacts>
+  `;
   }
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<chkrun:checkRunRequest xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
-  <chkrun:reporters>
-    <chkrun:reporter chkrun:name="abapCheckRun"/>
-  </chkrun:reporters>
-  <chkrun:objectSets>
-    <chkrun:objectSet>
-      <chkrun:objects>
-        <chkrun:object adtcore:uri="${objectUri}" chkrun:version="${versionParam}"/>
-      </chkrun:objects>
-    </chkrun:objectSet>
-  </chkrun:objectSets>${artifactsXml}
-</chkrun:checkRunRequest>`;
+<chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
+  <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${versionParam}">${artifactsXml}</chkrun:checkObject>
+</chkrun:checkObjectList>`;
 
   return connection.makeAdtRequest({
     url: checkUrl,

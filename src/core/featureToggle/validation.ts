@@ -2,7 +2,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
+import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
 
 /**
@@ -18,6 +18,13 @@ import { FEATURE_TOGGLE } from '../../endpoints/objects';
  * advertises for this — a GET on it answers 405, a POST with the usual
  * `objname`/`packagename`/`description` query answers 200 with
  * `<CHECK_RESULT>X</CHECK_RESULT>`. Measured 2026-08-31.
+ *
+ * It answers `application/vnd.sap.as+xml` (the `ACCEPT_VALIDATION` every other
+ * name validation sends) and nothing else: the toggle's own
+ * `application/vnd.sap.adt.blues.v1+xml`, sent until 36.0.1, is refused `406`
+ * "Accepted content types: application/vnd.sap.as+xml". Measured on an
+ * on-premise system, 2026-10-19. `validate` is `IAdtValidatable`'s, which takes
+ * no `options.headers`, so the type stays here, as in every other validation.
  */
 export async function validateFeatureToggleName(
   connection: IAbapConnection,
@@ -33,7 +40,7 @@ export async function validateFeatureToggleName(
     method: 'POST',
     url: FEATURE_TOGGLE.validation,
     timeout: 0,
-    headers: { Accept: ACCEPT_FEATURE_TOGGLE_METADATA },
+    headers: { Accept: ACCEPT_VALIDATION },
     params,
   });
 }

@@ -22,7 +22,37 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [36.0.2] - 2026-10-19
+
+Three requests SAP refused on every call, measured on an on-premise system.
+
+### Fixed
+
+- **`getFeatureToggle().validate`** (`POST /sap/bc/adt/sfw/featuretoggles/validation`)
+  sends `Accept: application/vnd.sap.as+xml`, the type every other name
+  validation sends. It sent `application/vnd.sap.adt.blues.v1+xml`, which SAP
+  refuses `406` "Accepted content types: application/vnd.sap.as+xml"; with the
+  new type it answers `200` with `<CHECK_RESULT>`. `validate` is
+  `IAdtValidatable`'s, which takes no `options.headers`, so the type stays the
+  member's, as in every other `validate`.
+- **`getEnhancement().check`** (`POST /sap/bc/adt/checkruns`) sends the
+  `chkrun:checkObjectList` document every other `check` sends, with the
+  reporter in the query (`?reporters=abapCheckRun`). It sent a
+  `chkrun:checkRunRequest`, which SAP refuses `400` under
+  `application/vnd.sap.adt.checkobjects+xml`, the only type it accepts. The pair
+  to pass is every other check's — `Accept:
+  application/vnd.sap.adt.checkmessages+xml`, `Content-Type:
+  application/vnd.sap.adt.checkobjects+xml`; the one 35.0.0 sent and
+  MIGRATION-36 recorded, `application/vnd.sap.adt.checkrun.v1+xml` for both, is
+  refused `415`. With the two together it answers `200`. MIGRATION-36 lists the
+  pair under [the corrected pairs](docs/usage/MIGRATION-36.md#the-corrected-pairs-measured).
+- **`getApplicationLog().getObject`** sends `Accept:
+  application/vnd.sap.adt.blues.v1+xml` and **`getSource`** `Accept:
+  application/json` (`GET /sap/bc/adt/applicationlog/objects/{name}[/source/main]`).
+  Both sent `application/xml`, which SAP refuses `406` (SADT_RESOURCE 037).
+  On an existing application log object the object answers `200` with its
+  `blue:blueSource` document, and the source `200` with JSON; the source
+  refuses `application/vnd.sap.adt.blues.v1+xml` (`406`).
 
 ### Documentation
 

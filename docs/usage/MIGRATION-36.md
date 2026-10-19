@@ -63,8 +63,10 @@ Pass `undefined` for the positional parameter that was optional:
 `activateObjectsGroup(objects, preauditRequested, options)` and
 `deleteObjectsGroup(objects, transportRequest, options)`.
 
-To send what 35.0.0 sent, pass the pair from the table below. A few things
-changed on the wire whatever you pass:
+To send what 35.0.0 sent, pass the pair from the table below — except the
+enhancement's `check`, whose pair SAP refuses:
+[the corrected pairs](#the-corrected-pairs-measured) give the one to pass. A
+few things changed on the wire whatever you pass:
 
 - **Members that sent one header send both.** `create` of a function group, a
   message class and a message class message, `update` of a feature toggle and
@@ -169,6 +171,25 @@ the table shows, and SAP accepted it:
 The legacy `DELETE`s were sent through `AdtClientLegacy` against that (modern)
 system, which serves the same direct `DELETE`.
 
+## The corrected pairs, measured
+
+One pair 35.0.0 sent is refused by SAP, whatever the rest of the request: pass
+the pair below instead of the one in [the pairs 35.0.0 sent](#the-pairs-3500-sent).
+Measured on an on-premise system (2026-10-19), on existing objects:
+
+| member | Accept | Content-Type | SAP answered |
+|---|---|---|---|
+| enhancement `check` (`POST /sap/bc/adt/checkruns`) | `application/vnd.sap.adt.checkmessages+xml` | `application/vnd.sap.adt.checkobjects+xml` | `200` (since 36.0.2) |
+
+The enhancement's `check` sent `application/vnd.sap.adt.checkrun.v1+xml` as
+both headers, and SAP answers `415` "Supported Media Types:
+application/vnd.sap.adt.checkobjects+xml". It is the pair every other
+handler's `check` sends. Its request document changed with it in 36.0.2: the
+`chkrun:checkRunRequest` it sent before is refused `400` under the
+checkobjects type, so it sends the `chkrun:checkObjectList` every other check
+sends, with the reporter in the query (`?reporters=abapCheckRun`). Before
+36.0.2 no pair made it succeed.
+
 ## The pairs 35.0.0 sent
 
 Recorded from 35.0.0 against a stub connection. "legacy" is `AdtClientLegacy`
@@ -245,7 +266,7 @@ set.
 | getDomain() | `delete` | `application/vnd.sap.adt.deletion.response.v1+xml` | `application/vnd.sap.adt.deletion.request.v1+xml` |
 | getDomain() | `updateMetadata` | `application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml` | `application/vnd.sap.adt.domains.v2+xml; charset=utf-8` |
 | getEnhancement() | `activate` | `application/xml` | `application/vnd.sap.adt.activation+xml` |
-| getEnhancement() | `check` | `application/vnd.sap.adt.checkrun.v1+xml` | `application/vnd.sap.adt.checkrun.v1+xml` |
+| getEnhancement() | `check` | `application/vnd.sap.adt.checkrun.v1+xml` (refused, [corrected](#the-corrected-pairs-measured)) | `application/vnd.sap.adt.checkrun.v1+xml` (refused, [corrected](#the-corrected-pairs-measured)) |
 | getEnhancement() | `checkDeletion` | `application/vnd.sap.adt.deletion.check.response.v1+xml` | `application/vnd.sap.adt.deletion.check.request.v1+xml` |
 | getEnhancement() | `create` | `application/vnd.sap.adt.enh.enhoxhh.v3+xml` | `application/vnd.sap.adt.enh.enhoxhh.v3+xml` |
 | getEnhancement() | `delete` | `application/vnd.sap.adt.deletion.response.v1+xml` | `application/vnd.sap.adt.deletion.request.v1+xml` |
