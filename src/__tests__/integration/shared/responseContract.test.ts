@@ -38,7 +38,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -239,7 +239,10 @@ describe('Response contract - 17.0.0', () => {
       const answer = await client
         .getUtils()
         .fetchNodeStructure('DEVC/K', NEVER_EXISTS, {
-          headers: headersOf(client.getUtils(), 'fetchNodeStructure'),
+          headers: integrationHeadersOf(
+            client.getUtils(),
+            'fetchNodeStructure',
+          ),
         });
 
       // The sharpest case in this file, and since 19.0.0 it is a statement
@@ -331,7 +334,7 @@ describe('Response contract - 17.0.0', () => {
         .getClass()
         .activate(
           { className: NEVER_EXISTS },
-          { headers: headersOf(client.getClass(), 'activate') },
+          { headers: integrationHeadersOf(client.getClass(), 'activate') },
         );
 
       expect(unjudged.ok).toBe(true);
@@ -350,7 +353,7 @@ describe('Response contract - 17.0.0', () => {
       const judged = await client.getClass().activate(
         { className: NEVER_EXISTS },
         {
-          headers: headersOf(client.getClass(), 'activate'),
+          headers: integrationHeadersOf(client.getClass(), 'activate'),
           analyse: refusalIsAFailure,
         },
       );

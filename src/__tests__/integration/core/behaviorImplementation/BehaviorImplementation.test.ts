@@ -15,7 +15,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IBehaviorImplementationConfig } from '../../../../core/behaviorImplementation';
 import { mainSourceFor } from '../../../../core/behaviorImplementation/AdtBehaviorImplementation';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
@@ -138,7 +138,10 @@ describe('BehaviorImplementation (using AdtClient)', () => {
               transportRequest: tester.getTransportRequest(),
             },
             {
-              headers: headersOf(client.getBehaviorImplementation(), 'delete'),
+              headers: integrationHeadersOf(
+                client.getBehaviorImplementation(),
+                'delete',
+              ),
             },
           );
           if (!removed.ok) {
@@ -263,7 +266,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
                     transportRequest: config.transportRequest,
                   },
                   {
-                    headers: headersOf(bimpl, 'update'),
+                    headers: integrationHeadersOf(bimpl, 'update'),
                     lockHandle: locked,
                     source: mainSourceFor(
                       config.className,

@@ -25,7 +25,7 @@ import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import { expectLockReleased } from '../../helpers/lockReleased';
 import {
@@ -204,7 +204,7 @@ describe('Group Activation (Shared)', () => {
               structureName: structureName,
               transportRequest: transportRequest,
             },
-            { headers: headersOf(client.getStructure(), 'delete') },
+            { headers: integrationHeadersOf(client.getStructure(), 'delete') },
           );
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
@@ -224,7 +224,9 @@ describe('Group Activation (Shared)', () => {
               dataElementName: dataElementName,
               transportRequest: transportRequest,
             },
-            { headers: headersOf(client.getDataElement(), 'delete') },
+            {
+              headers: integrationHeadersOf(client.getDataElement(), 'delete'),
+            },
           );
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
@@ -244,7 +246,7 @@ describe('Group Activation (Shared)', () => {
               domainName: domainName,
               transportRequest: transportRequest,
             },
-            { headers: headersOf(client.getDomain(), 'delete') },
+            { headers: integrationHeadersOf(client.getDomain(), 'delete') },
           );
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
@@ -306,22 +308,25 @@ describe('Group Activation (Shared)', () => {
         [
           'structure',
           () =>
-            client
-              .getStructure()
-              .delete(
-                { structureName: structureName!, transportRequest },
-                { headers: headersOf(client.getStructure(), 'delete') },
-              ),
+            client.getStructure().delete(
+              { structureName: structureName!, transportRequest },
+              {
+                headers: integrationHeadersOf(client.getStructure(), 'delete'),
+              },
+            ),
         ],
         [
           'data element',
           () =>
-            client
-              .getDataElement()
-              .delete(
-                { dataElementName: dataElementName!, transportRequest },
-                { headers: headersOf(client.getDataElement(), 'delete') },
-              ),
+            client.getDataElement().delete(
+              { dataElementName: dataElementName!, transportRequest },
+              {
+                headers: integrationHeadersOf(
+                  client.getDataElement(),
+                  'delete',
+                ),
+              },
+            ),
         ],
         [
           'domain',
@@ -330,7 +335,7 @@ describe('Group Activation (Shared)', () => {
               .getDomain()
               .delete(
                 { domainName: domainName!, transportRequest },
-                { headers: headersOf(client.getDomain(), 'delete') },
+                { headers: integrationHeadersOf(client.getDomain(), 'delete') },
               ),
         ],
       ] as const) {
@@ -408,7 +413,7 @@ describe('Group Activation (Shared)', () => {
                 `Test domain for group activation`,
               transportRequest: transportRequest,
             },
-            { headers: headersOf(client.getDomain(), 'create') },
+            { headers: integrationHeadersOf(client.getDomain(), 'create') },
           );
           domainCreated = true;
           await new Promise((resolve) =>
@@ -462,7 +467,9 @@ describe('Group Activation (Shared)', () => {
               typeKind: testCase.params.data_element_type_kind || 'domain',
               transportRequest: transportRequest,
             },
-            { headers: headersOf(client.getDataElement(), 'create') },
+            {
+              headers: integrationHeadersOf(client.getDataElement(), 'create'),
+            },
           );
           dataElementCreated = true;
           await new Promise((resolve) =>
@@ -518,7 +525,7 @@ define structure ${structureName} {
               `Test structure for group activation`,
             transportRequest: transportRequest,
           },
-          { headers: headersOf(client.getStructure(), 'create') },
+          { headers: integrationHeadersOf(client.getStructure(), 'create') },
         );
         structureCreated = true;
         await new Promise((resolve) =>
@@ -541,7 +548,7 @@ define structure ${structureName} {
               transportRequest: transportRequest,
             },
             {
-              headers: headersOf(structureHandler, 'update'),
+              headers: integrationHeadersOf(structureHandler, 'update'),
               lockHandle: structureLockHandle,
             },
           );
@@ -581,7 +588,7 @@ define structure ${structureName} {
         });
         const runId = expectResult(
           await utils.activateObjectsGroup(objectsToActivate, false, {
-            headers: headersOf(utils, 'activateObjectsGroup'),
+            headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
           }),
           'activation run id',
         );

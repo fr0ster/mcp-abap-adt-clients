@@ -36,7 +36,7 @@ import {
   executeBatchRequest,
 } from '../../../../runtime/debugger/abap';
 import { createRequestId } from '../../../../runtime/debugger/batchPayload';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { assertBatchStatuses } from '../../../helpers/batchStatuses';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import {
@@ -362,7 +362,9 @@ describe('Debugger batch wire measurements', () => {
       description: 'Debugger integration probe',
       ...(transportRequest ? { transportRequest } : {}),
     };
-    const creation = cls.create(config, { headers: headersOf(cls, 'create') });
+    const creation = cls.create(config, {
+      headers: integrationHeadersOf(cls, 'create'),
+    });
     probeCreationAttempted = true;
     const created = await creation;
     if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
@@ -372,7 +374,7 @@ describe('Debugger batch wire measurements', () => {
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
     const lockHandle = String(lock.getResult().value ?? '');
     const written = await cls.update(config, {
-      headers: headersOf(cls, 'update'),
+      headers: integrationHeadersOf(cls, 'update'),
       source: SOURCE,
       lockHandle,
     });
@@ -380,7 +382,7 @@ describe('Debugger batch wire measurements', () => {
     if (!written.ok)
       throw new Error(`probe write: ${written.getError().message}`);
     const activated = await cls.activate(config, {
-      headers: headersOf(cls, 'activate'),
+      headers: integrationHeadersOf(cls, 'activate'),
     });
     if (!activated.ok)
       throw new Error(`probe activate: ${activated.getError().message}`);
@@ -394,7 +396,7 @@ describe('Debugger batch wire measurements', () => {
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.add}` },
       ],
-      { headers: headersOf(listenerApi, 'setBreakpoints') },
+      { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
     );
     if (!breakpoints.ok) throw new Error('Could not arm probe breakpoints');
     armed.push(
@@ -467,7 +469,7 @@ describe('Debugger batch wire measurements', () => {
               ...(transportRequest ? { transportRequest } : {}),
             },
             {
-              headers: headersOf(
+              headers: integrationHeadersOf(
                 new AdtClient(connection, connectionLogger).getClass(),
                 'delete',
               ),
@@ -684,7 +686,7 @@ describe('Debugger batch wire measurements', () => {
         const frame = await topFrame();
         needs(frame.line === LINE.loop, 'the loop breakpoint in the probe');
         const children = await debuggerApi.getChildVariables(['@LOCALS'], {
-          headers: headersOf(debuggerApi, 'getChildVariables'),
+          headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
         });
         const total = [
           ...documentOf(children).matchAll(
@@ -759,7 +761,7 @@ describe('Debugger batch wire measurements', () => {
           // The comparison starts with the same baseline, outside its N envelopes.
           if (name === 'loop_client_per_step') {
             const baseline = await debuggerApi.getVariables(ids, {
-              headers: headersOf(debuggerApi, 'getVariables'),
+              headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             });
             fs.appendFileSync(
               file,
@@ -773,14 +775,14 @@ describe('Debugger batch wire measurements', () => {
             if (name === 'multi_step_variables_direct') {
               answers.push(
                 await api.getVariables(ids, {
-                  headers: headersOf(api, 'getVariables'),
+                  headers: integrationHeadersOf(api, 'getVariables'),
                 }),
               );
               for (let i = 0; i < steps; i++) {
                 answers.push(await api.step('stepOver'));
                 answers.push(
                   await api.getVariables(ids, {
-                    headers: headersOf(api, 'getVariables'),
+                    headers: integrationHeadersOf(api, 'getVariables'),
                   }),
                 );
               }
@@ -814,14 +816,14 @@ describe('Debugger batch wire measurements', () => {
                 if (name === 'multi_step_variables_client')
                   pending.push(
                     api.getVariables(ids, {
-                      headers: headersOf(api, 'getVariables'),
+                      headers: integrationHeadersOf(api, 'getVariables'),
                     }),
                   );
                 for (let i = 0; i < (rounds === 1 ? steps : 1); i++) {
                   pending.push(
                     api.step('stepOver'),
                     api.getVariables(ids, {
-                      headers: headersOf(api, 'getVariables'),
+                      headers: integrationHeadersOf(api, 'getVariables'),
                     }),
                   );
                 }
@@ -973,7 +975,7 @@ describe('Debugger batch wire measurements', () => {
       if (skipped()) return;
       await startAtBreakpoint();
       const children = await debuggerApi.getChildVariables(['@LOCALS'], {
-        headers: headersOf(debuggerApi, 'getChildVariables'),
+        headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       const rows = [
         ...documentOf(children).matchAll(
@@ -1018,7 +1020,7 @@ describe('Debugger batch wire measurements', () => {
       if (skipped()) return;
       await startAtBreakpoint();
       const children = await debuggerApi.getChildVariables(['@LOCALS'], {
-        headers: headersOf(debuggerApi, 'getChildVariables'),
+        headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       const rows = [
         ...documentOf(children).matchAll(
@@ -1042,7 +1044,7 @@ describe('Debugger batch wire measurements', () => {
         api.step('stepOver'),
         api.getStack(),
         api.getVariables([id as string], {
-          headers: headersOf(api, 'getVariables'),
+          headers: integrationHeadersOf(api, 'getVariables'),
         }),
       ];
       await batch.execute();

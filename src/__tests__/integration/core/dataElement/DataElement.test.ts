@@ -23,7 +23,7 @@ import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -321,7 +321,7 @@ describe('DataElement (using AdtClient)', () => {
               domainName: domainName,
               transportRequest: cleanupResolver.getTransportRequest(),
             },
-            { headers: headersOf(client.getDomain(), 'delete') },
+            { headers: integrationHeadersOf(client.getDomain(), 'delete') },
           );
         } catch (cleanupError) {
           // Log but don't fail - cleanup errors are silent

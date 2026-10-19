@@ -18,7 +18,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -201,7 +201,12 @@ describe('FunctionModule (using AdtClient)', () => {
                     description: 'Shared FUGR for FM tests',
                     transportRequest,
                   },
-                  { headers: headersOf(client.getFunctionGroup(), 'create') },
+                  {
+                    headers: integrationHeadersOf(
+                      client.getFunctionGroup(),
+                      'create',
+                    ),
+                  },
                 );
               } catch (_createErr) {
                 // On cloud, the HTTP create may succeed but the post-create read

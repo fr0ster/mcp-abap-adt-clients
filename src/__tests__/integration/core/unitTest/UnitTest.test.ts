@@ -29,7 +29,7 @@ import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -247,7 +247,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   transportRequest,
                   description: `Test container class for ${testClassName}`,
                 },
-                { headers: headersOf(client.getClass(), 'create') },
+                { headers: integrationHeadersOf(client.getClass(), 'create') },
               ),
               'create the container class',
             );
@@ -278,7 +278,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           const containerHandle = String(containerLock);
           expectResult(
             await client.getClass().update(containerConfig, {
-              headers: headersOf(client.getClass(), 'update'),
+              headers: integrationHeadersOf(client.getClass(), 'update'),
               source,
               lockHandle: containerHandle,
             }),
@@ -313,7 +313,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
               await client.getLocalTestClass().update(
                 { className: containerClass, transportRequest },
                 {
-                  headers: headersOf(client.getLocalTestClass(), 'update'),
+                  headers: integrationHeadersOf(
+                    client.getLocalTestClass(),
+                    'update',
+                  ),
                   source: testClassSource,
                   lockHandle: includeHandle,
                 },
@@ -336,12 +339,12 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           // Step 4: Activate class
           logTestStep('activate', testsLogger);
           expectResult(
-            await client
-              .getClass()
-              .activate(
-                { className: containerClass, transportRequest },
-                { headers: headersOf(client.getClass(), 'activate') },
-              ),
+            await client.getClass().activate(
+              { className: containerClass, transportRequest },
+              {
+                headers: integrationHeadersOf(client.getClass(), 'activate'),
+              },
+            ),
             'activate the container class',
           );
           testsLogger.info?.('Class activated');
@@ -502,7 +505,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   className: containerClass,
                   transportRequest,
                 },
-                { headers: headersOf(client.getClass(), 'delete') },
+                { headers: integrationHeadersOf(client.getClass(), 'delete') },
               );
               testsLogger.info?.('Test class deleted successfully');
             } catch (cleanupError) {

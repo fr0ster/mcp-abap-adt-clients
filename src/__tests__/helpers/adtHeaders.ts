@@ -22,7 +22,12 @@ import type {
   IAdtContentTypes,
   IAdtHeaders,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
+import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
+import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
+import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
 
 /** A pair for a unit test that only needs the call to compile and run. */
 export const TEST_HEADERS: IAdtHeaders = {
@@ -1031,18 +1036,17 @@ export function headersFor(key: string): IAdtHeaders {
 }
 
 /**
- * The pair `handler.member` sent before 36.0.0. A handler that answers
- * without a request (a legacy refusal) gets `TEST_HEADERS`: nothing is sent.
+ * The recorded pair for `handler.member`, or `undefined` when there is none.
  * An enhancement's `create` and `updateMetadata` need the `config`, whose
  * subtype chose the type.
  */
-export function headersOf(
+function recordedPair(
   handler: object,
   member: string,
   config?: object,
-): IAdtHeaders {
+): IAdtHeaders | undefined {
   const owner = ownerOf(handler, member);
-  if (!owner) return TEST_HEADERS;
+  if (!owner) return undefined;
   const key = `${owner}.${member}`;
   // An enhancement's own document has a type per subtype: before 36.0.0
   // `create` and `updateMetadata` chose it from the config.
@@ -1059,9 +1063,132 @@ export function headersOf(
   }
   const provider = (handler as { contentTypes?: IAdtContentTypes })
     .contentTypes;
+  return (provider && fromProvider(key, provider)) ?? SENT_BEFORE_36[key];
+}
+
+/**
+ * The pair `handler.member` sent before 36.0.0, for a **unit** test: a member
+ * with no recorded pair gets `TEST_HEADERS`, which only a mock receives.
+ * An integration test uses {@link integrationHeadersOf}, which has no such
+ * fallback.
+ */
+export function headersOf(
+  handler: object,
+  member: string,
+  config?: object,
+): IAdtHeaders {
+  return recordedPair(handler, member, config) ?? TEST_HEADERS;
+}
+
+/**
+ * Legacy members that answer a refusal and send no request (the class
+ * overrides the member with one that returns `failed(...)` at once). A member
+ * qualifies only when it **is** that class's own function, compared by
+ * identity, so a test handler or another class of the same name does not.
+ * The unit test `integrationHeadersOf.test.ts` calls each one on a mock
+ * connection and proves that no request leaves.
+ */
+const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
+  [AdtPackageLegacy, ['create', 'updateMetadata', 'delete']],
+  [AdtRequestLegacy, ['create', 'updateMetadata', 'delete']],
+  [AdtUtilsLegacy, ['getSqlQuery', 'getTableContents']],
+];
+
+function isLegacyRefusal(handler: object, member: string): boolean {
+  const own = (handler as Record<string, unknown>)[member];
+  return REFUSED_WITHOUT_REQUEST.some(
+    ([implementation, members]) =>
+      members.includes(member) &&
+      own === (implementation.prototype as Record<string, unknown>)[member],
+  );
+}
+
+/**
+ * The types `AdtClientLegacy` hands out through `absentOnLegacy`: a plain
+ * object whose every member answers a refusal without a request. Each name is
+ * the handler's `objectType` and its factory's suffix (`getDomain`, …).
+ */
+const ABSENT_ON_LEGACY = [
+  'Domain',
+  'DataElement',
+  'Structure',
+  'Table',
+  'TableType',
+  'AccessControl',
+  'ServiceDefinition',
+  'ServiceBinding',
+  'BehaviorDefinition',
+  'BehaviorImplementation',
+  'MetadataExtension',
+  'Enhancement',
+  'AuthorizationField',
+  'FeatureToggle',
+];
+
+/** A connection that refuses every request: the reference handlers send none. */
+const NO_CONNECTION = {
+  makeAdtRequest: () => {
+    throw new Error('a legacy refusal handler sent a request');
+  },
+} as unknown as IAbapConnection;
+
+/**
+ * Whether `handler` is a handler `absentOnLegacy` made: its `objectType` is
+ * one of {@link ABSENT_ON_LEGACY}, and it matches the handler the legacy
+ * client's own factory hands out for that type — the same keys, and the
+ * member the same refusal (`absentOnLegacy` builds each member from one
+ * source, so a member with any other body is not a refusal).
+ */
+function isAbsentOnLegacy(handler: object, member: string): boolean {
+  if (Object.getPrototypeOf(handler) !== Object.prototype) return false;
+  const objectType = (handler as { objectType?: unknown }).objectType;
+  if (typeof objectType !== 'string' || !ABSENT_ON_LEGACY.includes(objectType))
+    return false;
+  const client = new AdtClientLegacy(NO_CONNECTION) as unknown as Record<
+    string,
+    (() => Record<string, unknown>) | undefined
+  >;
+  const reference = client[`get${objectType}`]?.call(client);
+  if (!reference || Object.getPrototypeOf(reference) !== Object.prototype)
+    return false;
+  const own = (handler as Record<string, unknown>)[member];
+  const expected = reference[member];
   return (
-    (provider && fromProvider(key, provider)) ??
-    SENT_BEFORE_36[key] ??
-    TEST_HEADERS
+    Object.hasOwn(handler, member) &&
+    typeof own === 'function' &&
+    typeof expected === 'function' &&
+    // Catches an accidental handler, not deliberate evasion: a function with a forged toString() copying the refusal's body still passes.
+    own.toString() === expected.toString() &&
+    Object.keys(handler).sort().join() === Object.keys(reference).sort().join()
+  );
+}
+
+/**
+ * The pair for an **integration** test, where the request reaches a real
+ * system. A member with no recorded pair throws, naming `handler.member`:
+ * a fake `TEST_HEADERS` pair must never go to SAP. The one exception is a
+ * member that answers a refusal and sends no request at all (a type or an
+ * operation the legacy client refuses); it gets `TEST_HEADERS`, which nothing
+ * receives.
+ */
+export function integrationHeadersOf(
+  handler: object,
+  member: string,
+  config?: object,
+): IAdtHeaders {
+  const pair = recordedPair(handler, member, config);
+  if (pair) return pair;
+  const owner = ownerOf(handler, member);
+  if (
+    (owner && isLegacyRefusal(handler, member)) ||
+    (!owner && isAbsentOnLegacy(handler, member))
+  )
+    return TEST_HEADERS;
+  const name =
+    owner ??
+    (handler as { constructor?: { name?: string } }).constructor?.name ??
+    'unknown handler';
+  throw new Error(
+    `No Accept/Content-Type pair recorded for ${name}.${member}: add it to SENT_BEFORE_36 in src/__tests__/helpers/adtHeaders.ts. An integration test does not send TEST_HEADERS to SAP.`,
   );
 }

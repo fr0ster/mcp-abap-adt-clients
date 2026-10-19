@@ -10,7 +10,7 @@ import { AdtBatchConnection } from '../../../batch';
 import { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { escapeXmlAttr } from '../../../utils/xml';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { finaliseBatch } from '../../helpers/batchFinalisation';
 import { configuredCase, gate } from '../../helpers/caseGate';
 import { createTestConnection } from '../../helpers/sessionConfig';
@@ -111,7 +111,9 @@ gate('batch', 'domains')(
     }
     async function remove(label: string, mustDelete: boolean): Promise<void> {
       const pending = configs.map((config) =>
-        domain.delete(config, { headers: headersOf(domain, 'delete') }),
+        domain.delete(config, {
+          headers: integrationHeadersOf(domain, 'delete'),
+        }),
       );
       await execute(label);
       // A partial run may not have created every domain.
@@ -131,7 +133,9 @@ gate('batch', 'domains')(
     try {
       await remove('delete_leftovers_ms', false);
       const created = configs.map((config) =>
-        domain.create(config, { headers: headersOf(domain, 'create') }),
+        domain.create(config, {
+          headers: integrationHeadersOf(domain, 'create'),
+        }),
       );
       const locked = configs.map((config) => domain.lock(config));
       await execute('create_lock_ms');
@@ -146,7 +150,7 @@ gate('batch', 'domains')(
       const writes = configs.map((config, i) => {
         const source = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXmlAttr(config.domainName)}" adtcore:type="DOMA/DD" adtcore:description="Batch domain CHAR 1" adtcore:language="EN" adtcore:masterLanguage="EN"><adtcore:packageRef adtcore:name="${escapeXmlAttr(config.packageName)}"/><doma:content><doma:typeInformation><doma:datatype>CHAR</doma:datatype><doma:length>000001</doma:length><doma:decimals>000000</doma:decimals></doma:typeInformation><doma:outputInformation><doma:length>000001</doma:length><doma:style>00</doma:style><doma:conversionExit/><doma:signExists>false</doma:signExists><doma:lowercase>false</doma:lowercase><doma:ampmFormat>false</doma:ampmFormat></doma:outputInformation><doma:valueInformation><doma:valueTableRef/><doma:appendExists>false</doma:appendExists><doma:fixValues/></doma:valueInformation></doma:content></doma:domain>`;
         return domain.updateMetadata(config, {
-          headers: headersOf(domain, 'updateMetadata'),
+          headers: integrationHeadersOf(domain, 'updateMetadata'),
           source,
           lockHandle: handles[i],
         });
@@ -168,7 +172,7 @@ gate('batch', 'domains')(
           configs.map((config) => ({ type: 'DOMA', name: config.domainName })),
           false,
           {
-            headers: headersOf(utils, 'activateObjectsGroup'),
+            headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
             analyse: analyseActivation,
           },
         ),

@@ -19,7 +19,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -176,7 +176,7 @@ describe('FunctionGroup (using AdtClient)', () => {
                     transportRequest,
                   },
                   {
-                    headers: headersOf(
+                    headers: integrationHeadersOf(
                       cleanupClient.getFunctionGroup(),
                       'delete',
                     ),

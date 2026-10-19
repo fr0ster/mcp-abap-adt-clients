@@ -15,7 +15,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
@@ -358,7 +358,7 @@ describe('ClassExecutor (integration)', () => {
           const profilerId = expectResult(
             await classExecutor.scheduleTrace({
               ...profilerParameters,
-              headers: headersOf(classExecutor, 'scheduleTrace'),
+              headers: integrationHeadersOf(classExecutor, 'scheduleTrace'),
             }),
             'scheduled trace',
           );

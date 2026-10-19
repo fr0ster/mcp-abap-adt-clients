@@ -18,7 +18,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -164,7 +164,12 @@ describe('Admin: Teardown shared dependencies', () => {
                 includeName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getFunctionInclude(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getFunctionInclude(),
+                  'delete',
+                ),
+              },
             );
           },
           testsLogger,
@@ -196,7 +201,12 @@ describe('Admin: Teardown shared dependencies', () => {
                 functionGroupName: item.function_group,
                 transportRequest,
               },
-              { headers: headersOf(client.getFunctionModule(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getFunctionModule(),
+                  'delete',
+                ),
+              },
             );
           },
           testsLogger,
@@ -223,7 +233,12 @@ describe('Admin: Teardown shared dependencies', () => {
                 name: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getBehaviorDefinition(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getBehaviorDefinition(),
+                  'delete',
+                ),
+              },
             );
           },
           testsLogger,
@@ -250,7 +265,12 @@ describe('Admin: Teardown shared dependencies', () => {
                 serviceDefinitionName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getServiceDefinition(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getServiceDefinition(),
+                  'delete',
+                ),
+              },
             );
           },
           testsLogger,
@@ -277,7 +297,12 @@ describe('Admin: Teardown shared dependencies', () => {
                 accessControlName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getAccessControl(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getAccessControl(),
+                  'delete',
+                ),
+              },
             );
           },
           testsLogger,
@@ -304,7 +329,9 @@ describe('Admin: Teardown shared dependencies', () => {
                 interfaceName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getInterface(), 'delete') },
+              {
+                headers: integrationHeadersOf(client.getInterface(), 'delete'),
+              },
             );
           },
           testsLogger,
@@ -327,7 +354,7 @@ describe('Admin: Teardown shared dependencies', () => {
                 ddlName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getDdl(), 'delete') },
+              { headers: integrationHeadersOf(client.getDdl(), 'delete') },
             );
           },
           testsLogger,
@@ -350,7 +377,7 @@ describe('Admin: Teardown shared dependencies', () => {
                 tableName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getTable(), 'delete') },
+              { headers: integrationHeadersOf(client.getTable(), 'delete') },
             );
           },
           testsLogger,
@@ -377,7 +404,9 @@ describe('Admin: Teardown shared dependencies', () => {
                 structureName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getStructure(), 'delete') },
+              {
+                headers: integrationHeadersOf(client.getStructure(), 'delete'),
+              },
             );
           },
           testsLogger,
@@ -392,12 +421,15 @@ describe('Admin: Teardown shared dependencies', () => {
           'data_elements',
           'data_element',
           (name: string) =>
-            client
-              .getDataElement()
-              .delete(
-                { dataElementName: name, transportRequest },
-                { headers: headersOf(client.getDataElement(), 'delete') },
-              ),
+            client.getDataElement().delete(
+              { dataElementName: name, transportRequest },
+              {
+                headers: integrationHeadersOf(
+                  client.getDataElement(),
+                  'delete',
+                ),
+              },
+            ),
         ],
         [
           'domains',
@@ -407,7 +439,7 @@ describe('Admin: Teardown shared dependencies', () => {
               .getDomain()
               .delete(
                 { domainName: name, transportRequest },
-                { headers: headersOf(client.getDomain(), 'delete') },
+                { headers: integrationHeadersOf(client.getDomain(), 'delete') },
               ),
         ],
       ] as const) {
@@ -446,7 +478,12 @@ describe('Admin: Teardown shared dependencies', () => {
                 functionGroupName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getFunctionGroup(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getFunctionGroup(),
+                  'delete',
+                ),
+              },
             );
           },
           testsLogger,
@@ -473,7 +510,7 @@ describe('Admin: Teardown shared dependencies', () => {
                 programName: item.name,
                 transportRequest,
               },
-              { headers: headersOf(client.getProgram(), 'delete') },
+              { headers: integrationHeadersOf(client.getProgram(), 'delete') },
             );
           },
           testsLogger,
@@ -491,7 +528,7 @@ describe('Admin: Teardown shared dependencies', () => {
                 packageName: sharedConfig.package,
                 transportRequest,
               },
-              { headers: headersOf(client.getPackage(), 'delete') },
+              { headers: integrationHeadersOf(client.getPackage(), 'delete') },
             );
           },
           testsLogger,

@@ -18,7 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { INTERFACE, PROGRAM } from '../../../../endpoints/objects';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { escapeXmlAttr } from '../../../../utils/xml';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
   gate,
@@ -133,7 +133,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     if (existing.ok) {
       expectResult(
         await client.getEnhancement().delete(object, {
-          headers: headersOf(client.getEnhancement(), 'delete'),
+          headers: integrationHeadersOf(client.getEnhancement(), 'delete'),
           analyse: analyseDeletion,
         }),
         'delete leftover',
@@ -146,7 +146,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
   async function deleteAndVerify(object: IEnhancementConfig): Promise<void> {
     expectResult(
       await client.getEnhancement().delete(object, {
-        headers: headersOf(client.getEnhancement(), 'delete'),
+        headers: integrationHeadersOf(client.getEnhancement(), 'delete'),
         analyse: analyseDeletion,
       }),
       'delete enhancement',
@@ -172,7 +172,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       if (source !== undefined) {
         expectResult(
           await enhancement.update(object, {
-            headers: headersOf(enhancement, 'update'),
+            headers: integrationHeadersOf(enhancement, 'update'),
             ...analyse,
             source,
             lockHandle: handle,
@@ -237,7 +237,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
             if (read.ok)
               expectResult(
                 await cls.delete(classConfig, {
-                  headers: headersOf(cls, 'delete'),
+                  headers: integrationHeadersOf(cls, 'delete'),
                   analyse: analyseDeletion,
                 }),
                 'delete BAdI class',
@@ -251,7 +251,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
               if (read.ok)
                 expectResult(
                   await intf.delete(intfConfig, {
-                    headers: headersOf(intf, 'delete'),
+                    headers: integrationHeadersOf(intf, 'delete'),
                     analyse: analyseDeletion,
                   }),
                   'delete BAdI interface',
@@ -272,7 +272,11 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         try {
           expectResult(
             await enhancement.updateMetadata(object, {
-              headers: headersOf(enhancement, 'updateMetadata', object),
+              headers: integrationHeadersOf(
+                enhancement,
+                'updateMetadata',
+                object,
+              ),
               ...analyse,
               source,
               lockHandle: handle,
@@ -287,7 +291,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         }
         expectResult(
           await enhancement.activate(object, {
-            headers: headersOf(enhancement, 'activate'),
+            headers: integrationHeadersOf(enhancement, 'activate'),
             analyse: analyseActivation,
           }),
           'activate BAdI document',
@@ -306,7 +310,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await intf.create(intfConfig, {
             ...analyse,
-            headers: headersOf(intf, 'create'),
+            headers: integrationHeadersOf(intf, 'create'),
           }),
           'create BAdI interface',
         );
@@ -317,7 +321,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         try {
           expectResult(
             await intf.update(intfConfig, {
-              headers: headersOf(intf, 'update'),
+              headers: integrationHeadersOf(intf, 'update'),
               ...analyse,
               lockHandle: interfaceHandle,
               source: `INTERFACE ${interfaceName} PUBLIC.\n INTERFACES if_badi_interface.\n METHODS calc RETURNING VALUE(r) TYPE i.\nENDINTERFACE.`,
@@ -332,7 +336,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         }
         expectResult(
           await intf.activate(intfConfig, {
-            headers: headersOf(intf, 'activate'),
+            headers: integrationHeadersOf(intf, 'activate'),
             analyse: analyseActivation,
           }),
           'activate BAdI interface',
@@ -340,7 +344,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await enhancement.create(spot, {
             ...analyse,
-            headers: headersOf(enhancement, 'create', spot),
+            headers: integrationHeadersOf(enhancement, 'create', spot),
           }),
           'create BAdI spot',
         );
@@ -372,7 +376,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await cls.create(classConfig, {
             ...analyse,
-            headers: headersOf(cls, 'create'),
+            headers: integrationHeadersOf(cls, 'create'),
           }),
           'create BAdI class',
         );
@@ -383,7 +387,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         try {
           expectResult(
             await cls.update(classConfig, {
-              headers: headersOf(cls, 'update'),
+              headers: integrationHeadersOf(cls, 'update'),
               ...analyse,
               lockHandle: classHandle,
               source: `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.\n PUBLIC SECTION.\n INTERFACES if_badi_interface.\n INTERFACES ${interfaceName}.\nENDCLASS.\nCLASS ${className} IMPLEMENTATION.\n METHOD ${interfaceName}~calc.\n r = 1.\n ENDMETHOD.\nENDCLASS.`,
@@ -398,7 +402,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         }
         expectResult(
           await cls.activate(classConfig, {
-            headers: headersOf(cls, 'activate'),
+            headers: integrationHeadersOf(cls, 'activate'),
             analyse: analyseActivation,
           }),
           'activate BAdI class',
@@ -406,7 +410,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await enhancement.create(container, {
             ...analyse,
-            headers: headersOf(enhancement, 'create', container),
+            headers: integrationHeadersOf(enhancement, 'create', container),
           }),
           'create BAdI container',
         );
@@ -452,7 +456,11 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await client.getEnhancement().create(object, {
             ...analyse,
-            headers: headersOf(client.getEnhancement(), 'create', object),
+            headers: integrationHeadersOf(
+              client.getEnhancement(),
+              'create',
+              object,
+            ),
           }),
           'create XSB',
         );
@@ -466,7 +474,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         await lockWindow(object);
         expectResult(
           await client.getEnhancement().activate(object, {
-            headers: headersOf(client.getEnhancement(), 'activate'),
+            headers: integrationHeadersOf(client.getEnhancement(), 'activate'),
             analyse: analyseActivation,
           }),
           'activate XSB',
@@ -493,14 +501,22 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await client.getEnhancement().create(spot, {
             ...analyse,
-            headers: headersOf(client.getEnhancement(), 'create', spot),
+            headers: integrationHeadersOf(
+              client.getEnhancement(),
+              'create',
+              spot,
+            ),
           }),
           'create XHB spot',
         );
         expectResult(
           await client.getEnhancement().create(object, {
             ...analyse,
-            headers: headersOf(client.getEnhancement(), 'create', object),
+            headers: integrationHeadersOf(
+              client.getEnhancement(),
+              'create',
+              object,
+            ),
           }),
           'create XHB',
         );
@@ -578,7 +594,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
             },
             {
               ...analyse,
-              headers: headersOf(client.getEnhancement(), 'create', {
+              headers: integrationHeadersOf(client.getEnhancement(), 'create', {
                 ...object,
                 enhancementOption,
                 enhancementMode,
@@ -611,7 +627,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         );
         expectResult(
           await client.getEnhancement().activate(object, {
-            headers: headersOf(client.getEnhancement(), 'activate'),
+            headers: integrationHeadersOf(client.getEnhancement(), 'activate'),
             analyse: analyseActivation,
           }),
           'activate XHH',
