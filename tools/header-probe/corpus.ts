@@ -636,6 +636,8 @@ export interface ICorpusRow {
   afterWrite?: IWriteCheck;
   /** The temporary object the row ran on (`<type> <name>`), when it ran on one. */
   temporary?: string;
+  /** What the run did on the object after the row (a lock freed). */
+  objectNote?: string;
   /** Where the member runs: on a temporary object, not coverable (why), or on the probe name. */
   coverage?: string;
   /** `skipped: <reason>`: the row was not sent. */

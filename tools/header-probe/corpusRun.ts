@@ -643,6 +643,8 @@ interface IContext {
   temporary?: ITemporaryContext;
   /** What failed on the temporary objects (an unlock): the run ends failed. */
   failures: string[];
+  /** A session of its own, ended after: frees a lock no handle came back for. */
+  ownSession?: OwnSession;
 }
 
 /** Where the calls go: the connection (or the envelope), and whether it is an envelope. */
@@ -1029,11 +1031,13 @@ async function runClients(ctx: IContext): Promise<void> {
   const temporary = ctx.temporary;
   if (!temporary || !onObjects.length) return;
   ctx.out.progress(`clients: ${onObjects.length} members on temporary objects`);
-  const runner = (batched: boolean) =>
+  const runner = (batched: boolean, connection = ctx.connection) =>
     new Run<ITarget>(
-      ctx.connection,
+      connection,
       ctx.mode,
-      direct,
+      connection === ctx.connection
+        ? direct
+        : { base: connection, parts: false },
       onBatch,
       ctx.interrupt,
       ctx.out,
@@ -1054,8 +1058,9 @@ async function runClients(ctx: IContext): Promise<void> {
     rows: ctx.corpus.rows,
     target: (on) => on,
     headersFor: (member) => headersFor(ctx.mode, member),
-    send: async (plans, batched) => {
-      const run = runner(batched);
+    ...(ctx.ownSession ? { ownSession: ctx.ownSession } : {}),
+    send: async (plans, batched, connection) => {
+      const run = runner(batched, connection);
       try {
         await run.all(
           plans.map((plan) => ({
@@ -1284,6 +1289,17 @@ export function exitCodeOf(state: IRunState, interrupt: Interrupt): number {
 }
 
 /**
+ * Per gated connection, how to end its session and open a new one: what
+ * frees a lock whose handle never came back.
+ */
+const sessionsOf = new WeakMap<IAbapConnection, OwnSession>();
+
+/** Runs `use` on a session of its own, ended after: what frees a lock no handle came back for. */
+export type OwnSession = (
+  use: (connection: IAbapConnection) => Promise<void>,
+) => Promise<void>;
+
+/**
  * One run: the logon through the gate, the body on the gated connection,
  * the report — always written, marked with what ended the run —, the line
  * that says it, and the exit code from the run's state.
@@ -1306,7 +1322,20 @@ async function runWith(
       if (!input.open) throw new Error('the run needs a connection or open()');
       raw = await gateConnect(input.open, input.interrupt);
     }
-    await body(gate(raw, { interrupt: input.interrupt }), state);
+    const gated = gate(raw, { interrupt: input.interrupt });
+    const { open, close } = input;
+    if (open && close && !input.connection)
+      sessionsOf.set(gated, async (use) => {
+        // A session of its own, through the gate, closed after: the logoff
+        // ends it and every lock it held (measured).
+        const own = await gateConnect(open, input.interrupt);
+        try {
+          await use(gate(own, { interrupt: input.interrupt }));
+        } finally {
+          await close(own);
+        }
+      });
+    await body(gated, state);
   } catch (error) {
     if (error instanceof LogonRefused)
       state.stop ??= { status: error.status, kind: 'logon', endpoint: 'logon' };
@@ -1434,6 +1463,9 @@ async function runOn(
       ...(input.temporaryObjects && input.source === 'clients'
         ? { temporary: input.temporaryObjects }
         : {}),
+      ...(sessionsOf.get(connection)
+        ? { ownSession: sessionsOf.get(connection) }
+        : {}),
       failures,
     };
     await withCleanup(ledger, () =>
@@ -1458,7 +1490,10 @@ async function runOn(
     state.failure ??= `${remaining.length} object(s) may remain: ${remaining.map((removal) => removal.label).join(', ')}`;
   if (input.mode === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
   const files = finishCorpus(corpus, endedBy(state, input.interrupt), input);
-  const created = corpus.rows.filter((row) => row.afterWrite?.exists === true);
+  // A temporary object is there after a write by design; the probe name is not.
+  const created = corpus.rows.filter(
+    (row) => row.afterWrite?.exists === true && !row.temporary,
+  );
   if (created.length) {
     out.loud(`\n!!! ${created.length} write probe(s) created the probe name:`);
     for (const row of created)

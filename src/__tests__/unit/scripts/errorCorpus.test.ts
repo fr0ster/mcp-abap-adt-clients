@@ -3595,6 +3595,22 @@ describe('members on temporary objects', () => {
     expect(on.some((seen) => seen.method === 'PUT' && seen.part)).toBe(false);
   });
 
+  it('a temporary object there after a write is not reported as the probe name created', async () => {
+    const system = objectSystem();
+    const { loud, out } = output();
+    await runFull({
+      open: async () => onTheWire(system.connection),
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+      temporaryObjects: TEMPORARY,
+    });
+    expect(loud.some((line) => line.includes('created the probe name'))).toBe(
+      false,
+    );
+  });
+
   it('a write gets a real lock handle, is sent once per row and read back', async () => {
     const system = objectSystem();
     const file = (await run(system)).file as NonNullable<
@@ -3725,6 +3741,79 @@ describe('members on temporary objects', () => {
     expect(on[refused + 1]?.url).toContain('_action=LOCK');
     expect(on[refused + 1]?.headers.accept).not.toBe(PROBE_TYPE);
     expect(on[refused + 2]?.url).toContain('_action=UNLOCK');
+  });
+
+  it('a LOCK member runs on a session of its own, closed after: a lock it holds with no handle is freed with it', async () => {
+    // A classic LOCK takes the lock and refuses the bogus Accept; while it is
+    // held another LOCK is refused; a session's logoff frees its locks.
+    const held = new Map<string, number>();
+    const closed: number[] = [];
+    let sessions = 0;
+    const systemFor = (session: number) =>
+      objectSystem((request) => {
+        if (
+          request.method === 'DELETE' ||
+          request.url.includes('/deletion/delete')
+        )
+          for (const path of [...held.keys()])
+            if (`${request.url} ${request.body}`.toLowerCase().includes(path))
+              held.delete(path);
+        if (!request.url.includes('_action=')) return undefined;
+        const path = request.url.split('?')[0].toLowerCase();
+        if (request.url.includes('_action=UNLOCK')) {
+          held.delete(path);
+          return { status: 200 };
+        }
+        if (!request.url.includes('_action=LOCK')) return undefined;
+        if (held.has(path)) return { status: 403 };
+        held.set(path, session);
+        return request.headers.accept === PROBE_TYPE
+          ? { status: 406 }
+          : { status: 200, body: LOCKED };
+      });
+    const main = systemFor(0);
+    const connections = new Map<unknown, number>();
+    const result = await runFull({
+      open: async () => {
+        const session = sessions++;
+        const connection =
+          session === 0 ? main.connection : systemFor(session).connection;
+        connections.set(connection, session);
+        return onTheWire(connection);
+      },
+      close: async (connection) => {
+        const session = connections.get(connection) ?? -1;
+        closed.push(session);
+        for (const [path, owner] of [...held])
+          if (owner === session) held.delete(path);
+      },
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
+    });
+    expect(sessions).toBeGreaterThan(1);
+    expect(closed.filter((session) => session > 0).length).toBe(sessions - 1);
+    expect(result.file?.endedBy).toBe('complete');
+    expect([...held.values()].filter((owner) => owner > 0)).toEqual([]);
+  });
+
+  it('without a session to end, a lock that cannot be freed ends the run failed', async () => {
+    const held = new Set<string>();
+    const system = objectSystem((request) => {
+      if (!request.url.includes('_action=LOCK')) return undefined;
+      const path = request.url.split('?')[0].toLowerCase();
+      if (held.has(path)) return { status: 403 };
+      if (request.headers.accept === PROBE_TYPE) {
+        held.add(path);
+        return { status: 406 };
+      }
+      return undefined;
+    });
+    const result = await run(system);
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toMatch(/the object stays locked/);
   });
 
   it('an object left behind is reported and the run ends failed', async () => {

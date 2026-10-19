@@ -297,10 +297,11 @@ export interface IObjectRowPlan<T> {
   after?: (capture: ICapture) => void;
 }
 
-/** Sends planned rows: in envelopes (`batched`), or one by one. */
+/** Sends planned rows: in envelopes (`batched`), or one by one; on `connection` when given. */
 export type SendRows<T> = (
   rows: readonly IObjectRowPlan<T>[],
   batched: boolean,
+  connection?: IAbapConnection,
 ) => Promise<void>;
 
 export interface IObjectRunInput<T> {
@@ -321,6 +322,13 @@ export interface IObjectRunInput<T> {
   send: SendRows<T>;
   /** The member's headers in the mode. */
   headersFor: (member: IMemberEndpoint) => IAdtHeaders;
+  /**
+   * Runs `use` on a session of its own, ended after: the logoff frees every
+   * lock it held — a LOCK member runs there.
+   */
+  ownSession?: (
+    use: (connection: IAbapConnection) => Promise<void>,
+  ) => Promise<void>;
 }
 
 /** The run of the object members of one header mode; it answers what it made. */
@@ -506,45 +514,54 @@ export async function runOnTemporaryObjects<T>(
       }
     }
 
-    // 3. The lock members: a lock granted is released; an unlock is given a
-    // real handle, released again if the unlock refused it.
+    // 3. The lock members. A classic LOCK checks the Accept after it took the
+    // lock (SAP's code): a refused one may hold it with no handle to release
+    // it, and while it holds a LOCK with the known pair is refused
+    // (measured). So a LOCK member runs on a session of its own, ended
+    // after — the logoff frees its locks —; a LOCK and an UNLOCK on ours
+    // then prove the object free. An unlock is given a real handle, released
+    // again if the unlock refused it.
     for (const member of of('lock')) {
       const unlocks =
         member.member === 'unlock' ||
         member.requests.some((request) => request.action === 'UNLOCK');
       for (const plan of planOf(member)) {
         input.interrupt.check();
-        const held = unlocks ? await takeLock() : undefined;
-        if (held) lock.handle = held;
+        if (unlocks) {
+          const held = await takeLock();
+          if (held) lock.handle = held;
+          try {
+            await input.send([plan], false);
+          } finally {
+            delete lock.handle;
+          }
+          if (held && !isSuccess(plan.row.status)) await release(held);
+          continue;
+        }
         let granted: string | undefined;
-        try {
-          await input.send(
-            [
-              {
-                ...plan,
-                after: (capture) => {
-                  if (!unlocks) granted = lockHandle(capture);
-                },
-              },
-            ],
-            false,
+        const withHandle = {
+          ...plan,
+          after: (capture: ICapture) => {
+            granted = lockHandle(capture);
+          },
+        };
+        if (input.ownSession)
+          await input.ownSession((connection) =>
+            input.send([withHandle], false, connection),
           );
-        } finally {
-          delete lock.handle;
+        else {
+          await input.send([withHandle], false);
+          if (granted) await release(granted);
         }
-        if (granted) await release(granted);
-        else if (!unlocks) {
-          // A classic LOCK checks the Accept after it took the lock (SAP's
-          // code): a 406 may leave it held, and no handle came back. A LOCK
-          // with the known pair answers the handle; the UNLOCK frees it.
-          const again = await takeLock();
-          if (again) await release(again);
-          else
-            probe.lockFailures.push(
-              `${type} ${name}: after ${member.handler}.${member.member} answered ${plan.row.status ?? plan.row.failure ?? 'nothing'}, a LOCK to release it answered no handle`,
-            );
-        }
-        if (held && !isSuccess(plan.row.status)) await release(held);
+        const free = await takeLock();
+        if (free) await release(free);
+        else
+          probe.lockFailures.push(
+            `${type} ${name}: after ${member.handler}.${member.member} answered ${plan.row.status ?? plan.row.failure ?? 'nothing'}, the object stays locked${input.ownSession ? ' after its session ended' : ' (no session of its own to end)'}`,
+          );
+        plan.row.objectNote = input.ownSession
+          ? 'sent on a session of its own, ended after; the object then locked and unlocked'
+          : 'the object then locked and unlocked';
       }
     }
 
