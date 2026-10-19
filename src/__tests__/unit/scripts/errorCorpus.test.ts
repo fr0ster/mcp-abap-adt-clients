@@ -28,6 +28,7 @@ import {
   authorizationProblem,
   buildHeaderCorpus,
   classifyNeeds,
+  contentTypeContrasts,
   discoveryProbes,
   emptyNamed,
   existenceOf,
@@ -3382,5 +3383,84 @@ describe('long-poll endpoints', () => {
     expect(LONG_POLL_ENDPOINTS.every((entry) => entry.what.length > 0)).toBe(
       true,
     );
+  });
+});
+
+describe('the Content-Type contrast', () => {
+  const path = '/sap/bc/adt/packages/settings';
+  const working = 'application/vnd.sap.adt.packages.settings.v2+xml';
+  const at = (
+    extra: Partial<ICorpusRow>,
+    accept: string | null,
+    contentType: string | null,
+  ) =>
+    row({
+      source: 'discovery',
+      endpoint: { method: 'POST', path },
+      onWire: [{ accept, contentType }],
+      ...extra,
+    });
+  // The measured shape: Accept absent in all three calls.
+  const bogus = (accept: string | null = null) => [
+    at(
+      { bogus: 'accept', status: 400, sapType: 'ExceptionInvalidData' },
+      PROBE_TYPE,
+      working,
+    ),
+    at({ bogus: 'content-type', status: 406 }, accept, PROBE_TYPE),
+  ];
+  const none = at({ status: 406 }, null, null);
+  const corpus = (status: number, accept: string | null = null) =>
+    at({ status, sapType: 'ExceptionInvalidData' }, accept, working);
+
+  it('the packages/settings shape: Content-Type checked, inferred from the contrast', () => {
+    const [entry] = classifyNeeds(bogus(), [none, corpus(400)]);
+    expect(entry.contentType).toEqual({
+      verdict: 'checked',
+      status: 406,
+      reason:
+        'inferred from the contrast: 406 without a working Content-Type, 400 with one',
+    });
+    expect(entry.needs).toBe('content-type');
+    // The Accept verdict is not changed by it.
+    expect(entry.accept.verdict).toBe('unknown');
+  });
+
+  it('a different Accept between the two answers gives no inference', () => {
+    const [entry] = classifyNeeds(bogus(), [
+      at({ status: 406 }, 'application/xml', null),
+      corpus(400, 'text/plain'),
+    ]);
+    expect(entry.contentType.verdict).toBe('unknown');
+  });
+
+  it('both answers 406 give no inference', () => {
+    const [entry] = classifyNeeds(bogus(), [none, corpus(406)]);
+    expect(entry.contentType.verdict).toBe('unknown');
+  });
+
+  it('a 406 to a working Content-Type is no refused side', () => {
+    const rows = [
+      at({ status: 406 }, null, 'application/a+xml'),
+      at({ status: 400 }, null, 'application/b+xml'),
+    ].map((r) => ({ row: r, phase: 1 as const }));
+    expect(contentTypeContrasts(rows, (r) => r.endpoint?.path ?? '').size).toBe(
+      0,
+    );
+  });
+
+  it('in the final pass a pair completed by phase 2 is decided in phase 2', () => {
+    const item = evidenceItem({
+      endpoint: `POST ${path}`,
+      contentType: { verdict: 'unknown', status: 406, reason: '406' },
+    });
+    const [p2] = withContrast([item], [none], [corpus(400)]);
+    expect(p2.contentType).toMatchObject({ verdict: 'checked', decidedIn: 2 });
+    const [entry] = buildHeaderCorpus([p2], extras);
+    expect(entry.settledBy).toBe('phase 2');
+    const [p1] = withContrast([item], [none, corpus(400)], []);
+    expect(p1.contentType.verdict).toBe('checked');
+    expect(p1.contentType.decidedIn).toBeUndefined();
+    expect(buildHeaderCorpus([p1], extras)[0].settledBy).toBe('phase 1');
   });
 });

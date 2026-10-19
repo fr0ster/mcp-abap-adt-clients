@@ -1074,6 +1074,73 @@ export function isContrast(row: ICorpusRow): boolean {
   );
 }
 
+/** What a Content-Type contrast found on one endpoint: the deciding pair's phase and statuses. */
+export interface IContentTypeContrast {
+  phase: 1 | 2;
+  /** The 406 or 415 to the bogus or absent Content-Type. */
+  refused: number;
+  /** The answer to the working one. */
+  answered: number;
+}
+
+/** The last request's headers on the wire, if recorded. */
+const wireOf = (row: ICorpusRow) => row.onWire[row.onWire.length - 1];
+
+/**
+ * The Content-Type contrast: on one endpoint, two answers with the same
+ * Accept on the wire (both absent, or the same value), one to a bogus or
+ * absent Content-Type refused 406 or 415, the other to a working Content-Type
+ * answered anything else (a 2xx, a 400 about the body, a 404, …): the
+ * Content-Type made the difference. Measured: a resource can refuse an
+ * unsupported Content-Type with a bare 406 (no body, no SAP exception)
+ * instead of a 415. Per key, the earliest phase whose pair decides (a pair's
+ * phase is its later row's).
+ */
+export function contentTypeContrasts(
+  rows: readonly { row: ICorpusRow; phase: 1 | 2 }[],
+  keyOf: (row: ICorpusRow) => string,
+): Map<string, IContentTypeContrast> {
+  const by = new Map<string, { row: ICorpusRow; phase: 1 | 2 }[]>();
+  for (const item of rows)
+    if (item.row.endpoint && item.row.status !== undefined && wireOf(item.row))
+      by.set(keyOf(item.row), [...(by.get(keyOf(item.row)) ?? []), item]);
+  const found = new Map<string, IContentTypeContrast>();
+  for (const [key, items] of by)
+    for (const refused of items) {
+      const wire = wireOf(refused.row);
+      const status = refused.row.status;
+      if (!wire || (status !== 406 && status !== 415)) continue;
+      if (wire.contentType !== null && wire.contentType !== PROBE_TYPE)
+        continue;
+      for (const working of items) {
+        const other = wireOf(working.row);
+        const answered = working.row.status;
+        if (!other || answered === undefined) continue;
+        if (answered === 406 || answered === 415) continue;
+        if (other.contentType === null || other.contentType === PROBE_TYPE)
+          continue;
+        if (other.accept !== wire.accept) continue;
+        const phase =
+          working.phase > refused.phase ? working.phase : refused.phase;
+        const known = found.get(key);
+        if (!known || phase < known.phase)
+          found.set(key, { phase, refused: status, answered });
+      }
+    }
+  return found;
+}
+
+/** The Content-Type verdict a contrast gives: checked, naming the two statuses. */
+export function byContentTypeContrast(
+  contrast: IContentTypeContrast,
+): IHeaderVerdict {
+  return {
+    verdict: 'checked',
+    status: contrast.refused,
+    reason: `inferred from the contrast: ${contrast.refused} without a working Content-Type, ${contrast.answered} with one`,
+  };
+}
+
 /**
  * The contrast rule on evidence built outside {@link classifyNeeds} (the
  * write cycle, the update measurement, the reads): an unnamed 406 is
@@ -1094,17 +1161,35 @@ export function withContrast(
     for (const row of of)
       if (row.endpoint && isContrast(row))
         contrast.set(endpointKey(row.endpoint), phase);
-  return evidence.map((item) => {
-    const phase = contrast.get(item.endpoint);
-    if (!item.accept.unnamed406 || phase === undefined) return item;
+  const typed = contentTypeContrasts(
+    [
+      ...rows.map((row) => ({ row, phase: 1 as const })),
+      ...phase2Rows.map((row) => ({ row, phase: 2 as const })),
+    ],
+    (row) => (row.endpoint ? endpointKey(row.endpoint) : ''),
+  );
+  const later = (phase: 1 | 2, item: IEvidence) => {
     const decidedIn = phase > item.phase ? phase : item.phase;
-    return {
-      ...item,
-      accept: {
-        ...byContrast(item.accept),
-        ...(decidedIn !== item.phase ? { decidedIn } : {}),
-      },
-    };
+    return decidedIn !== item.phase ? { decidedIn } : {};
+  };
+  return evidence.map((item) => {
+    let out = item;
+    const phase = contrast.get(item.endpoint);
+    if (item.accept.unnamed406 && phase !== undefined)
+      out = {
+        ...out,
+        accept: { ...byContrast(item.accept), ...later(phase, item) },
+      };
+    const ct = typed.get(item.endpoint);
+    if (item.contentType.verdict === 'unknown' && ct)
+      out = {
+        ...out,
+        contentType: {
+          ...byContentTypeContrast(ct),
+          ...later(ct.phase, item),
+        },
+      };
+    return out;
   });
 }
 
@@ -1293,6 +1378,10 @@ export function classifyNeeds(
   const contrast = new Set<string>();
   for (const row of evidence)
     if (!row.bogus && isContrast(row)) contrast.add(needsKey(row));
+  const typedContrast = contentTypeContrasts(
+    [...rows, ...evidence].map((row) => ({ row, phase: 1 as const })),
+    needsKey,
+  );
   const missing = new Map<string, ICorpusRow>();
   for (const row of [...rows, ...evidence])
     if (isAcceptHeaderMissing(row) && !missing.has(needsKey(row)))
@@ -1312,11 +1401,14 @@ export function classifyNeeds(
         status: 400,
         reason: '400 acceptHeaderMissing without Accept',
       };
-    const contentType = pair.contentType
+    let contentType = pair.contentType
       ? judge(pair.contentType, 415)
       : pair.accept?.skipped
         ? judge(pair.accept, 415)
         : ({ verdict: 'no body' } as IHeaderVerdict);
+    const typed = typedContrast.get(endpoint);
+    if (contentType.verdict === 'unknown' && typed)
+      contentType = byContentTypeContrast(typed);
     const detail = [
       verdictText('Accept', accept),
       verdictText('Content-Type', contentType),

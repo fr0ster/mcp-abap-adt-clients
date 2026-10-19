@@ -407,6 +407,22 @@ phase, that did not carry the bogus Accept (the phase-1 count takes phase 1's
 answers only). `settledBy` names the phase whose answers decided: a phase-1
 406 settled by an answer that only phase 2 gave is `settled by phase 2`.
 
+The Content-Type has a contrast of its own. A resource can refuse an
+unsupported Content-Type with a bare 406 instead of 415: no body, no response
+Content-Type, no SAP exception. Measured on one system: `POST
+/sap/bc/adt/packages/settings`, without Accept, answered 406 with no
+Content-Type and with a bogus one, and 400 `ExceptionInvalidData` with
+`application/vnd.sap.adt.packages.settings.v2+xml`. So on one endpoint two
+answers with the same Accept on the wire (both absent, or the same value) are
+compared. If the one to a bogus or absent Content-Type got 406 or 415 and the
+one to a working Content-Type got anything else (a 2xx, a 400 about the body,
+a 404, …), an `unknown` Content-Type verdict becomes `checked (inferred from
+the contrast: <refused> without a working Content-Type, <status> with one)`.
+Two 406s, or a different Accept between the two, infer nothing, and the
+Accept verdict is never changed by this pair. It applies in every phase, like
+the Accept contrast; `settledBy` and `decidedIn` follow the phase of the
+pair's later answer.
+
 ### Long-poll endpoints
 
 A long-poll endpoint holds the request while it waits — but only when it
