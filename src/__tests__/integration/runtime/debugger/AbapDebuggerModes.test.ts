@@ -7,8 +7,8 @@
  * of another user.
  *
  * Two probe classes implementing IF_OO_ADT_CLASSRUN — two distinct main
- * programs — are created in a local package, run under the debugger and deleted
- * at the end. Every case is independent: it arms what it needs and, in a
+ * programs, the shared ZAC_SHR_DBG_MODES_A and _B — are ensured from
+ * `shared_dependencies`, run under the debugger and never deleted. Every case is independent: it arms what it needs and, in a
  * `finally`, deletes its breakpoints, stops its listeners, ends what it attached
  * and waits for its runs.
  *
@@ -31,10 +31,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  analyseDebuggeeEnd,
-  analyseDeletion,
-} from '@mcp-abap-adt/adt-strategies';
+import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IDebuggerBreakpoint,
@@ -47,7 +44,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import {
   AbapDebugger,
@@ -57,8 +53,13 @@ import {
 import { readListenerConflict } from '../../../../runtime/debugger/abap';
 import { rawDocument } from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
 import {
-  closeOwnTestConnection,
+  ensureDebugTarget,
+  markerLines,
+  sharedSource,
+} from '../../../helpers/debuggerTargets';
+import {
   createTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -68,8 +69,7 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase, resolvePackageName, resolveTransportRequest } =
-  require('../../../helpers/test-helper');
+const { getEnabledTestCase } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -85,10 +85,10 @@ const testCase = getEnabledTestCase(
   'adt_abap_debugger_modes',
 );
 const CLASS_A: string = (
-  testCase?.params?.class_name ?? 'ZAC_DBG_MODES_A'
+  testCase?.params?.class_name ?? 'ZAC_SHR_DBG_MODES_A'
 ).toUpperCase();
 const CLASS_B: string = (
-  testCase?.params?.class_name_b ?? 'ZAC_DBG_MODES_B'
+  testCase?.params?.class_name_b ?? 'ZAC_SHR_DBG_MODES_B'
 ).toUpperCase();
 const SECOND_USER_ENV: string = String(
   testCase?.params?.second_user_env ?? '',
@@ -101,63 +101,26 @@ const SHORT_HOLD_SECONDS = 15;
 const STEP_TIMEOUT = 240_000;
 
 /**
+ * The two probes are shared classes (`shared_dependencies.classes`), never
+ * created or deleted here.
+ *
  * Probe A: five passes over the loop line, then the end line. At a stop on
  * the loop line the line has not run yet, so on the n-th hit `LV_I` is n - 1.
- */
-const SOURCE_A = `CLASS ${CLASS_A.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-ENDCLASS.
-
-CLASS ${CLASS_A.toLowerCase()} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lv_i TYPE i.
-    DO 5 TIMES.
-      lv_i = lv_i + 1. "BP:LOOP
-    ENDDO.
-    out->write( |done { lv_i }| ). "BP:END
-  ENDMETHOD.
-ENDCLASS.
-`;
-
-/**
+ *
  * Probe B: a caught division by zero, so an exception breakpoint stops it at
  * the CATCH line (measured 2026-10-09: the stop is reported there, not at the
  * raising statement), and the marked end line.
  */
-const SOURCE_B = `CLASS ${CLASS_B.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-ENDCLASS.
-
-CLASS ${CLASS_B.toLowerCase()} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lv_text TYPE string VALUE 'probe b'.
-    DATA lv_zero TYPE i.
-    TRY.
-        lv_zero = 1 / lv_zero. "BP:RAISE
-      CATCH cx_sy_zerodivide.
-        lv_text = 'probe b'.
-    ENDTRY.
-    out->write( lv_text ). "BP:END
-  ENDMETHOD.
-ENDCLASS.
-`;
+const SOURCE_A = sharedSource('classes', CLASS_A);
+const SOURCE_B = sharedSource('classes', CLASS_B);
+const MARKERS_A = ['LOOP', 'END'];
+const MARKERS_B = ['RAISE', 'END'];
 
 const OUTPUT_A = 'done 5';
 const OUTPUT_B = 'probe b';
 
-function markers(source: string): Record<string, number> {
-  const lines: Record<string, number> = {};
-  source.split('\n').forEach((text, index) => {
-    const marker = /"BP:(\w+)/.exec(text);
-    if (marker) lines[marker[1]] = index + 1;
-  });
-  return lines;
-}
-
-const LINE_A = markers(SOURCE_A);
-const LINE_B = markers(SOURCE_B);
+const LINE_A = markerLines(SOURCE_A, '"BP:');
+const LINE_B = markerLines(SOURCE_B, '"BP:');
 const CLASS_URI_A = `/sap/bc/adt/oo/classes/${CLASS_A.toLowerCase()}`;
 const CLASS_URI_B = `/sap/bc/adt/oo/classes/${CLASS_B.toLowerCase()}`;
 /** A class reference that maps to no main program: no such class exists. */
@@ -394,7 +357,12 @@ class Scope {
     return { connection, api: debuggerOn(connection) };
   }
 
-  async close(): Promise<void> {
+  /**
+   * Debugger state is released quietly — a refusal is logged — but every
+   * session this scope opened is logged off through `steps`, so a failed
+   * log-off is reported.
+   */
+  async close(steps: CleanupSteps): Promise<void> {
     const quietly = async (what: string, work: () => Promise<unknown>) => {
       try {
         await work();
@@ -432,10 +400,7 @@ class Scope {
       await within(run, 45_000);
     }
     for (const connection of this.sessions.splice(0)) {
-      connection.setSessionType('stateless');
-      await quietly('close a session', () =>
-        closeOwnTestConnection(connection),
-      );
+      await steps.logOff('a scope session', connection);
     }
   }
 }
@@ -446,10 +411,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   /** Arms breakpoints and listens; never attaches. */
   let listenerApi: Debugger;
   let identity: IDebuggerIdentity;
-  let packageName = '';
-  let transportRequest: string | undefined;
   let skipReason: string | undefined;
-  const deployed: string[] = [];
 
   function skipped(): boolean {
     if (skipReason) {
@@ -465,11 +427,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   async function inScope(work: (scope: Scope) => Promise<void>): Promise<void> {
     const scope = new Scope();
-    try {
-      await work(scope);
-    } finally {
-      await scope.close();
-    }
+    await withCleanup(
+      () => work(scope),
+      (steps) => scope.close(steps),
+    );
   }
 
   /** Run a probe class on the trigger connection (or the given one). */
@@ -585,55 +546,6 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     expect(await continueToEnd(scope, session.api, runB.run)).toBe(OUTPUT_B);
   }
 
-  async function deployProbe(className: string, source: string): Promise<void> {
-    const cls = new AdtClient(
-      listenerConnection as Connection,
-      connectionLogger,
-    ).getClass();
-    const config = {
-      className,
-      packageName,
-      description: 'Debugger modes integration probe',
-      ...(transportRequest ? { transportRequest } : {}),
-    };
-    const created = await cls.create(config, {
-      headers: integrationHeadersOf(cls, 'create'),
-    });
-    // An object that already exists is not ours: neither overwritten here nor
-    // deleted in afterAll, so the setup fails instead.
-    if (!created.ok) {
-      throw new Error(
-        `probe ${className} create: ${created.getError().message} (an existing object is never overwritten; remove it or pick another name)`,
-      );
-    }
-    deployed.push(className);
-    const lock = await cls.lock(config);
-    if (!lock.ok) {
-      throw new Error(`probe ${className} lock: ${lock.getError().message}`);
-    }
-    const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, {
-      headers: integrationHeadersOf(cls, 'update'),
-      source,
-      lockHandle,
-    });
-    await cls.unlock(config, lockHandle);
-    if (!written.ok) {
-      throw new Error(
-        `probe ${className} write: ${written.getError().message}`,
-      );
-    }
-    const activated = await cls.activate(config, {
-      headers: integrationHeadersOf(cls, 'activate'),
-    });
-    if (!activated.ok) {
-      throw new Error(
-        `probe ${className} activate: ${activated.getError().message}`,
-      );
-    }
-    logTestStep(`probe ${className} active in ${packageName}`, testsLogger);
-  }
-
   beforeAll(async () => {
     if (!testCase) {
       skipReason = 'runtime_debugger.adt_abap_debugger_modes is not enabled';
@@ -657,15 +569,21 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
       testsLogger,
     );
     listenerApi = debuggerOn(listenerConnection);
-    packageName = resolvePackageName(testCase.params?.package_name);
-    // A local package takes no transport.
-    transportRequest = packageName.startsWith('$')
-      ? undefined
-      : resolveTransportRequest(testCase.params?.transport_request) ||
-        undefined;
-
-    await deployProbe(CLASS_A, SOURCE_A);
-    await deployProbe(CLASS_B, SOURCE_B);
+    await ensureDebugTarget(
+      listenerConnection,
+      'classes',
+      CLASS_A,
+      { marker: '"BP:', names: MARKERS_A },
+      testsLogger,
+    );
+    await ensureDebugTarget(
+      listenerConnection,
+      'classes',
+      CLASS_B,
+      { marker: '"BP:', names: MARKERS_B },
+      testsLogger,
+    );
+    logTestStep(`probes ${CLASS_A} and ${CLASS_B} active`, testsLogger);
 
     // Every debugger request needs a stateful session.
     listenerConnection.setSessionType('stateful');
@@ -673,34 +591,18 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   afterAll(async () => {
     if (!listenerConnection) return;
-    try {
-      await listenerApi?.stopListener(identity);
-    } catch {
-      // nothing listening
-    }
-    listenerConnection.setSessionType('stateless');
-    const cls = new AdtClient(listenerConnection, connectionLogger).getClass();
-    const failures: string[] = [];
-    for (const className of deployed) {
-      // `isDeleted="false"` arrives inside a 200; the reading makes it a failure.
-      const answer = await cls.delete(
-        {
-          className,
-          packageName,
-          ...(transportRequest ? { transportRequest } : {}),
-        },
-        {
-          headers: integrationHeadersOf(cls, 'delete'),
-          analyse: analyseDeletion,
-        },
+    // Debugger state only: the probes are shared and stay. Both sessions this
+    // file opened are logged off, and every failure is reported.
+    const steps = new CleanupSteps();
+    if (listenerApi && identity) {
+      // Nothing may be listening any more; a refusal here is not a failure.
+      await steps.run('stop the listener', () =>
+        listenerApi.stopListener(identity),
       );
-      if (!answer.ok) {
-        failures.push(`${className}: ${answer.getError().message}`);
-      }
     }
-    await closeOwnTestConnection(triggerConnection);
-    await closeOwnTestConnection(listenerConnection);
-    expect(failures).toEqual([]);
+    await steps.logOff('the trigger session', triggerConnection);
+    await steps.logOff('the listener session', listenerConnection);
+    steps.finish();
   }, STEP_TIMEOUT);
 
   // --- 1. syncBreakpoints full -----------------------------------------------------

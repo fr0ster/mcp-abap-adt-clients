@@ -2,9 +2,10 @@
  * Integration test for the AMDP debugger (AmdpDebugger), every member of
  * IAmdpDebugger against a live system on SAP HANA.
  *
- * The test deploys a class with an AMDP procedure and the AMDP method of a CDS
- * table function, and the table function's DDL — the two name each other, so
- * they are activated in one group run. It then drives two runs of the class:
+ * The test uses a class with an AMDP procedure and the AMDP method of a CDS
+ * table function, and the table function's DDL — the shared ZAC_SHR_DBG_AMDP
+ * and ZAC_SHR_DBG_TF, ensured from `shared_dependencies` and never deleted.
+ * The two name each other, so they are activated in one group run. It then drives two runs of the class:
  * the first stopped in both methods, stepped, and let finish; the second
  * stopped and cancelled.
  *
@@ -34,26 +35,27 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
-import { AdtUtils } from '../../../../core/shared/AdtUtils';
-import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
-import { wireItself } from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { CleanupSteps } from '../../../helpers/cleanupSteps';
 import {
-  closeOwnTestConnection,
+  ensureDebugTarget,
+  markerLines,
+  sharedSource,
+} from '../../../helpers/debuggerTargets';
+import {
   createTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
+import { activateSharedGroup } from '../../../helpers/sharedActivation';
 import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase, resolvePackageName, resolveTransportRequest } =
-  require('../../../helpers/test-helper');
+const { getEnabledTestCase } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -66,74 +68,21 @@ const testsLogger: ILogger = createTestsLogger();
 
 const testCase = getEnabledTestCase('runtime_debugger', 'adt_amdp_debugger');
 const CLASS_NAME: string = (
-  testCase?.params?.class_name ?? 'ZAC_DBG_AMDP2'
+  testCase?.params?.class_name ?? 'ZAC_SHR_DBG_AMDP'
 ).toUpperCase();
 const DDL_NAME: string = (
-  testCase?.params?.ddl_name ?? 'ZAC_DBG_TF2'
+  testCase?.params?.ddl_name ?? 'ZAC_SHR_DBG_TF'
 ).toUpperCase();
 const STEP_TIMEOUT = 300_000;
 
-const DDL_SOURCE = `@EndUserText.label: 'AMDP debugger test table function'
-@ClientHandling.type: #CLIENT_INDEPENDENT
-@AccessControl.authorizationCheck: #NOT_REQUIRED
-define table function ${DDL_NAME}
-  with parameters
-    p_limit : abap.int4
-  returns {
-    n      : abap.int4;
-    square : abap.int4;
-  }
-  implemented by method ${CLASS_NAME.toLowerCase()}=>tf;
-`;
-
-const CLASS_SOURCE = `CLASS ${CLASS_NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_amdp_marker_hdb.
-    INTERFACES if_oo_adt_classrun.
-    METHODS sum_to AMDP OPTIONS READ-ONLY CLIENT INDEPENDENT
-      IMPORTING VALUE(iv_limit) TYPE i
-      EXPORTING VALUE(ev_total) TYPE i
-                VALUE(ev_steps) TYPE i.
-    CLASS-METHODS tf FOR TABLE FUNCTION ${DDL_NAME.toLowerCase()}.
-ENDCLASS.
-
-CLASS ${CLASS_NAME.toLowerCase()} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    sum_to( EXPORTING iv_limit = 3
-            IMPORTING ev_total = DATA(lv_total)
-                      ev_steps = DATA(lv_steps) ).
-    SELECT * FROM ${DDL_NAME.toLowerCase()}( p_limit = 3 ) INTO TABLE @DATA(lt_rows).
-    out->write( |total { lv_total } steps { lv_steps } rows { lines( lt_rows ) }| ).
-  ENDMETHOD.
-
-  METHOD sum_to BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT
-    OPTIONS READ-ONLY.
-    DECLARE lv_i INTEGER;
-    ev_total = 0;
-    ev_steps = 0;
-    FOR lv_i IN 1..:iv_limit DO
-      ev_total = :ev_total + :lv_i; -- BP:loop
-      ev_steps = :ev_steps + 1;
-    END FOR;
-  ENDMETHOD.
-
-  METHOD tf BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT
-    OPTIONS READ-ONLY.
-    DECLARE lt_rows TABLE ( n INTEGER, square INTEGER );
-    DECLARE lv_i INTEGER;
-    FOR lv_i IN 1..:p_limit DO
-      :lt_rows.INSERT( ( :lv_i, :lv_i * :lv_i ) ); -- BP:tf
-    END FOR;
-    RETURN SELECT n, square FROM :lt_rows;
-  ENDMETHOD.
-ENDCLASS.
-`;
-
-const LINE: Record<string, number> = {};
-CLASS_SOURCE.split('\n').forEach((text, index) => {
-  const marker = /-- BP:(\w+)/.exec(text);
-  if (marker) LINE[marker[1]] = index + 1;
-});
+/**
+ * The class and its table function are shared (`shared_dependencies`), never
+ * created or deleted here. The class's `-- BP:<name>` markers name the
+ * SQLScript lines the test stops at.
+ */
+const CLASS_SOURCE = sharedSource('classes', CLASS_NAME);
+const LINE = markerLines(CLASS_SOURCE, '-- BP:');
+const MARKERS = ['loop', 'tf'];
 const SOURCE_URI = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
 
 // --- reading the documents ------------------------------------------------------
@@ -219,8 +168,6 @@ describe('AMDP debugger (AmdpDebugger)', () => {
   let trigger: Connection | undefined;
   let onSession: AmdpDebugger;
   let onCommands: AmdpDebugger;
-  let packageName = '';
-  let transportRequest: string | undefined;
   let skipReason: string | undefined;
 
   let mainId = '';
@@ -303,139 +250,60 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     }
     onSession = new AmdpDebugger(session, connectionLogger);
     onCommands = new AmdpDebugger(commands, connectionLogger);
-    packageName = resolvePackageName(testCase.params?.package_name);
-    transportRequest = packageName.startsWith('$')
-      ? undefined
-      : resolveTransportRequest(testCase.params?.transport_request) ||
-        undefined;
-    const transport = transportRequest ? { transportRequest } : {};
-
-    // The two name each other: shells, bodies, then one group activation.
-    const adt = new AdtClient(commands, connectionLogger);
-    const ddl = adt.getDdl();
-    const ddlConfig = {
-      ddlName: DDL_NAME,
-      packageName,
-      description: 'AMDP debugger test table function',
-      ...transport,
-    };
-    await ddl.create(ddlConfig, {
-      headers: integrationHeadersOf(ddl, 'create'),
-    });
-    const ddlLock = await ddl.lock(ddlConfig);
-    if (!ddlLock.ok)
-      throw new Error(`lock ${DDL_NAME}: ${ddlLock.getError().message}`);
-    const ddlHandle = String(ddlLock.getResult().value ?? '');
-    await ddl.update(ddlConfig, {
-      headers: integrationHeadersOf(ddl, 'update'),
-      source: DDL_SOURCE,
-      lockHandle: ddlHandle,
-    });
-    await ddl.unlock(ddlConfig, ddlHandle);
-
-    const cls = adt.getClass();
-    const classConfig = {
-      className: CLASS_NAME,
-      packageName,
-      description: 'AMDP debugger test class',
-      ...transport,
-    };
-    await cls.create(classConfig, {
-      headers: integrationHeadersOf(cls, 'create'),
-    });
-    const clsLock = await cls.lock(classConfig);
-    if (!clsLock.ok)
-      throw new Error(`lock ${CLASS_NAME}: ${clsLock.getError().message}`);
-    const clsHandle = String(clsLock.getResult().value ?? '');
-    await cls.update(classConfig, {
-      headers: integrationHeadersOf(cls, 'update'),
-      source: CLASS_SOURCE,
-      lockHandle: clsHandle,
-    });
-    await cls.unlock(classConfig, clsHandle);
-
-    const utils = new AdtUtils(commands, connectionLogger, {
-      ...utilDocuments,
-      activation: wireItself,
-    });
-    const started = await utils.activateObjectsGroup(
+    // The two name each other: each is ensured written (skip_activation in
+    // the shared config), then both are activated in one group run.
+    await ensureDebugTarget(
+      commands,
+      'views',
+      DDL_NAME,
+      undefined,
+      testsLogger,
+    );
+    await ensureDebugTarget(
+      commands,
+      'classes',
+      CLASS_NAME,
+      { marker: '-- BP:', names: MARKERS },
+      testsLogger,
+    );
+    await activateSharedGroup(
+      commands,
       [
         { type: 'DDLS/DF', name: DDL_NAME },
         { type: 'CLAS/OC', name: CLASS_NAME },
       ],
-      undefined,
-      { headers: integrationHeadersOf(utils, 'activateObjectsGroup') },
-    );
-    const wire = started.ok ? started.getResult().value : undefined;
-    const runId = /runs\/([^/?]+)/.exec(
-      String(wire?.headers?.location ?? wire?.headers?.Location ?? ''),
-    )?.[1];
-    if (!runId) throw new Error('the group activation answered no run id');
-    for (let i = 0; i < 10; i++) {
-      const state = await utils.getActivationRun(runId, {
-        withLongPolling: true,
-      });
-      const status = /status="([^"]*)"/.exec(
-        String(state.ok ? state.getResult().value : ''),
-      )?.[1];
-      if (status && status !== 'running' && status !== 'waiting') break;
-    }
-    const outcome = await utils.getActivationResults(runId);
-    const results = String(outcome.ok ? outcome.getResult().value : '');
-    // activationExecuted="true" beside an error message is still a failure
-    // (the errata): the class stays inactive, and a breakpoint in it is
-    // answered with an empty state and never stops.
-    const errors = [
-      ...results.matchAll(
-        /<msg\b[^>]*type="E"[^>]*>[\s\S]*?<txt>([^<]*)<\/txt>/g,
-      ),
-    ].map((m) => m[1]);
-    if (!/activationExecuted="true"/.test(results) || errors.length) {
-      throw new Error(
-        `group activation: ${errors.join('; ') || results.slice(0, 600)}`,
-      );
-    }
-    logTestStep(
-      `${CLASS_NAME} and ${DDL_NAME} active in ${packageName}`,
       testsLogger,
     );
+    logTestStep(`${CLASS_NAME} and ${DDL_NAME} active`, testsLogger);
 
     // The debug session's connection: stateful, for the whole test.
     session.setSessionType('stateful');
   }, STEP_TIMEOUT);
 
   afterAll(async () => {
-    if (!commands) return;
-    if (mainId) {
+    // Debugger state only: the class and the table function are shared and
+    // stay. All three sessions this file opened are logged off, and every
+    // failure is reported.
+    const steps = new CleanupSteps();
+    if (commands && mainId) {
       // Release whatever still stands before the stop: a stop does not.
       if (lastBreak && debuggeeId) {
-        await onCommands.deleteDebuggee(mainId, debuggeeId);
+        await steps.run('release the debuggee', () =>
+          onCommands.deleteDebuggee(mainId, debuggeeId),
+        );
       }
-      await onCommands.stop(mainId);
+      await steps.run('stop the debug session', () => onCommands.stop(mainId));
     }
     if (run) {
-      await Promise.race([run, new Promise((r) => setTimeout(r, 30_000))]);
+      const pending = run;
+      await steps.run('wait for the run', () =>
+        Promise.race([pending, new Promise((r) => setTimeout(r, 30_000))]),
+      );
     }
-    if (!testCase?.params?.keep_probe) {
-      const adt = new AdtClient(commands, connectionLogger);
-      const transport = transportRequest ? { transportRequest } : {};
-      await adt
-        .getClass()
-        .delete(
-          { className: CLASS_NAME, packageName, ...transport },
-          { headers: integrationHeadersOf(adt.getClass(), 'delete') },
-        );
-      await adt
-        .getDdl()
-        .delete(
-          { ddlName: DDL_NAME, packageName, ...transport },
-          { headers: integrationHeadersOf(adt.getDdl(), 'delete') },
-        );
-    }
-    session?.setSessionType('stateless');
-    await closeOwnTestConnection(trigger);
-    await closeOwnTestConnection(commands);
-    await closeOwnTestConnection(session);
+    await steps.logOff('the trigger session', trigger);
+    await steps.logOff('the commands session', commands);
+    await steps.logOff('the debug session', session);
+    steps.finish();
   }, STEP_TIMEOUT);
 
   it(

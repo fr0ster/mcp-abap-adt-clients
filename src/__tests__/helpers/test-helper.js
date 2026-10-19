@@ -2348,6 +2348,24 @@ function dataElementDocumentFor(current, depConfig) {
 }
 
 /**
+ * Write a shared object's configured source, and activate it unless the
+ * config says `skip_activation: true`.
+ *
+ * `skip_activation` is for objects that name each other — an AMDP class and
+ * the table function it implements — and so can only be activated together:
+ * each is written inactive here, and the caller activates the group
+ * (`activateSharedGroup` in `sharedActivation.ts`, or `shared:setup`'s group
+ * run).
+ */
+async function writeShared(handler, config, depConfig, logger) {
+  if (depConfig.skip_activation) {
+    await writeSource(handler, config, { source: depConfig.source }, logger);
+    return;
+  }
+  await writeAndActivate(handler, config, { source: depConfig.source }, logger);
+}
+
+/**
  * Update source and activate an existing shared dependency.
  * Called when object exists but may have outdated or inactive source.
  */
@@ -2379,10 +2397,11 @@ async function updateAndActivateShared(
       { source: depConfig.source },
     );
   } else if (type === 'views') {
-    await writeAndActivate(
+    await writeShared(
       client.getDdl(),
       { ddlName: name, source: depConfig.source, transportRequest },
-      { source: depConfig.source },
+      depConfig,
+      logger,
     );
   } else if (type === 'programs') {
     await writeAndActivate(
@@ -2397,10 +2416,11 @@ async function updateAndActivateShared(
       { source: depConfig.source },
     );
   } else if (type === 'classes') {
-    await writeAndActivate(
+    await writeShared(
       client.getClass(),
       { className: name, source: depConfig.source, transportRequest },
-      { source: depConfig.source },
+      depConfig,
+      logger,
     );
   } else if (type === 'access_controls') {
     mustSucceed(
@@ -2990,20 +3010,13 @@ async function ensureSharedDependency(client, type, name, logger) {
         `shared ddl create ${name}`,
       );
       if (depConfig.source) {
-        logger?.info?.(`Activating shared view ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getDdl(),
-            {
-              ddlName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared ddl update ${name}`,
+        await writeShared(
+          client.getDdl(),
+          { ddlName: name, source: depConfig.source, transportRequest },
+          depConfig,
+          logger,
         );
-        logger?.info?.(`Shared view ${name} activated`);
+        logger?.info?.(`Shared view ${name} written`);
       }
     } else if (type === 'programs') {
       mustSucceed(
@@ -3083,20 +3096,13 @@ async function ensureSharedDependency(client, type, name, logger) {
         `shared class create ${name}`,
       );
       if (depConfig.source) {
-        logger?.info?.(`Activating shared class ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getClass(),
-            {
-              className: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared class update ${name}`,
+        await writeShared(
+          client.getClass(),
+          { className: name, source: depConfig.source, transportRequest },
+          depConfig,
+          logger,
         );
-        logger?.info?.(`Shared class ${name} activated`);
+        logger?.info?.(`Shared class ${name} written`);
       }
     } else if (type === 'access_controls') {
       mustSucceed(

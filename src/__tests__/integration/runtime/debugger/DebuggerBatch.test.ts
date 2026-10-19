@@ -21,7 +21,6 @@ import * as dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtBatchConnection } from '../../../../batch';
 import { parseBatchResponse } from '../../../../batch/wire';
-import { AdtClient } from '../../../../clients/AdtClient';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import {
   AbapDebugger,
@@ -39,6 +38,12 @@ import { createRequestId } from '../../../../runtime/debugger/batchPayload';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { assertBatchStatuses } from '../../../helpers/batchStatuses';
 import { configuredCase, gate } from '../../../helpers/caseGate';
+import { CleanupSteps } from '../../../helpers/cleanupSteps';
+import {
+  ensureDebugTarget,
+  markerLines,
+  sharedSource,
+} from '../../../helpers/debuggerTargets';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -49,9 +54,6 @@ import {
   createTestsLogger,
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
-
-const { resolvePackageName, resolveTransportRequest } =
-  require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -64,53 +66,19 @@ const testsLogger: ILogger = createTestsLogger();
 
 const testCase = configuredCase('runtime_debugger', 'adt_abap_debugger');
 const CLASS_NAME: string = (
-  testCase?.params?.class_name ?? 'ZAC_DBG_PROBE'
+  testCase?.params?.class_name ?? 'ZAC_SHR_DBG_PROBE'
 ).toUpperCase();
 const HOLD_SECONDS = 30;
 const STEP_TIMEOUT = 120_000;
 
 /**
- * The probe. `"BP:<name>` markers name the lines the test stops at; the work
- * is deterministic, so every run stops at the same lines with the same values.
+ * The probe: the shared class `AbapDebugger.test.ts` stops in too
+ * (`shared_dependencies.classes`), never created or deleted here. Its
+ * `"BP:<name>` markers name the lines the measurements stop at.
  */
-const SOURCE = `CLASS ${CLASS_NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-  PRIVATE SECTION.
-    METHODS add
-      IMPORTING iv_a TYPE i
-                iv_b TYPE i
-      RETURNING VALUE(rv) TYPE i.
-ENDCLASS.
-
-CLASS ${CLASS_NAME.toLowerCase()} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lv_total TYPE i.
-    DATA lv_text TYPE string VALUE 'start'.
-    DO 3 TIMES.
-      lv_total = add( iv_a = lv_total iv_b = sy-index ). "BP:loop
-    ENDDO.
-    lv_text = |total { lv_total }|. "BP:after
-    TRY.
-        DATA(lv_zero) = 0.
-        lv_total = lv_total / lv_zero. "BP:raise
-      CATCH cx_sy_zerodivide.
-        lv_text = 'caught'. "BP:catch
-    ENDTRY.
-    out->write( lv_text ).
-  ENDMETHOD.
-
-  METHOD add.
-    rv = iv_a + iv_b. "BP:add
-  ENDMETHOD.
-ENDCLASS.
-`;
-
-const LINE: Record<string, number> = {};
-SOURCE.split('\n').forEach((text, index) => {
-  const marker = /"BP:(\w+)/.exec(text);
-  if (marker) LINE[marker[1]] = index + 1;
-});
+const SOURCE = sharedSource('classes', CLASS_NAME);
+const LINE = markerLines(SOURCE, '"BP:');
+const MARKERS = ['loop', 'add'];
 const SOURCE_URI = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
 
 // --- reading the documents ------------------------------------------------------
@@ -212,14 +180,11 @@ describe('Debugger batch wire measurements', () => {
   let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let packageName = '';
-  let transportRequest: string | undefined;
   let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
   let attached = false;
-  let probeCreationAttempted = false;
 
   /** Fails the step naming what it waited on, instead of running blind. */
   function needs(condition: unknown, what: string): void {
@@ -348,45 +313,14 @@ describe('Debugger batch wire measurements', () => {
       connectionLogger,
       abapDebuggerDocuments,
     );
-    packageName = resolvePackageName(testCase.params?.package_name);
-    // A local package takes no transport.
-    transportRequest = packageName.startsWith('$')
-      ? undefined
-      : resolveTransportRequest(testCase.params?.transport_request) ||
-        undefined;
-
-    const cls = new AdtClient(listenerConnection, connectionLogger).getClass();
-    const config = {
-      className: CLASS_NAME,
-      packageName,
-      description: 'Debugger integration probe',
-      ...(transportRequest ? { transportRequest } : {}),
-    };
-    const creation = cls.create(config, {
-      headers: integrationHeadersOf(cls, 'create'),
-    });
-    probeCreationAttempted = true;
-    const created = await creation;
-    if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
-      throw new Error(`probe create: ${created.getError().message}`);
-    }
-    const lock = await cls.lock(config);
-    if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
-    const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, {
-      headers: integrationHeadersOf(cls, 'update'),
-      source: SOURCE,
-      lockHandle,
-    });
-    await cls.unlock(config, lockHandle);
-    if (!written.ok)
-      throw new Error(`probe write: ${written.getError().message}`);
-    const activated = await cls.activate(config, {
-      headers: integrationHeadersOf(cls, 'activate'),
-    });
-    if (!activated.ok)
-      throw new Error(`probe activate: ${activated.getError().message}`);
-    logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
+    await ensureDebugTarget(
+      listenerConnection,
+      'classes',
+      CLASS_NAME,
+      { marker: '"BP:', names: MARKERS },
+      testsLogger,
+    );
+    logTestStep(`probe ${CLASS_NAME} active`, testsLogger);
 
     // Every debugger request needs the stateful session it attached on.
     listenerConnection.setSessionType('stateful');
@@ -409,101 +343,56 @@ describe('Debugger batch wire measurements', () => {
   }, STEP_TIMEOUT);
 
   afterAll(async () => {
-    const errors: unknown[] = [];
-    const cleanup = async (
-      step: string,
-      action: () => Promise<IAdtResponse<unknown>> | Promise<void>,
-    ): Promise<void> => {
-      try {
-        const response = await action();
-        if (response && !response.ok) {
-          throw new Error(`Debugger cleanup failed: ${step}`, {
-            cause: response.getError(),
-          });
-        }
-      } catch (error) {
-        errors.push(error);
-      }
-    };
+    // Debugger state only: the probe is shared and stays. Every step runs,
+    // every session this file opened is logged off, and every failure is
+    // reported at the end.
+    const steps = new CleanupSteps();
     if (listenerApi && identity) {
       for (const id of armed) {
-        await cleanup(`delete breakpoint ${id}`, () =>
-          listenerApi.deleteBreakpoint(identity, id),
+        await steps.run(
+          `delete breakpoint ${id}`,
+          () => listenerApi.deleteBreakpoint(identity, id),
+          { checkAnswer: true },
         );
       }
     }
     if (attached) {
-      await cleanup('terminate debuggee', () =>
-        debuggerApi.terminateDebuggee(),
-      );
-    }
-    if (sessionConnection) {
-      const connection = sessionConnection;
-      await cleanup('close session connection', async () => {
-        connection.setSessionType('stateless');
-        await closeOwnTestConnection(connection);
-      });
-    }
-    if (listenerApi && identity) {
-      await cleanup('stop listener', () => listenerApi.stopListener(identity));
-    }
-    if (run) {
-      await cleanup('wait for run', async () => {
-        await Promise.race([
-          run,
-          new Promise((resolve) => setTimeout(resolve, 15_000)),
-        ]);
-      });
-    }
-    if (listenerConnection) {
-      const connection = listenerConnection;
-      await cleanup('set listener connection stateless', async () => {
-        connection.setSessionType('stateless');
-      });
-      if (probeCreationAttempted && !testCase?.params?.keep_probe) {
-        await cleanup('delete probe class', () =>
-          new AdtClient(connection, connectionLogger).getClass().delete(
-            {
-              className: CLASS_NAME,
-              packageName,
-              ...(transportRequest ? { transportRequest } : {}),
-            },
-            {
-              headers: integrationHeadersOf(
-                new AdtClient(connection, connectionLogger).getClass(),
-                'delete',
-              ),
-            },
-          ),
-        );
-      }
-    }
-    await cleanup('close trigger connection', () =>
-      closeOwnTestConnection(triggerConnection),
-    );
-    await cleanup('close listener connection', () =>
-      closeOwnTestConnection(listenerConnection),
-    );
-    for (const report of [
-      writeMeasurementSummary,
-      compareMeasurementHistories,
-    ]) {
-      try {
-        report();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) {
-      throw new AggregateError(
-        errors,
-        'Debugger cleanup and measurement reporting failed',
+      await steps.run(
+        'terminate debuggee',
+        () => debuggerApi.terminateDebuggee(),
         {
-          cause: errors[0],
+          checkAnswer: true,
         },
       );
     }
+    await steps.logOff('the debug session', sessionConnection);
+    if (listenerApi && identity) {
+      await steps.run(
+        'stop listener',
+        () => listenerApi.stopListener(identity),
+        {
+          checkAnswer: true,
+        },
+      );
+    }
+    if (run) {
+      const pending = run;
+      await steps.run('wait for run', () =>
+        Promise.race([
+          pending,
+          new Promise((resolve) => setTimeout(resolve, 15_000)),
+        ]),
+      );
+    }
+    await steps.logOff('the trigger session', triggerConnection);
+    await steps.logOff('the listener session', listenerConnection);
+    for (const [name, report] of [
+      ['write the measurement summary', writeMeasurementSummary],
+      ['compare the measurement histories', compareMeasurementHistories],
+    ] as const) {
+      await steps.run(name, () => report());
+    }
+    steps.finish();
   }, STEP_TIMEOUT);
 
   async function startAtBreakpoint(): Promise<void> {
