@@ -320,6 +320,16 @@ Deliberate, and left as they are:
    computed member name gets past it, and it does not scan `capture.ts`, the
    gate's own module. The runtime refusals (`traced`, `clientsOn`,
    `runCalls`, the probe's clients) cover what reaches them.
+4. **A quoted media-type parameter is not read.** In a list such as
+   `Accepted content types: text/plain; note="a,b"` the item is cut at the
+   quote, so it does not count as a media type and the verdict can stay
+   `unknown`. No SAP answer in the measured corpora carried a quoted
+   parameter.
+5. **The named-type columns read media types out of any text after the
+   marker.** A sentence such as `Accepted content types: System expected
+   application/xml here` names `application/xml` in the column, although the
+   verdict does not count it as a list. In the measured corpora the only
+   sentence after a marker came with a 404 and named no type.
 
 ## The corpus
 
