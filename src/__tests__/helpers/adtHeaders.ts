@@ -1157,6 +1157,7 @@ function isAbsentOnLegacy(handler: object, member: string): boolean {
     Object.hasOwn(handler, member) &&
     typeof own === 'function' &&
     typeof expected === 'function' &&
+    // Catches an accidental handler, not deliberate evasion: a function with a forged toString() copying the refusal's body still passes.
     own.toString() === expected.toString() &&
     Object.keys(handler).sort().join() === Object.keys(reference).sort().join()
   );

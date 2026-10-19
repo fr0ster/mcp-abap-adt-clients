@@ -7,8 +7,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as ts from 'typescript';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
@@ -250,22 +251,50 @@ describe('integrationHeadersOf', () => {
     expect(resolverOffenders(join(__dirname, '..', '..'))).toEqual([]);
   });
 
-  it('exempts only helpers/adtHeaders.ts, not another file of that name', () => {
+  it('reports every re-export of helpers/adtHeaders and every other import', () => {
     const root = mkdtempSync(join(tmpdir(), 'resolver-scan-'));
+    const from = "'../helpers/adtHeaders'";
+    const files: Record<string, string> = {
+      // The definition itself is exempt.
+      'helpers/adtHeaders.ts':
+        'export const TEST_HEADERS = {};\nexport function headersOf() {}\nexport function integrationHeadersOf() {}\n',
+      // Re-exports, in any form, from any directory.
+      'integration/star.ts': `export * from ${from};\n`,
+      'integration/starAs.ts': `export * as headers from ${from};\n`,
+      'integration/adtHeaders.ts': `export { headersOf as pair } from ${from};\n`,
+      'admin/typeOnly.ts': `export type { IAdtHeaders } from ${from};\n`,
+      'unit/star.ts': `export * from ${from};\n`,
+      // Imports in the directories that reach SAP.
+      'integration/named.ts': `import { headersOf } from ${from};\n`,
+      'integration/namespace.ts': `import * as h from ${from};\n`,
+      'integration/fallback.ts': `import { integrationHeadersOf, TEST_HEADERS } from ${from};\n`,
+      'helpers/required.ts': `const h = require(${from});\n`,
+      'helpers/dynamic.ts': `const h = import(${from});\n`,
+      // Allowed: the strict resolver and types; a unit test's own import.
+      'integration/ok.ts': `import { integrationHeadersOf } from ${from};\nimport type { X } from ${from};\nimport { type Y } from ${from};\n`,
+      'unit/ok.ts': `import { headersOf, TEST_HEADERS } from ${from};\n`,
+    };
     try {
-      for (const dir of ['integration', 'admin', 'helpers'])
-        mkdirSync(join(root, dir));
-      writeFileSync(
-        join(root, 'helpers', 'adtHeaders.ts'),
-        'export const TEST_HEADERS = {};\nexport function headersOf() {}\n',
+      for (const [file, text] of Object.entries(files)) {
+        mkdirSync(join(root, file, '..'), { recursive: true });
+        writeFileSync(join(root, file), text);
+      }
+      expect(resolverOffenders(root).sort()).toEqual(
+        [
+          'admin/typeOnly.ts: re-exports helpers/adtHeaders',
+          'integration/adtHeaders.ts: re-exports helpers/adtHeaders',
+          'integration/star.ts: re-exports helpers/adtHeaders',
+          'integration/starAs.ts: re-exports helpers/adtHeaders',
+          'unit/star.ts: re-exports helpers/adtHeaders',
+          'integration/named.ts: imports headersOf',
+          'integration/namespace.ts: imports the whole module',
+          'integration/fallback.ts: imports TEST_HEADERS',
+          'helpers/required.ts: loads the module at runtime',
+          'helpers/dynamic.ts: loads the module at runtime',
+        ]
+          .map((line) => line.split('/').join(sep))
+          .sort(),
       );
-      writeFileSync(
-        join(root, 'integration', 'adtHeaders.ts'),
-        "export { headersOf as pair } from '../helpers/adtHeaders';\n",
-      );
-      expect(resolverOffenders(root)).toEqual([
-        join('integration', 'adtHeaders.ts'),
-      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -273,9 +302,13 @@ describe('integrationHeadersOf', () => {
 });
 
 /**
- * Files under `root` (`src/__tests__`) in the directories whose tests reach
- * SAP that name the unit-test resolver. Only the helper that defines it,
- * `helpers/adtHeaders.ts` by its exact path, is exempt.
+ * Under `root` (`src/__tests__`), read with the TypeScript parser:
+ * - no file but `helpers/adtHeaders.ts` itself re-exports anything from it,
+ *   in any form (`export *`, `export * as`, named, type-only);
+ * - a file in the directories whose tests reach SAP (integration, admin,
+ *   helpers) imports from it only `integrationHeadersOf` and types, and does
+ *   not load it with `require` or `import()`.
+ * Each offence is `<file>: <what>`.
  */
 function resolverOffenders(root: string): string[] {
   const walk = (dir: string): string[] =>
@@ -286,14 +319,65 @@ function resolverOffenders(root: string): string[] {
           ? [join(dir, entry.name)]
           : [],
     );
-  const definition = join('helpers', 'adtHeaders.ts');
-  return ['integration', 'admin', 'helpers']
-    .flatMap((dir) => walk(join(root, dir)))
-    .map((file) => relative(root, file))
-    .filter((file) => file !== definition)
-    .filter((file) =>
-      /\b(headersOf|headersFor|TEST_HEADERS)\b/.test(
-        readFileSync(join(root, file), 'utf8'),
-      ),
+  const definition = join(root, 'helpers', 'adtHeaders');
+  const reachesSap = ['integration', 'admin', 'helpers'];
+  const offences: string[] = [];
+  for (const path of walk(root)) {
+    const file = relative(root, path);
+    if (file === join('helpers', 'adtHeaders.ts')) continue;
+    const strict = reachesSap.includes(file.split(sep)[0] ?? '');
+    const isDefinition = (specifier: ts.Node | undefined): boolean => {
+      if (!specifier || !ts.isStringLiteral(specifier)) return false;
+      const text = specifier.text;
+      if (!text.startsWith('.')) return false;
+      const target = resolve(dirname(path), text);
+      return (
+        target === definition ||
+        target === `${definition}.ts` ||
+        target === `${definition}.js`
+      );
+    };
+    const source = ts.createSourceFile(
+      path,
+      readFileSync(path, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
     );
+    const visit = (node: ts.Node): void => {
+      if (ts.isExportDeclaration(node) && isDefinition(node.moduleSpecifier))
+        offences.push(`${file}: re-exports helpers/adtHeaders`);
+      if (
+        strict &&
+        ts.isImportDeclaration(node) &&
+        isDefinition(node.moduleSpecifier)
+      ) {
+        const clause = node.importClause;
+        if (clause && !clause.isTypeOnly) {
+          if (clause.name) offences.push(`${file}: imports a default`);
+          const bindings = clause.namedBindings;
+          if (bindings && ts.isNamespaceImport(bindings))
+            offences.push(`${file}: imports the whole module`);
+          if (bindings && ts.isNamedImports(bindings))
+            for (const element of bindings.elements) {
+              const name = (element.propertyName ?? element.name).text;
+              if (!element.isTypeOnly && name !== 'integrationHeadersOf')
+                offences.push(`${file}: imports ${name}`);
+            }
+        }
+        if (!clause) offences.push(`${file}: imports the module for effect`);
+      }
+      if (
+        strict &&
+        ts.isCallExpression(node) &&
+        (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+          (ts.isIdentifier(node.expression) &&
+            node.expression.text === 'require')) &&
+        isDefinition(node.arguments[0])
+      )
+        offences.push(`${file}: loads the module at runtime`);
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return offences;
 }
