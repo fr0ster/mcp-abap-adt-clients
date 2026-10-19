@@ -2137,12 +2137,34 @@ function mustSucceed(answer, what) {
   }
   if (!answer.ok) {
     const failure = answer.getError();
+    // The status and SAP's own sentence, so a refusal says what it was: the
+    // message alone is the transport's "Request failed with status code …"
+    // whenever no strategy read the body.
+    const status = failure.response?.status;
+    const said = sapMessageOf(failure.response?.data);
     throw new Error(
-      `${what} failed [${failure.origin}]: ${failure.message}` +
+      `${what} failed [${failure.origin}]${status ? ` ${status}` : ''}: ${failure.message}` +
+        (said && !String(failure.message ?? '').includes(said)
+          ? ` — SAP: ${said}`
+          : '') +
         (failure.request?.url ? ` (${failure.request.url})` : ''),
     );
   }
   return answer.getResult().value;
+}
+
+/**
+ * The text of the first `<message …>` (or `<ns:message …>`) element of an ADT
+ * exception document, or ''.
+ */
+function sapMessageOf(data) {
+  const text = typeof data === 'string' ? data : '';
+  const open = text.search(/<(\w+:)?message[\s>]/);
+  if (open < 0) return '';
+  const start = text.indexOf('>', open);
+  const end = text.indexOf('</', start);
+  if (start < 0 || end < 0) return '';
+  return text.slice(start + 1, end).trim();
 }
 
 /**
@@ -3456,13 +3478,32 @@ async function ensureSharedDependency(client, type, name, logger) {
       error.message?.includes('409') ||
       error.message?.includes('already exist')
     ) {
-      logger?.info?.(
-        `Shared ${type} ${name} already exists (concurrent creation)`,
+      // A 409 is not "it exists". SAP answers 409 to refusals too — "No
+      // suitable software component is modifiable", a package on the wrong
+      // route — and reading every one as a concurrent create reported success
+      // over an object that was never made. It counts as existing only when a
+      // read after it finds the object; otherwise the refusal is reported with
+      // what SAP said.
+      let after;
+      try {
+        after = await readShared();
+      } catch (readError) {
+        logger?.warn?.(
+          `Shared ${type} ${name}: the read after a refused create failed: ${readError.message}`,
+        );
+      }
+      if (after?.ok) {
+        logger?.info?.(
+          `Shared ${type} ${name} already exists (concurrent creation)`,
+        );
+        _verifiedDependencies[cacheKey] = true;
+        // Someone else's create: what it wrote is unknown, so it counts as
+        // changed and a group that includes it is activated.
+        return { existed: true, created: false, changed: true };
+      }
+      throw new Error(
+        `Shared ${type} ${name} was not created, and a read after the refusal does not find it: ${error.message}`,
       );
-      _verifiedDependencies[cacheKey] = true;
-      // Someone else's create: what it wrote is unknown, so it counts as
-      // changed and a group that includes it is activated.
-      return { existed: true, created: false, changed: true };
     }
     throw error;
   }

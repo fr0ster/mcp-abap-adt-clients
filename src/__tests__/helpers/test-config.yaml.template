@@ -146,6 +146,14 @@ shared_dependencies:
   software_component: ""                     # ← CHANGE (on-prem): e.g. HOME (leave empty for cloud)
   transport_layer: ""                        # ← CHANGE (on-prem): e.g. Z<SID> (leave empty for cloud)
   record_changes: false                      # ← CHANGE (on-prem, transportable component such as HOME): true — SAP refuses such a package without change recording (TR432)
+  # transport_request: ""                    # The request every shared create and write goes into.
+  #                                          #   Omitted → environment.default_transport.
+  #                                          #   "" → no request at all: only for a LOCAL shared package.
+  #                                          # The package and the request must fit together: a local
+  #                                          #   shared package (local software component) with a
+  #                                          #   transportable request refuses every create with
+  #                                          #   "Request … is not a local request" (CTS_WBO_API 047);
+  #                                          #   a transportable package needs a transportable request.
 
   domains:
     - name: "ZAC_SHR_GA_DOM"
@@ -1223,7 +1231,13 @@ create_package:
                                                 #   "Change recording must be activated for package …"
                                                 #   — and the symptom is the package never becoming
                                                 #   readable, which reads like a timing problem.
-        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "Z<SID>"
+        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "Z<SID>".
+                                                #   REQUIRED whenever record_changes is true on premise.
+                                                # The three settings must fit the parent package:
+                                                #   - recording off under a transportable parent → TR 432;
+                                                #   - a local software component (e.g. LOCAL) under a
+                                                #     transportable route → 409 "No suitable software
+                                                #     component is modifiable".
         # transport_request: ""                 # Uses environment.default_transport if omitted
 
 # Create Domain
@@ -1507,9 +1521,10 @@ read_ddl_table_function:
       enabled: true
       description: "Read an AMDP table function via getDdl (DDL source)"
       params:
-        # Pre-existing AMDP table function on the target system (adt-clients
-        # cannot create extend/AMDP-backed objects). Leave empty to skip.
-        ddl_name: ""  # ← CHANGE to a table function that exists on your system
+        # An AMDP table function that exists on the system: by default the
+        # shared one the AMDP debugger uses (shared_dependencies.views), made
+        # by `npm run shared:setup` on a system on SAP HANA. Leave empty to skip.
+        ddl_name: "ZAC_SHR_DBG_TF"
 
 # Create Service Definition
 create_service_definition:
@@ -1798,6 +1813,10 @@ create_feature_toggle:
         feature_toggle_name: "ZAC_FT01"
         description: "AdtFeatureToggle workflow toggle"
         update_description: "AdtFeatureToggle workflow toggle (updated)"
+        # transport_request: ""   # Used by create and by checkState/switch on/off; omitted →
+        #                         #   environment.default_transport. The switch is refused for a
+        #                         #   workbench request (403 "wrong transport type K"): give it a
+        #                         #   non-workbench request, per your system.
 
 # Create Function Group
 create_function_group:
@@ -2033,6 +2052,11 @@ run_unit_test:
           format: "abapunit"  # or "junit"
 
 # Create CDS Unit Test
+# NOTE: run_program_unit_test and run_function_group_unit_test were added to the
+# template after many local configs were made from it. A config without them
+# finds no test case, and the two suites skip silently — copy both sections
+# (`npm run check:config` lists what your config lacks).
+#
 # ABAP Unit on a report. The test class sits in an include the report pulls in
 # — the usual shape — and the run names the report (`osl:object type="PROG"`,
 # as Eclipse does), which finds it there. Measured on premise, 2026-09-30.
@@ -2432,17 +2456,21 @@ read_accept:
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Read Accept headers for all read methods (expects 2xx)"
-      params: {}
+      params:
+        # The shared behavior definition (shared_dependencies.behavior_definitions).
+        behavior_definition_name: "ZAC_SHR_BIMP_DDLS"
+        # The template ships no shared behavior implementation, metadata
+        # extension or enhancement: name existing ones, or leave them empty to
+        # skip those reads.
+        behavior_implementation_class_name: ""
+        metadata_extension_name: ""
+        enhancement_name: ""
+        enhancement_type: ""             # with enhancement_name, e.g. "enhoxhb"
         # Optional overrides (if standard_objects registry doesn't cover these)
         # program_name: ""
         # ddl_name: ""
         # tabletype_name: ""
         # service_definition_name: ""
-        # behavior_definition_name: ""
-        # behavior_implementation_class_name: ""
-        # metadata_extension_name: ""
-        # enhancement_name: ""
-        # enhancement_type: ""
         # function_group_name: ""
         # function_module_name: ""
 
@@ -2508,7 +2536,10 @@ runtime_debugger:
       params:
         class_name: "ZAC_SHR_DBG_MODES_A"     # probe A (shared_dependencies.classes): a loop and an end line
         class_name_b: "ZAC_SHR_DBG_MODES_B"   # probe B (shared_dependencies.classes): one marked line, a second main program
-        second_user_env: ""               # path of a .env file of a second user; "" skips the other-user case
+        second_user_env: ""               # path of a .env file for a SECOND SAP user of the same system
+                                          #   (~/ allowed): SAP_URL, SAP_CLIENT, SAP_AUTH_TYPE and that
+                                          #   user's credentials (SAP_USERNAME/SAP_PASSWORD, or the JWT/UAA
+                                          #   keys), as in the main .env. "" skips the other-user case.
       # Close the IDE of the test user, and make sure the second user's IDE
       # holds no listener, before running this.
 
@@ -2633,6 +2664,10 @@ atc_run:
 
 # Profiler traces operations (AdtRuntimeClient)
 
+# Like atc_run, this needs a check variant whose prerequisites the system has;
+# otherwise the worklist answers TOOL_FAILURE "ATC check run aborted, due to
+# missing prerequisites" and lists nothing.
+#
 # ATC over programs and every kind of include (interfaces-adt 12.0.0). ATC
 # checks an include as the object that owns it, so each reference names the
 # owner the finished worklist must list. The owner needs findings under the
@@ -2755,6 +2790,18 @@ run_program:
       params:
         program_name: "ZAC_SHR_PROG"
 
+# Run Class — integration/core/class/run.test.ts, runClass() directly.
+# Uses shared_dependencies.classes (ZAC_SHR_RUN01, if_oo_adt_classrun); the test
+# does not create it, so run `npm run shared:setup` first.
+run_class:
+  test_cases:
+    - name: "run_class"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Run an existing class using runClass() directly"
+      params:
+        class_name: "ZAC_SHR_RUN01"
+
 # Execute Program (Executor API)
 execute_program:
   test_cases:
@@ -2765,6 +2812,9 @@ execute_program:
       params:
         # The shared fixture, not a program built per run. The suite runs it and
         # never writes to it — creation is integration/core/program's job.
+        # It must name a program that EXISTS (run `npm run shared:setup` first):
+        # a missing one does not fail the request — the run answers 2xx with
+        # the text "Program does not exist!".
         program_name: "ZAC_SHR_RUNPROG"
         profiling:
           enabled: true
