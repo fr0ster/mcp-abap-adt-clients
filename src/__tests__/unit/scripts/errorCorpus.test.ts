@@ -3442,6 +3442,8 @@ function objectSystem(
   answer: (request: ISeen) => Answer | undefined = () => undefined,
 ) {
   const deleted = new Set<string>();
+  const existing = new Set<string>();
+  const collisions: string[] = [];
   const pathOf = (url: string) => url.split('?')[0].toLowerCase();
   const temporaryName = (path: string) =>
     path
@@ -3459,14 +3461,20 @@ function objectSystem(
       return { status: 200, body: LOCKED };
     if (request.method === 'DELETE') {
       deleted.add(path);
+      existing.delete(path);
       return { status: 200 };
     }
     // The deletion resource: the object URIs in its body.
-    if (request.method === 'POST' && path.includes('/deletion/')) {
-      for (const part of request.body.split('adtcore:uri="').slice(1))
-        deleted.add(pathOf(part.slice(0, part.indexOf('"'))));
+    if (request.method === 'POST' && path.includes('/deletion/delete')) {
+      for (const part of request.body.split('adtcore:uri="').slice(1)) {
+        const gone = pathOf(part.slice(0, part.indexOf('"')));
+        deleted.add(gone);
+        existing.delete(gone);
+      }
       return { status: 200 };
     }
+    if (request.method === 'POST' && path.includes('/deletion/'))
+      return { status: 200 };
     if (request.method === 'GET') {
       if (path.includes(PROBE_NAME.toLowerCase())) return { status: 404 };
       if (
@@ -3490,6 +3498,22 @@ function objectSystem(
           .toLowerCase();
         for (const gone of [...deleted])
           if (gone.endsWith(`/${name}`)) deleted.delete(gone);
+        // A create of a name that is there: two objects took one name.
+        const create =
+          !request.body.includes('objectReference') &&
+          !request.body.includes('checkObject') &&
+          !path.endsWith(`/${name}`);
+        if (
+          create &&
+          /^l?z_?hp/.test(name) &&
+          name !== PROBE_NAME.toLowerCase()
+        ) {
+          // Keyed by the object's path: a behavior definition shares its
+          // root entity's name by design, not its path.
+          const object = `${path}/${name}`;
+          if (existing.has(object)) collisions.push(object);
+          existing.add(object);
+        }
       }
       return { status: 201 };
     }
@@ -3506,7 +3530,7 @@ function objectSystem(
       await connection.transport.send({ headers: request.headers });
     return make(request);
   }) as typeof connection.makeAdtRequest;
-  return { ...system, connection, deleted };
+  return { ...system, connection, deleted, collisions };
 }
 
 describe('members on temporary objects', () => {
@@ -3687,6 +3711,26 @@ describe('members on temporary objects', () => {
       file.coverage?.find((c) => c.member === 'getUtils().searchObject')
         ?.coverage ?? 'no object: the probe name',
     ).toBe('no object: the probe name');
+  });
+
+  it('every temporary object has a name of its own, parents of parents included', async () => {
+    const system = objectSystem();
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    // No create of a name another object still holds.
+    expect(system.collisions).toEqual([]);
+    const binding = file.objects.find(
+      (object) =>
+        object.type === 'serviceBinding' && object.handler === 'clients corpus',
+    );
+    const definition = file.objects.find(
+      (object) =>
+        object.type === 'serviceDefinition' &&
+        object.handler === 'clients corpus',
+    );
+    expect(binding?.parent).toBeDefined();
+    expect(binding?.parent).not.toBe(definition?.name);
   });
 
   it('a delete row that took the object: it is made again for the next row', async () => {

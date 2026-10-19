@@ -643,8 +643,14 @@ async function make(
   if (!spec) return { object: { type, reason: 'no spec to make one' } };
   let parent: string | undefined;
   if (spec.parentType) {
-    // The parent's name carries the child's code: two children, two parents.
-    const made = await make(probe, spec.parentType, context, `${spec.code}P`);
+    // The parent's name carries the chain below it (the child's code and
+    // role): two children, or one child two levels up, two parents.
+    const made = await make(
+      probe,
+      spec.parentType,
+      context,
+      `${spec.code}${role}`,
+    );
     if (!made.object.name)
       return {
         object: {
