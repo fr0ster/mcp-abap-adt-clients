@@ -17,7 +17,7 @@ import type {
   IEvidence,
   IHeaderVerdict,
 } from './corpus';
-import { byContrast, emptyNamed, judge } from './corpus';
+import { byContrast, emptyNamed, judge, realMediaTypes } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
 import {
@@ -137,11 +137,11 @@ export function evidenceOfRows(
       contentType,
       namedAccept:
         of('badAccept')?.status === 406
-          ? (of('badAccept')?.supportedAccept ?? [])
+          ? realMediaTypes(of('badAccept')?.supportedAccept ?? [])
           : [],
       namedContentType:
         of('badContentType')?.status === 415
-          ? (of('badContentType')?.supportedContentType ?? [])
+          ? realMediaTypes(of('badContentType')?.supportedContentType ?? [])
           : [],
       text: `bogus Content-Type: ${text(of('badContentType'))} | bogus Accept: ${text(of('badAccept'))}`,
     });

@@ -26,6 +26,7 @@ import {
 } from '../../../../tools/header-probe/capture';
 import {
   authorizationProblem,
+  buildHeaderCorpus,
   classifyNeeds,
   discoveryProbes,
   emptyNamed,
@@ -34,8 +35,13 @@ import {
   headerShape,
   type ICorpus,
   type ICorpusRow,
+  type IEvidence,
+  isLongPoll,
+  isMediaType,
   isolationKeys,
   judge,
+  LONG_POLL_ENDPOINTS,
+  LONG_POLL_SKIP,
   namedPerEndpoint,
   needsLines,
   notSent,
@@ -43,7 +49,9 @@ import {
   parseDiscovery,
   refusedCorpusPairs,
   renderCorpusMarkdown,
+  renderHeaderCorpus,
   renderNamedSummary,
+  selfCheck,
   stats,
   t100Of,
   wireNote,
@@ -3144,5 +3152,235 @@ describe('the final contrast takes every source and phase', () => {
       verdict: 'checked',
       reason: '406 without a list (no T100), inferred from the contrast',
     });
+    expect(result.file?.selfCheck?.settledWithoutEvidence).toEqual([]);
+  });
+});
+
+const FUNCTION_GROUP_SENTENCE =
+  "System expected the element '{http://www.sap.com/adt/functions/groups}abapFunctionGroup'";
+
+describe('only media types count in a list', () => {
+  it('a list item is type/subtype with optional parameters, in plain string code', () => {
+    expect(isMediaType('application/vnd.sap.adt.oo.classes.v4+xml')).toBe(true);
+    expect(isMediaType('text/plain; charset=utf-8')).toBe(true);
+    expect(isMediaType('*/*')).toBe(true);
+    expect(isMediaType('none')).toBe(false);
+    expect(isMediaType(FUNCTION_GROUP_SENTENCE)).toBe(false);
+    expect(isMediaType('a/b/c')).toBe(false);
+    expect(isMediaType('text/plain; charset')).toBe(false);
+  });
+
+  it('a 406 whose list is `none` or a sentence names nothing; with T100 044 it is still the Accept check', () => {
+    for (const listed of ['none', FUNCTION_GROUP_SENTENCE]) {
+      const body = `<exc:exception><message lang="EN">Accepted content types: ${listed}</message></exc:exception>`;
+      const at = (extra: Partial<ICorpusRow>) =>
+        judge(
+          row({
+            bogus: 'accept',
+            status: 406,
+            body,
+            named: {
+              ...emptyNamed(),
+              acceptedText: `Accepted content types: ${listed}`,
+              // What the client's parser returns: the text after the marker.
+              supportedAccept: [listed],
+            },
+            ...extra,
+          }),
+          406,
+        );
+      expect(at({}).verdict).toBe('unknown');
+      expect(at({}).unnamed406).toBe(true);
+      expect(
+        at({ body: `${t100Body('SADT_RESOURCE', '044')}${body}` }).verdict,
+      ).toBe('checked');
+      const needs = classifyNeeds([
+        row({
+          label: 'z',
+          bogus: 'accept',
+          status: 406,
+          body,
+          named: { ...emptyNamed(), supportedAccept: [listed] },
+        }),
+      ]);
+      expect(needs[0].namedAccept).toEqual([]);
+    }
+  });
+});
+
+const evidenceItem = (overrides: Partial<IEvidence>): IEvidence => ({
+  endpoint: 'GET /sap/bc/adt/probe/x',
+  source: 'clients',
+  phase: 1,
+  who: 'getProbe().read',
+  accept: { verdict: 'unknown', reason: 'x' },
+  contentType: { verdict: 'no body' },
+  namedAccept: [],
+  namedContentType: [],
+  text: 'x',
+  ...overrides,
+});
+const extras = { discoveryContentType: new Map(), pairs: new Map() };
+
+describe('settledBy names the phase whose answers decided', () => {
+  const unnamed = judge(row({ bogus: 'accept', status: 406 }), 406);
+  const rows = (status: number) => [
+    row({ endpoint: { method: 'GET', path: '/sap/bc/adt/probe/x' }, status }),
+  ];
+
+  it("a phase-1 406 settled by phase 2's contrast is settled by phase 2", () => {
+    const [item] = withContrast(
+      [evidenceItem({ accept: unnamed })],
+      [],
+      rows(200),
+    );
+    expect(item.accept.verdict).toBe('checked');
+    const [entry] = buildHeaderCorpus([item], extras);
+    expect(entry.needs).toBe('accept');
+    expect(entry.settledBy).toBe('phase 2');
+    expect(selfCheck([entry]).settledWithoutEvidence).toEqual([]);
+  });
+
+  it("the same 406 settled by phase 1's own contrast is settled by phase 1", () => {
+    const [item] = withContrast(
+      [evidenceItem({ accept: unnamed })],
+      rows(200),
+      rows(200),
+    );
+    const [entry] = buildHeaderCorpus([item], extras);
+    expect(entry.settledBy).toBe('phase 1');
+  });
+});
+
+describe('the self-check', () => {
+  it('lists a record settled by a phase without its verdict, and a marker followed by no media type', () => {
+    const [entry] = buildHeaderCorpus(
+      [
+        evidenceItem({
+          accept: { verdict: 'unknown', status: 404, reason: '404' },
+          text: `Accept: unknown (404) | Accepted content types: ${FUNCTION_GROUP_SENTENCE}`,
+        }),
+        evidenceItem({
+          phase: 2,
+          accept: { verdict: 'checked', status: 406 },
+          text: 'Accepted content types: application/a+xml',
+        }),
+      ],
+      extras,
+    );
+    expect(entry.settledBy).toBe('phase 2');
+    expect(selfCheck([entry])).toEqual({
+      settledWithoutEvidence: [],
+      markerWithoutMediaType: [
+        {
+          endpoint: 'GET /sap/bc/adt/probe/x',
+          status: 404,
+          marker: 'Accepted content types:',
+          text: FUNCTION_GROUP_SENTENCE,
+        },
+      ],
+    });
+    // A record whose claim the lines do not show.
+    const wrong = { ...entry, settledBy: 'phase 1' as const };
+    expect(selfCheck([wrong]).settledWithoutEvidence).toEqual([
+      {
+        endpoint: 'GET /sap/bc/adt/probe/x',
+        settledBy: 'phase 1',
+        accept: 'checked',
+        contentType: 'no body',
+      },
+    ]);
+  });
+
+  it('is in the .md and the .json; an empty check prints 0', () => {
+    const [entry] = buildHeaderCorpus(
+      [evidenceItem({ accept: { verdict: 'checked', status: 406 } })],
+      extras,
+    );
+    const file = {
+      startedAt: 'x',
+      phases: [],
+      totalMs: 0,
+      counts: {
+        phase1: {
+          accept: 1,
+          'content-type': 0,
+          both: 0,
+          neither: 0,
+          unknown: 0,
+        },
+        phase2: {
+          accept: 1,
+          'content-type': 0,
+          both: 0,
+          neither: 0,
+          unknown: 0,
+        },
+      },
+      entries: [entry],
+      corpora: [],
+      removals: [],
+      objects: [],
+      selfCheck: selfCheck([entry]),
+    };
+    const md = renderHeaderCorpus(file);
+    expect(md).toContain('### settledBy without evidence: 0');
+    expect(md).toContain('### A marker followed by no media type: 0');
+    expect(JSON.parse(JSON.stringify(file)).selfCheck).toEqual({
+      settledWithoutEvidence: [],
+      markerWithoutMediaType: [],
+    });
+  });
+});
+
+describe('long-poll endpoints', () => {
+  const run = async (mode: 'corpus' | 'bogus' | 'none') => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 404 },
+    );
+    const result = await runCorpus({
+      connection: system.connection,
+      source: 'clients',
+      mode,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    const runStatus = (url: string) =>
+      url.startsWith('/sap/bc/adt/abapunit/runs/');
+    return {
+      sent: system.seen.filter((s) => s.method === 'GET' && runStatus(s.url)),
+      rows: (result.corpus?.rows ?? []).filter(
+        (r) => r.group === 'getClassTestRunner()' && r.label === 'getStatus',
+      ),
+    };
+  };
+
+  it('in corpus mode a long-poll endpoint is not sent and records the skip', async () => {
+    const { sent, rows } = await run('corpus');
+    expect(sent).toEqual([]);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.skipped).toBe(LONG_POLL_SKIP);
+  });
+
+  it('in bogus and none mode it is sent as before', async () => {
+    for (const mode of ['bogus', 'none'] as const) {
+      const { sent, rows } = await run(mode);
+      expect(sent.length).toBeGreaterThan(0);
+      for (const r of rows) expect(r.skipped).toBeUndefined();
+    }
+  });
+
+  it('the list matches by method and segments', () => {
+    expect(isLongPoll('GET', '/sap/bc/adt/abapunit/runs/{name}')).toBe(true);
+    expect(isLongPoll('GET', '/sap/bc/adt/abapunit/runs/ABC123')).toBe(true);
+    expect(isLongPoll('POST', '/sap/bc/adt/abapunit/runs/{name}')).toBe(false);
+    expect(isLongPoll('GET', '/sap/bc/adt/abapunit/runs')).toBe(false);
+    expect(LONG_POLL_ENDPOINTS.every((entry) => entry.what.length > 0)).toBe(
+      true,
+    );
   });
 });
