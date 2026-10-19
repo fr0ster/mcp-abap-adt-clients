@@ -240,6 +240,15 @@ export function stepOf(
   return 'write';
 }
 
+/** A metadata write: `updateMetadata`, whose body is the object's metadata document. */
+export const isMetadataWrite = (member: Pick<IMemberEndpoint, 'member'>) =>
+  member.member === 'updateMetadata';
+
+/** Whether the real call carries a body: a metadata write does (the metadata read back), whatever the dry recording said. */
+export const hasBody = (
+  member: Pick<IMemberEndpoint, 'member' | 'hasBody'>,
+): boolean => member.hasBody === true || isMetadataWrite(member);
+
 /** The names a member is given on a temporary object, beside its own. */
 export function overridesFor(
   type: string,
@@ -376,9 +385,7 @@ export async function runOnTemporaryObjects<T>(
       const known = rowsByMember.get(member);
       if (known) return known;
       const kinds: (BogusHeader | undefined)[] =
-        input.mode === 'bogus'
-          ? bogusHeaders(member.hasBody === true)
-          : [undefined];
+        input.mode === 'bogus' ? bogusHeaders(hasBody(member)) : [undefined];
       const rows = kinds.map((bogus) => {
         const row: ICorpusRow = {
           source: 'clients',
@@ -392,12 +399,7 @@ export async function runOnTemporaryObjects<T>(
             : {}),
           ...(member.pair ? { pair: { ...member.pair } } : {}),
           ...(bogus ? { bogus } : {}),
-          asked: askedFor(
-            input.mode,
-            member.pair,
-            member.hasBody === true,
-            bogus,
-          ),
+          asked: askedFor(input.mode, member.pair, hasBody(member), bogus),
           ...(made.object.name
             ? { temporary: `${type} ${made.object.name}` }
             : {}),
@@ -426,12 +428,28 @@ export async function runOnTemporaryObjects<T>(
     await prepare(probe, type, name, context);
     /** The lock handle the next call is given, if any. */
     const lock: { handle?: string } = {};
+    /** LOCK members sent on sessions of their own, whose locks are not yet proven freed. */
+    const lockedElsewhere: string[] = [];
+    /** The object's metadata as read before a metadata write: its body, written back unchanged. */
+    const metadata: { body?: string } = {};
+    const readMetadataBody = async () => {
+      const read = await stateRead();
+      metadata.body =
+        read.wire && isSuccess(read.wire.status)
+          ? String(read.wire.data ?? '')
+          : undefined;
+    };
     // A 403 "currently editing" on our own object is a lock of ours, not a
     // verdict on the headers.
     const send: SendRows<T> = async (plans, batched, connection) => {
       await input.send(plans, batched, connection);
       for (const plan of plans)
-        if (isLockRefusal(plan.row))
+        if (
+          isLockRefusal(plan.row) ||
+          // A 423 while a session of ours holds the object's lock.
+          (plan.row.status === 423 &&
+            (lock.handle !== undefined || lockedElsewhere.length > 0))
+        )
           plan.row.blocked = 'blocked by our own lock';
     };
     const planOf = (member: IMemberEndpoint): IObjectRowPlan<T>[] => {
@@ -466,6 +484,9 @@ export async function runOnTemporaryObjects<T>(
               name,
               overrides,
               ...(lock.handle ? { lockHandle: lock.handle } : {}),
+              ...(isMetadataWrite(member) && metadata.body !== undefined
+                ? { source: metadata.body }
+                : {}),
             });
           },
         });
@@ -531,11 +552,14 @@ export async function runOnTemporaryObjects<T>(
       } else {
         lock.handle = held;
         try {
-          for (const plan of writes.flatMap((member) => planOf(member))) {
-            input.interrupt.check();
-            await send([plan], false);
-            await readBack(plan.row);
-          }
+          for (const member of writes)
+            for (const plan of planOf(member)) {
+              input.interrupt.check();
+              // A metadata write sends the object's metadata back unchanged.
+              if (isMetadataWrite(member)) await readMetadataBody();
+              await send([plan], false);
+              await readBack(plan.row);
+            }
         } finally {
           delete lock.handle;
           await release(held);
@@ -550,7 +574,6 @@ export async function runOnTemporaryObjects<T>(
     // after — the logoff frees its locks —; a LOCK and an UNLOCK on ours
     // then prove the object free. An unlock is given a real handle, released
     // again if the unlock refused it.
-    const lockedElsewhere: string[] = [];
     // The unlocks first: each takes a LOCK on our session, which a lock
     // still held by an ended session would refuse.
     const isUnlock = (member: IMemberEndpoint) =>
@@ -571,8 +594,9 @@ export async function runOnTemporaryObjects<T>(
             await send([plan], false);
           } finally {
             delete lock.handle;
+            // Released on every path, unless the unlock row released it.
+            if (held && !isSuccess(plan.row.status)) await release(held);
           }
-          if (held && !isSuccess(plan.row.status)) await release(held);
           continue;
         }
         let granted: string | undefined;
@@ -591,8 +615,11 @@ export async function runOnTemporaryObjects<T>(
             'sent on a session of its own, ended after (its logoff frees the lock)';
           continue;
         }
-        await send([withHandle], false);
-        if (granted) await release(granted);
+        try {
+          await send([withHandle], false);
+        } finally {
+          if (granted) await release(granted);
+        }
         const free = await takeLock();
         if (free) await release(free);
         else
@@ -639,12 +666,14 @@ export async function runOnTemporaryObjects<T>(
           if (held) lock.handle = held;
           try {
             await send([plan], false);
+            await readBack(plan.row);
           } finally {
             delete lock.handle;
+            // Released on every path, unless the delete took the object
+            // (and its lock) with it.
+            if (held && plan.row.afterWrite?.exists !== false)
+              await release(held);
           }
-          await readBack(plan.row);
-          if (held && plan.row.afterWrite?.exists !== false)
-            await release(held);
         }
       }
     });
@@ -653,10 +682,21 @@ export async function runOnTemporaryObjects<T>(
     input.interrupt.check();
     await step();
   }
-  return { objects, failures: probe.lockFailures };
+  return {
+    objects,
+    failures: [
+      ...probe.lockFailures,
+      ...probe.possiblyOurs.map(
+        (taken) => `possibly ours, not deleted: ${taken}`,
+      ),
+    ],
+  };
 }
 
-/** Makes the object of `type` (its parent first), with the known pairs; in the ledger first. */
+/** The suffixes a name gets when the one before is there already. */
+const NAME_TRIES: readonly string[] = ['', 'X', 'Y'];
+
+/** Makes the object of `type` (its parent first), with the known pairs; ours once its create answered 2xx. */
 async function make(
   probe: Probe,
   type: string,
@@ -688,16 +728,32 @@ async function make(
     ...context,
     ...(parent ? { parent } : {}),
   };
-  const probeName = probe.name(spec, role);
-  const name =
-    spec.parentsName && parent
-      ? parent
-      : spec.nameFrom
-        ? spec.nameFrom(probeName, parent)
-        : probeName;
-  if (name !== probeName) probe.names.push(name);
-  // Newest first: the object before its parent, even one of the parent's name.
-  probe.remember(spec, name, own);
+  // A name that is there is not ours: another one, never that object.
+  let name: string | undefined;
+  for (const suffix of NAME_TRIES) {
+    const probeName = probe.name(spec, `${role}${suffix}`);
+    const candidate =
+      spec.parentsName && parent
+        ? parent
+        : spec.nameFrom
+          ? spec.nameFrom(probeName, parent)
+          : probeName;
+    if (candidate !== probeName) probe.names.push(candidate);
+    if (await probe.isFree(spec, candidate, own)) {
+      name = candidate;
+      break;
+    }
+    // A name fixed by its parent cannot change.
+    if (spec.parentsName && parent) break;
+  }
+  if (!name)
+    return {
+      object: {
+        type,
+        reason: 'every name tried is there already, so not ours',
+        ...(parent ? { parent } : {}),
+      },
+    };
   const why = await build(probe, spec, name, own);
   return why
     ? {
@@ -718,7 +774,6 @@ async function remake(
   name: string,
   context: ITemporaryContext,
 ): Promise<boolean> {
-  probe.remember(spec, name, context);
   return (await build(probe, spec, name, context)) === undefined;
 }
 
@@ -738,7 +793,13 @@ async function build(
       handle(client).create?.(config, { headers: pair('create'), analyse }) ??
       Promise.resolve(),
   );
-  if (!ok(created))
+  // Ours, and into the ledger (newest first: the object before its parent),
+  // only when the create answered 2xx.
+  if (
+    !(await probe.claim(spec, name, context, {
+      ...(created.wire ? { status: created.wire.status } : {}),
+    }))
+  )
     return `the create answered ${created.wire?.status ?? created.failure ?? 'nothing'}`;
   const source = spec.source?.(name, context);
   if (source !== undefined) {

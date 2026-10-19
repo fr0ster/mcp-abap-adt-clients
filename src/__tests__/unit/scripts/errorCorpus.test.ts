@@ -61,24 +61,34 @@ import {
 } from '../../../../tools/header-probe/corpus';
 import {
   defaultOutputDir,
+  headersFor,
   outputDir,
   removalOutcome,
   runCorpus,
   runFull,
   systemFolder,
 } from '../../../../tools/header-probe/corpusRun';
-import { Interrupt, Interrupted } from '../../../../tools/header-probe/ledger';
+import {
+  Interrupt,
+  Interrupted,
+  Ledger,
+} from '../../../../tools/header-probe/ledger';
 import {
   clientsOn,
   DEBUGGERS,
   handlerSpecs,
   LOCK_SKIP,
+  pairOf,
   prototypeMembers,
   recordingConnection,
   recordMembers,
   standInParameters,
 } from '../../../../tools/header-probe/members';
-import { coverageOf, stepOf } from '../../../../tools/header-probe/objectRun';
+import {
+  coverageOf,
+  runOnTemporaryObjects,
+  stepOf,
+} from '../../../../tools/header-probe/objectRun';
 import {
   KNOWN_PAIRS,
   LEGACY_PAIRS,
@@ -3477,10 +3487,11 @@ function objectSystem(
       return { status: 200 };
     if (request.method === 'GET') {
       if (path.includes(PROBE_NAME.toLowerCase())) return { status: 404 };
+      // A temporary name is there only once a create made it.
       if (
         temporaryName(path) &&
-        [...deleted].some(
-          (gone) => path === gone || path.startsWith(`${gone}/`),
+        ![...existing].some(
+          (object) => path === object || path.startsWith(`${object}/`),
         )
       )
         return { status: 404 };
@@ -3530,7 +3541,7 @@ function objectSystem(
       await connection.transport.send({ headers: request.headers });
     return make(request);
   }) as typeof connection.makeAdtRequest;
-  return { ...system, connection, deleted, collisions };
+  return { ...system, connection, deleted, collisions, existing };
 }
 
 describe('members on temporary objects', () => {
@@ -3701,6 +3712,104 @@ describe('members on temporary objects', () => {
     expect(entry?.evidence.join(' ')).toContain('blocked by our own lock');
   });
 
+  const corpusOf = (
+    file: NonNullable<Awaited<ReturnType<typeof run>>['file']>,
+    mode: string,
+  ) =>
+    JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          new RegExp(`corpus-clients-${mode}-[0-9].*\\.json$`).test(f),
+        ) as string,
+        'utf8',
+      ),
+    ) as ICorpus;
+
+  it('a 423 on our object while our lock is held is "blocked by our own lock"; one on the probe name, or with no lock of ours, is an answer', async () => {
+    const activated = new Set<string>();
+    const system = objectSystem((request) => {
+      const url = request.url.toLowerCase();
+      // Our domain's metadata write, under our LOCK.
+      if (request.method === 'PUT' && /\/ddic\/domains\/zhp/.test(url))
+        return { status: 423 };
+      // Our program's activation, no lock of ours held (after the make's
+      // own activation, which must go through).
+      if (
+        url.startsWith('/sap/bc/adt/activation') &&
+        request.body.toLowerCase().includes('/programs/programs/zhp')
+      ) {
+        const at = request.body.toLowerCase().indexOf('/programs/programs/zhp');
+        const program = request.body.toLowerCase().slice(at, at + 40);
+        if (activated.has(program)) return { status: 423 };
+        activated.add(program);
+      }
+      // The probe name, not coverable.
+      if (request.method === 'PUT' && url.includes('/enhancements/enhoxhb/'))
+        return { status: 423 };
+      return undefined;
+    });
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const rows = corpusOf(file, 'corpus').rows;
+    const domain = rows.filter(
+      (r) => r.temporary?.startsWith('domain ') && r.label === 'updateMetadata',
+    );
+    expect(domain.length).toBeGreaterThan(0);
+    for (const r of domain) expect(r.blocked).toBe('blocked by our own lock');
+    const activation = rows.filter(
+      (r) => r.temporary?.startsWith('program ') && r.label === 'activate',
+    );
+    expect(activation.length).toBeGreaterThan(0);
+    for (const r of activation) {
+      expect(r.status).toBe(423);
+      expect(r.blocked).toBeUndefined();
+    }
+    const enhancement = rows.filter(
+      (r) => r.group === 'getEnhancement()' && r.label === 'updateMetadata',
+    );
+    expect(enhancement.length).toBeGreaterThan(0);
+    for (const r of enhancement) {
+      expect(r.status).toBe(423);
+      expect(r.blocked).toBeUndefined();
+    }
+  });
+
+  it("a metadata write sends the object's metadata back unchanged, with the pair's Content-Type", async () => {
+    const metadata = '<domain:domain adtcore:name="probe-metadata"/>';
+    const system = objectSystem((request) =>
+      request.method === 'GET' &&
+      /^\/sap\/bc\/adt\/ddic\/domains\/zhp[a-z0-9]+$/.test(request.url) &&
+      system.existing.has(request.url)
+        ? { status: 200, body: metadata }
+        : undefined,
+    );
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'domain');
+    const puts = system.seen.filter(
+      (seen) =>
+        seen.method === 'PUT' &&
+        seen.url.toLowerCase().startsWith(`/sap/bc/adt/ddic/domains/${name}?`),
+    );
+    expect(puts.length).toBeGreaterThan(0);
+    for (const put of puts) {
+      expect(put.body).toBe(metadata);
+      expect(put.headers['content-type']).toBe(
+        pairOf('getDomain()', 'updateMetadata')?.contentType,
+      );
+    }
+    // Bogus mode has a Content-Type row too: the write has a body.
+    const bogus = corpusOf(file, 'bogus').rows.filter(
+      (r) => r.temporary?.startsWith('domain ') && r.label === 'updateMetadata',
+    );
+    expect(bogus.map((r) => r.bogus).sort()).toEqual([
+      'accept',
+      'content-type',
+    ]);
+  });
+
   it('a write gets a real lock handle, is sent once per row and read back', async () => {
     const system = objectSystem();
     const file = (await run(system)).file as NonNullable<
@@ -3797,6 +3906,81 @@ describe('members on temporary objects', () => {
     );
     expect(binding?.parent).toBeDefined();
     expect(binding?.parent).not.toBe(definition?.name);
+  });
+
+  it('a name that is there already is not ours: another name is made, that object is never touched', async () => {
+    const foreign = /^\/sap\/bc\/adt\/oo\/classes\/zhp[a-z0-9]{4}clk(\/|$|\?)/;
+    const system = objectSystem((request) =>
+      foreign.test(request.url.toLowerCase())
+        ? request.method === 'GET'
+          ? { status: 200, body: '<class/>' }
+          : { status: 500 }
+        : undefined,
+    );
+    const result = await run(system);
+    expect(result.file?.endedBy).toBe('complete');
+    const classes = (result.file?.objects ?? []).filter(
+      (object) => object.type === 'class',
+    );
+    for (const object of classes) expect(object.name).toMatch(/CLKX$/);
+    // Nothing but reads ever went to the name that was there.
+    const touched = system.seen.filter(
+      (seen) =>
+        (foreign.test(seen.url.toLowerCase()) && seen.method !== 'GET') ||
+        /\/oo\/classes\/zhp[a-z0-9]{4}clk"/.test(seen.body.toLowerCase()),
+    );
+    expect(touched).toEqual([]);
+  });
+
+  it('a create that failed while the name now reads as there: possibly ours, not deleted, and the run ends failed', async () => {
+    const made = new Set<string>();
+    const system = objectSystem((request) => {
+      const path = request.url.split('?')[0].toLowerCase();
+      if (
+        request.method === 'POST' &&
+        path === '/sap/bc/adt/programs/programs' &&
+        request.body.includes('adtcore:name="ZHP')
+      ) {
+        const at = request.body.indexOf('adtcore:name="') + 14;
+        made.add(
+          `/sap/bc/adt/programs/programs/${request.body.slice(at, request.body.indexOf('"', at)).toLowerCase()}`,
+        );
+        return { status: 500 };
+      }
+      if (request.method === 'GET' && made.has(path))
+        return { status: 200, body: '<program/>' };
+      return undefined;
+    });
+    const result = await run(system);
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toMatch(
+      /possibly ours, not deleted: program ZHP/,
+    );
+    // Not deleted: no delete of it was sent.
+    expect(
+      system.seen.some(
+        (seen) =>
+          (seen.method === 'DELETE' || seen.url.includes('/deletion/delete')) &&
+          [...made].some((path) =>
+            `${seen.url} ${seen.body}`.toLowerCase().includes(path),
+          ),
+      ),
+    ).toBe(false);
+  });
+
+  it('a create that failed, the name still free: nothing to report', async () => {
+    const system = objectSystem((request) =>
+      request.method === 'POST' &&
+      request.url.split('?')[0] === '/sap/bc/adt/programs/programs' &&
+      request.body.includes('adtcore:name="ZHP')
+        ? { status: 500 }
+        : undefined,
+    );
+    const result = await run(system);
+    expect(result.file?.endedBy).toBe('complete');
+    expect(
+      result.file?.objects.find((object) => object.type === 'program')?.reason,
+    ).toMatch(/^the create answered 500/);
   });
 
   it('a delete row that took the object: it is made again for the next row', async () => {
@@ -4136,4 +4320,126 @@ describe('workingContentType', () => {
       'application/a+xml',
     ]);
   });
+});
+
+describe('every lock the run takes is released on every path', () => {
+  /** A system that tracks the locks: LOCK holds, UNLOCK and a delete free. */
+  const lockingSystem = (
+    answer: (request: ISeen) => Answer | undefined = () => undefined,
+  ) => {
+    const held = new Set<string>();
+    const system = objectSystem((request) => {
+      const path = request.url.split('?')[0].toLowerCase();
+      const own = answer(request);
+      if (own) return own;
+      if (request.url.includes('_action=LOCK')) {
+        held.add(path);
+        return { status: 200, body: LOCKED };
+      }
+      if (request.url.includes('_action=UNLOCK')) held.delete(path);
+      if (request.method === 'DELETE') held.delete(path);
+      // The deletion resource: the object (and its lock) named in the body.
+      if (path.includes('/deletion/delete'))
+        for (const part of request.body.split('adtcore:uri="').slice(1))
+          held.delete(part.slice(0, part.indexOf('"')).toLowerCase());
+      return undefined;
+    });
+    return { ...system, held };
+  };
+
+  /** The program members, on a temporary program, with `send` throwing where told. */
+  const runPrograms = async (
+    system: ReturnType<typeof lockingSystem>,
+    throwAt: (label: string) => boolean,
+    interrupt = new Interrupt(),
+  ) => {
+    const connection = gate(onTheWire(system.connection), { interrupt });
+    const { members } = await recordMembers();
+    const programs = members.filter(
+      (member) => member.handler === 'getProgram()',
+    );
+    const specs = new Map(
+      handlerSpecs(clientsOn(traced(connection))).map((spec) => [
+        spec.label,
+        spec,
+      ]),
+    );
+    type Target = { base: IAbapConnection; parts: boolean };
+    // No cleanup: what releases the locks here is the object run's own
+    // `finally`, not the ledger's deletes.
+    const ledger = new Ledger(() => undefined);
+    return runOnTemporaryObjects<Target>({
+      connection,
+      mode: 'corpus',
+      members: programs,
+      specs,
+      clientOptions: {},
+      interrupt,
+      ledger,
+      context: TEMPORARY,
+      progress: () => undefined,
+      rows: [],
+      target: (on) => on,
+      headersFor: (member) => headersFor('corpus', member),
+      send: async (plans, _batched, on) => {
+        for (const plan of plans) {
+          if (throwAt(`${plan.row.label} before`))
+            throw new Error('the run broke');
+          const [capture] = await runCalls({
+            calls: [plan.call],
+            batched: false,
+            connection,
+            direct: { base: on ?? connection, parts: false },
+            onBatch: (batch) => ({ base: batch, parts: true }),
+            interrupt,
+          });
+          if (capture?.wire) plan.row.status = capture.wire.status;
+          if (capture) plan.after?.(capture);
+          if (throwAt(`${plan.row.label} after`))
+            throw new Error('the run broke');
+        }
+      },
+    });
+  };
+
+  for (const point of [
+    'update before',
+    'update after',
+    'unlock before',
+    'unlock after',
+    'lock after',
+    'delete before',
+    'delete after',
+  ])
+    it(`a throw while a lock is held (${point}): released`, async () => {
+      const system = lockingSystem();
+      await expect(
+        runPrograms(system, (label) => label === point),
+      ).rejects.toThrow('the run broke');
+      expect([...system.held]).toEqual([]);
+    });
+
+  const interruptAt: [string, (request: ISeen) => boolean][] = [
+    ['the write', (request) => request.method === 'PUT'],
+    ['the unlock row', (request) => request.url.includes('_action=UNLOCK')],
+    ['the delete', (request) => request.url.includes('/deletion/delete')],
+  ];
+  for (const [point, at] of interruptAt)
+    it(`Ctrl-C at ${point}, the lock held: released`, async () => {
+      const interrupt = new Interrupt();
+      let stopped = false;
+      const system = lockingSystem((request) => {
+        if (!stopped && at(request)) {
+          stopped = true;
+          interrupt.stop();
+        }
+        return undefined;
+      });
+      // Interrupted, or done if nothing was left to stop.
+      await runPrograms(system, () => false, interrupt).catch((error) => {
+        if (!(error instanceof Interrupted)) throw error;
+      });
+      expect(stopped).toBe(true);
+      expect([...system.held]).toEqual([]);
+    });
 });

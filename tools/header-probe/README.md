@@ -280,11 +280,27 @@ run's normal path, in every mode, each mode with its own objects
 - **Every session ends with a logoff:** the run's own and each LOCK
   member's, in a `finally`, on every path — complete, failed, an
   authorization stop, Ctrl-C.
-- **Cleanup:** every object is in the ledger before its create is sent; the
-  cleanup in a `finally` deletes what is left, newest first (an object before
-  its parent), and proves each removal by a read that answers 404. A
-  temporary object that may remain, or an unlock that failed, ends the run
-  `failed` (exit 1), listed loudly.
+- **Only our own objects:** before a create the name is read; a name that
+  is there is not ours, and another one is taken (never that object). An
+  object is ours, and goes into the ledger to be deleted, only once our
+  create answered 2xx. A create that failed, or whose answer is unknown,
+  registers nothing; if the name then reads as there it is reported
+  `possibly ours, not deleted: <name>` and the run ends `failed` — a person
+  decides. The write cycle and the update measurement follow the same rule.
+- **Cleanup:** the cleanup in a `finally` deletes what is ours, newest first
+  (an object before its parent), and proves each removal by a read that
+  answers 404. A temporary object that may remain, or an unlock that failed,
+  ends the run `failed` (exit 1), listed loudly.
+- **Every lock released:** a lock the run took is released in a `finally` —
+  the UNLOCK, and if that fails, the cleanup's UNLOCK again and the logoff
+  of the session — on a throw or Ctrl-C between the LOCK and the UNLOCK too.
+- **A metadata write** (`updateMetadata`) reads the object's metadata first
+  and writes it back unchanged as its body, with the mode's headers (the
+  pair, the bogus Content-Type, or none): a PUT with no body carries no
+  Content-Type, and SAP refuses it 415 — the probe's doing, not the
+  client's. A 423 on our object while a session of ours holds its lock is
+  `blocked by our own lock`, like a 403 "currently editing"; a 423 on the
+  probe name, or on a member that is not coverable, stays an answer.
 
 ### workingContentType
 

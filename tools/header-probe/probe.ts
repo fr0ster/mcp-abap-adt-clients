@@ -192,6 +192,7 @@ export class Probe {
         );
       return answer;
     });
+    this.lastProbes = probes;
     if (wanted)
       this.rows.push({
         objectType: input.objectType,
@@ -201,6 +202,9 @@ export class Probe {
       });
     return probes.find((probe) => probe.probe === 'known');
   }
+
+  /** The probes of the last operation, for what follows it (a create's claim). */
+  lastProbes: IProbeAnswer[] = [];
 
   /** One call on the plain connection, for a step that is not a probe. */
   async direct1(call: ICall, gated = true): Promise<ICapture> {
@@ -241,6 +245,62 @@ export class Probe {
             };
       },
     });
+  }
+
+  /**
+   * Names the probe's creates answered without proof that they are ours: the
+   * create failed or its answer is unknown, and the name now reads as there.
+   * Nothing deletes them; the run ends failed and a person decides.
+   */
+  readonly possiblyOurs: string[] = [];
+
+  /** The state of `name` as its type's metadata read answers it. */
+  async stateOfName(
+    spec: IObjectSpec,
+    name: string,
+    context: ISpecContext,
+  ): Promise<IObjectState> {
+    const config = spec.config(name, context);
+    return readState(
+      (
+        await this.direct1(
+          (client, analyse) =>
+            spec.handle(client).readMetadata?.(config, { analyse }) ??
+            Promise.resolve(),
+          false,
+        )
+      ).wire,
+    );
+  }
+
+  /** Whether a name is free: its read answers 404. Anything else is not ours to take. */
+  async isFree(
+    spec: IObjectSpec,
+    name: string,
+    context: ISpecContext,
+  ): Promise<boolean> {
+    return (await this.stateOfName(spec, name, context)).exists === false;
+  }
+
+  /**
+   * After a create: the object is ours only when the create answered 2xx —
+   * then it goes into the ledger, to be deleted. A failed create, or one
+   * whose answer is unknown, registers nothing; if the name now reads as
+   * there, it is `possibly ours, not deleted`.
+   */
+  async claim(
+    spec: IObjectSpec,
+    name: string,
+    context: ISpecContext,
+    created: { status?: number },
+  ): Promise<boolean> {
+    if (isSuccess(created.status)) {
+      this.remember(spec, name, context);
+      return true;
+    }
+    if ((await this.stateOfName(spec, name, context)).exists !== false)
+      this.possiblyOurs.push(`${spec.type} ${name}`);
+    return false;
   }
 
   /** A ledger entry that deletes `name` with the known delete pair, if it is there. */
@@ -304,7 +364,8 @@ export class Probe {
   ): Promise<boolean> {
     const context: ISpecContext = { ...this.context };
     const config = spec.config(name, context);
-    this.remember(spec, name, context);
+    // A name that is there is not ours: nothing is created or deleted.
+    if (!(await this.isFree(spec, name, context))) return false;
     const pair = (member: string) =>
       knownPair(spec.handler, member) as IAdtHeaders;
     const created = await this.direct1(
@@ -314,7 +375,12 @@ export class Probe {
           .create?.(config, { headers: pair('create'), analyse }) ??
         Promise.resolve(),
     );
-    if (!ok(created)) return false;
+    if (
+      !(await this.claim(spec, name, context, {
+        ...(created.wire ? { status: created.wire.status } : {}),
+      }))
+    )
+      return false;
     if (source) {
       const locked = await this.direct1(
         (client, analyse) =>
@@ -405,7 +471,26 @@ export class Probe {
         handle(client).readMetadata?.(spec.config(name, context), {
           analyse,
         }) ?? Promise.resolve();
-    for (const kind of PROBE_KINDS) this.remember(spec, names[kind], context);
+    // A name that is there is not ours: the type is left alone.
+    for (const kind of PROBE_KINDS)
+      if (!(await this.isFree(spec, names[kind], context))) {
+        for (const member of [
+          'create',
+          'update',
+          'updateMetadata',
+          'check',
+          'activate',
+          'checkDeletion',
+          'delete',
+        ])
+          if (knownPair(spec.handler, member) && this.wanted(spec.type, member))
+            this.skip(
+              spec.type,
+              member,
+              `skipped: the name ${names[kind]} is there already, so it is not ours`,
+            );
+        return;
+      }
 
     // 1. Create: each probe on a name of its own, read right after.
     const created = await this.operation({
@@ -417,6 +502,9 @@ export class Probe {
         Promise.resolve(),
       state: (kind) => stateOf(names[kind]),
     });
+    // Each name a create answered 2xx for is ours, and into the ledger.
+    for (const answer of this.lastProbes)
+      await this.claim(spec, names[answer.probe], context, answer);
     if (!created || !isSuccess(created.status)) {
       const why = `skipped: the known create answered ${created?.status ?? created?.failure ?? 'nothing'}`;
       for (const member of [

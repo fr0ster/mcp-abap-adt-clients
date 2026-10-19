@@ -276,6 +276,8 @@ export interface IMemberOptions {
   lockHandle?: string;
   /** Config keys answered with these values first: a temporary object's parent, its include, … */
   overrides?: Readonly<Record<string, unknown>>;
+  /** The body a write sends: a temporary object's metadata, read and written back unchanged. */
+  source?: string;
 }
 
 /** What one argument of a member gets, or why the member cannot be called without a real object. */
