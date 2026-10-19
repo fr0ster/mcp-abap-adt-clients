@@ -230,7 +230,11 @@ describe('Admin: Setup shared dependencies', () => {
       }
 
       // Group activation for objects with skip_activation: true
+      // Every type an entry may mark `skip_activation: true`. The AMDP debugger's
+      // table function and class name each other, so they activate together.
       const adtTypeMap: Record<string, string> = {
+        views: 'DDLS/DF',
+        classes: 'CLAS/OC',
         service_definitions: 'SRVD/SRV',
         service_bindings: 'SRVB/SVB',
       };

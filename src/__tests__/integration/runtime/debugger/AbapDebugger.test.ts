@@ -2,8 +2,9 @@
  * Integration test for the ABAP debugger (AbapDebugger), every member of
  * IAbapDebugger against a live system.
  *
- * The test deploys a small class implementing IF_OO_ADT_CLASSRUN, then drives
- * two runs of it through the debugger: the first from the first breakpoint to
+ * The test runs a small class implementing IF_OO_ADT_CLASSRUN — the shared
+ * ZAC_SHR_DBG_PROBE, ensured from `shared_dependencies` and never deleted —
+ * through the debugger twice: the first from the first breakpoint to
  * the program's end, the second caught and terminated where it stands. A third
  * part opens two listeners of its own to see what a conflict answers. The
  * steps depend on each other in order — one debug session is one sequence —
@@ -36,13 +37,18 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
+import {
+  ensureDebugTarget,
+  markerLines,
+  sharedSource,
+} from '../../../helpers/debuggerTargets';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -54,8 +60,7 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase, resolvePackageName, resolveTransportRequest } =
-  require('../../../helpers/test-helper');
+const { getEnabledTestCase } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -68,53 +73,20 @@ const testsLogger: ILogger = createTestsLogger();
 
 const testCase = getEnabledTestCase('runtime_debugger', 'adt_abap_debugger');
 const CLASS_NAME: string = (
-  testCase?.params?.class_name ?? 'ZAC_DBG_PROBE'
+  testCase?.params?.class_name ?? 'ZAC_SHR_DBG_PROBE'
 ).toUpperCase();
 const HOLD_SECONDS = 30;
 const STEP_TIMEOUT = 120_000;
 
 /**
- * The probe. `"BP:<name>` markers name the lines the test stops at; the work
- * is deterministic, so every run stops at the same lines with the same values.
+ * The probe: a shared class (`shared_dependencies.classes`), never created or
+ * deleted here. Its `"BP:<name>` markers name the lines the test stops at; the
+ * work is deterministic, so every run stops at the same lines with the same
+ * values.
  */
-const SOURCE = `CLASS ${CLASS_NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-  PRIVATE SECTION.
-    METHODS add
-      IMPORTING iv_a TYPE i
-                iv_b TYPE i
-      RETURNING VALUE(rv) TYPE i.
-ENDCLASS.
-
-CLASS ${CLASS_NAME.toLowerCase()} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lv_total TYPE i.
-    DATA lv_text TYPE string VALUE 'start'.
-    DO 3 TIMES.
-      lv_total = add( iv_a = lv_total iv_b = sy-index ). "BP:loop
-    ENDDO.
-    lv_text = |total { lv_total }|. "BP:after
-    TRY.
-        DATA(lv_zero) = 0.
-        lv_total = lv_total / lv_zero. "BP:raise
-      CATCH cx_sy_zerodivide.
-        lv_text = 'caught'. "BP:catch
-    ENDTRY.
-    out->write( lv_text ).
-  ENDMETHOD.
-
-  METHOD add.
-    rv = iv_a + iv_b. "BP:add
-  ENDMETHOD.
-ENDCLASS.
-`;
-
-const LINE: Record<string, number> = {};
-SOURCE.split('\n').forEach((text, index) => {
-  const marker = /"BP:(\w+)/.exec(text);
-  if (marker) LINE[marker[1]] = index + 1;
-});
+const SOURCE = sharedSource('classes', CLASS_NAME);
+const LINE = markerLines(SOURCE, '"BP:');
+const MARKERS = ['loop', 'after', 'raise', 'catch', 'add'];
 const SOURCE_URI = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
 
 // --- reading the documents ------------------------------------------------------
@@ -238,8 +210,6 @@ describe('ABAP debugger (AbapDebugger)', () => {
   let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let packageName = '';
-  let transportRequest: string | undefined;
   let skipReason: string | undefined;
 
   const armed: string[] = [];
@@ -362,43 +332,14 @@ describe('ABAP debugger (AbapDebugger)', () => {
       connectionLogger,
       abapDebuggerDocuments,
     );
-    packageName = resolvePackageName(testCase.params?.package_name);
-    // A local package takes no transport.
-    transportRequest = packageName.startsWith('$')
-      ? undefined
-      : resolveTransportRequest(testCase.params?.transport_request) ||
-        undefined;
-
-    const cls = new AdtClient(listenerConnection, connectionLogger).getClass();
-    const config = {
-      className: CLASS_NAME,
-      packageName,
-      description: 'Debugger integration probe',
-      ...(transportRequest ? { transportRequest } : {}),
-    };
-    const created = await cls.create(config, {
-      headers: integrationHeadersOf(cls, 'create'),
-    });
-    if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
-      throw new Error(`probe create: ${created.getError().message}`);
-    }
-    const lock = await cls.lock(config);
-    if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
-    const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, {
-      headers: integrationHeadersOf(cls, 'update'),
-      source: SOURCE,
-      lockHandle,
-    });
-    await cls.unlock(config, lockHandle);
-    if (!written.ok)
-      throw new Error(`probe write: ${written.getError().message}`);
-    const activated = await cls.activate(config, {
-      headers: integrationHeadersOf(cls, 'activate'),
-    });
-    if (!activated.ok)
-      throw new Error(`probe activate: ${activated.getError().message}`);
-    logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
+    await ensureDebugTarget(
+      listenerConnection,
+      'classes',
+      CLASS_NAME,
+      { marker: '"BP:', names: MARKERS },
+      testsLogger,
+    );
+    logTestStep(`probe ${CLASS_NAME} active`, testsLogger);
 
     // Every debugger request needs the stateful session it attached on.
     listenerConnection.setSessionType('stateful');
@@ -406,41 +347,41 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   afterAll(async () => {
     if (!listenerConnection) return;
+    // Debugger state only: the probe is shared and stays. Every session this
+    // file opened is logged off, and every failure is reported.
+    const steps = new CleanupSteps();
     for (const id of armed) {
-      await listenerApi.deleteBreakpoint(identity, id);
+      await steps.run(
+        `delete breakpoint ${id}`,
+        () => listenerApi.deleteBreakpoint(identity, id),
+        { checkAnswer: true },
+      );
     }
-    if (attached) await debuggerApi.terminateDebuggee();
-    if (sessionConnection) {
-      sessionConnection.setSessionType('stateless');
-      await closeOwnTestConnection(sessionConnection);
+    if (attached) {
+      await steps.run(
+        'terminate the debuggee',
+        () => debuggerApi.terminateDebuggee(),
+        { checkAnswer: true },
+      );
     }
-    await listenerApi.stopListener(identity);
+    await steps.logOff('the debug session', sessionConnection);
+    await steps.run(
+      'stop the listener',
+      () => listenerApi.stopListener(identity),
+      { checkAnswer: true },
+    );
     if (run) {
-      await Promise.race([
-        run,
-        new Promise((resolve) => setTimeout(resolve, 15_000)),
-      ]);
+      const pending = run;
+      await steps.run('wait for the run', () =>
+        Promise.race([
+          pending,
+          new Promise((resolve) => setTimeout(resolve, 15_000)),
+        ]),
+      );
     }
-    listenerConnection.setSessionType('stateless');
-    if (!testCase?.params?.keep_probe) {
-      await new AdtClient(listenerConnection, connectionLogger)
-        .getClass()
-        .delete(
-          {
-            className: CLASS_NAME,
-            packageName,
-            ...(transportRequest ? { transportRequest } : {}),
-          },
-          {
-            headers: integrationHeadersOf(
-              new AdtClient(listenerConnection, connectionLogger).getClass(),
-              'delete',
-            ),
-          },
-        );
-    }
-    await closeOwnTestConnection(triggerConnection);
-    await closeOwnTestConnection(listenerConnection);
+    await steps.logOff('the trigger session', triggerConnection);
+    await steps.logOff('the listener session', listenerConnection);
+    steps.finish();
   }, STEP_TIMEOUT);
 
   // --- breakpoints -----------------------------------------------------------------
@@ -898,22 +839,28 @@ describe('ABAP debugger (AbapDebugger)', () => {
         abapDebuggerDocuments,
         { onConflict: 'refuse' },
       );
-      try {
-        const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+      await withCleanup(
+        async () => {
+          const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+          await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const refused = await listenerApi.listen(identity, {
-          holdSeconds: 10,
-        });
-        expect(statusOf(refused)).toBe(409);
-        expect(subtypeOf(refused)).toBe('conflictDetected');
+          const refused = await listenerApi.listen(identity, {
+            holdSeconds: 10,
+          });
+          expect(statusOf(refused)).toBe(409);
+          expect(subtypeOf(refused)).toBe('conflictDetected');
 
-        await holding;
-      } finally {
-        await holder.stopListener(holderIdentity);
-        holderConnection.setSessionType('stateless');
-        await closeOwnTestConnection(holderConnection);
-      }
+          await holding;
+        },
+        async (steps) => {
+          await steps.run(
+            'stop the holder',
+            () => holder.stopListener(holderIdentity),
+            { checkAnswer: true },
+          );
+          await steps.logOff('the holder session', holderConnection);
+        },
+      );
     },
     STEP_TIMEOUT,
   );
@@ -940,25 +887,35 @@ describe('ABAP debugger (AbapDebugger)', () => {
         abapDebuggerDocuments,
         { onConflict: 'takeOver' },
       );
-      try {
-        const holding = holder.listen(holderIdentity, { holdSeconds: 20 });
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+      await withCleanup(
+        async () => {
+          const holding = holder.listen(holderIdentity, { holdSeconds: 20 });
+          await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const taking = taker.listen(identity, { holdSeconds: 5 });
-        // Measured on premise (2026-10-09): the displaced long poll returns
-        // at once, 409 with the subtype conflictNotification — the notice
-        // Eclipse shows.
-        const displaced = await holding;
-        expect(statusOf(displaced)).toBe(409);
-        expect(subtypeOf(displaced)).toBe('conflictNotification');
-        const took = await taking;
-        expect(took.ok).toBe(true);
-      } finally {
-        await taker.stopListener(identity);
-        await holder.stopListener(holderIdentity);
-        holderConnection.setSessionType('stateless');
-        await closeOwnTestConnection(holderConnection);
-      }
+          const taking = taker.listen(identity, { holdSeconds: 5 });
+          // Measured on premise (2026-10-09): the displaced long poll returns
+          // at once, 409 with the subtype conflictNotification — the notice
+          // Eclipse shows.
+          const displaced = await holding;
+          expect(statusOf(displaced)).toBe(409);
+          expect(subtypeOf(displaced)).toBe('conflictNotification');
+          const took = await taking;
+          expect(took.ok).toBe(true);
+        },
+        async (steps) => {
+          await steps.run(
+            'stop the taker',
+            () => taker.stopListener(identity),
+            { checkAnswer: true },
+          );
+          await steps.run(
+            'stop the holder',
+            () => holder.stopListener(holderIdentity),
+            { checkAnswer: true },
+          );
+          await steps.logOff('the holder session', holderConnection);
+        },
+      );
     },
     STEP_TIMEOUT,
   );
@@ -978,23 +935,33 @@ describe('ABAP debugger (AbapDebugger)', () => {
         abapDebuggerDocuments,
         { onConflict: 'takeOver' },
       );
-      try {
-        const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+      await withCleanup(
+        async () => {
+          const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+          await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // Measured on premise (2026-10-09): the conflict is seen whatever
-        // parameters the other listener registered with.
-        const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
-        expect(statusOf(beside)).toBe(409);
-        expect(subtypeOf(beside)).toBe('conflictDetected');
+          // Measured on premise (2026-10-09): the conflict is seen whatever
+          // parameters the other listener registered with.
+          const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
+          expect(statusOf(beside)).toBe(409);
+          expect(subtypeOf(beside)).toBe('conflictDetected');
 
-        await holding;
-      } finally {
-        await listenerApi.stopListener(identity);
-        await holder.stopListener(holderIdentity);
-        holderConnection.setSessionType('stateless');
-        await closeOwnTestConnection(holderConnection);
-      }
+          await holding;
+        },
+        async (steps) => {
+          await steps.run(
+            'stop the listener',
+            () => listenerApi.stopListener(identity),
+            { checkAnswer: true },
+          );
+          await steps.run(
+            'stop the holder',
+            () => holder.stopListener(holderIdentity),
+            { checkAnswer: true },
+          );
+          await steps.logOff('the holder session', holderConnection);
+        },
+      );
     },
     STEP_TIMEOUT,
   );
@@ -1017,19 +984,29 @@ describe('ABAP debugger (AbapDebugger)', () => {
         connectionLogger,
         abapDebuggerDocuments,
       );
-      try {
-        const holding = other.listen(sameIde, { holdSeconds: 10 });
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        // Measured on premise (2026-10-09): 200 after the hold, no 409.
-        const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
-        expect(statusOf(beside)).toBe(200);
-        await holding;
-      } finally {
-        await listenerApi.stopListener(identity);
-        await other.stopListener(sameIde);
-        otherConnection.setSessionType('stateless');
-        await closeOwnTestConnection(otherConnection);
-      }
+      await withCleanup(
+        async () => {
+          const holding = other.listen(sameIde, { holdSeconds: 10 });
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Measured on premise (2026-10-09): 200 after the hold, no 409.
+          const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
+          expect(statusOf(beside)).toBe(200);
+          await holding;
+        },
+        async (steps) => {
+          await steps.run(
+            'stop the listener',
+            () => listenerApi.stopListener(identity),
+            { checkAnswer: true },
+          );
+          await steps.run(
+            'stop the other listener',
+            () => other.stopListener(sameIde),
+            { checkAnswer: true },
+          );
+          await steps.logOff('the other session', otherConnection);
+        },
+      );
     },
     STEP_TIMEOUT,
   );

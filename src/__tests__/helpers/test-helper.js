@@ -2348,6 +2348,101 @@ function dataElementDocumentFor(current, depConfig) {
 }
 
 /**
+ * Write a shared object's configured source, and activate it unless the
+ * config says `skip_activation: true`.
+ *
+ * `skip_activation` is for objects that name each other — an AMDP class and
+ * the table function it implements — and so can only be activated together:
+ * each is written inactive here, and the caller activates the group
+ * (`activateSharedGroup` in `sharedActivation.ts`, or `shared:setup`'s group
+ * run).
+ */
+async function writeShared(handler, config, depConfig, logger) {
+  if (depConfig.skip_activation) {
+    await writeSource(handler, config, { source: depConfig.source }, logger);
+    return;
+  }
+  await writeAndActivate(handler, config, { source: depConfig.source }, logger);
+}
+
+/**
+ * The active source of an existing shared object, read for comparison; a
+ * type with no source read here answers `undefined`.
+ */
+function readActiveSharedSource(client, type, name, depConfig) {
+  const read = {
+    tables: () => client.getTable().read({ tableName: name }, 'active'),
+    structures: () =>
+      client.getStructure().read({ structureName: name }, 'active'),
+    views: () => client.getDdl().read({ ddlName: name }, 'active'),
+    programs: () => client.getProgram().read({ programName: name }, 'active'),
+    behavior_definitions: () =>
+      client.getBehaviorDefinition().read({ name }, 'active'),
+    classes: () => client.getClass().read({ className: name }, 'active'),
+    access_controls: () =>
+      client.getAccessControl().read({ accessControlName: name }, 'active'),
+    interfaces: () =>
+      client.getInterface().read({ interfaceName: name }, 'active'),
+    function_modules: () =>
+      client.getFunctionModule().read(
+        {
+          functionModuleName: name,
+          functionGroupName: depConfig.function_group,
+        },
+        'active',
+      ),
+    function_group_includes: () =>
+      client
+        .getFunctionInclude()
+        .read(
+          { functionGroupName: depConfig.function_group, includeName: name },
+          'active',
+        ),
+    service_definitions: () =>
+      client
+        .getServiceDefinition()
+        .read({ serviceDefinitionName: name }, 'active'),
+  }[type];
+  return read ? read() : undefined;
+}
+
+/**
+ * Two sources are the same when they differ only in line endings, trailing
+ * blanks at line ends, or blank lines at the end.
+ */
+function sameSource(a, b) {
+  const lines = (text) => {
+    const out = String(text ?? '')
+      .split('\r\n')
+      .join('\n')
+      .split('\n')
+      .map((line) => line.trimEnd());
+    while (out.length && out[out.length - 1] === '') out.pop();
+    return out.join('\n');
+  };
+  return lines(a) === lines(b);
+}
+
+/**
+ * Whether an existing shared object's **active** source is already the
+ * configured one. Then it is both right and active, and is left as it is:
+ * no lock, no write, no activation. Any doubt — the read refused, or no read
+ * for this type — answers `false`, and the object is written.
+ */
+async function sharedSourceIsCurrent(client, type, name, depConfig, logger) {
+  try {
+    const answer = await readActiveSharedSource(client, type, name, depConfig);
+    if (!answer || !answer.ok) return false;
+    return sameSource(answer.getResult().value, depConfig.source);
+  } catch (error) {
+    logger?.warn?.(
+      `Could not read the active source of shared ${type} ${name}: ${error.message}`,
+    );
+    return false;
+  }
+}
+
+/**
  * Update source and activate an existing shared dependency.
  * Called when object exists but may have outdated or inactive source.
  */
@@ -2359,6 +2454,15 @@ async function updateAndActivateShared(
   transportRequest,
   logger,
 ) {
+  // An object at the configured source and active is left alone: a lock and a
+  // write on every run put it into whatever request the system chooses, and
+  // gain nothing.
+  if (await sharedSourceIsCurrent(client, type, name, depConfig, logger)) {
+    logger?.info?.(
+      `Shared ${type} ${name} is at the configured source and active — left as it is`,
+    );
+    return false;
+  }
   logger?.info?.(
     `Shared ${type} ${name} exists — updating source and activating...`,
   );
@@ -2379,10 +2483,11 @@ async function updateAndActivateShared(
       { source: depConfig.source },
     );
   } else if (type === 'views') {
-    await writeAndActivate(
+    await writeShared(
       client.getDdl(),
       { ddlName: name, source: depConfig.source, transportRequest },
-      { source: depConfig.source },
+      depConfig,
+      logger,
     );
   } else if (type === 'programs') {
     await writeAndActivate(
@@ -2397,10 +2502,11 @@ async function updateAndActivateShared(
       { source: depConfig.source },
     );
   } else if (type === 'classes') {
-    await writeAndActivate(
+    await writeShared(
       client.getClass(),
       { className: name, source: depConfig.source, transportRequest },
-      { source: depConfig.source },
+      depConfig,
+      logger,
     );
   } else if (type === 'access_controls') {
     mustSucceed(
@@ -2473,9 +2579,10 @@ async function updateAndActivateShared(
     );
   } else {
     logger?.info?.(`Shared ${type} ${name} — no update logic, skipping`);
-    return;
+    return false;
   }
-  logger?.info?.(`Shared ${type} ${name} updated and activated`);
+  logger?.info?.(`Shared ${type} ${name} updated`);
+  return true;
 }
 
 /**
@@ -2568,7 +2675,7 @@ async function ensureSharedDependency(client, type, name, logger) {
   const cacheKey = `${type}:${name}`;
   if (_verifiedDependencies[cacheKey]) {
     logger?.info?.(`Shared ${type} ${name} already verified, skipping`);
-    return { existed: true, created: false };
+    return { existed: true, created: false, changed: false };
   }
 
   const depConfig = resolveSharedDependency(type, name);
@@ -2718,9 +2825,10 @@ async function ensureSharedDependency(client, type, name, logger) {
 
   if (exists) {
     // If config has source, update and activate to ensure it matches config
+    let changed = false;
     if (depConfig.source) {
       try {
-        await updateAndActivateShared(
+        changed = await updateAndActivateShared(
           client,
           type,
           name,
@@ -2829,7 +2937,9 @@ async function ensureSharedDependency(client, type, name, logger) {
         logger,
       ));
     if (ready) _verifiedDependencies[cacheKey] = true;
-    return { existed: true, created: false };
+    // `changed`: the source was written (and, without skip_activation,
+    // activated) by this call — what a caller activating a group needs to know.
+    return { existed: true, created: false, changed };
   }
 
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
@@ -2990,20 +3100,13 @@ async function ensureSharedDependency(client, type, name, logger) {
         `shared ddl create ${name}`,
       );
       if (depConfig.source) {
-        logger?.info?.(`Activating shared view ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getDdl(),
-            {
-              ddlName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared ddl update ${name}`,
+        await writeShared(
+          client.getDdl(),
+          { ddlName: name, source: depConfig.source, transportRequest },
+          depConfig,
+          logger,
         );
-        logger?.info?.(`Shared view ${name} activated`);
+        logger?.info?.(`Shared view ${name} written`);
       }
     } else if (type === 'programs') {
       mustSucceed(
@@ -3083,20 +3186,13 @@ async function ensureSharedDependency(client, type, name, logger) {
         `shared class create ${name}`,
       );
       if (depConfig.source) {
-        logger?.info?.(`Activating shared class ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getClass(),
-            {
-              className: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared class update ${name}`,
+        await writeShared(
+          client.getClass(),
+          { className: name, source: depConfig.source, transportRequest },
+          depConfig,
+          logger,
         );
-        logger?.info?.(`Shared class ${name} activated`);
+        logger?.info?.(`Shared class ${name} written`);
       }
     } else if (type === 'access_controls') {
       mustSucceed(
@@ -3354,7 +3450,7 @@ async function ensureSharedDependency(client, type, name, logger) {
     }
     logger?.info?.(`Created shared ${type} ${name}`);
     if (!activationRefused) _verifiedDependencies[cacheKey] = true;
-    return { existed: false, created: true };
+    return { existed: false, created: true, changed: true };
   } catch (error) {
     if (
       error.message?.includes('409') ||
@@ -3364,7 +3460,9 @@ async function ensureSharedDependency(client, type, name, logger) {
         `Shared ${type} ${name} already exists (concurrent creation)`,
       );
       _verifiedDependencies[cacheKey] = true;
-      return { existed: true, created: false };
+      // Someone else's create: what it wrote is unknown, so it counts as
+      // changed and a group that includes it is activated.
+      return { existed: true, created: false, changed: true };
     }
     throw error;
   }

@@ -2,8 +2,9 @@
  * Integration test for memory under the debugger: AbapDebugger's memory
  * members, and the snapshots they write read back through MemorySnapshots.
  *
- * The test deploys a class that fills an internal table between two
- * breakpoints, stops at both, and at each reads the memory sizes and writes a
+ * The test runs a class that fills an internal table between two breakpoints
+ * — the shared ZAC_SHR_DBG_MEM, ensured from `shared_dependencies` and never
+ * deleted — stops at both, and at each reads the memory sizes and writes a
  * memory snapshot. The table is what the reading must show: the sizes grow
  * between the stops, and the delta of the two snapshots puts the table first.
  *
@@ -35,7 +36,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import {
   AbapDebugger,
@@ -43,8 +43,13 @@ import {
 } from '../../../../runtime/debugger/AbapDebugger';
 import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { CleanupSteps } from '../../../helpers/cleanupSteps';
 import {
-  closeOwnTestConnection,
+  ensureDebugTarget,
+  markerLines,
+  sharedSource,
+} from '../../../helpers/debuggerTargets';
+import {
   createTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -54,8 +59,7 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase, resolvePackageName, resolveTransportRequest } =
-  require('../../../helpers/test-helper');
+const { getEnabledTestCase } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -69,35 +73,20 @@ const testsLogger: ILogger = createTestsLogger();
 const testCase = getEnabledTestCase('runtime_debugger', 'adt_memory_debugger');
 const readCase = getEnabledTestCase('runtime_debugger', 'adt_memory_snapshots');
 const CLASS_NAME: string = (
-  testCase?.params?.class_name ?? 'ZAC_DBG_MEM'
+  testCase?.params?.class_name ?? 'ZAC_SHR_DBG_MEM'
 ).toUpperCase();
-const ROWS = 100_000;
 const LIST_WAIT_SECONDS = Number(readCase?.params?.list_wait_seconds ?? 900);
 const STEP_TIMEOUT = 120_000;
 
-const SOURCE = `CLASS ${CLASS_NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-ENDCLASS.
-
-CLASS ${CLASS_NAME.toLowerCase()} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lt_rows TYPE STANDARD TABLE OF string WITH EMPTY KEY.
-    DATA(lv_count) = lines( lt_rows ). "BP:before
-    DO ${ROWS} TIMES.
-      APPEND |row { sy-index } { repeat( val = 'x' occ = 100 ) }| TO lt_rows.
-    ENDDO.
-    lv_count = lines( lt_rows ). "BP:after
-    out->write( |rows { lv_count }| ).
-  ENDMETHOD.
-ENDCLASS.
-`;
-
-const LINE: Record<string, number> = {};
-SOURCE.split('\n').forEach((text, index) => {
-  const marker = /"BP:(\w+)/.exec(text);
-  if (marker) LINE[marker[1]] = index + 1;
-});
+/**
+ * The probe: a shared class (`shared_dependencies.classes`), never created or
+ * deleted here. It fills a table between its `"BP:before` and `"BP:after`
+ * lines; how many rows is read from its `DO <n> TIMES` line.
+ */
+const SOURCE = sharedSource('classes', CLASS_NAME);
+const LINE = markerLines(SOURCE, '"BP:');
+const MARKERS = ['before', 'after'];
+const ROWS = Number(/\bDO (\d+) TIMES\./.exec(SOURCE)?.[1]);
 const SOURCE_URI = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
 
 function attr(xml: string, name: string): string | undefined {
@@ -156,8 +145,6 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
   let listenerApi: AbapDebugger;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let packageName = '';
-  let transportRequest: string | undefined;
   let skipReason: string | undefined;
 
   const armed: string[] = [];
@@ -214,87 +201,59 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       connectionLogger,
       abapDebuggerDocuments,
     );
-    packageName = resolvePackageName(testCase.params?.package_name);
-    transportRequest = packageName.startsWith('$')
-      ? undefined
-      : resolveTransportRequest(testCase.params?.transport_request) ||
-        undefined;
-
-    const cls = new AdtClient(listenerConnection, connectionLogger).getClass();
-    const config = {
-      className: CLASS_NAME,
-      packageName,
-      description: 'Memory integration probe',
-      ...(transportRequest ? { transportRequest } : {}),
-    };
-    const created = await cls.create(config, {
-      headers: integrationHeadersOf(cls, 'create'),
-    });
-    // A probe kept from an earlier run is rewritten in place; the 400 says so
-    // in its body, not in the message.
-    if (
-      !created.ok &&
-      !/exist/i.test(String(created.getError().response?.data ?? ''))
-    ) {
+    if (!Number.isFinite(ROWS)) {
       throw new Error(
-        `probe create: ${created.getError().message} ${String(created.getError().response?.data ?? '').slice(0, 300)}`,
+        `the source of shared class ${CLASS_NAME} has no DO <n> TIMES line`,
       );
     }
-    const lock = await cls.lock(config);
-    if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
-    const lockHandle = String(lock.getResult().value ?? '');
-    const written = await cls.update(config, {
-      headers: integrationHeadersOf(cls, 'update'),
-      source: SOURCE,
-      lockHandle,
-    });
-    await cls.unlock(config, lockHandle);
-    if (!written.ok)
-      throw new Error(`probe write: ${written.getError().message}`);
-    const activated = await cls.activate(config, {
-      headers: integrationHeadersOf(cls, 'activate'),
-    });
-    if (!activated.ok)
-      throw new Error(`probe activate: ${activated.getError().message}`);
-    logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
+    await ensureDebugTarget(
+      listenerConnection,
+      'classes',
+      CLASS_NAME,
+      { marker: '"BP:', names: MARKERS },
+      testsLogger,
+    );
+    logTestStep(`probe ${CLASS_NAME} active`, testsLogger);
     listenerConnection.setSessionType('stateful');
   }, STEP_TIMEOUT);
 
   afterAll(async () => {
     if (!listenerConnection) return;
-    for (const bp of armed) await listenerApi.deleteBreakpoint(identity, bp);
-    if (attached) await debuggerApi.step('stepContinue');
-    if (sessionConnection) {
-      sessionConnection.setSessionType('stateless');
-      await closeOwnTestConnection(sessionConnection);
+    // Debugger state only: the probe is shared and stays. Every session this
+    // file opened is logged off, and every failure is reported.
+    const steps = new CleanupSteps();
+    for (const bp of armed) {
+      await steps.run(
+        `delete breakpoint ${bp}`,
+        () => listenerApi.deleteBreakpoint(identity, bp),
+        { checkAnswer: true },
+      );
     }
-    await listenerApi.stopListener(identity);
+    if (attached) {
+      await steps.run(
+        'continue the debuggee',
+        () => debuggerApi.step('stepContinue'),
+        { checkAnswer: true },
+      );
+    }
+    await steps.logOff('the debug session', sessionConnection);
+    await steps.run(
+      'stop the listener',
+      () => listenerApi.stopListener(identity),
+      { checkAnswer: true },
+    );
     if (run) {
-      await Promise.race([
-        run,
-        new Promise((resolve) => setTimeout(resolve, 15_000)),
-      ]);
+      const pending = run;
+      await steps.run('wait for the run', () =>
+        Promise.race([
+          pending,
+          new Promise((resolve) => setTimeout(resolve, 15_000)),
+        ]),
+      );
     }
-    listenerConnection.setSessionType('stateless');
-    if (!testCase?.params?.keep_probe) {
-      await new AdtClient(listenerConnection, connectionLogger)
-        .getClass()
-        .delete(
-          {
-            className: CLASS_NAME,
-            packageName,
-            ...(transportRequest ? { transportRequest } : {}),
-          },
-          {
-            headers: integrationHeadersOf(
-              new AdtClient(listenerConnection, connectionLogger).getClass(),
-              'delete',
-            ),
-          },
-        );
-    }
-    await closeOwnTestConnection(triggerConnection);
-    await closeOwnTestConnection(listenerConnection);
+    await steps.logOff('the trigger session', triggerConnection);
+    await steps.logOff('the listener session', listenerConnection);
+    steps.finish();
   }, STEP_TIMEOUT);
 
   it(

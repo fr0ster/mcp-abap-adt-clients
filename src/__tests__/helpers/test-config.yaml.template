@@ -295,6 +295,24 @@ shared_dependencies:
           fld2
         }
 
+
+    - name: "ZAC_SHR_DBG_TF"
+      description: "Shared table function implemented by ZAC_SHR_DBG_AMDP (AmdpDebugger)"
+      available_in: ["onprem", "cloud"]
+      skip_activation: true   # activated in one group with ZAC_SHR_DBG_AMDP
+      source: |
+        @EndUserText.label: 'AMDP debugger test table function'
+        @ClientHandling.type: #CLIENT_INDEPENDENT
+        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        define table function ZAC_SHR_DBG_TF
+          with parameters
+            p_limit : abap.int4
+          returns {
+            n      : abap.int4;
+            square : abap.int4;
+          }
+          implemented by method zac_shr_dbg_amdp=>tf;
+
   access_controls:
     - name: "ZAC_SHR_AC01"
       description: "Shared access control for CDS view ZAC_SHR_CDSUT_DDLS"
@@ -410,6 +428,162 @@ shared_dependencies:
             IF lv_zero = abap_true.
               rv_result = 0.
             ENDIF.
+          ENDMETHOD.
+        ENDCLASS.
+
+
+    # The debugger tests' targets. The debugger changes no code, so these are
+    # shared like every object here: created once if missing, brought to this
+    # source and activated on every run, never deleted by a test. The tests
+    # read the `"BP:<name>` (ABAP) and `-- BP:<name>` (SQLScript) markers in
+    # the source below to know which lines they stop at — move a marker and
+    # the line moves with it; remove one and the test fails naming it.
+    - name: "ZAC_SHR_DBG_PROBE"
+      description: "Shared debugger probe (AbapDebugger, DebuggerBatch)"
+      available_in: ["onprem", "cloud"]
+      source: |
+        CLASS zac_shr_dbg_probe DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+          PRIVATE SECTION.
+            METHODS add
+              IMPORTING iv_a TYPE i
+                        iv_b TYPE i
+              RETURNING VALUE(rv) TYPE i.
+        ENDCLASS.
+
+        CLASS zac_shr_dbg_probe IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_total TYPE i.
+            DATA lv_text TYPE string VALUE 'start'.
+            DO 3 TIMES.
+              lv_total = add( iv_a = lv_total iv_b = sy-index ). "BP:loop
+            ENDDO.
+            lv_text = |total { lv_total }|. "BP:after
+            TRY.
+                DATA(lv_zero) = 0.
+                lv_total = lv_total / lv_zero. "BP:raise
+              CATCH cx_sy_zerodivide.
+                lv_text = 'caught'. "BP:catch
+            ENDTRY.
+            out->write( lv_text ).
+          ENDMETHOD.
+
+          METHOD add.
+            rv = iv_a + iv_b. "BP:add
+          ENDMETHOD.
+        ENDCLASS.
+
+    - name: "ZAC_SHR_DBG_MEM"
+      description: "Shared memory-debugger probe (MemorySnapshots)"
+      available_in: ["onprem", "cloud"]
+      source: |
+        CLASS zac_shr_dbg_mem DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zac_shr_dbg_mem IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lt_rows TYPE STANDARD TABLE OF string WITH EMPTY KEY.
+            DATA(lv_count) = lines( lt_rows ). "BP:before
+            DO 100000 TIMES.
+              APPEND |row { sy-index } { repeat( val = 'x' occ = 100 ) }| TO lt_rows.
+            ENDDO.
+            lv_count = lines( lt_rows ). "BP:after
+            out->write( |rows { lv_count }| ).
+          ENDMETHOD.
+        ENDCLASS.
+
+    - name: "ZAC_SHR_DBG_MODES_A"
+      description: "Shared debugger-modes probe A: a loop and an end line"
+      available_in: ["onprem"]
+      source: |
+        CLASS zac_shr_dbg_modes_a DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zac_shr_dbg_modes_a IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_i TYPE i.
+            DO 5 TIMES.
+              lv_i = lv_i + 1. "BP:LOOP
+            ENDDO.
+            out->write( |done { lv_i }| ). "BP:END
+          ENDMETHOD.
+        ENDCLASS.
+
+    - name: "ZAC_SHR_DBG_MODES_B"
+      description: "Shared debugger-modes probe B: a caught division by zero"
+      available_in: ["onprem"]
+      source: |
+        CLASS zac_shr_dbg_modes_b DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zac_shr_dbg_modes_b IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_text TYPE string VALUE 'probe b'.
+            DATA lv_zero TYPE i.
+            TRY.
+                lv_zero = 1 / lv_zero. "BP:RAISE
+              CATCH cx_sy_zerodivide.
+                lv_text = 'probe b'.
+            ENDTRY.
+            out->write( lv_text ). "BP:END
+          ENDMETHOD.
+        ENDCLASS.
+
+    # The AMDP debugger's class implements the table function ZAC_SHR_DBG_TF
+    # (views), and the function names the class: neither activates alone, so
+    # both are written inactive (skip_activation) and activated as one group —
+    # by shared:setup, and by the AMDP test before it runs. SAP HANA only.
+    - name: "ZAC_SHR_DBG_AMDP"
+      description: "Shared AMDP debugger class (AmdpDebugger)"
+      available_in: ["onprem", "cloud"]
+      skip_activation: true
+      source: |
+        CLASS zac_shr_dbg_amdp DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_amdp_marker_hdb.
+            INTERFACES if_oo_adt_classrun.
+            METHODS sum_to AMDP OPTIONS READ-ONLY CLIENT INDEPENDENT
+              IMPORTING VALUE(iv_limit) TYPE i
+              EXPORTING VALUE(ev_total) TYPE i
+                        VALUE(ev_steps) TYPE i.
+            CLASS-METHODS tf FOR TABLE FUNCTION zac_shr_dbg_tf.
+        ENDCLASS.
+
+        CLASS zac_shr_dbg_amdp IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            sum_to( EXPORTING iv_limit = 3
+                    IMPORTING ev_total = DATA(lv_total)
+                              ev_steps = DATA(lv_steps) ).
+            SELECT * FROM zac_shr_dbg_tf( p_limit = 3 ) INTO TABLE @DATA(lt_rows).
+            out->write( |total { lv_total } steps { lv_steps } rows { lines( lt_rows ) }| ).
+          ENDMETHOD.
+
+          METHOD sum_to BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT
+            OPTIONS READ-ONLY.
+            DECLARE lv_i INTEGER;
+            ev_total = 0;
+            ev_steps = 0;
+            FOR lv_i IN 1..:iv_limit DO
+              ev_total = :ev_total + :lv_i; -- BP:loop
+              ev_steps = :ev_steps + 1;
+            END FOR;
+          ENDMETHOD.
+
+          METHOD tf BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT
+            OPTIONS READ-ONLY.
+            DECLARE lt_rows TABLE ( n INTEGER, square INTEGER );
+            DECLARE lv_i INTEGER;
+            FOR lv_i IN 1..:p_limit DO
+              :lt_rows.INSERT( ( :lv_i, :lv_i * :lv_i ) ); -- BP:tf
+            END FOR;
+            RETURN SELECT n, square FROM :lt_rows;
           ENDMETHOD.
         ENDCLASS.
 
@@ -2322,10 +2496,7 @@ runtime_debugger:
       available_in: ["onprem", "cloud"]   # measured on both (2026-10-09)
       description: "ABAP debugger: breakpoints, listener, attach, stack, variables, steps, watchpoints, set value, terminate, listener conflict"
       params:
-        class_name: "ZAC_DBG_PROBE"   # created, run under the debugger, deleted
-        package_name: ""              # "" → environment.default_package; a local package needs no transport (the cloud has none)
-        transport_request: ""         # "" → environment.default_transport (ignored for a local package)
-        keep_probe: false             # true leaves the class in place after the run
+        class_name: "ZAC_SHR_DBG_PROBE"   # a shared_dependencies.classes entry: ensured, run under the debugger, never deleted
       # Nothing else may listen for the same SAP user while this runs: an IDE
       # with a breakpoint set holds the user's debugging, and the listeners
       # here refuse to displace it.
@@ -2335,10 +2506,8 @@ runtime_debugger:
       available_in: ["onprem"]
       description: "ABAP debugger modes: syncBreakpoints full/partial, skipCount (raw measurement), detachDebugger, terminateDebugger, setDebuggerSettings, checkListener, terminal mode, another user"
       params:
-        class_name: "ZAC_DBG_MODES_A"     # probe A: a loop and an end line; created, run under the debugger, deleted
-        class_name_b: "ZAC_DBG_MODES_B"   # probe B: one marked line, a second main program
-        package_name: ""                  # "" → environment.default_package; use a local package (no transport)
-        transport_request: ""             # "" → environment.default_transport (ignored for a local package)
+        class_name: "ZAC_SHR_DBG_MODES_A"     # probe A (shared_dependencies.classes): a loop and an end line
+        class_name_b: "ZAC_SHR_DBG_MODES_B"   # probe B (shared_dependencies.classes): one marked line, a second main program
         second_user_env: ""               # path of a .env file of a second user; "" skips the other-user case
       # Close the IDE of the test user, and make sure the second user's IDE
       # holds no listener, before running this.
@@ -2348,21 +2517,15 @@ runtime_debugger:
       available_in: ["onprem", "cloud"]   # SAP HANA only; measured on both (2026-10-09)
       description: "AMDP debugger: session, breakpoints, events, steps, table variables, finish, cancel, stop"
       params:
-        class_name: "ZAC_DBG_AMDP2"   # created with its table function, run under the debugger, deleted
-        ddl_name: "ZAC_DBG_TF2"
-        package_name: ""              # "" → environment.default_package; a local package needs no transport
-        transport_request: ""
-        keep_probe: false
+        class_name: "ZAC_SHR_DBG_AMDP"   # shared_dependencies.classes; activated in one group with ddl_name
+        ddl_name: "ZAC_SHR_DBG_TF"       # shared_dependencies.views: the table function the class implements
 
     - name: "adt_memory_debugger"
       enabled: true
       available_in: ["onprem", "cloud"]   # measured on both (2026-10-09)
       description: "Memory under the debugger: memory sizes and memory snapshots at two stops"
       params:
-        class_name: "ZAC_DBG_MEM"     # created, run under the debugger, deleted
-        package_name: ""              # "" → environment.default_package
-        transport_request: ""
-        keep_probe: false
+        class_name: "ZAC_SHR_DBG_MEM"   # a shared_dependencies.classes entry: ensured, run under the debugger, never deleted
 
     - name: "adt_memory_snapshots"
       enabled: true
