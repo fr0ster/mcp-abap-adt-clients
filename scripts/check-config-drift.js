@@ -107,8 +107,8 @@ function drift(templateText, configText) {
   };
 }
 
-function main() {
-  if (!fs.existsSync(CONFIG)) {
+function main(template = TEMPLATE, config = CONFIG) {
+  if (!fs.existsSync(config)) {
     console.log(
       'check:config — no test-config.yaml yet. Run `npm run test:init` before the integration tests.',
     );
@@ -120,7 +120,8 @@ function main() {
     missing,
     extra,
     missingShared,
-  } = drift(fs.readFileSync(TEMPLATE, 'utf8'), fs.readFileSync(CONFIG, 'utf8'));
+    sharedCompared,
+  } = drift(fs.readFileSync(template, 'utf8'), fs.readFileSync(config, 'utf8'));
 
   if (
     missing.length === 0 &&
@@ -184,4 +185,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { drift, sectionsOf, sharedEntriesOf };
+module.exports = { drift, main, sectionsOf, sharedEntriesOf };
