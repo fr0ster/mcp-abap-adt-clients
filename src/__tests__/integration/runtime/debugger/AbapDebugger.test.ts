@@ -42,7 +42,7 @@ import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -377,7 +377,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       ...(transportRequest ? { transportRequest } : {}),
     };
     const created = await cls.create(config, {
-      headers: headersOf(cls, 'create'),
+      headers: integrationHeadersOf(cls, 'create'),
     });
     if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
       throw new Error(`probe create: ${created.getError().message}`);
@@ -386,7 +386,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
     const lockHandle = String(lock.getResult().value ?? '');
     const written = await cls.update(config, {
-      headers: headersOf(cls, 'update'),
+      headers: integrationHeadersOf(cls, 'update'),
       source: SOURCE,
       lockHandle,
     });
@@ -394,7 +394,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     if (!written.ok)
       throw new Error(`probe write: ${written.getError().message}`);
     const activated = await cls.activate(config, {
-      headers: headersOf(cls, 'activate'),
+      headers: integrationHeadersOf(cls, 'activate'),
     });
     if (!activated.ok)
       throw new Error(`probe activate: ${activated.getError().message}`);
@@ -432,7 +432,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
             ...(transportRequest ? { transportRequest } : {}),
           },
           {
-            headers: headersOf(
+            headers: integrationHeadersOf(
               new AdtClient(listenerConnection, connectionLogger).getClass(),
               'delete',
             ),
@@ -456,7 +456,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
       ];
       const answer = await listenerApi.setBreakpoints(identity, all, {
-        headers: headersOf(listenerApi, 'setBreakpoints'),
+        headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
         validationOnly: true,
       });
       const document = documentOf(answer);
@@ -486,7 +486,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.catch}` },
           { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
         ],
-        { headers: headersOf(listenerApi, 'setBreakpoints') },
+        { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
       );
       expect(answer.ok).toBe(true);
       const ids = [
@@ -549,7 +549,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const root = await debuggerApi.getChildVariables(['@ROOT'], {
-        headers: headersOf(debuggerApi, 'getChildVariables'),
+        headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       expect(root.ok).toBe(true);
       const scopes = [
@@ -557,7 +557,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       ].map((m) => m[1]);
       expect(scopes).toContain('@LOCALS');
       const all = await debuggerApi.getChildVariables(scopes, {
-        headers: headersOf(debuggerApi, 'getChildVariables'),
+        headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       expect(all.ok).toBe(true);
       const locals = values(documentOf(all));
@@ -573,7 +573,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const answer = await debuggerApi.getVariables(['LV_TOTAL'], {
-        headers: headersOf(debuggerApi, 'getVariables'),
+        headers: integrationHeadersOf(debuggerApi, 'getVariables'),
       });
       expect(answer.ok).toBe(true);
       expect(values(documentOf(answer)).get('LV_TOTAL')).toBe('0');
@@ -593,7 +593,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const params = values(
         documentOf(
           await debuggerApi.getVariables(['IV_A', 'IV_B'], {
-            headers: headersOf(debuggerApi, 'getVariables'),
+            headers: integrationHeadersOf(debuggerApi, 'getVariables'),
           }),
         ),
       );
@@ -620,7 +620,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
-              headers: headersOf(debuggerApi, 'getVariables'),
+              headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
         ).get('LV_TOTAL'),
@@ -643,7 +643,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
-              headers: headersOf(debuggerApi, 'getVariables'),
+              headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
         ).get('LV_TOTAL'),
@@ -690,7 +690,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
-              headers: headersOf(debuggerApi, 'getVariables'),
+              headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
         ).get('LV_TOTAL'),
@@ -716,7 +716,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
-              headers: headersOf(debuggerApi, 'getVariables'),
+              headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
         ).get('LV_TOTAL'),

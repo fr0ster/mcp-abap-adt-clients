@@ -27,7 +27,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -267,7 +267,7 @@ describe('Admin: Setup shared dependencies', () => {
           const utils = readingUtils();
           const runId = await orThrow(
             utils.activateObjectsGroup(groupActivationObjects, undefined, {
-              headers: headersOf(utils, 'activateObjectsGroup'),
+              headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
             }),
           );
           let runStatus = '';
@@ -356,7 +356,7 @@ describe('Admin: Setup shared dependencies', () => {
             utils.activateObjectsGroup(
               firstPass.map((o) => ({ type: o.type, name: o.name })),
               undefined,
-              { headers: headersOf(utils, 'activateObjectsGroup') },
+              { headers: integrationHeadersOf(utils, 'activateObjectsGroup') },
             ),
           );
           let runStatus = '';

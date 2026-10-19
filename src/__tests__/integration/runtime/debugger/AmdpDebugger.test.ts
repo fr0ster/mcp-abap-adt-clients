@@ -40,7 +40,7 @@ import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
 import { wireItself } from '../../../../utils/resultStrategy';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -319,13 +319,15 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       description: 'AMDP debugger test table function',
       ...transport,
     };
-    await ddl.create(ddlConfig, { headers: headersOf(ddl, 'create') });
+    await ddl.create(ddlConfig, {
+      headers: integrationHeadersOf(ddl, 'create'),
+    });
     const ddlLock = await ddl.lock(ddlConfig);
     if (!ddlLock.ok)
       throw new Error(`lock ${DDL_NAME}: ${ddlLock.getError().message}`);
     const ddlHandle = String(ddlLock.getResult().value ?? '');
     await ddl.update(ddlConfig, {
-      headers: headersOf(ddl, 'update'),
+      headers: integrationHeadersOf(ddl, 'update'),
       source: DDL_SOURCE,
       lockHandle: ddlHandle,
     });
@@ -338,13 +340,15 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       description: 'AMDP debugger test class',
       ...transport,
     };
-    await cls.create(classConfig, { headers: headersOf(cls, 'create') });
+    await cls.create(classConfig, {
+      headers: integrationHeadersOf(cls, 'create'),
+    });
     const clsLock = await cls.lock(classConfig);
     if (!clsLock.ok)
       throw new Error(`lock ${CLASS_NAME}: ${clsLock.getError().message}`);
     const clsHandle = String(clsLock.getResult().value ?? '');
     await cls.update(classConfig, {
-      headers: headersOf(cls, 'update'),
+      headers: integrationHeadersOf(cls, 'update'),
       source: CLASS_SOURCE,
       lockHandle: clsHandle,
     });
@@ -360,7 +364,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
         { type: 'CLAS/OC', name: CLASS_NAME },
       ],
       undefined,
-      { headers: headersOf(utils, 'activateObjectsGroup') },
+      { headers: integrationHeadersOf(utils, 'activateObjectsGroup') },
     );
     const wire = started.ok ? started.getResult().value : undefined;
     const runId = /runs\/([^/?]+)/.exec(
@@ -419,13 +423,13 @@ describe('AMDP debugger (AmdpDebugger)', () => {
         .getClass()
         .delete(
           { className: CLASS_NAME, packageName, ...transport },
-          { headers: headersOf(adt.getClass(), 'delete') },
+          { headers: integrationHeadersOf(adt.getClass(), 'delete') },
         );
       await adt
         .getDdl()
         .delete(
           { ddlName: DDL_NAME, packageName, ...transport },
-          { headers: headersOf(adt.getDdl(), 'delete') },
+          { headers: integrationHeadersOf(adt.getDdl(), 'delete') },
         );
     }
     session?.setSessionType('stateless');
@@ -572,7 +576,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
       // No body: the server selects every column, the row id included.
       const whole = await onCommands.getDataPreview({
-        headers: headersOf(onCommands, 'getDataPreview'),
+        headers: integrationHeadersOf(onCommands, 'getDataPreview'),
         ...where,
         provideRowId: true,
       });
@@ -583,7 +587,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
       // A SELECT of the caller's.
       const selected = await onCommands.getDataPreview({
-        headers: headersOf(onCommands, 'getDataPreview'),
+        headers: integrationHeadersOf(onCommands, 'getDataPreview'),
         ...where,
         query: 'SELECT ":LT_ROWS"."SQUARE" AS "SQUARE" FROM ":LT_ROWS"',
       });

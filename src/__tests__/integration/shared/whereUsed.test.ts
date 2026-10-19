@@ -22,7 +22,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -123,7 +123,7 @@ describe('Shared - getWhereUsed', () => {
             object_name: objectName,
             object_type: objectType,
           },
-          { headers: headersOf(utils, 'getWhereUsedScope') },
+          { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
         ),
       ),
       'where-used scope',
@@ -143,7 +143,7 @@ describe('Shared - getWhereUsed', () => {
             object_type: objectType,
             scopeXml: scopeXml,
           },
-          { headers: headersOf(utils, 'getWhereUsed') },
+          { headers: integrationHeadersOf(utils, 'getWhereUsed') },
         ),
       ),
       'where-used search',
@@ -209,7 +209,7 @@ describe('Shared - getWhereUsed', () => {
             object_name: objectName,
             object_type: objectType,
           },
-          { headers: headersOf(utils, 'getWhereUsedScope') },
+          { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
         ),
       ),
       'where-used scope',
@@ -249,7 +249,7 @@ describe('Shared - getWhereUsed', () => {
             object_type: objectType,
             scopeXml: modifiedScope,
           },
-          { headers: headersOf(utils, 'getWhereUsed') },
+          { headers: integrationHeadersOf(utils, 'getWhereUsed') },
         ),
       ),
       'where-used search',
@@ -311,7 +311,7 @@ describe('Shared - getWhereUsed', () => {
               object_type: objectType,
             },
             {
-              headers: headersOf(
+              headers: integrationHeadersOf(
                 new AdtUtils(connection, testsLogger),
                 'getWhereUsed',
               ),
@@ -399,7 +399,7 @@ describe('Shared - getWhereUsed', () => {
         object_type: 'class',
       },
       {
-        headers: headersOf(
+        headers: integrationHeadersOf(
           new AdtUtils(connection, testsLogger),
           'getWhereUsed',
         ),
@@ -446,7 +446,7 @@ describe('Shared - getWhereUsed', () => {
           object_type: '',
         },
         {
-          headers: headersOf(
+          headers: integrationHeadersOf(
             new AdtUtils(connection, testsLogger),
             'getWhereUsed',
           ),
@@ -509,7 +509,7 @@ describe('Shared - getWhereUsed', () => {
             object_name: objectName,
             object_type: objectType,
           },
-          { headers: headersOf(utils, 'getWhereUsedScope') },
+          { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
         ),
       )) ?? '',
     );
@@ -522,7 +522,7 @@ describe('Shared - getWhereUsed', () => {
             ? utils.modifyWhereUsedScope(scope, { enableAll: true })
             : scope,
         },
-        { headers: headersOf(utils, 'getWhereUsed') },
+        { headers: integrationHeadersOf(utils, 'getWhereUsed') },
       ),
     );
     const result: IWhereUsedListResult = utilWhereUsedReferences({
@@ -611,7 +611,7 @@ describe('Shared - getWhereUsed', () => {
           object_name: objectName,
           object_type: objectType,
         },
-        { headers: headersOf(utils, 'getWhereUsed') },
+        { headers: integrationHeadersOf(utils, 'getWhereUsed') },
       ),
       'where-used document',
     );
@@ -674,7 +674,7 @@ describe('Shared - getWhereUsed', () => {
               object_name: objectName,
               object_type: objectType,
             },
-            { headers: headersOf(utils, 'getWhereUsedScope') },
+            { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
           ),
         )) ?? '',
       );
@@ -689,7 +689,7 @@ describe('Shared - getWhereUsed', () => {
             object_type: objectType,
             ...(scopeXml ? { scopeXml } : {}),
           },
-          { headers: headersOf(utils, 'getWhereUsed') },
+          { headers: integrationHeadersOf(utils, 'getWhereUsed') },
         ),
       );
       return utilWhereUsedReferences({ data: String(document) } as never);

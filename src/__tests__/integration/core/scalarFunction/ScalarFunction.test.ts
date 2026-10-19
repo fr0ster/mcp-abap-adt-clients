@@ -21,7 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -150,7 +150,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               scalarFunctionName,
               transportRequest,
             },
-            { headers: headersOf(sf, 'delete') },
+            { headers: integrationHeadersOf(sf, 'delete') },
           );
         } catch {
           // Ignore — object may not exist yet
@@ -165,7 +165,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               transportRequest,
               description: 'ADT integration test scalar function',
             },
-            { headers: headersOf(sf, 'create') },
+            { headers: integrationHeadersOf(sf, 'create') },
           );
         } catch (createError) {
           const status = (createError as { response?: { status?: number } })
@@ -210,7 +210,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                 await sf.update(
                   { scalarFunctionName, transportRequest },
                   {
-                    headers: headersOf(sf, 'update'),
+                    headers: integrationHeadersOf(sf, 'update'),
                     source: configuredSource,
                     lockHandle: sfLock,
                   },
@@ -229,7 +229,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             expectResult(
               await sf.activate(
                 { scalarFunctionName },
-                { headers: headersOf(sf, 'activate') },
+                { headers: integrationHeadersOf(sf, 'activate') },
               ),
               'activate scalar function',
             );
@@ -256,7 +256,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                 scalarFunctionName,
                 transportRequest,
               },
-              { headers: headersOf(sf, 'delete') },
+              { headers: integrationHeadersOf(sf, 'delete') },
             ),
             'deleteState',
           );
@@ -269,7 +269,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           try {
             await sf.delete(
               { scalarFunctionName, transportRequest },
-              { headers: headersOf(sf, 'delete') },
+              { headers: integrationHeadersOf(sf, 'delete') },
             );
           } catch {
             // Ignore cleanup errors

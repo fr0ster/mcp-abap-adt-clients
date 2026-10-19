@@ -28,7 +28,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -191,7 +191,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 implementationName: implName,
                 transportRequest,
               },
-              { headers: headersOf(dsfi, 'delete') },
+              { headers: integrationHeadersOf(dsfi, 'delete') },
             );
           } catch {
             /* ignore */
@@ -199,7 +199,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           try {
             await cls.delete(
               { className: amdpName },
-              { headers: headersOf(cls, 'delete') },
+              { headers: integrationHeadersOf(cls, 'delete') },
             );
           } catch {
             /* ignore */
@@ -207,7 +207,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           try {
             await sf.delete(
               { scalarFunctionName: funcName, transportRequest },
-              { headers: headersOf(sf, 'delete') },
+              { headers: integrationHeadersOf(sf, 'delete') },
             );
           } catch {
             /* ignore */
@@ -225,7 +225,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 transportRequest,
                 description: 'DSFI integration companion function',
               },
-              { headers: headersOf(sf, 'create') },
+              { headers: integrationHeadersOf(sf, 'create') },
             );
           } catch (e) {
             if (isSkippable(e)) {
@@ -247,7 +247,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               await sf.update(
                 { scalarFunctionName: funcName, transportRequest },
                 {
-                  headers: headersOf(sf, 'update'),
+                  headers: integrationHeadersOf(sf, 'update'),
                   source: sigSource,
                   lockHandle: funcLock,
                 },
@@ -266,7 +266,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           expectResult(
             await sf.activate(
               { scalarFunctionName: funcName },
-              { headers: headersOf(sf, 'activate') },
+              { headers: integrationHeadersOf(sf, 'activate') },
             ),
             'activate scalar function',
           );
@@ -279,7 +279,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               transportRequest,
               description: 'DSFI integration AMDP implementation',
             },
-            { headers: headersOf(cls, 'create') },
+            { headers: integrationHeadersOf(cls, 'create') },
           );
           const amdpLock = expectResult(
             await cls.lock({ className: amdpName }),
@@ -288,7 +288,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           await cls.update(
             { className: amdpName, transportRequest },
             {
-              headers: headersOf(cls, 'update'),
+              headers: integrationHeadersOf(cls, 'update'),
               source: amdpSource,
               lockHandle: amdpLock,
             },
@@ -312,7 +312,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 transportRequest,
                 description: 'DSFI integration implementation',
               },
-              { headers: headersOf(dsfi, 'create') },
+              { headers: integrationHeadersOf(dsfi, 'create') },
             );
           } catch (e) {
             if (isSkippable(e)) {
@@ -337,7 +337,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               await dsfi.update(
                 { implementationName: implName, transportRequest },
                 {
-                  headers: headersOf(dsfi, 'update'),
+                  headers: integrationHeadersOf(dsfi, 'update'),
                   source: implSource,
                   lockHandle: implLock,
                 },
@@ -370,7 +370,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 { type: 'DSFI/SFI', name: implName },
               ],
               undefined,
-              { headers: headersOf(utils, 'activateObjectsGroup') },
+              { headers: integrationHeadersOf(utils, 'activateObjectsGroup') },
             ),
             'activation run id',
           );
@@ -421,18 +421,18 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 implementationName: implName,
                 transportRequest,
               },
-              { headers: headersOf(dsfi, 'delete') },
+              { headers: integrationHeadersOf(dsfi, 'delete') },
             ),
             'del',
           );
           expect(del).toBeDefined();
           await cls.delete(
             { className: amdpName, transportRequest },
-            { headers: headersOf(cls, 'delete') },
+            { headers: integrationHeadersOf(cls, 'delete') },
           );
           await sf.delete(
             { scalarFunctionName: funcName, transportRequest },
-            { headers: headersOf(sf, 'delete') },
+            { headers: integrationHeadersOf(sf, 'delete') },
           );
 
           logTestSuccess(testsLogger, TEST_LABEL);

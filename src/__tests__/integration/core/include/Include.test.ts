@@ -28,7 +28,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { getIncludeSource } from '../../../../core/include';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -133,12 +133,15 @@ describe('Include (PROG/I, using AdtClient)', () => {
                 libraryLogger,
                 systemContext,
               );
-              await cleanupClient
-                .getInclude()
-                .delete(
-                  { includeName, transportRequest },
-                  { headers: headersOf(cleanupClient.getInclude(), 'delete') },
-                );
+              await cleanupClient.getInclude().delete(
+                { includeName, transportRequest },
+                {
+                  headers: integrationHeadersOf(
+                    cleanupClient.getInclude(),
+                    'delete',
+                  ),
+                },
+              );
               await new Promise((resolve) => setTimeout(resolve, 3000));
             } catch (cleanupError: any) {
               return {

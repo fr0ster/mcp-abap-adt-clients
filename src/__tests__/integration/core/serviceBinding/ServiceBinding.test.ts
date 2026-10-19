@@ -19,7 +19,7 @@ import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -183,7 +183,12 @@ describe('ServiceBinding (using AdtClient)', () => {
                     serviceName,
                     serviceVersion,
                   },
-                  { headers: headersOf(client.getServiceBinding(), 'update') },
+                  {
+                    headers: integrationHeadersOf(
+                      client.getServiceBinding(),
+                      'update',
+                    ),
+                  },
                 );
               } catch {
                 // best-effort: deletion may still work if state is already unpublished
@@ -197,7 +202,12 @@ describe('ServiceBinding (using AdtClient)', () => {
                   params.transport_request,
                 ),
               },
-              { headers: headersOf(client.getServiceBinding(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getServiceBinding(),
+                  'delete',
+                ),
+              },
             );
             await new Promise((resolve) => setTimeout(resolve, 2000));
           } catch (error: any) {
@@ -351,7 +361,7 @@ describe('ServiceBinding (using AdtClient)', () => {
           recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
           transportRequest: resolveTransportRequest(params.transport_request),
         },
-        { headers: headersOf(client.getPackage(), 'create') },
+        { headers: integrationHeadersOf(client.getPackage(), 'create') },
       );
     } catch (error: any) {
       // Package create may return 404/409 when package was created but not readable yet.

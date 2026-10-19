@@ -19,7 +19,7 @@ import * as dotenv from 'dotenv';
 import { selectEveryColumn } from '../../../../scripts/lib/tableSelect';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -136,7 +136,12 @@ describe('Shared - getTableContents', () => {
             // what the member used to build for itself.
             sql_query: await selectEveryColumn(connection, tableName),
           },
-          { headers: headersOf(client.getUtils(), 'getTableContents') },
+          {
+            headers: integrationHeadersOf(
+              client.getUtils(),
+              'getTableContents',
+            ),
+          },
         ),
       ),
       'table contents',
@@ -197,7 +202,12 @@ describe('Shared - getTableContents', () => {
             table_name: tableName,
             sql_query: await selectEveryColumn(connection, tableName),
           },
-          { headers: headersOf(client.getUtils(), 'getTableContents') },
+          {
+            headers: integrationHeadersOf(
+              client.getUtils(),
+              'getTableContents',
+            ),
+          },
         ),
       ),
       'table contents',
@@ -243,7 +253,7 @@ describe('Shared - getTableContents', () => {
         table_name: '',
         sql_query: 'SELECT 1 FROM T000',
       },
-      { headers: headersOf(client.getUtils(), 'getTableContents') },
+      { headers: integrationHeadersOf(client.getUtils(), 'getTableContents') },
     );
 
     expect(answer.ok).toBe(false);

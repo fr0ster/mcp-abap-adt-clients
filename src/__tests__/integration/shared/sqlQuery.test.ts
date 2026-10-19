@@ -18,7 +18,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -132,7 +132,7 @@ describe('Shared - getSqlQuery', () => {
             sql_query: sqlQuery,
             row_number: rowNumber,
           },
-          { headers: headersOf(client.getUtils(), 'getSqlQuery') },
+          { headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery') },
         ),
       ),
       'SQL query',
@@ -192,7 +192,7 @@ describe('Shared - getSqlQuery', () => {
           {
             sql_query: sqlQuery,
           },
-          { headers: headersOf(client.getUtils(), 'getSqlQuery') },
+          { headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery') },
         ),
       ),
       'SQL query',
@@ -242,7 +242,7 @@ describe('Shared - getSqlQuery', () => {
       .getUtils()
       .getSqlQuery(
         { sql_query: '' },
-        { headers: headersOf(client.getUtils(), 'getSqlQuery') },
+        { headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery') },
       );
     if (answer.ok) throw new Error('expected an empty query to be refused');
     expect(answer.getError().message).toMatch(/\S/);

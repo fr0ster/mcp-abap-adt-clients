@@ -22,7 +22,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IAuthorizationFieldConfig } from '../../../../core/authorizationField';
 import { readAuthorizationField } from '../../../../core/authorizationField/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
@@ -239,7 +239,10 @@ describe('AuthorizationField (using AdtClient)', () => {
                   ),
                 },
                 {
-                  headers: headersOf(client.getAuthorizationField(), 'delete'),
+                  headers: integrationHeadersOf(
+                    client.getAuthorizationField(),
+                    'delete',
+                  ),
                 },
               );
               testsLogger.info?.(

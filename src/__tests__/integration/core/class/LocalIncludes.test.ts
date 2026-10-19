@@ -25,7 +25,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -111,14 +111,14 @@ describe('Class local includes (using BaseTester)', () => {
           transportRequest: config.transportRequest,
           description: config.description || `Test class ${config.className}`,
         },
-        { headers: headersOf(client.getClass(), 'create') },
+        { headers: integrationHeadersOf(client.getClass(), 'create') },
       );
 
       await client
         .getClass()
         .activate(
           { className: config.className },
-          { headers: headersOf(client.getClass(), 'activate') },
+          { headers: integrationHeadersOf(client.getClass(), 'activate') },
         );
       return { success: true, created: true };
     } catch (error: any) {
@@ -317,7 +317,7 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: headersOf(client.getClass(), 'delete') },
+              { headers: integrationHeadersOf(client.getClass(), 'delete') },
             );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
@@ -397,7 +397,7 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: headersOf(client.getClass(), 'delete') },
+              { headers: integrationHeadersOf(client.getClass(), 'delete') },
             );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
@@ -477,7 +477,7 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: headersOf(client.getClass(), 'delete') },
+              { headers: integrationHeadersOf(client.getClass(), 'delete') },
             );
           } catch (cleanupError: any) {
             testsLogger.warn?.(
@@ -557,7 +557,7 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: headersOf(client.getClass(), 'delete') },
+              { headers: integrationHeadersOf(client.getClass(), 'delete') },
             );
           } catch (cleanupError: any) {
             testsLogger.warn?.(

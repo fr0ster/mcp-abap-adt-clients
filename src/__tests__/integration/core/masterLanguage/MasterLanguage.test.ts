@@ -21,7 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -119,7 +119,10 @@ describe('Master language on create (#105)', () => {
         expectResult(
           await cls.delete(
             { className, transportRequest },
-            { headers: headersOf(cls, 'delete'), analyse: analyseDeletion },
+            {
+              headers: integrationHeadersOf(cls, 'delete'),
+              analyse: analyseDeletion,
+            },
           ),
           what,
         );
@@ -142,7 +145,7 @@ describe('Master language on create (#105)', () => {
               transportRequest,
               description: 'master language integration probe',
             },
-            { headers: headersOf(cls, 'create') },
+            { headers: integrationHeadersOf(cls, 'create') },
           ),
           'create',
         );
@@ -172,7 +175,7 @@ describe('Master language on create (#105)', () => {
         expectResult(
           await cls.activate(
             { className },
-            { headers: headersOf(cls, 'activate') },
+            { headers: integrationHeadersOf(cls, 'activate') },
           ),
           'activate',
         );
@@ -194,7 +197,10 @@ describe('Master language on create (#105)', () => {
           await cls
             .delete(
               { className, transportRequest },
-              { headers: headersOf(cls, 'delete'), analyse: analyseDeletion },
+              {
+                headers: integrationHeadersOf(cls, 'delete'),
+                analyse: analyseDeletion,
+              },
             )
             .catch(() => undefined);
         }

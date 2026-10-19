@@ -28,7 +28,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -250,7 +250,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                 className,
                 transportRequest,
               },
-              { headers: headersOf(client.getClass(), 'delete') },
+              { headers: integrationHeadersOf(client.getClass(), 'delete') },
             );
             testsLogger.info?.(
               'Deleted existing CDS unit test class:',
@@ -290,7 +290,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                   `CDS unit test for ${ddlName}`,
                 transportRequest,
               },
-              { headers: headersOf(client.getClass(), 'create') },
+              { headers: integrationHeadersOf(client.getClass(), 'create') },
             ),
             'createState',
           );
@@ -304,7 +304,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
               className,
               transportRequest,
             },
-            { headers: headersOf(client.getClass(), 'activate') },
+            { headers: integrationHeadersOf(client.getClass(), 'activate') },
           );
           expect(activateState).toBeDefined();
           testsLogger.info?.('CDS unit test class activated');
@@ -395,7 +395,9 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                     className,
                     transportRequest,
                   },
-                  { headers: headersOf(client.getClass(), 'delete') },
+                  {
+                    headers: integrationHeadersOf(client.getClass(), 'delete'),
+                  },
                 );
                 testsLogger.info?.('CDS unit test class deleted successfully');
               } catch (cleanupError: any) {

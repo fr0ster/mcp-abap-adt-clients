@@ -24,7 +24,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -155,7 +155,12 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit test group',
             },
-            { headers: headersOf(client.getFunctionGroup(), 'create') },
+            {
+              headers: integrationHeadersOf(
+                client.getFunctionGroup(),
+                'create',
+              ),
+            },
           ),
           'create group',
         );
@@ -166,7 +171,12 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit test module',
             },
-            { headers: headersOf(client.getFunctionModule(), 'create') },
+            {
+              headers: integrationHeadersOf(
+                client.getFunctionModule(),
+                'create',
+              ),
+            },
           ),
           'create module',
         );
@@ -181,7 +191,10 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
             await client.getFunctionModule().update(
               { ...module, transportRequest },
               {
-                headers: headersOf(client.getFunctionModule(), 'update'),
+                headers: integrationHeadersOf(
+                  client.getFunctionModule(),
+                  'update',
+                ),
                 lockHandle: moduleHandle,
                 source: params.function_module_source,
               },
@@ -201,7 +214,12 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit tests',
             },
-            { headers: headersOf(client.getFunctionInclude(), 'create') },
+            {
+              headers: integrationHeadersOf(
+                client.getFunctionInclude(),
+                'create',
+              ),
+            },
           ),
           'create include',
         );
@@ -216,7 +234,10 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
             await client.getFunctionInclude().update(
               { ...include, transportRequest },
               {
-                headers: headersOf(client.getFunctionInclude(), 'update'),
+                headers: integrationHeadersOf(
+                  client.getFunctionInclude(),
+                  'update',
+                ),
                 lockHandle: includeHandle,
                 source: params.include_source,
               },
@@ -230,19 +251,28 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         logTestStep('activate', testsLogger);
         expectResult(
           await client.getFunctionModule().activate(module, {
-            headers: headersOf(client.getFunctionModule(), 'activate'),
+            headers: integrationHeadersOf(
+              client.getFunctionModule(),
+              'activate',
+            ),
           }),
           'activate module',
         );
         expectResult(
           await client.getFunctionInclude().activate(include, {
-            headers: headersOf(client.getFunctionInclude(), 'activate'),
+            headers: integrationHeadersOf(
+              client.getFunctionInclude(),
+              'activate',
+            ),
           }),
           'activate include',
         );
         expectResult(
           await client.getFunctionGroup().activate(group, {
-            headers: headersOf(client.getFunctionGroup(), 'activate'),
+            headers: integrationHeadersOf(
+              client.getFunctionGroup(),
+              'activate',
+            ),
           }),
           'activate group',
         );
@@ -285,7 +315,12 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
             .getFunctionGroup()
             .delete(
               { ...group, transportRequest },
-              { headers: headersOf(client.getFunctionGroup(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getFunctionGroup(),
+                  'delete',
+                ),
+              },
             )
             .catch(() => undefined);
         }

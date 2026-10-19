@@ -19,7 +19,7 @@ import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 // The source path, not the package: these readings are new in adt-strategies
 // and the package's built entry point does not carry them until it is released.
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -107,7 +107,7 @@ class NodeStructureObject implements TestableObject<INodeStructureParams> {
     return this.client
       .getUtils({ ...utilDocuments, node: utilNodeContents })
       .fetchNodeStructure(config.parent_type, config.parent_name, {
-        headers: headersOf(
+        headers: integrationHeadersOf(
           this.client.getUtils({ ...utilDocuments, node: utilNodeContents }),
           'fetchNodeStructure',
         ),

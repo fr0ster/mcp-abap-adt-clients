@@ -48,7 +48,7 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
-import { headersOf } from './adtHeaders';
+import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
 import {
   expectLockReleased,
@@ -390,7 +390,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // `isDeleted="false"` arrives inside a 200 and the library reads nothing
     // into it; the test wants the real outcome, so it asks for the reading.
     const answer = await this.adtObject.delete(config, {
-      headers: headersOf(this.adtObject, 'delete'),
+      headers: integrationHeadersOf(this.adtObject, 'delete'),
       analyse: analyseDeletion,
     });
     if (!answer.ok) {
@@ -456,13 +456,13 @@ export class BaseTester<TConfig, TState = unknown> {
     if (this.adtObject.update) {
       return this.adtObject.update(config, {
         ...options,
-        headers: headersOf(this.adtObject, 'update'),
+        headers: integrationHeadersOf(this.adtObject, 'update'),
       });
     }
     if (this.adtObject.updateMetadata) {
       return this.adtObject.updateMetadata(config, {
         ...options,
-        headers: headersOf(this.adtObject, 'updateMetadata'),
+        headers: integrationHeadersOf(this.adtObject, 'updateMetadata'),
       });
     }
     throw new Error(
@@ -1088,7 +1088,10 @@ export class BaseTester<TConfig, TState = unknown> {
       expectResult(
         await this.adtObject.create(
           createConfig as Omit<TConfig, 'source'> & { source?: never },
-          { ...createOptions, headers: headersOf(this.adtObject, 'create') },
+          {
+            ...createOptions,
+            headers: integrationHeadersOf(this.adtObject, 'create'),
+          },
         ),
         'create',
       );
@@ -1103,7 +1106,7 @@ export class BaseTester<TConfig, TState = unknown> {
         logTestStep('activate (after create)', this.logger);
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
-            headers: headersOf(this.adtObject, 'activate'),
+            headers: integrationHeadersOf(this.adtObject, 'activate'),
           }),
           'activate after create',
         );
@@ -1200,7 +1203,7 @@ export class BaseTester<TConfig, TState = unknown> {
           logTestStep('activate (after update)', this.logger);
           expectResult(
             await this.adtObject.activate(config as Partial<TConfig>, {
-              headers: headersOf(this.adtObject, 'activate'),
+              headers: integrationHeadersOf(this.adtObject, 'activate'),
             }),
             'activate after update',
           );
@@ -1233,7 +1236,7 @@ export class BaseTester<TConfig, TState = unknown> {
         // `<msg type="E">` for it, which a status check never could.
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
-            headers: headersOf(this.adtObject, 'activate'),
+            headers: integrationHeadersOf(this.adtObject, 'activate'),
           }),
           'activate',
         );
@@ -2024,7 +2027,7 @@ export class BaseTester<TConfig, TState = unknown> {
         logTestStep(currentStep, this.logger);
         const activateState = await this.adtObject.activate(
           config as Partial<TConfig>,
-          { headers: headersOf(this.adtObject, 'activate') },
+          { headers: integrationHeadersOf(this.adtObject, 'activate') },
         );
         const activateResponse =
           (activateState as any)?.activateResponse || activateState;

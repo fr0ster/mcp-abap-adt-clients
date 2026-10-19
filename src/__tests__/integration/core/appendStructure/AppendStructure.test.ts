@@ -21,7 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -212,7 +212,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
           try {
             await as.delete(
               { appendStructureName, transportRequest },
-              { headers: headersOf(as, 'delete') },
+              { headers: integrationHeadersOf(as, 'delete') },
             );
           } catch {
             // Ignore — object may not exist yet
@@ -228,7 +228,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
                 transportRequest,
                 description: 'ADT integration test append structure',
               },
-              { headers: headersOf(as, 'create') },
+              { headers: integrationHeadersOf(as, 'create') },
             );
           } catch (createError) {
             const status = (createError as { response?: { status?: number } })
@@ -274,7 +274,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
                 await as.update(
                   { appendStructureName, transportRequest },
                   {
-                    headers: headersOf(as, 'update'),
+                    headers: integrationHeadersOf(as, 'update'),
                     source: source,
                     lockHandle: appendLock,
                   },
@@ -293,7 +293,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
             expectResult(
               await as.activate(
                 { appendStructureName },
-                { headers: headersOf(as, 'activate') },
+                { headers: integrationHeadersOf(as, 'activate') },
               ),
               'activate append structure',
             );
@@ -325,7 +325,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
                   appendStructureName,
                   transportRequest,
                 },
-                { headers: headersOf(as, 'delete') },
+                { headers: integrationHeadersOf(as, 'delete') },
               ),
               'deleteState',
             );
@@ -338,7 +338,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
             try {
               await as.delete(
                 { appendStructureName, transportRequest },
-                { headers: headersOf(as, 'delete') },
+                { headers: integrationHeadersOf(as, 'delete') },
               );
             } catch {
               // Ignore cleanup errors

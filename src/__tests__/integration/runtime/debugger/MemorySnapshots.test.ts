@@ -42,7 +42,7 @@ import {
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
 import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -228,7 +228,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       ...(transportRequest ? { transportRequest } : {}),
     };
     const created = await cls.create(config, {
-      headers: headersOf(cls, 'create'),
+      headers: integrationHeadersOf(cls, 'create'),
     });
     // A probe kept from an earlier run is rewritten in place; the 400 says so
     // in its body, not in the message.
@@ -244,7 +244,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
     const lockHandle = String(lock.getResult().value ?? '');
     const written = await cls.update(config, {
-      headers: headersOf(cls, 'update'),
+      headers: integrationHeadersOf(cls, 'update'),
       source: SOURCE,
       lockHandle,
     });
@@ -252,7 +252,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     if (!written.ok)
       throw new Error(`probe write: ${written.getError().message}`);
     const activated = await cls.activate(config, {
-      headers: headersOf(cls, 'activate'),
+      headers: integrationHeadersOf(cls, 'activate'),
     });
     if (!activated.ok)
       throw new Error(`probe activate: ${activated.getError().message}`);
@@ -286,7 +286,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
             ...(transportRequest ? { transportRequest } : {}),
           },
           {
-            headers: headersOf(
+            headers: integrationHeadersOf(
               new AdtClient(listenerConnection, connectionLogger).getClass(),
               'delete',
             ),
@@ -307,7 +307,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.before}` },
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.after}` },
         ],
-        { headers: headersOf(listenerApi, 'setBreakpoints') },
+        { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
       );
       expect(set.ok).toBe(true);
       for (const m of documentOf(set).matchAll(/\bid="([^"]*)"/g))

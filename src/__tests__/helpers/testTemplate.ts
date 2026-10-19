@@ -43,7 +43,7 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../helpers/testLogger';
-import { headersOf } from './adtHeaders';
+import { integrationHeadersOf } from './adtHeaders';
 import { BaseTester } from './BaseTester';
 import { logTestSkip } from './testProgressLogger';
 
@@ -186,7 +186,12 @@ describe('ObjectType (using AdtClient)', () => {
                 includeName: name,
                 transportRequest: tester.getTransportRequest(),
               },
-              { headers: headersOf(cleanupClient.getInclude(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  cleanupClient.getInclude(),
+                  'delete',
+                ),
+              },
             );
             await new Promise((resolve) => setTimeout(resolve, 3000));
           } catch (error: any) {

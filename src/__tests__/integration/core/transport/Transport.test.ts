@@ -26,7 +26,7 @@ import {
   isCloudEnvironment,
 } from '../../../../utils/systemInfo';
 import { patchXmlElement } from '../../../../utils/xmlPatch';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -118,7 +118,7 @@ describe('AdtRequest', () => {
         .getRequest()
         .delete(
           { transportNumber: number },
-          { headers: headersOf(client.getRequest(), 'delete') },
+          { headers: integrationHeadersOf(client.getRequest(), 'delete') },
         );
       if (answer.ok) {
         testsLogger.info?.(`Deleted test transport ${number}`);
@@ -215,7 +215,7 @@ describe('AdtRequest', () => {
             await client
               .getRequest(transportParsing)
               .create(buildConfig(testCase) as any, {
-                headers: headersOf(
+                headers: integrationHeadersOf(
                   client.getRequest(transportParsing),
                   'create',
                 ),
@@ -438,7 +438,7 @@ describe('AdtRequest', () => {
           logTestStep('create the request this block works in', testsLogger);
           const created = expectResult(
             await request.create(buildConfig(testCase) as any, {
-              headers: headersOf(request, 'create'),
+              headers: integrationHeadersOf(request, 'create'),
             }),
             'create transport request',
           );
@@ -494,7 +494,7 @@ describe('AdtRequest', () => {
           }
           logTestStep(`the task will be owned by ${targetUser}`, testsLogger);
           const task = await request.createTask(transportNumber as string, {
-            headers: headersOf(request, 'createTask'),
+            headers: integrationHeadersOf(request, 'createTask'),
             targetUser,
           });
           if (!task.ok) {
@@ -543,7 +543,7 @@ describe('AdtRequest', () => {
             await request.changeTaskType(
               taskNumber,
               ADT_TASK_TYPE.developmentCorrection,
-              { headers: headersOf(request, 'changeTaskType') },
+              { headers: integrationHeadersOf(request, 'changeTaskType') },
             ),
             'give the task its type',
           );
@@ -622,7 +622,7 @@ describe('AdtRequest', () => {
                 type: 'DOMA',
                 position: stale.position,
               },
-              { headers: headersOf(request, 'removeObject') },
+              { headers: integrationHeadersOf(request, 'removeObject') },
             );
           }
 
@@ -639,7 +639,7 @@ describe('AdtRequest', () => {
                 domainName,
                 transportRequest: sharedRequest,
               },
-              { headers: headersOf(domain, 'delete') },
+              { headers: integrationHeadersOf(domain, 'delete') },
             );
           }
 
@@ -650,7 +650,7 @@ describe('AdtRequest', () => {
               transportRequest: sharedRequest,
               description: 'AdtRequest object-list round trip',
             },
-            { headers: headersOf(domain, 'create') },
+            { headers: integrationHeadersOf(domain, 'create') },
           );
           if (!madeIt.ok) {
             logTestSkip(
@@ -709,7 +709,7 @@ describe('AdtRequest', () => {
                 transportRequest: sharedRequest,
               },
               {
-                headers: headersOf(domain, 'updateMetadata'),
+                headers: integrationHeadersOf(domain, 'updateMetadata'),
                 source: typed,
                 lockHandle: domainHandle,
               },
@@ -731,7 +731,7 @@ describe('AdtRequest', () => {
 
           await domain.delete(
             { domainName, transportRequest: sharedRequest },
-            { headers: headersOf(domain, 'delete') },
+            { headers: integrationHeadersOf(domain, 'delete') },
           );
 
           logTestStep('find the entry the deletion left behind', testsLogger);
@@ -786,7 +786,7 @@ describe('AdtRequest', () => {
               type: 'DOMA',
               position: resorted.position,
             },
-            { headers: headersOf(request, 'removeObject') },
+            { headers: integrationHeadersOf(request, 'removeObject') },
           );
           expect(removed.ok).toBe(true);
 
@@ -848,7 +848,7 @@ describe('AdtRequest', () => {
                 await client
                   .getRequest(transportParsing)
                   .create(buildConfig(testCase) as any, {
-                    headers: headersOf(
+                    headers: integrationHeadersOf(
                       client.getRequest(transportParsing),
                       'create',
                     ),

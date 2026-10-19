@@ -27,7 +27,7 @@ import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { abapGitDocuments } from '../../../../clients/abapGit/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -124,7 +124,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       const info = expectResult(
         await abapGit.checkExternalRepo(
           { url: checkCase.params.url },
-          { headers: headersOf(abapGit, 'checkExternalRepo') },
+          { headers: integrationHeadersOf(abapGit, 'checkExternalRepo') },
         ),
         'check external repo',
       );
@@ -151,7 +151,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
           url: flowCaseDef.params.url,
           branchName: flowCaseDef.params.branch,
         },
-        { headers: headersOf(abapGit, 'link') },
+        { headers: integrationHeadersOf(abapGit, 'link') },
       );
 
       // Four steps since 19.0.0, because a pull was four requests: find the
@@ -175,7 +175,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
             pullLink: repo.pullLink,
             branchName: flowCaseDef.params.branch,
           },
-          { headers: headersOf(abapGit, 'pull') },
+          { headers: integrationHeadersOf(abapGit, 'pull') },
         ),
         'pull',
       );

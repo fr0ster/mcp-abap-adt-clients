@@ -25,7 +25,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { featureToggleDocuments } from '../../../../core/featureToggle/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { headersOf } from '../../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -283,7 +283,7 @@ describe('FeatureToggle (using AdtClient)', () => {
       });
       const config = buildConfig(testCase, resolver);
       await client.getFeatureToggle().create(config, {
-        headers: headersOf(client.getFeatureToggle(), 'create'),
+        headers: integrationHeadersOf(client.getFeatureToggle(), 'create'),
       });
       return null;
     } catch (error: any) {
@@ -321,7 +321,12 @@ describe('FeatureToggle (using AdtClient)', () => {
                   testCase.params.transport_request,
                 ),
               },
-              { headers: headersOf(client.getFeatureToggle(), 'delete') },
+              {
+                headers: integrationHeadersOf(
+                  client.getFeatureToggle(),
+                  'delete',
+                ),
+              },
             );
             testsLogger.info?.(
               `Pre-existing feature toggle ${featureToggleName} deleted before test`,
@@ -476,7 +481,7 @@ describe('FeatureToggle (using AdtClient)', () => {
         const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
           await handler.checkState({ featureToggleName }, undefined, {
-            headers: headersOf(handler, 'checkState'),
+            headers: integrationHeadersOf(handler, 'checkState'),
           }),
           'checkState',
         );

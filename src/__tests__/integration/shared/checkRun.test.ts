@@ -45,7 +45,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { headersOf } from '../../helpers/adtHeaders';
+import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -138,7 +138,7 @@ describe('Shared - what check answers', () => {
     logTestStep(`check ${className} as stored`, testsLogger);
 
     const answer = await client.getClass().check({ className }, 'active', {
-      headers: headersOf(client.getClass(), 'check'),
+      headers: integrationHeadersOf(client.getClass(), 'check'),
     });
 
     // `ok` first, but it is not the assertion — it only says there is a
@@ -186,7 +186,7 @@ describe('Shared - what check answers', () => {
     const answer = await client
       .getClass()
       .check({ className, source: BROKEN_SOURCE }, 'inactive', {
-        headers: headersOf(client.getClass(), 'check'),
+        headers: integrationHeadersOf(client.getClass(), 'check'),
       });
 
     if (!answer.ok) {
@@ -244,7 +244,7 @@ describe('Shared - what check answers', () => {
     const answer = await client
       .getClass()
       .check({ className: NEVER_EXISTS }, 'active', {
-        headers: headersOf(client.getClass(), 'check'),
+        headers: integrationHeadersOf(client.getClass(), 'check'),
       });
 
     if (!answer.ok) {
@@ -303,7 +303,7 @@ describe('Shared - what check answers', () => {
     const judged = await client
       .getClass()
       .check({ className, source: BROKEN_SOURCE }, 'inactive', {
-        headers: headersOf(client.getClass(), 'check'),
+        headers: integrationHeadersOf(client.getClass(), 'check'),
         analyse: everythingIsAFailure,
       });
 
@@ -326,7 +326,7 @@ describe('Shared - what check answers', () => {
     const realistic = await client
       .getClass()
       .check({ className, source: BROKEN_SOURCE }, 'inactive', {
-        headers: headersOf(client.getClass(), 'check'),
+        headers: integrationHeadersOf(client.getClass(), 'check'),
         analyse: bySeverity,
       });
     testsLogger.info?.(
