@@ -1,4 +1,12 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
@@ -164,6 +172,41 @@ describe('integrationHeadersOf', () => {
     );
   });
 
+  it('throws for a handler shaped like a legacy refusal that is not one', () => {
+    const sent: unknown[] = [];
+    const send = async (_config: unknown, options: { headers: unknown }) => {
+      sent.push(options.headers);
+    };
+    // An objectType the legacy client does not refuse.
+    expect(() =>
+      integrationHeadersOf({ objectType: 'Class', create: send }, 'create'),
+    ).toThrow('Object.create');
+    // A refused type's name and keys, but a member that sends.
+    const real = new AdtClientLegacy(connection(), logger).getDomain();
+    const forged: Record<string, unknown> = { ...real, create: send };
+    expect(() => integrationHeadersOf(forged, 'create')).toThrow(
+      'Object.create',
+    );
+    // A class that only borrows a legacy refusal's name.
+    class AdtPackageLegacy {
+      async create(_config: unknown, options: { headers: unknown }) {
+        sent.push(options.headers);
+      }
+    }
+    expect(() =>
+      integrationHeadersOf(new AdtPackageLegacy(), 'create'),
+    ).toThrow('AdtPackageLegacy.create');
+    // The real ones still pass.
+    expect(integrationHeadersOf(real, 'create')).toBe(TEST_HEADERS);
+    expect(
+      integrationHeadersOf(
+        new AdtClientLegacy(connection(), logger).getPackage(),
+        'create',
+      ),
+    ).toBe(TEST_HEADERS);
+    expect(sent).toEqual([]);
+  });
+
   it('resolves a real pair for every header member of every modern handler', () => {
     const { modern } = everyHeaderMember(connection());
     expect(modern.length).toBeGreaterThan(150);
@@ -204,24 +247,53 @@ describe('integrationHeadersOf', () => {
   });
 
   it('is the only resolver in tests that reach SAP', () => {
-    const root = join(__dirname, '..', '..');
-    const walk = (dir: string): string[] =>
-      readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-        entry.isDirectory()
-          ? walk(join(dir, entry.name))
-          : entry.name.endsWith('.ts')
-            ? [join(dir, entry.name)]
-            : [],
+    expect(resolverOffenders(join(__dirname, '..', '..'))).toEqual([]);
+  });
+
+  it('exempts only helpers/adtHeaders.ts, not another file of that name', () => {
+    const root = mkdtempSync(join(tmpdir(), 'resolver-scan-'));
+    try {
+      for (const dir of ['integration', 'admin', 'helpers'])
+        mkdirSync(join(root, dir));
+      writeFileSync(
+        join(root, 'helpers', 'adtHeaders.ts'),
+        'export const TEST_HEADERS = {};\nexport function headersOf() {}\n',
       );
-    const offenders = ['integration', 'admin', 'helpers']
-      .flatMap((dir) => walk(join(root, dir)))
-      .filter((file) => !file.endsWith('adtHeaders.ts'))
-      .filter((file) =>
-        /\b(headersOf|headersFor|TEST_HEADERS)\b/.test(
-          readFileSync(file, 'utf8'),
-        ),
-      )
-      .map((file) => relative(root, file));
-    expect(offenders).toEqual([]);
+      writeFileSync(
+        join(root, 'integration', 'adtHeaders.ts'),
+        "export { headersOf as pair } from '../helpers/adtHeaders';\n",
+      );
+      expect(resolverOffenders(root)).toEqual([
+        join('integration', 'adtHeaders.ts'),
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
+
+/**
+ * Files under `root` (`src/__tests__`) in the directories whose tests reach
+ * SAP that name the unit-test resolver. Only the helper that defines it,
+ * `helpers/adtHeaders.ts` by its exact path, is exempt.
+ */
+function resolverOffenders(root: string): string[] {
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? walk(join(dir, entry.name))
+        : entry.name.endsWith('.ts')
+          ? [join(dir, entry.name)]
+          : [],
+    );
+  const definition = join('helpers', 'adtHeaders.ts');
+  return ['integration', 'admin', 'helpers']
+    .flatMap((dir) => walk(join(root, dir)))
+    .map((file) => relative(root, file))
+    .filter((file) => file !== definition)
+    .filter((file) =>
+      /\b(headersOf|headersFor|TEST_HEADERS)\b/.test(
+        readFileSync(join(root, file), 'utf8'),
+      ),
+    );
+}

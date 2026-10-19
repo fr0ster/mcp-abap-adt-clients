@@ -22,7 +22,12 @@ import type {
   IAdtContentTypes,
   IAdtHeaders,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
+import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
+import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
+import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
 
 /** A pair for a unit test that only needs the call to compile and run. */
 export const TEST_HEADERS: IAdtHeaders = {
@@ -1077,31 +1082,83 @@ export function headersOf(
 
 /**
  * Legacy members that answer a refusal and send no request (the class
- * overrides the member with one that returns `failed(...)` at once). The
- * unit test `integrationHeadersOf.test.ts` calls each one on a mock connection
- * and proves that no request leaves.
+ * overrides the member with one that returns `failed(...)` at once). A member
+ * qualifies only when it **is** that class's own function, compared by
+ * identity, so a test handler or another class of the same name does not.
+ * The unit test `integrationHeadersOf.test.ts` calls each one on a mock
+ * connection and proves that no request leaves.
  */
-const REFUSED_WITHOUT_REQUEST = new Set([
-  'AdtPackageLegacy.create',
-  'AdtPackageLegacy.updateMetadata',
-  'AdtPackageLegacy.delete',
-  'AdtRequestLegacy.create',
-  'AdtRequestLegacy.updateMetadata',
-  'AdtRequestLegacy.delete',
-  'AdtUtilsLegacy.getSqlQuery',
-  'AdtUtilsLegacy.getTableContents',
-]);
+const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
+  [AdtPackageLegacy, ['create', 'updateMetadata', 'delete']],
+  [AdtRequestLegacy, ['create', 'updateMetadata', 'delete']],
+  [AdtUtilsLegacy, ['getSqlQuery', 'getTableContents']],
+];
+
+function isLegacyRefusal(handler: object, member: string): boolean {
+  const own = (handler as Record<string, unknown>)[member];
+  return REFUSED_WITHOUT_REQUEST.some(
+    ([implementation, members]) =>
+      members.includes(member) &&
+      own === (implementation.prototype as Record<string, unknown>)[member],
+  );
+}
 
 /**
- * A handler `AdtClientLegacy` hands out for a type absent on that system
- * (`absentOnLegacy`): a plain object, no class, whose every member answers a
- * refusal without a request, carrying the modern handler's `objectType`.
+ * The types `AdtClientLegacy` hands out through `absentOnLegacy`: a plain
+ * object whose every member answers a refusal without a request. Each name is
+ * the handler's `objectType` and its factory's suffix (`getDomain`, …).
+ */
+const ABSENT_ON_LEGACY = [
+  'Domain',
+  'DataElement',
+  'Structure',
+  'Table',
+  'TableType',
+  'AccessControl',
+  'ServiceDefinition',
+  'ServiceBinding',
+  'BehaviorDefinition',
+  'BehaviorImplementation',
+  'MetadataExtension',
+  'Enhancement',
+  'AuthorizationField',
+  'FeatureToggle',
+];
+
+/** A connection that refuses every request: the reference handlers send none. */
+const NO_CONNECTION = {
+  makeAdtRequest: () => {
+    throw new Error('a legacy refusal handler sent a request');
+  },
+} as unknown as IAbapConnection;
+
+/**
+ * Whether `handler` is a handler `absentOnLegacy` made: its `objectType` is
+ * one of {@link ABSENT_ON_LEGACY}, and it matches the handler the legacy
+ * client's own factory hands out for that type — the same keys, and the
+ * member the same refusal (`absentOnLegacy` builds each member from one
+ * source, so a member with any other body is not a refusal).
  */
 function isAbsentOnLegacy(handler: object, member: string): boolean {
+  if (Object.getPrototypeOf(handler) !== Object.prototype) return false;
+  const objectType = (handler as { objectType?: unknown }).objectType;
+  if (typeof objectType !== 'string' || !ABSENT_ON_LEGACY.includes(objectType))
+    return false;
+  const client = new AdtClientLegacy(NO_CONNECTION) as unknown as Record<
+    string,
+    (() => Record<string, unknown>) | undefined
+  >;
+  const reference = client[`get${objectType}`]?.call(client);
+  if (!reference || Object.getPrototypeOf(reference) !== Object.prototype)
+    return false;
+  const own = (handler as Record<string, unknown>)[member];
+  const expected = reference[member];
   return (
-    Object.getPrototypeOf(handler) === Object.prototype &&
-    typeof (handler as { objectType?: unknown }).objectType === 'string' &&
-    Object.hasOwn(handler, member)
+    Object.hasOwn(handler, member) &&
+    typeof own === 'function' &&
+    typeof expected === 'function' &&
+    own.toString() === expected.toString() &&
+    Object.keys(handler).sort().join() === Object.keys(reference).sort().join()
   );
 }
 
@@ -1122,7 +1179,7 @@ export function integrationHeadersOf(
   if (pair) return pair;
   const owner = ownerOf(handler, member);
   if (
-    (owner && REFUSED_WITHOUT_REQUEST.has(`${owner}.${member}`)) ||
+    (owner && isLegacyRefusal(handler, member)) ||
     (!owner && isAbsentOnLegacy(handler, member))
   )
     return TEST_HEADERS;
