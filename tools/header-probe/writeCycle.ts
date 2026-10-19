@@ -230,6 +230,10 @@ export async function runWriteCycle(
   }
   if (probe.lockFailures.length)
     error ??= `unlock failed: ${probe.lockFailures.join('; ')}`;
+  if (probe.possiblyOurs.length)
+    error ??= probe.possiblyOurs
+      .map((name) => `possibly ours, not deleted: ${name}`)
+      .join('; ');
   return {
     evidence: evidenceOfRows(probe.rows, wanted),
     rows: rowsOfCycle(probe.rows),
@@ -360,7 +364,11 @@ export async function measureUpdates(
         }
         const name = probe.name(spec, 'U');
         const config = spec.config(name, ctx);
-        probe.remember(spec, name, ctx);
+        // A name that is there is not ours: nothing is created or deleted.
+        if (!(await probe.isFree(spec, name, ctx))) {
+          row.note = `the name ${name} is there already, so it is not ours`;
+          continue;
+        }
         const pair = (m: string) => knownPair(spec.handler, m) as IAdtHeaders;
         const handle = (client: AdtClient) => spec.handle(client);
         const created = await probe.direct1((client, analyse) =>
@@ -371,8 +379,13 @@ export async function measureUpdates(
             }),
           ),
         );
-        if (!okOf(created)) {
-          row.note = `the create answered ${statusOf(created) ?? created.failure}`;
+        const status = statusOf(created);
+        if (
+          !(await probe.claim(spec, name, ctx, {
+            ...(status !== undefined ? { status } : {}),
+          }))
+        ) {
+          row.note = `the create answered ${status ?? created.failure}`;
           continue;
         }
         const read = () =>
@@ -477,6 +490,10 @@ export async function measureUpdates(
   }
   if (probe.lockFailures.length)
     error ??= `unlock failed: ${probe.lockFailures.join('; ')}`;
+  if (probe.possiblyOurs.length)
+    error ??= probe.possiblyOurs
+      .map((name) => `possibly ours, not deleted: ${name}`)
+      .join('; ');
   for (const row of rows) {
     const sapType = sapErrorIn(row.body ?? '')?.adtType;
     if (sapType) row.sapType = sapType;
