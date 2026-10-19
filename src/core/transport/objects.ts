@@ -197,7 +197,9 @@ export async function addObjectToTransport(
  *
  * Nothing here defaults it: `IAbapConnection` does not expose who is
  * authenticated, and finding out would cost a second request — which is the
- * one thing a member of this library does not do.
+ * one thing a member of this library does not do. It is sent in upper case,
+ * as SAP user names are: CTS compares the name as given, and a lower case one
+ * is refused with the same SCTS_ADT_MSG 009.
  */
 export async function createTransportTask(
   connection: IAbapConnection,
@@ -211,7 +213,7 @@ export async function createTransportTask(
     timeout: 0,
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
-      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}" tm:targetuser="${attribute(targetUser)}" tm:useraction="newtask"/>`,
+      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}" tm:targetuser="${attribute(targetUser.toUpperCase())}" tm:useraction="newtask"/>`,
     headers: requestHeaders(headers),
   });
 }

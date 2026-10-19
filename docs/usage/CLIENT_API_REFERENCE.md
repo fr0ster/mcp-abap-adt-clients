@@ -758,6 +758,38 @@ had:
   Unclassified); `Q` is a customizing type and is refused on a workbench
   request, and `K`/`W` are *request* types, refused as unknown.
 
+#### What CTS refuses, and why — measured on premise
+
+These are SAP's rules, not the library's; each member's doc comment repeats
+the one that applies to it.
+
+- **User names go in upper case.** `create()` sends its owner and
+  `createTask()` its `targetUser` upper-cased, because CTS compares the name as
+  given: a lower case name was refused with `SCTS_ADT_MSG 009`, *"User … does
+  not exist in the system (or locked)"*.
+- **A refused `create()` can leave a request behind.** One POST creates the
+  request and its first task. When the task part was refused, SAP still kept
+  the request header — empty, without a task — and the call answered the
+  refusal, with no number to report. A caller that must leave nothing behind
+  finds that empty request among its own and deletes it; the library does not.
+- **`moveObjects()`** needs the caller to hold both tasks (*"… can be changed
+  only by holder …"*), and both requests must have the same target (*"Object
+  can only be moved to a request with the same target"*).
+- **`changeTaskType()`** is the task holder's: someone else is refused, even
+  the user who created the task. Create the task for the user who will
+  classify it.
+- **`addObject()`** refuses an entry still held in another task (*"… is locked
+  in request/task …"*): remove it there first, then add it — or move it. Into a
+  transportable request it refuses objects of a package without a transport
+  layer (*"Only edit objects from package … in local requests"*); those belong
+  in a local request.
+
+#### No release
+
+There is no member that releases a request or a task, and none is planned:
+releasing ships whatever the request holds, so it stays a person's decision,
+made in the transport organizer.
+
   The type goes on a `tm:task` child of the document, not on its root — six
   spellings on the root were each answered `400 "Specified request type or
   task type  is unknown"`, with two spaces where the value belongs.
