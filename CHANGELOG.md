@@ -24,7 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [36.0.2] - 2026-10-19
 
-Three requests SAP refused on every call, measured on an on-premise system.
+Three requests SAP refused on every call, and a transport request owner sent in
+the wrong case, all measured on an on-premise system.
 
 ### Fixed
 
@@ -53,9 +54,6 @@ Three requests SAP refused on every call, measured on an on-premise system.
   On an existing application log object the object answers `200` with its
   `blue:blueSource` document, and the source `200` with JSON; the source
   refuses `application/vnd.sap.adt.blues.v1+xml` (`406`).
-
-### Fixed
-
 - `getRequest().create()` sends its owner, and `createTask()` its `targetUser`,
   in upper case. CTS compares the name as given, and a lower case SAP user name
   was refused with `SCTS_ADT_MSG 009` ("User … does not exist in the system (or
