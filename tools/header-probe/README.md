@@ -161,10 +161,8 @@ header corpus, everything batched and poisoned envelopes split:
      `Z_HPEC_NO_PACKAGE`), which no system has. A member that cannot be
      recorded or sent that way is a `skipped: <reason>` row: it needs a URI
      an earlier answer handed out, the server assigns its key, it sends a
-     `LOCK`, it polls, the debuggers need a live session, …; in corpus mode also the
-     ABAP Unit run-status read (`getStatus`), which with a valid Accept waits
-     for the run it names to finish (measured 2026-10-18: 307 s for one
-     request on a run id that does not exist). A method that
+     `LOCK`, it polls, the debuggers need a live session, …; in corpus mode also
+     every long-poll endpoint (`LONG_POLL_ENDPOINTS` in `corpus.ts`, below). A method that
      answers no promise is a helper and is listed under `notMembers`.
 3. **The headers** (`--headers`). A request without a body gets no
    Content-Type in any mode; in corpus mode the pair's value is recorded as
@@ -322,6 +320,16 @@ Deliberate, and left as they are:
    computed member name gets past it, and it does not scan `capture.ts`, the
    gate's own module. The runtime refusals (`traced`, `clientsOn`,
    `runCalls`, the probe's clients) cover what reaches them.
+4. **A quoted media-type parameter is not read.** In a list such as
+   `Accepted content types: text/plain; note="a,b"` the item is cut at the
+   quote, so it does not count as a media type and the verdict can stay
+   `unknown`. No SAP answer in the measured corpora carried a quoted
+   parameter.
+5. **The named-type columns read media types out of any text after the
+   marker.** A sentence such as `Accepted content types: System expected
+   application/xml here` names `application/xml` in the column, although the
+   verdict does not count it as a list. In the measured corpora the only
+   sentence after a marker came with a 404 and named no type.
 
 ## The corpus
 
@@ -385,7 +393,13 @@ Per header, from its bogus request:
 A 406 points at the Accept only when it names it: T100 `SADT_RESOURCE`
 **044** ("Accepted content types: …"; it is the Accept check even with an
 empty list, as on the DDIC creates — measured) or a list naming at least one
-type (a bare `Accepted content types:` marker is no list). Any other
+type. A list item counts only when it is a media type — `type/subtype`, each
+a token, with optional `; name=value` parameters, read with plain string code:
+`none`, or a sentence SAP put after the marker (a 404 on a function group
+read answers `Accepted content types: System expected the element '{…}abapFunctionGroup'`),
+is dropped, and a marker with nothing left is a marker with no list (a bare
+`Accepted content types:` too). The `Accept named` and `Content-Type named`
+columns show media types only. Any other
 406 does not say the Accept was refused. **037** ("The message content is not
 acceptable", no list) is the default text of `CX_ADT_RES_NOT_ACCEPTABLE`
 raised without a text id (from reading SAP's code: the search raises it for an
@@ -400,7 +414,56 @@ every phase: in phase 1 per member; in the write cycle the known probe's
 answer beside its bogus-Accept probe; and in the header corpus, for every
 piece of evidence, any answer on the same endpoint, from any source and in any
 phase, that did not carry the bogus Accept (the phase-1 count takes phase 1's
-answers only).
+answers only). `settledBy` names the phase whose answers decided: a phase-1
+406 settled by an answer that only phase 2 gave is `settled by phase 2`.
+
+The Content-Type has a contrast of its own. A resource can refuse an
+unsupported Content-Type with a bare 406 instead of 415: no body, no response
+Content-Type, no SAP exception. Measured on one system: `POST
+/sap/bc/adt/packages/settings`, without Accept, answered 406 with no
+Content-Type and with a bogus one, and 400 `ExceptionInvalidData` with
+`application/vnd.sap.adt.packages.settings.v2+xml`. So on one endpoint two
+answers with the same Accept on the wire (both absent, or the same value) are
+compared. If the one to a bogus or absent Content-Type got 406 or 415 and the
+one to a working Content-Type got anything else (a 2xx, a 400 about the body,
+a 404, …), an `unknown` Content-Type verdict becomes `checked (inferred from
+the contrast: <refused> without a working Content-Type, <status> with one)`.
+Two 406s, or a different Accept between the two, infer nothing, and the
+Accept verdict is never changed by this pair. It applies in every phase, like
+the Accept contrast; `settledBy` and `decidedIn` follow the phase of the
+pair's later answer.
+
+### Long-poll endpoints
+
+A long-poll endpoint holds the request while it waits — but only when it
+accepts the headers; with no Accept or a bogus one it answers at once. The
+none and bogus calls give the header verdict and the accepted list, so a call
+with working headers adds only the wait. `LONG_POLL_ENDPOINTS` (`corpus.ts`)
+lists them, each with what it is: today the ABAP Unit run status (`GET
+/sap/bc/adt/abapunit/runs/{name}`, measured 307 s with the corpus Accept on a
+run id that does not exist). In corpus mode, phase 2's reads included, such a
+call is not sent and its row records `skipped: long-poll, holds the request
+when the headers are accepted`; its none and bogus calls go out as before.
+The list was checked against the saved runs: no call there took more than
+30 s on its own. The debugger's listen and the AMDP debugger's events are not
+in it: the probe sends no debugger call in any mode.
+
+### Self-check
+
+The header corpus ends its counts with a self-check, in the `.md` and as
+`selfCheck` in the `.json`, computed from the final corpus alone. It lists
+what a record claims that its own evidence does not show:
+
+- **settledBy without evidence:** records whose `settledBy` names a phase
+  with no evidence line carrying the record's decided Accept or Content-Type
+  verdict;
+- **a marker followed by no media type:** evidence lines where `Accepted
+  content types:` or `Supported Media Types:` is followed by something that is
+  not a media type, with the endpoint and the HTTP status.
+
+Each check gives a count and the list; an empty check prints 0. A non-zero
+count is no error of the run: it shows where to look — a classification bug,
+or SAP text the parser should not read as a list.
 
 The probe's own arguments must build a real request: a stand-in value that a
 real call never sends (`undefined`, an object type that is not an ADT type

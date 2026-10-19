@@ -67,7 +67,7 @@ Each statement carries one of three tags:
 | `405` | Nothing. The method is not implemented; it comes from dispatch, before any header is read. *Code.* |
 | `500` | Nothing. A router failure, an ADT exception with status `500`, or a dump. *Code.* |
 | `415` | The resource refused the Content-Type, through the checking handler or through its own check. *Code.* |
-| `406` | The resource refused the Accept, through the checking handler or through its own check or negotiation. It may come before or after the work. *Code.* |
+| `406` | Usually the resource refused the Accept, through the checking handler or through its own check or negotiation. It may come before or after the work. *Code.* A resource can also refuse an unsupported Content-Type with a bare `406` instead of a `415`: no body, no response Content-Type, no SAP exception. `POST /sap/bc/adt/packages/settings`, without Accept, answered a bare `406` with no Content-Type and with a bogus one, and `400` `ExceptionInvalidData` with `application/vnd.sap.adt.packages.settings.v2+xml`. *Measured* (one system). |
 | `400` `acceptHeaderMissing` / `contentTypeMissing` | The resource needs that header and got none. *Code.* |
 | `2xx` with an unusual header | Only that this request succeeded. The resource may compare nothing, or may accept the value through a permissive match. *Inference.* |
 

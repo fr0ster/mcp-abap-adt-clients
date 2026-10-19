@@ -56,8 +56,10 @@ import {
   type IHeaderCorpusFile,
   type ISplit,
   isIsolated,
+  isLongPoll,
   isWrite,
   judge,
+  LONG_POLL_SKIP,
   needsCounts,
   PROBE_NAME,
   PROBE_PACKAGE,
@@ -67,6 +69,7 @@ import {
   renderHeaderCorpus,
   rowKey,
   type Source,
+  selfCheck,
   wireNote,
   withContrast,
   writeCheck,
@@ -823,17 +826,16 @@ async function runClients(ctx: IContext): Promise<void> {
   for (const member of members) {
     const spec = specs.get(member.handler);
     const call = member.call;
-    // With the corpus Accept the run-status read waits for the run it names
-    // (long polling): measured 307 s for one request on a run id that does
-    // not exist, 2026-10-18. Without it, or with a bogus one, it answers at once.
+    // A long-poll endpoint holds the request when it accepts the headers:
+    // not sent with them (LONG_POLL_ENDPOINTS); none and bogus go out.
+    const last = member.requests[member.requests.length - 1];
     if (
       ctx.mode === 'corpus' &&
       !member.skipped &&
-      member.member === 'getStatus' &&
-      member.handler.endsWith('TestRunner()')
+      last &&
+      isLongPoll(last.method, last.path)
     )
-      member.skipped =
-        'skipped: with the corpus Accept it waits for the ABAP Unit run it names to finish (long polling; measured 307 s on a run id that does not exist)';
+      member.skipped = LONG_POLL_SKIP;
     const hasBody = member.hasBody === true;
     const kinds: (BogusHeader | undefined)[] =
       ctx.mode === 'bogus' && call && spec && !member.skipped
@@ -1876,7 +1878,7 @@ export async function runFull(
       evidence.filter((item) => item.phase === 1),
       phase1Rows,
     );
-    const contrasted = withContrast(evidence, [...phase1Rows, ...phase2Rows]);
+    const contrasted = withContrast(evidence, phase1Rows, phase2Rows);
     const entries = buildHeaderCorpus(contrasted, extras);
     file = {
       startedAt,
@@ -1888,6 +1890,7 @@ export async function runFull(
         phase2: needsCounts(entries),
       },
       entries,
+      selfCheck: selfCheck(entries),
       corpora: [...files],
       removals,
       objects,

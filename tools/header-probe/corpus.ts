@@ -183,6 +183,56 @@ export interface IDiscoveryProbe {
 }
 
 /**
+ * The long-poll endpoints: each holds the request while it waits, but only
+ * when it accepts the headers — with no Accept or a bogus one it answers at
+ * once. The none and bogus calls give the header verdict and the accepted
+ * list; a call with working headers adds only the wait. So the corpus-header
+ * mode, and phase 2's reads with the client's own headers, do not send them;
+ * the none and bogus calls go out as before. Paths as the corpus keys them:
+ * `{name}` stands for one path segment.
+ *
+ * Built from the saved runs: no call there took more than 30 s on its own
+ * (the slow envelopes are 25–29 parts of about 1.5 s each). The ABAP Unit run
+ * status is the one measured long poll. The debuggers' listen and the AMDP
+ * debugger's events are not listed: the probe sends no debugger call in any
+ * mode (`notSent`, `DEBUGGERS`). Discovery lists collections only, none of
+ * them a long poll, so the list applies to the clients' members.
+ */
+export const LONG_POLL_ENDPOINTS: readonly {
+  method: string;
+  path: string;
+  /** What the entry is, and what was measured. */
+  what: string;
+}[] = [
+  {
+    method: 'GET',
+    path: '/sap/bc/adt/abapunit/runs/{name}',
+    what: "ABAP Unit run status (the test runners' getStatus): with the corpus Accept it waits for the run it names to finish — measured 307 s on a run id that does not exist; with no Accept or a bogus one it answers at once",
+  },
+];
+
+/** What a long-poll endpoint's row records in the corpus-header mode. */
+export const LONG_POLL_SKIP =
+  'skipped: long-poll, holds the request when the headers are accepted';
+
+/** Whether a request is one of {@link LONG_POLL_ENDPOINTS}; `{name}` (or a concrete name) matches any one segment. */
+export function isLongPoll(method: string, path: string): boolean {
+  const segments = path.split('/');
+  return LONG_POLL_ENDPOINTS.some((entry) => {
+    if (entry.method !== method) return false;
+    const pattern = entry.path.split('/');
+    return (
+      pattern.length === segments.length &&
+      pattern.every(
+        (part, index) =>
+          part === segments[index] ||
+          (part === '{name}' && Boolean(segments[index])),
+      )
+    );
+  });
+}
+
+/**
  * The discovery requests the corpus does not send, and why: what attaches to
  * or waits for another session, what switches a trace on, and what answers a
  * logon ticket — a secret, which must not reach the corpus.
@@ -425,6 +475,75 @@ const TOP_LEVEL = new Set([
   'model',
   '*',
 ]);
+
+/** RFC 9110 `tchar`: the characters of a token, as in a type or a subtype. */
+const TCHAR_SYMBOLS = "!#$%&'*+-.^_`|~";
+const isToken = (text: string): boolean => {
+  if (!text) return false;
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    const alnum =
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122);
+    if (!alnum && !TCHAR_SYMBOLS.includes(char)) return false;
+  }
+  return true;
+};
+
+/**
+ * Whether one list item is a media type: `type/subtype`, each a token, with
+ * optional `; name=value` parameters. Plain string code, no pattern over
+ * SAP's text: `none`, or a sentence SAP put after the marker
+ * (`System expected the element '{…}abapFunctionGroup'`), is no media type.
+ */
+export function isMediaType(item: string): boolean {
+  const parts = item.split(';');
+  const main = (parts[0] ?? '').trim();
+  const slash = main.indexOf('/');
+  // A second slash fails the subtype's token check.
+  if (slash === -1) return false;
+  if (!isToken(main.slice(0, slash)) || !isToken(main.slice(slash + 1)))
+    return false;
+  for (const parameter of parts.slice(1)) {
+    const equals = parameter.indexOf('=');
+    if (equals === -1 || !isToken(parameter.slice(0, equals).trim()))
+      return false;
+    if (!parameter.slice(equals + 1).trim()) return false;
+  }
+  return true;
+}
+
+/** The items of a list that are media types; the rest is dropped. */
+export const realMediaTypes = (items: readonly string[]): string[] =>
+  items.filter((item) => isMediaType(item));
+
+/** Where a list after a marker ends: the element, an attribute or the line (as the client reads it). */
+const LIST_ENDS = ['<', '"', '\n'];
+
+/** Every item after `marker` in `text`, up to the list's end, split at commas; empty items dropped. */
+export function listItemsAfter(
+  text: string | undefined,
+  marker: string,
+): string[] {
+  if (!text) return [];
+  const items: string[] = [];
+  let at = text.indexOf(marker);
+  while (at !== -1) {
+    const start = at + marker.length;
+    let end = text.length;
+    for (const stop of LIST_ENDS) {
+      const found = text.indexOf(stop, start);
+      if (found !== -1 && found < end) end = found;
+    }
+    for (const entry of text.slice(start, end).split(',')) {
+      const item = entry.trim();
+      if (item) items.push(item);
+    }
+    at = text.indexOf(marker, end);
+  }
+  return items;
+}
 
 /** Every media type (`type/subtype`, a known top-level type) a text names, in order, once each. */
 export function mediaTypesIn(text: string | undefined): string[] {
@@ -771,13 +890,19 @@ export function typesNamed(row: ICorpusRow): {
   const unique = (values: string[]) => [...new Set(values)];
   if (row.status === 406)
     return {
-      accept: unique([...fromText, ...row.named.supportedAccept]),
+      accept: unique([
+        ...fromText,
+        ...realMediaTypes(row.named.supportedAccept),
+      ]),
       contentType: [],
     };
   if (row.status === 415)
     return {
       accept: [],
-      contentType: unique([...fromText, ...row.named.supportedContentType]),
+      contentType: unique([
+        ...fromText,
+        ...realMediaTypes(row.named.supportedContentType),
+      ]),
     };
   return { accept: [], contentType: [] };
 }
@@ -861,6 +986,11 @@ export interface IHeaderVerdict {
   status?: number;
   reason?: string;
   /**
+   * The phase whose answers decided the verdict, when it is not the phase of
+   * the evidence carrying it (a phase-1 406 settled by phase 2's contrast).
+   */
+  decidedIn?: 1 | 2;
+  /**
    * A 406 that names no accepted type (no T100 044, no list): the Accept may
    * not be what it refused. Checked only by contrast.
    */
@@ -901,20 +1031,19 @@ export function namesAccepted(row: ICorpusRow): boolean {
     (key?.id === 'SADT_RESOURCE' && key.no === '044') ||
     // A list counts only with at least one type after the marker.
     listsAType(row.named?.acceptedText) ||
-    Boolean(row.named?.supportedAccept.length) ||
+    realMediaTypes(row.named?.supportedAccept ?? []).length > 0 ||
     // A row built from the write cycle's answers may carry no named lists.
     listsAType(row.body)
   );
 }
 
-/** Whether a text names at least one type after `Accepted content types:`. */
+/**
+ * Whether a text names at least one media type after `Accepted content
+ * types:`. Items that are not media types are dropped first; a marker with
+ * nothing left is a marker with no list.
+ */
 function listsAType(text: string | undefined): boolean {
-  if (!text) return false;
-  const at = text.indexOf(ACCEPTED_MARKER);
-  if (at === -1) return false;
-  const rest = text.slice(at + ACCEPTED_MARKER.length);
-  const end = rest.indexOf('<');
-  return mediaTypesIn(end === -1 ? rest : rest.slice(0, end)).length > 0;
+  return realMediaTypes(listItemsAfter(text, ACCEPTED_MARKER)).length > 0;
 }
 
 /** The T100 key of a 406 that names nothing, for its reason. */
@@ -945,6 +1074,73 @@ export function isContrast(row: ICorpusRow): boolean {
   );
 }
 
+/** What a Content-Type contrast found on one endpoint: the deciding pair's phase and statuses. */
+export interface IContentTypeContrast {
+  phase: 1 | 2;
+  /** The 406 or 415 to the bogus or absent Content-Type. */
+  refused: number;
+  /** The answer to the working one. */
+  answered: number;
+}
+
+/** The last request's headers on the wire, if recorded. */
+const wireOf = (row: ICorpusRow) => row.onWire[row.onWire.length - 1];
+
+/**
+ * The Content-Type contrast: on one endpoint, two answers with the same
+ * Accept on the wire (both absent, or the same value), one to a bogus or
+ * absent Content-Type refused 406 or 415, the other to a working Content-Type
+ * answered anything else (a 2xx, a 400 about the body, a 404, …): the
+ * Content-Type made the difference. Measured: a resource can refuse an
+ * unsupported Content-Type with a bare 406 (no body, no SAP exception)
+ * instead of a 415. Per key, the earliest phase whose pair decides (a pair's
+ * phase is its later row's).
+ */
+export function contentTypeContrasts(
+  rows: readonly { row: ICorpusRow; phase: 1 | 2 }[],
+  keyOf: (row: ICorpusRow) => string,
+): Map<string, IContentTypeContrast> {
+  const by = new Map<string, { row: ICorpusRow; phase: 1 | 2 }[]>();
+  for (const item of rows)
+    if (item.row.endpoint && item.row.status !== undefined && wireOf(item.row))
+      by.set(keyOf(item.row), [...(by.get(keyOf(item.row)) ?? []), item]);
+  const found = new Map<string, IContentTypeContrast>();
+  for (const [key, items] of by)
+    for (const refused of items) {
+      const wire = wireOf(refused.row);
+      const status = refused.row.status;
+      if (!wire || (status !== 406 && status !== 415)) continue;
+      if (wire.contentType !== null && wire.contentType !== PROBE_TYPE)
+        continue;
+      for (const working of items) {
+        const other = wireOf(working.row);
+        const answered = working.row.status;
+        if (!other || answered === undefined) continue;
+        if (answered === 406 || answered === 415) continue;
+        if (other.contentType === null || other.contentType === PROBE_TYPE)
+          continue;
+        if (other.accept !== wire.accept) continue;
+        const phase =
+          working.phase > refused.phase ? working.phase : refused.phase;
+        const known = found.get(key);
+        if (!known || phase < known.phase)
+          found.set(key, { phase, refused: status, answered });
+      }
+    }
+  return found;
+}
+
+/** The Content-Type verdict a contrast gives: checked, naming the two statuses. */
+export function byContentTypeContrast(
+  contrast: IContentTypeContrast,
+): IHeaderVerdict {
+  return {
+    verdict: 'checked',
+    status: contrast.refused,
+    reason: `inferred from the contrast: ${contrast.refused} without a working Content-Type, ${contrast.answered} with one`,
+  };
+}
+
 /**
  * The contrast rule on evidence built outside {@link classifyNeeds} (the
  * write cycle, the update measurement, the reads): an unnamed 406 is
@@ -953,16 +1149,48 @@ export function isContrast(row: ICorpusRow): boolean {
 export function withContrast(
   evidence: readonly IEvidence[],
   rows: readonly ICorpusRow[],
+  /** Phase 2's rows: a contrast found only there was decided in phase 2. */
+  phase2Rows: readonly ICorpusRow[] = [],
 ): IEvidence[] {
-  const contrast = new Set<string>();
-  for (const row of rows)
-    if (row.endpoint && isContrast(row))
-      contrast.add(endpointKey(row.endpoint));
-  return evidence.map((item) =>
-    item.accept.unnamed406 && contrast.has(item.endpoint)
-      ? { ...item, accept: byContrast(item.accept) }
-      : item,
+  // Per endpoint, the earliest phase whose rows give a contrast.
+  const contrast = new Map<string, 1 | 2>();
+  for (const [phase, of] of [
+    [2, phase2Rows],
+    [1, rows],
+  ] as const)
+    for (const row of of)
+      if (row.endpoint && isContrast(row))
+        contrast.set(endpointKey(row.endpoint), phase);
+  const typed = contentTypeContrasts(
+    [
+      ...rows.map((row) => ({ row, phase: 1 as const })),
+      ...phase2Rows.map((row) => ({ row, phase: 2 as const })),
+    ],
+    (row) => (row.endpoint ? endpointKey(row.endpoint) : ''),
   );
+  const later = (phase: 1 | 2, item: IEvidence) => {
+    const decidedIn = phase > item.phase ? phase : item.phase;
+    return decidedIn !== item.phase ? { decidedIn } : {};
+  };
+  return evidence.map((item) => {
+    let out = item;
+    const phase = contrast.get(item.endpoint);
+    if (item.accept.unnamed406 && phase !== undefined)
+      out = {
+        ...out,
+        accept: { ...byContrast(item.accept), ...later(phase, item) },
+      };
+    const ct = typed.get(item.endpoint);
+    if (item.contentType.verdict === 'unknown' && ct)
+      out = {
+        ...out,
+        contentType: {
+          ...byContentTypeContrast(ct),
+          ...later(ct.phase, item),
+        },
+      };
+    return out;
+  });
 }
 
 export interface IEndpointNeeds {
@@ -1150,6 +1378,10 @@ export function classifyNeeds(
   const contrast = new Set<string>();
   for (const row of evidence)
     if (!row.bogus && isContrast(row)) contrast.add(needsKey(row));
+  const typedContrast = contentTypeContrasts(
+    [...rows, ...evidence].map((row) => ({ row, phase: 1 as const })),
+    needsKey,
+  );
   const missing = new Map<string, ICorpusRow>();
   for (const row of [...rows, ...evidence])
     if (isAcceptHeaderMissing(row) && !missing.has(needsKey(row)))
@@ -1169,11 +1401,14 @@ export function classifyNeeds(
         status: 400,
         reason: '400 acceptHeaderMissing without Accept',
       };
-    const contentType = pair.contentType
+    let contentType = pair.contentType
       ? judge(pair.contentType, 415)
       : pair.accept?.skipped
         ? judge(pair.accept, 415)
         : ({ verdict: 'no body' } as IHeaderVerdict);
+    const typed = typedContrast.get(endpoint);
+    if (contentType.verdict === 'unknown' && typed)
+      contentType = byContentTypeContrast(typed);
     const detail = [
       verdictText('Accept', accept),
       verdictText('Content-Type', contentType),
@@ -1837,7 +2072,129 @@ export interface IHeaderCorpusEntry {
   workingAccept: string[];
   /** Who said what: status and raw text. */
   evidence: string[];
+  /** Per evidence line, index for index: its verdicts and the phase that decided each. */
+  verdicts: IEvidenceVerdicts[];
 }
+
+/** One evidence line's verdicts, kept for the self-check. */
+export interface IEvidenceVerdicts {
+  accept: { verdict: IHeaderVerdict['verdict']; status?: number; phase: 1 | 2 };
+  contentType: {
+    verdict: IHeaderVerdict['verdict'];
+    status?: number;
+    phase: 1 | 2;
+  };
+}
+
+const verdictOfLine = (
+  verdict: IHeaderVerdict,
+  phase: 1 | 2,
+): IEvidenceVerdicts['accept'] => ({
+  verdict: verdict.verdict,
+  ...(verdict.status !== undefined ? { status: verdict.status } : {}),
+  phase: verdict.decidedIn ?? phase,
+});
+
+/** The self-check of a header corpus: what its records claim that its evidence does not show. */
+export interface ISelfCheck {
+  /** Records whose `settledBy` phase has no evidence line with the record's decided verdict. */
+  settledWithoutEvidence: {
+    endpoint: string;
+    settledBy: string;
+    accept: string;
+    contentType: string;
+  }[];
+  /** Evidence lines where a list marker is followed by something that is not a media type. */
+  markerWithoutMediaType: {
+    endpoint: string;
+    status?: number;
+    marker: string;
+    text: string;
+  }[];
+}
+
+const DECIDED = new Set<IHeaderVerdict['verdict']>(['checked', 'not checked']);
+
+/** The self-check, from the final corpus alone. */
+export function selfCheck(entries: readonly IHeaderCorpusEntry[]): ISelfCheck {
+  const settledWithoutEvidence: ISelfCheck['settledWithoutEvidence'] = [];
+  const markerWithoutMediaType: ISelfCheck['markerWithoutMediaType'] = [];
+  for (const entry of entries) {
+    if (entry.settledBy !== 'unsettled') {
+      const phase = entry.settledBy === 'phase 1' ? 1 : 2;
+      const shows = entry.verdicts.some(
+        (line) =>
+          (DECIDED.has(entry.accept.verdict) &&
+            line.accept.phase === phase &&
+            line.accept.verdict === entry.accept.verdict) ||
+          (DECIDED.has(entry.contentType.verdict) &&
+            line.contentType.phase === phase &&
+            line.contentType.verdict === entry.contentType.verdict),
+      );
+      if (!shows)
+        settledWithoutEvidence.push({
+          endpoint: entry.endpoint,
+          settledBy: entry.settledBy,
+          accept: entry.accept.verdict,
+          contentType: entry.contentType.verdict,
+        });
+    }
+    for (const [index, line] of entry.evidence.entries())
+      for (const segment of line.split(' | '))
+        for (const [marker, header] of [
+          [ACCEPTED_MARKER, 'accept'],
+          [SUPPORTED_MARKER, 'contentType'],
+        ] as const)
+          for (const item of listItemsAfter(segment, marker))
+            if (!isMediaType(item)) {
+              const status = entry.verdicts[index]?.[header].status;
+              markerWithoutMediaType.push({
+                endpoint: entry.endpoint,
+                ...(status !== undefined ? { status } : {}),
+                marker,
+                text: item.slice(0, 200),
+              });
+            }
+  }
+  return { settledWithoutEvidence, markerWithoutMediaType };
+}
+
+/** The self-check as Markdown: a count and a list per check, 0 when empty. */
+export function selfCheckLines(check: ISelfCheck): string[] {
+  const lines = ['', '## Self-check', ''];
+  lines.push(
+    `### settledBy without evidence: ${check.settledWithoutEvidence.length}`,
+    '',
+  );
+  if (check.settledWithoutEvidence.length) {
+    lines.push(
+      '| endpoint | settled by | Accept | Content-Type |',
+      '|---|---|---|---|',
+    );
+    for (const item of check.settledWithoutEvidence)
+      lines.push(
+        `| ${cell(item.endpoint)} | ${item.settledBy} | ${item.accept} | ${item.contentType} |`,
+      );
+    lines.push('');
+  }
+  lines.push(
+    `### A marker followed by no media type: ${check.markerWithoutMediaType.length}`,
+    '',
+  );
+  if (check.markerWithoutMediaType.length) {
+    lines.push('| endpoint | status | marker | text |', '|---|---|---|---|');
+    for (const item of check.markerWithoutMediaType)
+      lines.push(
+        `| ${cell(item.endpoint)} | ${item.status ?? '—'} | ${cell(item.marker)} | ${cell(item.text)} |`,
+      );
+  }
+  return lines;
+}
+
+const unknownLater: IHeaderVerdict = {
+  verdict: 'unknown',
+  reason: 'decided by a later phase',
+};
 
 /** The header corpus: per endpoint, everything the phases found. */
 export function buildHeaderCorpus(
@@ -1861,7 +2218,23 @@ export function buildHeaderCorpus(
       contentType: mergeVerdicts(of.map((item) => item.contentType)),
     });
     const all = merged(items);
-    const first = merged(items.filter((item) => item.phase === 1));
+    // What phase 1 alone decided: a verdict decided by a later phase's
+    // answers is not phase 1's.
+    const ofPhase = (phase: 1 | 2) =>
+      items
+        .filter((item) => item.phase <= phase)
+        .map((item) => ({
+          ...item,
+          accept:
+            (item.accept.decidedIn ?? item.phase) <= phase
+              ? item.accept
+              : unknownLater,
+          contentType:
+            (item.contentType.decidedIn ?? item.phase) <= phase
+              ? item.contentType
+              : unknownLater,
+        }));
+    const first = merged(ofPhase(1));
     const needs = needsFrom(all.accept, all.contentType);
     const settledBy =
       needs === 'unknown'
@@ -1900,6 +2273,10 @@ export function buildHeaderCorpus(
         (item) =>
           `phase ${item.phase} ${item.source} ${item.who}: ${item.text}`,
       ),
+      verdicts: items.map((item) => ({
+        accept: verdictOfLine(item.accept, item.phase),
+        contentType: verdictOfLine(item.contentType, item.phase),
+      })),
     });
   }
   return entries.sort((x, y) => x.endpoint.localeCompare(y.endpoint));
@@ -1943,6 +2320,8 @@ export interface IHeaderCorpusFile {
   }[];
   /** Phase 2's read objects: per object type, the name found or why none. */
   objects: { handler: string; type?: string; name?: string; reason?: string }[];
+  /** What the records claim that the evidence does not show. */
+  selfCheck?: ISelfCheck;
   error?: string;
 }
 
@@ -1969,6 +2348,7 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
     lines.push(
       `| ${value} | ${file.counts.phase1[value]} | ${file.counts.phase2[value]} |`,
     );
+  if (file.selfCheck) lines.push(...selfCheckLines(file.selfCheck));
   lines.push(
     '',
     '## Endpoint existence',
