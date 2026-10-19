@@ -10,7 +10,11 @@
  * that tested everything.
  *
  * So: compare the top-level sections and report what the template has and the
- * local config does not. It warns rather than fails — the config is the
+ * local config does not — and, inside `shared_dependencies`, the entries
+ * (collection and name) the template lists and the local config does not: a
+ * test whose shared object is missing from the config fails or skips naming a
+ * dependency nobody told the developer about. Only presence is compared; the
+ * values (sources, descriptions, flags) are not. It warns rather than fails — the config is the
  * developer's, and a section they deliberately left out is their business. What
  * they must not have is *no idea* that it appeared.
  *
@@ -34,8 +38,12 @@ const CONFIG = path.join(ROOT, 'src/__tests__/helpers/test-config.yaml');
  * a colon", and this file must run before anything is installed.
  */
 function sections(file) {
+  return sectionsOf(fs.readFileSync(file, 'utf8'));
+}
+
+function sectionsOf(text) {
   const found = new Set();
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+  for (const line of text.split('\n')) {
     const match = /^([A-Za-z_][A-Za-z0-9_]*):\s*(#.*)?$/.exec(line);
     if (match) {
       found.add(match[1]);
@@ -44,45 +52,118 @@ function sections(file) {
   return found;
 }
 
-if (!fs.existsSync(CONFIG)) {
-  console.log(
-    'check:config — no test-config.yaml yet. Run `npm run test:init` before the integration tests.',
-  );
-  process.exit(0);
-}
-
-const inTemplate = sections(TEMPLATE);
-const inConfig = sections(CONFIG);
-const missing = [...inTemplate].filter((s) => !inConfig.has(s)).sort();
-const extra = [...inConfig].filter((s) => !inTemplate.has(s)).sort();
-
-if (missing.length === 0 && extra.length === 0) {
-  console.log(
-    `check:config — test-config.yaml carries all ${inTemplate.size} sections the template does.`,
-  );
-  process.exit(0);
-}
-
-if (missing.length > 0) {
-  console.warn(
-    `\n⚠️  test-config.yaml is missing ${missing.length} section(s) the template has:\n`,
-  );
-  for (const s of missing) {
-    console.warn(`      ${s}`);
+/**
+ * `shared_dependencies` entries as `collection/NAME`, read line by line: a
+ * collection is a two-space key under the section, an entry a four-space
+ * `- name:` under it. Commented lines are not entries.
+ */
+function sharedEntriesOf(text) {
+  const found = new Set();
+  let inShared = false;
+  let collection = '';
+  for (const line of text.split('\n')) {
+    const topLevel = /^([A-Za-z_][A-Za-z0-9_]*):/.exec(line);
+    if (topLevel) {
+      inShared = topLevel[1] === 'shared_dependencies';
+      collection = '';
+      continue;
+    }
+    if (!inShared) continue;
+    const key = /^ {2}([A-Za-z_][A-Za-z0-9_]*):\s*(#.*)?$/.exec(line);
+    if (key) {
+      collection = key[1];
+      continue;
+    }
+    const entry = /^ {4}- name:\s*["']?([^"'#\s]+)["']?/.exec(line);
+    if (entry && collection) found.add(`${collection}/${entry[1]}`);
   }
-  console.warn(
-    '\n   A suite whose section is absent finds no test case, skips, and reports\n' +
-      '   PASS having run nothing. Copy them from the template, or leave them out\n' +
-      '   deliberately — but knowingly.\n',
-  );
+  return found;
 }
 
-if (extra.length > 0) {
-  console.warn(
-    `   ${extra.length} section(s) exist locally and not in the template: ${extra.join(', ')}\n` +
-      '   Harmless, unless one was renamed upstream and yours is now the old name.\n',
-  );
+/** What the template has and the config lacks, and the other way round. */
+function drift(templateText, configText) {
+  const inTemplate = sectionsOf(templateText);
+  const inConfig = sectionsOf(configText);
+  const sharedTemplate = sharedEntriesOf(templateText);
+  const sharedConfig = sharedEntriesOf(configText);
+  return {
+    sections: inTemplate.size,
+    missing: [...inTemplate].filter((s) => !inConfig.has(s)).sort(),
+    extra: [...inConfig].filter((s) => !inTemplate.has(s)).sort(),
+    missingShared: inConfig.has('shared_dependencies')
+      ? [...sharedTemplate].filter((e) => !sharedConfig.has(e)).sort()
+      : [],
+  };
 }
 
-// A warning, not a failure: the config belongs to whoever runs the tests.
-process.exit(0);
+function main() {
+  if (!fs.existsSync(CONFIG)) {
+    console.log(
+      'check:config — no test-config.yaml yet. Run `npm run test:init` before the integration tests.',
+    );
+    process.exit(0);
+  }
+
+  const {
+    sections: count,
+    missing,
+    extra,
+    missingShared,
+  } = drift(fs.readFileSync(TEMPLATE, 'utf8'), fs.readFileSync(CONFIG, 'utf8'));
+
+  if (
+    missing.length === 0 &&
+    extra.length === 0 &&
+    missingShared.length === 0
+  ) {
+    console.log(
+      `check:config — test-config.yaml carries all ${count} sections and every shared entry the template does.`,
+    );
+    process.exit(0);
+  }
+
+  if (missing.length > 0) {
+    console.warn(
+      `\n⚠️  test-config.yaml is missing ${missing.length} section(s) the template has:\n`,
+    );
+    for (const s of missing) {
+      console.warn(`      ${s}`);
+    }
+    console.warn(
+      '\n   A suite whose section is absent finds no test case, skips, and reports\n' +
+        '   PASS having run nothing. Copy them from the template, or leave them out\n' +
+        '   deliberately — but knowingly.\n',
+    );
+  }
+
+  if (extra.length > 0) {
+    console.warn(
+      `   ${extra.length} section(s) exist locally and not in the template: ${extra.join(', ')}\n` +
+        '   Harmless, unless one was renamed upstream and yours is now the old name.\n',
+    );
+  }
+
+  if (missingShared.length > 0) {
+    console.warn(
+      `\n⚠️  shared_dependencies lacks ${missingShared.length} entr${missingShared.length === 1 ? 'y' : 'ies'} the template has:\n`,
+    );
+    for (const e of missingShared) {
+      console.warn(`      ${e}`);
+    }
+    console.warn(
+      '\n   A test that ensures one of them fails naming it, or one that reads it skips.\n' +
+        '   Copy them from the template (with your own prefix if you rename shared\n' +
+        '   objects — then this list names the template entries you have renamed).\n' +
+        '   Values are not compared.\n',
+    );
+  }
+
+  // A warning, not a failure: the config belongs to whoever runs the tests.
+  process.exit(0);
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { drift, sectionsOf, sharedEntriesOf };
