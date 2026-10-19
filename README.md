@@ -886,6 +886,10 @@ still takes an optional `accept` (`IReadOptions`).
   for them. It (and `unicode`) still decides the artifact type inside a
   check-run document and a class's `readMetadata` `Accept`. abapGit's
   `contentTypeVersion` option is removed.
+- An enhancement's `check` takes the `CHECK_RUN` pair below, as every other
+  `check` does (since 36.0.2). 35.0.0 sent
+  `application/vnd.sap.adt.checkrun.v1+xml` for both, which SAP refuses `415`;
+  see [the corrected pairs](docs/usage/MIGRATION-36.md#the-corrected-pairs-measured).
 
 The pairs 35.0.0 chose for itself, for the samples below (a modern system):
 

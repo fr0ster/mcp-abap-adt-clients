@@ -258,6 +258,19 @@ export const CT_TRACE_PARAMETERS = 'application/xml';
 // System Information
 export const ACCEPT_SYSTEM_INFO = 'application/json';
 
+// Application log objects (APLO)
+/**
+ * What an application log object's two reads ask for. Until 36.0.1 both sent
+ * `application/xml`, which SAP refuses `406` (SADT_RESOURCE 037). Measured on
+ * an on-premise system (2026-10-19), on an existing object: the properties
+ * answer `200` `application/vnd.sap.adt.blues.v1+xml` to that type, and the
+ * source answers `200` `application/json` to that type and `406` to
+ * `application/vnd.sap.adt.blues.v1+xml`.
+ */
+export const ACCEPT_APPLICATION_LOG_OBJECT =
+  'application/vnd.sap.adt.blues.v1+xml';
+export const ACCEPT_APPLICATION_LOG_SOURCE = 'application/json';
+
 // Feature Toggles (FTG2/FT) — metadata uses the shared blues envelope
 // same as APS IAM; state and domain endpoints use dedicated JSON types.
 export const ACCEPT_FEATURE_TOGGLE_METADATA =

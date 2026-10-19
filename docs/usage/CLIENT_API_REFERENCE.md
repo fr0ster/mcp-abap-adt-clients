@@ -1818,6 +1818,11 @@ const logObject = await appLog.getObject('Z_MY_LOG');
 const logSource = await appLog.getSource('Z_MY_LOG');
 ```
 
+`getObject` asks for `application/vnd.sap.adt.blues.v1+xml` and answers the
+object's document; `getSource` asks for `application/json` and answers the
+object's subobjects as JSON. Until 36.0.1 both asked for `application/xml`,
+which SAP refuses `406`.
+
 ### ATC check runs
 
 `runtime.getAtc()` makes one request per member. An ATC run is three requests —
