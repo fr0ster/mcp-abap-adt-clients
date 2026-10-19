@@ -85,7 +85,37 @@ import { measureUpdates, runWriteCycle } from './writeCycle';
 // The helpers load `.env` when imported; nothing else here reads it.
 const {
   getEnvironmentConfig,
+  getTestCaseDefinition,
 } = require('../../src/__tests__/helpers/test-helper');
+
+/**
+ * Where the clients run makes its temporary objects: the configured package
+ * and transport, and for a package object the software component and
+ * transport layer the package test case names. Nothing of it is printed.
+ */
+function temporaryObjects():
+  | {
+      packageName: string;
+      transportRequest: string;
+      softwareComponent?: string;
+      transportLayer?: string;
+    }
+  | undefined {
+  const environment = getEnvironmentConfig();
+  const packageName = String(environment.default_package ?? '');
+  if (!packageName) return undefined;
+  const params = getTestCaseDefinition('create_package')?.params ?? {};
+  return {
+    packageName,
+    transportRequest: String(environment.default_transport ?? ''),
+    ...(params.software_component
+      ? { softwareComponent: String(params.software_component) }
+      : {}),
+    ...(params.transport_layer
+      ? { transportLayer: String(params.transport_layer) }
+      : {}),
+  };
+}
 
 const progress = (line: string): void => {
   process.stdout.write(`${line}\n`);
@@ -235,8 +265,10 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
   if (!args.from) {
     // The full run: the header corpus of the system.
     const environment = getEnvironmentConfig();
+    const temporary = temporaryObjects();
     const { exitCode } = await runFull({
       open,
+      ...(temporary ? { temporaryObjects: temporary } : {}),
       ...(isolate ? { isolate } : {}),
       close: (connection) => closeOwnTestConnection(connection),
       interrupt,
@@ -279,6 +311,9 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
     sequential: args.sequential === true,
     ...(args.only ? { only: args.only } : {}),
     ...(isolate ? { isolate } : {}),
+    ...(args.from === 'clients' && temporaryObjects()
+      ? { temporaryObjects: temporaryObjects() }
+      : {}),
   });
   return exitCode;
 }

@@ -57,6 +57,7 @@ import {
   t100Of,
   wireNote,
   withContrast,
+  workingContentTypes,
 } from '../../../../tools/header-probe/corpus';
 import {
   defaultOutputDir,
@@ -71,11 +72,13 @@ import {
   clientsOn,
   DEBUGGERS,
   handlerSpecs,
+  LOCK_SKIP,
   prototypeMembers,
   recordingConnection,
   recordMembers,
   standInParameters,
 } from '../../../../tools/header-probe/members';
+import { coverageOf, stepOf } from '../../../../tools/header-probe/objectRun';
 import {
   KNOWN_PAIRS,
   LEGACY_PAIRS,
@@ -462,8 +465,13 @@ describe('the clients source', () => {
           );
         }
     }
+    // A call for every member sent; a skipped one has none, but a member
+    // that sends a LOCK keeps its call for a temporary object.
     for (const member of recorded.members)
-      expect(Boolean(member.call) !== Boolean(member.skipped)).toBe(true);
+      expect(
+        Boolean(member.call) !== Boolean(member.skipped) ||
+          member.skipped === LOCK_SKIP,
+      ).toBe(true);
   });
 });
 
@@ -1540,30 +1548,19 @@ describe('a poisoned write', () => {
 });
 
 describe('the full run', () => {
-  it('phase 1 on the probe name, phase 2 on an existing object, one header corpus with the time of each phase', async () => {
-    const real = 'CL_REAL_ONE';
-    const classRead = `/sap/bc/adt/oo/classes/${real.toLowerCase()}`;
-    const system = fakeSystem((request) => {
-      if (request.url === '/sap/bc/adt/discovery')
-        return { status: 200, body: DISCOVERY };
+  it('phase 1 on the probe name and on temporary objects, phase 2 the write cycle and the update measurement, one header corpus with the time of each phase', async () => {
+    const system = objectSystem((request) => {
+      // A temporary class checks Accept and names it.
       if (
-        request.url.startsWith(
-          '/sap/bc/adt/repository/informationsystem/search',
-        )
+        request.method === 'GET' &&
+        /^\/sap\/bc\/adt\/oo\/classes\/zhp[a-z0-9]+$/.test(request.url) &&
+        request.headers.accept === PROBE_TYPE
       )
         return {
-          status: 200,
-          body: `<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:name="${real}" adtcore:type="CLAS/OC"/></adtcore:objectReferences>`,
+          status: 406,
+          body: NOT_ACCEPTABLE('application/vnd.sap.adt.oo.classes.v4+xml'),
         };
-      // The real class checks Accept; the probe name is not found.
-      if (request.url === classRead)
-        return request.headers.accept === PROBE_TYPE
-          ? {
-              status: 406,
-              body: NOT_ACCEPTABLE('application/vnd.sap.adt.oo.classes.v4+xml'),
-            }
-          : { status: 200, body: '<class/>' };
-      return { status: 404 };
+      return undefined;
     });
     const dir = tempDir();
     const cycles: string[][] = [];
@@ -1573,6 +1570,7 @@ describe('the full run', () => {
       outDir: dir,
       clientOptions: async () => ({}),
       out: output().out,
+      temporaryObjects: TEMPORARY,
       writeCycle: async ({ unknown }) => {
         cycles.push([...unknown]);
         return { evidence: [], removals: [] };
@@ -1590,7 +1588,6 @@ describe('the full run', () => {
       'phase 1',
       'phase 2',
       'phase 2',
-      'phase 2',
     ]);
     expect(file.updates).toEqual([
       { type: 'class', member: 'update', status: 406, applied: true },
@@ -1600,41 +1597,21 @@ describe('the full run', () => {
       (e) => e.endpoint === 'GET /sap/bc/adt/oo/classes/{name}',
     );
     expect(entry?.needs).toBe('accept');
-    expect(entry?.settledBy).toBe('phase 2');
+    expect(entry?.settledBy).toBe('phase 1');
     expect(entry?.exists).toBe('yes');
     expect(entry?.namedAccept).toEqual([
       'application/vnd.sap.adt.oo.classes.v4+xml',
     ]);
-    expect(file.counts.phase2.accept).toBeGreaterThan(
-      file.counts.phase1.accept,
-    );
-    expect(file.objects).toContainEqual({
-      handler: 'getClass()',
-      type: 'CLAS',
-      name: real,
-    });
     // The writes still unknown went to the cycle, and only those.
-    expect(cycles).toHaveLength(1);
-    expect(cycles[0].every((key) => /— (POST|PUT|DELETE) /.test(key))).toBe(
-      true,
-    );
-    // Phase 2 reads are GETs only: nothing written on the real object.
-    expect(
-      system.seen.some(
-        (s) => s.url.includes(real.toLowerCase()) && s.method !== 'GET',
-      ),
-    ).toBe(false);
+    for (const keys of cycles)
+      expect(keys.every((key) => /— (POST|PUT|DELETE) /.test(key))).toBe(true);
     const names = fs.readdirSync(dir);
     expect(names.some((n) => /^header-corpus-.*\.json$/.test(n))).toBe(true);
-    expect(
-      names.some((n) => /^corpus-clients-bogus-phase2-.*\.json$/.test(n)),
-    ).toBe(true);
-    expect(
-      fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
-    ).toContain('| accept |');
-    expect(
-      fs.readFileSync(result.files[result.files.length - 1], 'utf8'),
-    ).toContain('| class | update | 406 | yes |');
+    const md = fs.readFileSync(result.files[result.files.length - 1], 'utf8');
+    expect(md).toContain('| accept |');
+    expect(md).toContain('| class | update | 406 | yes |');
+    expect(md).toContain('## Temporary objects');
+    expect(md).toContain('## Coverage');
   });
 
   it('a 401 at the logon is the Oops, and nothing runs', async () => {
@@ -2031,21 +2008,27 @@ describe('a stop in any phase of the full run', () => {
     ).toHaveLength(3);
   });
 
-  it('in phase 2 reads: the report, exit 2', async () => {
-    const { result } = await full((request) => {
-      if (request.url === '/sap/bc/adt/discovery')
-        return { status: 200, body: DISCOVERY };
-      const hit = search(request);
-      if (hit) return hit;
-      if (request.url.includes('cl_real_one')) return denied;
-      return { status: 404 };
+  it('on a temporary object: the report, exit 2', async () => {
+    const system = objectSystem((request) =>
+      // The bogus mode's read of the temporary class is refused; the cleanup's is not.
+      /^\/sap\/bc\/adt\/oo\/classes\/zhp[a-z0-9]+$/.test(request.url) &&
+      request.method === 'GET' &&
+      request.headers.accept === PROBE_TYPE
+        ? denied
+        : undefined,
+    );
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
     });
     expect(result.exitCode).toBe(2);
     expect(result.file?.error).toMatch(/^stopped: authorization \(401/);
-    expect(result.file?.phases.map((p) => p.name.split(':')[0])).toEqual([
-      'phase 1',
-      'phase 2',
-    ]);
+    // The cleanup still ran, and proved the objects gone.
+    expect(unprovenOf(result.file?.removals ?? [])).toEqual([]);
   });
 
   it('in phase 2 writes: the report, exit 2', async () => {
@@ -2746,59 +2729,40 @@ describe('every phase counts', () => {
 });
 
 describe('knownWorking', () => {
-  it("reads an endpoint whose 406 named nothing on an existing object, with the client's own headers, and records what worked", async () => {
-    const real = 'CL_REAL_ONE';
-    const probeRead = `/sap/bc/adt/oo/classes/${PROBE_NAME.toLowerCase()}`;
-    const realRead = `/sap/bc/adt/oo/classes/${real.toLowerCase()}`;
-    const system = fakeSystem((request) => {
-      if (request.url === '/sap/bc/adt/discovery')
-        return { status: 200, body: DISCOVERY };
-      if (
-        request.url.startsWith(
-          '/sap/bc/adt/repository/informationsystem/search',
-        )
-      )
-        return {
-          status: 200,
-          body: `<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:name="${real}"/></adtcore:objectReferences>`,
-        };
-      // On the probe name a bogus Accept gets a 406 that names nothing.
-      if (request.url === probeRead)
-        return request.headers.accept === PROBE_TYPE
-          ? {
-              status: 406,
-              body: AUTH_EXCEPTION(
-                'ExceptionResourceNotAcceptable',
-                'The message content is not acceptable',
-              ),
-            }
-          : { status: 404 };
-      if (request.url === realRead)
-        return request.headers.accept === PROBE_TYPE
-          ? { status: 406 }
-          : { status: 200, body: '<class/>' };
-      return { status: 404 };
-    });
+  it("records what the client's own Accept got on a temporary object", async () => {
+    const system = objectSystem((request) =>
+      request.method === 'GET' &&
+      /^\/sap\/bc\/adt\/oo\/classes\/zhp[a-z0-9]+$/.test(request.url) &&
+      request.headers.accept === PROBE_TYPE
+        ? {
+            status: 406,
+            body: AUTH_EXCEPTION(
+              'ExceptionResourceNotAcceptable',
+              'The message content is not acceptable',
+            ),
+          }
+        : undefined,
+    );
     const result = await runFull({
       open: async () => system.connection,
       interrupt: new Interrupt(),
       outDir: tempDir(),
       clientOptions: async () => ({}),
       out: output().out,
+      temporaryObjects: TEMPORARY,
     });
     const entry = result.file?.entries.find(
       (e) => e.endpoint === 'GET /sap/bc/adt/oo/classes/{name}',
     );
-    expect(entry?.needs).toBe('accept');
     expect(entry?.namedAccept).toEqual([]);
     expect(entry?.workingAccept.length).toBeGreaterThan(0);
     expect(
       entry?.knownWorking.some((text) => text.endsWith('→ 200 (works)')),
     ).toBe(true);
-    // The corpus-mode read on the real object went with the client's own Accept.
+    // The corpus-mode read went to the temporary class with the client's own Accept.
     const corpusRead = system.seen.find(
       (s) =>
-        s.url === realRead &&
+        /^\/sap\/bc\/adt\/oo\/classes\/zhp[a-z0-9]+$/.test(s.url) &&
         s.headers.accept &&
         s.headers.accept !== PROBE_TYPE,
     );
@@ -3462,5 +3426,440 @@ describe('the Content-Type contrast', () => {
     expect(p1.contentType.verdict).toBe('checked');
     expect(p1.contentType.decidedIn).toBeUndefined();
     expect(buildHeaderCorpus([p1], extras)[0].settledBy).toBe('phase 1');
+  });
+});
+
+const LOCKED =
+  '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>';
+const TEMPORARY = { packageName: 'ZHP_PKG', transportRequest: '' };
+
+/**
+ * A system that keeps the temporary objects the run makes: a create makes
+ * one, a DELETE removes it, a read answers 404 after; LOCK answers a handle.
+ * The probe name is never there.
+ */
+function objectSystem(
+  answer: (request: ISeen) => Answer | undefined = () => undefined,
+) {
+  const deleted = new Set<string>();
+  const pathOf = (url: string) => url.split('?')[0].toLowerCase();
+  const temporaryName = (path: string) =>
+    path
+      .split('/')
+      .some(
+        (part) => /^(l?z_?hp)/.test(part) && part !== PROBE_NAME.toLowerCase(),
+      );
+  const system = fakeSystem((request) => {
+    const own = answer(request);
+    if (own) return own;
+    if (request.url === '/sap/bc/adt/discovery')
+      return { status: 200, body: DISCOVERY };
+    const path = pathOf(request.url);
+    if (request.url.includes('_action=LOCK'))
+      return { status: 200, body: LOCKED };
+    if (request.method === 'DELETE') {
+      deleted.add(path);
+      return { status: 200 };
+    }
+    // The deletion resource: the object URIs in its body.
+    if (request.method === 'POST' && path.includes('/deletion/')) {
+      for (const part of request.body.split('adtcore:uri="').slice(1))
+        deleted.add(pathOf(part.slice(0, part.indexOf('"'))));
+      return { status: 200 };
+    }
+    if (request.method === 'GET') {
+      if (path.includes(PROBE_NAME.toLowerCase())) return { status: 404 };
+      if (
+        temporaryName(path) &&
+        [...deleted].some(
+          (gone) => path === gone || path.startsWith(`${gone}/`),
+        )
+      )
+        return { status: 404 };
+      return {
+        status: 200,
+        body: '<adtcore:objectReference xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="x" adtcore:version="inactive"/>',
+      };
+    }
+    if (request.method === 'POST' && !request.url.includes('_action=')) {
+      // A create names its object: it is there again.
+      const at = request.body.indexOf('adtcore:name="');
+      if (at !== -1) {
+        const name = request.body
+          .slice(at + 14, request.body.indexOf('"', at + 14))
+          .toLowerCase();
+        for (const gone of [...deleted])
+          if (gone.endsWith(`/${name}`)) deleted.delete(gone);
+      }
+      return { status: 201 };
+    }
+    return { status: 200 };
+  });
+  // A transport seam as the real connection has: `onTheWire` reads what goes out there.
+  const connection = system.connection as IAbapConnection & {
+    transport: { send: (request: unknown) => Promise<unknown> };
+  };
+  connection.transport = { send: async (request) => request };
+  const make = connection.makeAdtRequest.bind(connection);
+  connection.makeAdtRequest = (async (request: IAbapRequestOptions) => {
+    if (request.url !== '/sap/bc/adt/communication/batch')
+      await connection.transport.send({ headers: request.headers });
+    return make(request);
+  }) as typeof connection.makeAdtRequest;
+  return { ...system, connection, deleted };
+}
+
+describe('members on temporary objects', () => {
+  const run = (system: ReturnType<typeof objectSystem>) =>
+    runFull({
+      // As the command opens it: what went on the wire is recorded.
+      open: async () => onTheWire(system.connection),
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
+    });
+
+  it('runs the object members on objects it makes, in every mode, and proves each removed', async () => {
+    const system = objectSystem();
+    const result = await run(system);
+    const file = result.file as NonNullable<typeof result.file>;
+    expect(file.endedBy).toBe('complete');
+    expect(result.exitCode).toBe(0);
+    const classes = file.objects.filter((object) => object.type === 'class');
+    expect(classes.map((object) => object.handler).sort()).toEqual([
+      'clients bogus',
+      'clients corpus',
+      'clients none',
+    ]);
+    for (const object of classes) expect(object.name).toMatch(/^ZHP/);
+    expect(file.removals.length).toBeGreaterThan(0);
+    expect(unprovenOf(file.removals)).toEqual([]);
+  });
+
+  const objectOf = (
+    file: NonNullable<Awaited<ReturnType<typeof run>>['file']>,
+    type: string,
+    mode = 'corpus',
+  ) =>
+    String(
+      file.objects.find(
+        (object) =>
+          object.type === type && object.handler === `clients ${mode}`,
+      )?.name,
+    ).toLowerCase();
+
+  it('per object: create, the reads in envelopes, LOCK, the writes, UNLOCK, the lock members, the deletes last; a 404 read after the cleanup', async () => {
+    const system = objectSystem();
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'program');
+    const on = system.seen
+      .map((seen, index) => ({ ...seen, index }))
+      .filter((seen) =>
+        `${seen.url} ${seen.body}`.toLowerCase().includes(name),
+      );
+    const first = (test: (seen: ISeen) => boolean) =>
+      on.find(test)?.index ?? -1;
+    const last = (test: (seen: ISeen) => boolean) =>
+      on.filter(test).pop()?.index ?? -1;
+    const created = first(
+      (seen) =>
+        (seen.method === 'POST' &&
+          seen.url.startsWith('/sap/bc/adt/programs/programs?')) ||
+        (seen.method === 'POST' &&
+          seen.url === '/sap/bc/adt/programs/programs'),
+    );
+    const read = first((seen) => seen.method === 'GET' && seen.part);
+    const locked = first((seen) => seen.url.includes('_action=LOCK'));
+    const written = first((seen) => seen.method === 'PUT');
+    const deletes = first(
+      (seen) =>
+        seen.method === 'DELETE' ||
+        (seen.url.includes('/deletion/delete') && !seen.part),
+    );
+    expect(created).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(created);
+    expect(locked).toBeGreaterThan(read);
+    expect(written).toBeGreaterThan(locked);
+    expect(deletes).toBeGreaterThan(written);
+    // The cleanup's read answered 404: the object is gone.
+    const removal = file.removals.find(
+      (r) => r.label.toLowerCase() === `program ${name}`,
+    );
+    expect(removal?.removed).toBe(true);
+    expect(last((seen) => seen.method === 'GET')).toBeGreaterThan(deletes);
+    // Writes go one by one, never in an envelope.
+    expect(on.some((seen) => seen.method === 'PUT' && seen.part)).toBe(false);
+  });
+
+  it('a write gets a real lock handle, is sent once per row and read back', async () => {
+    const system = objectSystem();
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'program');
+    const puts = system.seen.filter(
+      (seen) =>
+        seen.method === 'PUT' &&
+        seen.url
+          .toLowerCase()
+          .includes(`/programs/programs/${name}/source/main`),
+    );
+    expect(puts.length).toBeGreaterThan(0);
+    for (const put of puts) expect(put.url).toContain('lockHandle=H1');
+    const corpus = JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          /corpus-clients-corpus-.*\.json$/.test(f),
+        ) as string,
+        'utf8',
+      ),
+    ) as ICorpus;
+    const rows = corpus.rows.filter(
+      (r) =>
+        r.temporary === `program ${name.toUpperCase()}` &&
+        r.endpoint?.method === 'PUT',
+    );
+    expect(rows.length).toBe(puts.length);
+    for (const r of rows)
+      expect(r.afterWrite?.note).toBe(
+        'the temporary program read back after the write',
+      );
+  });
+
+  it('a lock member on the object is released; the members that take no object keep the probe name; the not coverable say why', async () => {
+    const system = objectSystem();
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'interface');
+    // Every LOCK granted is released (UNLOCK) or ends with the object (a
+    // delete) before the next LOCK: none is left held.
+    let held = false;
+    let locks = 0;
+    for (const seen of system.seen) {
+      const url = seen.url.toLowerCase();
+      const own =
+        url.includes(`/oo/interfaces/${name}`) ||
+        seen.body.toLowerCase().includes(`/oo/interfaces/${name}`);
+      if (!own) continue;
+      if (seen.url.includes('_action=LOCK')) {
+        expect(held).toBe(false);
+        held = true;
+        locks++;
+      } else if (
+        seen.url.includes('_action=UNLOCK') ||
+        seen.method === 'DELETE' ||
+        url.includes('/deletion/delete')
+      )
+        held = false;
+    }
+    expect(locks).toBeGreaterThan(0);
+    expect(held).toBe(false);
+    expect(file.coverage).toContainEqual({
+      member: 'getRequest().readMetadata',
+      coverage: expect.stringMatching(/^not coverable: transport requests/),
+    });
+    expect(file.coverage).toContainEqual({
+      member: 'getInterface().read',
+      coverage: 'temporary interface',
+    });
+    expect(
+      file.coverage?.find((c) => c.member === 'getUtils().searchObject')
+        ?.coverage ?? 'no object: the probe name',
+    ).toBe('no object: the probe name');
+  });
+
+  it('a delete row that took the object: it is made again for the next row', async () => {
+    const system = objectSystem();
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'program', 'bogus');
+    const creates = system.seen.filter(
+      (seen) =>
+        seen.method === 'POST' &&
+        seen.url.split('?')[0] === '/sap/bc/adt/programs/programs' &&
+        seen.body.toLowerCase().includes(`"${name}"`),
+    );
+    expect(creates.length).toBeGreaterThan(1);
+    const corpus = JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          /corpus-clients-bogus-[0-9].*\.json$/.test(f),
+        ) as string,
+        'utf8',
+      ),
+    ) as ICorpus;
+    const deletes = corpus.rows.filter(
+      (r) =>
+        r.temporary === `program ${name.toUpperCase()}` && r.label === 'delete',
+    );
+    expect(deletes.length).toBeGreaterThan(1);
+    for (const r of deletes) expect(r.skipped).toBeUndefined();
+  });
+
+  it('any LOCK attempt on the object is followed by a LOCK and UNLOCK that free it, a refused one included', async () => {
+    // A classic LOCK takes the lock, then refuses the bogus Accept.
+    const system = objectSystem((request) =>
+      request.url.includes('_action=LOCK') &&
+      request.headers.accept === PROBE_TYPE
+        ? { status: 406 }
+        : undefined,
+    );
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const name = objectOf(file, 'program', 'bogus');
+    const on = system.seen.filter((seen) =>
+      seen.url.toLowerCase().includes(`/programs/programs/${name}?`),
+    );
+    const refused = on.findIndex(
+      (seen) =>
+        seen.url.includes('_action=LOCK') && seen.headers.accept === PROBE_TYPE,
+    );
+    expect(refused).toBeGreaterThan(-1);
+    expect(on[refused + 1]?.url).toContain('_action=LOCK');
+    expect(on[refused + 1]?.headers.accept).not.toBe(PROBE_TYPE);
+    expect(on[refused + 2]?.url).toContain('_action=UNLOCK');
+  });
+
+  it('an object left behind is reported and the run ends failed', async () => {
+    // Nothing deletes the temporary programs: not a delete row, not the cleanup.
+    const system = objectSystem((request) =>
+      (request.method === 'POST' &&
+        request.url.includes('/deletion/') &&
+        /\/programs\/programs\/zhp/.test(request.body.toLowerCase())) ||
+      (request.method === 'DELETE' &&
+        /\/programs\/programs\/zhp/.test(request.url.toLowerCase()))
+        ? { status: 500 }
+        : undefined,
+    );
+    const result = await run(system);
+    expect(result.exitCode).toBe(1);
+    expect(result.file?.endedBy).toMatch(
+      /^failed: .*may remain: .*program ZHP/,
+    );
+    expect(
+      unprovenOf(result.file?.removals ?? []).some((l) =>
+        l.startsWith('program ZHP'),
+      ),
+    ).toBe(true);
+  });
+
+  it('records a Content-Type that got through: workingContentType', async () => {
+    const system = objectSystem((request) =>
+      request.method === 'PUT' &&
+      /\/ddic\/ddl\/sources\/zhp/.test(request.url.toLowerCase()) &&
+      request.headers['content-type'] === PROBE_TYPE
+        ? { status: 415 }
+        : undefined,
+    );
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const entry = file.entries.find(
+      (e) =>
+        e.endpoint === 'PUT /sap/bc/adt/ddic/ddl/sources/{name}/source/main',
+    );
+    expect(entry?.workingContentType.length).toBeGreaterThan(0);
+    expect(entry?.workingContentType).not.toContain(PROBE_TYPE);
+  });
+});
+
+const unprovenOf = (
+  removals: readonly { removed: boolean | 'unknown'; label: string }[],
+) =>
+  removals
+    .filter((removal) => removal.removed !== true)
+    .map((removal) => removal.label);
+
+describe('where a member runs', () => {
+  const at = (handler: string, member: string, path = '/sap/bc/adt/x/{name}') =>
+    coverageOf({ handler, member, requests: [{ method: 'GET', path }] });
+
+  it('an object handler member on a temporary object, but create and validate', () => {
+    expect(at('getClass()', 'read')).toEqual({ kind: 'object', type: 'class' });
+    expect(
+      at('legacy getClass()', 'delete', '/sap/bc/adt/deletion/delete'),
+    ).toEqual({
+      kind: 'object',
+      type: 'class',
+    });
+    expect(at('getClass()', 'create')).toEqual({ kind: 'no object' });
+    expect(at('getClass()', 'validate')).toEqual({ kind: 'no object' });
+    expect(at('getUtils()', 'getTableColumns', '/x')).toEqual({
+      kind: 'object',
+      type: 'table',
+    });
+    expect(at('getUtils()', 'searchObject', '/x')).toEqual({
+      kind: 'no object',
+    });
+  });
+
+  it('what cannot be made and removed cleanly is not coverable, with its reason', () => {
+    for (const [handler, member] of [
+      ['getRequest()', 'readMetadata'],
+      ['legacy getRequest()', 'list'],
+      ['getAtcLog()', 'getExecutionLog'],
+      ['AdtAbapGitClient', 'unlink'],
+      ['getApplicationLog()', 'getObject'],
+      ['getDumps()', 'getById'],
+      ['getProfiler()', 'delete'],
+      ['getFeatureToggle()', 'read'],
+      ['getEnhancement()', 'lock'],
+      ['getServiceBinding()', 'publishByServiceType'],
+    ]) {
+      const coverage = at(handler, member);
+      expect(coverage.kind).toBe('not coverable');
+      expect(
+        coverage.kind === 'not coverable' && coverage.reason.length,
+      ).toBeGreaterThan(10);
+    }
+    // The rest of the binding's members do run on one.
+    expect(at('getServiceBinding()', 'lock').kind).toBe('object');
+  });
+
+  it('the order: reads, writes, lock members, deletes', () => {
+    const step = (member: string, method: string, action?: string) =>
+      stepOf({
+        member,
+        requests: [{ method, path: '/x', ...(action ? { action } : {}) }],
+      });
+    expect(step('read', 'GET')).toBe('read');
+    expect(step('update', 'PUT')).toBe('write');
+    expect(step('activate', 'POST')).toBe('write');
+    expect(step('lock', 'POST', 'LOCK')).toBe('lock');
+    expect(step('unlock', 'POST', 'UNLOCK')).toBe('lock');
+    expect(step('delete', 'POST')).toBe('delete');
+    expect(step('remove', 'DELETE')).toBe('delete');
+  });
+});
+
+describe('workingContentType', () => {
+  it('a 2xx or a 400 about the body counts; a 415, a bogus type or no type does not', () => {
+    const put = { method: 'PUT', path: '/sap/bc/adt/x/{name}' };
+    const at = (status: number, contentType: string | null, sapType?: string) =>
+      row({
+        endpoint: put,
+        status,
+        onWire: [{ accept: null, contentType }],
+        ...(sapType ? { sapType } : {}),
+      });
+    const found = workingContentTypes([
+      at(200, 'text/plain'),
+      at(400, 'application/a+xml', 'ExceptionInvalidData'),
+      at(400, 'application/b+xml', 'ExceptionResourceBadRequest'),
+      at(415, 'application/c+xml'),
+      at(200, PROBE_TYPE),
+      at(200, null),
+    ]);
+    expect(found.get('PUT /sap/bc/adt/x/{name}')).toEqual([
+      'text/plain',
+      'application/a+xml',
+    ]);
   });
 });

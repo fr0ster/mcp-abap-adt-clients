@@ -72,6 +72,7 @@ import {
   selfCheck,
   wireNote,
   withContrast,
+  workingContentTypes,
   writeCheck,
 } from './corpus';
 import {
@@ -90,6 +91,8 @@ import {
   recordMembers,
   UNIVERSAL,
 } from './members';
+import { coverageOf, runOnTemporaryObjects } from './objectRun';
+import type { ITemporaryContext } from './objects';
 import {
   endpointKey,
   endpointOf,
@@ -636,6 +639,10 @@ interface IContext {
   isolate?: ReadonlySet<string>;
   /** Adds a ledger entry once per key, before the write it covers is sent. */
   register: (key: string, entry: () => ILedgerEntry) => void;
+  /** Where the temporary objects are made; absent: the probe name for every member. */
+  temporary?: ITemporaryContext;
+  /** What failed on the temporary objects (an unlock): the run ends failed. */
+  failures: string[];
 }
 
 /** Where the calls go: the connection (or the envelope), and whether it is an envelope. */
@@ -769,6 +776,8 @@ export function headersFor(
   };
 }
 
+const modern = (handler: string) => handler.replace(/^legacy /, '');
+
 async function runClients(ctx: IContext): Promise<void> {
   const recorded = await recordMembers();
   const only = ctx.only;
@@ -823,9 +832,39 @@ async function runClients(ctx: IContext): Promise<void> {
     `clients: ${members.length} members, ${members.filter((member) => !member.skipped).length} to send`,
   );
   const planned: IPlanned<ITarget>[] = [];
+  // The members that work on an object run on a temporary object, after the
+  // probe name's; the rest — and every member without a package to make one
+  // in — on the probe name, as before.
+  const onObjects: IMemberEndpoint[] = [];
+  ctx.corpus.coverage = [];
   for (const member of members) {
+    const coverage = coverageOf(member);
+    ctx.corpus.coverage.push({
+      member: `${member.handler}.${member.member}`,
+      coverage:
+        coverage.kind === 'object'
+          ? `temporary ${coverage.type}`
+          : coverage.kind === 'not coverable'
+            ? `not coverable: ${coverage.reason}`
+            : 'no object: the probe name',
+    });
+    if (coverage.kind === 'object' && ctx.temporary) {
+      const last = member.requests[member.requests.length - 1];
+      if (
+        ctx.mode === 'corpus' &&
+        !member.skipped &&
+        last &&
+        isLongPoll(last.method, last.path)
+      )
+        member.skipped = LONG_POLL_SKIP;
+      onObjects.push(member);
+    }
+  }
+  for (const member of members) {
+    if (onObjects.includes(member)) continue;
     const spec = specs.get(member.handler);
     const call = member.call;
+    const coverage = coverageOf(member);
     // A long-poll endpoint holds the request when it accepts the headers:
     // not sent with them (LONG_POLL_ENDPOINTS); none and bogus go out.
     const last = member.requests[member.requests.length - 1];
@@ -855,6 +894,9 @@ async function runClients(ctx: IContext): Promise<void> {
         ...(member.pair ? { pair: { ...member.pair } } : {}),
         ...(bogus ? { bogus } : {}),
         ...(member.standIn ? { standIn: member.standIn } : {}),
+        ...(coverage.kind === 'not coverable'
+          ? { coverage: `not coverable: ${coverage.reason}` }
+          : {}),
       };
       ctx.corpus.rows.push(row);
       if (member.skipped || !call || !spec) {
@@ -984,6 +1026,54 @@ async function runClients(ctx: IContext): Promise<void> {
   } finally {
     ctx.corpus.splits = [...(ctx.corpus.splits ?? []), ...run.splits];
   }
+  const temporary = ctx.temporary;
+  if (!temporary || !onObjects.length) return;
+  ctx.out.progress(`clients: ${onObjects.length} members on temporary objects`);
+  const runner = (batched: boolean) =>
+    new Run<ITarget>(
+      ctx.connection,
+      ctx.mode,
+      direct,
+      onBatch,
+      ctx.interrupt,
+      ctx.out,
+      ctx.meter,
+      batched ? ctx.sequential : true,
+      ctx.envelopeProbes,
+    );
+  const made = await runOnTemporaryObjects<ITarget>({
+    connection: ctx.connection,
+    mode: ctx.mode,
+    members: onObjects,
+    specs,
+    clientOptions: ctx.clientOptions,
+    interrupt: ctx.interrupt,
+    ledger: ctx.ledger,
+    context: temporary,
+    progress: ctx.out.progress,
+    rows: ctx.corpus.rows,
+    target: (on) => on,
+    headersFor: (member) => headersFor(ctx.mode, member),
+    send: async (plans, batched) => {
+      const run = runner(batched);
+      try {
+        await run.all(
+          plans.map((plan) => ({
+            row: plan.row,
+            call: plan.call,
+            write: plan.write,
+            ...(plan.after
+              ? { after: (probe: ICapture) => plan.after?.(probe) }
+              : {}),
+          })),
+        );
+      } finally {
+        ctx.corpus.splits = [...(ctx.corpus.splits ?? []), ...run.splits];
+      }
+    },
+  });
+  ctx.corpus.temporaryObjects = made.objects;
+  ctx.failures.push(...made.failures);
 }
 
 /** Removes the probe object a member's write created: the handler's delete, then a read. */
@@ -1158,6 +1248,11 @@ export interface ICorpusRunInput {
   isolate?: ReadonlySet<string>;
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
   envelopeProbes?: number;
+  /**
+   * Where the clients run makes its temporary objects: the members that work
+   * on an object run on them. Without it they run on the probe name.
+   */
+  temporaryObjects?: ITemporaryContext;
 }
 
 /** What the run met: the record the end decides the exit from. */
@@ -1312,6 +1407,7 @@ async function runOn(
   }
   const meter: IMeter = { envelopes: corpus.envelopes as IEnvelopeTiming[] };
   const registered = new Set<string>();
+  const failures: string[] = [];
   const ledger = new Ledger((removal: IRemoval) => {
     corpus.removals.push(removal);
     out.progress(`  cleanup: ${removalWord(removal)} ${removal.label}`);
@@ -1335,6 +1431,10 @@ async function runOn(
         registered.add(key);
         ledger.add(entry());
       },
+      ...(input.temporaryObjects && input.source === 'clients'
+        ? { temporary: input.temporaryObjects }
+        : {}),
+      failures,
     };
     await withCleanup(ledger, () =>
       input.source === 'discovery'
@@ -1347,6 +1447,15 @@ async function runOn(
       out.loud(`The run stopped: ${message(error)}`);
     }
   }
+  if (failures.length)
+    state.failure ??= `temporary objects: ${failures.join('; ')}`;
+  // No temporary object may be left behind: the run ends failed. (What a
+  // write on the probe name made is reported as before, `clients: …`.)
+  const remaining = unproven(corpus.removals).filter(
+    (removal) => !removal.label.startsWith('clients: '),
+  );
+  if (input.source === 'clients' && remaining.length)
+    state.failure ??= `${remaining.length} object(s) may remain: ${remaining.map((removal) => removal.label).join(', ')}`;
   if (input.mode === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
   const files = finishCorpus(corpus, endedBy(state, input.interrupt), input);
   const created = corpus.rows.filter((row) => row.afterWrite?.exists === true);
@@ -1368,253 +1477,6 @@ async function runOn(
       );
   }
   return { corpus, files };
-}
-
-// --- phase 2: existing objects for the reads still unknown -------------------
-
-/**
- * The repository search type of each handler whose objects a phase-2 read
- * can name with one existing object's name; the legacy client's the same.
- */
-export const SEARCH_TYPES: Readonly<Record<string, string>> = {
-  'getClass()': 'CLAS',
-  'getLocalTestClass()': 'CLAS',
-  'getLocalTypes()': 'CLAS',
-  'getLocalDefinitions()': 'CLAS',
-  'getLocalMacros()': 'CLAS',
-  'getProgram()': 'PROG',
-  'getInclude()': 'PROG/I',
-  'getInterface()': 'INTF',
-  'getDomain()': 'DOMA',
-  'getDataElement()': 'DTEL',
-  'getStructure()': 'TABL/DS',
-  'getTable()': 'TABL/DT',
-  'getTableType()': 'TTYP',
-  'getDdl()': 'DDLS',
-  'getFunctionGroup()': 'FUGR',
-  'getPackage()': 'DEVC',
-  'getMessageClass()': 'MSAG',
-  'getAccessControl()': 'DCLS',
-  'getTransformation()': 'XSLT',
-  'getServiceDefinition()': 'SRVD',
-  'getServiceBinding()': 'SRVB',
-  'getBehaviorDefinition()': 'BDEF',
-  'getMetadataExtension()': 'DDLX',
-  'getEnhancement()': 'ENHO',
-  'getAuthorizationField()': 'AUTH',
-};
-
-const modern = (handler: string) => handler.replace(/^legacy /, '');
-
-/** The first object name a quick search answered. */
-export function firstHitName(body: string): string | undefined {
-  const marker = 'adtcore:name="';
-  const at = body.indexOf(marker);
-  if (at === -1) return undefined;
-  const end = body.indexOf('"', at + marker.length);
-  return end === -1 ? undefined : body.slice(at + marker.length, end);
-}
-
-export interface IRealReadsInput {
-  connection: IAbapConnection;
-  clientOptions: ClientOptions;
-  interrupt: Interrupt;
-  out: IOutput;
-  outDir: string;
-  /** The needs keys (`handler.member — endpoint`) phase 1 left unknown. */
-  unknown: ReadonlySet<string>;
-  envelopeProbes?: number;
-  /** As for phase 1: the calls known to poison envelopes go alone. */
-  isolate?: ReadonlySet<string>;
-}
-
-/**
- * Phase 2's reads: every GET member still unknown is sent again on an
- * existing object of its type, found read-only by the repository's quick
- * search — once with a bogus Accept, once with none, in envelopes. Nothing
- * is created; nothing needs removing.
- */
-export async function runRealReads(input: IRealReadsInput): Promise<{
-  evidence: IEvidence[];
-  objects: IHeaderCorpusFile['objects'];
-  files: string[];
-  rows: ICorpusRow[];
-}> {
-  const { members } = await recordMembers();
-  const candidates = members.filter((member) => {
-    const [request] = member.requests;
-    return (
-      member.call &&
-      !member.skipped &&
-      member.requests.length === 1 &&
-      request.method === 'GET' &&
-      request.path.includes('{name}') &&
-      input.unknown.has(
-        `${member.handler}.${member.member} — ${endpointKey(request)}`,
-      )
-    );
-  });
-  const objects: IHeaderCorpusFile['objects'] = [];
-  const handlers = [...new Set(candidates.map((member) => member.handler))];
-  const types = new Map<string, string>();
-  for (const handler of handlers) {
-    const type = SEARCH_TYPES[modern(handler)];
-    if (type) types.set(handler, type);
-    else
-      objects.push({
-        handler,
-        reason:
-          'no repository search type: its objects cannot be named by one name',
-      });
-  }
-  const direct: ITarget = { base: input.connection, parts: false };
-  const onBatch = (batch: IAbapConnection): ITarget => ({
-    base: batch,
-    parts: true,
-  });
-  const plainClients = (on: ITarget) =>
-    clientsOn(traced(on.base, { parts: on.parts }), input.clientOptions);
-  // One search per type, read-only, in one envelope.
-  const distinct = [...new Set(types.values())];
-  const searches = await runCalls({
-    calls: distinct.map(
-      (type) => (on: ITarget, analyse: IAnalyse) =>
-        Promise.resolve(
-          (
-            plainClients(on).adt.getUtils() as unknown as {
-              search: (criteria: unknown, options: unknown) => Promise<unknown>;
-            }
-          ).search(
-            { query: '*', objectType: type, maxResults: 1 },
-            { analyse },
-          ),
-        ),
-    ),
-    batched: true,
-    connection: input.connection,
-    direct,
-    onBatch,
-    interrupt: input.interrupt,
-  });
-  const names = new Map<string, string | undefined>();
-  for (const [index, type] of distinct.entries())
-    names.set(type, firstHitName(String(searches[index]?.wire?.data ?? '')));
-  for (const [handler, type] of types) {
-    const name = names.get(type);
-    objects.push(
-      name
-        ? { handler, type, name }
-        : { handler, type, reason: 'the search found no object of this type' },
-    );
-  }
-  const specs = new Map(
-    handlerSpecs(plainClients(direct)).map((spec) => [spec.label, spec]),
-  );
-  const meter: IMeter = { envelopes: [] };
-  const corpora: ICorpus[] = [];
-  // The client's own headers too (corpus): which Accept works on a real object.
-  for (const mode of ['bogus', 'none', 'corpus'] as const) {
-    if (input.interrupt.requested) break;
-    const corpus: ICorpus = {
-      source: 'clients',
-      headers: mode,
-      phase: 2,
-      startedAt: new Date().toISOString(),
-      rows: [],
-      removals: [],
-      envelopes: meter.envelopes,
-    };
-    const planned: IPlanned<ITarget>[] = [];
-    for (const member of candidates) {
-      const type = types.get(member.handler);
-      const name = type ? names.get(type) : undefined;
-      const spec = specs.get(member.handler);
-      const call = member.call;
-      if (!name || !spec || !call) continue;
-      const [request] = member.requests;
-      const row: ICorpusRow = {
-        source: 'clients',
-        group: member.handler,
-        label: member.member,
-        endpoint: request,
-        requests: member.requests,
-        onWire: [],
-        named: emptyNamed(),
-        ...(mode === 'bogus' ? { bogus: 'accept' as const } : {}),
-        ...(member.pair ? { pair: { ...member.pair } } : {}),
-        headersMode: mode,
-        asked: askedFor(
-          mode,
-          member.pair,
-          false,
-          mode === 'bogus' ? 'accept' : undefined,
-        ),
-      };
-      corpus.rows.push(row);
-      planned.push({
-        row,
-        call: (on, analyse) =>
-          call(
-            spec.of(
-              clientsOn(
-                traced(on.base, {
-                  shape: headerShape(
-                    mode,
-                    on.parts,
-                    mode === 'bogus' ? 'accept' : undefined,
-                  ),
-                  parts: on.parts,
-                }),
-                input.clientOptions,
-              ),
-            ) as never,
-            { headers: headersFor(mode, member), analyse, name },
-          ),
-      });
-    }
-    isolateKnown(planned, input.isolate);
-    if (planned.length) {
-      input.out.progress(
-        `phase 2 reads, ${mode}: ${planned.length} probes on existing objects`,
-      );
-      const run = new Run<ITarget>(
-        input.connection,
-        mode,
-        direct,
-        onBatch,
-        input.interrupt,
-        input.out,
-        meter,
-        false,
-        input.envelopeProbes ?? ENVELOPE_PROBES,
-      );
-      try {
-        await run.all(planned);
-      } catch (thrown) {
-        if (!(thrown instanceof Interrupted)) throw thrown;
-        corpus.error = 'stopped';
-      } finally {
-        corpus.splits = run.splits;
-      }
-    }
-    corpus.finishedAt = new Date().toISOString();
-    corpora.push(corpus);
-  }
-  const bogus = corpora.find((corpus) => corpus.headers === 'bogus');
-  const none = corpora.find((corpus) => corpus.headers === 'none');
-  if (!bogus) return { evidence: [], objects, files: [], rows: [] };
-  const own = corpora.find((corpus) => corpus.headers === 'corpus');
-  bogus.needs = classifyNeeds(bogus.rows, [
-    ...(none?.rows ?? []),
-    ...(own?.rows ?? []),
-  ]);
-  const files = corpora.flatMap((corpus) => writeCorpus(corpus, input.outDir));
-  return {
-    evidence: evidenceOf(bogus.needs, 'clients', 2),
-    objects,
-    files,
-    rows: corpora.flatMap((corpus) => corpus.rows),
-  };
 }
 
 // --- the full run: one command, the system's header corpus -------------------
@@ -1680,7 +1542,6 @@ export async function runFull(
   const files: string[] = [];
   const corpora = new Map<string, ICorpus>();
   const evidence: IEvidence[] = [];
-  let objects: IHeaderCorpusFile['objects'] = [];
   let removals: IRemoval[] = [];
   let file: IHeaderCorpusFile | undefined;
   const phase2Rows: ICorpusRow[] = [];
@@ -1741,46 +1602,11 @@ export async function runFull(
       ...evidenceOf(needs1.clients, 'clients', 1),
     );
     const unknown = needs1.clients.filter((entry) => entry.needs === 'unknown');
-    // The reads still unknown, and those that need Accept but whose 406
-    // named nothing: a real object shows which Accept works.
-    const unknownReads = new Set(
-      needs1.clients
-        .filter(
-          (entry) =>
-            entry.endpoint.includes(' — GET ') &&
-            (entry.needs === 'unknown' ||
-              ((entry.needs === 'accept' || entry.needs === 'both') &&
-                !entry.namedAccept.length)),
-        )
-        .map((entry) => entry.endpoint),
-    );
     const unknownWrites = new Set(
       unknown
         .filter((entry) => /— (POST|PUT|DELETE) /.test(entry.endpoint))
         .map((entry) => entry.endpoint),
     );
-    if (!stopped() && unknownReads.size)
-      await timed(
-        `phase 2: reads on existing objects (${unknownReads.size} unknown)`,
-        async () => {
-          const reads = await runRealReads({
-            connection,
-            clientOptions: await input.clientOptions(connection),
-            interrupt: input.interrupt,
-            out,
-            outDir: input.outDir,
-            unknown: unknownReads,
-            ...(input.envelopeProbes
-              ? { envelopeProbes: input.envelopeProbes }
-              : {}),
-            ...(input.isolate ? { isolate: input.isolate } : {}),
-          });
-          evidence.push(...reads.evidence);
-          phase2Rows.push(...reads.rows);
-          objects = reads.objects;
-          files.push(...reads.files);
-        },
-      );
     const cycle = input.writeCycle;
     if (!stopped() && unknownWrites.size && cycle)
       await timed(
@@ -1869,7 +1695,19 @@ export async function runFull(
         ...new Set([...(knownWorking.get(key) ?? []), text]),
       ]);
     }
-    const extras = { discoveryContentType, pairs, existence, knownWorking };
+    const workingContentType = workingContentTypes([
+      ...[...corpora.values()]
+        .filter((corpus) => corpus.source === 'clients')
+        .flatMap((corpus) => corpus.rows),
+      ...phase2Rows,
+    ]);
+    const extras = {
+      discoveryContentType,
+      pairs,
+      existence,
+      knownWorking,
+      workingContentType,
+    };
     // The contrast rule: an unnamed 406 is checked when another Accept got a
     // 2xx or a 404 on the endpoint — from any source and phase, keyed by the
     // endpoint. Phase 1's own count takes phase 1's rows only.
@@ -1892,8 +1730,22 @@ export async function runFull(
       entries,
       selfCheck: selfCheck(entries),
       corpora: [...files],
-      removals,
-      objects,
+      // Every object a run made, the probe name's and the temporary ones.
+      removals: [
+        ...[...corpora.values()]
+          .filter((corpus) => corpus.source === 'clients')
+          .flatMap((corpus) => corpus.removals),
+        ...removals,
+      ],
+      objects: [...corpora.values()].flatMap((corpus) =>
+        (corpus.temporaryObjects ?? []).map((object) => ({
+          handler: `clients ${corpus.headers}`,
+          ...object,
+        })),
+      ),
+      ...(corpora.get('clients corpus')?.coverage
+        ? { coverage: corpora.get('clients corpus')?.coverage }
+        : {}),
       updates,
       endedBy: ended,
       ...(ended !== 'complete' ? { error: ended } : {}),

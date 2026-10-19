@@ -339,3 +339,190 @@ export const SKIPPED: readonly {
       'skipped: creating a feature toggle was refused on the measured system (403, MIGRATION-36)',
   })),
 ];
+
+/**
+ * A temporary object the clients run makes for the members that work on an
+ * object: how it is made (its parent first), and what its members are given.
+ */
+export interface ITemporarySpec extends IObjectSpec {
+  /** The parent's type, made first and removed last. */
+  parentType?: string;
+  /** Saved, not activated: an inactive object is enough for its members. */
+  noActivation?: boolean;
+  /** The object takes its parent's name (a behavior definition is named as its root entity). */
+  parentsName?: boolean;
+  /** The name from the probe's name for it and the parent's (a function include is `L<group>F01`). */
+  nameFrom?: (probeName: string, parent?: string) => string;
+}
+
+/** What every temporary spec gets beside the package: the package type's own fields. */
+export interface ITemporaryContext extends ISpecContext {
+  /** For a package: the software component and transport layer of the configured package's system. */
+  softwareComponent?: string;
+  transportLayer?: string;
+}
+
+/** The objects beside OBJECT_SPECS that only the clients run makes. */
+export const TEMPORARY_SPECS: readonly ITemporarySpec[] = [
+  {
+    type: 'functionInclude',
+    handler: 'getFunctionInclude()',
+    code: 'FI',
+    parentType: 'functionGroup',
+    nameFrom: (_name, parent) => `L${parent}F01`,
+    handle: (client) => as(client.getFunctionInclude()),
+    config: (name, context) => ({
+      functionGroupName: context.parent,
+      includeName: name,
+      ...base(context),
+    }),
+    write: 'source',
+    source: () => '* Header probe',
+  },
+  {
+    type: 'package',
+    handler: 'getPackage()',
+    code: 'PK',
+    handle: (client) => as(client.getPackage()),
+    config: (name, context) => {
+      const own = context as ITemporaryContext;
+      return {
+        packageName: name,
+        superPackage: context.packageName,
+        description: 'Header probe',
+        packageType: 'development',
+        recordChanges: Boolean(context.transportRequest),
+        ...(context.transportRequest
+          ? { transportRequest: context.transportRequest }
+          : {}),
+        ...(own.softwareComponent
+          ? { softwareComponent: own.softwareComponent }
+          : {}),
+        ...(own.transportLayer ? { transportLayer: own.transportLayer } : {}),
+      };
+    },
+    write: 'metadata',
+    noActivation: true,
+  },
+  {
+    type: 'scalarFunction',
+    handler: 'getScalarFunction()',
+    code: 'SF',
+    handle: (client) => as(client.getScalarFunction()),
+    config: (name, context) => ({ scalarFunctionName: name, ...base(context) }),
+    write: 'source',
+    source: (name) =>
+      `define scalar function ${name}\n  with parameters\n    p_portion : abap.int4,\n    p_total   : abap.int4\n  returns abap.decfloat34;\n`,
+    noActivation: true,
+  },
+  {
+    type: 'scalarFunctionImplementation',
+    handler: 'getScalarFunctionImplementation()',
+    code: 'SI',
+    parentType: 'scalarFunction',
+    handle: (client) => as(client.getScalarFunctionImplementation()),
+    config: (name, context) => ({
+      implementationName: name,
+      scalarFunctionName: context.parent,
+      engineValue: 'sqlEngine',
+      ...base(context),
+    }),
+    write: 'metadata',
+    noActivation: true,
+  },
+  {
+    type: 'authorizationField',
+    handler: 'getAuthorizationField()',
+    code: 'AF',
+    handle: (client) => as(client.getAuthorizationField()),
+    config: (name, context) => ({
+      authorizationFieldName: name,
+      ...base(context),
+    }),
+    write: 'metadata',
+    noActivation: true,
+  },
+  {
+    type: 'rootDdl',
+    handler: 'getDdl()',
+    code: 'RD',
+    handle: (client) => as(client.getDdl()),
+    config: (name, context) => ({ ddlName: name, ...base(context) }),
+    write: 'source',
+    source: (name) =>
+      `${LABEL}\n@AccessControl.authorizationCheck: #NOT_REQUIRED\ndefine root view entity ${name}\n  as select from t000\n{\n  key mandt,\n  mtext\n}\n`,
+  },
+  {
+    type: 'behaviorDefinition',
+    handler: 'getBehaviorDefinition()',
+    code: 'BD',
+    parentType: 'rootDdl',
+    parentsName: true,
+    handle: (client) => as(client.getBehaviorDefinition()),
+    config: (name, context) => ({
+      name,
+      rootEntity: name,
+      implementationType: 'Managed',
+      ...base(context),
+    }),
+    write: 'source',
+    source: (name) =>
+      `managed implementation in class zbp_${name.toLowerCase()} unique;\nstrict ( 2 );\n\ndefine behavior for ${name}\npersistent table t000\nlock master\nauthorization master ( instance )\n{\n}\n`,
+    noActivation: true,
+  },
+  {
+    type: 'extensibleStructure',
+    handler: 'getStructure()',
+    code: 'XS',
+    handle: (client) => as(client.getStructure()),
+    config: (name, context) => ({ structureName: name, ...base(context) }),
+    write: 'source',
+    source: (name) =>
+      `${LABEL}\n@AbapCatalog.enhancement.category: #EXTENSIBLE_CHARACTER_NUMERIC\ndefine structure ${name.toLowerCase()} {\n  field1 : abap.char(1);\n}\n`,
+  },
+  {
+    type: 'appendStructure',
+    handler: 'getAppendStructure()',
+    code: 'AS',
+    parentType: 'extensibleStructure',
+    handle: (client) => as(client.getAppendStructure()),
+    config: (name, context) => ({
+      appendStructureName: name,
+      baseObject: context.parent,
+      ...base(context),
+    }),
+    write: 'source',
+    source: (name, context) =>
+      `${LABEL}\nextend type ${(context.parent ?? '').toLowerCase()} with ${name.toLowerCase()} {\n  zzprobe : abap.char(1);\n}\n`,
+    noActivation: true,
+  },
+  {
+    type: 'serviceBinding',
+    handler: 'getServiceBinding()',
+    code: 'SB',
+    parentType: 'serviceDefinition',
+    handle: (client) => as(client.getServiceBinding()),
+    config: (name, context) => ({
+      bindingName: name,
+      serviceDefinitionName: context.parent,
+      serviceName: context.parent,
+      serviceVersion: '0001',
+      bindingVariant: 'ODATA_V4_WEB_API',
+      ...base(context),
+    }),
+    write: 'metadata',
+    noActivation: true,
+  },
+];
+
+/** Every spec a temporary object of the clients run is made from, by type. */
+export function temporarySpec(type: string): ITemporarySpec | undefined {
+  const own = TEMPORARY_SPECS.find((spec) => spec.type === type);
+  if (own) return own;
+  const shared = OBJECT_SPECS.find((spec) => spec.type === type);
+  if (!shared) return undefined;
+  return {
+    ...shared,
+    ...(shared.needs ? { parentType: shared.needs } : {}),
+  };
+}

@@ -11,10 +11,11 @@ package (`tools/` is outside `src/`, so nothing here reaches `dist/`, and
 
 - `.env` in the repository root with the SAP connection (`SAP_URL`,
   `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`), as the integration tests use.
-- `src/__tests__/helpers/test-config.yaml` (`npm run test:init`). The single
-  runs (`--from`) read only `environment.system`. The full run's phase 2 also needs `default_package` and
-`default_transport`: its write cycle creates temporary objects there and
-deletes them again.
+- `src/__tests__/helpers/test-config.yaml` (`npm run test:init`): `environment.system`,
+  and `default_package` and `default_transport`, where the clients run and
+  phase 2 make their temporary objects and delete them again (a package
+  object also takes `create_package`'s software component and transport
+  layer). Without a package, every clients member runs on the probe name.
 
 ## Run
 
@@ -55,18 +56,12 @@ needs.
 header corpus, everything batched and poisoned envelopes split:
 
 1. **The authorization check** (below).
-2. **Phase 1, the probe name:** discovery and clients, each in corpus, none
-   and bogus (corpus for the comparison column). It settles every endpoint
-   whose `needs` it can.
-3. **Phase 2, real objects, for the clients endpoints still `unknown` only:**
-   - **reads** (`GET` with the object's name in the path) still unknown, or
-     needing Accept with a 406 that named nothing: one existing object per
-     object type, found read-only by the repository's quick search
-     (`query=*`, the first hit), is named in place of the probe name; each
-     such read goes with a bogus Accept, with none, and with the client's own
-     headers, in envelopes.
-     Nothing is created. A handler with no search type, or a type the search
-     finds nothing of, stays unknown with that reason.
+2. **Phase 1:** discovery and clients, each in corpus, none and bogus
+   (corpus for the comparison column). Discovery, and every clients member
+   that takes no object, goes on the probe name; every clients member that
+   works on an object goes on a **temporary object the run makes itself**
+   (below). It settles every endpoint whose `needs` it can.
+3. **Phase 2, for the clients endpoints still `unknown` only:**
    - **writes**: the write cycle (the former header probe, below), only for the
      object types whose write members are still unknown (the modern client's;
      the legacy client's writes stay as phase 1 left them). The bogus
@@ -90,7 +85,8 @@ header corpus, everything batched and poisoned envelopes split:
    Content-Type values the system named, the Content-Type discovery lists, the
    pair table's pairs, which phase settled it, and the evidence (status and
    raw text); the time of each phase and the total; the `needs` counts after
-   phase 1 and after phase 2; phase 2's objects; what was left behind. The raw
+   phase 1 and after phase 2; the temporary objects made; where every member
+   runs (the coverage table); what was left behind. The raw
    corpora of every run are written beside it as usual. Verdicts of several
    members on one endpoint merge: `checked` wins over `not checked`, which
    wins over `unknown`.
@@ -217,9 +213,7 @@ Where SAP's 406 names nothing (no T100 044 and no list — the generic 037,
 Accept works from what the client sends today: `knownWorking` lists, per
 endpoint, every corpus-mode answer — `<member>: Accept <what went on the
 wire> → <status>`, marked `(works)` on a 2xx — from phase 1 (the probe name)
-and from phase 2, which reads such an endpoint (a GET naming an object) on an
-existing object with the client's own headers as well as with a bogus Accept
-and with none. `workingAccept` keeps the Accept values that got a 2xx. The
+on the probe name and on the temporary objects. `workingAccept` keeps the Accept values that got a 2xx. The
 pair table (`pairs.ts`) has no row for a member that takes no `headers` —
 most reads —, so its column is empty there by design.
 
@@ -236,8 +230,58 @@ every answer of every run:
 
 Nothing is dropped: every answer stays in the corpus; `exists` only reads
 them. `exists`, and `needs` where it applies, take the answers of every phase:
-phase 1, the reads on existing objects, the write cycle and the update
+phase 1 (the probe name and the temporary objects), the write cycle and the update
 measurement (whose bogus Accept is evidence for the update's Accept).
+
+## Members on temporary objects
+
+A member that works on an object runs on a real one: the run makes it, in
+the configured package (`default_package`, `default_transport`), runs the
+member on it in the mode's headers, and deletes it. This is the clients
+run's normal path, in every mode, each mode with its own objects
+(`objectRun.ts`).
+
+- **Where a member runs** (`coverageOf`): every member of an object's
+  handler (`OBJECT_OF_HANDLER`; the utilities that read a table or an
+  include by name, `OBJECT_OF_MEMBER`) on a temporary object of its type —
+  but `create`, which makes its own object from the probe name and removes
+  it, and `validate`, which asks whether a new name is free. What cannot be
+  made and removed cleanly is `not coverable` (`NOT_COVERABLE`, with the
+  reason: transport requests, ATC results, traces, abapGit repositories,
+  application logs, runtime dumps, the debuggers, feature toggles, BAdI
+  implementations, publishing a service binding); those, and every member
+  that takes no object, keep the probe name. The header corpus lists every
+  member with where it runs (`## Coverage`), and the objects made.
+- **The objects** (`OBJECT_SPECS`, `TEMPORARY_SPECS` in `objects.ts`): made
+  with the known pairs — create, the source written under a lock, activated
+  (an inactive one where activation needs more than the probe makes) —
+  their parent first (a function module's group, a CDS entity for a service
+  definition, an access control, a metadata extension, a behavior
+  definition's root entity, a scalar function for its implementation, an
+  extensible structure for an append). What an object's members read is made
+  too: message `001` of a message class, a local test class include. A type
+  that cannot be made (its create refused) leaves its members skipped with
+  the answer that refused it.
+- **The order, per object:** the reads, in envelopes; a LOCK with the known
+  pair, the writes one by one with its real handle — each read back after,
+  never resent —, the UNLOCK; the lock members (a granted lock released; an
+  unlock given a real handle); the deletes last, each on the object, made
+  again first if an earlier delete took it. A classic LOCK checks the Accept
+  after it took the lock (from SAP's code), so a refused lock may hold it:
+  after every LOCK member, whatever it answered, a LOCK with the known pair
+  and an UNLOCK free the object.
+- **Cleanup:** every object is in the ledger before its create is sent; the
+  cleanup in a `finally` deletes what is left, newest first (an object before
+  its parent), and proves each removal by a read that answers 404. A
+  temporary object that may remain, or an unlock that failed, ends the run
+  `failed` (exit 1), listed loudly.
+
+### workingContentType
+
+Beside `workingAccept`, the header corpus records per endpoint the
+Content-Type values that got through to the body: sent on the wire (not the
+bogus type) and answered a 2xx, or a 400 about the body's content
+(`ExceptionInvalidData`) — the resource read the body, so it took the type.
 
 ## The write cycle (the former header probe)
 

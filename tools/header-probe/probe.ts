@@ -801,13 +801,14 @@ function contentTypeFirst(kinds: readonly ProbeKind[]): ProbeKind[] {
   return out;
 }
 
-const isSuccess = (status: number | undefined): boolean =>
+export const isSuccess = (status: number | undefined): boolean =>
   status !== undefined && status >= 200 && status < 300;
 
-const ok = (capture: ICapture): boolean => isSuccess(capture.wire?.status);
+export const ok = (capture: ICapture): boolean =>
+  isSuccess(capture.wire?.status);
 
 /** The lock handle the member read from its LOCK's answer. */
-function lockHandle(capture: ICapture): string | undefined {
+export function lockHandle(capture: ICapture): string | undefined {
   const result = capture.result as
     | { ok: boolean; getResult?: () => { value: unknown } }
     | undefined;

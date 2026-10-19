@@ -634,6 +634,10 @@ export interface ICorpusRow {
   failure?: string;
   /** Read after a write probe (POST, PUT, DELETE). */
   afterWrite?: IWriteCheck;
+  /** The temporary object the row ran on (`<type> <name>`), when it ran on one. */
+  temporary?: string;
+  /** Where the member runs: on a temporary object, not coverable (why), or on the probe name. */
+  coverage?: string;
   /** `skipped: <reason>`: the row was not sent. */
   skipped?: string;
   /** Sent again: what its envelope answered first. */
@@ -677,6 +681,15 @@ export interface ICorpus {
   notMembers?: string[];
   /** What stopped the run, when something did. */
   error?: string;
+  /** The temporary objects the clients run made for the members that work on one. */
+  temporaryObjects?: {
+    type: string;
+    name?: string;
+    parent?: string;
+    reason?: string;
+  }[];
+  /** Where every member runs (clients source): on a temporary object, not coverable, or on the probe name. */
+  coverage?: { member: string; coverage: string }[];
 }
 
 const SAP_PREFIX = 'SAP refused the request: ';
@@ -2070,6 +2083,11 @@ export interface IHeaderCorpusEntry {
   knownWorking: string[];
   /** The Accept values the client sends that got a 2xx. */
   workingAccept: string[];
+  /**
+   * The Content-Type values that got through to the body: a 2xx, or a 400
+   * about the body's content (`ExceptionInvalidData`).
+   */
+  workingContentType: string[];
   /** Who said what: status and raw text. */
   evidence: string[];
   /** Per evidence line, index for index: its verdicts and the phase that decided each. */
@@ -2191,6 +2209,29 @@ export function selfCheckLines(check: ISelfCheck): string[] {
   return lines;
 }
 
+/**
+ * Per endpoint, the Content-Type values that got through: on the wire (not
+ * the bogus type), answered a 2xx or a 400 about the body's content
+ * (`ExceptionInvalidData`) — the resource read the body, so it took the type.
+ */
+export function workingContentTypes(
+  rows: readonly ICorpusRow[],
+): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!row.endpoint || row.skipped || row.status === undefined) continue;
+    const contentType = row.onWire[row.onWire.length - 1]?.contentType;
+    if (!contentType || contentType === PROBE_TYPE) continue;
+    const through =
+      (row.status >= 200 && row.status < 300) ||
+      (row.status === 400 && row.sapType === 'ExceptionInvalidData');
+    if (!through) continue;
+    const key = endpointKey(row.endpoint);
+    found.set(key, [...new Set([...(found.get(key) ?? []), contentType])]);
+  }
+  return found;
+}
+
 const unknownLater: IHeaderVerdict = {
   verdict: 'unknown',
   reason: 'decided by a later phase',
@@ -2206,6 +2247,8 @@ export function buildHeaderCorpus(
     existence?: ReadonlyMap<string, { exists: Exists; reason: string }>;
     /** Per endpoint: `who: Accept … → status`. */
     knownWorking?: ReadonlyMap<string, readonly string[]>;
+    /** Per endpoint: the Content-Type values that got through ({@link workingContentTypes}). */
+    workingContentType?: ReadonlyMap<string, readonly string[]>;
   },
 ): IHeaderCorpusEntry[] {
   const by = new Map<string, IEvidence[]>();
@@ -2269,6 +2312,7 @@ export function buildHeaderCorpus(
             ),
         ),
       ],
+      workingContentType: [...(extras.workingContentType?.get(endpoint) ?? [])],
       evidence: items.map(
         (item) =>
           `phase ${item.phase} ${item.source} ${item.who}: ${item.text}`,
@@ -2319,7 +2363,16 @@ export interface IHeaderCorpusFile {
     note?: string;
   }[];
   /** Phase 2's read objects: per object type, the name found or why none. */
-  objects: { handler: string; type?: string; name?: string; reason?: string }[];
+  /** The temporary objects the clients runs made (per mode), and why one could not be. */
+  objects: {
+    handler: string;
+    type?: string;
+    name?: string;
+    parent?: string;
+    reason?: string;
+  }[];
+  /** Where every clients member runs: a temporary object, not coverable (why), or the probe name. */
+  coverage?: { member: string; coverage: string }[];
   /** What the records claim that the evidence does not show. */
   selfCheck?: ISelfCheck;
   error?: string;
@@ -2368,12 +2421,12 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
       continue;
     }
     lines.push(
-      '| endpoint | exists | Accept named | Content-Type named | discovery Content-Type | pair table | knownWorking | settled by | evidence |',
-      '|---|---|---|---|---|---|---|---|---|',
+      '| endpoint | exists | Accept named | Content-Type named | discovery Content-Type | pair table | knownWorking | workingContentType | settled by | evidence |',
+      '|---|---|---|---|---|---|---|---|---|---|',
     );
     for (const entry of of)
       lines.push(
-        `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${cell(entry.knownWorking.join('; '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
+        `| ${cell(entry.endpoint)} | ${entry.exists} (${cell(entry.existsBecause)}) | ${cell(entry.namedAccept.join(', '))} | ${cell(entry.namedContentType.join(', '))} | ${cell(entry.discoveryContentType.join(', '))} | ${cell(entry.pairs.join('; '))} | ${cell(entry.knownWorking.join('; '))} | ${cell(entry.workingContentType.join(', '))} | ${entry.settledBy} | ${cell(entry.evidence.join(' ‖ ').slice(0, 600))} |`,
       );
   }
   lines.push('', '## Updates with a bogus Accept', '');
@@ -2390,15 +2443,37 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
         `| ${cell(update.type)} | ${update.member} | ${update.status ?? '—'}${update.sapType ? ` ${cell(update.sapType)}` : ''} | ${update.applied === 'unknown' ? `unknown${update.note ? ` (${cell(update.note)})` : ''}` : update.applied ? 'yes' : 'no'} |`,
       );
   }
-  lines.push('', '## Phase 2 objects', '');
-  if (!file.objects.length) lines.push('None needed.');
+  lines.push('', '## Temporary objects', '');
+  if (!file.objects.length) lines.push('None made.');
   for (const object of file.objects)
     lines.push(
-      `- ${cell(object.handler)}${object.type ? ` (${object.type})` : ''}: ${object.name ? `\`${object.name}\`` : cell(object.reason)}`,
+      `- ${cell(object.handler)}${object.type ? ` (${object.type})` : ''}: ${object.name ? `\`${object.name}\`${object.parent ? ` on \`${object.parent}\`` : ''}` : cell(object.reason)}`,
     );
+  if (file.coverage?.length) {
+    const counts = new Map<string, number>();
+    for (const entry of file.coverage) {
+      const kind = entry.coverage.startsWith('temporary ')
+        ? 'on a temporary object'
+        : entry.coverage.startsWith('not coverable')
+          ? 'not coverable'
+          : 'no object: the probe name';
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    lines.push(
+      '',
+      '## Coverage',
+      '',
+      [...counts].map(([kind, count]) => `${kind}: ${count}`).join('; '),
+      '',
+      '| member | where it runs |',
+      '|---|---|',
+    );
+    for (const entry of file.coverage)
+      lines.push(`| ${cell(entry.member)} | ${cell(entry.coverage)} |`);
+  }
   lines.push('', '## Left behind', '');
   const left = unproven(file.removals);
-  if (!file.removals.length) lines.push('Phase 2 created nothing.');
+  if (!file.removals.length) lines.push('Nothing was created.');
   else if (!left.length)
     lines.push(
       `Nothing: all ${file.removals.length} temporary objects removed.`,

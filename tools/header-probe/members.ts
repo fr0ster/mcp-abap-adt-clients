@@ -200,7 +200,10 @@ const PROBE_TEXT = 'Error corpus probe';
  * answers every `…Name`, `name` and `…Id` with the probe name, and a string
  * where a string is read. Never thenable.
  */
-function universalFor(objectName: string): unknown {
+function universalFor(
+  objectName: string,
+  overrides: Readonly<Record<string, unknown>> = {},
+): unknown {
   return new Proxy(
     {},
     {
@@ -208,6 +211,8 @@ function universalFor(objectName: string): unknown {
         if (key === Symbol.toPrimitive) return () => objectName;
         if (typeof key !== 'string') return undefined;
         if (key === 'then' || key === 'toJSON') return undefined;
+        // A temporary object's own names (its parent, its include, …).
+        if (Object.hasOwn(overrides, key)) return overrides[key];
         if (key === 'packageName' || key === 'superPackage')
           return PROBE_PACKAGE;
         if (key === 'name' || key.endsWith('Name') || key.endsWith('_name'))
@@ -245,7 +250,12 @@ function universalFor(objectName: string): unknown {
 const universals = new Map<string, unknown>();
 
 /** The universal value naming `name`: what a member gets in place of every config and name. */
-export function universal(name: string): unknown {
+export function universal(
+  name: string,
+  overrides?: Readonly<Record<string, unknown>>,
+): unknown {
+  if (overrides && Object.keys(overrides).length)
+    return universalFor(name, overrides);
   let value = universals.get(name);
   if (value === undefined) {
     value = universalFor(name);
@@ -260,8 +270,12 @@ export const UNIVERSAL: unknown = universal(PROBE_NAME);
 export interface IMemberOptions {
   headers?: IAdtHeaders;
   analyse: IAnalyse;
-  /** The object every name argument names: the probe name unless given (a real object, phase 2). */
+  /** The object every name argument names: the probe name unless given (a temporary object). */
   name?: string;
+  /** A real lock handle, from a LOCK on the probe's own object. */
+  lockHandle?: string;
+  /** Config keys answered with these values first: a temporary object's parent, its include, … */
+  overrides?: Readonly<Record<string, unknown>>;
 }
 
 /** What one argument of a member gets, or why the member cannot be called without a real object. */
@@ -271,13 +285,17 @@ export function argumentFor(
 ): { value: unknown } | { skip: string } {
   const lower = name.toLowerCase();
   // A member reads its lock handle from the options too.
-  if (lower.includes('option'))
-    return { value: { lockHandle: PROBE_HANDLE, ...options } };
+  if (lower.includes('option')) {
+    const { name: _name, overrides: _overrides, ...rest } = options;
+    return {
+      value: { ...rest, lockHandle: options.lockHandle ?? PROBE_HANDLE },
+    };
+  }
   // A positional ADT object type: a valid one.
   if (lower === 'objecttype' || lower === 'object_type')
     return { value: 'PROG/P' };
   if (lower === 'lockhandle' || lower === 'handle' || lower.endsWith('handle'))
-    return { value: PROBE_HANDLE };
+    return { value: options.lockHandle ?? PROBE_HANDLE };
   if (lower === 'version' || lower === 'status' || lower === 'transportrequest')
     return { value: undefined };
   if (lower.endsWith('uri') || lower.endsWith('url') || lower.endsWith('link'))
@@ -286,7 +304,13 @@ export function argumentFor(
     };
   if (lower === 'objects' || lower.endsWith('objects'))
     return { value: [{ type: 'PROG/P', name: PROBE_NAME }] };
-  return { value: options.name ? universal(options.name) : UNIVERSAL };
+  if (options.overrides && Object.hasOwn(options.overrides, name))
+    return { value: options.overrides[name] };
+  return {
+    value: options.name
+      ? universal(options.name, options.overrides)
+      : UNIVERSAL,
+  };
 }
 
 /**
@@ -321,6 +345,10 @@ export function standInParameters(
   }
   return [...new Set(found)];
 }
+
+/** Why a member that sends a LOCK is not sent on the probe name; on a temporary object it is. */
+export const LOCK_SKIP =
+  'skipped: sends a LOCK, and SAP grants a lock on the probe name although no object of that name exists (measured); the corpus takes no locks';
 
 /** How many requests one recording may issue before it is stopped (a polling member). */
 export const RECORDING_LIMIT = 10;
@@ -490,8 +518,7 @@ export async function recordMembers(): Promise<{
           ? `skipped: builds no request from the probe name alone: ${capture.failure}`
           : 'skipped: answers without a request on the probe name alone (it reads its input from a server answer it was not given)';
       else if (entry.requests.some((request) => request.action === 'LOCK'))
-        entry.skipped =
-          'skipped: sends a LOCK, and SAP grants a lock on the probe name although no object of that name exists (measured); the corpus takes no locks';
+        entry.skipped = LOCK_SKIP;
       else if (
         entry.requests.some(
           (request) =>
@@ -503,7 +530,9 @@ export async function recordMembers(): Promise<{
         entry.skipped = `skipped: builds no address from the probe name alone (${entry.requests.map((request) => request.path).join(', ')})`;
       else if (capture.requests.length > RECORDING_LIMIT)
         entry.skipped = `skipped: polls (more than ${RECORDING_LIMIT} requests recorded)`;
-      else
+      // The call, for what is sent: a member that sends a LOCK keeps it, and
+      // runs on a temporary object, never on the probe name.
+      if (!entry.skipped || entry.skipped === LOCK_SKIP)
         entry.call = (target, options) => {
           const live = build(options);
           if ('skip' in live) return Promise.reject(new Error(live.skip));
