@@ -142,6 +142,24 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    *
    * The number is the system's to generate, so there is nothing to validate
    * before the POST — which is why this module has no `validate`.
+   *
+   * **The owner is sent in upper case** (`config.owner`, else the system
+   * context's `responsible`). SAP user names are upper case and CTS compares
+   * them as given: measured on premise, a lower case name was refused with
+   * `SCTS_ADT_MSG 009`, *"User … does not exist in the system (or locked)"*.
+   *
+   * **One request, and a refusal can still leave one behind.** The POST
+   * carries the request and its first task (owned by the owner) in one
+   * document; the library makes no second call. Measured on premise: when the
+   * task part was refused, SAP still created the request header and kept it —
+   * empty, with no task — while the call answered the refusal. The library
+   * cannot report a number it was never given, so after a refused create a
+   * caller that must leave nothing behind looks among its requests for the
+   * empty one with this description, and deletes it. Nothing here deletes it
+   * for you.
+   *
+   * There is no release member: releasing a request stays a person's
+   * decision, made in the organizer.
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITransportConfig, 'source'> & { source?: never },
@@ -445,6 +463,12 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    *
    * The answer echoes the entries under the source's number, so a `200` is
    * not evidence: re-read both tasks.
+   *
+   * **Two conditions SAP checks** (measured on premise):
+   * - the caller must hold both tasks — otherwise *"… can be changed only by
+   *   holder …"*;
+   * - both requests must have the same target — otherwise *"Object can only
+   *   be moved to a request with the same target"*.
    */
   async moveObjects<E extends IAdtError = IAdtError>(
     sourceTask: string,
@@ -486,6 +510,14 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * Unclassified task** on an on-premise system, 2026-09-25 — including one
    * created explicitly through {@link createTask}. Classify it through
    * {@link changeTaskType} before adding objects directly.
+   *
+   * **An entry still held in another task is refused** (*"… is locked in
+   * request/task …"*): to move an entry, {@link removeObject} it from the
+   * task holding it first, then add it — or use {@link moveObjects}.
+   *
+   * **A transportable request refuses objects of a package without a
+   * transport layer**: *"Only edit objects from package … in local
+   * requests"*. Such objects belong in a local request.
    */
   async addObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
@@ -524,7 +556,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * exist in the system (or locked)"* — an empty name — and the same call
    * carrying it answered 200 with a task number. This client cannot fill it
    * in: the connection does not say who is authenticated, and asking would
-   * cost a second request.
+   * cost a second request. It is sent in upper case, as SAP user names are; a
+   * lower case name is refused with the same message.
    */
   async createTask<E extends IAdtError = IAdtError>(
     transportNumber: string,
@@ -613,6 +646,11 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * customizing type and is refused on a workbench request, and `'K'`/`'W'`
    * are REQUEST types, refused as unknown. Addressed at the TASK — that is
    * where the listing puts the `changetasktype` link.
+   *
+   * **Only the task's holder can classify it**, even when someone else
+   * created the task: a call from anyone else is refused (measured on
+   * premise). Create a task for the user who will classify it
+   * ({@link createTask}'s `targetUser`), and classify it as that user.
    *
    * As with every user action here, `ok` means the document was understood.
    * Read the request back to see the type.
