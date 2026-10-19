@@ -287,7 +287,8 @@ run's normal path, in every mode, each mode with its own objects
   registers nothing; if the name then reads as there it is reported
   `possibly ours, not deleted: <name>` and the run ends `failed` — a person
   decides. The write cycle and the update measurement follow the same rule.
-  A delete proven by a 404 retires the object's ledger entry: a delete row
+  A delete proven by a 404 retires the object's ledger entry (one function,
+  `settleDelete`, for the object run and the write cycle): a delete row
   runs only on a name the ledger owns, and a name made again is ours only
   through a new create of ours that answered 2xx.
 - **Cleanup:** the cleanup in a `finally` deletes what is ours, newest first
@@ -302,9 +303,12 @@ run's normal path, in every mode, each mode with its own objects
   could not be read (<status>)`, when the read fails — with the mode's headers (the
   pair, the bogus Content-Type, or none): a PUT with no body carries no
   Content-Type, and SAP refuses it 415 — the probe's doing, not the
-  client's. A 423 on our object while a session of ours holds its lock is
-  `blocked by our own lock`, like a 403 "currently editing"; a 423 on the
-  probe name, or on a member that is not coverable, stays an answer.
+  client's. A 403 "currently editing"/"currently locked" or a 423 on our
+  object while a session of ours holds its lock is `blocked by our own
+  lock`; any other — the probe name, a member that is not coverable, or our
+  object with no lock of ours held — stays an answer, its message naming
+  who holds the lock. The lock of the LOCK members' own sessions counts as
+  ours until a LOCK and an UNLOCK that answered 2xx prove the object free.
 
 ### workingContentType
 

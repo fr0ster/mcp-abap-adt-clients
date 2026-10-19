@@ -1801,6 +1801,56 @@ describe('phase 2 writes', () => {
   });
 });
 
+describe('the write cycle settles a delete like the object run', () => {
+  it('a delete proven by a 404 retires the entry: a name someone makes again is not deleted by the cleanup', async () => {
+    // After the delete probes took our class, someone else makes the name again.
+    const theirs = new Set<string>();
+    const deletes = new Map<string, number>();
+    let cleanupTouched = false;
+    const system = objectSystem((request) => {
+      const url = request.url.split('?')[0].toLowerCase();
+      const body = request.body.toLowerCase();
+      const known = body.match(/\/oo\/classes\/(zhp[a-z0-9]+clk)/)?.[1];
+      if (url === '/sap/bc/adt/deletion/delete' && known) {
+        if (theirs.has(known)) cleanupTouched = true;
+        const count = (deletes.get(known) ?? 0) + 1;
+        deletes.set(known, count);
+        // The last delete probe (the known pair): the name is theirs after it.
+        if (count === 3) theirs.add(known);
+        return undefined;
+      }
+      for (const name of theirs)
+        if (
+          url === `/sap/bc/adt/oo/classes/${name}` &&
+          request.method === 'GET'
+        )
+          return { status: 200, body: '<class/>' };
+      return undefined;
+    });
+    const result = await runWriteCycle({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      unknown: new Set([
+        'getClass().delete — POST /sap/bc/adt/deletion/delete',
+      ]),
+      packageName: 'ZPKG',
+      transportRequest: '',
+    });
+    expect(theirs.size).toBeGreaterThan(0);
+    expect(cleanupTouched).toBe(false);
+    expect(
+      result.removals.some(
+        (removal) =>
+          removal.removed === true &&
+          /deleted by the .* delete probe \(read 404 after\)/.test(
+            removal.detail,
+          ),
+      ),
+    ).toBe(true);
+  });
+});
+
 describe('an authorization problem', () => {
   const exc = (type: string, message: string) =>
     `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="${type}"/><message lang="EN">${message}</message></exc:exception>`;
@@ -3646,7 +3696,7 @@ describe('members on temporary objects', () => {
     );
   });
 
-  it('activation runs once every lock on the object is released; a lock refusal on it is "blocked by our own lock", no verdict', async () => {
+  it('activation runs once every lock on the object is released; a lock refusal then is an answer naming the holder, not our lock', async () => {
     const system = objectSystem((request) =>
       request.url.startsWith('/sap/bc/adt/activation') &&
       request.body.toLowerCase().includes('/programs/programs/zhp') &&
@@ -3698,16 +3748,52 @@ describe('members on temporary objects', () => {
         'utf8',
       ),
     ) as ICorpus;
-    const blocked = bogus.rows.filter(
+    const refused = bogus.rows.filter(
       (r) =>
         r.temporary?.startsWith('program ') &&
         r.label === 'activate' &&
         r.bogus === 'accept',
     );
+    expect(refused.length).toBeGreaterThan(0);
+    // No lock of ours held then: an answer, its message naming who holds it.
+    for (const r of refused) {
+      expect(r.status).toBe(403);
+      expect(r.blocked).toBeUndefined();
+      expect(r.sapMessage).toContain('User X is currently editing');
+    }
+  });
+
+  it('a 403 lock refusal while our lock is held is "blocked by our own lock", no verdict', async () => {
+    const system = objectSystem((request) =>
+      request.method === 'PUT' &&
+      /\/ddic\/domains\/zhp/.test(request.url.toLowerCase())
+        ? {
+            status: 403,
+            body: AUTH_EXCEPTION(
+              'ExceptionResourceNoAccess',
+              'User X is currently editing ZHP',
+            ),
+          }
+        : undefined,
+    );
+    const file = (await run(system)).file as NonNullable<
+      Awaited<ReturnType<typeof run>>['file']
+    >;
+    const rows = JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          /corpus-clients-corpus-[0-9].*\.json$/.test(f),
+        ) as string,
+        'utf8',
+      ),
+    ).rows as ICorpusRow[];
+    const blocked = rows.filter(
+      (r) => r.temporary?.startsWith('domain ') && r.label === 'updateMetadata',
+    );
     expect(blocked.length).toBeGreaterThan(0);
     for (const r of blocked) expect(r.blocked).toBe('blocked by our own lock');
     const entry = file.entries.find(
-      (e) => e.endpoint === 'POST /sap/bc/adt/activation',
+      (e) => e.endpoint === 'PUT /sap/bc/adt/ddic/domains/{name}',
     );
     expect(entry?.evidence.join(' ')).toContain('blocked by our own lock');
   });
@@ -4303,6 +4389,64 @@ describe('members on temporary objects', () => {
       expect(r.status).toBe(423);
       expect(r.blocked).toBeUndefined();
     }
+  });
+
+  it('a proof UNLOCK that failed keeps the object marked as locked by us: a later 423 is ours', async () => {
+    let ownSessions = 0;
+    const activated = new Set<string>();
+    const answer = (request: ISeen) => {
+      const url = request.url.toLowerCase();
+      const body = request.body.toLowerCase();
+      // Once a LOCK member ran on its own session, our UNLOCKs of the
+      // program are refused.
+      if (
+        ownSessions > 0 &&
+        url.includes('/programs/programs/zhp') &&
+        url.includes('_action=unlock')
+      )
+        return { status: 500 };
+      if (
+        url.startsWith('/sap/bc/adt/activation') &&
+        body.includes('/programs/programs/zhp')
+      ) {
+        const at = body.indexOf('/programs/programs/zhp');
+        const program = body.slice(at, at + 40);
+        if (activated.has(program)) return { status: 423 };
+        activated.add(program);
+      }
+      return undefined;
+    };
+    let opened = 0;
+    const result = await runFull({
+      open: async () => {
+        opened++;
+        if (opened > 1) ownSessions++;
+        return onTheWire(objectSystem(answer).connection);
+      },
+      close: async () => undefined,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
+    });
+    expect(ownSessions).toBeGreaterThan(0);
+    const file = result.file as NonNullable<typeof result.file>;
+    const rows = JSON.parse(
+      fs.readFileSync(
+        file.corpora.find((f) =>
+          /corpus-clients-corpus-[0-9].*\.json$/.test(f),
+        ) as string,
+        'utf8',
+      ),
+    ).rows as ICorpusRow[];
+    const activation = rows.filter(
+      (r) => r.temporary?.startsWith('program ') && r.label === 'activate',
+    );
+    expect(activation.length).toBeGreaterThan(0);
+    for (const r of activation)
+      expect(r.blocked).toBe('blocked by our own lock');
+    expect(result.exitCode).toBe(1);
   });
 
   it('without a session to end, a lock that cannot be freed ends the run failed', async () => {

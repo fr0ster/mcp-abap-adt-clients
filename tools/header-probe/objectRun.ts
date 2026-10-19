@@ -446,13 +446,12 @@ export async function runOnTemporaryObjects<T>(
     // verdict on the headers.
     const send: SendRows<T> = async (plans, batched, connection) => {
       await input.send(plans, batched, connection);
+      // Ours only while a session of ours holds the object's lock: a 403
+      // lock refusal ("currently editing"/"locked") or a 423. Any other is
+      // an ordinary answer, its message naming who holds it.
+      const oursHeld = lock.handle !== undefined || lockedElsewhere.length > 0;
       for (const plan of plans)
-        if (
-          isLockRefusal(plan.row) ||
-          // A 423 while a session of ours holds the object's lock.
-          (plan.row.status === 423 &&
-            (lock.handle !== undefined || lockedElsewhere.length > 0))
-        )
+        if (oursHeld && (isLockRefusal(plan.row) || plan.row.status === 423))
           plan.row.blocked = 'blocked by our own lock';
     };
     const planOf = (member: IMemberEndpoint): IObjectRowPlan<T>[] => {
@@ -646,11 +645,10 @@ export async function runOnTemporaryObjects<T>(
     finish.push(async () => {
       if (lockedElsewhere.length) {
         const free = await takeLock();
-        if (free) {
-          await release(free);
-          // Proven free: no session of ours holds it any more.
-          lockedElsewhere.length = 0;
-        } else
+        // Proven free only once the UNLOCK answered 2xx; else it stays
+        // marked as locked by us.
+        if (free && (await release(free))) lockedElsewhere.length = 0;
+        else if (!free)
           made.object.note = `after ${lockedElsewhere.join(', ')} on sessions of their own (ended), a LOCK answered ${lockRefusal}`;
       }
       // The writes without a lock handle (activation, a check): an
@@ -693,12 +691,12 @@ export async function runOnTemporaryObjects<T>(
               await release(held);
           }
           // Proven gone: the object is not ours any more, its entry retires.
-          if (plan.row.afterWrite?.exists === false)
-            probe.retire(
-              spec,
-              name,
-              `deleted by ${member.handler}.${member.member} (read 404 after)`,
-            );
+          probe.settleDelete(
+            spec,
+            name,
+            plan.row.afterWrite,
+            `deleted by ${member.handler}.${member.member} (read 404 after)`,
+          );
         }
       }
     });

@@ -229,9 +229,9 @@ export class Probe {
     label: string,
     unlock: (handle: string) => ICall,
     held: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const capture = await this.direct1(unlock(held), false);
-    if (ok(capture)) return;
+    if (ok(capture)) return true;
     this.lockFailures.push(
       `${label}: the unlock answered ${capture.wire?.status ?? capture.failure ?? 'nothing'}`,
     );
@@ -250,6 +250,7 @@ export class Probe {
             };
       },
     });
+    return false;
   }
 
   /**
@@ -317,8 +318,18 @@ export class Probe {
     return entry !== undefined && this.ledger.holds(entry);
   }
 
-  /** A delete proven by a 404: the object is not ours any more, and its entry retires. */
-  retire(spec: IObjectSpec, name: string, detail: string): void {
+  /**
+   * After a delete: proven gone by a 404, the object is not ours any more and
+   * its ledger entry retires — if someone makes the name again, nothing of
+   * ours deletes it. The one place both cycles settle a delete.
+   */
+  settleDelete(
+    spec: IObjectSpec,
+    name: string,
+    after: { exists?: boolean | 'unknown' } | undefined,
+    detail: string,
+  ): void {
+    if (after?.exists !== false) return;
     const entry = this.owned.get(`${spec.type} ${name}`);
     if (entry) this.ledger.retire(entry, detail);
   }
@@ -675,6 +686,13 @@ export class Probe {
         Promise.resolve(),
       state: () => stateOf(names.known),
     });
+    for (const answer of this.lastProbes)
+      this.settleDelete(
+        spec,
+        names.known,
+        answer.stateAfter,
+        `deleted by the ${answer.probe} delete probe (read 404 after)`,
+      );
   }
 
   /** The class includes, written under the class's lock. */
