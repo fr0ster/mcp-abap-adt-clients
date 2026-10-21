@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [37.0.0] - 2026-10-21
+
+On `@mcp-abap-adt/interfaces-adt` `^20.1.0`.
+
 ### Added
 
 - **`getUtils().getObjectProperties(objectUri, options?)`** — one GET to
@@ -82,6 +86,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - `isCloudEnvironment` (internal, used by the integration tests) raises a
   failure of `getSystemInformation` instead of reading it as on-premise — a
   malformed `2xx` included.
+
+### Migration
+
+Two breaking changes; [`docs/usage/MIGRATION-37.md`](docs/usage/MIGRATION-37.md)
+has the code before and after for each.
+
+- **`getSystemInformation`** answers an `IAdtResponse`: read `ok`, then
+  `present`. A `404` is `{ present: false }`; a `405`, a `501`, a malformed
+  `2xx` and every other failure is `ok: false` instead of `null` or a throw.
+  Pass `analyse` to read a status otherwise.
+- **`IUtilResults`** has the required slot `objectProperties`: a result set
+  written slot by slot names it (`rawDocument`, or a reading of your own); one
+  that spreads `utilDocuments` needs nothing.
+
+`@mcp-abap-adt/adt-strategies` 0.14.0, released beside this, makes
+`analyseMessageClassMessage` refuse an answer that is no message class
+document.
 
 ## [36.0.2] - 2026-10-19
 

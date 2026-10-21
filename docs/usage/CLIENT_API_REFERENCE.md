@@ -1477,8 +1477,9 @@ await client.getMessageClassMessage().update({
 
 // Read one message. The answer is the class's document — there is no resource
 // for a single message. analyseMessageClassMessage (@mcp-abap-adt/adt-strategies)
-// turns a message number the class does not carry into a failure; without it,
-// the class answering is a success whether or not the message is there.
+// turns a message number the class does not carry — and an answer that is no
+// message class document at all — into a failure; without it, the class
+// answering is a success whether or not the message is there.
 const msg = await client.getMessageClassMessage().read(
   { className: 'ZMY_MSG', msgno: '001' },
   undefined,
