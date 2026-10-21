@@ -11,6 +11,10 @@
  * (/sap/bc/adt/repository/informationsystem/objectproperties, also absent). It
  * went with the base method, which nobody called: the only code that ever
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
+ *
+ * The base class exposes that endpoint again as `getObjectProperties`
+ * (/sap/bc/adt/repository/informationsystem/objectproperties/values), so this
+ * class refuses it again: legacy discovery still does not list it.
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
@@ -131,6 +135,16 @@ ${objectReferences}
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['query']>, E>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
+  }
+
+  override async getObjectProperties<E extends IAdtError = IAdtError>(
+    _objectUri: string,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['objectProperties']>, E>> {
+    return this.refuse(
+      'Object properties',
+      '/sap/bc/adt/repository/informationsystem/objectproperties/values',
+    );
   }
 
   private refuse<T, E extends IAdtError>(

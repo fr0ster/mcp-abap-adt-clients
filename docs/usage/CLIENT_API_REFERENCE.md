@@ -1580,6 +1580,32 @@ await utils.activateObjectsGroup([
 ], undefined, { headers });
 ```
 
+### AdtUtils (Object properties)
+
+`getObjectProperties(objectUri, options?)` is one GET to
+`/sap/bc/adt/repository/informationsystem/objectproperties/values?uri={objectUri}`,
+the uri sent URL-encoded, `Accept:
+application/vnd.sap.adt.repository.objproperties.result.v1+xml`. It answers the
+`opr:objectProperties` document: an `opr:object` with the object's `name`,
+`type`, `text` and `package`, then one `opr:property` per facet (`APPL`,
+`PACKAGE`, …). The default `objectProperties` slot answers that document as it
+came; `options.analyse` is the error strategy.
+
+A transaction is named by its workbench uri; `/sap/bc/adt/transactions/{name}`
+is refused with `422` (measured on premise, SAP_BASIS 816).
+
+```typescript
+const answer = await client
+  .getUtils()
+  .getObjectProperties('/sap/bc/adt/vit/wb/object_type/trant/object_name/SE38');
+if (answer.ok) {
+  answer.getResult().value; // <opr:objectProperties …><opr:object type="TRAN/T" name="SE38" …/>…
+}
+```
+
+On a legacy system (`AdtClientLegacy`) the endpoint is absent and the member
+answers a refusal (`UNSUPPORTED_OPERATION`) without a request.
+
 ### AdtUtils (Where-used)
 
 Where-used is two requests, and both are yours:

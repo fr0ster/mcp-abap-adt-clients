@@ -35,11 +35,11 @@ describe('AdtUtils readings', () => {
     expect(fixed).toEqual([]);
   });
 
-  it('names a slot for each of the twenty members that make a request', () => {
+  it('names a slot for each of the twenty-one members that make a request', () => {
     const named = new Set(
       [...source.matchAll(/this\.results\.(\w+)/g)].map((m) => m[1]),
     );
-    // The legacy subclass overrides four of them; it reaches the same slots.
+    // The legacy subclass overrides some of them; it reaches the same slots.
     const legacy = readFileSync(
       join(__dirname, '../../../core/shared/AdtUtilsLegacy.ts'),
       'utf-8',
@@ -47,7 +47,7 @@ describe('AdtUtils readings', () => {
     for (const m of legacy.matchAll(/this\.results\.(\w+)/g)) named.add(m[1]);
 
     expect([...named].sort()).toEqual(Object.keys(utilDocuments).sort());
-    expect(named.size).toBe(20);
+    expect(named.size).toBe(21);
   });
 
   it('ships a default for every slot', () => {

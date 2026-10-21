@@ -59,7 +59,16 @@
  *
  * `getTypeInfo` reached it with a domain's uri and `getTransaction` with
  * `/sap/bc/adt/transactions/{name}` — the same request about different objects,
- * which is what made two members of it. The enhancement endpoint formerly
+ * which is what made two members of it.
+ *
+ * It is exposed again as {@link AdtUtils.getObjectProperties}: one member for
+ * the one endpoint, taking any object uri. A transaction is asked about by its
+ * workbench uri, `/sap/bc/adt/vit/wb/object_type/trant/object_name/{name}`;
+ * the `/sap/bc/adt/transactions/{name}` uri `getTransaction` sent is refused
+ * with `422` (`SADT_RESOURCE` 042) on premise (SAP_BASIS 816, measured
+ * 2026-10-21).
+ *
+ * The enhancement endpoint formerly
  * recorded here is now exposed by the typed host handlers:
  *
  * ```
@@ -101,6 +110,7 @@ import {
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
+import { getObjectProperties as getObjectPropertiesUtil } from './objectProperties';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
 import {
   getObjectMetadataUri,
@@ -131,6 +141,7 @@ import { buildObjectUri } from '../../utils/activationUtils';
 import type {
   AdtObjectType,
   AdtSourceObjectType,
+  IAdtObjectProperties,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
   IGetSqlQueryParams,
@@ -175,7 +186,7 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  * The parser overloads went in 30.0.0, when the reading became something
  * injected once rather than passed per call — and since 19.0.0 there is nothing
  * left that a reading cannot reach. Every member below that makes a request
- * takes its shape from a slot of `IUtilResults`, all twenty of them. The three
+ * takes its shape from a slot of `IUtilResults`, all twenty-one of them. The three
  * that take none — `modifyWhereUsedScope`, `supportsSourceCode` and
  * `getObjectSourceUri` — make no request, so there is no answer for a strategy
  * to read.
@@ -223,7 +234,8 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
       ReturnType<R['source']>,
       ReturnType<R['metadata']>,
       ReturnType<R['include']>
-    >
+    >,
+    IAdtObjectProperties<ReturnType<R['objectProperties']>>
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
@@ -803,6 +815,42 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
       () => getObjectStructureUtil(this.connection, objectType, objectName),
       this.results.objectStructure as IResultStrategy<
         ReturnType<R['objectStructure']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The properties of one repository object —
+   * `/repository/informationsystem/objectproperties/values?uri={objectUri}`.
+   *
+   * One GET, any object the uri names. The answer is the
+   * `opr:objectProperties` document: an `opr:object` with the object's `name`,
+   * `type`, `text` and `package`, then one `opr:property` per facet
+   * (`APPL`, `PACKAGE`, …). It is answered as it came through the
+   * `objectProperties` slot.
+   *
+   * @param objectUri - The object's ADT uri, sent URL-encoded — for a
+   *   transaction `/sap/bc/adt/vit/wb/object_type/trant/object_name/{name}`
+   * @param options.analyse - The error strategy for the answer
+   * @returns The properties document, read by the `objectProperties` slot
+   *
+   * @example
+   * ```typescript
+   * const answer = await utils.getObjectProperties(
+   *   '/sap/bc/adt/vit/wb/object_type/trant/object_name/SE38',
+   * );
+   * if (answer.ok) answer.getResult().value; // the opr:objectProperties document
+   * ```
+   */
+  async getObjectProperties<E extends IAdtError = IAdtError>(
+    objectUri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['objectProperties']>, E>> {
+    return answering(
+      () => getObjectPropertiesUtil(this.connection, objectUri),
+      this.results.objectProperties as IResultStrategy<
+        ReturnType<R['objectProperties']>
       >,
       options?.analyse,
     );

@@ -24,6 +24,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **`getUtils().getObjectProperties(objectUri, options?)`** — one GET to
+  `/repository/informationsystem/objectproperties/values?uri={objectUri}` for
+  any object uri, `Accept:
+  application/vnd.sap.adt.repository.objproperties.result.v1+xml`, answered
+  through the new `objectProperties` slot of `IUtilResults` (default: the
+  document). A transaction is named by its workbench uri
+  `/sap/bc/adt/vit/wb/object_type/trant/object_name/{name}` (measured on
+  premise, SAP_BASIS 816: `200`; the old `/sap/bc/adt/transactions/{name}`
+  answers `422`). `AdtUtilsLegacy` refuses it (`UNSUPPORTED_OPERATION`), as
+  legacy discovery lists no such endpoint. The contract atom,
+  `IAdtObjectProperties`, is declared in this package until
+  `@mcp-abap-adt/interfaces-adt` carries one.
+
 ### Changed
 
 - **BREAKING: `getSystemInformation(connection, options?)` answers an

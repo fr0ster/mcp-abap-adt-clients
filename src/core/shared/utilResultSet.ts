@@ -9,7 +9,7 @@
  * **The line is measured, not felt.** A result strategy reads *an answer*, so a
  * member belongs here exactly when it makes one request. Since 19.0.0 every
  * member of `AdtUtils` that reaches ADT makes exactly one — the walks, the
- * chains and the read-modify-writes left — so all twenty are here.
+ * chains and the read-modify-writes left — so all twenty-one are here.
  *
  * Three members are absent and always will be. `modifyWhereUsedScope` edits a
  * document it was handed, `supportsSourceCode` answers from a table in this
@@ -87,6 +87,11 @@ export interface IUtilResults {
   readonly metadata: IResultStrategy<unknown>;
   /** One include of a program — `/programs/includes/{name}`. */
   readonly include: IResultStrategy<unknown>;
+  /**
+   * What `/informationsystem/objectproperties/values` answers for one object
+   * uri — the `opr:objectProperties` document.
+   */
+  readonly objectProperties: IResultStrategy<unknown>;
 }
 
 /**
@@ -115,4 +120,5 @@ export const utilDocuments = {
   source: rawDocument,
   metadata: rawDocument,
   include: rawDocument,
+  objectProperties: rawDocument,
 } satisfies IUtilResults;
