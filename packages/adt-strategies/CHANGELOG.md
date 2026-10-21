@@ -15,10 +15,12 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-21
+
 ### Changed
 
 - `@mcp-abap-adt/interfaces-adt` is `^20.1.0`, the range `adt-clients` declares (it carries `IAdtObjectProperties`, which this package does not use).
-- **`analyseMessageClassMessage` refuses an answer that is no message class document** — an empty body, a body that is not XML, another document — as `ADT_OBJECT_NOT_FOUND` ("Message <msgno>: the answer is not a message class document"). It let such an answer through: only a class document holding the message shows the message exists. A caller who reads such an answer otherwise passes its own `analyse`.
+- **`analyseMessageClassMessage` refuses an answer that is no message class document** — an empty body, a body that is not XML, another document — as `ADT_OBJECT_NOT_FOUND` ("Message <msgno>: the answer is not a message class document"). It let such an answer through: only a class document holding the message shows the message exists. The reading under it, `readMessageClassMessageAbsence(document, msgno)`, answers that refusal where it answered `null`. A caller who reads such an answer otherwise passes its own `analyse`.
 
 ## [0.13.0] - 2026-10-18
 
