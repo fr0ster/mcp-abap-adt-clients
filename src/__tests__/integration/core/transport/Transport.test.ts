@@ -472,16 +472,22 @@ describe('AdtRequest', () => {
           // `getSystemInformation` fills that gap and **only that gap**: it
           // reads `/sap/bc/adt/core/http/systeminformation`, which is a cloud
           // endpoint. On-premise there is nothing there, the helper answers
-          // `null`, and the configured name is what is left — which is the
-          // one that was right there all along.
+          // the endpoint absent, and the configured name is what is left —
+          // which is the one that was right there all along.
           //
           // `createTask` itself asks neither. A member here does not spend a
           // second request to fill in an argument, which is exactly why the
           // contract makes the caller name the user. A test is that caller.
           logTestStep('create a task under it', testsLogger);
+          const systemUser = async (): Promise<string | undefined> => {
+            const answer = await getSystemInformation(connection);
+            if (!answer.ok) throw new Error(answer.getError().message);
+            const found = answer.getResult().value;
+            return found.present ? found.info.userName : undefined;
+          };
           const targetUser =
             (process.env.SAP_USERNAME || '').toUpperCase() ||
-            (await getSystemInformation(connection))?.userName ||
+            (await systemUser()) ||
             '';
           if (!targetUser) {
             logTestSkip(

@@ -808,3 +808,33 @@ than chosen by the consumer — as `lock`'s is — would belong to the
 implementation, the way `lockHandleOf` does. And if the contract ever typed a
 member's result as a specific shape rather than a strategy's output, that reading
 would come back with it; the fix would be in the contract, decided there first.
+
+## 16. `systeminformation` answers three ways, and only a `404` is absent
+
+**Problem.** `getSystemInformation` answered `null` for a `404`, a `405`, a
+`501` and for a `2xx` whose body it could not read, and `isCloudEnvironment`
+read that `null` as on-premise. A logon page a proxy answered with `200` was a
+system without the endpoint. The MCP server stopped using the helper and read
+the endpoint itself, with its status, because its rules need the cases apart: on
+premise a `404` falls back to the configured values; on ABAP Cloud a `404` is
+an error; a malformed answer is an error everywhere.
+
+**Decided.** It answers an `IAdtResponse` through the same composition as every
+member: `{ present: true, info }`, `{ present: false }` for a `404`, else a
+failure, with `options.analyse` seeing the library's verdict and the response.
+Changed in place, marked BREAKING; no second function beside a deprecated one.
+
+**Against.** A new function with the old one `@deprecated`. Nothing under `src/`
+carries `@deprecated`, every behaviour change of this kind has shipped as a
+breaking major with a migration note (23.0.0 changed this same helper's throws
+that way), and decision 2 asks only that a removal ship with its replacement —
+here the replacement is the same import. Keeping the old reading alive would
+keep the `null` that made the defect.
+
+**Why only `404`.** It is the status the server's reader takes as absent and
+the one seen for this endpoint on premise. `405` and `501` came from the probe
+helper shared with `isModernAdtSystem`, not from a measurement of this endpoint;
+a caller who wants them read as absent clears them with `analyse`.
+
+**What would change it.** A system measured answering this endpoint's absence
+with another status.

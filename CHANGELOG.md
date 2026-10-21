@@ -22,6 +22,37 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING: `getSystemInformation(connection, options?)` answers an
+  `IAdtResponse`, and only a `404` is the endpoint absent.** It answered `null`
+  for a `404`, `405` or `501` and also for a `2xx` whose body it could not read,
+  so a caller could not tell a system without the endpoint from a logon page a
+  proxy answered with. Now:
+  - a `2xx` with a JSON object is `{ present: true, info }`, each field read
+    only when it is a string;
+  - a `404` is `{ present: false }` — the status the MCP server's own reader
+    takes as the endpoint absent on premise; no `405` or `501` has been seen
+    for this endpoint;
+  - any other status (`405`, `501`, `500`, `401`, …), no answer, or a `2xx`
+    whose body is no JSON object is `ok: false`, with the response and the
+    request — a status a connection hands back instead of throwing included.
+
+  The verdict goes through `options.analyse`, which receives the library's
+  (`ADT_NO_FAILURE` for a `404` and for a readable `2xx`) and the response: it
+  may name a `404` a failure (a system that must have the endpoint), or clear
+  one — a cleared other status is `{ present: false }`, a cleared `2xx` a
+  record naming nothing. A credential refusal SAP was never asked about still
+  rejects as it came. **Migrating:** read `answer.ok`, then
+  `answer.getResult().value.present`; where `null` was read as on-premise, a
+  failure is now one; to keep reading a `405`/`501` as absent, pass an
+  `analyse` that clears them.
+- `isCloudEnvironment` (internal, used by the integration tests) raises a
+  failure of `getSystemInformation` instead of reading it as on-premise — a
+  malformed `2xx` included.
+
 ## [36.0.2] - 2026-10-19
 
 Three requests SAP refused on every call, and a transport request owner sent in
