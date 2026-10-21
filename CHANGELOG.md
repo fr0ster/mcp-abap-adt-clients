@@ -39,6 +39,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `IAdtObjectProperties`, is declared in this package until
   `@mcp-abap-adt/interfaces-adt` carries one.
 
+  **BREAKING: `IUtilResults` has one more required slot, `objectProperties`.**
+  A result set that spreads `utilDocuments` is unaffected; one written slot by
+  slot no longer compiles until it names it, with the shipped reading or its
+  own:
+
+  ```typescript
+  import { rawDocument, utilDocuments } from '@mcp-abap-adt/adt-clients';
+
+  const results = {
+    ...utilDocuments, // already has it
+    // or, written out:
+    objectProperties: rawDocument,
+  };
+  ```
+
 ### Changed
 
 - **BREAKING: `getSystemInformation(connection, options?)` answers an
