@@ -124,7 +124,7 @@ a `403` on a service binding's LOCK that is to be ignored
 | `analyseDebuggeeEnd` | an ABAP debugger step or termination: `500 AdiFailed` subtype `debuggeeEnded` or `terminateDebuggee` is the debuggee ending as asked, no failure — the result is the document naming the subtype; every other refusal as `analyseException` |
 | `analyseDebuggerFreed` | `terminateDebugger`: a `500` served as `text/plain` or with an empty body, with no ADT exception document, is the debugger freeing its own session, no failure; everything else (a `500` with an exception document or served as anything else, other statuses, a connection failure, a body that is not a string) as `analyseException` |
 | `analyseCdsTestDoubles` | the CDS test-doubles check |
-| `analyseMessageClassMessage(msgno)` | the class answering is not the message existing |
+| `analyseMessageClassMessage(msgno)` | the class answering is not the message existing: a class document without the message, and an answer that is no message class document at all (empty, not XML, another document), are refused `ADT_OBJECT_NOT_FOUND` (since 0.14.0 the second too) |
 | `analyseUnitTestStart` | a started run whose answer names no run id |
 | `analyseUnsupportedStatus(statuses, what)` | renames a `404`/`405`/`501`… as `UNSUPPORTED_OPERATION` — a system without the resource, told apart from a refusal |
 | `analyseAny` | dispatches on the root element when the form is not known in advance |

@@ -22,6 +22,8 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
+- [**MIGRATION-37.md**](usage/MIGRATION-37.md) — what a consumer on 36.x has to change: `getSystemInformation` answers an `IAdtResponse`, and `IUtilResults` has the required `objectProperties` slot
+- [**MIGRATION-36.md**](usage/MIGRATION-36.md) — what a consumer on 35.x has to change: a request's `Accept` and `Content-Type` are the caller's
 - [**MIGRATION-23.md**](usage/MIGRATION-23.md) — what a consumer on 22.x has to change: every reading and verdict the library applied is a strategy in `@mcp-abap-adt/adt-strategies`, with the replacing code for each
 - [**MIGRATION-19.md**](usage/MIGRATION-19.md) — what a consumer on 18.x has to change: one member, one endpoint call
 - [**MIGRATION-18.0.md**](usage/MIGRATION-18.0.md) — what a consumer on 17.x has to change, and why the compiler is right
@@ -54,6 +56,8 @@ docs/
 │   ├── discovery.md                  # ADT Discovery documentation
 │   └── discovery.xml                 # Pretty-printed ADT discovery XML
 ├── usage/
+│   ├── MIGRATION-37.md               # 36.x → 37.0.0: getSystemInformation's answer, the objectProperties slot
+│   ├── MIGRATION-36.md               # 35.x → 36.0.0: a request's own headers
 │   ├── MIGRATION-23.md               # 22.x → 23.0.0: readings and verdicts became strategies
 │   ├── MIGRATION-19.md               # 18.x → 19.0.0
 │   ├── MIGRATION-18.0.md             # 17.x → 18.0.0
