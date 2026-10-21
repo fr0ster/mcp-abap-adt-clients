@@ -729,7 +729,9 @@ export function readCdsTestDoublesRefusal(
 }
 
 /**
- * A message class document that does not hold the message asked for.
+ * A message class document that does not hold the message asked for, or an
+ * answer that is no message class document at all (empty, not XML, another
+ * document): neither shows the message exists.
  *
  * A message is a row inside its class, so reading one reads the class; the
  * class answering is not the message existing. Moved from adt-clients'
@@ -740,7 +742,17 @@ export function readMessageClassMessageAbsence(
   msgno: string,
 ): AdtRefusal | null {
   const root = parseXml(document)?.messageClass;
-  if (!root) return null;
+  // The class answering is what shows the message exists: an answer that is
+  // not a class document shows nothing, so it is refused too.
+  if (!root) {
+    const message = `Message ${msgno}: the answer is not a message class document`;
+    return {
+      form: 'messageClass',
+      code: AdtObjectErrorCodes.OBJECT_NOT_FOUND,
+      message,
+      messages: [{ type: 'E', text: message }],
+    };
+  }
   const held = asArray(root.messages).some(
     (m: any) => String(m?.['@msgno'] ?? '') === msgno,
   );
