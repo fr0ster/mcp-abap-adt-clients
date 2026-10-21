@@ -15,6 +15,10 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` is `^20.1.0`, the range `adt-clients` declares (it carries `IAdtObjectProperties`, which this package does not use).
+
 ## [0.13.0] - 2026-10-18
 
 ### Changed

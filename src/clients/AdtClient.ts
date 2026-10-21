@@ -30,6 +30,7 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
+  IAdtObjectProperties,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
@@ -724,8 +725,8 @@ export type IScalarFunctionImplementationContract<
     ReturnType<R['versionSource']>
   >;
 /**
- * The cross-cutting operations, as the nine atoms `AdtUtils` implements —
- * every member it has (#109). `getUtils()` answers this, not the class.
+ * The cross-cutting operations, as the atoms `AdtUtils` implements — every
+ * member it has (#109). `getUtils()` answers this, not the class.
  */
 export type IUtilsContract<R extends IUtilResults> = IAdtInformationSystem<
   ReturnType<R['search']>,
@@ -756,7 +757,8 @@ export type IUtilsContract<R extends IUtilResults> = IAdtInformationSystem<
     ReturnType<R['source']>,
     ReturnType<R['metadata']>,
     ReturnType<R['include']>
-  >;
+  > &
+  IAdtObjectProperties<ReturnType<R['objectProperties']>>;
 
 /**
  * A service binding's operations: its lifecycle atoms, and the two reads beyond

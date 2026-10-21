@@ -24,8 +24,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **`getUtils().getObjectProperties(objectUri, options?)`** — one GET to
+  `/repository/informationsystem/objectproperties/values?uri={objectUri}` for
+  any object uri, `Accept:
+  application/vnd.sap.adt.repository.objproperties.result.v1+xml`, answered
+  through the new `objectProperties` slot of `IUtilResults` (default: the
+  document). A transaction is named by its workbench uri
+  `/sap/bc/adt/vit/wb/object_type/trant/object_name/{name}` (measured on
+  premise, SAP_BASIS 816: `200`; the old `/sap/bc/adt/transactions/{name}`
+  answers `422`). `AdtUtilsLegacy` refuses it (`UNSUPPORTED_OPERATION`), as
+  legacy discovery lists no such endpoint. `getUtils()`'s contract carries it
+  as `IAdtObjectProperties` (`@mcp-abap-adt/interfaces-adt` 20.1.0).
+
+  **BREAKING: `IUtilResults` has one more required slot, `objectProperties`.**
+  A result set that spreads `utilDocuments` is unaffected; one written slot by
+  slot no longer compiles until it names it, with the shipped reading or its
+  own:
+
+  ```typescript
+  import { rawDocument, utilDocuments } from '@mcp-abap-adt/adt-clients';
+
+  const results = {
+    ...utilDocuments, // already has it
+    // or, written out:
+    objectProperties: rawDocument,
+  };
+  ```
+
 ### Changed
 
+- `@mcp-abap-adt/interfaces-adt` is `^20.1.0`.
 - **BREAKING: `getSystemInformation(connection, options?)` answers an
   `IAdtResponse`, and only a `404` is the endpoint absent.** It answered `null`
   for a `404`, `405` or `501` and also for a `2xx` whose body it could not read,
