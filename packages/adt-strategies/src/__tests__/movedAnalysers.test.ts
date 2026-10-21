@@ -85,6 +85,26 @@ describe('analyseMessageClassMessage', () => {
     );
     expect((failure as IAdtError).message).toContain('003');
   });
+  it.each([
+    ['an empty body', ''],
+    ['a body that is not XML', 'not xml'],
+    [
+      'another document',
+      '<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>',
+    ],
+  ])('refuses %s: the message is not shown to exist', (_label, body) => {
+    const failure = analyseMessageClassMessage('001')(
+      ADT_NO_FAILURE,
+      answer(body),
+    );
+    expect(failure).not.toBe(ADT_NO_FAILURE);
+    expect((failure as IAdtError).code).toBe(
+      AdtObjectErrorCodes.OBJECT_NOT_FOUND,
+    );
+    expect((failure as IAdtError).message).toBe(
+      'Message 001: the answer is not a message class document',
+    );
+  });
 });
 
 describe('analyseUnitTestStart', () => {
