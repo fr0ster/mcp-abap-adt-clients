@@ -121,6 +121,11 @@ describe('analyseObjectProperties', () => {
     ['a body that is not XML', 'not xml'],
     ['a sign-in page', '<html><head><title>Logon</title></head></html>'],
     [
+      'a truncated document',
+      '<opr:objectProperties xmlns:opr="http://www.sap.com/adt/ris/objectProperties"><opr:object name="SE38" type="TRAN/T">',
+    ],
+    ['two documents in one body', `${props}${props}`],
+    [
       'the document without its object',
       '<opr:objectProperties xmlns:opr="http://www.sap.com/adt/ris/objectProperties"><opr:property facet="APPL" name="BC"/></opr:objectProperties>',
     ],

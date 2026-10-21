@@ -1,5 +1,5 @@
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
 /**
  * Reading a refusal out of the document SAP sent.
@@ -780,7 +780,11 @@ export function readMessageClassMessageAbsence(
 export function readObjectPropertiesAbsence(
   document: unknown,
 ): AdtRefusal | null {
-  const root = parseXml(document)?.objectProperties;
+  // Well-formed, one root: a truncated or concatenated answer is no document,
+  // whatever the parser makes of it.
+  const wellFormed =
+    typeof document === 'string' && XMLValidator.validate(document) === true;
+  const root = wellFormed ? parseXml(document)?.objectProperties : undefined;
   if (root && root.object) return null;
   const message = 'The answer is not an object properties document';
   return {
