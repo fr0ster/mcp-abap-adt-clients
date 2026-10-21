@@ -221,7 +221,10 @@ export async function resolveSystemContext(
     getEnvironmentConfig().default_master_language || undefined;
 
   if (isCloud) {
-    const systemInfo = await getSystemInformation(connection);
+    const answer = await getSystemInformation(connection);
+    if (!answer.ok) throw new Error(answer.getError().message);
+    const found = answer.getResult().value;
+    const systemInfo = found.present ? found.info : undefined;
     return {
       masterSystem: systemInfo?.systemID,
       responsible: systemInfo?.userName,

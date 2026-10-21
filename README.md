@@ -994,8 +994,11 @@ hold yourself:
 `fetchDiscoveryEndpoints`, `isEndpointInDiscovery`, `createAdtClient`
 <!-- surface:end -->
 
-- `getSystemInformation(connection)` — the ADT system record, or `null` when
-  the endpoint is absent.
+- `getSystemInformation(connection, options?)` — an `IAdtResponse` of
+  `{ present: true, info }` (the system record), or `{ present: false }` for a
+  `404` (the endpoint absent, as on premise). Any other status, no answer, or a
+  `2xx` whose body is no JSON object is a failure, through `options.analyse`
+  like any member's.
 - `isModernAdtSystem(connection)` — whether `/sap/bc/adt/core/discovery` is
   served. S/4 HANA and BTP expose it; BASIS 7.40 and below only have
   `/sap/bc/adt/discovery`.
@@ -1006,11 +1009,31 @@ hold yourself:
 - `createAdtClient(connection, logger?, options?)` — `AdtClient` or
   `AdtClientLegacy`, from `isModernAdtSystem`.
 
-**A probe answers only for an absent endpoint.** A `404`, `405` or `501` is the
-answer `false`, `null` or an empty set stands for. Any other failure — no
-network, an expired session, a `401`, a `500` — is raised, since 23.0.0: it
-says nothing about the system, and swallowing it handed a legacy client to a
-modern system reached over a broken connection.
+**A probe answers only for an absent endpoint.** For `isModernAdtSystem` and
+`fetchDiscoveryEndpoints` a `404`, `405` or `501` is the answer `false` or an
+empty set stands for. Any other failure — no network, an expired session, a
+`401`, a `500` — is raised, since 23.0.0: it says nothing about the system, and
+swallowing it handed a legacy client to a modern system reached over a broken
+connection.
+
+`getSystemInformation` answers rather than raises, and only a `404` is the
+endpoint absent. A malformed answer is not a system without the endpoint:
+
+```typescript
+import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
+
+const answer = await getSystemInformation(connection);
+if (!answer.ok) {
+  // Another status, no answer, or a 2xx that is not the record.
+  throw new Error(answer.getError().message);
+}
+const found = answer.getResult().value;
+const user = found.present ? found.info.userName : undefined; // absent: a 404
+```
+
+A caller whose system must have the endpoint names a `404` a failure with its
+own `analyse`; one that read a `405` or `501` as absent (23.0.0–36.x) clears
+them with `analyse` and gets `{ present: false }`.
 
 The parsers that used to sit here — `parseSearchResults`, `parseTransportTree`,
 `parseCreatedTransport` — are readings, and are in `@mcp-abap-adt/adt-strategies`

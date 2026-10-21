@@ -2,16 +2,32 @@
  * Shared system information utilities
  */
 
-import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  AdtNoFailure,
+  IAdtAnalyseOptions,
+  IAdtContentTypes,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from '../core/shared/contentTypes';
+import {
+  failed,
+  isUnansweredCredentialRefusal,
+  recogniseFailure,
+  succeeded,
+} from './adtResponse';
 
 /**
- * Whether a failure says the endpoint is not there — the one failure these
- * probes answer rather than raise.
+ * Whether a failure says the endpoint is not there — the one failure
+ * `isModernAdtSystem` answers rather than raises.
  *
  * 404, 405 and 501 are a system without the resource. Anything else — no
  * network, an expired session, a 401, a 500 — is not an answer about the
@@ -24,70 +40,158 @@ function endpointAbsent(error: unknown): boolean {
   return status === 404 || status === 405 || status === 501;
 }
 
-/**
- * Get system information from SAP ADT (for cloud systems)
- * Returns systemID and userName if available
- */
-export async function getSystemInformation(
-  connection: IAbapConnection,
-): Promise<{
+const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
+
+/** The record `systeminformation` answers, each field read only as a string. */
+type SystemInformationRecord = {
   systemID?: string;
   userName?: string;
   client?: string;
   language?: string;
   userFullName?: string;
-} | null> {
+};
+
+/** The body as a plain JSON object, else `undefined`. */
+function objectOf(data: unknown): Record<string, unknown> | undefined {
+  let value = data;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function recordOf(
+  body: Record<string, unknown> | undefined,
+): SystemInformationRecord {
+  const text = (name: string): string | undefined => {
+    const value = body?.[name];
+    return typeof value === 'string' ? value : undefined;
+  };
+  return {
+    systemID: text('systemID'),
+    userName: text('userName'),
+    userFullName: text('userFullName'),
+    client: text('client'),
+    language: text('language'),
+  };
+}
+
+const isSuccessStatus = (status: number) => status >= 200 && status <= 299;
+
+/**
+ * The system's own record, from `/sap/bc/adt/core/http/systeminformation`.
+ *
+ * Three answers, kept apart, because a caller acts differently on each:
+ *
+ * - **present** — a `2xx` whose body is a JSON object: `{ present: true, info }`,
+ *   each field read only when it is a string;
+ * - **absent** — a `404`: the system has no such endpoint (an on-premise
+ *   system without it), `{ present: false }`. Only a `404`: it is what
+ *   the MCP server's own `systeminformation` reader takes as the endpoint
+ *   absent on premise, and no other status has been seen for it. A `405` or `501` is a failure like
+ *   any other status;
+ * - **a failure** — any other status, no answer at all, or a `2xx` whose body
+ *   is no JSON object (a logon page a proxy answered with, an empty body):
+ *   `ok: false`, with the response and the request. A malformed `2xx` is
+ *   `origin: 'connection'` — no usable answer came back.
+ *
+ * The verdict goes through `options.analyse` like any member's: it receives
+ * the library's verdict (`ADT_NO_FAILURE` for a `404` and for a readable
+ * `2xx`) and the response. It may name a failure — a `404` on a system that
+ * must have the endpoint — or clear one: a cleared `2xx` is a record naming
+ * nothing, a cleared other status is the endpoint absent (a `405`/`501` read
+ * as absent, as 23.0.0–36.x did), and a failure with no response cannot be
+ * cleared. A connection that hands back a status other than a `2xx` instead
+ * of throwing it is read by that status the same way.
+ *
+ * A credential refusal SAP was never asked about is thrown as it came, as by
+ * every member.
+ */
+export async function getSystemInformation<E extends IAdtError = IAdtError>(
+  connection: IAbapConnection,
+  options?: IAdtAnalyseOptions<E>,
+): Promise<
+  IAdtResponse<
+    { present: true; info: SystemInformationRecord } | { present: false },
+    E
+  >
+> {
+  const request = { method: 'GET', url: SYSTEM_INFORMATION_URL };
+  let wire: IAdtWireResponse | undefined;
+  let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
+
   try {
-    const url = `/sap/bc/adt/core/http/systeminformation`;
-
-    const headers = {
-      Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
-    };
-
-    // Add cache busting parameter like Eclipse does
-    const params = {
-      _: Date.now(),
-    };
-
-    const response = await connection.makeAdtRequest({
-      url,
+    wire = await connection.makeAdtRequest({
+      url: SYSTEM_INFORMATION_URL,
       method: 'GET',
       timeout: 0,
-      headers,
-      params,
+      headers: {
+        Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+      },
+      // Cache busting, as Eclipse sends it.
+      params: { _: Date.now() },
     });
+  } catch (error: unknown) {
+    if (isUnansweredCredentialRefusal(error)) throw error;
+    wire = (error as { response?: IAdtWireResponse })?.response;
+    if (wire?.status !== 404) {
+      const recognised = recogniseFailure(error);
+      verdict = { ...recognised, request: recognised.request ?? request };
+    }
+  }
 
-    // Parse response - can be JSON or XML
-    let data = response.data;
-    if (typeof data === 'string') {
-      try {
-        // Try to parse as JSON
-        data = JSON.parse(data);
-      } catch {
-        // If not JSON, might be XML or error - return null
-        return null;
+  let body: Record<string, unknown> | undefined;
+  if (wire && verdict === ADT_NO_FAILURE && wire.status !== 404) {
+    if (!isSuccessStatus(wire.status)) {
+      verdict = {
+        origin: 'connection',
+        message: `systeminformation answered ${wire.status}`,
+        response: wire,
+        request,
+      };
+    } else {
+      body = objectOf(wire.data);
+      if (!body) {
+        verdict = {
+          origin: 'connection',
+          message: `systeminformation answered ${wire.status} with a body that is not a JSON object`,
+          response: wire,
+          request,
+        };
       }
     }
-
-    if (data && typeof data === 'object') {
-      // The service's JSON, read for the five fields it is asked for.
-      const info = data as Record<string, string | undefined>;
-      return {
-        systemID: info.systemID,
-        userName: info.userName,
-        userFullName: info.userFullName,
-        client: info.client,
-        language: info.language,
-      };
-    }
-
-    return null;
-  } catch (error) {
-    // The endpoint absent (on-premise) is the answer `null` stands for; any
-    // other failure is not, and goes back to the caller.
-    if (endpointAbsent(error)) return null;
-    throw error;
   }
+
+  // `E` is given a value only by `analyse`; without one the verdict is the
+  // library's own `IAdtError`, which is `E`'s default — as in `answering`.
+  const analyse = options?.analyse;
+  if (analyse) {
+    const overruled = analyse(verdict, wire);
+    if (overruled !== ADT_NO_FAILURE) return failed(overruled);
+  } else if (verdict !== ADT_NO_FAILURE) {
+    return failed(verdict as E);
+  }
+
+  if (!wire) {
+    return failed(
+      (verdict === ADT_NO_FAILURE
+        ? {
+            origin: 'connection',
+            message: 'The request did not complete, and carried no answer',
+            request,
+          }
+        : verdict) as E,
+    );
+  }
+  if (!isSuccessStatus(wire.status)) return succeeded({ present: false });
+  return succeeded({ present: true, info: recordOf(body) });
 }
 
 /**
@@ -122,9 +226,15 @@ export async function isCloudEnvironment(
     // getBaseUrl() failed — continue to fallback
   }
 
-  // Fallback: check if systeminformation endpoint is available
-  const systemInfo = await getSystemInformation(connection);
-  return systemInfo !== null;
+  // Fallback: whether the systeminformation endpoint answers. Its failure —
+  // another status, no answer, a body that is not its record — says nothing
+  // about the system and is raised, never read as on-premise.
+  const answer = await getSystemInformation(connection);
+  if (!answer.ok) {
+    const failure = answer.getError();
+    throw Object.assign(new Error(failure.message), { failure });
+  }
+  return answer.getResult().value.present;
 }
 
 /**
