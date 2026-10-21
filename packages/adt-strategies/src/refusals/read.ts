@@ -125,7 +125,8 @@ export interface AdtRefusal {
     | 'unittest'
     | 'publication'
     | 'cdsTestDoubles'
-    | 'messageClass';
+    | 'messageClass'
+    | 'objectProperties';
   /**
    * An `AdtObjectErrorCodes` value where the reading names one — a message a
    * class does not hold is `OBJECT_NOT_FOUND`. Absent where the document is
@@ -761,6 +762,29 @@ export function readMessageClassMessageAbsence(
   const message = `Message ${msgno} not found in class ${name}`.trim();
   return {
     form: 'messageClass',
+    code: AdtObjectErrorCodes.OBJECT_NOT_FOUND,
+    message,
+    messages: [{ type: 'E', text: message }],
+  };
+}
+
+/**
+ * An answer that is no object properties document.
+ *
+ * `GET /repository/informationsystem/objectproperties/values?uri=` answers an
+ * `opr:objectProperties` document holding the object as `opr:object` (measured
+ * on premise, SAP_BASIS 816: a transaction by its workbench uri). An answer
+ * that is not such a document — empty, not XML, another document such as a
+ * sign-in page — shows no object, so it is refused.
+ */
+export function readObjectPropertiesAbsence(
+  document: unknown,
+): AdtRefusal | null {
+  const root = parseXml(document)?.objectProperties;
+  if (root && root.object) return null;
+  const message = 'The answer is not an object properties document';
+  return {
+    form: 'objectProperties',
     code: AdtObjectErrorCodes.OBJECT_NOT_FOUND,
     message,
     messages: [{ type: 'E', text: message }],

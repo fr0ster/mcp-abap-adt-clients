@@ -15,6 +15,12 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-21
+
+### Added
+
+- **`analyseObjectProperties`** (and its reading `readObjectPropertiesAbsence`): for `getUtils().getObjectProperties`, an answer that is no `opr:objectProperties` document holding `opr:object` — an empty body, a body that is not XML, another document such as a sign-in page — is refused `ADT_OBJECT_NOT_FOUND` ("The answer is not an object properties document"). A caller who reads such an answer otherwise passes its own `analyse`.
+
 ## [0.14.0] - 2026-10-21
 
 ### Changed
