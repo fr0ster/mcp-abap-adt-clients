@@ -35,9 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `/sap/bc/adt/vit/wb/object_type/trant/object_name/{name}` (measured on
   premise, SAP_BASIS 816: `200`; the old `/sap/bc/adt/transactions/{name}`
   answers `422`). `AdtUtilsLegacy` refuses it (`UNSUPPORTED_OPERATION`), as
-  legacy discovery lists no such endpoint. The contract atom,
-  `IAdtObjectProperties`, is declared in this package until
-  `@mcp-abap-adt/interfaces-adt` carries one.
+  legacy discovery lists no such endpoint. `getUtils()`'s contract carries it
+  as `IAdtObjectProperties` (`@mcp-abap-adt/interfaces-adt` 20.1.0).
 
   **BREAKING: `IUtilResults` has one more required slot, `objectProperties`.**
   A result set that spreads `utilDocuments` is unaffected; one written slot by
@@ -56,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 
+- `@mcp-abap-adt/interfaces-adt` is `^20.1.0`.
 - **BREAKING: `getSystemInformation(connection, options?)` answers an
   `IAdtResponse`, and only a `404` is the endpoint absent.** It answered `null`
   for a `404`, `405` or `501` and also for a `2xx` whose body it could not read,

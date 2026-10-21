@@ -30,6 +30,7 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
+  IAdtObjectProperties,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
@@ -210,7 +211,6 @@ import {
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
-import type { IAdtObjectProperties } from '../core/shared/types';
 import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
 import {
   AdtStructure,
@@ -726,8 +726,7 @@ export type IScalarFunctionImplementationContract<
   >;
 /**
  * The cross-cutting operations, as the atoms `AdtUtils` implements — every
- * member it has (#109). `IAdtObjectProperties` is this package's own until
- * `@mcp-abap-adt/interfaces-adt` carries an atom for that endpoint. `getUtils()` answers this, not the class.
+ * member it has (#109). `getUtils()` answers this, not the class.
  */
 export type IUtilsContract<R extends IUtilResults> = IAdtInformationSystem<
   ReturnType<R['search']>,

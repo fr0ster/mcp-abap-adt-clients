@@ -89,6 +89,7 @@ import type {
   IAdtHeaders,
   IAdtInformationSystem,
   IAdtObjectAccess,
+  IAdtObjectProperties,
   IAdtOperationOptions,
   IAdtRepositoryStructure,
   IAdtResponse,
@@ -141,7 +142,6 @@ import { buildObjectUri } from '../../utils/activationUtils';
 import type {
   AdtObjectType,
   AdtSourceObjectType,
-  IAdtObjectProperties,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
   IGetSqlQueryParams,
