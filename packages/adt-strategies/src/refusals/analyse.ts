@@ -15,6 +15,7 @@ import {
   readExceptionRefusal,
   readExceptionSubType,
   readMessageClassMessageAbsence,
+  readObjectPropertiesAbsence,
   readPublicationRefusal,
   readUnitTestRefusal,
   readValidationRefusal,
@@ -284,6 +285,15 @@ export const analyseMessageClassMessage = (
   msgno: string,
 ): IAnalyse<IAdtMessageFailure> =>
   analyser((document) => readMessageClassMessageAbsence(document, msgno));
+
+/**
+ * Reading an object's properties: a `200` is not the object being described.
+ * An answer that is no `opr:objectProperties` document holding the object is
+ * refused `ADT_OBJECT_NOT_FOUND`.
+ */
+export const analyseObjectProperties: IAnalyse<IAdtMessageFailure> = analyser(
+  readObjectPropertiesAbsence,
+);
 
 /**
  * A unit-test run that started without saying which run it is.

@@ -91,7 +91,7 @@ misses the first of them silently and reports a taken name as free.
 `analyseUnitTest`, `analyseException`, `analysePublication`,
 `analyseCdsTestDoubles` — `analyseAny`, which dispatches on the root element
 when the form is not known in advance, and five built for one question:
-`analyseMessageClassMessage(msgno)`, `analyseUnitTestStart`,
+`analyseMessageClassMessage(msgno)`, `analyseObjectProperties`, `analyseUnitTestStart`,
 `analysePublicationLock`, `analyseDebuggeeEnd`, `analyseDebuggerFreed` and
 `analyseUnsupportedStatus(statuses, what)`.
 
@@ -125,10 +125,11 @@ a `403` on a service binding's LOCK that is to be ignored
 | `analyseDebuggerFreed` | `terminateDebugger`: a `500` served as `text/plain` or with an empty body, with no ADT exception document, is the debugger freeing its own session, no failure; everything else (a `500` with an exception document or served as anything else, other statuses, a connection failure, a body that is not a string) as `analyseException` |
 | `analyseCdsTestDoubles` | the CDS test-doubles check |
 | `analyseMessageClassMessage(msgno)` | the class answering is not the message existing: a class document without the message, and an answer that is no message class document at all (empty, not XML, another document), are refused `ADT_OBJECT_NOT_FOUND` (since 0.14.0 the second too) |
+| `analyseObjectProperties` | a `200` from `getUtils().getObjectProperties` is not the object being described: an answer that is no `opr:objectProperties` document holding `opr:object` (empty, not XML, another document such as a sign-in page) is refused `ADT_OBJECT_NOT_FOUND` (since 0.15.0) |
 | `analyseUnitTestStart` | a started run whose answer names no run id |
 | `analyseUnsupportedStatus(statuses, what)` | renames a `404`/`405`/`501`… as `UNSUPPORTED_OPERATION` — a system without the resource, told apart from a refusal |
 | `analyseAny` | dispatches on the root element when the form is not known in advance |
-| `readActivationRefusal`, `readCheckRunRefusal`, `readDeletionRefusal`, `readValidationRefusal`, `readUnitTestRefusal`, `readExceptionRefusal`, `readPublicationRefusal`, `readCdsTestDoublesRefusal`, `readMessageClassMessageAbsence`, `readAdtRefusal` | the readings underneath — pure functions over a document, answering `AdtRefusal` or `null` |
+| `readActivationRefusal`, `readCheckRunRefusal`, `readDeletionRefusal`, `readValidationRefusal`, `readUnitTestRefusal`, `readExceptionRefusal`, `readPublicationRefusal`, `readCdsTestDoublesRefusal`, `readMessageClassMessageAbsence`, `readObjectPropertiesAbsence`, `readAdtRefusal` | the readings underneath — pure functions over a document, answering `AdtRefusal` or `null` |
 | `readExceptionSubType` | the subtype an `exc:exception` names (`com.sap.adt.communicationFramework.subType`), or `undefined` |
 | `isIndeterminateWalkAnswer` | says an empty node structure cannot be read: an empty package and one that does not exist answer identically |
 | `AdtMessage`, `AdtRefusal`, `IAdtMessageFailure` | the shapes those produce |

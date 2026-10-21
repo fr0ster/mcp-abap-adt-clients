@@ -7,6 +7,7 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   analyseCdsTestDoubles,
   analyseMessageClassMessage,
+  analyseObjectProperties,
   analysePublication,
   analyseUnitTestStart,
   analyseUnsupportedStatus,
@@ -103,6 +104,39 @@ describe('analyseMessageClassMessage', () => {
     );
     expect((failure as IAdtError).message).toBe(
       'Message 001: the answer is not a message class document',
+    );
+  });
+});
+
+describe('analyseObjectProperties', () => {
+  const props =
+    '<opr:objectProperties xmlns:opr="http://www.sap.com/adt/ris/objectProperties"><opr:object text="ABAP Editor" name="SE38" package="SEDT" type="TRAN/T"/><opr:property facet="APPL" name="BC"/></opr:objectProperties>';
+  it('lets an object properties document holding the object through', () => {
+    expect(analyseObjectProperties(ADT_NO_FAILURE, answer(props))).toBe(
+      ADT_NO_FAILURE,
+    );
+  });
+  it.each([
+    ['an empty body', ''],
+    ['a body that is not XML', 'not xml'],
+    ['a sign-in page', '<html><head><title>Logon</title></head></html>'],
+    [
+      'a truncated document',
+      '<opr:objectProperties xmlns:opr="http://www.sap.com/adt/ris/objectProperties"><opr:object name="SE38" type="TRAN/T">',
+    ],
+    ['two documents in one body', `${props}${props}`],
+    [
+      'the document without its object',
+      '<opr:objectProperties xmlns:opr="http://www.sap.com/adt/ris/objectProperties"><opr:property facet="APPL" name="BC"/></opr:objectProperties>',
+    ],
+  ])('refuses %s as OBJECT_NOT_FOUND', (_label, body) => {
+    const failure = analyseObjectProperties(ADT_NO_FAILURE, answer(body));
+    expect(failure).not.toBe(ADT_NO_FAILURE);
+    expect((failure as IAdtError).code).toBe(
+      AdtObjectErrorCodes.OBJECT_NOT_FOUND,
+    );
+    expect((failure as IAdtError).message).toBe(
+      'The answer is not an object properties document',
     );
   });
 });
