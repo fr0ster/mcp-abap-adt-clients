@@ -37,9 +37,11 @@ changes: no code of the package and no dependency range of it.
   `docs/development/RFC_TESTING.md`), `@parcel/watcher` and `unrs-resolver`
   (Jest's; both ship prebuilt binaries as optional dependencies). `.npmrc`:
   `strict-allow-scripts=true`, so a new dependency with an unreviewed install
-  script fails the install; `min-release-age=7`, except
-  `min-release-age-exclude[]=@mcp-abap-adt/*`, which the chain releases to
-  itself the same day.
+  script fails the install. No release-age gate (`min-release-age`): it
+  conflicts with the gating audit — a security fix younger than the gate
+  could not be installed while the audit kept CI red on the advisory it
+  fixes. The install-script policy, the lockfile's integrity hashes,
+  `npm ci --ignore-scripts` and the gating audit are the defence.
 - **Workflows install with `npm ci --ignore-scripts`** (npm reads
   `allowScripts` in full only from 11.19.0), gate on
   `npm audit --audit-level=moderate` for both lockfiles — this package's and
@@ -50,20 +52,11 @@ changes: no code of the package and no dependency range of it.
   `ts-node` was never installed, so every `npx ts-node` script fetched it from
   the registry at run time: it is a dev dependency now (`^10.9.2`). The unit
   suite has its script, `npm run test:unit`.
-- **Lockfile refreshed within ranges** under the 7-day age: follow-redirects
-  1.16.1 under axios (high advisories), jest 30.5.2, ts-jest 29.4.15, Biome
-  2.5.15 (two findings of its new rules fixed), fast-xml-parser 5.11.2.
-  `npm audit`: 0, `--omit=dev`: 0.
-- **One-time exception to the 7-day age: markdown-it 14.3.3** (dev
-  dependency, range now `^14.3.3`). 14.3.2 carries two high advisories
-  (GHSA-vfgh-jcmw-g37q, quadratic-time inline HTML parsing; GHSA-gfr2-rv44-r23c,
-  quadratic-time rendering of a multi-line link reference definition), and
-  the fix was published 2026-10-16, a few hours short of 7 days. The owner
-  chose not to wait: it was resolved by one
-  `npm install markdown-it@^14.3.3 --save-dev --min-release-age=0`. `.npmrc`
-  is unchanged — `min-release-age=7` holds for everything else, markdown-it
-  has no permanent exclusion — and `npm ci` installs the pinned version
-  under it.
+- **Lockfile refreshed within ranges**: follow-redirects 1.16.1 under axios
+  and markdown-it 14.3.3 (dev range now `^14.3.3`; 14.3.2 had
+  GHSA-vfgh-jcmw-g37q and GHSA-gfr2-rv44-r23c, both high), jest 30.5.2,
+  ts-jest 29.4.15, Biome 2.5.15 (two findings of its new rules fixed),
+  fast-xml-parser 5.11.2. `npm audit`: 0, `--omit=dev`: 0.
 - `src/__tests__/unit/supplyChain.test.ts` holds both packages, both
   workflows, the hook and the runner scripts to this.
 

@@ -130,11 +130,15 @@ describe.each(PACKAGES)('%s decides every install script', (dir) => {
     ).toBe(true);
   });
 
-  it('.npmrc makes an unreviewed install script fail, and waits 7 days for a release', () => {
+  it('.npmrc makes an unreviewed install script fail, and sets no release-age gate', () => {
+    // No min-release-age: it conflicts with the gating audit — a security
+    // fix younger than the gate could not be installed while the audit
+    // kept CI red on the advisory it fixes.
     const npmrc = lines(join(dir, '.npmrc')).map((line) => line.trim());
     expect(npmrc).toContain('strict-allow-scripts=true');
-    expect(npmrc).toContain('min-release-age=7');
-    expect(npmrc).toContain('min-release-age-exclude[]=@mcp-abap-adt/*');
+    expect(npmrc.filter((line) => line.startsWith('min-release-age'))).toEqual(
+      [],
+    );
   });
 
   it('the lockfile resolves every package from the registry, none linked', () => {
