@@ -2050,6 +2050,43 @@ run_unit_test:
         unit_test_result:
           with_navigation_uris: false
           format: "abapunit"  # or "junit"
+    # The same tests through both runners: the asynchronous one (`run` on
+    # /abapunit/runs, polled) and the synchronous one (`runSync` on
+    # /abapunit/testruns), compared — one test passes, one fails on purpose.
+    # The class is created and deleted by the test.
+    - name: "adt_unit_test_sync"
+      enabled: true
+      description: "Run a class's unit tests asynchronously and synchronously, and compare"
+      params:
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        container_class: "ZAC_UTSY_CLS"
+        source_code: |
+          CLASS zac_utsy_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+            PUBLIC SECTION.
+              METHODS add IMPORTING a TYPE i b TYPE i RETURNING VALUE(r) TYPE i.
+          ENDCLASS.
+          CLASS zac_utsy_cls IMPLEMENTATION.
+            METHOD add.
+              r = a + b.
+            ENDMETHOD.
+          ENDCLASS.
+        test_class_source: |
+          CLASS ltc_add DEFINITION FINAL FOR TESTING DURATION SHORT RISK LEVEL HARMLESS.
+            PRIVATE SECTION.
+              METHODS adds_two FOR TESTING.
+              METHODS fails_on_purpose FOR TESTING.
+          ENDCLASS.
+          CLASS ltc_add IMPLEMENTATION.
+            METHOD adds_two.
+              cl_abap_unit_assert=>assert_equals( act = NEW zac_utsy_cls( )->add( a = 1 b = 1 ) exp = 2 ).
+            ENDMETHOD.
+            METHOD fails_on_purpose.
+              cl_abap_unit_assert=>assert_equals( act = NEW zac_utsy_cls( )->add( a = 1 b = 1 ) exp = 3 ).
+            ENDMETHOD.
+          ENDCLASS.
+        passing_method: "ADDS_TWO"
+        failing_method: "FAILS_ON_PURPOSE"
 
 # Create CDS Unit Test
 # NOTE: run_program_unit_test and run_function_group_unit_test were added to the

@@ -3,7 +3,7 @@
  * manages the tests themselves — that is the local test class's.
  */
 
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import { analyseUnitTest, unitTestRunId } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -18,7 +18,36 @@ import { ClassTestRunnerLegacy } from '../../../executors/class/ClassTestRunnerL
 import { expectFailure, expectResult } from '../../helpers/contract';
 import { createLibraryLogger } from '../../helpers/testLogger';
 
-type Call = { url: string; method: string; data?: unknown };
+type Call = {
+  url: string;
+  method: string;
+  data?: unknown;
+  headers?: Record<string, string>;
+};
+
+/** What `/testruns` answers: the finished run, one test failed. */
+const RUN_RESULT = `<?xml version="1.0" encoding="utf-8"?><aunit:runResult xmlns:aunit="http://www.sap.com/adt/aunit" xmlns:adtcore="http://www.sap.com/adt/core">
+<program adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests" adtcore:name="ZCL_TESTS"><testClasses><testClass adtcore:name="LTC_ADD"><testMethods>
+<testMethod adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests/includes/testclasses#adds" adtcore:name="ADDS_TWO"/>
+<testMethod adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests/includes/testclasses#fails" adtcore:name="FAILS_ON_PURPOSE"><alerts><alert kind="failedAssertion" severity="critical"><title>Critical Assertion Error: 'Assert Equals'</title></alert></alerts></testMethod>
+</testMethods></testClass></testClasses></program></aunit:runResult>`;
+
+/**
+ * The body the legacy runner sent before the endpoint moved into the shared
+ * core, byte for byte: a legacy system must keep receiving exactly this.
+ */
+const LEGACY_BODY = `<?xml version="1.0" encoding="UTF-8"?><aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">
+  <external>
+    <coverage active="false"/>
+  </external>
+  <adtcore:objectSets xmlns:adtcore="http://www.sap.com/adt/core">
+    <objectSet kind="inclusive">
+      <adtcore:objectReferences>
+        <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests"/>
+      </adtcore:objectReferences>
+    </objectSet>
+  </adtcore:objectSets>
+</aunit:runConfiguration>`;
 
 const RUN_STARTED = {
   status: 200,
@@ -114,7 +143,163 @@ describe('ClassTestRunner — running', () => {
   });
 });
 
+describe('ClassTestRunner — running synchronously (runSync)', () => {
+  /** Marks which strategy read the answer. */
+  const results = {
+    ...classTestRunnerDocuments,
+    run: () => 'read by run',
+    result: () => 'read by result',
+  };
+
+  it('one POST to /testruns, application/xml both ways, read by `result`', async () => {
+    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunner(conn, createLibraryLogger(), results);
+
+    const answer = expectResult(await runner.runSync('zcl_tests'), 'runSync');
+
+    expect(answer).toBe('read by result');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
+    expect(calls[0].headers).toEqual({
+      'Content-Type': 'application/xml',
+      Accept: 'application/xml',
+    });
+  });
+
+  it('the run configuration names the class by URI, with the default options', async () => {
+    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunner(conn, createLibraryLogger());
+
+    await runner.runSync('zcl_tests');
+
+    const body = String(calls[0].data);
+    expect(body).toContain(
+      '<aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">',
+    );
+    expect(body).toContain(
+      '<adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests"/>',
+    );
+    expect(body).toContain(
+      '<testDeterminationStrategy sameProgram="true" assignedTests="false" appendAssignedTestsPreview="true"/>',
+    );
+    expect(body).toContain(
+      '<testRiskLevels harmless="true" dangerous="true" critical="true"/>',
+    );
+    expect(body).toContain(
+      '<testDurations short="true" medium="true" long="true"/>',
+    );
+    expect(body).not.toContain('<aunit:run ');
+  });
+
+  it('scope, risk levels and durations are sent as given', async () => {
+    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunner(conn, createLibraryLogger());
+
+    await runner.runSync('ZCL_TESTS', {
+      title: 'not in this format',
+      scope: { ownTests: false, foreignTests: true },
+      riskLevel: { dangerous: false, critical: false },
+      duration: { long: false },
+    });
+
+    const body = String(calls[0].data);
+    expect(body).toContain(
+      '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="true"/>',
+    );
+    expect(body).toContain(
+      '<testRiskLevels harmless="true" dangerous="false" critical="false"/>',
+    );
+    expect(body).toContain(
+      '<testDurations short="true" medium="true" long="false"/>',
+    );
+    expect(body).not.toContain('not in this format');
+    expect(body).not.toContain('analyse');
+  });
+
+  it('test definitions run each distinct container whole', async () => {
+    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunner(conn, createLibraryLogger());
+
+    await runner.runSync([
+      { containerClass: 'ZCL_A', testClass: 'LTCL_1' },
+      { containerClass: 'ZCL_A', testClass: 'LTCL_2' },
+      { containerClass: 'ZCL_B', testClass: 'LTCL_1' },
+    ]);
+
+    const refs = [
+      ...String(calls[0].data).matchAll(
+        /objectReference adtcore:uri="([^"]+)"/g,
+      ),
+    ].map((m) => m[1]);
+    expect(refs).toEqual([
+      '/sap/bc/adt/oo/classes/zcl_a',
+      '/sap/bc/adt/oo/classes/zcl_b',
+    ]);
+  });
+
+  it('a failing test is the caller’s analyse to judge, not the runner’s', async () => {
+    const { conn } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunner(conn, createLibraryLogger());
+
+    const asItCame = expectResult(
+      await runner.runSync('ZCL_TESTS'),
+      'no analyse',
+    );
+    expect(String(asItCame)).toContain('FAILS_ON_PURPOSE');
+
+    const judged = expectFailure(
+      await runner.runSync('ZCL_TESTS', { analyse: analyseUnitTest }),
+      'analyseUnitTest',
+    );
+    expect(judged.message).toContain(
+      "Critical Assertion Error: 'Assert Equals'",
+    );
+  });
+
+  it('AdtExecutor hands it out; the asynchronous `run` stays on /runs', async () => {
+    const { conn, calls } = makeConn(() => RUN_STARTED);
+    const runner = new AdtExecutor(conn).getClassTestRunner();
+
+    await runner.run('ZCL_TESTS');
+    await runner.runSync('ZCL_TESTS');
+
+    expect(calls.map((c) => c.url)).toEqual([
+      '/sap/bc/adt/abapunit/runs',
+      '/sap/bc/adt/abapunit/testruns',
+    ]);
+  });
+});
+
 describe('ClassTestRunnerLegacy', () => {
+  it('run sends the body it always sent — no <options>', async () => {
+    const { conn, calls } = makeConn();
+    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+
+    await runner.run('ZCL_TESTS', { riskLevel: { dangerous: false } });
+
+    expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
+    expect(calls[0].data).toBe(LEGACY_BODY);
+    expect(calls[0].headers).toEqual({
+      'Content-Type': 'application/xml',
+      Accept: 'application/xml',
+    });
+  });
+
+  it('runSync is the same request, read by `result`', async () => {
+    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger(), {
+      ...classTestRunnerDocuments,
+      run: () => 'read by run',
+      result: () => 'read by result',
+    });
+
+    expect(expectResult(await runner.runSync('ZCL_TESTS'), 'runSync')).toBe(
+      'read by result',
+    );
+    expect(calls[0].data).toBe(LEGACY_BODY);
+  });
+
   it('runs each distinct container whole, on /testruns', async () => {
     const { conn, calls } = makeConn();
     const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());

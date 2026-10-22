@@ -104,7 +104,7 @@ answered there.
 
 | Object Type | Getter | Note |
 |-------------|--------|------|
-| ABAP Unit run | `AdtExecutorLegacy.getClassTestRunner()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — `run` answers the finished result; `getStatus`/`getResult` refuse without a request |
+| ABAP Unit run | `AdtExecutorLegacy.getClassTestRunner()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — `run` answers the finished result; `getStatus`/`getResult` refuse without a request; `runSync` sends the same request as `run` and reads it with the `result` strategy |
 | ABAP Unit run of a function group or module | `AdtExecutorLegacy.getFunctionGroupTestRunner()`, `getFunctionModuleTestRunner()` | refused without a request — no legacy endpoint measured to find them |
 | ABAP Unit run of a report | `AdtExecutorLegacy.getProgramTestRunner()` | refused without a request — `/abapunit/testruns` given a report's URI answered an empty result where `/abapunit/runs` found the tests |
 | CDS test-doubles check | `getDdl().checkCdsTestDoubles()` | `/sap/bc/adt/aunit/dbtestdoubles/cds/validation` absent — refused without a request |
