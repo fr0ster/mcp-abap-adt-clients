@@ -128,3 +128,110 @@ export async function getUnitTestRunResult(
     },
   });
 }
+
+// =============================================================================
+// The synchronous runner: /abapunit/testruns
+// =============================================================================
+
+const CT_TESTRUNS = 'application/xml';
+const ACCEPT_TESTRUNS = 'application/xml';
+
+/**
+ * Run the ABAP Unit tests of whole objects and answer the finished result —
+ * `POST /sap/bc/adt/abapunit/testruns`, one request, no run to poll. The
+ * objects are named by their ADT URIs: a class, a report, a function group, a
+ * function module.
+ *
+ * The one implementation of this endpoint: every runner's `runSync`, and the
+ * legacy class runner's `run`, send it.
+ *
+ * **Measured:** synchronous on a modern and a legacy on-prem system, over HTTP
+ * and over RFC — `<aunit:runResult>` in the POST's answer, no `Location` — and
+ * the typed and `application/xml` bodies byte-identical; the legacy system
+ * ignores a typed `Accept` and answers `application/xml` either way. Advertised
+ * (2026-10-22) by an on-prem system and an ABAP Cloud system alike, beside
+ * `/abapunit/runs`; and on an on-prem S/4HANA 2023 that has no `/runs` at all
+ * (fr0ster/mcp-abap-adt#286).
+ *
+ * **`<options>` decides whether anything runs for a report or a function
+ * group.** Measured on premise (SAP_BASIS 816, 2026-10-23): with `<options>`, a
+ * report (test class in its own source or in an include it pulls in), a
+ * function group and a function module each ran the same tests with the same
+ * alerts as `/abapunit/runs`; the same body without `<options>` answered `200`
+ * with an empty `<aunit:runResult/>` for all four. An include's own URI
+ * answered empty even with `<options>` — its tests run through the report. So
+ * every runner but the legacy class runner sends `<options>`.
+ *
+ * **Reading the result: `kind` carries the distinction, `severity` does not.**
+ * A failed assertion and an uncaught exception both come back
+ * `severity="critical"`, so a parser classifying on severity reports a short
+ * dump as a failed test. `kind` separates them: `failedAssertion`,
+ * `exception`, `noTestClasses`.
+ *
+ * The format differs from `/runs`:
+ * - root `aunit:runConfiguration` in `http://www.sap.com/adt/aunit` (not
+ *   `aunit:run` in `http://www.sap.com/adt/api/aunit`);
+ * - objects by URI in `adtcore:objectReferences` — so a run covers whole
+ *   objects: the format has no way to name one test class inside its
+ *   container;
+ * - `application/xml` for `Content-Type` and `Accept`.
+ *
+ * `options` absent sends no `<options>` element — the body the legacy class
+ * runner has always sent, unchanged. Given (`{}` included), the scope, risk
+ * levels and durations go in `<options>` with the same defaults `/runs` gets;
+ * `title` and `context` have no place in this format and are not sent.
+ */
+export async function startUnitTestRunSync(
+  connection: IAbapConnection,
+  objectUris: string[],
+  options?: IClassUnitTestRunOptions,
+): Promise<IAdtWireResponse> {
+  const objectRefs = objectUris
+    .map((uri) => {
+      return `        <adtcore:objectReference adtcore:uri="${escapeXmlAttr(uri)}"/>`;
+    })
+    .join('\n');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">
+  <external>
+    <coverage active="false"/>
+  </external>
+${options ? testRunsOptions(options) : ''}  <adtcore:objectSets xmlns:adtcore="http://www.sap.com/adt/core">
+    <objectSet kind="inclusive">
+      <adtcore:objectReferences>
+${objectRefs}
+      </adtcore:objectReferences>
+    </objectSet>
+  </adtcore:objectSets>
+</aunit:runConfiguration>`;
+
+  return connection.makeAdtRequest({
+    url: '/sap/bc/adt/abapunit/testruns',
+    method: 'POST',
+    timeout: 0,
+    data: xml,
+    headers: {
+      'Content-Type': CT_TESTRUNS,
+      Accept: ACCEPT_TESTRUNS,
+    },
+  });
+}
+
+/**
+ * `<options>` of a `runConfiguration`, as Eclipse sends it. The scope's three
+ * flags are `testDeterminationStrategy`'s: own tests are `sameProgram`,
+ * foreign tests `assignedTests`, their preview `appendAssignedTestsPreview`.
+ */
+function testRunsOptions(options: IClassUnitTestRunOptions): string {
+  const scope = options.scope ?? {};
+  const risk = options.riskLevel ?? {};
+  const duration = options.duration ?? {};
+  return `  <options>
+    <uriType value="semantic"/>
+    <testDeterminationStrategy sameProgram="${boolAttr(scope.ownTests, true)}" assignedTests="${boolAttr(scope.foreignTests, false)}" appendAssignedTestsPreview="${boolAttr(scope.addForeignTestsAsPreview, true)}"/>
+    <testRiskLevels harmless="${boolAttr(risk.harmless, true)}" dangerous="${boolAttr(risk.dangerous, true)}" critical="${boolAttr(risk.critical, true)}"/>
+    <testDurations short="${boolAttr(duration.short, true)}" medium="${boolAttr(duration.medium, true)}" long="${boolAttr(duration.long, true)}"/>
+    <withNavigationUri enabled="true"/>
+  </options>
+`;
+}

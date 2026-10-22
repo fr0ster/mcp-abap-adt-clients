@@ -49,6 +49,31 @@ const LEGACY_BODY = `<?xml version="1.0" encoding="UTF-8"?><aunit:runConfigurati
   </adtcore:objectSets>
 </aunit:runConfiguration>`;
 
+/**
+ * The body `runSync` sends for one class with no options given, byte for byte:
+ * the shared request now also serves reports and function groups, and a class
+ * must keep receiving exactly this.
+ */
+const SYNC_BODY = `<?xml version="1.0" encoding="UTF-8"?><aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">
+  <external>
+    <coverage active="false"/>
+  </external>
+  <options>
+    <uriType value="semantic"/>
+    <testDeterminationStrategy sameProgram="true" assignedTests="false" appendAssignedTestsPreview="true"/>
+    <testRiskLevels harmless="true" dangerous="true" critical="true"/>
+    <testDurations short="true" medium="true" long="true"/>
+    <withNavigationUri enabled="true"/>
+  </options>
+  <adtcore:objectSets xmlns:adtcore="http://www.sap.com/adt/core">
+    <objectSet kind="inclusive">
+      <adtcore:objectReferences>
+        <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests"/>
+      </adtcore:objectReferences>
+    </objectSet>
+  </adtcore:objectSets>
+</aunit:runConfiguration>`;
+
 const RUN_STARTED = {
   status: 200,
   headers: { location: '/sap/bc/adt/abapunit/runs/00155D-3F2A' },
@@ -190,6 +215,15 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
       '<testDurations short="true" medium="true" long="true"/>',
     );
     expect(body).not.toContain('<aunit:run ');
+  });
+
+  it('the body is pinned byte for byte', async () => {
+    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+    const runner = new ClassTestRunner(conn, createLibraryLogger());
+
+    await runner.runSync('ZCL_TESTS');
+
+    expect(calls[0].data).toBe(SYNC_BODY);
   });
 
   it('scope, risk levels and durations are sent as given', async () => {
