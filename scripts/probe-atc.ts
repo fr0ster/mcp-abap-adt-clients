@@ -49,9 +49,9 @@
  * of the spec's recorded facts are error responses.
  *
  * Usage:
- *   npx ts-node scripts/probe-atc.ts
- *   npx ts-node scripts/probe-atc.ts --package=ZADT_BLD_PKG03 --out=atc-probe
- *   MCP_ENV_PATH=./trial.env npx ts-node scripts/probe-atc.ts
+ *   node_modules/.bin/ts-node scripts/probe-atc.ts
+ *   node_modules/.bin/ts-node scripts/probe-atc.ts --package=ZADT_BLD_PKG03 --out=atc-probe
+ *   MCP_ENV_PATH=./trial.env node_modules/.bin/ts-node scripts/probe-atc.ts
  *
  * Flags:
  *   --package=NAME   package to take representative objects from

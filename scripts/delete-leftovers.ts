@@ -8,7 +8,7 @@
  * the cleanup is a deliberate, named script rather than a force-delete hidden
  * inside the harness.
  *
- *   npx ts-node scripts/delete-leftovers.ts ZAC_INNER_PKG03 ZAC_SRVD01
+ *   node_modules/.bin/ts-node scripts/delete-leftovers.ts ZAC_INNER_PKG03 ZAC_SRVD01
  *
  * Names are matched against the list below, so a typo deletes nothing rather
  * than something else.

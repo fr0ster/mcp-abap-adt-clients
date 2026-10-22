@@ -14,7 +14,7 @@
  * prints every exchange whole: status, headers, body. The class is created here
  * and deleted here.
  *
- *   npx ts-node scripts/probe-testclass-empty-write.ts [CLASS]
+ *   node_modules/.bin/ts-node scripts/probe-testclass-empty-write.ts [CLASS]
  */
 
 import * as fs from 'node:fs';

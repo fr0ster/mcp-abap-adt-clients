@@ -24,8 +24,8 @@
  * into an error is required. Nothing is created: validation is a question.
  *
  * Usage:
- *   npx ts-node scripts/probe-validation-params.ts
- *   npx ts-node scripts/probe-validation-params.ts --package=TEST_MCP --out=validation-probe
+ *   node_modules/.bin/ts-node scripts/probe-validation-params.ts
+ *   node_modules/.bin/ts-node scripts/probe-validation-params.ts --package=TEST_MCP --out=validation-probe
  *
  * Writes `DIR/manifest.json` and one raw body per request, and prints the
  * matrix. Exit code is 1 only if the probe could not ask at all.

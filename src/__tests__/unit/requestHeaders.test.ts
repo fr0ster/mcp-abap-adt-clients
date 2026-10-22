@@ -732,7 +732,8 @@ describe('the batch path', () => {
     await pending;
 
     expect(send).toHaveBeenCalledTimes(1);
-    const body = (send.mock.calls[0]?.[0] as { data: string }).data;
+    const body = (send.mock.calls[0]?.[0] as { data: string } | undefined)
+      ?.data;
     expect(body).toContain(`Accept: ${pair.accept}`);
     expect(body).toContain(`Content-Type: ${pair.contentType}`);
   });

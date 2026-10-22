@@ -14,7 +14,7 @@
  * whether that succeeds is one of the things being measured, so check the
  * package afterwards.
  *
- *   npx ts-node scripts/probe-unfinished-create.ts
+ *   node_modules/.bin/ts-node scripts/probe-unfinished-create.ts
  */
 
 import * as fs from 'node:fs';

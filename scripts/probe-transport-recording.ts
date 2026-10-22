@@ -13,9 +13,9 @@
  * contains, so that is what gets printed — before, after the create, and after
  * the update.
  *
- *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816
- *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816 --update-request=DEVK906818
- *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816 ZAC_TR_CLS02 --keep
+ *   node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816
+ *   node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816 --update-request=DEVK906818
+ *   node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816 ZAC_TR_CLS02 --keep
  *
  * **`--update-request` is what makes the update half provable.** With one
  * request the class is already in it after the create, so a list that does not

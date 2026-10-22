@@ -14,7 +14,7 @@
  * round: listen on L, run on T, then attach on a fresh A; if A is refused,
  * attach on L too, for comparison. Then the debuggee is let go.
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-debugger-cross-server.ts [rounds] [--take-over]
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-debugger-cross-server.ts [rounds] [--take-over]
  *   ... --deploy   only create and activate the class, and leave it
  *   ... --run      only run the class once (for a debugger listening elsewhere)
  *

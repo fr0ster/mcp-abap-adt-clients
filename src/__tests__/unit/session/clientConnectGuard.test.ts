@@ -8,7 +8,7 @@
  * rather than "you never connected".
  *
  * No SAP, no HTTP:
- *   npx jest src/__tests__/unit/session
+ *   node_modules/.bin/jest src/__tests__/unit/session
  */
 import {
   ADT_SESSION_ERROR,

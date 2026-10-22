@@ -139,7 +139,10 @@ describe('case registration gate', () => {
         ...parsed,
         enhancement: {
           test_cases: [
-            { ...parsed.enhancement.test_cases[0], available_in: availableIn },
+            {
+              ...parsed.enhancement.test_cases[0],
+              available_in: availableIn,
+            },
           ],
         },
       })),

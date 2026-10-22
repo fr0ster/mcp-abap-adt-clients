@@ -8,7 +8,7 @@
  * The job takes about two minutes of server time and the request may time out
  * before it finishes; the state read at the end is the verdict, not the call.
  *
- *   npx ts-node scripts/unpublish-binding.ts ZAC_SRVB01
+ *   node_modules/.bin/ts-node scripts/unpublish-binding.ts ZAC_SRVB01
  */
 
 import * as fs from 'node:fs';

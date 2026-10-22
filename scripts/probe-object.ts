@@ -4,7 +4,7 @@
  * One GET. For confirming that a shared dependency a run needs is actually on
  * the system — a green `shared:setup` that printed nothing is not evidence.
  *
- *   npx ts-node scripts/probe-object.ts class ZAC_CLS023
+ *   node_modules/.bin/ts-node scripts/probe-object.ts class ZAC_CLS023
  */
 
 import * as fs from 'node:fs';

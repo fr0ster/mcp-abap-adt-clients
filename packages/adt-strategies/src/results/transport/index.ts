@@ -49,12 +49,12 @@ export const transportObjectEntries: IResultStrategy<
   ITransportObjectEntry[]
 > = (answer) => parseObjectEntries(answer.data);
 
+export type * from './types';
 export {
   type ICreatedTransport,
+  type ITransportObjectEntry,
   parseCreatedTransport,
   parseObjectEntries,
   parseSearchConfigurations,
   parseTransportTree,
-  type ITransportObjectEntry,
 };
-export type * from './types';

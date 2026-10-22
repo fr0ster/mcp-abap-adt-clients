@@ -5,7 +5,7 @@
  * `?status=` filters answer an empty `<tm:root/>` on every system measured, so
  * a configuration is the only way to get a list at all.
  *
- *   npx ts-node scripts/list-transports.ts
+ *   node_modules/.bin/ts-node scripts/list-transports.ts
  */
 
 import * as fs from 'node:fs';

@@ -32,7 +32,7 @@
  * sake — this is a measurement with a fixed cost, not a pattern to copy.
  *
  *   MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/trial.env \
- *     npx ts-node scripts/probe-two-update-cycles.ts [ZAC_CLS_NAME] [--sessions=2]
+ *     node_modules/.bin/ts-node scripts/probe-two-update-cycles.ts [ZAC_CLS_NAME] [--sessions=2]
  *
  * Add `WIRE_LOG=probe-wire.txt` to see the cookies and the session type header.
  *

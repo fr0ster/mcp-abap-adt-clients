@@ -2,9 +2,9 @@
  * Script: Show package hierarchy/contents
  *
  * Usage:
- *   npx ts-node scripts/show-package-contents.ts <PACKAGE_NAME> [OPTIONS]
- *   npx ts-node scripts/show-package-contents.ts ZTEST_PKG
- *   npx ts-node scripts/show-package-contents.ts ZTEST_PKG --depth=3 --no-subpackages
+ *   node_modules/.bin/ts-node scripts/show-package-contents.ts <PACKAGE_NAME> [OPTIONS]
+ *   node_modules/.bin/ts-node scripts/show-package-contents.ts ZTEST_PKG
+ *   node_modules/.bin/ts-node scripts/show-package-contents.ts ZTEST_PKG --depth=3 --no-subpackages
  *
  * Options:
  *   --depth=N           Max depth for subpackages (default: 5)
@@ -119,7 +119,7 @@ async function run(): Promise<void> {
 
   if (!options.packageName) {
     console.error(
-      'Usage: npx ts-node scripts/show-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
+      'Usage: node_modules/.bin/ts-node scripts/show-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
     );
     console.error('');
     console.error('Options:');

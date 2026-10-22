@@ -13,9 +13,9 @@
  * The object is created if missing and **never deleted**. Nothing here cleans
  * up, on purpose: the residue is the measurement.
  *
- *   npx ts-node scripts/probe-repeated-update.ts
- *   npx ts-node scripts/probe-repeated-update.ts --writes 5
- *   npx ts-node scripts/probe-repeated-update.ts --writes 5 --no-activate
+ *   node_modules/.bin/ts-node scripts/probe-repeated-update.ts
+ *   node_modules/.bin/ts-node scripts/probe-repeated-update.ts --writes 5
+ *   node_modules/.bin/ts-node scripts/probe-repeated-update.ts --writes 5 --no-activate
  *
  * `--no-activate` writes without activating, which separates the two suspects:
  * if the locks appear anyway, the write takes them; if they do not, activation

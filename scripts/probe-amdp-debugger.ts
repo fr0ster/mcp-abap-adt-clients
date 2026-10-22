@@ -19,7 +19,7 @@
  * `#start=<line>` of a SQLScript statement; this probe finds the lines in the
  * class's source as the system has it.
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-amdp-debugger.ts
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-amdp-debugger.ts
  *   PROBE_FINISH=1     at the first break: clear the breakpoints and continue
  *   PROBE_RELEASE=1    at the first break: delete the debuggee (cancels it)
  *   PROBE_HARD_STOP=1  at the first break: stop the session with hardStop=true

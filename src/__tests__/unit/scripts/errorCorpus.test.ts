@@ -2406,7 +2406,7 @@ describe('the command', () => {
       ),
     ).scripts as Record<string, string>;
     expect(scripts['header:discovery']).toBe(
-      'npx ts-node tools/header-probe/errorCorpus.ts',
+      'ts-node tools/header-probe/errorCorpus.ts',
     );
     expect(scripts['header:discovery:next']).toBeUndefined();
     expect(

@@ -6,7 +6,7 @@
  * raw probe stays as the reference: when the two disagree, the library is
  * what changed.
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-debugger-cycle-client.ts
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-debugger-cycle-client.ts
  *   ... --keep            leave the probe class in place
  *   ... --deploy          only create and activate the probe class, and leave it
  *   ... --run-only        only run the class: no breakpoints, no listener of ours

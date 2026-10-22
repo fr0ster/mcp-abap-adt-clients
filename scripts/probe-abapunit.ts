@@ -24,8 +24,8 @@
  * whichever way it goes — a 406 for the v4 types would itself be the answer.
  *
  * Usage:
- *   npx ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
- *   MCP_ENV_PATH=./<other-system>.env npx ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
+ *   node_modules/.bin/ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
+ *   MCP_ENV_PATH=./<other-system>.env node_modules/.bin/ts-node scripts/probe-abapunit.ts --class=ZAC_UTST_CLS
  *
  * Flags:
  *   --class=NAME  the class carrying the tests. It must already exist with its

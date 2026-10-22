@@ -11,7 +11,7 @@
  * Before proposing that the type gains `IAdtLockable`, find out whether the
  * endpoint even offers one.
  *
- *   npx ts-node scripts/probe-binding-lock.ts ZAC_SRVB01
+ *   node_modules/.bin/ts-node scripts/probe-binding-lock.ts ZAC_SRVB01
  */
 
 import * as fs from 'node:fs';

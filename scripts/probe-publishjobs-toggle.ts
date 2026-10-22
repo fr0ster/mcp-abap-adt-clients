@@ -10,7 +10,7 @@
  * `srvb:published`. If it flips to false, the endpoint is driven by the
  * object's state, not by the URL, and `unpublishjobs` is the wrong address.
  *
- *   npx ts-node scripts/probe-publishjobs-toggle.ts ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
+ *   node_modules/.bin/ts-node scripts/probe-publishjobs-toggle.ts ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
  */
 
 import * as fs from 'node:fs';

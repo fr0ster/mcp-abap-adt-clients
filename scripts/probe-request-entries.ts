@@ -9,7 +9,7 @@
  *
  * Read-only. Prints what each level lists.
  *
- *   MCP_ENV_PATH=… npx ts-node scripts/probe-request-entries.ts <REQUEST>
+ *   MCP_ENV_PATH=… node_modules/.bin/ts-node scripts/probe-request-entries.ts <REQUEST>
  */
 
 import * as fs from 'node:fs';
