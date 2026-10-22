@@ -2126,12 +2126,67 @@ run_program_unit_test:
           ENDCLASS.
         expected_test_methods: ["PASSES"]
         # skip_cleanup: false  # true leaves the report and include for analysis
+    # The same report shapes through both runners: the asynchronous one (`run`
+    # on /abapunit/runs, polled) and the synchronous one (`runSync` on
+    # /abapunit/testruns, with <options>), compared — one test passes, one
+    # fails on purpose. One report holds its test class in its own source, the
+    # other pulls it in from an include. The test creates and deletes them.
+    - name: "adt_program_unit_test_sync"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Run a report's tests asynchronously and synchronously, and compare"
+      params:
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        own_program_name: "ZAC_UTSY_PROG1"
+        own_program_source: |
+          REPORT zac_utsy_prog1.
+
+          CLASS ltc_own DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS passes FOR TESTING.
+              METHODS fails FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltc_own IMPLEMENTATION.
+            METHOD passes.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 1 ).
+            ENDMETHOD.
+            METHOD fails.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 2 ).
+            ENDMETHOD.
+          ENDCLASS.
+        include_program_name: "ZAC_UTSY_PROG2"
+        include_name: "ZAC_UTSY_PROG2_T"
+        include_program_source: |
+          REPORT zac_utsy_prog2.
+
+          INCLUDE zac_utsy_prog2_t.
+        include_source: |
+          CLASS ltc_incl DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS passes FOR TESTING.
+              METHODS fails FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltc_incl IMPLEMENTATION.
+            METHOD passes.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 1 ).
+            ENDMETHOD.
+            METHOD fails.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 2 ).
+            ENDMETHOD.
+          ENDCLASS.
+        passing_method: "PASSES"
+        failing_method: "FAILS"
 
 # ABAP Unit on a function group and on one of its modules. The test class sits
 # in an include of the group (creating it adds the INCLUDE to the group's main
 # program); the group run (`FUGR`) runs every test of the group, the module run
 # (`FUNC`, what Eclipse sends) the tests that exercise that module. Measured on
-# premise, 2026-09-30. The test builds the group, runs both, and deletes it.
+# premise, 2026-09-30 — on SAP_BASIS 816 on 2026-10-23 the module run ran the
+# whole group (see adt_function_group_unit_test_sync). The test builds the
+# group, runs both, and deletes it.
 run_function_group_unit_test:
   test_cases:
     - name: "adt_function_group_unit_test"
@@ -2171,6 +2226,81 @@ run_function_group_unit_test:
           ENDCLASS.
         expected_test_methods: ["DOUBLES"]
         # skip_cleanup: false  # true leaves the group for analysis
+    # A group's and a module's tests through both runners, compared. The test
+    # include holds two test classes: LTC_MODULE calls the first module (one
+    # test passes, one fails on purpose), LTC_OTHER calls no module. The second
+    # module is exercised by no test. Whether a module's synchronous run keeps
+    # to the tests that exercise it, as the asynchronous one does, is what the
+    # two classes and the second module show. The test creates and deletes the
+    # group.
+    - name: "adt_function_group_unit_test_sync"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Run a function group's and its modules' tests asynchronously and synchronously, and compare"
+      params:
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        function_group_name: "ZAC_UTSY_FUGR"
+        function_module_name: "Z_AC_UTSY_FM"
+        function_module_source: |
+          FUNCTION z_ac_utsy_fm
+            IMPORTING
+              VALUE(iv_in) TYPE i
+            EXPORTING
+              VALUE(ev_out) TYPE i.
+            ev_out = iv_in * 2.
+          ENDFUNCTION.
+        untested_module_name: "Z_AC_UTSY_FM2"
+        untested_module_source: |
+          FUNCTION z_ac_utsy_fm2
+            IMPORTING
+              VALUE(iv_in) TYPE i
+            EXPORTING
+              VALUE(ev_out) TYPE i.
+            ev_out = iv_in * 3.
+          ENDFUNCTION.
+        include_name: "LZAC_UTSY_FUGRT99"
+        include_source: |
+          CLASS ltc_module DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS passes FOR TESTING.
+              METHODS fails FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltc_module IMPLEMENTATION.
+            METHOD passes.
+              DATA lv_out TYPE i.
+              CALL FUNCTION 'Z_AC_UTSY_FM'
+                EXPORTING
+                  iv_in  = 2
+                IMPORTING
+                  ev_out = lv_out.
+              cl_abap_unit_assert=>assert_equals( act = lv_out exp = 4 ).
+            ENDMETHOD.
+            METHOD fails.
+              DATA lv_out TYPE i.
+              CALL FUNCTION 'Z_AC_UTSY_FM'
+                EXPORTING
+                  iv_in  = 2
+                IMPORTING
+                  ev_out = lv_out.
+              cl_abap_unit_assert=>assert_equals( act = lv_out exp = 5 ).
+            ENDMETHOD.
+          ENDCLASS.
+
+          CLASS ltc_other DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS unrelated FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltc_other IMPLEMENTATION.
+            METHOD unrelated.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 1 ).
+            ENDMETHOD.
+          ENDCLASS.
+        module_methods: ["PASSES", "FAILS"]
+        other_methods: ["UNRELATED"]
+        failing_method: "FAILS"
 
 create_cds_unit_test:
   test_cases:

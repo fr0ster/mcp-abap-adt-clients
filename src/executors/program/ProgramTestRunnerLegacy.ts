@@ -3,10 +3,12 @@
  * (BASIS < 7.50), which has no `/abapunit/runs`.
  *
  * Refused without a request. The legacy endpoint, `/abapunit/testruns`, was
- * given a report's URI on premise (2026-09-30) and answered an empty result for
- * a report whose tests `/abapunit/runs` found — so sending it would answer "no
- * tests" where there are some. It stays refused until a legacy system is
- * measured.
+ * given a report's URI on premise (2026-09-30) without `<options>` — the body a
+ * legacy system is sent — and answered an empty result for a report whose
+ * tests `/abapunit/runs` found, so sending it would answer "no tests" where
+ * there are some. With `<options>` it runs them on SAP_BASIS 816 (2026-10-23),
+ * but no legacy system has been measured with that body: `run` and `runSync`
+ * stay refused until one is.
  */
 
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -24,6 +26,12 @@ export class ProgramTestRunnerLegacy<
     IAdtResponse<ReturnType<R['run']>, E>
   > {
     return refusedBelow750<ReturnType<R['run']>, E>("a report's");
+  }
+
+  override async runSync<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['result']>, E>
+  > {
+    return refusedBelow750<ReturnType<R['result']>, E>("a report's");
   }
 
   override async getStatus<E extends IAdtError = IAdtError>(): Promise<

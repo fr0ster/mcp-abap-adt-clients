@@ -24,6 +24,7 @@ export {
   FunctionModuleTestRunnerLegacy,
   functionModuleTestRunnerDocuments,
   type IFunctionModuleTestRunnerResults,
+  type IFunctionModuleTestRunSyncTarget,
 } from './functionModule';
 export {
   type IProgramExecutorResults,

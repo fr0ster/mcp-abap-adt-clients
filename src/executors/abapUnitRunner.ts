@@ -25,6 +25,7 @@ import {
   getUnitTestRunResult,
   getUnitTestRunStatus,
   startUnitTestRunByObject,
+  startUnitTestRunSync,
 } from '../core/shared/abapUnit';
 import { answering, failed } from '../utils/adtResponse';
 import { rawDocument } from '../utils/resultStrategy';
@@ -80,6 +81,28 @@ export abstract class AbapUnitRunner<R extends IAbapUnitRunnerResults>
       () => startUnitTestRunByObject(this.connection, { name, type }, options),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
       options?.analyse,
+    );
+  }
+
+  /**
+   * Run the tests of whole objects, named by their ADT URIs, and answer the
+   * finished result: one POST to `/abapunit/testruns`. Always with
+   * `<options>` — without it a report's, a function group's and a function
+   * module's run answered an empty result (see `core/shared/abapUnit`). The
+   * answer is the result document, so it is read by `result`, the strategy
+   * `getResult` uses; `options.analyse` judges it.
+   */
+  protected startSync<E extends IAdtError>(
+    objectUris: string[],
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+    // `runOptions` is an object even when the caller gave none, so the
+    // `<options>` element is always sent.
+    const { analyse, ...runOptions } = options ?? {};
+    return answering(
+      () => startUnitTestRunSync(this.connection, objectUris, runOptions),
+      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      analyse,
     );
   }
 

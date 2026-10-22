@@ -158,8 +158,8 @@ npm install @mcp-abap-adt/adt-clients
    - Executors:
      - `getClassExecutor()` for `classrun`
      - `getClassTestRunner()` for a class's ABAP Unit tests: `run`, `getStatus`, `getResult` (asynchronous, the default), or `runSync` (synchronous)
-     - `getProgramTestRunner()` for a report's ABAP Unit tests, in its source or its includes
-     - `getFunctionGroupTestRunner()` / `getFunctionModuleTestRunner()` for a function group's tests, or the ones exercising one module
+     - `getProgramTestRunner()` for a report's ABAP Unit tests, in its source or its includes — `run` (asynchronous, the default) or `runSync`
+     - `getFunctionGroupTestRunner()` / `getFunctionModuleTestRunner()` for a function group's tests, or a module's — `run` (asynchronous, the default) or `runSync`
      - `getProgramExecutor()` for `programrun` (on-premise systems)
    - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
    - Each executor factory takes an optional result set, like the runtime client's
@@ -468,7 +468,37 @@ through `executor.getProgramTestRunner().run(programName)`, with the same
 `getStatus`/`getResult`. A function group's are written in an include of the
 group (`getFunctionInclude()`) and run through `getFunctionGroupTestRunner()`
 for the whole group or `getFunctionModuleTestRunner()` for one module. Below
-7.50 these three runners refuse without a request.
+7.50 these three runners refuse without a request, `runSync` included.
+
+All three have `runSync` as well — the same `/abapunit/testruns` request as a
+class's, naming the object by its URI, read by `result` and judged by
+`options.analyse`:
+
+```typescript
+await executor.getProgramTestRunner().runSync('ZREPORT', { analyse: analyseUnitTest });
+await executor.getFunctionGroupTestRunner().runSync('ZGROUP', { analyse: analyseUnitTest });
+await executor
+  .getFunctionModuleTestRunner()
+  .runSync({ functionGroupName: 'ZGROUP', functionModuleName: 'Z_MODULE' }, { analyse: analyseUnitTest });
+```
+
+Their run configuration always carries `<options>` (scope, risk levels and
+durations, with `run`'s defaults). Measured on premise (SAP_BASIS 816,
+2026-10-23): with it, a report (test class in its own source or in an include),
+a function group and a function module each ran the same tests with the same
+alerts as `run`; without it the endpoint answered `200` with an empty
+`aunit:runResult`. Name the report, not the include: an include's own URI ran
+nothing, its tests run through the report.
+
+**A module's `runSync` runs its whole group's tests.** The module's URI lies
+under its group's, so the target names both. On the measured system it ran
+every test of the group — a test class that calls no module included — and so
+did the run of a module that no test calls; the result names the group
+(`FUGR/F`). `run` (`FUNC`) did the same there. The library filters nothing: a
+caller who wants one module's tests reads them out of the result. With an ABAP
+Doc test relation (`"! @testing FUNC:<module>`) on a test class, the default
+scope answered the group's tests as a preview (`isForeign="true"`, nothing
+executed) and `scope: { foreignTests: true }` ran them.
 
 **AdtUtils read type safety:**
 `readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.
