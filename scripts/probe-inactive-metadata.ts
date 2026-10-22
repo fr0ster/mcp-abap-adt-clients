@@ -19,7 +19,7 @@
  *
  * Creates ZAC_PROBE_INACT in the default package and deletes it again.
  *
- *   npx ts-node scripts/probe-inactive-metadata.ts
+ *   node_modules/.bin/ts-node scripts/probe-inactive-metadata.ts
  */
 
 import * as fs from 'node:fs';

@@ -13,7 +13,7 @@
  * So this reads a list of domains and tallies, per field, how many filled it in
  * and with what. Nothing is created, nothing is deleted, nothing is locked.
  *
- *   npx ts-node scripts/probe-domain-document-shape.ts [DOMAIN ...]
+ *   node_modules/.bin/ts-node scripts/probe-domain-document-shape.ts [DOMAIN ...]
  *
  * With no arguments it reads a spread chosen to exercise all three groups: a
  * flag with fixed values, a language with a conversion exit and a value table,

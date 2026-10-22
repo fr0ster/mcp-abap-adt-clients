@@ -2,10 +2,10 @@
  * Read runtime dumps (ST22) from SAP system.
  *
  * Usage:
- *   npx ts-node scripts/read-dumps.ts                    # list dumps
- *   npx ts-node scripts/read-dumps.ts <dumpId>           # read specific dump
- *   npx ts-node scripts/read-dumps.ts <dumpId> summary   # read dump summary (HTML)
- *   npx ts-node scripts/read-dumps.ts <dumpId> formatted # read dump formatted (text)
+ *   node_modules/.bin/ts-node scripts/read-dumps.ts                    # list dumps
+ *   node_modules/.bin/ts-node scripts/read-dumps.ts <dumpId>           # read specific dump
+ *   node_modules/.bin/ts-node scripts/read-dumps.ts <dumpId> summary   # read dump summary (HTML)
+ *   node_modules/.bin/ts-node scripts/read-dumps.ts <dumpId> formatted # read dump formatted (text)
  *
  * Options (env vars):
  *   DUMP_USER=DEVELOPER     — filter by user
@@ -80,7 +80,7 @@ async function main() {
       }
       if (ids.size > 0) {
         console.log(
-          `\nRead a specific dump: npx ts-node scripts/read-dumps.ts <dumpId>`,
+          `\nRead a specific dump: node_modules/.bin/ts-node scripts/read-dumps.ts <dumpId>`,
         );
       }
       return;

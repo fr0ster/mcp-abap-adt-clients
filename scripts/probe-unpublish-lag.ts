@@ -6,7 +6,7 @@
  * or a refusal is a fact about the server, so it gets measured rather than
  * covered with a sleep somebody guessed.
  *
- *   npx ts-node scripts/probe-unpublish-lag.ts ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
+ *   node_modules/.bin/ts-node scripts/probe-unpublish-lag.ts ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
  */
 
 import * as fs from 'node:fs';

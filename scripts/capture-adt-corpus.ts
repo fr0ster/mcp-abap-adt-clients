@@ -56,7 +56,7 @@
  * polygon objects (`ZMCP_SHR_PKG`) beyond reading them.
  *
  * Usage:
- *   npx tsx scripts/capture-adt-corpus.ts [--env <path>] [--only a,b,c]
+ *   node_modules/.bin/ts-node scripts/capture-adt-corpus.ts [--env <path>] [--only a,b,c]
  *                                         [--empty-package ZNAME]
  *
  * Default --env is the prepared ABAP Cloud session

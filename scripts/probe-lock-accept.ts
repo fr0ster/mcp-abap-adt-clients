@@ -27,7 +27,7 @@
  * the suites use. The class is created here and deleted here; nothing that
  * existed before this run is touched.
  *
- *   npx ts-node scripts/probe-lock-accept.ts [CLASS]
+ *   node_modules/.bin/ts-node scripts/probe-lock-accept.ts [CLASS]
  */
 
 import * as fs from 'node:fs';

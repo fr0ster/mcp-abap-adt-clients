@@ -1,6 +1,6 @@
 /**
  * Fetch ADT discovery XML from SAP systems for comparison.
- * Usage: npx ts-node scripts/fetch-discovery.ts
+ * Usage: node_modules/.bin/ts-node scripts/fetch-discovery.ts
  *
  * Set MCP_ENV_PATH to switch systems (default: .env)
  */

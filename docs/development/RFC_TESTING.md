@@ -24,42 +24,40 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 
 > **Important:** `dotenv` does not expand `$PATH`/`%PATH%` or `~`, so these variables cannot be set via `.env` files. They must be set in the shell session before running tests.
 
-### Install with those variables set, too
-
-Setting them before the tests is not enough — they have to be set when
-dependencies are installed:
-
-```bash
-# Windows (Git Bash) — the SDK path is wherever it was unpacked
-SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm ci
-
-# macOS
-SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm ci
-
-# Linux
-SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm ci
-```
+### The binding: prebuilt, no install script
 
 The transport is `@mcp-abap-adt/sap-rfc-lite`, an `optionalDependencies` entry
-of `@mcp-abap-adt/connection` with a native build. **npm drops an optional
-dependency whose build fails and reports nothing**, and the build needs the SDK.
-
-Measured on the same lockfile: `npm ci` alone installs 1675 packages and no
-binding; with the variables, 1678, placed at
+of `@mcp-abap-adt/connection`, installed nested:
 
 ```
 node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite
 ```
 
-Nested — never at the top level, so looking for it there suggests it is absent
-when it is not. Without it every RFC run stops in `globalSetup`:
+— never at the top level, so looking for it there suggests it is absent when
+it is not.
+
+Its install script does not run here: `package.json` `allowScripts` denies it,
+like every dependency's (see `.npmrc`, `strict-allow-scripts`). None is needed
+on linux-x64 (glibc), darwin-arm64 and win32-x64: the package carries a
+prebuilt binding for each, loaded at run time, so a plain `npm ci` is enough
+and the SDK need not be visible at install time — only at run time, through
+the variables above. Measured on linux-x64: with the script denied, the
+binding loads with the SDK on the library path.
+
+On any other platform (a musl Linux, an Intel Mac) there is no prebuild, and
+the binding has to be compiled — explicitly, with the SDK visible, since the
+install no longer does it:
+
+```bash
+cd node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite
+SAPNWRFC_HOME=~/nwrfcsdk node scripts/install.js
+```
+
+Without a usable binding every RFC run stops in `globalSetup`:
 
 ```
 @mcp-abap-adt/sap-rfc-lite is not available … Cannot find module
 ```
-
-which names the package rather than the SDK that was missing an installation
-earlier.
 
 ### test-config.yaml
 
@@ -112,7 +110,7 @@ Or pass variables inline:
 ```bash
 SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" \
   SAP_URL=http://saphost:8000 SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_CLIENT=100 \
-  npx jest --runInBand
+  npm test
 ```
 
 ## Running Tests
@@ -122,10 +120,10 @@ SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" \
 npm test
 
 # Specific object type
-npx jest --runInBand integration/core/functionGroup
+npm test -- integration/core/functionGroup
 
 # With debug logs
-DEBUG_ADT_TESTS=true npx jest --runInBand integration/core/class
+DEBUG_ADT_TESTS=true npm test -- integration/core/class
 ```
 
 ## RFC-Specific Considerations

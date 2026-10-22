@@ -5,8 +5,8 @@
  * parameters endpoint refuses GET, which is why this exists. See
  * fr0ster/mcp-abap-adt-interfaces#46 and the plan's Tasks 0.1 / 0.2.
  *
- *   npx ts-node scripts/probe-profiler-contract.ts
- *   npx ts-node scripts/probe-profiler-contract.ts --write   # also POSTs one
+ *   node_modules/.bin/ts-node scripts/probe-profiler-contract.ts
+ *   node_modules/.bin/ts-node scripts/probe-profiler-contract.ts --write   # also POSTs one
  *                                                            # parameters resource
  *
  * Credentials and target come from the same place the tests use, so whatever

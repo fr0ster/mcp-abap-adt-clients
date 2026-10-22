@@ -21,7 +21,7 @@
  * from the header question above.
  *
  * Local HTTP stub — no SAP, no credentials:
- *   npx jest src/__tests__/unit/session
+ *   node_modules/.bin/jest src/__tests__/unit/session
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';

@@ -11,7 +11,7 @@
  * So this prints what a real system actually produced, which is the only way to
  * tell a typed field from an honoured one.
  *
- *   npx ts-node scripts/print-trace-entry.ts
+ *   node_modules/.bin/ts-node scripts/print-trace-entry.ts
  *
  * Credentials and target come from the same `.env` and `test-config.yaml` the
  * tests use. Read-only: one GET of the trace feed, nothing written.

@@ -6,8 +6,8 @@
  * only an EMPTY request, so one holding objects comes back refused — which is
  * the server protecting the objects, not this script failing.
  *
- *   npx ts-node scripts/transport-admin.ts delete DEVK900460 DEVK900454
- *   npx ts-node scripts/transport-admin.ts describe DEVK900438 "adt-clients tests"
+ *   node_modules/.bin/ts-node scripts/transport-admin.ts delete DEVK900460 DEVK900454
+ *   node_modules/.bin/ts-node scripts/transport-admin.ts describe DEVK900438 "adt-clients tests"
  */
 
 import * as fs from 'node:fs';

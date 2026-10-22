@@ -12,7 +12,7 @@
  * and the ADT list stays empty — until the user's role carries
  * `S_MEM_SNAP` (2026-10-10).
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-memory.ts [--keep]
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-memory.ts [--keep]
  *
  * The class is created in PROBE_PACKAGE (default: the configured package)
  * and deleted at the end unless --keep is given.

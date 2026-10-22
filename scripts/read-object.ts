@@ -2,24 +2,24 @@
  * Universal script to read any ADT object: source code + metadata
  *
  * Usage:
- *   npx ts-node scripts/read-object.ts --type=class ZCL_MY_CLASS
- *   npx ts-node scripts/read-object.ts --type=program Z_MY_REPORT
- *   npx ts-node scripts/read-object.ts --type=interface ZIF_MY_INTF
- *   npx ts-node scripts/read-object.ts --type=table T000
- *   npx ts-node scripts/read-object.ts --type=structure BAPI_EPM_PRODUCT_HEADER
- *   npx ts-node scripts/read-object.ts --type=domain MANDT
- *   npx ts-node scripts/read-object.ts --type=dataelement MANDT
- *   npx ts-node scripts/read-object.ts --type=tabletype MARA_TAB
- *   npx ts-node scripts/read-object.ts --type=view V_T000
- *   npx ts-node scripts/read-object.ts --type=functiongroup SDIF
- *   npx ts-node scripts/read-object.ts --type=functionmodule DDIF_TABL_PUT --group=SDIF
- *   npx ts-node scripts/read-object.ts --type=package SDIC
- *   npx ts-node scripts/read-object.ts --type=accesscontrol ZAC_SHR_AC01
- *   npx ts-node scripts/read-object.ts --type=servicedefinition ZAC_SHR_SRVD01
- *   npx ts-node scripts/read-object.ts --type=behaviordefinition ZAC_SHR_BD01
- *   npx ts-node scripts/read-object.ts --type=behaviorimplementation ZAC_SHR_BI01
- *   npx ts-node scripts/read-object.ts --type=metadataextension ZAC_SHR_MDE01
- *   npx ts-node scripts/read-object.ts --type=enhancement ZAC_SHR_ENH01 --enhancement-type=enhoxhb
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=class ZCL_MY_CLASS
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=program Z_MY_REPORT
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=interface ZIF_MY_INTF
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=table T000
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=structure BAPI_EPM_PRODUCT_HEADER
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=domain MANDT
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=dataelement MANDT
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=tabletype MARA_TAB
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=view V_T000
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=functiongroup SDIF
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=functionmodule DDIF_TABL_PUT --group=SDIF
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=package SDIC
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=accesscontrol ZAC_SHR_AC01
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=servicedefinition ZAC_SHR_SRVD01
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=behaviordefinition ZAC_SHR_BD01
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=behaviorimplementation ZAC_SHR_BI01
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=metadataextension ZAC_SHR_MDE01
+ *   node_modules/.bin/ts-node scripts/read-object.ts --type=enhancement ZAC_SHR_ENH01 --enhancement-type=enhoxhb
  *
  * Flags:
  *   --read=source      Read source code only (default: both)

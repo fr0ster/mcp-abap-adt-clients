@@ -8,7 +8,7 @@
  *
  * Off unless `WIRE_LOG` names a file, so ordinary runs are untouched:
  *
- *   WIRE_LOG=/tmp/wire.txt npx jest --runInBand integration/core/package
+ *   WIRE_LOG=/tmp/wire.txt npm test -- integration/core/package
  *
  * Bodies are cut at 1200 characters by default, which is right for comparing
  * headers and wrong for reading what SAP answered — a package read is 876 KB.

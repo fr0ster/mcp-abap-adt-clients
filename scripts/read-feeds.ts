@@ -2,10 +2,10 @@
  * Read feed catalog and feed entries from SAP system.
  *
  * Usage:
- *   npx ts-node scripts/read-feeds.ts                    # feed catalog
- *   npx ts-node scripts/read-feeds.ts dumps              # dumps feed
- *   npx ts-node scripts/read-feeds.ts systemMessages     # system messages feed
- *   npx ts-node scripts/read-feeds.ts gatewayErrors      # gateway error log feed
+ *   node_modules/.bin/ts-node scripts/read-feeds.ts                    # feed catalog
+ *   node_modules/.bin/ts-node scripts/read-feeds.ts dumps              # dumps feed
+ *   node_modules/.bin/ts-node scripts/read-feeds.ts systemMessages     # system messages feed
+ *   node_modules/.bin/ts-node scripts/read-feeds.ts gatewayErrors      # gateway error log feed
  *
  * Options (env vars):
  *   FEED_USER=DEVELOPER     — filter by user

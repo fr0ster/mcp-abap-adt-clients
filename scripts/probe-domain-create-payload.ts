@@ -33,7 +33,7 @@
  * Both are deleted at the end, whatever happened. Every exchange is printed
  * whole: status, headers, body.
  *
- *   npx ts-node scripts/probe-domain-create-payload.ts [PACKAGE] [TRANSPORT]
+ *   node_modules/.bin/ts-node scripts/probe-domain-create-payload.ts [PACKAGE] [TRANSPORT]
  */
 
 import * as fs from 'node:fs';

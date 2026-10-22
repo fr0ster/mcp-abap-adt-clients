@@ -6,7 +6,7 @@
  * side passes with that mismatch in place, so this crosses the seam with a
  * stub connection and no SAP system.
  *
- * Usage: npx ts-node scripts/probe-trace-reaches-analyse.ts
+ * Usage: node_modules/.bin/ts-node scripts/probe-trace-reaches-analyse.ts
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';

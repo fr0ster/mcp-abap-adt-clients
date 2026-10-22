@@ -12,9 +12,9 @@
  * whole point: `createTestConnection` opens a session of its own when no run
  * has published shared material, which is the case outside jest.
  *
- *   npx ts-node scripts/probe-two-sessions-one-object.ts
- *   npx ts-node scripts/probe-two-sessions-one-object.ts --contend
- *   npx ts-node scripts/probe-two-sessions-one-object.ts ZAC_TR_PKG DEVK906816
+ *   node_modules/.bin/ts-node scripts/probe-two-sessions-one-object.ts
+ *   node_modules/.bin/ts-node scripts/probe-two-sessions-one-object.ts --contend
+ *   node_modules/.bin/ts-node scripts/probe-two-sessions-one-object.ts ZAC_TR_PKG DEVK906816
  *
  * `--steps [seconds]` runs the cycle one step at a time, announcing each and
  * pausing, so SM12 can be watched between them. It exists because the lock this

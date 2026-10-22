@@ -10,8 +10,8 @@
  * it flips, printing the elapsed time. That is the number the library needs in
  * order to stop deleting a binding that is still publishing.
  *
- *   npx ts-node scripts/probe-publication-settle.ts publish   ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
- *   npx ts-node scripts/probe-publication-settle.ts unpublish ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
+ *   node_modules/.bin/ts-node scripts/probe-publication-settle.ts publish   ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
+ *   node_modules/.bin/ts-node scripts/probe-publication-settle.ts unpublish ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
  */
 
 import * as fs from 'node:fs';
