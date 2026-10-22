@@ -105,8 +105,8 @@ answered there.
 | Object Type | Getter | Note |
 |-------------|--------|------|
 | ABAP Unit run | `AdtExecutorLegacy.getClassTestRunner()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — `run` answers the finished result; `getStatus`/`getResult` refuse without a request; `runSync` sends the same request as `run` and reads it with the `result` strategy |
-| ABAP Unit run of a function group or module | `AdtExecutorLegacy.getFunctionGroupTestRunner()`, `getFunctionModuleTestRunner()` | refused without a request — no legacy endpoint measured to find them |
-| ABAP Unit run of a report | `AdtExecutorLegacy.getProgramTestRunner()` | refused without a request — `/abapunit/testruns` given a report's URI answered an empty result where `/abapunit/runs` found the tests |
+| ABAP Unit run of a function group or module | `AdtExecutorLegacy.getFunctionGroupTestRunner()`, `getFunctionModuleTestRunner()` | refused without a request, `runSync` included — no legacy endpoint measured to find them |
+| ABAP Unit run of a report | `AdtExecutorLegacy.getProgramTestRunner()` | refused without a request, `runSync` included — `/abapunit/testruns` given a report's URI without `<options>` (the body a legacy system is sent) answered an empty result where `/abapunit/runs` found the tests; with `<options>` it runs them on SAP_BASIS 816, but no legacy system has been measured with that body |
 | CDS test-doubles check | `getDdl().checkCdsTestDoubles()` | `/sap/bc/adt/aunit/dbtestdoubles/cds/validation` absent — refused without a request |
 | Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `read()`/`list()` work, `create()`/`update()`/`delete()` answer a refusal. `list()` takes no `configUri` (the endpoint is no saved search, and one that is passed is refused rather than ignored) and answers the document as it came; its payload has never been captured, so `transportTree` from adt-strategies may not read it — inject a reading for your system |
 

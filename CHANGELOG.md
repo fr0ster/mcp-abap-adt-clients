@@ -24,6 +24,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+Next minor: 37.2.0.
+
+### Added
+
+- **`runSync` on `ProgramTestRunner`, `FunctionGroupTestRunner` and
+  `FunctionModuleTestRunner`** — the synchronous ABAP Unit runner for reports,
+  function groups and function modules, as 37.1.0 added it for classes
+  (fr0ster/mcp-abap-adt#286). One `POST /sap/bc/adt/abapunit/testruns`,
+  `application/xml` both ways, naming the object by its URI (a report
+  `/programs/programs/<name>`, a group `/functions/groups/<group>`, a module
+  `/functions/groups/<group>/fmodules/<module>`), answering the finished
+  `aunit:runResult`; read by each runner's `result` strategy and judged by the
+  caller's `options.analyse`. `run` (asynchronous) stays the default; nothing
+  picks a runner by release or discovery. `FunctionModuleTestRunner.runSync`
+  takes `{ functionGroupName, functionModuleName }`
+  (`IFunctionModuleTestRunSyncTarget`), since the module's URI lies under its
+  group's.
+
+  The run configuration always carries the Eclipse-style `<options>` (scope,
+  risk levels, durations, with `run`'s defaults). Measured on premise
+  (SAP_BASIS 816, 2026-10-23), one passing and one failing test per test class:
+  a report with its test class in its own source, a report pulling it in from
+  an include, a function group and its modules each gave the same methods, the
+  same failed method and the same `failedAssertion` through `run` and `runSync`
+  (`runSync` 150–420 ms against 530–830 ms for start, poll and result);
+  excluding harmless tests ran none. The same body without `<options>` answered
+  `200` with an empty `aunit:runResult` for every one of them — which is what
+  the 2026-09-30 note on `ProgramTestRunner` had measured, and why.
+
+  **A module's `runSync` runs every test of its group**: the result names the
+  group (`FUGR/F`), a test class that calls no module included, and the run of
+  a module no test calls answered the same. Nothing filters it. On the same
+  system `run` (`osl:object type="FUNC"`) did the same, which does not
+  reproduce the 2026-09-30 note that it kept to the module's tests. With an
+  ABAP Doc `"! @testing FUNC:<module>` relation on a test class, the default
+  scope answered the group's tests as a preview (`isForeign="true"`, nothing
+  executed) and `scope: { foreignTests: true }` ran them.
+
+  The legacy runners of the three types refuse `runSync` without a request, as
+  they refuse `run`: no legacy system has been measured with `<options>`.
+
+### Changed
+
+- The `/abapunit/testruns` request lives once, in `core/shared/abapUnit`
+  (`startUnitTestRunSync`, taking object URIs); `startClassUnitTestRunSync`
+  hands it the class URIs. A class's body — with and without `<options>` — is
+  unchanged byte for byte.
+
 ## [37.1.0] - 2026-10-22
 
 ### Added
