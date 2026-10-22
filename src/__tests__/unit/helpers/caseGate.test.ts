@@ -55,14 +55,12 @@ describe('case registration gate', () => {
     expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(it.skip);
   });
 
-  it.each([
-    undefined,
-    {},
-    { environment: {} },
-    config('invalid'),
-  ])('registers normally when config or system is missing or invalid: %p', (parsed) => {
-    expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(it);
-  });
+  it.each([undefined, {}, { environment: {} }, config('invalid')])(
+    'registers normally when config or system is missing or invalid: %p',
+    (parsed) => {
+      expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(it);
+    },
+  );
 
   it('registers normally when loading config fails', () => {
     expect(
@@ -127,24 +125,25 @@ describe('case registration gate', () => {
     ).toBe(it);
   });
 
-  it.each([
-    'onprem',
-    null,
-    {},
-    true,
-  ])('allows cases with non-array available_in: %p', (availableIn) => {
-    const parsed = config('cloud');
-    expect(
-      gate('enhancement', 'enhoxhh', () => ({
-        ...parsed,
-        enhancement: {
-          test_cases: [
-            { ...parsed.enhancement.test_cases[0], available_in: availableIn },
-          ],
-        },
-      })),
-    ).toBe(it);
-  });
+  it.each(['onprem', null, {}, true])(
+    'allows cases with non-array available_in: %p',
+    (availableIn) => {
+      const parsed = config('cloud');
+      expect(
+        gate('enhancement', 'enhoxhh', () => ({
+          ...parsed,
+          enhancement: {
+            test_cases: [
+              {
+                ...parsed.enhancement.test_cases[0],
+                available_in: availableIn,
+              },
+            ],
+          },
+        })),
+      ).toBe(it);
+    },
+  );
 
   it('allows cases with no availability restriction', () => {
     expect(

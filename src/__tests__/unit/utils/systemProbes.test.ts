@@ -49,13 +49,12 @@ describe('isModernAdtSystem', () => {
     await expect(isModernAdtSystem(failingWith(status))).resolves.toBe(false);
   });
 
-  it.each([
-    401,
-    500,
-    undefined,
-  ])('a %s failure is raised, not read as legacy', async (status) => {
-    await expect(isModernAdtSystem(failingWith(status))).rejects.toThrow();
-  });
+  it.each([401, 500, undefined])(
+    'a %s failure is raised, not read as legacy',
+    async (status) => {
+      await expect(isModernAdtSystem(failingWith(status))).rejects.toThrow();
+    },
+  );
 });
 
 describe('getSystemInformation', () => {
@@ -135,15 +134,16 @@ describe('getSystemInformation', () => {
     expect(answer.getResult().value).toEqual({ present: false });
   });
 
-  it.each([
-    405, 501, 500, 401,
-  ])('a %i is a failure carrying its status', async (status) => {
-    const answer = await getSystemInformation(failingWith(status));
-    expect(answer.ok).toBe(false);
-    if (answer.ok) return;
-    expect(answer.getError().origin).toBe('connection');
-    expect(answer.getError().response?.status).toBe(status);
-  });
+  it.each([405, 501, 500, 401])(
+    'a %i is a failure carrying its status',
+    async (status) => {
+      const answer = await getSystemInformation(failingWith(status));
+      expect(answer.ok).toBe(false);
+      if (answer.ok) return;
+      expect(answer.getError().origin).toBe('connection');
+      expect(answer.getError().response?.status).toBe(status);
+    },
+  );
 
   it('a 500 a connection hands back instead of throwing is a failure, whatever its body', async () => {
     const answer = await getSystemInformation(replying(500, RECORD));
@@ -267,14 +267,12 @@ describe('isCloudEnvironment, asking systeminformation', () => {
     ).rejects.toThrow();
   });
 
-  it.each([
-    405,
-    501,
-    500,
-    undefined,
-  ])('a %s failure is raised, never read as on-premise', async (status) => {
-    await expect(isCloudEnvironment(at(failing(status)))).rejects.toThrow();
-  });
+  it.each([405, 501, 500, undefined])(
+    'a %s failure is raised, never read as on-premise',
+    async (status) => {
+      await expect(isCloudEnvironment(at(failing(status)))).rejects.toThrow();
+    },
+  );
 
   it('a hana.ondemand.com URL is cloud without a request', async () => {
     const reply = jest.fn(failing(500));

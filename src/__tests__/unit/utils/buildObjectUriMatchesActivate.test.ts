@@ -327,12 +327,12 @@ describe('buildObjectUri matches each family’s own activation address', () => 
  * That is the caller's argument, not SAP's answer, so it is thrown.
  */
 describe('a type that cannot be addressed without more', () => {
-  it.each([
-    'ENHO',
-    'ENHS',
-  ])('%s alone is refused, naming the subtype', (type) => {
-    expect(() => buildObjectUri('ZENH_X', type)).toThrow(/subtype/);
-  });
+  it.each(['ENHO', 'ENHS'])(
+    '%s alone is refused, naming the subtype',
+    (type) => {
+      expect(() => buildObjectUri('ZENH_X', type)).toThrow(/subtype/);
+    },
+  );
 
   it('a function include without its group is refused', () => {
     expect(() => buildObjectUri('LZFG_XTOP', 'FUGR/I')).toThrow(/group/);

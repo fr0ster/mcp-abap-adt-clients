@@ -95,11 +95,12 @@ describe('documented imports resolve against the real public surface', () => {
     expect(exported.size).toBeGreaterThan(0);
   });
 
-  it.each(
-    files.map((f) => [f.replace(`${REPO_ROOT}/`, ''), f]),
-  )('%s imports only names the package exports', (_label, file) => {
-    const unresolved = importedNames(file).filter((n) => !exported.has(n));
+  it.each(files.map((f) => [f.replace(`${REPO_ROOT}/`, ''), f]))(
+    '%s imports only names the package exports',
+    (_label, file) => {
+      const unresolved = importedNames(file).filter((n) => !exported.has(n));
 
-    expect(unresolved).toEqual([]);
-  });
+      expect(unresolved).toEqual([]);
+    },
+  );
 });

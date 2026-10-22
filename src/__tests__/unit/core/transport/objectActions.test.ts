@@ -566,19 +566,18 @@ describe('changeTaskType', () => {
   });
 
   /** `X` puts a task back in the state every task is created in. */
-  it.each([
-    'S',
-    'R',
-    'X',
-  ] as const)('sends %s as the server spells it', async (type) => {
-    const { connection, calls } = connectionOver(() => answering(REMOVED));
+  it.each(['S', 'R', 'X'] as const)(
+    'sends %s as the server spells it',
+    async (type) => {
+      const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).changeTaskType('DEVK905943', type, {
-      headers: headersOf(new AdtRequest(connection), 'changeTaskType'),
-    });
+      await new AdtRequest(connection).changeTaskType('DEVK905943', type, {
+        headers: headersOf(new AdtRequest(connection), 'changeTaskType'),
+      });
 
-    expect(String(calls[0].data)).toContain(`tm:type="${type}"`);
-  });
+      expect(String(calls[0].data)).toContain(`tm:type="${type}"`);
+    },
+  );
 });
 
 describe('sortAndCompress', () => {
