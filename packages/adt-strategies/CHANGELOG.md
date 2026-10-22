@@ -15,6 +15,25 @@ and fires its release workflow.
 
 ## [Unreleased]
 
+### Security
+
+Supply-chain hardening of this package's install (worms of the Shai-Hulud kind
+spread through dependencies' install scripts and stolen tokens). Nothing
+published changes: no code and no dependency range.
+
+- **No dependency runs an install script.** `package.json` `allowScripts`
+  denies the two with one, both Jest's: `@parcel/watcher` and `unrs-resolver`
+  (each ships prebuilt binaries as optional dependencies). The package's own
+  `.npmrc` — npm reads the project `.npmrc` of the directory it installs in,
+  so the root's does not reach here — sets `strict-allow-scripts=true`,
+  `min-release-age=7` and `min-release-age-exclude[]=@mcp-abap-adt/*`.
+- **No `npx`**: `build` and `test` call `tsc` and `jest` directly. The
+  repository's workflows install this package with
+  `npm ci --ignore-scripts --prefix packages/adt-strategies` and gate on its
+  `npm audit --audit-level=moderate`.
+- Lockfile refreshed within ranges under the 7-day age (ts-jest 29.4.15,
+  strnum 2.5.1, …). `npm audit`: 0, `--omit=dev`: 0.
+
 ## [0.15.0] - 2026-10-21
 
 ### Added
