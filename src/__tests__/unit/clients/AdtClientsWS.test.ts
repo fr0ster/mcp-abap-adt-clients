@@ -367,30 +367,33 @@ describe('AdtClientsWS', () => {
       ],
       ['a BigInt', { n: BigInt(1) }],
       ['a cycle', cyclic],
-    ])('an error answer whose payload has %s rejects it in fixed words', async (_name, payload) => {
-      const transport = new MockWebSocketTransport();
-      const client = new AdtClientsWS(transport);
+    ])(
+      'an error answer whose payload has %s rejects it in fixed words',
+      async (_name, payload) => {
+        const transport = new MockWebSocketTransport();
+        const client = new AdtClientsWS(transport);
 
-      const pending = client.request('debugger.attach', undefined, {
-        correlationId: 'req-unserialisable',
-      });
-      const outcome = pending.then(
-        () => 'resolved',
-        (error: Error) => error.message,
-      );
-      await transport
-        .emitMessage({
-          kind: 'error',
+        const pending = client.request('debugger.attach', undefined, {
           correlationId: 'req-unserialisable',
-          payload,
-        })
-        .catch(() => {});
+        });
+        const outcome = pending.then(
+          () => 'resolved',
+          (error: Error) => error.message,
+        );
+        await transport
+          .emitMessage({
+            kind: 'error',
+            correlationId: 'req-unserialisable',
+            payload,
+          })
+          .catch(() => {});
 
-      await expect(outcome).resolves.toBe(
-        'AdtClientsWS request failed for correlationId "req-unserialisable": the error payload could not be serialised',
-      );
-      expect(pendingSize(client)).toBe(0);
-    });
+        await expect(outcome).resolves.toBe(
+          'AdtClientsWS request failed for correlationId "req-unserialisable": the error payload could not be serialised',
+        );
+        expect(pendingSize(client)).toBe(0);
+      },
+    );
 
     it.each([
       ['Object.create(null)', () => Object.create(null)],
@@ -402,34 +405,37 @@ describe('AdtClientsWS', () => {
           },
         }),
       ],
-    ])('a send rejected with %s rejects the request in fixed words', async (_name, value) => {
-      const transport = new MockWebSocketTransport();
-      const client = new AdtClientsWS(transport);
-      const unhandled: unknown[] = [];
-      const record = (reason: unknown) => unhandled.push(reason);
-      process.on('unhandledRejection', record);
-      try {
-        transport.send.mockImplementationOnce(() => Promise.reject(value()));
+    ])(
+      'a send rejected with %s rejects the request in fixed words',
+      async (_name, value) => {
+        const transport = new MockWebSocketTransport();
+        const client = new AdtClientsWS(transport);
+        const unhandled: unknown[] = [];
+        const record = (reason: unknown) => unhandled.push(reason);
+        process.on('unhandledRejection', record);
+        try {
+          transport.send.mockImplementationOnce(() => Promise.reject(value()));
 
-        const outcome = client
-          .request('debugger.getStack', undefined, {
-            correlationId: 'req-send-failed',
-          })
-          .then(
-            () => 'resolved',
-            (error: Error) => error.message,
+          const outcome = client
+            .request('debugger.getStack', undefined, {
+              correlationId: 'req-send-failed',
+            })
+            .then(
+              () => 'resolved',
+              (error: Error) => error.message,
+            );
+
+          await expect(outcome).resolves.toBe(
+            'AdtClientsWS request failed: the send failure could not be described',
           );
-
-        await expect(outcome).resolves.toBe(
-          'AdtClientsWS request failed: the send failure could not be described',
-        );
-        await new Promise((resolve) => setImmediate(resolve));
-        expect(unhandled).toEqual([]);
-        expect(pendingSize(client)).toBe(0);
-      } finally {
-        process.off('unhandledRejection', record);
-      }
-    });
+          await new Promise((resolve) => setImmediate(resolve));
+          expect(unhandled).toEqual([]);
+          expect(pendingSize(client)).toBe(0);
+        } finally {
+          process.off('unhandledRejection', record);
+        }
+      },
+    );
 
     it('refuses an empty correlationId before sending it', async () => {
       const transport = new MockWebSocketTransport();

@@ -246,33 +246,36 @@ describe('the authorization check', () => {
       ),
       'ExceptionResourceNoAuthorization',
     ],
-  ])('a %i at the discovery read stops the run: the Oops, exit 2, nothing more sent, the report marked', async (status, body, kind) => {
-    const system = fakeSystem(() => ({ status, body }));
-    const dir = tempDir();
-    const { lines, out } = output();
-    let asked = false;
-    const result = await runCorpus({
-      connection: system.connection,
-      source: 'clients',
-      mode: 'corpus',
-      interrupt: new Interrupt(),
-      outDir: dir,
-      clientOptions: async () => {
-        asked = true;
-        return {};
-      },
-      out,
-    });
-    expect(result.exitCode).toBe(2);
-    expect(lines[lines.length - 1]).toBe(
-      `Oops: authorization problem (${status}, ${kind}) at GET /sap/bc/adt/discovery — fix it and run again`,
-    );
-    expect(system.seen).toHaveLength(1);
-    expect(system.seen[0].url).toBe('/sap/bc/adt/discovery');
-    expect(asked).toBe(false);
-    expect(result.corpus?.error).toMatch(/^stopped: authorization/);
-    expect(fs.readdirSync(dir)).toHaveLength(2);
-  });
+  ])(
+    'a %i at the discovery read stops the run: the Oops, exit 2, nothing more sent, the report marked',
+    async (status, body, kind) => {
+      const system = fakeSystem(() => ({ status, body }));
+      const dir = tempDir();
+      const { lines, out } = output();
+      let asked = false;
+      const result = await runCorpus({
+        connection: system.connection,
+        source: 'clients',
+        mode: 'corpus',
+        interrupt: new Interrupt(),
+        outDir: dir,
+        clientOptions: async () => {
+          asked = true;
+          return {};
+        },
+        out,
+      });
+      expect(result.exitCode).toBe(2);
+      expect(lines[lines.length - 1]).toBe(
+        `Oops: authorization problem (${status}, ${kind}) at GET /sap/bc/adt/discovery — fix it and run again`,
+      );
+      expect(system.seen).toHaveLength(1);
+      expect(system.seen[0].url).toBe('/sap/bc/adt/discovery');
+      expect(asked).toBe(false);
+      expect(result.corpus?.error).toMatch(/^stopped: authorization/);
+      expect(fs.readdirSync(dir)).toHaveLength(2);
+    },
+  );
 
   it('a 403 that is not an authorization refusal is a status, not a stop', async () => {
     const system = fakeSystem(() => ({ status: 403, body: 'Forbidden' }));
@@ -1263,35 +1266,38 @@ describe('a poisoned envelope', () => {
     // probes, the bad one, envelopes the splitting sends, calls sent alone
     [100, 37, 10 + 10, 1],
     [29, 17, 10 + 3, 1],
-  ])('of %i probes is split in tens until the one dumping call is found', async (count, badIndex, envelopes, alone) => {
-    const { bad, system, run } = splitRun(count, badIndex);
-    const { corpus } = await run;
-    expect(corpus?.splits).toEqual([
-      expect.objectContaining({
-        parts: count,
-        envelopes,
-        requestsAlone: alone,
-        causes: [`GET ${bad}`],
-      }),
-    ]);
-    // One first envelope, then the splitting's.
-    expect(corpus?.envelopes).toHaveLength(1 + envelopes);
-    // Nothing but the dumping call is sent on its own.
-    const direct = system.seen.filter(
-      (s) => !s.part && s.url.startsWith('/sap/bc/adt/probe/'),
-    );
-    expect(direct.map((s) => s.url)).toEqual([bad]);
-    for (const r of corpus?.rows ?? []) {
-      if (r.endpoint?.path === bad) {
-        expect(r.poisonCause).toBe(true);
-        expect(r.status).toBe(500);
-        continue;
+  ])(
+    'of %i probes is split in tens until the one dumping call is found',
+    async (count, badIndex, envelopes, alone) => {
+      const { bad, system, run } = splitRun(count, badIndex);
+      const { corpus } = await run;
+      expect(corpus?.splits).toEqual([
+        expect.objectContaining({
+          parts: count,
+          envelopes,
+          requestsAlone: alone,
+          causes: [`GET ${bad}`],
+        }),
+      ]);
+      // One first envelope, then the splitting's.
+      expect(corpus?.envelopes).toHaveLength(1 + envelopes);
+      // Nothing but the dumping call is sent on its own.
+      const direct = system.seen.filter(
+        (s) => !s.part && s.url.startsWith('/sap/bc/adt/probe/'),
+      );
+      expect(direct.map((s) => s.url)).toEqual([bad]);
+      for (const r of corpus?.rows ?? []) {
+        if (r.endpoint?.path === bad) {
+          expect(r.poisonCause).toBe(true);
+          expect(r.status).toBe(500);
+          continue;
+        }
+        expect(r.status).toBe(404);
+        expect(r.settled?.path).toMatch(/^env 1 → group \d+( → group \d+)?$/);
+        expect(r.ran).toMatch(/^batched: env 1 → group/);
       }
-      expect(r.status).toBe(404);
-      expect(r.settled?.path).toMatch(/^env 1 → group \d+( → group \d+)?$/);
-      expect(r.ran).toMatch(/^batched: env 1 → group/);
-    }
-  });
+    },
+  );
 
   it('only when every part answered 500 with the same text: distinct 500s are answers', async () => {
     let n = 0;
@@ -1462,36 +1468,41 @@ describe('the logon is the authorization check', () => {
         status: 403,
       }),
     ],
-  ])('a %i at connect prints the Oops and sends nothing else', async (status, thrown) => {
-    let opened = 0;
-    const dir = tempDir();
-    const { lines, out } = output();
-    let asked = false;
-    const result = await runCorpus({
-      open: async () => {
-        opened++;
-        throw thrown;
-      },
-      source: 'discovery',
-      mode: 'none',
-      interrupt: new Interrupt(),
-      outDir: dir,
-      clientOptions: async () => {
-        asked = true;
-        return {};
-      },
-      out,
-    });
-    expect(result.exitCode).toBe(2);
-    expect(lines[lines.length - 1]).toBe(`Oops: no authorization (${status})`);
-    expect(opened).toBe(1);
-    expect(asked).toBe(false);
-    // Nothing else was sent; the report is written, marked.
-    expect(result.corpus.error).toBe(
-      `stopped: authorization (${status}, logon) at logon`,
-    );
-    expect(fs.readdirSync(dir)).toHaveLength(2);
-  });
+  ])(
+    'a %i at connect prints the Oops and sends nothing else',
+    async (status, thrown) => {
+      let opened = 0;
+      const dir = tempDir();
+      const { lines, out } = output();
+      let asked = false;
+      const result = await runCorpus({
+        open: async () => {
+          opened++;
+          throw thrown;
+        },
+        source: 'discovery',
+        mode: 'none',
+        interrupt: new Interrupt(),
+        outDir: dir,
+        clientOptions: async () => {
+          asked = true;
+          return {};
+        },
+        out,
+      });
+      expect(result.exitCode).toBe(2);
+      expect(lines[lines.length - 1]).toBe(
+        `Oops: no authorization (${status})`,
+      );
+      expect(opened).toBe(1);
+      expect(asked).toBe(false);
+      // Nothing else was sent; the report is written, marked.
+      expect(result.corpus.error).toBe(
+        `stopped: authorization (${status}, logon) at logon`,
+      );
+      expect(fs.readdirSync(dir)).toHaveLength(2);
+    },
+  );
 });
 
 describe('a poisoned write', () => {
@@ -2367,34 +2378,34 @@ describe('the run decides its exit once, from its state', () => {
     ).toHaveLength(3);
   });
 
-  it.each([
-    'single',
-    'full',
-  ] as const)('the first discovery read failing after Ctrl-C (%s run): exit 130, the report written', async (kind) => {
-    const interrupt = new Interrupt();
-    const system = fakeSystem(() => {
-      interrupt.stop();
-      return { status: 500 };
-    });
-    const dir = tempDir();
-    const common = {
-      interrupt,
-      outDir: dir,
-      clientOptions: async () => ({}),
-      out: output().out,
-    };
-    const result =
-      kind === 'single'
-        ? await runCorpus({
-            ...common,
-            connection: system.connection,
-            source: 'discovery',
-            mode: 'none',
-          })
-        : await runFull({ ...common, open: async () => system.connection });
-    expect(result.exitCode).toBe(130);
-    expect(fs.readdirSync(dir).length).toBeGreaterThan(0);
-  });
+  it.each(['single', 'full'] as const)(
+    'the first discovery read failing after Ctrl-C (%s run): exit 130, the report written',
+    async (kind) => {
+      const interrupt = new Interrupt();
+      const system = fakeSystem(() => {
+        interrupt.stop();
+        return { status: 500 };
+      });
+      const dir = tempDir();
+      const common = {
+        interrupt,
+        outDir: dir,
+        clientOptions: async () => ({}),
+        out: output().out,
+      };
+      const result =
+        kind === 'single'
+          ? await runCorpus({
+              ...common,
+              connection: system.connection,
+              source: 'discovery',
+              mode: 'none',
+            })
+          : await runFull({ ...common, open: async () => system.connection });
+      expect(result.exitCode).toBe(130);
+      expect(fs.readdirSync(dir).length).toBeGreaterThan(0);
+    },
+  );
 });
 
 describe('the command', () => {
@@ -2589,35 +2600,38 @@ describe('the update measurement', () => {
   it.each([
     [true, true],
     [false, false],
-  ])('an update the system applies despite its 406 (%s) is recorded applied: %s; unlocked, cleaned, no content kept', async (applies, applied) => {
-    const { system, sources, counts } = classSystem(applies);
-    const result = await measureUpdates({
-      connection: gate(system.connection, {}),
-      clientOptions: {},
-      interrupt: new Interrupt(),
-      packageName: 'ZPKG',
-      transportRequest: '',
-      only: ['class'],
-    });
-    expect(result.updates).toEqual([
-      expect.objectContaining({
-        type: 'class',
-        member: 'update',
-        status: 406,
-        applied,
-      }),
-    ]);
-    expect(counts().locks).toBe(1);
-    expect(counts().unlocks).toBe(1);
-    expect(sources.size).toBe(0);
-    expect(result.removals.every((r) => r.removed === true)).toBe(true);
-    // Hashes only: neither content reaches the record.
-    expect(JSON.stringify(result)).not.toContain('error corpus update');
-    expect(JSON.stringify(result)).not.toContain('ENDCLASS');
-    // The update went with the bogus Accept.
-    const put = system.seen.find((s) => s.method === 'PUT');
-    expect(put?.headers.accept).toBe(PROBE_TYPE);
-  });
+  ])(
+    'an update the system applies despite its 406 (%s) is recorded applied: %s; unlocked, cleaned, no content kept',
+    async (applies, applied) => {
+      const { system, sources, counts } = classSystem(applies);
+      const result = await measureUpdates({
+        connection: gate(system.connection, {}),
+        clientOptions: {},
+        interrupt: new Interrupt(),
+        packageName: 'ZPKG',
+        transportRequest: '',
+        only: ['class'],
+      });
+      expect(result.updates).toEqual([
+        expect.objectContaining({
+          type: 'class',
+          member: 'update',
+          status: 406,
+          applied,
+        }),
+      ]);
+      expect(counts().locks).toBe(1);
+      expect(counts().unlocks).toBe(1);
+      expect(sources.size).toBe(0);
+      expect(result.removals.every((r) => r.removed === true)).toBe(true);
+      // Hashes only: neither content reaches the record.
+      expect(JSON.stringify(result)).not.toContain('error corpus update');
+      expect(JSON.stringify(result)).not.toContain('ENDCLASS');
+      // The update went with the bogus Accept.
+      const put = system.seen.find((s) => s.method === 'PUT');
+      expect(put?.headers.accept).toBe(PROBE_TYPE);
+    },
+  );
 });
 
 describe('a failed unlock', () => {

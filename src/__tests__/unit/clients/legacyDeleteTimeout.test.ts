@@ -72,17 +72,18 @@ describe("legacy delete carries the caller's timeout", () => {
     expect(sent.map((r) => r.timeout)).toEqual(sent.map(() => 1234));
   });
 
-  it.each(
-    cases,
-  )('%s sends no deadline without one', async (_name, handler, config) => {
-    const { connection, sent } = recordingConnection();
-    const client = new AdtClientLegacy(connection);
+  it.each(cases)(
+    '%s sends no deadline without one',
+    async (_name, handler, config) => {
+      const { connection, sent } = recordingConnection();
+      const client = new AdtClientLegacy(connection);
 
-    const deletable = handler(client);
-    await deletable.delete(config, {
-      headers: headersOf(deletable, 'delete'),
-    });
+      const deletable = handler(client);
+      await deletable.delete(config, {
+        headers: headersOf(deletable, 'delete'),
+      });
 
-    expect(sent.map((r) => r.timeout)).toEqual(sent.map(() => 0));
-  });
+      expect(sent.map((r) => r.timeout)).toEqual(sent.map(() => 0));
+    },
+  );
 });

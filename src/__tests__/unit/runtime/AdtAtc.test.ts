@@ -410,22 +410,20 @@ describe('AdtAtc — refusing before the request', () => {
 
   // 17. The server answers 0 with a 400; a client that can name the problem
   // should not spend a round trip being told.
-  it.each([
-    0,
-    -1,
-    1.5,
-    Number.NaN,
-  ])('maximumVerdicts of %p rejects before any request', async (value) => {
-    const { connection } = connectionFor();
+  it.each([0, -1, 1.5, Number.NaN])(
+    'maximumVerdicts of %p rejects before any request',
+    async (value) => {
+      const { connection } = connectionFor();
 
-    await expect(
-      new AdtAtc(connection, logger() as never).startRun('WL1', TARGET, {
-        maximumVerdicts: value,
-      }),
-    ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
+      await expect(
+        new AdtAtc(connection, logger() as never).startRun('WL1', TARGET, {
+          maximumVerdicts: value,
+        }),
+      ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
 
-    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
-  });
+      expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+    },
+  );
 });
 
 // 18. The one part of the contract resting on evidence rather than reasoning:

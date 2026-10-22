@@ -171,17 +171,17 @@ describe('probe-atc — what the verdict counts', () => {
   // so they read as an explicit statement. A run required to confirm nothing
   // confirms it and exits 0 — a clean pass that decided nothing, which is the
   // bug this whole change exists to remove, reachable by a stray keystroke.
-  it.each([
-    [[] as string[]],
-    [[''] as string[]],
-  ])('an empty --require (%p after trimming) throws rather than requiring nothing', (keys) => {
-    const cleaned = keys.map((k) => k.trim()).filter(Boolean);
+  it.each([[[] as string[]], [[''] as string[]]])(
+    'an empty --require (%p after trimming) throws rather than requiring nothing',
+    (keys) => {
+      const cleaned = keys.map((k) => k.trim()).filter(Boolean);
 
-    expect(() => assertKnownKeys(cleaned)).toThrow(/no candidate/i);
-    expect(() =>
-      requiredKeysFor(cleaned, false, silentLogger() as never),
-    ).toThrow(/no candidate/i);
-  });
+      expect(() => assertKnownKeys(cleaned)).toThrow(/no candidate/i);
+      expect(() =>
+        requiredKeysFor(cleaned, false, silentLogger() as never),
+      ).toThrow(/no candidate/i);
+    },
+  );
 
   it('the candidate set still holds the two types an on-prem run is for', () => {
     expect(ONPREM_KEYS).toEqual(expect.arrayContaining(['program', 'include']));
