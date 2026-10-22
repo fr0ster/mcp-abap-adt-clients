@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   build-and-release:
+    # A hung step is capped here instead of by GitHub's 6-hour default; a
+    # release takes about a minute.
+    timeout-minutes: 10
     runs-on: ubuntu-latest
 
     steps:
@@ -22,8 +25,20 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      # --ignore-scripts: the runner's npm may predate 11.19.0, which reads
+      # package.json `allowScripts` in full, and no dependency's install
+      # script is needed to build or pack.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      # A tag with a known advisory of moderate severity or above is not
+      # released, dev dependencies included. Both trees; npm audit reads the
+      # strategies package's lockfile without installing it.
+      - name: Security audit (moderate+)
+        run: npm audit --audit-level=moderate
+
+      - name: Security audit, strategies package (moderate+)
+        run: npm audit --audit-level=moderate --prefix packages/adt-strategies
 
       - name: Build project
         run: npm run build
