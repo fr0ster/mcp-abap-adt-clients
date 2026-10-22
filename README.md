@@ -157,7 +157,7 @@ npm install @mcp-abap-adt/adt-clients
    - Typed execution API based on `IExecutor`
    - Executors:
      - `getClassExecutor()` for `classrun`
-     - `getClassTestRunner()` for a class's ABAP Unit tests: `run`, `getStatus`, `getResult`
+     - `getClassTestRunner()` for a class's ABAP Unit tests: `run`, `getStatus`, `getResult` (asynchronous, the default), or `runSync` (synchronous)
      - `getProgramTestRunner()` for a report's ABAP Unit tests, in its source or its includes
      - `getFunctionGroupTestRunner()` / `getFunctionModuleTestRunner()` for a function group's tests, or the ones exercising one module
      - `getProgramExecutor()` for `programrun` (on-premise systems)
@@ -439,6 +439,28 @@ const result = await runner.getResult(runId, { analyse: analyseUnitTest });
 `run` takes a class name (every test class in it) or a list of
 `{ containerClass, testClass }`. On a legacy system the runner's `run` answers
 the finished result, and `getStatus`/`getResult` refuse without a request.
+
+**The synchronous runner, `runSync`.** `run` starts a run on
+`/sap/bc/adt/abapunit/runs`, which is then polled; that stays the default.
+`runSync` is the other runner ADT has — one `POST /sap/bc/adt/abapunit/testruns`
+answering the finished `aunit:runResult` — chosen explicitly by the caller.
+Some systems have only this one (an on-prem S/4HANA 2023, SAP_BASIS 758, was
+measured without `/abapunit/runs`); whether a system has `/runs` is in its
+discovery, and reading that is the caller's — the library picks no runner by
+release or by discovery.
+
+```typescript
+const result = await runner.runSync('ZCL_UNDER_TEST', { analyse: analyseUnitTest });
+```
+
+Its answer is read by the runner's `result` strategy, the one `getResult` uses:
+on the measured systems (on premise and ABAP Cloud, 2026-10-22) both runners
+answer the same document — `aunit:runResult` in `http://www.sap.com/adt/aunit`
+— with the same methods and alerts. Two differences: the endpoint addresses
+whole classes, so `{ containerClass, testClass }` targets run each distinct
+container whole; and `title` and `context` are not sent. Scope, risk levels and
+durations are, with `run`'s defaults. On a legacy system `runSync` is the
+request `run` already sends there, read by `result`.
 
 A report's tests are local classes in its source or in an include it pulls in —
 written through `getProgram().update()` or `getInclude().update()` — and run

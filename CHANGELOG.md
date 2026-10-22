@@ -24,6 +24,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+Next minor: 37.1.0.
+
+### Added
+
+- **`ClassTestRunner.runSync(target, options?)` — the synchronous ABAP Unit
+  runner for classes** (fr0ster/mcp-abap-adt#286). One `POST
+  /sap/bc/adt/abapunit/testruns`, `application/xml` both ways, answering the
+  finished `aunit:runResult`; read by the runner's `result` strategy, the one
+  `getResult` uses, and judged by the caller's `options.analyse`
+  (`analyseUnitTest`). The asynchronous `run` (`/abapunit/runs`, then
+  `getStatus` and `getResult`) stays the default: `runSync` is the caller's
+  explicit choice, for a system without `/runs` — an on-prem S/4HANA 2023
+  (SAP_BASIS 758) has only `/testruns`. Nothing in the library picks a runner
+  by release or discovery.
+
+  Measured 2026-10-22 on premise (SAP_BASIS 816) and on ABAP Cloud, a class
+  with one passing and one failing test, through both runners: the same two
+  methods, the same failed method, one `failedAssertion` alert each, the same
+  root (`aunit:runResult` in `http://www.sap.com/adt/aunit`); excluding
+  harmless tests ran none on either runner, so the options are applied.
+  Differences from `run`: whole classes only — test-class targets run each
+  distinct container whole — and `title`/`context` are not sent; scope, risk
+  levels and durations go in the run configuration's `<options>` with `run`'s
+  defaults.
+
+  On `ClassTestRunnerLegacy`, `runSync` sends the request its `run` sends and
+  reads it with `result`.
+
+### Changed
+
+- The `/abapunit/testruns` request lives once, in the class core
+  (`startClassUnitTestRunSync`), for the regular runner's `runSync` and the
+  legacy runner's `run`; `core/class/runLegacy.ts` is gone. The legacy body is
+  unchanged byte for byte — no `<options>` is sent to a legacy system.
+
 ## [37.0.0] - 2026-10-21
 
 On `@mcp-abap-adt/interfaces-adt` `^20.1.0`.
