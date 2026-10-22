@@ -47,7 +47,10 @@ VERIFY_LOCK_RELEASED=false npm test 2>&1 | tee test-run.log   # Skip the second-
 # Ask SAP directly: one request to several systems, every answer printed whole
 # (status, headers, body). Targets are session files under ~/.config/mcp-abap-adt/sessions/;
 # the system kind is stated (:onprem|:cloud|:legacy or SAP_SYSTEM_TYPE), never inferred.
-npx ts-node scripts/adt-nc.ts --to <system>-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
+node_modules/.bin/ts-node scripts/adt-nc.ts --to <system>-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
+
+# Unit tests only (no SAP system)
+npm run test:unit
 
 # Type-check tests without running
 npm run test:check              # All test tsconfigs
@@ -150,31 +153,15 @@ RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP st
 
 **Prerequisites:**
 1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
-2. **Install dependencies with the SDK visible** — the RFC transport is
-   `@mcp-abap-adt/sap-rfc-lite`, reached through `@mcp-abap-adt/connection`,
-   and there is nothing to add to `package.json`. But it is an
-   `optionalDependencies` entry with a native build, and **npm drops an optional
-   dependency whose build fails, silently** — so it must be installed with the
-   same variables the test run uses:
-
-   ```bash
-   # Windows (Git Bash) — the SDK path is wherever it was unpacked
-   SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm ci
-
-   # macOS
-   SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm ci
-
-   # Linux
-   SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm ci
-   ```
-
-   Measured on the same lockfile: `npm ci` alone installs 1675 packages and no
-   binding; with the variables, 1678, and it lands at
-   `node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite`
-   — nested, never at the top level, which is where looking for it misleads.
-   Without it `connection_type: "rfc"` fails in `globalSetup` with
-   `@mcp-abap-adt/sap-rfc-lite is not available … Cannot find module`, which
-   names the package rather than the SDK that was missing at install time.
+2. **The RFC transport needs no build at install.** It is `@mcp-abap-adt/sap-rfc-lite`, reached
+   through `@mcp-abap-adt/connection` (nested at
+   `node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite`, never at the
+   top level). Its install script is denied (`allowScripts`), and a plain `npm ci` installs its
+   prebuilt binding for linux-x64 (glibc), darwin-arm64 and win32-x64, which loads at run time with
+   the SDK's libraries on the library path (below). On any other platform compile it explicitly,
+   once, inside that nested directory: `SAPNWRFC_HOME=<sdk> node scripts/install.js`. Without a
+   binding, `connection_type: "rfc"` fails in `globalSetup` with `@mcp-abap-adt/sap-rfc-lite is
+   not available … Cannot find module`.
 3. SAP user has `S_RFC` authorization for `SADT_REST_RFC_ENDPOINT` (SAP Note 3569684)
 
 **Ensure `test-config.yaml` has `connection_type: "rfc"`:**
@@ -212,6 +199,22 @@ SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC
 
 See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for full details.
 
+## No dependency runs an install script
+
+Supply-chain worms (Shai-Hulud and its kind) spread through dependencies' install scripts. So:
+
+- `allowScripts` in both `package.json` files (the root and `packages/adt-strategies`) lists every
+  package in the lockfile that has an install script, each denied (`false`); both directories have
+  an `.npmrc` with `strict-allow-scripts=true` (the strategies one exists because npm with
+  `--prefix` reads that directory's `.npmrc`), so a new dependency with an unreviewed install
+  script fails the install. A new entry needs its reason; the default answer is deny.
+- No `min-release-age`: it blocked installing a security fix while the gating audit failed CI.
+- CI and the release workflow install both packages with `npm ci --ignore-scripts`, and
+  `npm audit --audit-level=moderate` gates both trees. An advisory with no fixed release gets an
+  `overrides` entry with its reason in the CHANGELOG — never a non-gating audit.
+- Never `npx`: scripts call the installed bins (`biome`, `tsc`, `jest`, `ts-node`), shell scripts
+  `node_modules/.bin/…`. `src/__tests__/unit/supplyChain.test.ts` holds all of this.
+
 ## Key Dependencies
 
 - `@mcp-abap-adt/interfaces-adt` — ADT contracts (capability atoms, configs, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`)
@@ -219,6 +222,7 @@ See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for ful
 - `@mcp-abap-adt/interfaces-network` — `IWebSocketTransport`, `HttpError`; `@mcp-abap-adt/interfaces-utils` — `ILogger`, `XmlNode`
 - `@mcp-abap-adt/logger` — Logging implementation
 - `fast-xml-parser` — XML parsing for ADT responses
+- `ts-node` — **dev only** — runs the probe and read scripts in `scripts/` (`node_modules/.bin/ts-node`)
 - `axios` — HTTP client (used internally by connection layer)
 - `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests; `@mcp-abap-adt/interfaces-auth` and `-auth-sap` are dev-only too
 - `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, published on its own, and **not a workspace**: no local link. adt-clients' tests take it from npm as a devDependency (`^0.10.0`); the package builds and tests against what it installs from the registry (`npm ci --prefix packages/adt-strategies`). A strategy change that adt-clients' tests need is published first.
