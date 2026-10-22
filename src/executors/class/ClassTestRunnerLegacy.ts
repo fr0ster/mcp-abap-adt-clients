@@ -20,11 +20,12 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
-import { startClassUnitTestRunLegacy } from '../../core/class/runLegacy';
+import { startClassUnitTestRunSync } from '../../core/class/run';
 import { answering, failed } from '../../utils/adtResponse';
 import {
   ClassTestRunner,
   type classTestRunnerDocuments,
+  containersOf,
   type IClassTestRunnerResults,
   type IClassTestRunTarget,
 } from './ClassTestRunner';
@@ -42,13 +43,27 @@ export class ClassTestRunnerLegacy<
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    const classNames =
-      typeof target === 'string'
-        ? [target]
-        : [...new Set(target.map((test) => test.containerClass))];
+    // No options: the body a legacy system has always been sent — the
+    // `<options>` element `runSync` sends is unmeasured there.
     return answering(
-      () => startClassUnitTestRunLegacy(this.connection, classNames),
+      () => startClassUnitTestRunSync(this.connection, containersOf(target)),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The same request as `run` — on a legacy system `run` is already the
+   * synchronous one — answered through the `result` strategy, as the regular
+   * runner's `runSync` is.
+   */
+  override async runSync<E extends IAdtError = IAdtError>(
+    target: IClassTestRunTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+    return answering(
+      () => startClassUnitTestRunSync(this.connection, containersOf(target)),
+      this.results.result as IResultStrategy<ReturnType<R['result']>>,
       options?.analyse,
     );
   }

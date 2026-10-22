@@ -30,7 +30,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { startClassUnitTestRun } from '../../core/class/run';
+import {
+  startClassUnitTestRun,
+  startClassUnitTestRunSync,
+} from '../../core/class/run';
 import { answering } from '../../utils/adtResponse';
 import {
   AbapUnitRunner,
@@ -44,7 +47,17 @@ import {
  */
 export type IClassTestRunTarget = IClassUnitTestDefinition[] | string;
 
-/** One strategy per distinct answer: starting a run, polling it, its result. */
+/** The distinct containers a target names: what `/testruns` addresses. */
+export function containersOf(target: IClassTestRunTarget): string[] {
+  return typeof target === 'string'
+    ? [target]
+    : [...new Set(target.map((test) => test.containerClass))];
+}
+
+/**
+ * One strategy per distinct answer: starting a run, polling it, its result.
+ * `runSync` answers the result document itself, so it is read by `result`.
+ */
 export type IClassTestRunnerResults = IAbapUnitRunnerResults;
 
 /** The shipped default: documents as they arrived. */
@@ -92,6 +105,43 @@ export class ClassTestRunner<
       () => startClassUnitTestRun(this.connection, target, options),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
       options?.analyse,
+    );
+  }
+
+  /**
+   * Run the tests and answer the finished result. One POST, to
+   * `/sap/bc/adt/abapunit/testruns` — the synchronous runner, beside the
+   * asynchronous `run` + `getStatus` + `getResult`, which stays the default.
+   *
+   * An explicit choice of the caller's: nothing here asks the system which
+   * runner it has. A system without `/abapunit/runs` (an on-prem S/4HANA 2023
+   * was measured with `/testruns` alone) needs this one; whether a system has
+   * it is in its discovery, which is the caller's to read.
+   *
+   * The answer is the `aunit:runResult` document, so it is read by this
+   * runner's `result` strategy — the one `getResult` uses — and a failing test
+   * is in it as an `alert`; whether that is a failure is `options.analyse`'s
+   * (`analyseUnitTest` from @mcp-abap-adt/adt-strategies reads it so).
+   *
+   * Differences from `run`: the endpoint addresses whole classes, so a target
+   * of test definitions runs each distinct container whole, and `title` and
+   * `context` are not sent; scope, risk levels and durations are, with the
+   * same defaults.
+   */
+  async runSync<E extends IAdtError = IAdtError>(
+    target: IClassTestRunTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+    const { analyse, ...runOptions } = options ?? {};
+    return answering(
+      () =>
+        startClassUnitTestRunSync(
+          this.connection,
+          containersOf(target),
+          runOptions,
+        ),
+      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      analyse,
     );
   }
 }

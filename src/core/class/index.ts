@@ -20,5 +20,6 @@ export {
   IClassUnitTestRunOptions,
   startClassUnitTestRun,
   startClassUnitTestRunByObject,
+  startClassUnitTestRunSync,
 } from './run';
 export * from './types';
