@@ -2,8 +2,8 @@
  * Temporary script: verify active vs inactive read sequence.
  *
  * Usage:
- *   npx ts-node scripts/read-object-versions.ts [OBJECT_NAME] [--type=class] [--function-group=ZFG]
- *   npx ts-node scripts/read-object-versions.ts ZOK_CL_READER_DIGEST
+ *   node_modules/.bin/ts-node scripts/read-object-versions.ts [OBJECT_NAME] [--type=class] [--function-group=ZFG]
+ *   node_modules/.bin/ts-node scripts/read-object-versions.ts ZOK_CL_READER_DIGEST
  *
  * Flags:
  *   --type=class|program|interface|functionmodule|view|structure|table|tabletype

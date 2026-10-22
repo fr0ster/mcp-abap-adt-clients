@@ -12,7 +12,7 @@
  * class's `main` (IF_OO_ADT_CLASSRUN) calls the procedure and selects from
  * the table function, so one classrun enters both.
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-amdp.ts --deploy
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-amdp.ts --deploy
  *   ... --run      run the class once (for a debugger listening elsewhere)
  *   ... --delete   remove both objects
  *

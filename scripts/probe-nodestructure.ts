@@ -8,7 +8,7 @@
  * the root the walk starts from and for the child that came back empty.
  *
  * Usage:
- *   npx ts-node scripts/probe-nodestructure.ts [PKG ...]
+ *   node_modules/.bin/ts-node scripts/probe-nodestructure.ts [PKG ...]
  */
 
 import * as fs from 'node:fs';

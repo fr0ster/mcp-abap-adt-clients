@@ -40,7 +40,7 @@ corpus is the fixture.
 ## Collecting
 
 ```bash
-npx ts-node scripts/capture-adt-corpus.ts
+node_modules/.bin/ts-node scripts/capture-adt-corpus.ts
 ```
 
 It talks to this package's own public surface, with a thin interceptor on

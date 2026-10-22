@@ -11,7 +11,7 @@
  * `application/vnd.sap.adt.businessservices.odatav2.v3+xml`. They cannot both
  * be right.
  *
- *   npx ts-node scripts/probe-406-accept.ts ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
+ *   node_modules/.bin/ts-node scripts/probe-406-accept.ts ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
  */
 
 import * as fs from 'node:fs';

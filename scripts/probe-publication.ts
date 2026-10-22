@@ -10,8 +10,8 @@
  * and the binding's own state before and after, so a job that reports something
  * about itself can be seen reporting it.
  *
- *   npx ts-node scripts/probe-publication.ts state ZAC_SRVB01
- *   npx ts-node scripts/probe-publication.ts unpublish ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
+ *   node_modules/.bin/ts-node scripts/probe-publication.ts state ZAC_SRVB01
+ *   node_modules/.bin/ts-node scripts/probe-publication.ts unpublish ZAC_SRVB01 ZAC_SRVD01 odatav4 0001
  */
 
 import * as fs from 'node:fs';

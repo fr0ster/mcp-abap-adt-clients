@@ -67,17 +67,20 @@ describe('debugger tests use shared targets', () => {
     ['adt_abap_debugger_modes', 'class_name', '"BP:', ['LOOP', 'END']],
     ['adt_abap_debugger_modes', 'class_name_b', '"BP:', ['RAISE', 'END']],
     ['adt_amdp_debugger', 'class_name', '-- BP:', ['loop', 'tf']],
-  ] as const)('%s.%s names a shared class whose source carries its markers', (caseName, key, marker, names) => {
-    const name = params(caseName)[key];
-    expect(name).toMatch(/^ZAC_SHR_DBG_/);
-    const entry = shared('classes', name as string);
-    expect(entry?.source).toBeTruthy();
-    const lines = markerLines(entry?.source ?? '', marker);
-    expect(names.filter((n) => !lines[n])).toEqual([]);
-    expect(entry?.source).toContain(
-      `CLASS ${(name as string).toLowerCase()} DEFINITION`,
-    );
-  });
+  ] as const)(
+    '%s.%s names a shared class whose source carries its markers',
+    (caseName, key, marker, names) => {
+      const name = params(caseName)[key];
+      expect(name).toMatch(/^ZAC_SHR_DBG_/);
+      const entry = shared('classes', name as string);
+      expect(entry?.source).toBeTruthy();
+      const lines = markerLines(entry?.source ?? '', marker);
+      expect(names.filter((n) => !lines[n])).toEqual([]);
+      expect(entry?.source).toContain(
+        `CLASS ${(name as string).toLowerCase()} DEFINITION`,
+      );
+    },
+  );
 
   it('the AMDP class and its table function name each other and activate as a group', () => {
     const { class_name: cls, ddl_name: ddl } = params('adt_amdp_debugger');

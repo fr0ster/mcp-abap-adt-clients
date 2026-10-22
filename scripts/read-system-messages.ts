@@ -2,8 +2,8 @@
  * Read System Messages (SM02) from SAP system.
  *
  * Usage:
- *   npx ts-node scripts/read-system-messages.ts              # list messages
- *   npx ts-node scripts/read-system-messages.ts <messageId>  # read specific message
+ *   node_modules/.bin/ts-node scripts/read-system-messages.ts              # list messages
+ *   node_modules/.bin/ts-node scripts/read-system-messages.ts <messageId>  # read specific message
  *
  * Options (env vars):
  *   SM_USER=DEVELOPER       — filter by user

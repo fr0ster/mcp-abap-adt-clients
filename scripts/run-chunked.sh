@@ -6,6 +6,8 @@
 # here is its own jest, so the memory goes back between them, and the verdicts
 # add up to the same gate.
 set -u
+# Run from the repository root (bash scripts/run-chunked.sh): it calls the
+# installed node_modules/.bin/jest, never npx.
 LOG=chunked-run.log
 : > "$LOG"
 
@@ -24,7 +26,7 @@ pass=0; fail=0
 for chunk in "${CHUNKS[@]}"; do
   echo "=================== chunk: $(echo "$chunk" | tr ' ' '\n' | sed 's#src/__tests__/##' | tr '\n' ' ')" | tee -a "$LOG"
   # shellcheck disable=SC2086
-  npx jest --runInBand $chunk >> "$LOG" 2>&1
+  node_modules/.bin/jest --runInBand $chunk >> "$LOG" 2>&1
   code=$?
   line=$(grep -E "^Tests: " "$LOG" | tail -1)
   echo "  -> exit $code   $line" | tee -a "$LOG"

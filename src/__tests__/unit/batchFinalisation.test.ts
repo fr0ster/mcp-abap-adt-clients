@@ -63,21 +63,22 @@ test('a finalisation failure fails an otherwise successful run', async () => {
   ).rejects.toBe(failure);
 });
 
-test.each([
-  200, 404, 500,
-])('debugger verdict checks inner status %s', (status) => {
-  const response = {
-    status: 202,
-    statusText: 'Accepted',
-    headers: { 'content-type': 'multipart/mixed; boundary=b' },
-    data: `--b\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Result\r\nContent-Type: text/plain\r\n\r\nbody\r\n--b--\r\n`,
-  };
-  if (status === 200)
-    expect(() =>
-      assertBatchStatuses(response, '/tmp/exchange.txt'),
-    ).not.toThrow();
-  else
-    expect(() => assertBatchStatuses(response, '/tmp/exchange.txt')).toThrow(
-      `expected 200, received ${status}; exchange: /tmp/exchange.txt`,
-    );
-});
+test.each([200, 404, 500])(
+  'debugger verdict checks inner status %s',
+  (status) => {
+    const response = {
+      status: 202,
+      statusText: 'Accepted',
+      headers: { 'content-type': 'multipart/mixed; boundary=b' },
+      data: `--b\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 ${status} Result\r\nContent-Type: text/plain\r\n\r\nbody\r\n--b--\r\n`,
+    };
+    if (status === 200)
+      expect(() =>
+        assertBatchStatuses(response, '/tmp/exchange.txt'),
+      ).not.toThrow();
+    else
+      expect(() => assertBatchStatuses(response, '/tmp/exchange.txt')).toThrow(
+        `expected 200, received ${status}; exchange: /tmp/exchange.txt`,
+      );
+  },
+);

@@ -13,7 +13,7 @@
  * - B: the listener as Eclipse sends it — checkConflict=true and
  *      isNotifiedOnConflict=true.
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-debugger-conflict.ts [A|B ...]
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-debugger-conflict.ts [A|B ...]
  */
 
 import { createHash } from 'node:crypto';

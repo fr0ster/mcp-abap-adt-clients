@@ -6,7 +6,7 @@
  * recognise. Whether that body is a different shape or simply empty is a fact
  * about the server, so it gets measured rather than guessed.
  *
- *   npx ts-node scripts/probe-package-deletion.ts ZAC_INNER_PKG03
+ *   node_modules/.bin/ts-node scripts/probe-package-deletion.ts ZAC_INNER_PKG03
  */
 
 import * as fs from 'node:fs';

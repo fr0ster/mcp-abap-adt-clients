@@ -20,7 +20,7 @@
  * from markers in its source, so editing the source never leaves a stale
  * line number behind.
  *
- *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-debugger-cycle.ts
+ *   MCP_ENV_PATH=<session>.env node_modules/.bin/ts-node scripts/probe-debugger-cycle.ts
  *   ... --keep            leave the probe class in place
  *   ... --package <name>  package for the probe class (default: $TMP)
  *

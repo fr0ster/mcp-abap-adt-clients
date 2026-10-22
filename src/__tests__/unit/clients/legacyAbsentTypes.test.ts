@@ -95,24 +95,25 @@ describe('AdtClientLegacy: object types absent on legacy', () => {
     );
   });
 
-  it.each(
-    absent,
-  )('%s answers a refusal from every member, without a request', async (getter) => {
-    const handler = handlerOf(legacy, getter);
-    const members = membersOf(handler);
-    expect(members.length).toBeGreaterThan(0);
+  it.each(absent)(
+    '%s answers a refusal from every member, without a request',
+    async (getter) => {
+      const handler = handlerOf(legacy, getter);
+      const members = membersOf(handler);
+      expect(members.length).toBeGreaterThan(0);
 
-    for (const member of members) {
-      const answer = (await handler[member]({})) as {
-        ok: boolean;
-        getError: () => { origin: string; code: string; message: string };
-      };
-      expect(answer.ok).toBe(false);
-      const error = answer.getError();
-      expect(error.origin).toBe('refusal');
-      expect(error.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
-      expect(error.message).toContain('/sap/bc/adt/');
-    }
-    expect(makeAdtRequest).not.toHaveBeenCalled();
-  });
+      for (const member of members) {
+        const answer = (await handler[member]({})) as {
+          ok: boolean;
+          getError: () => { origin: string; code: string; message: string };
+        };
+        expect(answer.ok).toBe(false);
+        const error = answer.getError();
+        expect(error.origin).toBe('refusal');
+        expect(error.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+        expect(error.message).toContain('/sap/bc/adt/');
+      }
+      expect(makeAdtRequest).not.toHaveBeenCalled();
+    },
+  );
 });

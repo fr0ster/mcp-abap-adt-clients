@@ -15,11 +15,11 @@
  * `test-config.yaml` through the same resolver the suites use, never from a
  * literal here.
  *
- *   npx ts-node scripts/probe-activation-steps.ts create   ZAC_ACT_PROBE
- *   npx ts-node scripts/probe-activation-steps.ts look     ZAC_ACT_PROBE
- *   npx ts-node scripts/probe-activation-steps.ts write    ZAC_ACT_PROBE
- *   npx ts-node scripts/probe-activation-steps.ts activate ZAC_ACT_PROBE
- *   npx ts-node scripts/probe-activation-steps.ts delete   ZAC_ACT_PROBE
+ *   node_modules/.bin/ts-node scripts/probe-activation-steps.ts create   ZAC_ACT_PROBE
+ *   node_modules/.bin/ts-node scripts/probe-activation-steps.ts look     ZAC_ACT_PROBE
+ *   node_modules/.bin/ts-node scripts/probe-activation-steps.ts write    ZAC_ACT_PROBE
+ *   node_modules/.bin/ts-node scripts/probe-activation-steps.ts activate ZAC_ACT_PROBE
+ *   node_modules/.bin/ts-node scripts/probe-activation-steps.ts delete   ZAC_ACT_PROBE
  *
  * `look` reads four things and says what each one answered: the inactive
  * objects list, the class's metadata document, and its source in BOTH versions

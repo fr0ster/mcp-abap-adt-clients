@@ -586,5 +586,5 @@ INTERFACE … does not exist."*, *"Data definition … of version  does not
 exist"*. All mean the same thing, and none is worth matching on: branch on the
 failure your own `analyse` decided.
 
-Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts` and
-`npx ts-node scripts/probe-unfinished-create.ts`.
+Reproduce with `node_modules/.bin/ts-node scripts/probe-inactive-metadata.ts` and
+`node_modules/.bin/ts-node scripts/probe-unfinished-create.ts`.

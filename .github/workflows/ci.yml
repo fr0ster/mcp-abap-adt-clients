@@ -8,6 +8,9 @@ on:
 
 jobs:
   lint-and-build:
+    # A hung step is capped here instead of by GitHub's 6-hour default; a
+    # whole run takes 2 to 5 minutes.
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     
     steps:
@@ -23,15 +26,31 @@ jobs:
       # Two installs, both from the registry: the strategies package is not a
       # workspace (no local links between packages — what is built and tested
       # here is what a consumer installs).
+      #
+      # --ignore-scripts: the runner's npm may predate 11.19.0, which reads
+      # package.json `allowScripts` and .npmrc `strict-allow-scripts` in full,
+      # and no dependency's install script is needed to lint, build or test —
+      # `allowScripts` denies every one of them. It also skips the root's own
+      # `prepare` (husky), which CI has no use for.
       - name: Install dependencies
-        run: |
-          npm ci
-          npm ci --prefix packages/adt-strategies
+        run: npm ci --ignore-scripts
+
+      - name: Install dependencies (strategies package)
+        run: npm ci --ignore-scripts --prefix packages/adt-strategies
+
+      # Any known advisory of moderate severity or above fails the run, dev
+      # dependencies included: they run here and on every developer's
+      # machine. Both trees: the strategies package has a lockfile of its own.
+      - name: Security audit (moderate+)
+        run: npm audit --audit-level=moderate
+
+      - name: Security audit, strategies package (moderate+)
+        run: npm audit --audit-level=moderate --prefix packages/adt-strategies
       
       # `src packages`, not `src`: a gate that lints only the root package is a
       # gate that reports success about half the tree.
       - name: Run Biome lint
-        run: npx biome check src packages --diagnostic-level=error
+        run: node_modules/.bin/biome check src packages --diagnostic-level=error
 
       # The strategies package builds against what it installed from the
       # registry. adt-clients' tests use the PUBLISHED strategies (a
@@ -40,7 +59,7 @@ jobs:
         run: npm run build:packages
 
       - name: Type check
-        run: npx tsc -p tsconfig.json --noEmit
+        run: node_modules/.bin/tsc -p tsconfig.json --noEmit
 
       # Tests, scripts and examples are type-checked by their own configs. The
       # root one covers `src` alone, so a script or an example naming a member
@@ -56,7 +75,7 @@ jobs:
       # is built on. `MCP_ENV_PATH` points at nothing so the preflight skips
       # instead of aborting the run.
       - name: Unit tests
-        run: MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit
+        run: MCP_ENV_PATH=/tmp/nonexistent-env npm run test:unit
 
       # The strategies package is tested entirely against the recorded answers
       # in `corpus/adt/`, so it needs no system at all.
@@ -70,6 +89,7 @@ jobs:
         if: success()
         run: |
           echo "✅ All checks passed!"
+          echo "- npm audit, both trees: OK"
           echo "- Biome lint (src + packages): OK"
           echo "- TypeScript, root and test configs: OK"
           echo "- Build, root and strategies package: OK"

@@ -3,7 +3,7 @@
  * the registry sends (lowercase, through `seg`) and in the case a caller gives
  * (as written), and say whether the two answers agree.
  *
- *   npx ts-node scripts/address-matrix.ts --objects <file.json> \
+ *   node_modules/.bin/ts-node scripts/address-matrix.ts --objects <file.json> \
  *     --to <system>-tunnel --to trial:cloud --out address-matrix.md
  *
  * The objects file names real objects on concrete systems, so it lives outside

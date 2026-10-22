@@ -10,7 +10,7 @@
  * This validates a name that certainly exists, per type, and prints the status
  * beside what the body said. Creates nothing.
  *
- *   npx ts-node scripts/probe-validate-collision.ts
+ *   node_modules/.bin/ts-node scripts/probe-validate-collision.ts
  */
 
 import * as fs from 'node:fs';

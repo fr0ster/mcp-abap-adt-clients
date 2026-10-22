@@ -43,7 +43,7 @@
  * leaves that question open rather than answering it from a number.
  *
  * Usage:
- *   npx ts-node scripts/probe-atc-checkvariant.ts --out=atc-chkv-probe
+ *   node_modules/.bin/ts-node scripts/probe-atc-checkvariant.ts --out=atc-chkv-probe
  *
  *   --out=DIR        Where the evidence goes. Default `atc-chkv-probe`.
  *   --variant=NAME   Read this variant instead of the system's nominated one.

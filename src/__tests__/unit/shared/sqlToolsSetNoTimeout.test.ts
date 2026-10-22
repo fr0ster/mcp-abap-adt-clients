@@ -105,21 +105,23 @@ const calls: Array<[string, (c: IAbapConnection) => Promise<unknown>]> = [
 ];
 
 describe('the SQL tools set no timeout of their own', () => {
-  it.each(
-    calls,
-  )('%s sends no timeout when the caller sets none', async (_name, call) => {
-    const { connection, sent } = recordingConnection();
-    await call(connection);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].timeout).toBe(0);
-  });
+  it.each(calls)(
+    '%s sends no timeout when the caller sets none',
+    async (_name, call) => {
+      const { connection, sent } = recordingConnection();
+      await call(connection);
+      expect(sent).toHaveLength(1);
+      expect(sent[0].timeout).toBe(0);
+    },
+  );
 
-  it.each(
-    calls,
-  )("%s keeps the caller's timeout as given", async (_name, call) => {
-    const { connection, sent } = recordingConnection();
-    await call(withCallerDeadline(connection, 5000));
-    expect(sent).toHaveLength(1);
-    expect(sent[0].timeout).toBe(5000);
-  });
+  it.each(calls)(
+    "%s keeps the caller's timeout as given",
+    async (_name, call) => {
+      const { connection, sent } = recordingConnection();
+      await call(withCallerDeadline(connection, 5000));
+      expect(sent).toHaveLength(1);
+      expect(sent[0].timeout).toBe(5000);
+    },
+  );
 });

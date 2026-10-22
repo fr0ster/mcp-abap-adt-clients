@@ -2,11 +2,11 @@
  * Script: Read package contents using AdtClient
  *
  * Usage:
- *   npx ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]
- *   npx ts-node scripts/read-package-contents.ts ZTEST_PKG
- *   npx ts-node scripts/read-package-contents.ts ZTEST_PKG --tree
- *   npx ts-node scripts/read-package-contents.ts ZTEST_PKG --subpackages
- *   npx ts-node scripts/read-package-contents.ts ZTEST_PKG --json
+ *   node_modules/.bin/ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]
+ *   node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG
+ *   node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG --tree
+ *   node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG --subpackages
+ *   node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG --json
  *
  * Options:
  *   --tree         Output as tree structure (using getPackageHierarchy)
@@ -162,7 +162,7 @@ async function run(): Promise<void> {
 
   if (!options.packageName) {
     console.error(
-      'Usage: npx ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
+      'Usage: node_modules/.bin/ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
     );
     console.error('');
     console.error('Options:');

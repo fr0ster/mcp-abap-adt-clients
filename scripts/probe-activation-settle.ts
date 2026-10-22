@@ -28,7 +28,7 @@
  * answer cannot: with no `analyse` strategy a refusal arrives as a 200, so
  * `ok === true` covers both "activated" and "refused to activate".
  *
- *   npx ts-node scripts/probe-activation-settle.ts [GROUP] [INCLUDE] [PACKAGE] [TRANSPORT]
+ *   node_modules/.bin/ts-node scripts/probe-activation-settle.ts [GROUP] [INCLUDE] [PACKAGE] [TRANSPORT]
  *
  * Defaults come from `test-config.yaml` / `.env`, and the group is created in
  * the configured package if it is not there. Poll period and budget:

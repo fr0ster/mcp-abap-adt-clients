@@ -6,7 +6,7 @@
  * same 3836 bytes — which is either a coincidence or the endpoint answering
  * something generic. Measured rather than assumed.
  *
- *   npx ts-node scripts/probe-package.ts ZAC_INNER_PKG04 ZZ_NEVER_EXISTED_PKG
+ *   node_modules/.bin/ts-node scripts/probe-package.ts ZAC_INNER_PKG04 ZZ_NEVER_EXISTED_PKG
  */
 
 import * as fs from 'node:fs';

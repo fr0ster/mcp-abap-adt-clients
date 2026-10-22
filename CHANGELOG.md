@@ -24,6 +24,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Security
+
+Supply-chain hardening of the repository (worms of the Shai-Hulud kind spread
+through dependencies' install scripts and stolen tokens). Nothing published
+changes: no code of the package and no dependency range of it.
+
+- **No dependency runs an install script.** `package.json` `allowScripts`
+  names the three dependencies with one and denies each:
+  `@mcp-abap-adt/sap-rfc-lite` (its binding ships prebuilt for linux-x64,
+  darwin-arm64 and win32-x64; elsewhere it is compiled explicitly, see
+  `docs/development/RFC_TESTING.md`), `@parcel/watcher` and `unrs-resolver`
+  (Jest's; both ship prebuilt binaries as optional dependencies). `.npmrc`:
+  `strict-allow-scripts=true`, so a new dependency with an unreviewed install
+  script fails the install. No release-age gate (`min-release-age`): it
+  conflicts with the gating audit — a security fix younger than the gate
+  could not be installed while the audit kept CI red on the advisory it
+  fixes. The install-script policy, the lockfile's integrity hashes,
+  `npm ci --ignore-scripts` and the gating audit are the defence.
+- **Workflows install with `npm ci --ignore-scripts`** (npm reads
+  `allowScripts` in full only from 11.19.0), gate on
+  `npm audit --audit-level=moderate` for both lockfiles — this package's and
+  `packages/adt-strategies`' —, dev dependencies included, and cap every job
+  with `timeout-minutes`.
+- **No `npx`.** Package scripts, the pre-commit hook, the runner scripts and
+  the workflows call the installed bins (`biome`, `tsc`, `jest`, `ts-node`).
+  `ts-node` was never installed, so every `npx ts-node` script fetched it from
+  the registry at run time: it is a dev dependency now (`^10.9.2`). The unit
+  suite has its script, `npm run test:unit`.
+- **Lockfile refreshed within ranges**: follow-redirects 1.16.1 under axios
+  and markdown-it 14.3.3 (dev range now `^14.3.3`; 14.3.2 had
+  GHSA-vfgh-jcmw-g37q and GHSA-gfr2-rv44-r23c, both high), jest 30.5.2,
+  ts-jest 29.4.15, Biome 2.5.15 (two findings of its new rules fixed),
+  fast-xml-parser 5.11.2. `npm audit`: 0, `--omit=dev`: 0.
+- `src/__tests__/unit/supplyChain.test.ts` holds both packages, both
+  workflows, the hook and the runner scripts to this.
+
 ## [37.1.0] - 2026-10-22
 
 ### Added

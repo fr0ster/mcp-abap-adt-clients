@@ -7,7 +7,7 @@
  * Usage:
  *   npm run test:long-polling-read
  *   or
- *   npx ts-node scripts/test-long-polling-read.ts
+ *   node_modules/.bin/ts-node scripts/test-long-polling-read.ts
  *
  * Environment variables:
  *   MCP_ENV_PATH - Path to .env file (default: .env in project root)

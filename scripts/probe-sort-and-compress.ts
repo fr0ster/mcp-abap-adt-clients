@@ -6,8 +6,8 @@
  * object names, each named entry still on a listed task is then removed from it
  * and added to MOVE_TO — the case a duplicate used to block (TR292).
  *
- *   MCP_ENV_PATH=… TASKS=T1,T2 npx ts-node scripts/probe-sort-and-compress.ts
- *   MCP_ENV_PATH=… TASKS=T1 NAMES=A,B MOVE_TO=T9 npx ts-node scripts/probe-sort-and-compress.ts
+ *   MCP_ENV_PATH=… TASKS=T1,T2 node_modules/.bin/ts-node scripts/probe-sort-and-compress.ts
+ *   MCP_ENV_PATH=… TASKS=T1 NAMES=A,B MOVE_TO=T9 node_modules/.bin/ts-node scripts/probe-sort-and-compress.ts
  */
 
 import * as fs from 'node:fs';

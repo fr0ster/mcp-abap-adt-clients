@@ -5,8 +5,8 @@
  * method entry carries) and MOVE=1, moves the named entries of FROM to TO in
  * one call and lists both again.
  *
- *   MCP_ENV_PATH=… FROM=T1 TO=T2 npx ts-node scripts/probe-move-objects.ts
- *   MCP_ENV_PATH=… FROM=T1 TO=T2 NAMES=A,B MOVE=1 npx ts-node scripts/probe-move-objects.ts
+ *   MCP_ENV_PATH=… FROM=T1 TO=T2 node_modules/.bin/ts-node scripts/probe-move-objects.ts
+ *   MCP_ENV_PATH=… FROM=T1 TO=T2 NAMES=A,B MOVE=1 node_modules/.bin/ts-node scripts/probe-move-objects.ts
  */
 
 import * as fs from 'node:fs';

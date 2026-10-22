@@ -2,8 +2,8 @@
  * Read Gateway Error Log (/IWFND/ERROR_LOG) from SAP system.
  *
  * Usage:
- *   npx ts-node scripts/read-gateway-errors.ts                              # list errors
- *   npx ts-node scripts/read-gateway-errors.ts "Frontend Error" <errorId>   # read specific error
+ *   node_modules/.bin/ts-node scripts/read-gateway-errors.ts                              # list errors
+ *   node_modules/.bin/ts-node scripts/read-gateway-errors.ts "Frontend Error" <errorId>   # read specific error
  *
  * Options (env vars):
  *   GW_USER=DEVELOPER       — filter by user
@@ -79,7 +79,7 @@ async function main() {
 
     if (!errorId) {
       console.error(
-        'Usage: npx ts-node scripts/read-gateway-errors.ts "<errorType>" <errorId>',
+        'Usage: node_modules/.bin/ts-node scripts/read-gateway-errors.ts "<errorType>" <errorId>',
       );
       process.exitCode = 1;
       return;

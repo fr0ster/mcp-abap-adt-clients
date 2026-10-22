@@ -19,8 +19,8 @@
   ],
   "scripts": {
     "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\"",
-    "build": "npm run --silent clean && npx tsc -p tsconfig.json",
-    "test": "npx jest -c jest.config.js",
+    "build": "npm run --silent clean && tsc -p tsconfig.json",
+    "test": "jest -c jest.config.js",
     "prepack": "node scripts/copy-errata.js && npm run --silent build"
   },
   "keywords": [
@@ -50,5 +50,9 @@
     "jest": "^30.0.5",
     "ts-jest": "^29.4.1",
     "typescript": "^5.9.2"
+  },
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "unrs-resolver": false
   }
 }
