@@ -19,7 +19,8 @@
 #   tail -f test-run.log
 set -u
 LOG="${DETACHED_LOG:-test-run.log}"
-CMD=(npx jest --runInBand "$@")
+# The installed jest itself, never npx (which fetches what it does not find).
+CMD=(node_modules/.bin/jest --runInBand "$@")
 
 nohup "${CMD[@]}" > "$LOG" 2>&1 &
 PID=$!
