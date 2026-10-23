@@ -111,6 +111,10 @@ const SENDS_NO_REQUEST = new Set([
   'AdtFunctionIncludeLegacy.delete',
   'AdtMessageClassLegacy.checkDeletion',
   'AdtMessageClassLegacy.delete',
+  // Measured 404 on 7.40 (spec §10.2).
+  'AdtUtilsLegacy.getWhereUsed',
+  'AdtUtilsLegacy.getWhereUsedScope',
+  'AdtUtilsLegacy.getVirtualFoldersContents',
 ]);
 
 /**

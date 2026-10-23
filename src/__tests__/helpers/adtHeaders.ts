@@ -1120,6 +1120,13 @@ const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
       'getTableContents',
       'checkDeletionGroup',
       'deleteObjectsGroup',
+      // Measured 404 on 7.40, or no run to ask about (spec §10.2).
+      'getWhereUsed',
+      'getWhereUsedScope',
+      'getVirtualFoldersContents',
+      'getAllTypes',
+      'getActivationRun',
+      'getActivationResults',
     ],
   ],
   // No deletion API on 7.40 (spec §4.3, §5).

@@ -1527,17 +1527,6 @@ const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
   rows.map((row) => ({ row, assertion: 'sends nothing', task }));
 
 export const PENDING: readonly Pending[] = [
-  // Task 7: utilities.
-  ...pendingRefusals(7, [
-    'getUtils.getWhereUsed',
-    'getUtils.getWhereUsedScope',
-    'getUtils.getVirtualFoldersContents',
-    'getUtils.getAllTypes',
-    'getUtils.getActivationRun',
-    'getUtils.getActivationResults',
-    ...METADATA_REFUSED.map((t) => `getUtils.readObjectMetadata[${t}]`),
-    ...SOURCE_REFUSED.map((t) => `getUtils.readObjectSource[${t}]`),
-  ]),
   // Task 8: the package item resource.
   ...pendingRefusals(8, [
     'getPackage.lock',
