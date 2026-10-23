@@ -1,20 +1,28 @@
 /**
  * AdtRequestLegacy - Transport request handler for legacy SAP systems
- * (BASIS < 7.50).
+ * (BASIS < 7.50), over RFC.
  *
  * Legacy systems use `/sap/bc/cts/` instead of `/sap/bc/adt/cts/`.
  *
- * Supported:
- * - `read`: GET /sap/bc/cts/transportrequests (the full list, as it came)
- * - `list`: the same resource; not a saved-configuration search, so no configUri
+ * Served:
+ * - `list`: GET /sap/bc/cts/transportrequests, the user's full list as it came
+ *   (measured on 7.40 SP04; the measured user had no requests, so a populated
+ *   list was not seen). Not a saved-configuration search, so `configUri` is
+ *   refused.
+ * - `readMetadata`: the same GET.
  *
- * Refused without a request: the members on `/sap/bc/adt/cts/*`, which 7.40
- * does not advertise, and the members whose legacy endpoint shape is unknown.
- * Each with its reason: the legacy endpoint's shape for that
- * operation has never been captured, and inventing a payload for an uncaptured
- * endpoint is exactly the guessing this design exists to stop. They answer the
- * refusal rather than throwing it — a consumer that supports both kinds of
- * system will call them, and that is a normal case, not an exception.
+ * Refused without a request, answered through `failed()`:
+ * - `create` — measured on 7.40 SP04: the POST answered `400` "user action is
+ *   not supported".
+ * - `updateMetadata`, `delete` — not measured; create and modify are refused.
+ * - the other members on `/sap/bc/adt/cts/*`, which 7.40 does not advertise
+ *   (`searchConfigurations`, `checkDeletion`, `readObjects`, `readActionLog`,
+ *   `addObject`, `removeObject`, `moveObjects`, `sortAndCompress`,
+ *   `createTask`, `changeTaskType`).
+ *
+ * They answer the refusal rather than throwing it — a consumer that supports
+ * both kinds of system will call them, and that is a normal case, not an
+ * exception.
  */
 
 import type {

@@ -1,12 +1,17 @@
 /**
- * AdtExecutorLegacy — executors for legacy SAP systems (BASIS < 7.50).
+ * AdtExecutorLegacy — executors for legacy SAP systems (BASIS < 7.50), over RFC.
  *
- * The ABAP Unit runners differ: 7.40 has no `/abapunit/runs`, so every
- * runner's inherited `runSync` — `/abapunit/testruns` with `<options>`,
- * measured for a class, a report, a function group and a function module — is
- * what runs the tests. A class's, a report's and a group's `run` send that same
- * request; a function module's `run` is refused (it names no group), and there
- * is no run to poll or fetch. The rest is inherited.
+ * The ABAP Unit runners differ: 7.40 has no `/abapunit/runs`, so the
+ * `/abapunit/testruns` request with `<options>` is what runs the tests —
+ * measured on 7.40 SP04 for a class, a report, a function group and a function
+ * module. A class's, a report's and a group's `run` and `runSync` all send it;
+ * a function module's `runSync` sends it and its `run` is refused (it names no
+ * group); `getStatus` and `getResult` are refused, as there is no run id.
+ *
+ * The class and program executors refuse their runs and the trace type lists
+ * without a request (7.40 has no `/oo/classrun`; `programrun` and the trace
+ * catalogues are not advertised and not measured); the trace schedule is
+ * inherited, unmeasured.
  */
 
 import type {

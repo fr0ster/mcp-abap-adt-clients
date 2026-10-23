@@ -1,7 +1,8 @@
 /**
  * AdtProgramLegacy - Program handler for legacy SAP systems (BASIS < 7.50)
  *
- * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
+ * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
+ * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
  */
 
@@ -27,6 +28,17 @@ import type {
 export class AdtProgramLegacy<
   R extends IProgramResults = typeof programDocuments,
 > extends AdtProgram<R> {
+  /**
+   * Delete program — legacy override.
+   *
+   * One stateless request: `DELETE <object URI>?lockHandle=<options.lockHandle>`,
+   * with `&corrNr=<transportRequest>` when one is given. Pass the handle from
+   * your own `lock()` and release it with `unlock()` afterwards; this member
+   * does not lock. Measured on 7.40 SP04: lock, delete with the handle,
+   * unlock deleted a program. Without a handle SAP answered `400` "Parameter lockHandle could not be found." for a program; the request still goes and that answer reaches you. The `corrNr` is sent as before; a delete
+   * with it in a transportable package was not measured. `/sap/bc/adt/deletion/*`
+   * does not exist there.
+   */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,

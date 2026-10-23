@@ -3,7 +3,8 @@
  * appropriate executor client — the twin of `createAdtClient`.
  *
  * - Modern systems (BASIS >= 7.50): AdtExecutor
- * - Legacy systems (BASIS < 7.50): AdtExecutorLegacy
+ * - Legacy systems (BASIS < 7.50): AdtExecutorLegacy, supported over RFC only
+ *   (HTTP to a legacy system is unsupported)
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';

@@ -14,6 +14,11 @@
  * the group's URI runs the same tests with the same alerts as `/runs` — with
  * the Eclipse-style `<options>` only; without it, an empty result. `runSync`
  * always sends `<options>`.
+ *
+ * On a legacy system (7.40 SP04, no `/abapunit/runs`),
+ * `FunctionGroupTestRunnerLegacy` sends this `/testruns` request
+ * with `<options>` from `runSync` as it is here and from `run`. Its `getStatus`
+ * and `getResult` are refused (there is no run id).
  */
 
 import type {

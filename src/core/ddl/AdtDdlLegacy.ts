@@ -1,7 +1,8 @@
 /**
  * AdtDdlLegacy - DDL source handler for legacy SAP systems (BASIS < 7.50)
  *
- * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API,
+ * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
+ * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API),
  * and refuses checkCdsTestDoubles(): the CDS test-doubles framework endpoint is
  * not present below 7.50 (issue #207).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
@@ -27,6 +28,17 @@ import type { ddlDocuments, IDdlConfig, IDdlResults } from './types';
 export class AdtDdlLegacy<
   R extends IDdlResults = typeof ddlDocuments,
 > extends AdtDdl<R> {
+  /**
+   * Delete DDL source — legacy override.
+   *
+   * One stateless request: `DELETE <object URI>?lockHandle=<options.lockHandle>`,
+   * with `&corrNr=<transportRequest>` when one is given. Pass the handle from
+   * your own `lock()` and release it with `unlock()` afterwards; this member
+   * does not lock. Measured on 7.40 SP04: lock, delete with the handle,
+   * unlock deleted a DDL source. Without a handle 7.40 SP04 deleted a DDL source too, but pass the handle all the same. The `corrNr` is sent as before; a delete
+   * with it in a transportable package was not measured. `/sap/bc/adt/deletion/*`
+   * does not exist there.
+   */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,

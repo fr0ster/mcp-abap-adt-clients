@@ -142,7 +142,8 @@ const ACCEPT_TESTRUNS = 'application/xml';
  * objects are named by their ADT URIs: a class, a report, a function group, a
  * function module.
  *
- * The one implementation of this endpoint: every runner's `runSync` sends it.
+ * The one implementation of this endpoint: a runner's `runSync` sends it, and so
+ * does any runner whose `run` is this request.
  *
  * **Measured:** synchronous on a modern and a legacy on-prem system, over HTTP
  * and over RFC — `<aunit:runResult>` in the POST's answer, no `Location` — and

@@ -34,7 +34,11 @@ export function legacyRefusal<T, E extends IAdtError = IAdtError>(
 export const DELETION_CHECK = '/sap/bc/adt/deletion/check';
 export const DELETION_DELETE = '/sap/bc/adt/deletion/delete';
 
-/** `checkDeletion` of a handler whose legacy `delete` is the DELETE under the caller's lock (§4.2). */
+/**
+ * `checkDeletion` of a handler whose legacy `delete` is the DELETE under the
+ * caller's lock (§4.2) — and the refusal of `checkDeletionGroup` (§5), which
+ * points to the same delete.
+ */
 export function noDeletionCheck<T, E extends IAdtError = IAdtError>(
   operation = 'checkDeletion',
 ): IAdtResponse<T, E> {

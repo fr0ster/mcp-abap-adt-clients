@@ -192,7 +192,8 @@ export async function startClassUnitTestRunByObject(
  * request is `startUnitTestRunSync` (`core/shared/abapUnit`), given each
  * class's URI; see there for the format and what was measured.
  *
- * The runner's `runSync` sends it. `options` absent sends no `<options>`
+ * Whoever runs tests synchronously sends it: a runner's `runSync`, and any
+ * runner whose `run` is this request. `options` absent sends no `<options>`
  * element.
  */
 export async function startClassUnitTestRunSync(

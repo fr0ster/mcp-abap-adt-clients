@@ -14,7 +14,8 @@
  * as the stronger signal of the two.
  *
  * The main library uses isModernAdtSystem() to auto-detect and
- * AdtClientLegacy has hardcoded stubs for known-unsupported types.
+ * AdtClientLegacy answers a refusal for the types and members 7.40 SP04 lacks
+ * (`absentOnLegacy` and the `*Legacy` handlers), not by reading this catalogue.
  * These utilities are for consumers who want manual checking.
  */
 

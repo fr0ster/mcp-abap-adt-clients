@@ -2,8 +2,9 @@
  * AdtClassLegacy - Class handler for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides:
- * - delete() — uses direct DELETE instead of /sap/bc/adt/deletion/ API;
- *   `update` is the inherited stateless PUT.
+ * - delete() — `DELETE <URI>?lockHandle=…` under the lock handle the caller
+ *   holds, instead of the /sap/bc/adt/deletion/ API 7.40 SP04 lacks.
+ *   `update` is the inherited stateless PUT; this class does not override it.
  * - checkDeletion() — refused without a request: 7.40 has no deletion API.
  */
 
@@ -28,8 +29,13 @@ export class AdtClassLegacy<
   /**
    * Delete class — legacy override.
    *
-   * A direct DELETE on the object under its own lock: the `/sap/bc/adt/deletion/`
-   * resource the modern path uses does not exist on these systems.
+   * One stateless request: `DELETE <object URI>?lockHandle=<options.lockHandle>`,
+   * with `&corrNr=<transportRequest>` when one is given. Pass the handle from
+   * your own `lock()` and release it with `unlock()` afterwards; this member
+   * does not lock. Measured on 7.40 SP04: lock, delete with the handle,
+   * unlock deleted a class. Without a handle SAP answered `400` "Parameter lockHandle could not be found." for a class; the request still goes and that answer reaches you. The `corrNr` is sent as before; a delete
+   * with it in a transportable package was not measured. `/sap/bc/adt/deletion/*`
+   * does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,

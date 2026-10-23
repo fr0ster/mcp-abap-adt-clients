@@ -18,6 +18,11 @@
  * reproduce the 2026-09-30 filter; what made the difference is not known.
  * Which tests a module's run covers is ADT's to decide, and nothing here
  * filters them.
+ *
+ * On a legacy system (7.40 SP04, no `/abapunit/runs`),
+ * `FunctionModuleTestRunnerLegacy` sends this `/testruns` request
+ * with `<options>` from `runSync`, as it is here. Its `run` is refused (it names
+ * no group), and so are `getStatus` and `getResult` (there is no run id).
  */
 
 import type {

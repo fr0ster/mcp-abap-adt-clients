@@ -1,10 +1,16 @@
 /**
- * AdtClientLegacy - ADT Client for older SAP systems (BASIS < 7.50)
+ * AdtClientLegacy - ADT Client for older SAP systems (BASIS < 7.50), over RFC
+ *
+ * Supported and measured over RFC only (SAP_BASIS 7.40 SP04); the library does
+ * not detect or branch on the wire, and HTTP to a legacy system is unsupported.
  *
  * Extends AdtClient and overrides methods that differ on legacy systems:
  * - Object types absent on legacy answer a refusal from every member, without a request
- * - Supported types use legacy-compatible deletion (direct DELETE vs /deletion/delete);
- *   every checkDeletion, and the deletes that need /sap/bc/adt/deletion/*, refuse
+ * - The class, program, interface, function group, function module and DDL
+ *   source delete with a direct DELETE under the object's lock handle (the
+ *   caller's, from lock()) instead of /deletion/delete; every checkDeletion,
+ *   and the deletes that need /sap/bc/adt/deletion/* (include, function
+ *   include, message class, group delete), are refused without a request
  * - Content-Type defaults to v1 (AdtContentTypesBase)
  * - Transport requests use /sap/bc/cts/ instead of /sap/bc/adt/cts/
  *
@@ -316,12 +322,11 @@ export class AdtClientLegacy extends AdtClient {
    * The legacy transport handler.
    *
    * The **type** is the base's contract, and that is all this declaration says.
-   * It is not a claim that the two behave alike: a legacy CTS endpoint serves
-   * `read` and `list`, while `create`, `update`, `delete` and `listNodes` refuse
-   * at runtime — `create` because the endpoint accepts no POST that creates a
-   * request, the rest because nobody has captured whether it supports them and
-   * guessing against the modern shape is not a contract. `list` differs too: no
-   * saved-configuration search, and `configUri` is rejected rather than used.
+   * It is not a claim that the two behave alike: the legacy handler serves
+   * `list` and `readMetadata` (the user's list from `/sap/bc/cts/`), `create`
+   * is refused (measured on 7.40 SP04), and the other twelve members refuse
+   * without a request. `list` differs too: no saved-configuration search, and
+   * `configUri` is rejected rather than used.
    *
    * Narrowing this to what the handler offers does not compile: an override's
    * return must be assignable to the base's, and offering *less* is the one
