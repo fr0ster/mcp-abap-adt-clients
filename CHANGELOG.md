@@ -24,6 +24,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed (repository only — nothing in the published package)
+
+- **The tests run on `@mcp-abap-adt/connection` ^19.0.0** (dev dependency, was
+  ^16.0.0). 17 dropped its own deadlines (`getTimeout`, `SAP_TIMEOUT_*`), 18
+  made `rfcParamsFrom` return `RfcAddress`, 19 moved the RFC transport to
+  `@mcp-abap-adt/sap-rfc-lite` ^0.3.2. No helper or test here used what 17 and
+  18 removed or retyped (the `getTimeout` of the test helpers is this
+  repository's own Jest timeout), so no test code changed. Measured on an
+  on-prem system: a class lifecycle and the unit-test runner over HTTP, a
+  source read over RFC.
+- **`allowScripts` no longer names `@mcp-abap-adt/sap-rfc-lite`**: 0.3.x has no
+  install script — `npm ci` compiles nothing — and loads a prebuilt binding
+  (linux-x64 glibc, win32-x64, darwin-arm64) at run time. `supplyChain.test.ts`
+  holds the list to exactly the lockfile's packages with an install script.
+- `docs/development/RFC_TESTING.md` and `docs/usage/RFC_CONNECTION.md` no
+  longer describe a binding compiled at install: on a platform without a
+  prebuild, the binding is built from sap-rfc-lite's own repository.
+
 ## [37.2.0] - 2026-10-23
 
 ### Added
