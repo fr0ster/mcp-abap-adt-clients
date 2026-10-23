@@ -617,8 +617,7 @@ asks):
   object types are refused; the members that sent a request and now refuse, and
   the runners that refused and now send. No migration guide: a minor.
 - `CHANGELOG.md` — one entry: the measured basis ("on 7.40 SP04"), the
-  refusals, the fixes, RFC as the legacy wire, the migration link. The version is the
-  owner's to name (CLAUDE.md).
+  refusals, the fixes, RFC as the legacy wire; version 37.3.0 (a minor, §15).
 
 ## 15. Versioning
 
