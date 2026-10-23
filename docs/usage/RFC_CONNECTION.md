@@ -43,22 +43,13 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 
 RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in automatically as a dependency of `@mcp-abap-adt/connection`. Nothing needs to be added to `package.json` — `adt-clients` consumes the `IAbapConnection` interface and does not depend on any RFC library directly.
 
-It is an **optional** dependency with a native build, though, so "automatically"
-has a condition: the SAP NW RFC SDK must be visible when dependencies are
-installed. npm drops an optional dependency whose build fails and says nothing,
-which leaves an install that looks complete and an RFC connection that cannot
-start. Install with the same variables the runtime uses:
-
-```bash
-# Windows (Git Bash) — the SDK path is wherever it was unpacked
-SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm ci
-
-# macOS
-SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm ci
-
-# Linux
-SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm ci
-```
+It is an **optional** dependency with no install script (sap-rfc-lite 0.3.x,
+`@mcp-abap-adt/connection` 19 and later): `npm install` compiles nothing and needs
+no SDK. It ships prebuilt bindings for linux-x64 (glibc), win32-x64 and
+darwin-arm64. On any other platform the install succeeds without a binding and
+the RFC connection fails when it loads sap-rfc-lite; build the binding from
+sap-rfc-lite's repository (its README, "Installation") and install the package
+you built.
 
 `@mcp-abap-adt/sap-rfc-lite` binds to the SAP NW RFC SDK at runtime; the SDK libraries must be on the shared-library path as shown in step 1.
 

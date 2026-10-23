@@ -26,8 +26,8 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 
 ### The binding: prebuilt, no install script
 
-The transport is `@mcp-abap-adt/sap-rfc-lite`, an `optionalDependencies` entry
-of `@mcp-abap-adt/connection`, installed nested:
+The transport is `@mcp-abap-adt/sap-rfc-lite` (0.3.x), an `optionalDependencies`
+entry of `@mcp-abap-adt/connection`, installed nested:
 
 ```
 node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite
@@ -36,22 +36,16 @@ node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite
 — never at the top level, so looking for it there suggests it is absent when
 it is not.
 
-Its install script does not run here: `package.json` `allowScripts` denies it,
-like every dependency's (see `.npmrc`, `strict-allow-scripts`). None is needed
-on linux-x64 (glibc), darwin-arm64 and win32-x64: the package carries a
-prebuilt binding for each, loaded at run time, so a plain `npm ci` is enough
-and the SDK need not be visible at install time — only at run time, through
-the variables above. Measured on linux-x64: with the script denied, the
-binding loads with the SDK on the library path.
+It has no install script: `npm ci` compiles nothing and needs no SDK. It
+carries a prebuilt binding for linux-x64 (glibc), darwin-arm64 and win32-x64,
+loaded at run time with the SDK's libraries on the library path (the variables
+above).
 
-On any other platform (a musl Linux, an Intel Mac) there is no prebuild, and
-the binding has to be compiled — explicitly, with the SDK visible, since the
-install no longer does it:
-
-```bash
-cd node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite
-SAPNWRFC_HOME=~/nwrfcsdk node scripts/install.js
-```
+On any other platform (a musl Linux, an Intel Mac, linux-arm64) there is no
+prebuild and nothing in this repository builds one: build sap-rfc-lite's
+binding from its own repository (its README, "Installation" — `npm ci`,
+`npm run prebuild:native` with `SAPNWRFC_HOME` and a C++ toolchain, `npm pack`)
+and install the package you built.
 
 Without a usable binding every RFC run stops in `globalSetup`:
 
