@@ -21,6 +21,7 @@
 
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
+import { requireOwnNames } from '../../helpers/legacyEnv';
 import {
   closeLegacySession,
   type LegacyDeletable,
@@ -72,6 +73,10 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
     let created = false;
 
     beforeAll(async () => {
+      requireOwnNames('legacy_function_include', [
+        ['function group', group.functionGroupName],
+        ['function include', include.includeName],
+      ]);
       session = await openLegacySession();
       await requireAbsent('legacy_function_include', [groupObject]);
       const handler = current().client.getFunctionGroup();

@@ -1,4 +1,4 @@
-"! The teardown action of the legacy test environment, run by ABAP Unit.
+"! The teardown action (first phase: the objects) of the legacy test environment, run by ABAP Unit.
 "!
 "! The report reaches the caller as alerts: each line of
 "! ZCL_LG7_ENV->report_lines( ) ('@@LOG {json}' per step, then

@@ -2,7 +2,7 @@
 "!
 "! Prepares and removes, in one call each, what a run of the live checks needs
 "! and what a crashed run leaves behind. Run through ABAP Unit by the runner
-"! classes ZCL_LG7_ENV_PREPARE / _STATUS / _TEARDOWN (7.40 SP04 has no
+"! classes ZCL_LG7_ENV_PREPARE / _STATUS / _TEARDOWN / _REMOVE (7.40 SP04 has no
 "! IF_OO_ADT_CLASSRUN); their test methods hand the report to the caller.
 "!
 "! SCOPE — the only things this class ever touches:
@@ -53,10 +53,14 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! Read only: the open marked request, the package, the objects in scope.
     METHODS status.
 
-    "! When no longer needed: own locks released; every object in scope
-    "! deleted, fixtures included; inactive versions dropped; package ZLG7_TEST
-    "! deleted; every marked request of the user deleted.
+    "! Teardown, first phase: own locks released; every object in scope
+    "! deleted, fixtures included (DDL sources are left for ADT); inactive
+    "! versions dropped. The request is kept for the ADT deletions.
     METHODS teardown.
+
+    "! Teardown, second phase (after ADT deleted the DDL sources): package
+    "! ZLG7_TEST deleted, every marked request of the user deleted.
+    METHODS remove.
 
     "! One '@@LOG {json}' line per step, then '@@RESULT {json}'.
     METHODS report_lines RETURNING VALUE(rt_lines) TYPE string_table.
@@ -283,7 +287,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     mv_action = `teardown`.
     release_locks( ).
     " The deletions in ZLG7_TEST and of the package itself are recorded on a
-    " marked request; it is deleted with the others at the end.
+    " marked request; remove deletes it with the others.
     IF package_exists( ) = abap_true.
       ensure_request( ).
     ELSE.
@@ -292,6 +296,18 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     ENDIF.
     delete_objects( abap_false ).
     clean_inactive( abap_false ).
+  ENDMETHOD.
+
+
+  METHOD remove.
+    DATA lt_requests TYPE tt_trkorr.
+    mv_action = `remove`.
+    IF package_exists( ) = abap_true.
+      ensure_request( ).
+    ELSE.
+      lt_requests = marked_requests( ).
+      READ TABLE lt_requests INTO mv_request INDEX 1.
+    ENDIF.
     delete_package( ).
     delete_requests( ).
     purge_deleted_entries( ).
@@ -299,20 +315,33 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD release_locks.
-    " Touches: enqueue entries of sy-uname in sy-mandt whose argument names an
-    " object in scope or a marked request. Nothing else is passed to ENQUE_DELETE.
+    " Touches: enqueue entries of sy-uname in sy-mandt one of whose argument
+    " words is EXACTLY a name of the scope list built from TADIR here (objects
+    " in scope, env classes excluded) or derived from one — a class's pool
+    " includes (the name padded with '=' to 30, then its suffix), a function
+    " group's SAPL program, its L<group>xxx includes, its modules (TFDIR) — or
+    " a marked request. No substring match. Nothing else goes to ENQUE_DELETE.
+    TYPES tt_names TYPE SORTED TABLE OF string WITH UNIQUE KEY table_line.
     DATA lt_enq TYPE STANDARD TABLE OF seqg3.
     DATA lt_del TYPE STANDARD TABLE OF seqg3.
     DATA ls_enq TYPE seqg3.
+    DATA lt_exact TYPE tt_names.
+    DATA lt_pools TYPE tt_names.
+    DATA lt_groups TYPE tt_names.
+    DATA lt_objects TYPE tt_object.
+    DATA ls_object TYPE ty_object.
     DATA lt_requests TYPE tt_trkorr.
     DATA lv_request TYPE trkorr.
+    DATA lt_modules TYPE STANDARD TABLE OF tfdir-funcname.
+    DATA lv_module TYPE tfdir-funcname.
+    DATA lv_pname TYPE tfdir-pname.
+    DATA lv_name TYPE string.
     DATA lv_arg TYPE string.
     DATA lt_words TYPE string_table.
     DATA lv_word TYPE string.
     DATA lv_hit TYPE abap_bool.
     DATA lv_subrc TYPE sy-subrc.
-    DATA lv_offset TYPE i.
-    DATA lv_candidate TYPE string.
+    DATA lv_length TYPE i.
 
     TRY.
         CALL FUNCTION 'ENQUEUE_READ'
@@ -331,7 +360,34 @@ CLASS zcl_lg7_env IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " The scope list: every name a lock of ours can carry.
+    lt_objects = objects_in_scope( abap_false ).
+    LOOP AT lt_objects INTO ls_object.
+      lv_name = ls_object-obj_name.
+      INSERT lv_name INTO TABLE lt_exact.
+      CASE ls_object-object.
+        WHEN 'CLAS'.
+          WHILE strlen( lv_name ) < 30.
+            CONCATENATE lv_name '=' INTO lv_name.
+          ENDWHILE.
+          INSERT lv_name INTO TABLE lt_pools.
+        WHEN 'FUGR'.
+          INSERT lv_name INTO TABLE lt_groups.
+          lv_pname = |SAPL{ lv_name }|.
+          lv_name = lv_pname.
+          INSERT lv_name INTO TABLE lt_exact.
+          SELECT funcname FROM tfdir INTO TABLE lt_modules WHERE pname = lv_pname.
+          LOOP AT lt_modules INTO lv_module.
+            lv_name = lv_module.
+            INSERT lv_name INTO TABLE lt_exact.
+          ENDLOOP.
+      ENDCASE.
+    ENDLOOP.
     lt_requests = marked_requests( ).
+    LOOP AT lt_requests INTO lv_request.
+      lv_name = lv_request.
+      INSERT lv_name INTO TABLE lt_exact.
+    ENDLOOP.
 
     LOOP AT lt_enq INTO ls_enq.
       lv_arg = ls_enq-garg.
@@ -340,37 +396,22 @@ CLASS zcl_lg7_env IMPLEMENTATION.
       SPLIT lv_arg AT space INTO TABLE lt_words.
       lv_hit = abap_false.
       LOOP AT lt_words INTO lv_word.
-        " A word may carry a prefix of the lock object (%C, a type): look for
-        " the start of one of our names inside it.
-        CLEAR lv_candidate.
-        FIND FIRST OCCURRENCE OF 'SAPLZLG7' IN lv_word MATCH OFFSET lv_offset.
-        IF sy-subrc <> 0.
-          FIND FIRST OCCURRENCE OF 'LZLG7' IN lv_word MATCH OFFSET lv_offset.
-        ENDIF.
-        IF sy-subrc <> 0.
-          FIND FIRST OCCURRENCE OF 'ZCL_LG7_' IN lv_word MATCH OFFSET lv_offset.
-        ENDIF.
-        IF sy-subrc <> 0.
-          FIND FIRST OCCURRENCE OF 'ZIF_LG7_' IN lv_word MATCH OFFSET lv_offset.
-        ENDIF.
-        IF sy-subrc <> 0.
-          FIND FIRST OCCURRENCE OF 'Z_LG7_' IN lv_word MATCH OFFSET lv_offset.
-        ENDIF.
-        IF sy-subrc <> 0.
-          FIND FIRST OCCURRENCE OF 'ZLG7' IN lv_word MATCH OFFSET lv_offset.
-        ENDIF.
-        IF sy-subrc = 0.
-          lv_candidate = lv_word+lv_offset.
-          IF is_env_name( owner_of( lv_candidate ) ) = abap_false
-              AND scope_package_of( owner_of( lv_candidate ) ) IS NOT INITIAL.
+        TRANSLATE lv_word TO UPPER CASE.
+        lv_length = strlen( lv_word ).
+        IF line_exists( lt_exact[ table_line = lv_word ] ).
+          lv_hit = abap_true.
+        ELSEIF lv_length > 30 AND lv_length <= 35
+            AND line_exists( lt_pools[ table_line = lv_word(30) ] ).
+          " A class pool include: the padded name, then CP, CU, CCIMP, CM001 ...
+          lv_hit = abap_true.
+        ELSEIF lv_length > 4 AND lv_word(1) = 'L'.
+          " L<group> plus exactly three characters: an include of the group.
+          lv_length = lv_length - 4.
+          lv_name = lv_word+1(lv_length).
+          IF line_exists( lt_groups[ table_line = lv_name ] ).
             lv_hit = abap_true.
           ENDIF.
         ENDIF.
-        LOOP AT lt_requests INTO lv_request.
-          IF lv_word CS lv_request.
-            lv_hit = abap_true.
-          ENDIF.
-        ENDLOOP.
         IF lv_hit = abap_true.
           EXIT.
         ENDIF.
@@ -496,6 +537,8 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     DATA lv_trkorr TYPE trkorr.
     DATA ls_unlock TYPE trwbo_request.
     DATA lx_call TYPE REF TO cx_sy_dyn_call_error.
+    DATA lt_tasks TYPE STANDARD TABLE OF e070.
+    DATA ls_task TYPE e070.
 
     lt_requests = marked_requests( ).
     IF lt_requests IS INITIAL.
@@ -504,7 +547,17 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     ENDIF.
     LOOP AT lt_requests INTO lv_request.
       CLEAR lt_order.
-      SELECT trkorr FROM e070 INTO TABLE lt_order WHERE strkorr = lv_request.
+      " Tasks of the request: only sy-uname's are touched. Another user's task
+      " is reported and left; the request then stays (TR_DELETE_COMM refuses).
+      SELECT * FROM e070 INTO TABLE lt_tasks WHERE strkorr = lv_request.
+      LOOP AT lt_tasks INTO ls_task.
+        IF ls_task-as4user = sy-uname.
+          APPEND ls_task-trkorr TO lt_order.
+        ELSE.
+          add_log( iv_step = `requests` iv_object = ls_task-trkorr iv_status = `ERROR`
+                   iv_message = |task of { lv_request } belongs to another user; not touched| ).
+        ENDIF.
+      ENDLOOP.
       APPEND lv_request TO lt_order.
       LOOP AT lt_order INTO lv_trkorr.
         CLEAR ls_unlock.
@@ -767,9 +820,15 @@ CLASS zcl_lg7_env IMPLEMENTATION.
             EXPORTING
               object    = ls_inactive-object
               obj_name  = ls_inactive-obj_name
-              immediate = 'X'.
-          lv_cleaned = lv_cleaned + 1.
-          add_log( iv_step = `inactive` iv_object = |{ ls_inactive-object } { ls_inactive-obj_name }| iv_status = `REMOVED` ).
+              immediate = 'X'
+            EXCEPTIONS
+              OTHERS    = 1.
+          IF sy-subrc = 0.
+            lv_cleaned = lv_cleaned + 1.
+            add_log( iv_step = `inactive` iv_object = |{ ls_inactive-object } { ls_inactive-obj_name }| iv_status = `REMOVED` ).
+          ELSE.
+            add_log( iv_step = `inactive` iv_object = |{ ls_inactive-object } { ls_inactive-obj_name }| iv_status = `ERROR` iv_message = sy_message( ) ).
+          ENDIF.
         CATCH cx_sy_dyn_call_error INTO lx_call.
           add_log( iv_step = `inactive` iv_object = |{ ls_inactive-object } { ls_inactive-obj_name }| iv_status = `ERROR` iv_message = lx_call->get_text( ) ).
       ENDTRY.
@@ -994,9 +1053,9 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     rv_json = iv_value.
     REPLACE ALL OCCURRENCES OF `\` IN rv_json WITH `\\`.
     REPLACE ALL OCCURRENCES OF `"` IN rv_json WITH `\"`.
-    REPLACE ALL OCCURRENCES OF `<` IN rv_json WITH `<`.
-    REPLACE ALL OCCURRENCES OF `>` IN rv_json WITH `>`.
-    REPLACE ALL OCCURRENCES OF `&` IN rv_json WITH `&`.
+    REPLACE ALL OCCURRENCES OF `<` IN rv_json WITH `\u003c`.
+    REPLACE ALL OCCURRENCES OF `>` IN rv_json WITH `\u003e`.
+    REPLACE ALL OCCURRENCES OF `&` IN rv_json WITH `\u0026`.
     REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline IN rv_json WITH `\n`.
     REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN rv_json WITH `\t`.
     REPLACE ALL OCCURRENCES OF lv_cr IN rv_json WITH `\r`.

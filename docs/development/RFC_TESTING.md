@@ -148,19 +148,21 @@ has no `IF_OO_ADT_CLASSRUN`, so they run through ABAP Unit
 |---|---|
 | `npm run legacy:setup` | installs `ZCL_LG7_ENV` and its runners (`$TMP`, written only when the source differs); runs prepare — releases the user's locks on ZLG7 names, deletes leftovers (not the fixtures) and their inactive versions, reuses or creates the request `ZLG7 LEGACY-TEST …`, creates package `ZLG7_TEST`; deletes leftover DDL sources over ADT; creates or refreshes the fixtures in `$TMP` |
 | `npm run legacy:status` | reads: the open request, the package, every ZLG7 object in scope |
-| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions, package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT |
+| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions; deletes the DDL sources over ADT; runs remove — package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT. A credential refusal stops it at once |
 
 Reports go to `.legacy-env/<action>.json` (gitignored). Nothing outside the
 prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`, `Z_LG7_*`) in `$TMP` or
 `ZLG7_TEST` is touched; every delete checks the name and the TADIR package
-first. A run of the live checks uses the fixtures and leaves them; only
+first. The `$TMP` part of that scope is by name: a ZLG7-named object another
+user put in `$TMP` is in it too, by design — the prefix is reserved for these
+checks. A run of the live checks uses the fixtures and leaves them; only
 `legacy:teardown` removes them.
 
 ```bash
 export MCP_TEST_CONFIG_PATH=src/__tests__/helpers/test-config.legacy-740.yaml
 export MCP_ENV_PATH=$HOME/<the 7.40 system>.env
 export SAPNWRFC_HOME=$HOME/sap/nwrfcsdk PATH=$HOME/sap/nwrfcsdk/lib:$PATH \
-  LD_LIBRARY_PATH=$HOME/sap/nwrfcsdk/lib:$LD_LIBRARY_PATH
+  LD_LIBRARY_PATH=$HOME/.local/lib/sap-rfc-lite:$HOME/sap/nwrfcsdk/lib:$LD_LIBRARY_PATH
 npm run legacy:setup
 npm run test:detached -- integration/legacy
 npm run legacy:teardown        # when the environment is no longer needed

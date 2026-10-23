@@ -35,5 +35,8 @@ CLASS ltc_math IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.
 
+DATA gv_value TYPE i.
+
 START-OF-SELECTION.
-  WRITE / lcl_math=>double( 21 ).
+  gv_value = lcl_math=>double( 21 ).
+  WRITE / gv_value.

@@ -8,7 +8,7 @@
  *
  * - `ZCL_LG7_ENV` holds the logic (`abap/zcl_lg7_env.clas.abap`, whose header
  *   states the scope it never leaves);
- * - `ZCL_LG7_ENV_PREPARE`, `_STATUS`, `_TEARDOWN` each hold one local test
+ * - `ZCL_LG7_ENV_PREPARE`, `_STATUS`, `_TEARDOWN`, `_REMOVE` each hold one local test
  *   method calling one action, and report it as ABAP Unit alerts:
  *   `@@LOG {json}` per step, then `@@RESULT {json}`.
  *
@@ -37,8 +37,10 @@ import type {
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { XMLParser } from 'fast-xml-parser';
 import type { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import type { AdtExecutorLegacy } from '../../clients/AdtExecutorLegacy';
+import { isUnansweredCredentialRefusal } from '../../utils/adtResponse';
 import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
 import {
@@ -97,6 +99,21 @@ export function assertOwnName(kind: OwnKind, name: string): void {
   if (!isOwnName(kind, name))
     throw new Error(
       `legacy env: ${kind} ${name} is not a ZLG7 name (${PREFIXES[kind].join(', ')}…); not touched`,
+    );
+}
+
+/**
+ * Fail unless every configured name of a live case is a ZLG7 name — before
+ * anything is created: the environment cleans and removes only that prefix.
+ */
+export function requireOwnNames(
+  caseName: string,
+  names: ReadonlyArray<readonly [OwnKind, string]>,
+): void {
+  const wrong = names.filter(([kind, name]) => !isOwnName(kind, name));
+  if (wrong.length > 0)
+    throw new Error(
+      `legacy_740/${caseName}: ${wrong.map(([kind, name]) => `${kind} ${name}`).join(', ')} not a ZLG7 name (${wrong.map(([kind]) => PREFIXES[kind].join('|')).join(', ')}…); nothing created`,
     );
 }
 
@@ -213,13 +230,14 @@ export interface ClassSource {
   readonly testClasses?: string;
 }
 
-export type EnvAction = 'prepare' | 'status' | 'teardown';
+export type EnvAction = 'prepare' | 'status' | 'teardown' | 'remove';
 
 /** The runner class of each action. */
 export const RUNNERS: Record<EnvAction, string> = {
   prepare: 'ZCL_LG7_ENV_PREPARE',
   status: 'ZCL_LG7_ENV_STATUS',
   teardown: 'ZCL_LG7_ENV_TEARDOWN',
+  remove: 'ZCL_LG7_ENV_REMOVE',
 };
 
 /** The prepare runner's test include, the settings filled in. */
@@ -311,68 +329,41 @@ export interface EnvRun {
   readonly log: EnvLogLine[];
 }
 
-/** XML character data or an attribute value, unescaped. */
-export function unescapeXml(text: string): string {
-  let out = '';
-  let at = 0;
-  while (at < text.length) {
-    const amp = text.indexOf('&', at);
-    if (amp === -1) {
-      out += text.slice(at);
-      break;
-    }
-    out += text.slice(at, amp);
-    const semi = text.indexOf(';', amp);
-    if (semi === -1) {
-      out += text.slice(amp);
-      break;
-    }
-    const entity = text.slice(amp + 1, semi);
-    const named: Record<string, string> = {
-      quot: '"',
-      apos: "'",
-      lt: '<',
-      gt: '>',
-      amp: '&',
-    };
-    let decoded: string | undefined = named[entity];
-    if (decoded === undefined && entity.startsWith('#')) {
-      const hex = entity.startsWith('#x') || entity.startsWith('#X');
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
-      if (Number.isInteger(code) && code >= 0 && code <= 0x10ffff)
-        decoded = String.fromCodePoint(code);
-    }
-    if (decoded === undefined) {
-      out += text.slice(amp, semi + 1);
-    } else {
-      out += decoded;
-    }
-    at = semi + 1;
-  }
-  return out;
+/** Every element text and attribute value of a document, in document order. */
+function textsOf(document: string): string[] {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseTagValue: false,
+    parseAttributeValue: false,
+    trimValues: false,
+    processEntities: true,
+    htmlEntities: true,
+  });
+  const texts: string[] = [];
+  const walk = (node: unknown): void => {
+    if (typeof node === 'string') texts.push(node);
+    else if (Array.isArray(node)) for (const item of node) walk(item);
+    else if (node !== null && typeof node === 'object')
+      for (const value of Object.values(node)) walk(value);
+  };
+  walk(parser.parse(document));
+  return texts;
 }
 
 /**
- * The marked lines a testruns answer carries, in order, each once: the text
- * after the marker up to the end of the element text or attribute value it is
- * in. The env class writes `<`, `>` and `&` inside its JSON as `\u` escapes,
- * so neither ends a line early.
+ * The marked lines a testruns answer carries: each element text or attribute
+ * value (an alert's title, a detail's text) that holds the marker, from the
+ * marker on, the entities decoded by the XML parser — so a `"` written raw in
+ * element text or as `&quot;` reads the same. Each line once.
  */
-function markedLines(document: string, marker: string): string[] {
+export function markedLines(document: string, marker: string): string[] {
   const found: string[] = [];
-  let at = document.indexOf(marker);
-  while (at !== -1) {
-    const start = at + marker.length;
-    let end = start;
-    while (
-      end < document.length &&
-      document[end] !== '<' &&
-      document[end] !== '"'
-    )
-      end++;
-    const line = unescapeXml(document.slice(start, end)).trim();
+  for (const text of textsOf(document)) {
+    const at = text.indexOf(marker);
+    if (at === -1) continue;
+    const line = text.slice(at + marker.length).trim();
     if (!found.includes(line)) found.push(line);
-    at = document.indexOf(marker, end);
   }
   return found;
 }
@@ -393,9 +384,13 @@ export function parseEnvRun(document: string): EnvRun {
       `legacy env: ${results.length} @@RESULT lines in one answer`,
     );
   const result = JSON.parse(results[0] as string) as EnvResult;
-  const log = markedLines(document, '@@LOG ')
-    .map((l) => JSON.parse(l) as EnvLogLine)
-    .sort((a, b) => a.n - b.n);
+  // A line may come twice (title and detail): one per step number.
+  const byStep = new Map<number, EnvLogLine>();
+  for (const line of markedLines(document, '@@LOG ')) {
+    const entry = JSON.parse(line) as EnvLogLine;
+    if (!byStep.has(entry.n)) byStep.set(entry.n, entry);
+  }
+  const log = [...byStep.values()].sort((a, b) => a.n - b.n);
   if (log.length !== result.lines)
     throw new Error(
       `legacy env: the answer carries ${log.length} of ${result.lines} @@LOG lines`,
@@ -455,9 +450,41 @@ const as = (handler: unknown) => handler as Writable;
 const lockable = (handler: Writable) =>
   handler as unknown as LegacyDeletable<object>;
 
+/**
+ * SAP refused the credential: every further request would be refused too,
+ * so a loop over objects stops here instead of collecting one failure each.
+ */
+export class CredentialRefused extends Error {}
+
+/** A refusal of the credential: a `401`, `RFC_LOGON_FAILURE`, or the connection's own refusal. */
+export function isCredentialRefusal(error: unknown): boolean {
+  if (error instanceof CredentialRefused) return true;
+  if (isUnansweredCredentialRefusal(error)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('RFC_LOGON_FAILURE');
+}
+
+/** Throw `CredentialRefused` when `answer` is SAP refusing the credential. */
+export function stopOnCredentialRefusal(
+  answer: IAdtResponse<unknown, IAdtError>,
+  what: string,
+): void {
+  if (answer.ok) return;
+  const failure = answer.getError();
+  if (
+    failure.response?.status === 401 ||
+    (failure.message ?? '').includes('RFC_LOGON_FAILURE')
+  )
+    throw new CredentialRefused(
+      `legacy env: ${what}: the credential was refused [${failure.origin}]: ${failure.message} — stopping`,
+    );
+}
+
 /** Is it there? `unknown` is never read as either answer. */
 async function isPresent(handler: Writable, config: object, label: string) {
-  const there = presenceOf(await handler.readMetadata(config), label);
+  const answer = await handler.readMetadata(config);
+  stopOnCredentialRefusal(answer, `read ${label}`);
+  const there = presenceOf(answer, label);
   if (there.present === 'unknown') throw new Error(there.reason);
   return there.present;
 }
@@ -746,12 +773,9 @@ export async function deleteLeftDdls(
     const local = line.message.toUpperCase() === LOCAL_PACKAGE;
     const inEnvPackage = line.message.toUpperCase() === ENV_PACKAGE;
     try {
-      const metadata = String(
-        expectResult(
-          await handler.readMetadata({ ddlName: name }),
-          `read ${label}`,
-        ),
-      );
+      const read = await handler.readMetadata({ ddlName: name });
+      stopOnCredentialRefusal(read, `read ${label}`);
+      const metadata = String(expectResult(read, `read ${label}`));
       const pkg = packageOf(metadata)?.toUpperCase();
       if (
         !(local && pkg === LOCAL_PACKAGE) &&
@@ -762,12 +786,12 @@ export async function deleteLeftDdls(
         ddlName: name,
         ...(inEnvPackage && { transportRequest: run.result.request }),
       };
-      expectResult(
-        await deleteLocked(lockable(handler), config, label),
-        `delete ${label}`,
-      );
+      const deleted = await deleteLocked(lockable(handler), config, label);
+      stopOnCredentialRefusal(deleted, `delete ${label}`);
+      expectResult(deleted, `delete ${label}`);
       target.logger?.info(`legacy env: deleted ${label}`);
     } catch (error) {
+      if (isCredentialRefusal(error)) throw error;
       problems.push(
         `${label}: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -797,7 +821,11 @@ export async function setup(
   target: LegacyEnvTarget,
   settings: LegacyEnvSettings,
 ): Promise<EnvRun> {
-  await installEnv(target, ['prepare', 'status', 'teardown'], settings);
+  await installEnv(
+    target,
+    ['prepare', 'status', 'teardown', 'remove'],
+    settings,
+  );
   const run = await runEnvAction(target, 'prepare');
   requireClean(run, await deleteLeftDdls(target, run));
   await ensureFixtures(target);
@@ -817,21 +845,46 @@ export async function status(target: LegacyEnvTarget): Promise<EnvRun> {
   return runEnvAction(target, 'status');
 }
 
+/** Two runs as one report: both logs, the second's state, ok only if both are. */
+export function combineRuns(first: EnvRun, second: EnvRun): EnvRun {
+  const offset = first.log.length;
+  const log = [
+    ...first.log,
+    ...second.log.map((l) => ({ ...l, n: l.n + offset })),
+  ];
+  return {
+    result: {
+      ...second.result,
+      action: `${first.result.action}+${second.result.action}`,
+      ok: first.result.ok && second.result.ok,
+      errors: first.result.errors + second.result.errors,
+      lines: log.length,
+    },
+    log,
+  };
+}
+
 /**
- * When no longer needed: run teardown (everything in scope, fixtures and
- * package included, then the marked requests — none is released), delete the
- * DDL sources it left for ADT, then remove the env classes themselves over
- * ADT, runners first.
+ * When no longer needed, in this order:
+ * 1. teardown (ABAP): own locks; every object in scope, fixtures included,
+ *    DDL sources left for ADT; inactive versions — the request kept;
+ * 2. the DDL sources over ADT, with the request as `corrNr` in `ZLG7_TEST`;
+ * 3. remove (ABAP): package `ZLG7_TEST`, then every marked request — none
+ *    is released;
+ * 4. the env classes themselves over ADT, runners first.
+ * A credential refusal stops it at once.
  */
 export async function teardown(target: LegacyEnvTarget): Promise<EnvRun> {
-  await installEnv(target, ['teardown']);
-  const run = await runEnvAction(target, 'teardown');
-  const problems = await deleteLeftDdls(target, run);
+  await installEnv(target, ['teardown', 'remove']);
+  const objects = await runEnvAction(target, 'teardown');
+  const problems = await deleteLeftDdls(target, objects);
+  const rest = await runEnvAction(target, 'remove');
   const handler = as(target.client.getClass());
   const classes = [
     RUNNERS.prepare,
     RUNNERS.status,
     RUNNERS.teardown,
+    RUNNERS.remove,
     'ZCL_LG7_ENV',
   ];
   for (const name of classes) {
@@ -841,17 +894,18 @@ export async function teardown(target: LegacyEnvTarget): Promise<EnvRun> {
     try {
       if (!(await isPresent(handler, config, label))) continue;
       await assertLocal(handler, config, label);
-      expectResult(
-        await deleteLocked(lockable(handler), config, label),
-        `delete ${label}`,
-      );
+      const deleted = await deleteLocked(lockable(handler), config, label);
+      stopOnCredentialRefusal(deleted, `delete ${label}`);
+      expectResult(deleted, `delete ${label}`);
       target.logger?.info(`legacy env: deleted ${label}`);
     } catch (error) {
+      if (isCredentialRefusal(error)) throw error;
       problems.push(
         `${label}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
+  const run = combineRuns(objects, rest);
   requireClean(run, problems);
   return run;
 }

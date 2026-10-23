@@ -21,6 +21,7 @@
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../helpers/contract';
+import { requireOwnNames } from '../../helpers/legacyEnv';
 import {
   type CaseParams,
   closeLegacySession,
@@ -186,6 +187,14 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — delete', () => {
     const created = new Set<Subject>();
 
     beforeAll(async () => {
+      requireOwnNames('legacy_deletes', [
+        ['class', param(params, 'class_name')],
+        ['program', param(params, 'program_name')],
+        ['interface', param(params, 'interface_name')],
+        ['function group', param(params, 'function_group_name')],
+        ['function module', param(params, 'function_module_name')],
+        ['DDL source', param(params, 'ddl_name')],
+      ]);
       session = await openLegacySession();
       await requireAbsent('legacy_deletes', creationOrder);
       for (const s of creationOrder) {

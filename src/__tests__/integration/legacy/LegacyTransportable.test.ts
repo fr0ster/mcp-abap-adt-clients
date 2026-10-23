@@ -24,7 +24,7 @@
 
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../helpers/contract';
-import { ENV_PACKAGE, status } from '../../helpers/legacyEnv';
+import { ENV_PACKAGE, requireOwnNames, status } from '../../helpers/legacyEnv';
 import {
   closeLegacySession,
   deleteLocked,
@@ -74,6 +74,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
     let created = false;
 
     beforeAll(async () => {
+      requireOwnNames('legacy_transportable', [['program', programName]]);
       session = await openLegacySession();
       const env = await status(current());
       if (!env.result.request || !env.result.packageExists)

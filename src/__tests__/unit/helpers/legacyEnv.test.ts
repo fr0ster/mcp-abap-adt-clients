@@ -5,17 +5,22 @@ import {
   ABAP_DIR,
   abapNameValue,
   assertOwnName,
+  CredentialRefused,
+  combineRuns,
   deleteLeftDdls,
   ensureClass,
   envClasses,
+  isCredentialRefusal,
   isOwnName,
   type LegacyEnvTarget,
+  markedLines,
   packageOf,
   parseEnvRun,
   renderPrepare,
+  requireOwnNames,
   sameSource,
   settingsOf,
-  unescapeXml,
+  stopOnCredentialRefusal,
 } from '../../helpers/legacyEnv';
 
 // The stubs are no handler class `integrationHeadersOf` knows; the pair is not
@@ -72,9 +77,135 @@ describe('legacy env: the ABAP Unit report', () => {
     );
   });
 
-  it('unescapes named and numeric entities and keeps unknown ones', () => {
-    expect(unescapeXml('&lt;&#65;&#x42;&amp;lt;&bogus;')).toBe(
-      '<AB&lt;&bogus;',
+  it('reads a raw " in element text and &quot; in an attribute alike', () => {
+    const line =
+      '@@LOG {"n":1,"step":"locks","object":"","status":"OK","message":"say \\"hi\\""}';
+    const raw = `<alerts><alert><title>${line}</title></alert></alerts>`;
+    const quoted = `<alerts><alert><details><detail text="${line.replace(/"/g, '&quot;')}"/></details></alert></alerts>`;
+    const both = `<r>${raw}${quoted}</r>`;
+    expect(markedLines(raw, '@@LOG ')).toEqual([line.slice(6)]);
+    expect(markedLines(quoted, '@@LOG ')).toEqual([line.slice(6)]);
+    // The same line in a title and a detail is one line.
+    expect(markedLines(both, '@@LOG ')).toEqual([line.slice(6)]);
+    const run = parseEnvRun(
+      `<r>${raw}<title>@@RESULT {"ok":true,"action":"status","request":"","package":"ZLG7_TEST","packageExists":false,"errors":0,"lines":1}</title></r>`,
+    );
+    expect(run.log[0]?.message).toBe('say "hi"');
+  });
+
+  it('decodes numeric entities through the XML parser', () => {
+    expect(markedLines('<t>@@LOG a&#65;&#x42;&amp;</t>', '@@LOG ')).toEqual([
+      'aAB&',
+    ]);
+  });
+
+  it('joins teardown and remove into one report, ok only when both are', () => {
+    const one = parseEnvRun(
+      answerWith([
+        '@@LOG {"n":1,"step":"objects","object":"PROG ZLG7_X","status":"DELETED","message":""}',
+        '@@LOG {"n":2,"step":"locks","object":"","status":"OK","message":""}',
+        RESULT.replace('"prepare"', '"teardown"'),
+      ]),
+    );
+    const two = parseEnvRun(
+      answerWith([
+        '@@LOG {"n":1,"step":"package","object":"ZLG7_TEST","status":"ERROR","message":"x"}',
+        '@@RESULT {"ok":false,"action":"remove","request":"","package":"ZLG7_TEST","packageExists":true,"errors":1,"lines":1}',
+      ]),
+    );
+    const run = combineRuns(one, two);
+    expect(run.result).toMatchObject({
+      action: 'teardown+remove',
+      ok: false,
+      errors: 1,
+      lines: 3,
+    });
+    expect(run.log.map((l) => l.n)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('legacy env: a credential refusal stops the loop', () => {
+  const failure = (status: number | undefined, message: string) =>
+    ({
+      ok: false,
+      getError: () => ({
+        origin: 'connection',
+        message,
+        ...(status !== undefined && { response: { status } }),
+      }),
+    }) as unknown as IAdtResponse<unknown>;
+
+  it('stops on a 401 and on RFC_LOGON_FAILURE, not on another failure', () => {
+    expect(() => stopOnCredentialRefusal(failure(401, 'no'), 'read X')).toThrow(
+      CredentialRefused,
+    );
+    expect(() =>
+      stopOnCredentialRefusal(
+        failure(undefined, 'RFC_LOGON_FAILURE: x'),
+        'read X',
+      ),
+    ).toThrow('the credential was refused');
+    expect(() =>
+      stopOnCredentialRefusal(failure(404, 'not found'), 'read X'),
+    ).not.toThrow();
+    expect(
+      isCredentialRefusal(new Error('lock X failed: RFC_LOGON_FAILURE')),
+    ).toBe(true);
+    expect(isCredentialRefusal(new Error('lock X failed: 403'))).toBe(false);
+  });
+
+  it('deleteLeftDdls stops at the first refusal instead of trying the rest', async () => {
+    const calls: string[] = [];
+    const handler = {
+      readMetadata: async () => {
+        calls.push('readMetadata');
+        return failure(401, 'Unauthorized');
+      },
+    };
+    const target = {
+      client: { getDdl: () => handler },
+      executor: {},
+    } as unknown as LegacyEnvTarget;
+    const left = (name: string, n: number) => ({
+      n,
+      step: 'objects',
+      object: `DDLS ${name}`,
+      status: 'LEFT-FOR-ADT',
+      message: '$TMP',
+    });
+    await expect(
+      deleteLeftDdls(target, {
+        result: {
+          ok: true,
+          action: 'teardown',
+          request: '',
+          package: 'ZLG7_TEST',
+          packageExists: false,
+          errors: 0,
+          lines: 2,
+        },
+        log: [left('ZLG7_A', 1), left('ZLG7_B', 2)],
+      }),
+    ).rejects.toThrow(CredentialRefused);
+    expect(calls).toEqual(['readMetadata']);
+  });
+});
+
+describe('legacy env: configured names of the live cases', () => {
+  it('passes ZLG7 names and fails naming the case and every other name', () => {
+    expect(() =>
+      requireOwnNames('legacy_deletes', [
+        ['class', 'ZCL_LG7_DEL'],
+        ['DDL source', 'ZLG7_DEL_DDL'],
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      requireOwnNames('legacy_transportable', [
+        ['program', 'ZAC_PROG'],
+        ['function module', 'Z_LG7_X'],
+      ]),
+    ).toThrow(
+      'legacy_740/legacy_transportable: program ZAC_PROG not a ZLG7 name',
     );
   });
 });
@@ -160,6 +291,10 @@ describe('legacy env: settings into ABAP', () => {
       'ZCL_LG7_ENV',
       'ZCL_LG7_ENV_PREPARE',
       'ZCL_LG7_ENV_TEARDOWN',
+    ]);
+    expect(envClasses(['remove']).map((c) => c.name)).toEqual([
+      'ZCL_LG7_ENV',
+      'ZCL_LG7_ENV_REMOVE',
     ]);
     expect(classes[1]?.testClasses).toContain("iv_software_component = 'HOME'");
     expect(classes[1]?.testClasses).not.toContain('{{');
@@ -289,6 +424,12 @@ describe('legacy env: never writes what is not its own', () => {
   });
 });
 
+/** The body of one method of the env class. */
+function methodOf(env: string, name: string): string {
+  const start = env.indexOf(`  METHOD ${name}.`);
+  return env.slice(start, env.indexOf('ENDMETHOD.', start));
+}
+
 describe('legacy env: the ABAP sources', () => {
   const files = readdirSync(ABAP_DIR).filter((f) => f.endsWith('.abap'));
   const read = (f: string) => readFileSync(join(ABAP_DIR, f), 'utf8');
@@ -340,7 +481,58 @@ describe('legacy env: the ABAP sources', () => {
     expect(env).toContain(
       "c_request_marker TYPE as4text VALUE 'ZLG7 LEGACY-TEST'",
     );
+    // Real JSON escapes, so < > & cannot end or bend the line in XML.
+    expect(env).toContain(
+      'REPLACE ALL OCCURRENCES OF `<` IN rv_json WITH `\\u003c`.',
+    );
+    expect(env).toContain(
+      'REPLACE ALL OCCURRENCES OF `>` IN rv_json WITH `\\u003e`.',
+    );
+    expect(env).toContain(
+      'REPLACE ALL OCCURRENCES OF `&` IN rv_json WITH `\\u0026`.',
+    );
+    expect(env).toContain(
+      'REPLACE ALL OCCURRENCES OF `\\` IN rv_json WITH `\\\\`.',
+    );
+    expect(env).toContain(
+      'REPLACE ALL OCCURRENCES OF `"` IN rv_json WITH `\\"`.',
+    );
     // Never a release of a request.
     expect(env).not.toMatch(/TR_RELEASE|RELEASE_REQUEST/i);
+  });
+
+  it('match locks exactly against the scope list, never a substring', () => {
+    const locks = methodOf(code('zcl_lg7_env.clas.abap'), 'release_locks');
+    expect(locks).toContain('objects_in_scope( abap_false )');
+    expect(locks).toContain('line_exists( lt_exact[ table_line = lv_word ] )');
+    expect(locks).not.toMatch(/FIND\b|\bCS\b|\bCP\b/);
+  });
+
+  it('touch only tasks of the current user', () => {
+    const env = read('zcl_lg7_env.clas.abap');
+    const requests = methodOf(env, 'delete_requests');
+    expect(requests).toContain('IF ls_task-as4user = sy-uname.');
+    expect(requests).toContain('belongs to another user; not touched');
+  });
+
+  it('check every function module call for its exceptions', () => {
+    const env = read('zcl_lg7_env.clas.abap');
+    const calls = env.split("CALL FUNCTION '").slice(1);
+    expect(calls.length).toBeGreaterThan(5);
+    for (const call of calls) {
+      const name = call.slice(0, call.indexOf("'"));
+      const body = call.slice(0, call.indexOf('.\n'));
+      if (name === 'ENQUE_DELETE') continue; // answers subrc as a parameter
+      expect(`${name}: ${body}`).toContain('OTHERS');
+    }
+  });
+
+  it('remove the package and the requests only in the second teardown phase', () => {
+    const env = read('zcl_lg7_env.clas.abap');
+    const first = methodOf(env, 'teardown');
+    const second = methodOf(env, 'remove');
+    expect(first).not.toMatch(/delete_package|delete_requests/);
+    expect(second).toContain('delete_package( ).');
+    expect(second).toContain('delete_requests( ).');
   });
 });
