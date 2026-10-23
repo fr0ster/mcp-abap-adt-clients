@@ -191,6 +191,38 @@ describe('legacy env: a credential refusal stops the loop', () => {
   });
 });
 
+describe('legacy env: a 401 in the package check is a credential refusal', () => {
+  it('teardown-style deletion stops: assertLocal rethrows by status', async () => {
+    const calls: string[] = [];
+    let reads = 0;
+    const handler = {
+      readMetadata: async () => {
+        calls.push('readMetadata');
+        reads += 1;
+        // Present on the first read; the package check is refused.
+        return reads === 1
+          ? ok('<x><adtcore:packageRef adtcore:name="$TMP"/></x>')
+          : ({
+              ok: false,
+              getError: () => ({
+                origin: 'connection',
+                message: 'Unauthorized',
+                response: { status: 401 },
+              }),
+            } as unknown as IAdtResponse<unknown>);
+      },
+    };
+    const target = {
+      client: { getClass: () => handler, getLocalTestClass: () => handler },
+      executor: {},
+    } as unknown as LegacyEnvTarget;
+    await expect(
+      ensureClass(target, { name: 'ZCL_LG7_X', description: 'd', main: 'm' }),
+    ).rejects.toThrow(CredentialRefused);
+    expect(calls).toEqual(['readMetadata', 'readMetadata']);
+  });
+});
+
 describe('legacy env: configured names of the live cases', () => {
   it('passes ZLG7 names and fails naming the case and every other name', () => {
     expect(() =>
@@ -504,15 +536,45 @@ describe('legacy env: the ABAP sources', () => {
   it('match locks exactly against the scope list, never a substring', () => {
     const locks = methodOf(code('zcl_lg7_env.clas.abap'), 'release_locks');
     expect(locks).toContain('objects_in_scope( abap_false )');
-    expect(locks).toContain('line_exists( lt_exact[ table_line = lv_word ] )');
+    expect(locks).toContain(
+      'LOOP AT lt_scope INTO ls_scope WHERE name = lv_word.',
+    );
     expect(locks).not.toMatch(/FIND\b|\bCS\b|\bCP\b/);
   });
 
-  it('touch only tasks of the current user', () => {
-    const env = read('zcl_lg7_env.clas.abap');
-    const requests = methodOf(env, 'delete_requests');
-    expect(requests).toContain('IF ls_task-as4user = sy-uname.');
-    expect(requests).toContain('belongs to another user; not touched');
+  it('skip a whole request holding a task of another user', () => {
+    const requests = methodOf(code('zcl_lg7_env.clas.abap'), 'delete_requests');
+    const skip = requests.indexOf(
+      'a task of another user is in it; request not touched',
+    );
+    const next = requests.indexOf('CONTINUE.', skip);
+    expect(requests).toContain('IF ls_task-as4user <> sy-uname.');
+    expect(skip).toBeGreaterThan(-1);
+    // The skip comes before the first unlock and delete, and leaves the loop.
+    expect(next).toBeGreaterThan(skip);
+    expect(next).toBeLessThan(
+      requests.indexOf("CALL FUNCTION 'TRINT_UNLOCK_REQUEST'"),
+    );
+    expect(next).toBeLessThan(
+      requests.indexOf("CALL FUNCTION 'TR_DELETE_COMM'"),
+    );
+  });
+
+  it('release a lock only with the lock object of the name it matched', () => {
+    const code740 = code('zcl_lg7_env.clas.abap');
+    const fits = methodOf(code740, 'lock_object_fits');
+    expect(fits).toContain("rv_yes = boolc( iv_gname = 'SEOCLASS' ).");
+    expect(fits).toContain("rv_yes = boolc( iv_gname = 'TRDIR' ).");
+    expect(fits).toContain("rv_yes = boolc( iv_gname = 'TFDIR' ).");
+    expect(fits).toContain("rv_yes = boolc( iv_gname = 'E070' ).");
+    expect(fits).toContain('WHEN OTHERS.\n        rv_yes = abap_false.');
+    const locks = methodOf(code740, 'release_locks');
+    // Every hit passes through the type check; a name of the wrong object is left.
+    expect(
+      locks.split('\n').filter((l) => l.trim() === 'lv_hit = abap_true.'),
+    ).toHaveLength(2);
+    expect(locks.split('lock_object_fits(').length - 1).toBe(2);
+    expect(locks).toContain('iv_status = `LEFT`');
   });
 
   it('check every function module call for its exceptions', () => {

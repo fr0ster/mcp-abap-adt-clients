@@ -115,6 +115,10 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS delete_package.
     METHODS purge_deleted_entries.
     METHODS commit.
+    CLASS-METHODS lock_object_fits
+      IMPORTING iv_kind       TYPE csequence
+                iv_gname      TYPE csequence
+      RETURNING VALUE(rv_yes) TYPE abap_bool.
     CLASS-METHODS owner_of
       IMPORTING iv_name         TYPE csequence
       RETURNING VALUE(rv_owner) TYPE string.
@@ -320,12 +324,24 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     " in scope, env classes excluded) or derived from one — a class's pool
     " includes (the name padded with '=' to 30, then its suffix), a function
     " group's SAPL program, its L<group>xxx includes, its modules (TFDIR) — or
-    " a marked request. No substring match. Nothing else goes to ENQUE_DELETE.
-    TYPES tt_names TYPE SORTED TABLE OF string WITH UNIQUE KEY table_line.
+    " a marked request. No substring match. And the lock's object (its table,
+    " GNAME) must be the one that kind of name is locked with — see
+    " lock_object_fits; a lock of any other object naming our name is left in
+    " place and logged. Nothing else goes to ENQUE_DELETE.
+    TYPES:
+      BEGIN OF ty_scope_name,
+        name TYPE string,
+        kind TYPE string,
+      END OF ty_scope_name,
+      tt_scope_names TYPE SORTED TABLE OF ty_scope_name WITH NON-UNIQUE KEY name,
+      tt_names TYPE SORTED TABLE OF string WITH UNIQUE KEY table_line.
+    DATA lt_scope TYPE tt_scope_names.
+    DATA ls_scope TYPE ty_scope_name.
+    DATA lv_kind TYPE string.
+    DATA lv_left TYPE abap_bool.
     DATA lt_enq TYPE STANDARD TABLE OF seqg3.
     DATA lt_del TYPE STANDARD TABLE OF seqg3.
     DATA ls_enq TYPE seqg3.
-    DATA lt_exact TYPE tt_names.
     DATA lt_pools TYPE tt_names.
     DATA lt_groups TYPE tt_names.
     DATA lt_objects TYPE tt_object.
@@ -363,8 +379,10 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     " The scope list: every name a lock of ours can carry.
     lt_objects = objects_in_scope( abap_false ).
     LOOP AT lt_objects INTO ls_object.
+      ls_scope-name = ls_object-obj_name.
+      ls_scope-kind = ls_object-object.
+      INSERT ls_scope INTO TABLE lt_scope.
       lv_name = ls_object-obj_name.
-      INSERT lv_name INTO TABLE lt_exact.
       CASE ls_object-object.
         WHEN 'CLAS'.
           WHILE strlen( lv_name ) < 30.
@@ -374,19 +392,22 @@ CLASS zcl_lg7_env IMPLEMENTATION.
         WHEN 'FUGR'.
           INSERT lv_name INTO TABLE lt_groups.
           lv_pname = |SAPL{ lv_name }|.
-          lv_name = lv_pname.
-          INSERT lv_name INTO TABLE lt_exact.
+          ls_scope-name = lv_pname.
+          ls_scope-kind = `FUGR-PROGRAM`.
+          INSERT ls_scope INTO TABLE lt_scope.
           SELECT funcname FROM tfdir INTO TABLE lt_modules WHERE pname = lv_pname.
           LOOP AT lt_modules INTO lv_module.
-            lv_name = lv_module.
-            INSERT lv_name INTO TABLE lt_exact.
+            ls_scope-name = lv_module.
+            ls_scope-kind = `FUNC`.
+            INSERT ls_scope INTO TABLE lt_scope.
           ENDLOOP.
       ENDCASE.
     ENDLOOP.
     lt_requests = marked_requests( ).
     LOOP AT lt_requests INTO lv_request.
-      lv_name = lv_request.
-      INSERT lv_name INTO TABLE lt_exact.
+      ls_scope-name = lv_request.
+      ls_scope-kind = `REQUEST`.
+      INSERT ls_scope INTO TABLE lt_scope.
     ENDLOOP.
 
     LOOP AT lt_enq INTO ls_enq.
@@ -395,30 +416,49 @@ CLASS zcl_lg7_env IMPLEMENTATION.
       CONDENSE lv_arg.
       SPLIT lv_arg AT space INTO TABLE lt_words.
       lv_hit = abap_false.
+      lv_left = abap_false.
       LOOP AT lt_words INTO lv_word.
         TRANSLATE lv_word TO UPPER CASE.
         lv_length = strlen( lv_word ).
-        IF line_exists( lt_exact[ table_line = lv_word ] ).
-          lv_hit = abap_true.
-        ELSEIF lv_length > 30 AND lv_length <= 35
-            AND line_exists( lt_pools[ table_line = lv_word(30) ] ).
-          " A class pool include: the padded name, then CP, CU, CCIMP, CM001 ...
-          lv_hit = abap_true.
-        ELSEIF lv_length > 4 AND lv_word(1) = 'L'.
-          " L<group> plus exactly three characters: an include of the group.
-          lv_length = lv_length - 4.
-          lv_name = lv_word+1(lv_length).
-          IF line_exists( lt_groups[ table_line = lv_name ] ).
+        CLEAR lv_kind.
+        LOOP AT lt_scope INTO ls_scope WHERE name = lv_word.
+          lv_kind = ls_scope-kind.
+          IF lock_object_fits( iv_kind = lv_kind iv_gname = ls_enq-gname ) = abap_true.
+            lv_hit = abap_true.
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+        IF lv_hit = abap_false AND lv_kind IS INITIAL.
+          IF lv_length > 30 AND lv_length <= 35
+              AND line_exists( lt_pools[ table_line = lv_word(30) ] ).
+            " A class pool include: the padded name, then CP, CU, CCIMP, CM001 ...
+            lv_kind = `CLAS-INCLUDE`.
+          ELSEIF lv_length > 4 AND lv_word(1) = 'L'.
+            " L<group> plus exactly three characters: an include of the group.
+            lv_length = lv_length - 4.
+            lv_name = lv_word+1(lv_length).
+            IF line_exists( lt_groups[ table_line = lv_name ] ).
+              lv_kind = `FUGR-INCLUDE`.
+            ENDIF.
+          ENDIF.
+          IF lv_kind IS NOT INITIAL
+              AND lock_object_fits( iv_kind = lv_kind iv_gname = ls_enq-gname ) = abap_true.
             lv_hit = abap_true.
           ENDIF.
         ENDIF.
         IF lv_hit = abap_true.
           EXIT.
         ENDIF.
+        IF lv_kind IS NOT INITIAL.
+          lv_left = abap_true.
+        ENDIF.
       ENDLOOP.
       IF lv_hit = abap_true.
         APPEND ls_enq TO lt_del.
         add_log( iv_step = `locks` iv_object = |{ ls_enq-gname } { ls_enq-garg }| iv_status = `RELEASE` ).
+      ELSEIF lv_left = abap_true.
+        add_log( iv_step = `locks` iv_object = |{ ls_enq-gname } { ls_enq-garg }| iv_status = `LEFT`
+                 iv_message = `names an own object, but not with the lock object of its type; left in place` ).
       ENDIF.
     ENDLOOP.
 
@@ -442,6 +482,28 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     ELSE.
       add_log( iv_step = `locks` iv_status = `ERROR` iv_message = |ENQUE_DELETE subrc { lv_subrc }| ).
     ENDIF.
+  ENDMETHOD.
+
+
+  METHOD lock_object_fits.
+    " The lock object (seqg3-gname: the table its enqueue object locks) each
+    " kind of name is locked with — the ones known for 7.40, not measured
+    " there: a class or interface by ESEOCLASS (SEOCLASS), a program or an
+    " include by ESRDIRE (TRDIR), a function module by ESFUNCTION (TFDIR), a
+    " request by E_TRKORR (E070). Every other pairing is no — a DDL source, a
+    " function group by its own name and every unnamed lock object are left.
+    CASE iv_kind.
+      WHEN `CLAS` OR `INTF`.
+        rv_yes = boolc( iv_gname = 'SEOCLASS' ).
+      WHEN `PROG` OR `FUGR-PROGRAM` OR `FUGR-INCLUDE` OR `CLAS-INCLUDE`.
+        rv_yes = boolc( iv_gname = 'TRDIR' ).
+      WHEN `FUNC`.
+        rv_yes = boolc( iv_gname = 'TFDIR' ).
+      WHEN `REQUEST`.
+        rv_yes = boolc( iv_gname = 'E070' ).
+      WHEN OTHERS.
+        rv_yes = abap_false.
+    ENDCASE.
   ENDMETHOD.
 
 
@@ -539,6 +601,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     DATA lx_call TYPE REF TO cx_sy_dyn_call_error.
     DATA lt_tasks TYPE STANDARD TABLE OF e070.
     DATA ls_task TYPE e070.
+    DATA lv_foreign TYPE abap_bool.
 
     lt_requests = marked_requests( ).
     IF lt_requests IS INITIAL.
@@ -547,17 +610,21 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     ENDIF.
     LOOP AT lt_requests INTO lv_request.
       CLEAR lt_order.
-      " Tasks of the request: only sy-uname's are touched. Another user's task
-      " is reported and left; the request then stays (TR_DELETE_COMM refuses).
+      " A request holding a task of another user is skipped whole: neither
+      " unlocked nor deleted, nor any of its tasks.
       SELECT * FROM e070 INTO TABLE lt_tasks WHERE strkorr = lv_request.
+      lv_foreign = abap_false.
       LOOP AT lt_tasks INTO ls_task.
-        IF ls_task-as4user = sy-uname.
-          APPEND ls_task-trkorr TO lt_order.
-        ELSE.
-          add_log( iv_step = `requests` iv_object = ls_task-trkorr iv_status = `ERROR`
-                   iv_message = |task of { lv_request } belongs to another user; not touched| ).
+        IF ls_task-as4user <> sy-uname.
+          lv_foreign = abap_true.
         ENDIF.
+        APPEND ls_task-trkorr TO lt_order.
       ENDLOOP.
+      IF lv_foreign = abap_true.
+        add_log( iv_step = `requests` iv_object = lv_request iv_status = `ERROR`
+                 iv_message = `a task of another user is in it; request not touched` ).
+        CONTINUE.
+      ENDIF.
       APPEND lv_request TO lt_order.
       LOOP AT lt_order INTO lv_trkorr.
         CLEAR ls_unlock.

@@ -491,9 +491,10 @@ async function isPresent(handler: Writable, config: object, label: string) {
 
 /** Throw unless the object's metadata names `$TMP`. */
 async function assertLocal(handler: Writable, config: object, label: string) {
-  const metadata = String(
-    expectResult(await handler.readMetadata(config), `read ${label}`),
-  );
+  const answer = await handler.readMetadata(config);
+  // By the answer's status, not its words: a 401 here stops the caller's loop.
+  stopOnCredentialRefusal(answer, `read ${label}`);
+  const metadata = String(expectResult(answer, `read ${label}`));
   const pkg = packageOf(metadata);
   if (pkg?.toUpperCase() !== LOCAL_PACKAGE)
     throw new Error(
@@ -507,6 +508,7 @@ async function assertLocal(handler: Writable, config: object, label: string) {
  */
 async function source(handler: Writable, config: object, label: string) {
   const answer = await handler.read(config, 'inactive');
+  stopOnCredentialRefusal(answer, `read ${label}`);
   if (!answer.ok && answer.getError().response?.status === 404) return '';
   return String(expectResult(answer, `read ${label}`) ?? '');
 }
