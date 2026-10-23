@@ -30,12 +30,14 @@ export class AdtClassLegacy<
    * Delete class — legacy override.
    *
    * One stateless request: `DELETE <object URI>?lockHandle=<options.lockHandle>`,
-   * with `&corrNr=<transportRequest>` when one is given. Pass the handle from
-   * your own `lock()` and release it with `unlock()` afterwards; this member
-   * does not lock. Measured on 7.40 SP04: lock, delete with the handle,
-   * unlock deleted a class. Without a handle SAP answered `400` "Parameter lockHandle could not be found." for a class; the request still goes and that answer reaches you. The `corrNr` is sent as before; a delete
-   * with it in a transportable package was not measured. `/sap/bc/adt/deletion/*`
-   * does not exist there.
+   * plus `&corrNr=<transportRequest>` when `transportRequest` is given. Pass the
+   * handle from your own `lock()` and release it with `unlock()` afterwards;
+   * this member does not lock. Measured on 7.40 SP04: lock, delete with the
+   * handle, unlock deleted a class. Without a handle SAP answered `400`
+   * "Parameter lockHandle could not be found." for a class; the request still goes
+   * and that answer reaches you.
+   * A delete with `corrNr` in a transportable package was not measured.
+   * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,

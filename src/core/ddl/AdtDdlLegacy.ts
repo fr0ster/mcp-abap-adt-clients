@@ -32,12 +32,13 @@ export class AdtDdlLegacy<
    * Delete DDL source — legacy override.
    *
    * One stateless request: `DELETE <object URI>?lockHandle=<options.lockHandle>`,
-   * with `&corrNr=<transportRequest>` when one is given. Pass the handle from
-   * your own `lock()` and release it with `unlock()` afterwards; this member
-   * does not lock. Measured on 7.40 SP04: lock, delete with the handle,
-   * unlock deleted a DDL source. Without a handle 7.40 SP04 deleted a DDL source too, but pass the handle all the same. The `corrNr` is sent as before; a delete
-   * with it in a transportable package was not measured. `/sap/bc/adt/deletion/*`
-   * does not exist there.
+   * plus `&corrNr=<transportRequest>` when `transportRequest` is given. Pass the
+   * handle from your own `lock()` and release it with `unlock()` afterwards;
+   * this member does not lock. Measured on 7.40 SP04: lock, delete with the
+   * handle, unlock deleted a DDL source. Without a handle 7.40 SP04 deleted
+   * a DDL source too; pass the handle all the same.
+   * A delete with `corrNr` in a transportable package was not measured.
+   * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,

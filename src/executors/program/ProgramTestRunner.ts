@@ -19,11 +19,6 @@
  * endpoint, was why that run found nothing. `runSync` therefore always sends
  * `<options>`. An include's own URI answers empty even with `<options>`; its
  * tests run through the report.
- *
- * On a legacy system (7.40 SP04, no `/abapunit/runs`),
- * `ProgramTestRunnerLegacy` sends this `/testruns` request
- * with `<options>` from `runSync` as it is here and from `run`. Its `getStatus`
- * and `getResult` are refused (there is no run id).
  */
 
 import type {
