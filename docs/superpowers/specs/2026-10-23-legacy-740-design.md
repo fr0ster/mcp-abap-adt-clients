@@ -611,11 +611,11 @@ asks):
   — wherever they list legacy support per type.
 - `docs/development/RFC_TESTING.md`, `TEST_CONFIG_SCHEMA.md` — the live checks
   and that a legacy run needs `connection_type: "rfc"`.
-- `docs/usage/MIGRATION-<major>.md` — what a consumer on 37.x does: use the
-  legacy client over RFC; stop calling `checkDeletion` on legacy and lock before `delete`;
-  where-used, virtual folders and object types are refused; the list of members
-  that sent a request and now refuse, and the runners that refused and now
-  send.
+- `docs/usage/LEGACY.md` (or the legacy section that replaces it) carries what a
+  consumer on 37.2 does differently on 7.40: use the legacy client over RFC; lock
+  before `delete`; no `checkDeletion` on legacy; where-used, virtual folders and
+  object types are refused; the members that sent a request and now refuse, and
+  the runners that refused and now send. No migration guide: a minor.
 - `CHANGELOG.md` — one entry: the measured basis ("on 7.40 SP04"), the
   refusals, the fixes, RFC as the legacy wire, the migration link. The version is the
   owner's to name (CLAUDE.md).
