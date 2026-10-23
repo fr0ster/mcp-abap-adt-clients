@@ -62,6 +62,11 @@ import {
 } from '../core/functionGroup';
 import { AdtFunctionGroupLegacy } from '../core/functionGroup/AdtFunctionGroupLegacy';
 import {
+  functionIncludeDocuments,
+  type IFunctionIncludeResults,
+} from '../core/functionInclude';
+import { AdtFunctionIncludeLegacy } from '../core/functionInclude/AdtFunctionIncludeLegacy';
+import {
   functionModuleDocuments,
   type IFunctionModuleResults,
 } from '../core/functionModule';
@@ -157,6 +162,21 @@ export class AdtClientLegacy extends AdtClient {
     results: R = classDocuments as unknown as R,
   ): AdtClassLegacy<R> {
     return new AdtClassLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+      this.lockRegistry,
+      results,
+    );
+  }
+
+  override getFunctionInclude<
+    R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
+  >(
+    results: R = functionIncludeDocuments as unknown as R,
+  ): AdtFunctionIncludeLegacy<R> {
+    return new AdtFunctionIncludeLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,

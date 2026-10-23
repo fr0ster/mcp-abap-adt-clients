@@ -14,6 +14,7 @@ import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { AdtClass } from '../../../core/class/AdtClass';
+import { AdtFunctionIncludeLegacy } from '../../../core/functionInclude/AdtFunctionIncludeLegacy';
 import { AdtContentTypesBase } from '../../../core/shared/contentTypes';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
@@ -258,6 +259,26 @@ describe('integrationHeadersOf', () => {
       accept: 'text/plain',
       contentType: 'text/plain',
     });
+  });
+
+  it('records the measured v1 pair for the function include create on a legacy client', () => {
+    const include = new AdtClientLegacy(
+      connection(),
+      logger,
+    ).getFunctionInclude();
+    expect(include).toBeInstanceOf(AdtFunctionIncludeLegacy);
+    const v1 = 'application/vnd.sap.adt.functions.fincludes+xml';
+    expect(integrationHeadersOf(include, 'create')).toEqual({
+      accept: v1,
+      contentType: v1,
+    });
+    // The modern client keeps v2.
+    expect(
+      integrationHeadersOf(
+        new AdtClient(connection(), logger).getFunctionInclude(),
+        'create',
+      ).contentType,
+    ).toBe('application/vnd.sap.adt.functions.fincludes.v2+xml');
   });
 
   it('is the only resolver in tests that reach SAP', () => {

@@ -424,6 +424,11 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/xml',
     contentType: 'application/xml',
   },
+  // measured on 7.40 SP04 over RFC: v2 answers 400 "No content handler found"
+  'AdtFunctionIncludeLegacy.create': {
+    accept: 'application/vnd.sap.adt.functions.fincludes+xml',
+    contentType: 'application/vnd.sap.adt.functions.fincludes+xml',
+  },
   'AdtFunctionInclude.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
@@ -1046,6 +1051,15 @@ function recordedPair(
 ): IAdtHeaders | undefined {
   const owner = ownerOf(handler, member);
   if (!owner) return undefined;
+  // A legacy class that inherits `member` may still send another pair: the
+  // library sends what the caller passes, and the measured one is recorded
+  // under the legacy class's own name.
+  const leaf = (handler as { constructor?: { name?: string } }).constructor
+    ?.name;
+  if (leaf && leaf !== owner && leaf.endsWith('Legacy')) {
+    const own = SENT_BEFORE_36[`${leaf}.${member}`];
+    if (own) return own;
+  }
   const key = `${owner}.${member}`;
   // An enhancement's own document has a type per subtype: before 36.0.0
   // `create` and `updateMetadata` chose it from the config.
