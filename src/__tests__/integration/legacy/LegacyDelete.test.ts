@@ -8,8 +8,11 @@
  * recorder saw: the handle-less DELETE is one request with no `lockHandle`,
  * the locked one carries the handle the `lock` returned.
  *
- * Every object is created in `$TMP` (no transport) and removed again in
- * `afterAll`, whatever the tests found.
+ * Every object is created in `$TMP` (no transport). A configured name that
+ * already exists fails the run before anything is created, and nothing is
+ * deleted that this run did not create: `afterAll` removes, module before
+ * group, only what was created here and is still there, attempts every one,
+ * and names every object it left behind.
  *
  * Runs on a legacy configuration over RFC with case `legacy_740/legacy_deletes`
  * enabled: npm run test:detached -- integration/legacy/LegacyDelete
@@ -23,13 +26,15 @@ import {
   closeLegacySession,
   deleteLocked,
   type LegacyDeletable,
+  type LegacyObject,
   type LegacySession,
   LOCAL_PACKAGE,
   lineOf,
   openLegacySession,
   param,
   queryOf,
-  removeIfPresent,
+  removeCreated,
+  requireAbsent,
   sentSince,
   stepOf,
   withLegacyCase,
@@ -38,11 +43,8 @@ import { describeLegacyRfc } from '../../helpers/legacyRfc';
 
 const DESCRIPTION = 'legacy live check: delete';
 
-/** One type: its handler, its config, and `make`, which creates it. */
-interface Subject {
-  readonly label: string;
-  readonly handler: () => LegacyDeletable<object>;
-  readonly config: object;
+/** One type: the object, and `make`, which creates it. */
+interface Subject extends LegacyObject {
   readonly make: () => Promise<IAdtResponse<unknown>>;
   /** SAP answers a DELETE without a handle with `400` (measured). */
   readonly refusesWithoutHandle: boolean;
@@ -68,6 +70,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
       label: 'class',
       handler: () => as(client().getClass()),
       config: cls,
+      name: cls.className,
       make: () =>
         client()
           .getClass()
@@ -81,6 +84,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
       label: 'program',
       handler: () => as(client().getProgram()),
       config: prog,
+      name: prog.programName,
       make: () =>
         client()
           .getProgram()
@@ -94,6 +98,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
       label: 'interface',
       handler: () => as(client().getInterface()),
       config: intf,
+      name: intf.interfaceName,
       make: () =>
         client()
           .getInterface()
@@ -109,6 +114,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
       label: 'function group',
       handler: () => as(client().getFunctionGroup()),
       config: group,
+      name: group.functionGroupName,
       make: () =>
         client()
           .getFunctionGroup()
@@ -127,6 +133,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
       label: 'function module',
       handler: () => as(client().getFunctionModule()),
       config: module,
+      name: module.functionModuleName,
       make: () =>
         client()
           .getFunctionModule()
@@ -145,6 +152,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
       label: 'DDL source',
       handler: () => as(client().getDdl()),
       config: ddl,
+      name: ddl.ddlName,
       make: () =>
         client()
           .getDdl()
@@ -174,21 +182,25 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — delete', () => {
     const current = () => session as LegacySession;
     const { creationOrder, deletionOrder } = subjects(current, params);
 
-    const removeAll = async () => {
-      for (const s of deletionOrder)
-        await removeIfPresent(s.handler(), s.config, s.label);
-    };
+    /** Created by this run: the only objects it may delete. */
+    const created = new Set<Subject>();
 
     beforeAll(async () => {
       session = await openLegacySession();
-      await removeAll();
-      for (const s of creationOrder)
-        expectResult(await s.make(), `create ${s.label}`);
+      await requireAbsent('legacy_deletes', creationOrder);
+      for (const s of creationOrder) {
+        expectResult(await s.make(), `create ${s.label} ${s.name}`);
+        created.add(s);
+      }
     }, 600000);
 
     afterAll(async () => {
       try {
-        if (session) await removeAll();
+        if (session)
+          await removeCreated(
+            'legacy_deletes',
+            deletionOrder.filter((s) => created.has(s)),
+          );
       } finally {
         await closeLegacySession(session);
       }

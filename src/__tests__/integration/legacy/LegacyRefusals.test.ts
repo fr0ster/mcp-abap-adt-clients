@@ -8,8 +8,11 @@
  * and executor refusals, and each refused type of `readObjectMetadata` /
  * `readObjectSource` — and must answer the refusal (`origin: 'refusal'`,
  * `UNSUPPORTED_OPERATION`) with nothing on the recorder: no request, no session
- * type. The cases of those two members that send (program, class, in each
- * spelling) are read for real objects and answer `200`.
+ * type. Those calls go through a recorder in deny mode, on a client of their
+ * own: a request is recorded and refused there, never forwarded, so a member
+ * that regressed into sending fails here without reaching the system. The
+ * cases of those two members that send (program, class, in each spelling)
+ * are read for real objects, on a forwarding recorder, and answer `200`.
  *
  * Nothing is created. Runs on a legacy configuration over RFC with case
  * `legacy_740/legacy_refusals_send_nothing` enabled:
@@ -26,6 +29,7 @@ import { expectResult } from '../../helpers/contract';
 import {
   closeLegacySession,
   type LegacySession,
+  legacyClientsOn,
   lineOf,
   openLegacySession,
   param,
@@ -82,10 +86,14 @@ describeLegacyRfc(
   () => {
     withLegacyCase('legacy_refusals_send_nothing', (params) => {
       let session: LegacySession | undefined;
+      /** The same connection, behind a recorder that forwards nothing. */
+      let denying: LegacySession | undefined;
       const current = () => session as LegacySession;
+      const guarded = () => denying as LegacySession;
 
       beforeAll(async () => {
         session = await openLegacySession();
+        denying = await legacyClientsOn(session.connection, { deny: true });
       }, 120000);
 
       afterAll(async () => {
@@ -94,12 +102,12 @@ describeLegacyRfc(
 
       for (const { getter, member, row } of refusedRows) {
         it(`${getter}.${member} (${row.section}) answers the refusal and sends nothing`, async () => {
-          const { recorder } = current();
+          const { recorder } = guarded();
           const mark = recorder.requests.length;
           const types = recorder.sessionTypes.length;
 
           const answer = (await row.call(
-            handlerFor(current(), getter),
+            handlerFor(guarded(), getter),
             integrationHeadersOf,
           )) as {
             ok: boolean;

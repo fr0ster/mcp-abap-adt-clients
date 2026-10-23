@@ -8,6 +8,10 @@
  * read off the error's `response`, and the error is rethrown as it came).
  * `setSessionType` calls are recorded too, then forwarded. Every other member
  * is the connection's own, called on the connection itself.
+ *
+ * **Deny mode** (`{ deny: true }`) is for a check that nothing is sent: a
+ * request is recorded and then refused with an error, never forwarded, so a
+ * member that regressed into sending cannot reach the system.
  */
 
 import type {
@@ -37,8 +41,14 @@ function statusOf(value: unknown): number | undefined {
   return typeof status === 'number' ? status : undefined;
 }
 
+export interface RecordOptions {
+  /** Record each request, then throw instead of forwarding it. */
+  readonly deny?: boolean;
+}
+
 export function recordRequests<T extends IAbapConnection>(
   connection: T,
+  options: RecordOptions = {},
 ): RequestRecorder<T> {
   const requests: RecordedRequest[] = [];
   const sessionTypes: string[] = [];
@@ -56,6 +66,10 @@ export function recordRequests<T extends IAbapConnection>(
             ...(request.headers !== undefined && { headers: request.headers }),
           };
           requests.push(entry);
+          if (options.deny)
+            throw new Error(
+              `request denied by the recorder: ${request.method} ${request.url}`,
+            );
           try {
             const answer = await value.call(target, request);
             entry.status = statusOf(answer);

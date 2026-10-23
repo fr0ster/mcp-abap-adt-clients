@@ -10,7 +10,9 @@
  * The include's own `delete` is refused on 7.40 (spec §4.3), so the test
  * creates a function group of its own in `$TMP` (no transport), creates the
  * include in it, and removes the group in `afterAll` — lock, `DELETE
- * ?lockHandle=`, unlock — which removes its includes with it.
+ * ?lockHandle=`, unlock — which removes its includes with it. A group of the
+ * configured name that already exists fails the run and is left alone: only a
+ * group this run created is deleted.
  *
  * Runs on a legacy configuration over RFC with case
  * `legacy_740/legacy_function_include` enabled:
@@ -22,15 +24,19 @@ import { expectResult } from '../../helpers/contract';
 import {
   closeLegacySession,
   type LegacyDeletable,
+  type LegacyLockable,
+  type LegacyObject,
   type LegacySession,
   LOCAL_PACKAGE,
   lineOf,
   openLegacySession,
   param,
-  removeIfPresent,
+  removeCreated,
+  requireAbsent,
   sentSince,
   stepOf,
   withLegacyCase,
+  withLock,
 } from '../../helpers/legacyLive';
 import { describeLegacyRfc } from '../../helpers/legacyRfc';
 
@@ -55,27 +61,34 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
     const current = () => session as LegacySession;
     const group = { functionGroupName: param(params, 'function_group_name') };
     const include = { ...group, includeName: param(params, 'include_name') };
-    const groups = () =>
-      current().client.getFunctionGroup() as unknown as LegacyDeletable<
-        typeof group
-      >;
+    const groupObject: LegacyObject = {
+      label: 'function group',
+      name: group.functionGroupName,
+      handler: () =>
+        current().client.getFunctionGroup() as unknown as LegacyDeletable<object>,
+      config: group,
+    };
+    /** Set once this run created the group: the only thing it may delete. */
+    let created = false;
 
     beforeAll(async () => {
       session = await openLegacySession();
-      await removeIfPresent(groups(), group, 'function group');
+      await requireAbsent('legacy_function_include', [groupObject]);
       const handler = current().client.getFunctionGroup();
       expectResult(
         await handler.create(
           { ...group, packageName: LOCAL_PACKAGE, description: DESCRIPTION },
           { headers: integrationHeadersOf(handler, 'create') },
         ),
-        'create the function group',
+        `create function group ${group.functionGroupName}`,
       );
+      created = true;
     }, 600000);
 
     afterAll(async () => {
       try {
-        if (session) await removeIfPresent(groups(), group, 'function group');
+        if (session && created)
+          await removeCreated('legacy_function_include', [groupObject]);
       } finally {
         await closeLegacySession(session);
       }
@@ -106,21 +119,20 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
       const finc = client.getFunctionInclude();
       const mark = recorder.requests.length;
 
-      const lockHandle = String(
-        expectResult(await finc.lock(include), 'lock the function include'),
+      await withLock(
+        finc as unknown as LegacyLockable<typeof include>,
+        include,
+        `function include ${include.includeName}`,
+        async (lockHandle) =>
+          expectResult(
+            await finc.update(include, {
+              headers: integrationHeadersOf(finc, 'update'),
+              lockHandle,
+              source: SOURCE,
+            }),
+            'write the function include',
+          ),
       );
-      try {
-        expectResult(
-          await finc.update(include, {
-            headers: integrationHeadersOf(finc, 'update'),
-            lockHandle,
-            source: SOURCE,
-          }),
-          'write the function include',
-        );
-      } finally {
-        await finc.unlock(include, lockHandle);
-      }
 
       const sent = sentSince(recorder, mark);
       expect(sent.map(stepOf)).toEqual(['LOCK', 'PUT', 'UNLOCK']);

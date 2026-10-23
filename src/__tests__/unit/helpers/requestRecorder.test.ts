@@ -71,6 +71,45 @@ describe('request recorder', () => {
     ]);
   });
 
+  it('in deny mode records a request and throws without forwarding it', async () => {
+    let forwarded = 0;
+    const { connection } = stub(async () => {
+      forwarded += 1;
+      return { status: 200 };
+    });
+    const recorder = recordRequests(connection, { deny: true });
+
+    const thrown = await recorder.connection
+      .makeAdtRequest({
+        url: '/sap/bc/adt/guard',
+        method: 'DELETE',
+        timeout: 0,
+      })
+      .catch((e: unknown) => e);
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe(
+      'request denied by the recorder: DELETE /sap/bc/adt/guard',
+    );
+    expect(forwarded).toBe(0);
+    expect(recorder.requests).toEqual([
+      { method: 'DELETE', url: '/sap/bc/adt/guard' },
+    ]);
+  });
+
+  it('in deny mode still forwards the other members', async () => {
+    const { target, connection } = stub(async () => ({ status: 200 }));
+    const recorder = recordRequests(connection, { deny: true });
+
+    recorder.connection.setSessionType('stateful');
+
+    expect(recorder.sessionTypes).toEqual(['stateful']);
+    expect(target.types).toEqual(['stateful']);
+    await expect(recorder.connection.getBaseUrl()).resolves.toBe(
+      'https://example',
+    );
+  });
+
   it('records the session types set and forwards them', () => {
     const { target, connection } = stub(async () => ({ status: 200 }));
     const recorder = recordRequests(connection);

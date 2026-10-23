@@ -30,11 +30,42 @@ import { describeLegacyRfc } from '../../helpers/legacyRfc';
 
 const TESTRUNS = 'POST /sap/bc/adt/abapunit/testruns';
 
-/** The names of the methods a result document reports. */
+const SPACE = [' ', '\n', '\t', '\r'];
+
+/** The value of `attribute` in a start tag, or `undefined`. */
+function attributeOf(tag: string, attribute: string): string | undefined {
+  const key = `${attribute}="`;
+  let at = tag.indexOf(key);
+  while (at !== -1) {
+    if (SPACE.includes(tag.charAt(at - 1))) {
+      const start = at + key.length;
+      const close = tag.indexOf('"', start);
+      return close === -1 ? undefined : tag.slice(start, close);
+    }
+    at = tag.indexOf(key, at + 1);
+  }
+  return undefined;
+}
+
+/**
+ * The names of the methods a result document reports: the `adtcore:name` of
+ * every `<testMethod` element (not `<testMethods`). Plain string code over the
+ * server's XML, no regular expression.
+ */
 function methodsOf(document: string): string[] {
-  return [
-    ...document.matchAll(/<testMethod\b[^>]*\badtcore:name="([^"]+)"/g),
-  ].map((m) => m[1]);
+  const names: string[] = [];
+  const OPEN = '<testMethod';
+  let at = document.indexOf(OPEN);
+  while (at !== -1) {
+    const end = document.indexOf('>', at);
+    if (end === -1) break;
+    if (SPACE.includes(document.charAt(at + OPEN.length))) {
+      const name = attributeOf(document.slice(at, end), 'adtcore:name');
+      if (name !== undefined) names.push(name);
+    }
+    at = document.indexOf(OPEN, end);
+  }
+  return names;
 }
 
 interface RunCase {
