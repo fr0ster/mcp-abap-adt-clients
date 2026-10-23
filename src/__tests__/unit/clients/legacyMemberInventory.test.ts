@@ -11,9 +11,6 @@
  * tables in `helpers/legacyMembers.ts`: refused (answered without a request)
  * or sending (the request it sends, asserted on a recording connection). A new
  * or inherited member therefore cannot go undecided.
- *
- * A row whose behaviour a later task delivers is in `PENDING` with the one
- * assertion that does not hold yet; only that assertion runs as `it.failing`.
  */
 
 import * as fs from 'node:fs';
@@ -26,11 +23,9 @@ import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
 import {
   ARGUMENT_DEPENDENT,
-  type Assertion,
   LEGACY_REFUSED,
   LEGACY_SENDS,
   NON_PUBLIC,
-  PENDING,
   type RefusedRow,
   type SendsRow,
 } from '../../helpers/legacyMembers';
@@ -189,14 +184,6 @@ function targetFor(connection: IAbapConnection, getter: string) {
   return target as Record<string, unknown>;
 }
 
-function isPending(row: string, assertion: Assertion): boolean {
-  return PENDING.some((p) => p.row === row && p.assertion === assertion);
-}
-
-function itFor(row: string, assertion: Assertion) {
-  return isPending(row, assertion) ? it.failing : it;
-}
-
 function rowsOf<T>(
   table: Record<string, Record<string, T>>,
 ): [string, string, T][] {
@@ -319,39 +306,10 @@ describe('legacy member inventory', () => {
     expect(problems).toEqual([]);
   });
 
-  it('pending names only decided rows and their assertions', () => {
-    const problems: string[] = [];
-    const seen = new Set<string>();
-    for (const { row, assertion, task } of PENDING) {
-      const id = `${row} ${assertion}`;
-      if (seen.has(id)) problems.push(`${id} (twice)`);
-      seen.add(id);
-      if (!Number.isInteger(task) || task < 2 || task > 19)
-        problems.push(`${id} (task ${task})`);
-      const dot = row.indexOf('.');
-      const getter = row.slice(0, dot);
-      const member = row.slice(dot + 1);
-      const refused = LEGACY_REFUSED[getter]?.[member];
-      const sends = LEGACY_SENDS[getter]?.[member];
-      if (!refused && !sends) {
-        problems.push(`${id} (no such row)`);
-        continue;
-      }
-      const assertions: Assertion[] = refused
-        ? ['sends nothing']
-        : sends?.body
-          ? ['request', 'body']
-          : ['request'];
-      if (!assertions.includes(assertion))
-        problems.push(`${id} (not an assertion of the row)`);
-    }
-    expect(problems).toEqual([]);
-  });
-
   describe('a refused member sends nothing', () => {
     for (const [getter, member, row] of rowsOf<RefusedRow>(LEGACY_REFUSED)) {
       const id = `${getter}.${member}`;
-      itFor(id, 'sends nothing')(`${id} (${row.section})`, async () => {
+      it(`${id} (${row.section})`, async () => {
         const { connection, sent, sessionTypes } = recordingConnection();
         const target = targetFor(connection, getter);
         const answer = (await row.call(target, headersOf)) as {
@@ -382,7 +340,7 @@ describe('legacy member inventory', () => {
         }
         return sent;
       };
-      itFor(id, 'request')(`${id} (${row.section})`, async () => {
+      it(`${id} (${row.section})`, async () => {
         const sent = await record();
         expect(sent.map((r) => `${r.method} ${r.path.toLowerCase()}`)).toEqual(
           row.sends.map((r) => `${r.method} ${r.path.toLowerCase()}`),
@@ -400,7 +358,7 @@ describe('legacy member inventory', () => {
       });
       if (row.body) {
         const fragments = row.body;
-        itFor(id, 'body')(`${id} body (${row.section})`, async () => {
+        it(`${id} body (${row.section})`, async () => {
           const sent = await record();
           const body = String(sent[0]?.data ?? '');
           for (const fragment of fragments) expect(body).toContain(fragment);

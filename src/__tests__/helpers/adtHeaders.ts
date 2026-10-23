@@ -38,6 +38,12 @@ import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
 import { AdtProgramLegacy } from '../../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
+import { ClassExecutorLegacy } from '../../executors/class/ClassExecutorLegacy';
+import { ClassTestRunnerLegacy } from '../../executors/class/ClassTestRunnerLegacy';
+import { FunctionGroupTestRunnerLegacy } from '../../executors/functionGroup/FunctionGroupTestRunnerLegacy';
+import { FunctionModuleTestRunnerLegacy } from '../../executors/functionModule/FunctionModuleTestRunnerLegacy';
+import { ProgramExecutorLegacy } from '../../executors/program/ProgramExecutorLegacy';
+import { ProgramTestRunnerLegacy } from '../../executors/program/ProgramTestRunnerLegacy';
 
 /** A pair for a unit test that only needs the call to compile and run. */
 export const TEST_HEADERS: IAdtHeaders = {
@@ -1107,10 +1113,12 @@ export function headersOf(
  * overrides the member with one that returns `failed(...)` at once). A member
  * qualifies only when it **is** that class's own function, compared by
  * identity, so a test handler or another class of the same name does not.
- * The unit test `integrationHeadersOf.test.ts` calls each one on a mock
- * connection and proves that no request leaves.
+ * The list is the class-handler rows of `LEGACY_REFUSED`
+ * (`helpers/legacyMembers.ts`), member for member — `integrationHeadersOf.test.ts`
+ * holds the two together, and `legacyMemberInventory.test.ts` calls each row
+ * on a recording connection and proves that no request leaves.
  */
-const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
+export const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
   [
     AdtPackageLegacy,
     [
@@ -1122,6 +1130,11 @@ const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
       'unlock',
       'readTransport',
       'check',
+      // Refused before this change, and still: the item resource answered
+      // 404 to the read (spec §8).
+      'readMetadata',
+      'validate',
+      'read',
     ],
   ],
   [
@@ -1156,6 +1169,9 @@ const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
       'getAllTypes',
       'getActivationRun',
       'getActivationResults',
+      // Refused on legacy before this change, and still (spec §10.2).
+      'getTableColumns',
+      'getObjectProperties',
     ],
   ],
   // No deletion API on 7.40 (spec §4.3, §5).
@@ -1164,10 +1180,28 @@ const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
   [AdtInterfaceLegacy, ['checkDeletion']],
   [AdtFunctionGroupLegacy, ['checkDeletion']],
   [AdtFunctionModuleLegacy, ['checkDeletion']],
-  [AdtDdlLegacy, ['checkDeletion']],
+  // `checkCdsTestDoubles` stays refused (spec §10.3).
+  [AdtDdlLegacy, ['checkDeletion', 'checkCdsTestDoubles']],
   [AdtIncludeLegacy, ['checkDeletion', 'delete']],
   [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
   [AdtMessageClassLegacy, ['checkDeletion', 'delete']],
+  // A legacy run is answered finished, with no run id to ask about; the
+  // function module's `run` takes no function group, which its URI needs
+  // (spec §6.2).
+  [ClassTestRunnerLegacy, ['getStatus', 'getResult']],
+  [ProgramTestRunnerLegacy, ['getStatus', 'getResult']],
+  [FunctionGroupTestRunnerLegacy, ['getStatus', 'getResult']],
+  [FunctionModuleTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
+  // The runs, the profiled runs and the trace type lists: not advertised on
+  // 7.40, or no class run there at all (spec §6.3).
+  [
+    ClassExecutorLegacy,
+    ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'],
+  ],
+  [
+    ProgramExecutorLegacy,
+    ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'],
+  ],
 ];
 
 function isLegacyRefusal(handler: object, member: string): boolean {

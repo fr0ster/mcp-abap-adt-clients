@@ -15,10 +15,6 @@
  * symbol-keyed member is written `[Symbol.asyncDispose]`. A member whose
  * decision depends on its arguments has one row per case,
  * `member[case]`, and its cases are listed in {@link ARGUMENT_DEPENDENT}.
- *
- * A row whose current behaviour differs from its decision names, in
- * {@link PENDING}, the assertion that does not hold yet and the task of the
- * plan that delivers it. Only that assertion runs as `it.failing`.
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
@@ -39,9 +35,6 @@ import {
   transportUri,
   versionsUri,
 } from '../../endpoints/objects';
-
-/** The assertions a row can be held to. */
-export type Assertion = 'sends nothing' | 'request' | 'body';
 
 /** One request a member sends. */
 export interface ExpectedRequest {
@@ -1515,12 +1508,3 @@ export const ARGUMENT_DEPENDENT: Record<
   'getUtils.readObjectMetadata': METADATA.cases,
   'getUtils.readObjectSource': SOURCE.cases,
 };
-
-/** An assertion a later task delivers, on the row it belongs to. */
-export interface Pending {
-  readonly row: string;
-  readonly assertion: Assertion;
-  readonly task: number;
-}
-
-export const PENDING: readonly Pending[] = [];

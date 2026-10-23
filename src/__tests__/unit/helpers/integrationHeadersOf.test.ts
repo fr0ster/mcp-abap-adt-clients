@@ -13,6 +13,7 @@ import * as ts from 'typescript';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
+import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
 import { AdtClass } from '../../../core/class/AdtClass';
 import { AdtFunctionIncludeLegacy } from '../../../core/functionInclude/AdtFunctionIncludeLegacy';
 import { AdtContentTypesBase } from '../../../core/shared/contentTypes';
@@ -23,8 +24,10 @@ import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
 import {
   headersOf,
   integrationHeadersOf,
+  REFUSED_WITHOUT_REQUEST,
   TEST_HEADERS,
 } from '../../helpers/adtHeaders';
+import { LEGACY_REFUSED } from '../../helpers/legacyMembers';
 
 /**
  * `integrationHeadersOf` is what every test that reaches SAP uses: a member
@@ -248,6 +251,55 @@ describe('integrationHeadersOf', () => {
     // refusals: each was called, and none sent a request.
     expect(refusals).toBeGreaterThan(50);
     expect(sentWithTestHeaders).toEqual([]);
+  });
+
+  /**
+   * `REFUSED_WITHOUT_REQUEST` and the inventory's refused rows are one list
+   * (spec §11.1 "Refusals"): every member a legacy class handler refuses is
+   * one `integrationHeadersOf` lets through without a pair, and no other. The
+   * inventory (`legacyMemberInventory.test.ts`) calls each of those rows and
+   * proves it sends nothing, so this agreement is what carries that proof
+   * here. Left out, each for its reason:
+   * - an `absentOnLegacy` object's rows — `isAbsentOnLegacy` recognises those
+   *   by their refusal, not by a list;
+   * - a row by case (`member[case]`) — that member sends for its other cases,
+   *   so a per-member entry would let a sending call go without a pair.
+   */
+  it('lets through exactly the members the inventory refuses on a legacy class handler', () => {
+    const conn = connection();
+    const owners: Record<string, object> = {};
+    for (const client of [
+      new AdtClientLegacy(conn, logger),
+      new AdtExecutorLegacy(conn, logger),
+    ]) {
+      for (const getter of Object.keys(LEGACY_REFUSED)) {
+        const make = (client as unknown as Record<string, unknown>)[getter];
+        if (typeof make === 'function') owners[getter] = make.call(client);
+      }
+    }
+    const fromInventory = new Set<string>();
+    for (const [getter, rows] of Object.entries(LEGACY_REFUSED)) {
+      const handler = owners[getter];
+      if (!handler) throw new Error(`No legacy getter ${getter}`);
+      if (Object.getPrototypeOf(handler) === Object.prototype) continue;
+      for (const member of Object.keys(rows)) {
+        if (member.endsWith(']')) continue;
+        let proto: object | null = handler;
+        while (proto && !Object.hasOwn(proto, member))
+          proto = Object.getPrototypeOf(proto);
+        const owner = (proto as { constructor?: { name?: string } } | null)
+          ?.constructor?.name;
+        fromInventory.add(`${owner}.${member}`);
+      }
+    }
+    const fromHelper = REFUSED_WITHOUT_REQUEST.flatMap(
+      ([implementation, members]) =>
+        members.map(
+          (member) => `${(implementation as { name?: string }).name}.${member}`,
+        ),
+    );
+    expect(fromHelper.length).toBeGreaterThan(30);
+    expect([...fromHelper].sort()).toEqual([...fromInventory].sort());
   });
 
   it('hands out the inherited stateless class update on a legacy client', () => {
