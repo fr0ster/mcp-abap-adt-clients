@@ -1,0 +1,664 @@
+# The legacy client on 7.40 SP04: what every member sends
+
+**Status:** proposed. Delete this file when it is implemented or abandoned.
+
+Prescriptive. Where it disagrees with the code, the code is what changes.
+
+Authority: the goal, `docs/superpowers/2026-10-23-legacy-740-goal.md`. Its
+invariants bind every decision here; where this spec could not ground a decision
+in a measurement, it says so and argues it from those invariants (§12).
+
+## 1. Scope and evidence
+
+**In scope:** every member that `AdtClientLegacy` and `AdtExecutorLegacy` hand
+out, through every getter, whether the handler is a `*Legacy` class, an
+`absentOnLegacy` stand-in or a modern handler inherited as it is.
+
+**Out of scope, with a decision of its own (§10):** the clients with no legacy
+variant — `AdtRuntimeClient`, the debuggers, memory snapshots,
+`AdtBatchConnection`, `AdtAbapGitClient`, `AdtClientsWS` — and the exported
+system probes.
+
+**Evidence.** Every claim "measured" below names the probe record it comes from.
+The records are JSONL, one line per step, kept beside the probe scripts outside
+this repository; the spec names them by file and step id:
+
+| record | what it ran | wire |
+|---|---|---|
+| `B1-summary.md` (`B1-20261022-1736`) | the library's reads through `AdtClientLegacy` | HTTP |
+| `B1b-gaps-20261023-1358` | raw requests to the endpoints the gap report lists | HTTP |
+| `B3-cycle-20261023-1544` | a class life cycle through the library, unit tests, deletion check, delete | RFC |
+| `B3-deletes-20261023-1601` | program, interface, function group, function module, DDL: delete without a lock, then with one | RFC |
+| `B3-deletes-lock-20261023-1612` | function group, function module, DDL: lock → delete with the handle → unlock | RFC |
+| `B3-unmeasured-20261023-1631` | unit tests of a program, function group, module; packages; transport list and create | RFC |
+| `B3-fugr-v1-20261023-1632` | the function group run again with a v1 function include holding tests | RFC |
+
+All measurements are from one SAP_BASIS 7.40 SP04 system. The static inventory
+of every endpoint the library sends, with file and line, is the gap report
+(`legacy-gap-report.md`, beside the records); its classification of an
+endpoint as *both*, *newOnly*, *legacyOnly* or *unlisted* (whether 7.40's
+`/sap/bc/adt/discovery` lists the collection the path belongs to) is used below
+as "advertised" / "not advertised". `docs/architecture/LEGACY.md`, "Measured on
+BASIS 7.40", holds earlier measurements on a BASIS 7.40 system whose support
+package it does not state; they are cited as such and never as "7.40 SP04".
+
+Two pieces of SAP's own code were read, locally: the class resource
+controller's `delete` takes the lock handle from the URL and refuses without a
+valid one, and reads `corrNr` from the URL unless the object is not
+transportable (`CL_OO_ADT_RC_CLASS`); the newer resource base takes a transient
+lock when a delete brings none (`CL_WB_ADT_REST_RESOURCE`). Which controllers
+on 7.40 derive from which base was not read; nothing below depends on it.
+
+## 2. How each member is decided
+
+Four outcomes, and the order they are tried in:
+
+1. **Measured served** — a run on 7.40 SP04 accepted the request the member
+   sends (or a request the member will send after this change). The member
+   sends exactly that. If it is the modern handler's request, the member is
+   **works as inherited**; if it differs, it is **fixed in a legacy override**.
+2. **Measured not served** — 7.40 SP04 answered 404/405/400-for-the-endpoint,
+   or a `200` with an empty body where a document belongs. The member is
+   **refused without a request**.
+3. **Not measured, advertised** — the request's path belongs to a collection
+   7.40's discovery lists. The member keeps the request (**not measured, kept**).
+   Reason: under an advertised family, every unmeasured-then-measured sub-path
+   that 7.40 lacked answered a **404** (`packages/{n}`, `usageReferences`,
+   `virtualfolders/contents`, `objecttypes`, `oo/classrun` — `B1b`, `B3-unmeasured`),
+   which the strict default reads as a failure. The worst case is an honest
+   failure, never a false success, so keeping it breaks no invariant and claims
+   nothing.
+4. **Not measured, not advertised** — the member is **refused without a
+   request until measured**. Reason: a path in a family 7.40 does not register
+   answered `200` with an empty body over HTTP in every measured case, ten
+   requests (`B1b` TR-6, DEL-1, DDIC-1, DDIC-2, ENH-1; `B1` XSLT, DSFD ×2, APPS ×2), and the
+   shipped `rawDocument` strategy reads that as success. Sending it would break
+   "no member reports success for an answer that carries nothing".
+
+A measurement overrides the discovery catalogue in both directions: `/deletion/*`
+is not advertised and is measured absent; `/packages/{name}` is advertised and
+measured absent; `/sap/bc/cts/*` is advertised and measured absent over HTTP.
+
+### 2.1 The refusal
+
+Every refusal here takes the shape the existing legacy refusals already have
+(`absentOnLegacy`, `AdtPackageLegacy`, `AdtRequestLegacy`, `AdtUtilsLegacy.refuse`,
+`refusedBelow750`): answered, never thrown, through `failed()`, with
+
+- `origin: 'refusal'`,
+- `code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION`,
+- a message that names the operation, the endpoint 7.40 lacks or answers
+  without content, and — where there is one — what to use instead.
+
+No request leaves, so `options.analyse` has nothing to read; it is accepted for
+the contract's shape, as today. One code for every refusal: a consumer branches
+on `UNSUPPORTED_OPERATION`, and the message is for people. No new error code.
+
+### 2.2 Where the differences live
+
+Only in legacy classes: `*Legacy` subclasses that override the members that
+differ, `absentOnLegacy` for a type 7.40 does not have, and the legacy client's
+and executor's getters that hand them out. Nothing in a main handler, in
+`src/core/shared/*` functions the modern handlers call, in the connection, or in
+a header pair. The pairs stay the caller's (`options.headers`, since 36.0.0).
+
+New legacy classes this spec needs: `AdtIncludeLegacy`,
+`AdtFunctionIncludeLegacy`, `AdtMessageClassLegacy`, `ClassExecutorLegacy`,
+`ProgramExecutorLegacy`. Each is a subclass that overrides only the members
+below; `AdtClientLegacy` and `AdtExecutorLegacy` override the getters that
+return them.
+
+## 3. The wire: how the legacy client knows RFC from HTTP
+
+**It cannot tell, and must not guess.** `IAbapConnection` carries no member that
+names its wire. The concrete connection of `@mcp-abap-adt/connection` has a
+transport with `kind = 'rfc'`, but reading it would bind this library to one
+implementation of the contract (interface-only communication), and a
+consumer's own connection, a batch recorder or a test stub has none.
+`getBaseUrl()`, `getSessionId()` and cookies are not statements about the wire;
+reading meaning into them is the guessing the goal forbids.
+
+**Decision: the consumer declares it.** `AdtClientLegacy` takes
+`IAdtClientLegacyOptions`, declared in adt-clients beside the class (it is a
+legacy concern, so it does not go into `interfaces-adt`'s `IAdtClientOptions`):
+
+```typescript
+interface IAdtClientLegacyOptions extends IAdtClientOptions {
+  /** The wire the connection speaks. Required: nothing here can read it. */
+  wire: 'rfc' | 'http';
+}
+```
+
+- **Required**, no default. A default would be a guess about the consumer's
+  connection, and both values change what members do.
+- `createAdtClient(connection, logger, options)` takes an optional `wire` beside
+  `IAdtClientOptions`. A modern system ignores it. A legacy system without it is
+  a caller argument missing before the legacy client can be built, so
+  `createAdtClient` **throws** a library error naming `options.wire` — after
+  its one probe request, which is the factory's own and unchanged. It never
+  builds a legacy client with a wire it assumed.
+- `AdtExecutorLegacy` takes no wire: nothing it hands out depends on one (§6).
+
+What the wire changes: transports (§7) and the HTTP write refusal (§9).
+
+*Rejected:* a capability atom on the connection contract
+(`interfaces-adt-connection`, e.g. a readonly `wire`), implemented by
+`@mcp-abap-adt/connection`. The connection is what really knows its wire, but a
+connection that does not implement the atom leaves the library guessing again,
+so the explicit option is needed anyway; the atom can come later and feed the
+option, not replace it.
+
+## 4. Delete
+
+### 4.1 What 7.40 SP04 does
+
+- `DELETE <object>` **without** a lock handle answers `400`
+  "Parameter lockHandle could not be found." for a class (`B3-cycle` s8-delete), a
+  program (`B3-deletes-1601` p2c), an interface (i2c) and a function group (g2c).
+- Without a handle, a function module (m2c) and a DDL source (d2c) answered `200`
+  and were gone.
+- `LOCK` (stateful) → `DELETE <object>?lockHandle=…` (stateless) → `UNLOCK`
+  (stateful) deleted all six: class (`B3-cycle` c1–c4), program (p2e), interface
+  (i2e), function group (`B3-deletes-1601` g2e, `B3-deletes-lock-1612` g2e), function module
+  (`B3-deletes-lock-1612` m2e, `B3-fugr-v1` a2-9), DDL (`B3-deletes-lock-1612` d2e);
+  the read afterwards answered `404` each time. The `UNLOCK` after a successful
+  delete answered `200`.
+
+### 4.2 Decision: the consumer's lock handle, one request
+
+The six legacy `delete` overrides (`AdtClassLegacy`, `AdtProgramLegacy`,
+`AdtInterfaceLegacy`, `AdtFunctionGroupLegacy`, `AdtFunctionModuleLegacy`,
+`AdtDdlLegacy`) keep sending what they send today, which is the measured
+request: `DELETE <object URI>?lockHandle=<options.lockHandle>[&corrNr=<transportRequest>]`,
+stateless, the caller's header pair, the caller's `options.timeout` and no
+deadline of the library's. **Works as overridden — measured**; the change is
+to their documentation and tests.
+
+The handle is **the consumer's**, from `lock()`, passed as `options.lockHandle`.
+The handler does not lock on its own:
+
+- *One endpoint, one member.* `delete` is the DELETE; `lock`/`unlock` are the
+  lock window; nothing composes them for the caller (CLAUDE.md, "One endpoint,
+  one member"). A delete that locked, deleted and unlocked would be three
+  requests in one member and a lock window the consumer cannot see.
+- *The session rule.* Only `LOCK` and `UNLOCK` are stateful; the measured
+  sequence had the DELETE stateless between them. A self-locking delete would
+  have to manage that window inside a member.
+- *No fallback.* The goal: "the delete with a lock is the delete, not a
+  fallback after a failed one". A delete that retried with a lock after a `400`
+  is exactly that fallback.
+
+**Without a handle the request still goes**, unchanged. SAP's `400` reaches the
+consumer through the strategy as the failure it is (measured: `ok: false`,
+`origin: 'connection'`, status `400`), and a function module or DDL source is
+deleted as 7.40 deletes it. Refusing a handle-less delete in the library would
+add a rule 7.40 itself contradicts for two of the six types, and the answer is
+not empty, so no invariant asks for a refusal.
+
+**`corrNr`.** Sent when `transportRequest` is given, as today. The class
+controller reads it from the URL (SAP code), but every probe ran in a local
+package, so a delete with `corrNr` is **not measured**; kept (§12).
+
+### 4.3 The other deletes
+
+| member | today | decision |
+|---|---|---|
+| `getInclude().delete` | `POST /deletion/delete` | **refused without a request** — `/deletion/*` is not served (§5) |
+| `getFunctionInclude().delete` | `POST /deletion/check`, then `/deletion/delete` | **refused without a request** |
+| `getMessageClass().delete` | `POST /deletion/check`, then `/deletion/delete` | **refused without a request** |
+| `getUtils().deleteObjectsGroup` | `POST /deletion/check`, then `/deletion/delete` | **refused without a request** |
+| `getPackage().delete` | refused | refused (§8) |
+| `getRequest().delete` | refused | refused (§7) |
+| `getMessageClassMessage().delete` | read, two locks, `PUT` of the class, two unlocks | **not measured, kept**: no `/deletion/*`; its endpoints are advertised |
+| `getLocalTestClass/Types/Definitions/Macros().delete` | `update` with empty source | **kept**: the write is the include `PUT`, measured for the test-class include (`B3-cycle` s3-update) |
+
+A direct `DELETE <object>?lockHandle=` on an include, a function include or a
+message class is the obvious candidate replacement and is **not measured**. It
+is not implemented on inference: the goal's "only what was measured". The live
+check in §11.2 measures it; if it is measured to work before the release, the
+three refusals become overrides of the §4.2 kind in `AdtIncludeLegacy`,
+`AdtFunctionIncludeLegacy` and `AdtMessageClassLegacy`, and this table is
+amended. Not measured by the release, they ship refused.
+
+## 5. `checkDeletion`
+
+7.40 SP04 has no deletion API: `POST /sap/bc/adt/deletion/check` answered
+`404` "No application class found for URI" over RFC (`B3-cycle` s7-checkDeletion)
+and `200` with an empty body over HTTP (`B1b` DEL-1). Today every legacy
+`checkDeletion` sends it, and over HTTP the empty `200` reads as success — an
+approval nobody gave.
+
+**Decision: refused without a request**, on every handler the legacy client
+hands out that has the member: class, program, interface, function group,
+function module, DDL source, package, include, function include, message
+class; and `getUtils().checkDeletionGroup`. The message says that 7.40 has no
+deletion check and that `delete` with the object's lock handle is the delete.
+`getRequest().checkDeletion` is refused with the transport members (§7).
+
+## 6. ABAP Unit runners and executors
+
+### 6.1 What 7.40 SP04 does
+
+- `POST /sap/bc/adt/abapunit/testruns`, `application/xml` both ways:
+  - for a class, **without** `<options>` (the body `ClassTestRunnerLegacy` sends),
+    answered the finished result: two methods, one alert (`B3-cycle` s6a-run,
+    s6b-runSync);
+  - for a program, **with** `<options>` (the body `startUnitTestRunSync` builds
+    when given options, defaults filled), answered two methods, one alert
+    (`B3-unmeasured` a1-6);
+  - for a function group and for a function module, with `<options>`, answered
+    two methods, one alert (`B3-fugr-v1` a2-7, a2-8) once the group held a test
+    include; without one, `noTestClasses` and no methods (`B3-unmeasured` a2-7,
+    a2-8) — the right answer for a group without tests. The module's URI ran the
+    group's tests, as the modern runner's JSDoc records for SAP_BASIS 816.
+- `/abapunit/runs` and `/abapunit/results` are not advertised; nothing polls.
+
+### 6.2 Decisions
+
+| runner.member | today | decision |
+|---|---|---|
+| class `run`, `runSync` | testruns without `<options>` | **works as overridden — measured**; unchanged |
+| class `getStatus`, `getResult` | refused | refused, unchanged |
+| program `runSync` | refused | **works as inherited — measured**: remove the override; the modern `runSync` sends `startSync([PROGRAM.uri(name)], options)`, the measured body |
+| program `run` | refused | **fixed in the legacy override**: the same request as `runSync`, read by the `run` strategy — what the class runner already does, because on 7.40 the testruns POST is the run |
+| function group `runSync` | refused | **works as inherited — measured**: remove the override |
+| function group `run` | refused | **fixed in the legacy override**, as program `run` |
+| function module `runSync` | refused | **works as inherited — measured**: remove the override |
+| function module `run` | refused | **refused**, with a new reason: `run(functionModuleName)` takes no function group, and the measured request needs the module's URI, which lies under its group. The message points to `runSync({ functionGroupName, functionModuleName })` |
+| program, group, module `getStatus`, `getResult` | refused | refused, with the class runner's reason — a legacy run is answered finished; there is no run id |
+
+The program and group `run` overrides belong in the legacy classes: the modern
+`run` is the asynchronous `/runs` request, which is right on modern systems,
+and the difference is 7.40's. `refusedBelow750`'s message ("answered no tests
+where there are some") was measured without `<options>` and is now wrong for
+these runners; it stays only if some member still uses it with a true reason,
+otherwise it goes.
+
+The class runner keeps its body without `<options>`: that is what was measured
+for a class. It means a caller's `scope`, risk levels and durations do not reach
+a legacy class run — the member drops options it accepts. Sending `<options>`
+for a class is not measured; see §12.
+
+### 6.3 Executors
+
+`AdtExecutorLegacy` gets `getClassExecutor` and `getProgramExecutor` overrides
+returning `ClassExecutorLegacy` and `ProgramExecutorLegacy`.
+
+| member | endpoint | decision |
+|---|---|---|
+| class `run`, `runWithProfiler` | `/sap/bc/adt/oo/classrun/{c}` | **refused without a request — measured**: 7.40 has neither `IF_OO_ADT_CLASSRUN` nor `/oo/classrun` (`B1b` RUN-0: `404` "No suitable resource found"; the goal, measurement 7) |
+| program `run`, `runWithProfiler` | `/sap/bc/adt/programs/programrun/{p}` | **refused until measured**: not advertised (rule 4) |
+| class/program `listObjectTypes`, `listProcessTypes` | `…/abaptraces/objecttypes`, `/processtypes` | **refused until measured**: not advertised (rule 4) |
+| class/program `listRequests`, `getRequestsByUri`, `scheduleTrace` | `…/abaptraces/requests`, `/parameters` | **not measured, kept**: advertised; the trace list `GET …/abaptraces` answered a feed (`B1b` TRC-1) |
+
+`programrun` is refused only because nothing measured it; the live check in
+§11.2 can flip it.
+
+## 7. Transports
+
+### 7.1 What 7.40 SP04 does
+
+- Over **HTTP**, every `/sap/bc/cts/*` path answered `404` with the ICF error
+  page before any logon (`B1b` TR-1 … TR-5). The modern `/sap/bc/adt/cts/transportrequests`
+  answered `200`, empty (TR-6).
+- Over **RFC**, `GET /sap/bc/cts/transportrequests` answered `200` with a
+  `tm:root` document, with and without `?user=` (`B3-unmeasured` c1-1, c1-2).
+- Over RFC, `POST /sap/bc/cts/transportrequests` with the modern create's
+  document answered `400` "user action is not supported" (c2-1).
+- Updating and deleting a request were not reached: nothing was created to act
+  on.
+
+### 7.2 Decisions (`AdtRequestLegacy`)
+
+| member | wire `rfc` | wire `http` |
+|---|---|---|
+| `list` | **works as overridden — measured** (`GET /sap/bc/cts/transportrequests`; `configUri` still refused) | **refused without a request — measured** |
+| `readMetadata` | **works as overridden** — the same GET as `list`, measured; it answers the user's list, as its JSDoc says | **refused — measured** |
+| `create` | refused — **measured** | refused |
+| `updateMetadata`, `delete` | refused — not measured; the goal: create and modify refused | refused |
+| `searchConfigurations`, `checkDeletion`, `readObjects`, `readActionLog` | **refused without a request**: `/sap/bc/adt/cts/*` is not advertised, and over HTTP answered an empty `200` (TR-6). Today they send it | refused |
+| `addObject`, `removeObject`, `moveObjects`, `sortAndCompress`, `createTask`, `changeTaskType` | **refused without a request**, for the same reason, and because they modify | refused |
+
+So over RFC a legacy client lists and reads, and over HTTP it does nothing with
+transports. The list's content is answered as it arrived; the measured user had
+no requests, so how a populated list looks — and whether `transportTree` reads
+it — is not measured (§12).
+
+## 8. Packages (`AdtPackageLegacy`)
+
+7.40 SP04: `GET /sap/bc/adt/packages/{name}` answered `404` "No suitable
+resource found" over HTTP (`B1` R-PKG-1) and RFC (`B3-unmeasured` b1-2, b2-0);
+`POST /sap/bc/adt/packages` answered `405` "Resource controller does not support
+method Create" (b2-1). The item resource is not served, although the collection
+is advertised. Package contents come through `repository/nodestructure` with
+`parent_type=DEVC/K` (b1-3, `200`, sixteen nodes) — another endpoint family, so
+`getPackage()` does not offer them (the goal).
+
+| member | today | decision |
+|---|---|---|
+| `create`, `readMetadata`, `updateMetadata`, `delete`, `validate` | refused | refused — measured for read and create |
+| `lock`, `unlock`, `readTransport` | sent to `/packages/{name}` | **refused without a request**: the item resource answered `404` to the read; its `?_action=LOCK` and `/transport` are on the same resource. Not measured themselves (§12) |
+| `check` | `POST /checkruns` naming `/packages/{name}` | **refused without a request**, with the handler: a check of an object 7.40 cannot address through ADT. Not measured (§12) |
+| `checkDeletion` | `POST /deletion/check` | **refused — measured** (§5) |
+| `read` (declared only here; `AdtPackage` has none) | refused | **removed**: it answers for a member no contract declares |
+
+The class header is corrected: what is refused and why, on the measurements
+above, instead of "all package operations … do not return usable results over
+RFC".
+
+## 9. Writes over HTTP
+
+The goal: "RFC writes, HTTP reads. Writes on legacy are supported over RFC; over
+HTTP legacy is read-only." Measured earlier on a BASIS 7.40 system
+(`LEGACY.md`): over HTTP `LOCK` answers a handle that the next `PUT` refuses
+with `423` in every session shape a client can choose. On 7.40 SP04 every write
+was measured over RFC only.
+
+**Decision: with `wire: 'http'`, every write member of the legacy client
+answers the refusal without a request.** The writes are `create`, `update`,
+`updateMetadata`, `delete`, `lock`, `unlock`, `activate`,
+`activateTestClasses`, `getUtils().activateObjectsGroup`, and the message class
+message's `create`/`update`/`delete` and the local includes' `update`/`delete`.
+Reads, `check` and `validate` are unaffected. The message says that a legacy
+system is written over RFC.
+
+The refusal is applied by the legacy client when it builds a handler, in one
+place of the `absentOnLegacy` kind (a function in `src/clients/` that, for wire
+`http`, replaces the named write members of a handler with the refusal and
+leaves the rest as they are), so every handler — `*Legacy` class or inherited —
+gets it without a legacy branch in a main handler. With `wire: 'rfc'` nothing
+is replaced.
+
+This is the one decision of the spec that refuses members nobody measured
+failing over HTTP on 7.40 SP04 (create, delete, activate); it rests on the
+goal's invariant and the earlier `423` measurement. See §12.
+
+## 10. Every other member the legacy client hands out
+
+### 10.1 Types with an empty answer: `absentOnLegacy`
+
+| getter | endpoint | evidence | decision |
+|---|---|---|---|
+| `getTransformation()` | `/sap/bc/adt/xslt/transformations` | `200`, empty, and the library said `ok: true` (`B1` R-GET-XSLT) | **refused — absentOnLegacy** |
+| `getScalarFunction()` | `/sap/bc/adt/ddic/dsfd/sources` | `200`, empty, `ok: true` (`B1` R-GET-DSFD ×2) | **refused — absentOnLegacy** |
+| `getScalarFunctionImplementation()` | `/sap/bc/adt/ddic/dsfi` | not measured; not advertised | **refused until measured — absentOnLegacy** (rule 4) |
+| `getAppendStructure()` | `/sap/bc/adt/ddic/structures` | `200`, empty, `ok: true` (`B1` R-GET-APPS ×2) | **refused — absentOnLegacy**; `getStructure()`, on the same collection, already is |
+| `getEnhancement()` | `/sap/bc/adt/enhancements/*` | `200`, empty (`B1b` ENH-1) | already `absentOnLegacy`; now measured |
+| `getDomain()`, `getTable()` | `/ddic/domains`, `/ddic/tables` | `200`, empty (`B1b` DDIC-2, DDIC-1) | already `absentOnLegacy`; now measured |
+| `getDataElement()`, `getStructure()`, `getTableType()` and the other nine | — | not advertised | already `absentOnLegacy`, unchanged |
+
+### 10.2 `getUtils()` — `AdtUtilsLegacy`
+
+| member | decision |
+|---|---|
+| `search`, `fetchNodeStructure`, `getObjectStructure`, `discovery`, `getInactiveObjects` | **works as inherited — measured** (`B1`, `B1b` INAC-1, `B3-cycle` s0-search, `B3-unmeasured` b1-3) |
+| `activateObjectsGroup` (legacy override) | works as overridden — measured earlier on BASIS 7.40 (`LEGACY.md`); not in a 7.40 SP04 record (§12) |
+| `getInclude` | not measured, kept (`/programs/includes`, advertised) |
+| `getWhereUsed`, `getWhereUsedScope` | **refused — measured**: `usageReferences` answered `404` (`B1b` WU-1). 7.40 serves where-used only through RIS (`fullnamemapping` → `metadata` → `whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY`), another endpoint family; the message names it |
+| `modifyWhereUsedScope` | **kept**: it edits XML the caller holds and sends nothing |
+| `getVirtualFoldersContents` | **refused — measured**: `404` (`B1b` VF-1); package contents are `fetchNodeStructure` with `DEVC/K` |
+| `getAllTypes` | **refused — measured**: `objecttypes` answered `404` (`B1b` TYPES-1); 7.40 has `repository/typestructure`, another family |
+| `getActivationRun`, `getActivationResults` | **refused**: a legacy group activation is synchronous and yields no run id (the override; `LEGACY.md`), and `/activation/runs`, `/results` are not advertised |
+| `checkDeletionGroup`, `deleteObjectsGroup` | **refused — measured** (§5, §4.3) |
+| `readObjectMetadata` for `domain`, `dataelement`, `structure`, `table`, `tabletype`, `package` | **refused for those types**, answered rather than thrown (a known type 7.40 lacks is a normal case; an unknown type stays the caller's mistake and is thrown as today): `200` empty for domain (`B1b` DDIC-2), `404` for package (§8), not advertised for the rest |
+| `readObjectSource` for `structure`, `table`, `tabletype` | **refused for those types**: `200` empty for a table's source (`B1b` DDIC-1), not advertised for the rest |
+| `readObjectMetadata`/`readObjectSource` for the other types | works as inherited — measured through the handlers, which send the same request (`objectWire`): `B1` R-GET-*, `B3-deletes` *-read |
+| `getTableColumns`, `getTableContents`, `getSqlQuery`, `getObjectProperties` | refused, unchanged |
+| `supportsSourceCode`, `getObjectSourceUri` | kept: pure, they describe ADT's addressing and send nothing |
+
+### 10.3 Object handlers, member by member
+
+"Measured" cites the record; "kept" is rule 3. Deletes, deletion checks and
+HTTP writes are §4, §5 and §9 and are not repeated.
+
+| handler | works — measured | not measured, kept |
+|---|---|---|
+| class (`AdtClassLegacy`) | `create` (`B3-cycle` s1), `lock`/`unlock` (s2), `update` — stateless `PUT ?lockHandle=` (s2-update), `activate` (s4), `check` (s5), `read` (s9, `B1` R-GET-CLAS), `readMetadata` (`B1`) | `validate`, `getVersions`, `getVersionSource`, `readTransport`, `activateTestClasses`, `readEnhancementElements`, `readEnhancementOptions` |
+| local test class, types, definitions, macros | `read` ×4 (`B1` R-GET-LOCL), test class `update` (s3-update) and `check` (s5-check-testclasses) | the others' `update`/`check`, `validate`, `getVersions` |
+| program (`AdtProgramLegacy`) | `create`, `lock`, `update`, `unlock` (`B3-deletes` p1), `activate` (`B3-unmeasured` a1-3), `read`/`readMetadata` (`B1`), `getVersions` (`B1b` VER-1) | `validate`, `check`, `getVersionSource`, `readTransport`, enhancement readers |
+| interface (`AdtInterfaceLegacy`) | `create` (`B3-deletes` i1), `lock`/`unlock` (i2e), `read`/`readMetadata` (`B1`) | `update`, `activate`, `check`, `validate`, versions, `readTransport` |
+| function group (`AdtFunctionGroupLegacy`) | `create`, `lock`/`unlock` (`B3-deletes`), `activate` (`B3-unmeasured` a2-6), `readMetadata` (`B1`) | `updateMetadata`, `check`, `validate`, `readTransport`, enhancement readers |
+| function module (`AdtFunctionModuleLegacy`) | `create`, `lock`, `update`, `unlock` (`B3-deletes` m1), `activate` (`B3-fugr-v1` a2-6), `read`/`readMetadata` (`B1`) | `check`, `validate`, versions, `readTransport` |
+| DDL source (`AdtDdlLegacy`) | `create`, `lock`, `update`, `unlock` (`B3-deletes` d1), `read`/`readMetadata` (`B1`) | `activate`, `check`, `validate`, versions, `readTransport`; `checkCdsTestDoubles` stays refused |
+| function include (`AdtFunctionIncludeLegacy`, new) | `create` with the v1 pair (§10.4), `lock`, `update`, `unlock` (`B3-fugr-v1` a2-5), `activate` (a2-6), `read` (`B1` R-GET-FINC) | `readMetadata`, `updateMetadata`, `check`, `validate`, versions |
+| include (`AdtIncludeLegacy`, new) | `read` (`B1` R-GET-INCL) | `create`, `update`, `lock`, `unlock`, `activate`, `validate`, `readMetadata`, enhancement readers |
+| message class (`AdtMessageClassLegacy`, new) | `readMetadata` (`B1` R-GET-MSAG) | `create`, `updateMetadata`, `lock`, `unlock`, `validate` |
+| message class message | `read` (`B1`, answers the whole class) | `create`, `update`, `delete`, `readMetadata` |
+
+`AdtClassLegacy.update` is an override that only calls `super.update` while its
+JSDoc says it holds one stateful session. The measured `PUT` is the inherited
+stateless one, so the override and its comment are **deleted**; the note about
+HTTP locks (GitHub #11) moves to `LEGACY.md`, where the HTTP measurement is.
+
+The enhancement readers are kept by rule 3 although 7.40 advertises no
+enhancement collection at all: their path is under the object's own advertised
+collection, where an absent sub-resource answered `404`, not an empty `200`.
+§12 lists them for measurement first.
+
+### 10.4 Function include create: the caller's v1 pair
+
+7.40 SP04 refused the v2 type — `400` "No content handler found for content type
+'application/vnd.sap.adt.functions.fincludes.v2+xml'" (`B3-unmeasured` a2-4) — and
+created the include with `application/vnd.sap.adt.functions.fincludes+xml` both
+ways (`B3-fugr-v1` a2-4, `200`).
+
+**The library sends what the caller passes** (36.0.0: the pair is the
+caller's), so `create` needs no override for it, and the header pairs get no
+legacy branch. What changes:
+
+- `AdtFunctionIncludeLegacy` exists (for §4.3 and §5), so the integration helper
+  `src/__tests__/helpers/adtHeaders.ts` records `AdtFunctionIncludeLegacy.create`
+  with the v1 pair, as it records the other `*Legacy` members; a legacy run
+  then passes what 7.40 accepts.
+- `LEGACY.md` states the measured pair; its footnote 4, which still says the
+  create sends v2 "straight from constants/contentTypes.ts", is replaced.
+
+### 10.5 Outside the legacy client
+
+`AdtRuntimeClient`, `AbapDebugger`, `AmdpDebugger`, `MemorySnapshots`,
+`AdtBatchConnection`, `AdtAbapGitClient` and `AdtClientsWS` have no legacy
+variant, and the goal binds the legacy client and executors only. **Decision:
+no legacy variant in this work.** Measured on 7.40 SP04 over HTTP: feeds
+(`B1b` FEED-1), runtime dumps list (DUMP-1, although not advertised) and the
+profiler's trace list (TRC-1) answered documents. Every other family in the gap
+report's section 2.8 is not measured, and most are not advertised. `LEGACY.md`
+gets a table of these families with what was measured and what was not, and
+says that on a legacy system a consumer calls only the measured ones. A legacy
+runtime client that refuses the rest would be its own goal; it is reported to
+the owner, not built here (§13).
+
+`getSystemInformation` and `isModernAdtSystem` are unchanged: the second's
+reading of `core/discovery` is measured over HTTP (`B1` R-CORE: `200 text/html`,
+empty → legacy).
+
+## 11. Tests
+
+### 11.1 Unit tests (no SAP) — each pins one decision
+
+All on a recording connection, the pattern of `legacyDeleteTimeout.test.ts`:
+they assert what leaves the wire (method, URL, query, body, headers) or that
+nothing does.
+
+- **Delete:** the six legacy deletes send exactly one `DELETE <uri>?lockHandle=<h>`,
+  plus `&corrNr=` when a transport is given, and no `lockHandle` when none is;
+  none calls `setSessionType`; none sends a `LOCK`. Extends
+  `legacyDeleteTimeout.test.ts`.
+- **Refusals:** one table-driven test over every member this spec refuses —
+  per handler and member, `ok: false`, `origin: 'refusal'`,
+  `UNSUPPORTED_OPERATION`, zero requests. The table *is* the list in §4–§10, so
+  a refused member removed from the code fails it. `REFUSED_WITHOUT_REQUEST` in
+  `adtHeaders.ts` is extended to the same members, and
+  `integrationHeadersOf.test.ts` keeps proving each one sends nothing.
+- **absentOnLegacy:** `legacyAbsentTypes.test.ts` gains transformation, scalar
+  function, scalar function implementation and append structure.
+- **Runners:** `programTestRunner.test.ts`, `functionTestRunners.test.ts`,
+  `syncTestRunners.test.ts`: the legacy program and group `run` and `runSync`
+  send one `POST /abapunit/testruns` with `<options>`, byte for byte the
+  modern `runSync` body for that URI; `run` is read by `run`, `runSync` by
+  `result`; the module's `run`, and every `getStatus`/`getResult`, refuse.
+  `classTestRunner.test.ts` keeps pinning the class body without `<options>`.
+- **Executors:** the legacy executor hands out `ClassExecutorLegacy` and
+  `ProgramExecutorLegacy`; their refused members send nothing; `listRequests`,
+  `getRequestsByUri`, `scheduleTrace` send what the modern ones send.
+- **Transports:** `legacyList.test.ts`: over `rfc`, `list`/`readMetadata`
+  send `GET /sap/bc/cts/transportrequests`; over `http`, nothing; every other
+  member refuses on both.
+- **The wire:** `new AdtClientLegacy(connection)` without `wire` does not
+  compile (an `@ts-expect-error` line under `test:check`, as
+  `transport/updateDelete.test.ts` does); `createAdtClient` on a connection whose probe answers a legacy
+  `core/discovery` throws without `wire` and builds the legacy client with it;
+  with `wire: 'http'` every write member of every handler refuses and every
+  read member sends its request (one table over the handlers); with `'rfc'`
+  nothing is replaced.
+- **Utilities:** `readObjectMetadata`/`readObjectSource` refuse for the listed
+  types and send for the rest; an unknown type still throws.
+- **No legacy branch in main code:** a source test (TypeScript parser, like
+  `noHardcodedObjectAddresses.test.ts`) that no file outside the `*Legacy`
+  classes, `absentOnLegacy`, the legacy wire guard and the two legacy clients
+  mentions `wire`, `Legacy` or `/sap/bc/cts`.
+- **Capabilities:** `capabilities/completeness.test.ts` and `behaviour.test.ts`
+  cover the new legacy classes like the existing ones (every member issues the
+  request its capability names, or is listed as refused).
+
+### 11.2 Live checks on a 7.40 SP04 system
+
+Each states where it runs: it runs when `test-config.yaml` says
+`is_legacy: true` and `connection_type: "rfc"` (or `"http"` for the read
+checks), and skips elsewhere with that reason. The integration helper builds
+the legacy client with `wire` from `connection_type`.
+
+Confirming what is measured (regressions):
+
+- the six deletes: lock → delete with the handle → unlock → read `404`; and a
+  delete without a handle answering `400` for class, program, interface,
+  function group;
+- `checkDeletion` and the other refused members send nothing (asserted on the
+  wire recorder, not on a log);
+- the program and group `run`/`runSync` and the module `runSync` answer the
+  methods of an object with tests; the class runner as today;
+- the function include created with the v1 pair, written, activated;
+- transports: `list` over RFC; refused over HTTP;
+- the empty-`200` handlers refuse; reads that work keep working over HTTP.
+
+Measuring what is not (each can flip a decision before the release; a probe
+script under `scripts/` holds the request, as the repo's rule for measurements
+asks):
+
+- direct `DELETE ?lockHandle=` of an include, a function include, a message
+  class (§4.3);
+- a delete with `corrNr` in a transportable package (§4.2);
+- package `lock`, `readTransport`, `check` (§8);
+- the class runner with `<options>` (§6.2);
+- `programrun`, trace `objecttypes`/`processtypes` (§6.3);
+- the enhancement readers on a program and a class (§10.3);
+- a populated transport list and `readMetadata` over RFC (§7.2);
+- `create`, `delete`, `activate` over HTTP (§9), to state the HTTP refusal as
+  measured rather than as the goal's rule;
+- `activateObjectsGroup` on 7.40 SP04 (§10.2).
+
+## 12. Not measured — the decisions taken without a measurement
+
+| member(s) | decision | argued from |
+|---|---|---|
+| delete with `corrNr` | kept: sent when `transportRequest` is given | SAP's class controller reads it; removing it would break a transportable delete that likely works; rule 3 |
+| include, function include, message class `delete` | refused until measured | "only what was measured"; today's `/deletion/*` is measured absent, and a direct DELETE is an inference |
+| package `lock`, `unlock`, `readTransport`, `check` | refused | the item resource they address answered `404` to a read; the handler is refused as a whole on 7.40 |
+| class runner with `<options>` | unchanged (no `<options>`) | measured without; the drop of caller options is reported (§13) |
+| function module `run` | refused | not a 7.40 statement: the member's argument cannot address the measured request |
+| `programrun`, `objecttypes`, `processtypes` | refused until measured | rule 4: not advertised |
+| `getScalarFunctionImplementation()` | refused until measured | rule 4: not advertised; its sibling is measured empty |
+| `readObjectMetadata`/`Source` for data element, structure, table type | refused | rule 4; their family is measured empty for domain and table |
+| `getActivationRun`, `getActivationResults` | refused | the legacy group activation has no run id (code); not advertised |
+| enhancement readers, `readTransport`, versions other than program's, `validate`, the unmeasured `check`s and `activate`s | kept | rule 3: under advertised collections; worst case a `404` read strictly |
+| `getRequest()` `updateMetadata`, `delete` | refused | the goal: over RFC create and modify are refused |
+| the other `getRequest()` members | refused | rule 4 (not advertised; measured empty over HTTP) |
+| HTTP writes | refused with `wire: 'http'` | the goal's "HTTP reads"; update measured `423` over HTTP earlier on BASIS 7.40 |
+| the wire | an explicit required option | the contract cannot tell; the provider does not guess |
+| runtime, debuggers, batch, abapGit, WS | no legacy variant; documented | outside the goal |
+| `activateObjectsGroup` | kept | measured on BASIS 7.40 earlier; not in a 7.40 SP04 record |
+
+## 13. Found while writing this
+
+- **Stale documentation, corrected by this work:** `deleteLegacy.ts` and
+  `LEGACY.md` ("a delete needs no lock", "Create and delete need no lock") —
+  four of six types refuse a delete without one; the `getRequest` JSDoc in
+  `AdtClientLegacy` refuses a `listNodes` that `AdtRequest` does not have and
+  omits ten inherited members; the `AdtPackageLegacy` header; the
+  `AdtClassLegacy` header and `update` JSDoc; `AdtExecutorLegacy`'s header and
+  `refusedBelow750`'s message; `LEGACY.md`'s support matrix (package read,
+  update and delete marked ✅; function include create ❌ with an outdated cause;
+  `readObjectMetadata` given an informationsystem path it does not use; the
+  architecture sketch's "throw error"), its "Unblocked but endpoint is absent"
+  table, and README's "the legacy one differs only in the test runner".
+- **The class runner drops caller options** (`scope`, risk levels, durations)
+  on a legacy system, silently. Kept until the class body with `<options>` is
+  measured; then the class runner sends it like the others.
+- **The legacy runtime is unguarded:** `AdtRuntimeClient` and the debuggers on
+  a 7.40 system send modern requests, and some of those families are likely to
+  answer an empty `200` over HTTP. Outside this goal; for the owner to decide
+  whether it is a goal of its own.
+- **"No timeouts" and `options.timeout`:** the legacy deletes carry the
+  caller's `options.timeout` (`withCallTimeout`, pinned by
+  `legacyDeleteTimeout.test.ts`). Read as the goal intends — no deadline of the
+  library's choosing — this stays; the caller's own deadline is the caller's.
+
+## 14. Docs
+
+- `docs/architecture/LEGACY.md` — rewritten around this spec: the wire option;
+  the support matrix per handler and member with "measured on 7.40 SP04",
+  "not measured" or "refused"; the delete sequence (lock → delete with the
+  handle → unlock) with an example; the measured function include pair; the
+  transport table by wire; the runtime families table (§10.5); a "Measured on
+  7.40 SP04" section next to the earlier "Measured on BASIS 7.40", kept as it is
+  and labelled with what it does not state.
+- `README.md` — the executor bullet, the unit-test runner paragraphs (legacy
+  `run`/`runSync` for program, group, module), the legacy client's construction
+  with `wire`.
+- `docs/usage/RFC_CONNECTION.md` — building a legacy client over RFC with
+  `wire: 'rfc'`; over HTTP read-only.
+- `docs/usage/OBJECT_LIFECYCLE.md` — the legacy delete needs the object's lock
+  handle; no `checkDeletion` on legacy.
+- `docs/usage/CLIENT_API_REFERENCE.md` and `docs/usage/ADT_OBJECT_ENTITIES.md`
+  — wherever they list legacy support per type.
+- `docs/development/RFC_TESTING.md`, `TEST_CONFIG_SCHEMA.md` — the live checks
+  and how `connection_type` reaches `wire`.
+- `docs/usage/MIGRATION-<major>.md` — what a consumer on 37.x does: pass
+  `wire`; stop calling `checkDeletion` on legacy and lock before `delete`;
+  where-used, virtual folders and object types are refused; the list of members
+  that sent a request and now refuse, and the runners that refused and now
+  send.
+- `CHANGELOG.md` — one entry: the measured basis ("on 7.40 SP04"), the
+  refusals, the fixes, the wire option, the migration link. The version is the
+  owner's to name (CLAUDE.md).
+
+## 15. Versioning
+
+**A major.** The public API changes in both kinds a semver major covers:
+
+- **Type:** `AdtClientLegacy`'s options gain a required `wire`, so
+  `new AdtClientLegacy(connection, logger)` stops compiling; `AdtPackageLegacy.read`
+  goes; getters return new subclasses (assignable to the old types, so not
+  breaking by themselves).
+- **Behaviour:** about forty members that sent a request now answer a refusal
+  without one — every legacy `checkDeletion`, three deletes, four handlers,
+  nine utilities, ten transport members, four package members, six executor
+  members — and a consumer reading their answers (an empty `200` read as
+  success, or SAP's own `404`) gets a different `IAdtResponse`. The program and
+  group runners go the other way: refused before, a request now.
+
+The proposed number is the next major, 38.0.0; the owner confirms it before the
+CHANGELOG names it. No dependency moves: nothing here needs a contract change in
+`interfaces-adt` or `interfaces-adt-connection`, and no `adt-strategies` reading
+changes.
+
+## 16. Done means
+
+- Every member `AdtClientLegacy` and `AdtExecutorLegacy` hand out is in exactly
+  one row of §4–§10, and the refusal table test (§11.1) is that list.
+- No legacy branch outside the legacy classes, pinned by the source test.
+- `npm run build`, `lint:check`, `test:check` and the unit suite green; the live
+  checks of §11.2 run on a 7.40 SP04 system over RFC and over HTTP, and every
+  "measured" claim in `LEGACY.md` names the run behind it.
+- Each "not measured" row of §12 is either measured before the release, with
+  its decision amended here and in `LEGACY.md`, or ships as decided above and
+  is listed as not measured in `LEGACY.md`.
