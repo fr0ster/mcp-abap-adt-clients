@@ -351,7 +351,7 @@ is advertised. Package contents come through `repository/nodestructure` with
 | `lock`, `unlock`, `readTransport` | sent to `/packages/{name}` | **refused without a request**: the item resource answered `404` to the read; its `?_action=LOCK` and `/transport` are on the same resource. Not measured themselves (§12) |
 | `check` | `POST /checkruns` naming `/packages/{name}` | **refused without a request**, with the handler: a check of an object 7.40 cannot address through ADT. Not measured (§12) |
 | `checkDeletion` | `POST /deletion/check` | **refused — measured** (§5) |
-| `read` (declared only here; `AdtPackage` has none) | refused | **removed**: it answers for a member no contract declares |
+| `read` (declared only here; `AdtPackage` has none) | refused | **kept, refused**: removing it would change a public type for no gain on 7.40 |
 
 The class header is corrected: what is refused and why, on the measurements
 above, instead of "all package operations … do not return usable results over
@@ -622,22 +622,20 @@ asks):
 
 ## 15. Versioning
 
-**A major.** The public API changes in both kinds a semver major covers:
+**A minor.** No public type changes: the constructors stay, the getters return
+subclasses assignable to the old types, and `AdtPackageLegacy.read` stays
+(refused). The behaviour changes are fixes for 7.40 SP04: the members that now
+answer a refusal without a request — every legacy `checkDeletion`, three
+deletes, four handlers, nine utilities, ten transport members, four package
+members, six executor members — sent requests that 7.40 does not serve (an
+empty `200` the library read as success, or SAP's `404`); they never worked
+there, so no consumer relied on them. The program and function group runners
+go the other way, refused before and served now, which is a new capability. The
+class runner's body gains `<options>`, measured to answer the same result.
 
-- **Type:** `AdtPackageLegacy.read` goes; getters return new subclasses
-  (assignable to the old types, so not breaking by themselves). The
-  constructors do not change.
-- **Behaviour:** about forty members that sent a request now answer a refusal
-  without one — every legacy `checkDeletion`, three deletes, four handlers,
-  nine utilities, ten transport members, four package members, six executor
-  members — and a consumer reading their answers (an empty `200` read as
-  success, or SAP's own `404`) gets a different `IAdtResponse`. The program and
-  group runners go the other way: refused before, a request now; and the class
-  runner's body changes (`<options>` sent).
-
-The number is the owner's to name before the CHANGELOG does. No dependency moves: nothing here needs a contract change in
-`interfaces-adt` or `interfaces-adt-connection`, and no `adt-strategies` reading
-changes.
+The CHANGELOG lists each behaviour change under the minor, as fixes for 7.40.
+No dependency moves: nothing here needs a contract change in `interfaces-adt`
+or `interfaces-adt-connection`, and no `adt-strategies` reading changes.
 
 ## 16. Done means
 
