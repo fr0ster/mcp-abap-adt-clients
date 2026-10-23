@@ -120,6 +120,52 @@ npm test -- integration/core/functionGroup
 DEBUG_ADT_TESTS=true npm test -- integration/core/class
 ```
 
+## The 7.40 system: a configuration and an environment of its own
+
+The live checks of the legacy client (`src/__tests__/integration/legacy/`) run
+against a SAP_BASIS 7.40 SP04 system over RFC, with a configuration of their own
+— not the main system's `test-config.yaml`:
+
+- `src/__tests__/helpers/test-config.legacy-740.yaml.template`: copy it to
+  `test-config.legacy-740.yaml` (gitignored) and edit the lines marked
+  `# ← CHANGE` (the system ID, and the software component and transport layer of
+  the transportable package the environment creates). Only the `legacy_740`
+  cases are in it, all enabled; `is_legacy: true`, `connection_type: "rfc"`.
+- `MCP_TEST_CONFIG_PATH` names the configuration a run loads. Set, it is that
+  file or the run fails naming it — there is no fallback to `test-config.yaml`
+  or a template. `npm run check:config` then compares it with the template
+  beside it (`<file>.template`). `MCP_ENV_PATH` names the `.env` with that
+  system's credentials.
+
+The objects the checks need are prepared and removed by ABAP classes in the
+system, one call each (the idea of mcp-test's environment classes): 7.40 SP04
+has no `IF_OO_ADT_CLASSRUN`, so they run through ABAP Unit
+(`POST /sap/bc/adt/abapunit/testruns`, measured there) and report as alerts,
+`@@LOG {json}` per step and `@@RESULT {json}` last. Sources:
+`src/__tests__/integration/legacy/abap/`; driver: `src/__tests__/helpers/legacyEnv.ts`.
+
+| Command | Does |
+|---|---|
+| `npm run legacy:setup` | installs `ZCL_LG7_ENV` and its runners (`$TMP`, written only when the source differs); runs prepare — releases the user's locks on ZLG7 names, deletes leftovers (not the fixtures) and their inactive versions, reuses or creates the request `ZLG7 LEGACY-TEST …`, creates package `ZLG7_TEST`; deletes leftover DDL sources over ADT; creates or refreshes the fixtures in `$TMP` |
+| `npm run legacy:status` | reads: the open request, the package, every ZLG7 object in scope |
+| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions, package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT |
+
+Reports go to `.legacy-env/<action>.json` (gitignored). Nothing outside the
+prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`, `Z_LG7_*`) in `$TMP` or
+`ZLG7_TEST` is touched; every delete checks the name and the TADIR package
+first. A run of the live checks uses the fixtures and leaves them; only
+`legacy:teardown` removes them.
+
+```bash
+export MCP_TEST_CONFIG_PATH=src/__tests__/helpers/test-config.legacy-740.yaml
+export MCP_ENV_PATH=$HOME/<the 7.40 system>.env
+export SAPNWRFC_HOME=$HOME/sap/nwrfcsdk PATH=$HOME/sap/nwrfcsdk/lib:$PATH \
+  LD_LIBRARY_PATH=$HOME/sap/nwrfcsdk/lib:$LD_LIBRARY_PATH
+npm run legacy:setup
+npm run test:detached -- integration/legacy
+npm run legacy:teardown        # when the environment is no longer needed
+```
+
 ## RFC-Specific Considerations
 
 ### Lock Handle Encoding

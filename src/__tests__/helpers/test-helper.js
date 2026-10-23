@@ -179,6 +179,23 @@ function loadTestConfig(configDirectory = __dirname) {
     return cachedConfig;
   }
 
+  // A configuration of its own for another system (the 7.40 one: see
+  // test-config.legacy-740.yaml.template), named explicitly. It is that file
+  // or nothing: no fallback to test-config.yaml or the template, which
+  // describe another system.
+  const explicit = process.env.MCP_TEST_CONFIG_PATH?.trim();
+  if (explicit) {
+    const explicitPath = path.resolve(explicit);
+    if (!fs.existsSync(explicitPath)) {
+      throw new Error(
+        `MCP_TEST_CONFIG_PATH names ${explicitPath}, which does not exist`,
+      );
+    }
+    cachedConfig = yaml.parse(fs.readFileSync(explicitPath, 'utf8')) || {};
+    configLoadedFrom = 'custom';
+    return cachedConfig;
+  }
+
   const configPath = path.resolve(configDirectory, 'test-config.yaml');
   const templatePath = path.resolve(
     configDirectory,

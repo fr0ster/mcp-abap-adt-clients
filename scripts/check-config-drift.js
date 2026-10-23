@@ -32,6 +32,19 @@ const TEMPLATE = path.join(
 const CONFIG = path.join(ROOT, 'src/__tests__/helpers/test-config.yaml');
 
 /**
+ * Which pair to compare. `MCP_TEST_CONFIG_PATH` names a configuration of its
+ * own (another system's, e.g. the 7.40 one); it is compared with the template
+ * beside it (`<file>.template`), or with the main template when it has none.
+ */
+function pathsFor(env = process.env, exists = fs.existsSync) {
+  const explicit = env.MCP_TEST_CONFIG_PATH?.trim();
+  if (!explicit) return { template: TEMPLATE, config: CONFIG };
+  const config = path.resolve(explicit);
+  const own = `${config}.template`;
+  return { template: exists(own) ? own : TEMPLATE, config };
+}
+
+/**
  * Top-level keys, read without a YAML parser: "lines that start in column zero
  * and end in a colon" need none, and this check works before anything is
  * installed. The shared entries below need the parser, and are skipped (with
@@ -182,7 +195,8 @@ function main(template = TEMPLATE, config = CONFIG) {
 }
 
 if (require.main === module) {
-  main();
+  const { template, config } = pathsFor();
+  main(template, config);
 }
 
-module.exports = { drift, main, sectionsOf, sharedEntriesOf };
+module.exports = { drift, main, pathsFor, sectionsOf, sharedEntriesOf };

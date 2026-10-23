@@ -14,7 +14,8 @@
  * cases of those two members that send (program, class, in each spelling)
  * are read for real objects, on a forwarding recorder, and answer `200`.
  *
- * Nothing is created. Runs on a legacy configuration over RFC with case
+ * Nothing is created: the class and program read are the fixtures `npm run
+ * legacy:setup` creates. Runs on a legacy configuration over RFC with case
  * `legacy_740/legacy_refusals_send_nothing` enabled:
  * npm run test:detached -- integration/legacy/LegacyRefusals
  */

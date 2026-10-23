@@ -1,0 +1,346 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ABAP_DIR,
+  abapNameValue,
+  assertOwnName,
+  deleteLeftDdls,
+  ensureClass,
+  envClasses,
+  isOwnName,
+  type LegacyEnvTarget,
+  packageOf,
+  parseEnvRun,
+  renderPrepare,
+  sameSource,
+  settingsOf,
+  unescapeXml,
+} from '../../helpers/legacyEnv';
+
+// The stubs are no handler class `integrationHeadersOf` knows; the pair is not
+// this test's subject.
+jest.mock('../../helpers/adtHeaders', () => ({
+  integrationHeadersOf: () => ({ accept: 'x/test', contentType: 'x/test' }),
+}));
+
+const ok = <T>(value: T): IAdtResponse<T> => ({
+  ok: true,
+  getResult: () => ({ value }),
+});
+
+/** An ABAP Unit answer carrying `lines` as alert titles, as 7.40 writes XML. */
+function answerWith(lines: string[]): string {
+  const escaped = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const alerts = lines
+    .map(
+      (l) =>
+        `<alert kind="failedAssertion" severity="tolerable"><title>${escaped(l)}</title>` +
+        `<details><detail text="${escaped(l)}"/></details></alert>`,
+    )
+    .join('');
+  return `<?xml version="1.0"?><aunit:runResult><program><testClasses><testClass><testMethods><testMethod adtcore:name="RUN_PREPARE"><alerts>${alerts}</alerts></testMethod></testMethods></testClass></testClasses></program></aunit:runResult>`;
+}
+
+const RESULT =
+  '@@RESULT {"ok":true,"action":"prepare","request":"","package":"ZLG7_TEST","packageExists":true,"errors":0,"lines":2}';
+
+describe('legacy env: the ABAP Unit report', () => {
+  it('reads every @@LOG line once, in order, and the @@RESULT', () => {
+    const run = parseEnvRun(
+      answerWith([
+        '@@LOG {"n":2,"step":"package","object":"ZLG7_TEST","status":"OK","message":"exists"}',
+        '@@LOG {"n":1,"step":"locks","object":"","status":"OK","message":"a \\u003c b \\u0026 \\"c\\""}',
+        RESULT,
+      ]),
+    );
+    expect(run.result).toMatchObject({ ok: true, action: 'prepare', lines: 2 });
+    expect(run.log.map((l) => l.step)).toEqual(['locks', 'package']);
+    expect(run.log[0]?.message).toBe('a < b & "c"');
+  });
+
+  it('fails naming the answer when no @@RESULT came back', () => {
+    expect(() => parseEnvRun('<aunit:runResult/>')).toThrow(
+      /carries no @@RESULT line — the runner did not run.*runResult/,
+    );
+  });
+
+  it('fails when lines are missing (a truncated answer)', () => {
+    expect(() => parseEnvRun(answerWith([RESULT]))).toThrow(
+      'the answer carries 0 of 2 @@LOG lines',
+    );
+  });
+
+  it('unescapes named and numeric entities and keeps unknown ones', () => {
+    expect(unescapeXml('&lt;&#65;&#x42;&amp;lt;&bogus;')).toBe(
+      '<AB&lt;&bogus;',
+    );
+  });
+});
+
+describe('legacy env: names and packages', () => {
+  it('admits only ZLG7 names, per kind', () => {
+    expect(isOwnName('class', 'ZCL_LG7_FX_UNIT')).toBe(true);
+    expect(isOwnName('class', 'ZCL_LG7_')).toBe(false);
+    expect(isOwnName('class', 'ZCL_OTHER')).toBe(false);
+    expect(isOwnName('program', 'zlg7_fx_unit')).toBe(true);
+    expect(isOwnName('function module', 'Z_LG7_FX_UNIT')).toBe(true);
+    expect(isOwnName('function module', 'ZLG7_FX_UNIT')).toBe(false);
+    expect(isOwnName('function include', 'LZLG7_FXT99')).toBe(true);
+    expect(isOwnName('interface', 'ZIF_LG7_DEL')).toBe(true);
+    expect(() => assertOwnName('program', 'ZAC_PROG')).toThrow(
+      'program ZAC_PROG is not a ZLG7 name',
+    );
+  });
+
+  it('reads the package an object metadata document names', () => {
+    expect(
+      packageOf(
+        '<class:abapClass adtcore:name="ZCL_LG7_X"><adtcore:packageRef adtcore:uri="/x" adtcore:type="DEVC/K" adtcore:name="$TMP"/></class:abapClass>',
+      ),
+    ).toBe('$TMP');
+    expect(packageOf('<class:abapClass adtcore:name="ZCL_LG7_X"/>')).toBe(
+      undefined,
+    );
+  });
+
+  it('compares sources without line ends and trailing blanks', () => {
+    expect(sameSource('A.  \r\nB.\r\n\r\n', 'A.\nB.')).toBe(true);
+    expect(sameSource('A.', 'B.')).toBe(false);
+  });
+});
+
+describe('legacy env: settings into ABAP', () => {
+  it('admits A-Z, 0-9, _ and / only, within the length', () => {
+    expect(abapNameValue('software_component', ' home ', 30)).toBe('HOME');
+    expect(() => abapNameValue('transport_layer', 'ZE19X', 4)).toThrow(
+      'legacy_env.transport_layer must be 1-4 characters',
+    );
+    expect(() => abapNameValue('transport_layer', "Z'1", 4)).toThrow(
+      'must be 1-4 characters',
+    );
+    expect(() =>
+      abapNameValue('software_component', '<SOFTWARE_COMPONENT>', 30),
+    ).toThrow('a placeholder is still in place?');
+    expect(() => abapNameValue('software_component', '', 30)).toThrow(
+      'legacy_env.software_component is required',
+    );
+  });
+
+  it('reads the legacy_env section, or says it is missing', () => {
+    expect(
+      settingsOf({
+        legacy_env: { software_component: 'HOME', transport_layer: 'zabc' },
+      }),
+    ).toEqual({ softwareComponent: 'HOME', transportLayer: 'ZABC' });
+    expect(() => settingsOf({})).toThrow('no legacy_env section');
+  });
+
+  it('fills the prepare runner and leaves no placeholder', () => {
+    const filled = renderPrepare(
+      "x = '{{SOFTWARE_COMPONENT}}' y = '{{TRANSPORT_LAYER}}'",
+      { softwareComponent: 'HOME', transportLayer: 'ZABC' },
+    );
+    expect(filled).toBe("x = 'HOME' y = 'ZABC'");
+    expect(() =>
+      renderPrepare('{{OTHER}}', {
+        softwareComponent: 'HOME',
+        transportLayer: 'ZABC',
+      }),
+    ).toThrow('unknown placeholder');
+  });
+
+  it('installs the env class before its runners, the prepare one filled', () => {
+    const classes = envClasses(['prepare', 'teardown'], {
+      softwareComponent: 'HOME',
+      transportLayer: 'ZABC',
+    });
+    expect(classes.map((c) => c.name)).toEqual([
+      'ZCL_LG7_ENV',
+      'ZCL_LG7_ENV_PREPARE',
+      'ZCL_LG7_ENV_TEARDOWN',
+    ]);
+    expect(classes[1]?.testClasses).toContain("iv_software_component = 'HOME'");
+    expect(classes[1]?.testClasses).not.toContain('{{');
+    expect(() => envClasses(['prepare'])).toThrow('prepare needs');
+  });
+});
+
+/** A client whose class handler answers `metadata` and records every call. */
+function stubTarget(metadata: string) {
+  const calls: string[] = [];
+  const handler = {
+    readMetadata: async () => {
+      calls.push('readMetadata');
+      return ok(metadata);
+    },
+    read: async () => {
+      calls.push('read');
+      return ok('old source');
+    },
+    create: async () => {
+      calls.push('create');
+      return ok('');
+    },
+    lock: async () => {
+      calls.push('lock');
+      return ok('H');
+    },
+    unlock: async () => {
+      calls.push('unlock');
+      return ok(undefined);
+    },
+    update: async () => {
+      calls.push('update');
+      return ok('');
+    },
+    activate: async () => {
+      calls.push('activate');
+      return ok('');
+    },
+    delete: async () => {
+      calls.push('delete');
+      return ok('');
+    },
+  };
+  const client = {
+    getClass: () => handler,
+    getLocalTestClass: () => handler,
+    getDdl: () => handler,
+  };
+  const target = { client, executor: {} } as unknown as LegacyEnvTarget;
+  return { target, calls };
+}
+
+const IN = (pkg: string) =>
+  `<x adtcore:name="N"><adtcore:packageRef adtcore:name="${pkg}"/></x>`;
+
+describe('legacy env: never writes what is not its own', () => {
+  it('refuses a name without the prefix before any request', async () => {
+    const { target, calls } = stubTarget(IN('$TMP'));
+    await expect(
+      ensureClass(target, { name: 'ZCL_OTHER', description: 'd', main: 'm' }),
+    ).rejects.toThrow('class ZCL_OTHER is not a ZLG7 name');
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses an existing ZLG7 class outside $TMP and writes nothing', async () => {
+    const { target, calls } = stubTarget(IN('ZSOMEONE'));
+    await expect(
+      ensureClass(target, { name: 'ZCL_LG7_X', description: 'd', main: 'm' }),
+    ).rejects.toThrow('is in package ZSOMEONE, not $TMP; not touched');
+    expect(calls).toEqual(['readMetadata', 'readMetadata']);
+  });
+
+  it('writes a differing $TMP class under one lock and activates it', async () => {
+    const { target, calls } = stubTarget(IN('$TMP'));
+    expect(
+      await ensureClass(target, {
+        name: 'ZCL_LG7_X',
+        description: 'd',
+        main: 'new',
+        testClasses: 'tests',
+      }),
+    ).toBe(true);
+    expect(calls).toEqual([
+      'readMetadata',
+      'readMetadata',
+      'read',
+      'read',
+      'lock',
+      'update',
+      'update',
+      'unlock',
+      'activate',
+    ]);
+  });
+
+  it('deletes a left DDL source only when it is ZLG7 and in $TMP', async () => {
+    const run = (object: string, message: string) => ({
+      result: {
+        ok: true,
+        action: 'prepare',
+        request: '',
+        package: 'ZLG7_TEST',
+        packageExists: true,
+        errors: 0,
+        lines: 1,
+      },
+      log: [{ n: 1, step: 'objects', object, status: 'LEFT-FOR-ADT', message }],
+    });
+    const outside = stubTarget(IN('ZSOMEONE'));
+    expect(
+      await deleteLeftDdls(outside.target, run('DDLS ZLG7_DDL', '$TMP')),
+    ).toEqual(['DDL source ZLG7_DDL: in package ZSOMEONE; not touched']);
+    expect(outside.calls).toEqual(['readMetadata']);
+
+    const foreign = stubTarget(IN('$TMP'));
+    expect(
+      await deleteLeftDdls(foreign.target, run('DDLS ZOTHER', '$TMP')),
+    ).toEqual(['DDLS ZOTHER: not a ZLG7 DDL source; not touched']);
+    expect(foreign.calls).toEqual([]);
+
+    const own = stubTarget(IN('$TMP'));
+    expect(
+      await deleteLeftDdls(own.target, run('DDLS ZLG7_DDL', '$TMP')),
+    ).toEqual([]);
+    expect(own.calls).toEqual(['readMetadata', 'lock', 'delete', 'unlock']);
+  });
+});
+
+describe('legacy env: the ABAP sources', () => {
+  const files = readdirSync(ABAP_DIR).filter((f) => f.endsWith('.abap'));
+  const read = (f: string) => readFileSync(join(ABAP_DIR, f), 'utf8');
+  /** The code without its full-line comments (`*` or `"` first), which name what is not used. */
+  const code = (f: string) =>
+    read(f)
+      .split('\n')
+      .filter(
+        (l) => !l.trimStart().startsWith('*') && !l.trimStart().startsWith('"'),
+      )
+      .join('\n');
+
+  it('are all named with the ZLG7 prefix', () => {
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) expect(f.toLowerCase()).toMatch(/^z(cl_lg7_|lg7)/);
+  });
+
+  // What SAP_BASIS 7.40 SP04 does not compile: the strict Open SQL host
+  // escapes (SP05), xsdbool and FOR / REDUCE (SP08), +=, IS INSTANCE OF
+  // (7.50), and the classes it does not have.
+  it.each([
+    [/\s@[A-Za-z(]/, 'an Open SQL @ host escape'],
+    [/\bxsdbool\b/i, 'xsdbool'],
+    [/\bREDUCE\b|\bFOR\s+\w+\s+IN\b/i, 'REDUCE / FOR'],
+    [/\+=|-=/, '+= / -='],
+    [/IS INSTANCE OF/i, 'IS INSTANCE OF'],
+    [
+      /if_oo_adt_classrun|xco_|cl_wb_object_operator|\/ui2\/cl_json/i,
+      'a class 7.40 SP04 lacks',
+    ],
+  ])('use no %s (%s)', (pattern) => {
+    for (const f of files) expect(`${f}: ${code(f)}`).not.toMatch(pattern);
+  });
+
+  it('guard every delete with the name and the package, and never the env classes', () => {
+    const env = read('zcl_lg7_env.clas.abap');
+    const deleteOne = env.slice(
+      env.indexOf('METHOD delete_one.'),
+      env.indexOf('ENDMETHOD.', env.indexOf('METHOD delete_one.')),
+    );
+    expect(deleteOne).toContain('in_scope_package( lv_devclass ) = abap_false');
+    expect(deleteOne).toContain(
+      'is_own_name( is_object-obj_name ) = abap_false',
+    );
+    expect(deleteOne).toContain(
+      'is_env_name( is_object-obj_name ) = abap_true',
+    );
+    expect(env).toContain("c_package        TYPE devclass VALUE 'ZLG7_TEST'");
+    expect(env).toContain(
+      "c_request_marker TYPE as4text VALUE 'ZLG7 LEGACY-TEST'",
+    );
+    // Never a release of a request.
+    expect(env).not.toMatch(/TR_RELEASE|RELEASE_REQUEST/i);
+  });
+});

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 const {
   drift,
   main,
+  pathsFor,
   sharedEntriesOf,
 } = require('../../../../scripts/check-config-drift');
 
@@ -174,6 +175,33 @@ describe('check:config', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('not compared'),
       );
+    });
+  });
+
+  describe('which pair it compares', () => {
+    it('compares the main config with the main template by default', () => {
+      const { template, config } = pathsFor({}, () => true);
+      expect(path.basename(template)).toBe('test-config.yaml.template');
+      expect(path.basename(config)).toBe('test-config.yaml');
+    });
+
+    it('compares MCP_TEST_CONFIG_PATH with the template beside it', () => {
+      const named = path.join(os.tmpdir(), 'test-config.legacy-740.yaml');
+      const { template, config } = pathsFor(
+        { MCP_TEST_CONFIG_PATH: named },
+        (p: string) => p === `${named}.template`,
+      );
+      expect(config).toBe(named);
+      expect(template).toBe(`${named}.template`);
+    });
+
+    it('falls back to the main template when the named config has none', () => {
+      const named = path.join(os.tmpdir(), 'other.yaml');
+      const { template } = pathsFor(
+        { MCP_TEST_CONFIG_PATH: named },
+        () => false,
+      );
+      expect(path.basename(template)).toBe('test-config.yaml.template');
     });
   });
 });

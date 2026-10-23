@@ -9,9 +9,13 @@
  * to `testruns`, `<options>` in its body, answered `200` — and on the answer:
  * at least one `testMethod`.
  *
- * Nothing is created: the case names existing objects that hold tests. Runs on
- * a legacy configuration over RFC with case `legacy_740/legacy_unit_runners`
- * enabled: npm run test:detached -- integration/legacy/LegacyUnitTests
+ * Nothing is created here: the case names the fixtures `npm run legacy:setup`
+ * creates in `$TMP` (ZCL_LG7_FX_UNIT, ZLG7_FX_UNIT, ZLG7_FX with
+ * Z_LG7_FX_UNIT and its test include — one passing, one failing test each;
+ * sources in `abap/`), and the run leaves them for the next; `npm run
+ * legacy:teardown` removes them. Runs on a legacy configuration over RFC with
+ * case `legacy_740/legacy_unit_runners` enabled:
+ * npm run test:detached -- integration/legacy/LegacyUnitTests
  */
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
