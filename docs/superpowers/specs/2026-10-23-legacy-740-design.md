@@ -411,7 +411,8 @@ are §4 and §5 and are not repeated.
 | handler | works — measured over RFC | not measured, kept |
 |---|---|---|
 | class (`AdtClassLegacy`) | `create` (`B3-cycle` s1), `lock`/`unlock` (s2), `update` — stateless `PUT ?lockHandle=` (s2-update), `activate` (s4), `check` (s5), `read`/`readMetadata` (`B2-reads` s8), `getVersions` — `includes/main/versions` (s9-class-versions) | `validate`, `getVersionSource`, `readTransport`, `activateTestClasses`, `readEnhancementElements`, `readEnhancementOptions` |
-| local test class, types, definitions, macros | `read` ×4 (`B2-reads` s7-*), test class `update` (`B3-cycle` s3-update) and `check` (s5-check-testclasses) | the others' `update`/`check`, `validate`, `getVersions` |
+| local test class, types, definitions, macros — own members | `read` ×4 (`B2-reads` s7-*), test class `update` (`B3-cycle` s3-update) and `check` (s5-check-testclasses) | the others' `update`/`check`, `validate`, `getVersions` (each include's own `includes/<type>/versions`; only `includes/main/versions` is measured, s9-class-versions) |
+| the same four — members inherited from `AdtClassMemberBase` (see below) | `lock`/`unlock` — the container class's `?_action=LOCK`/`UNLOCK` (`B3-cycle` s2, s3); `activate` — the container class (s4); `readMetadata` — the container class's metadata (`B2-reads` s8-class-meta) | `readTransport` — the container class's `/transport` (rule 3: `/oo/classes` advertised); `getVersionSource(contentUri)` — a GET of the URI the caller passes, taken from a versions feed (rule 3) |
 | program (`AdtProgramLegacy`) | `create`, `lock`, `update`, `unlock` (`B3-deletes` p1), `activate` (`B3-unmeasured` a1-3), `read`/`readMetadata` (`B2-reads` s1), `getVersions` (s9-prog-versions) | `validate`, `check`, `getVersionSource`, `readTransport`, enhancement readers |
 | interface (`AdtInterfaceLegacy`) | `create` (`B3-deletes` i1), `lock`/`unlock` (i2e), `read`/`readMetadata` (`B2-reads` s2), `getVersions` (s9-intf-versions) | `update`, `activate`, `check`, `validate`, `getVersionSource`, `readTransport` |
 | function group (`AdtFunctionGroupLegacy`) | `create`, `lock`/`unlock`, `readMetadata` (`B3-deletes` g1, g2e, g2d; `B2-reads` s3-fg-meta), `activate` (`B3-unmeasured` a2-6) | `updateMetadata`, `check`, `validate`, `readTransport`, enhancement readers |
@@ -421,6 +422,32 @@ are §4 and §5 and are not repeated.
 | include (`AdtIncludeLegacy`, new) | `read` (`B2-reads` s5-incl-read) | `create`, `update`, `lock`, `unlock`, `activate`, `validate`, `readMetadata`, enhancement readers |
 | message class (`AdtMessageClassLegacy`, new) | `readMetadata` (`B2-reads` s6-msag-meta) | `create`, `updateMetadata`, `lock`, `unlock`, `validate` |
 | message class message | `read` (`B2-reads` s6-msg-read: the whole class document, the message present in it) | `create`, `update`, `delete`, `readMetadata` |
+
+**The four local-include handlers inherit six public members from
+`AdtClassMemberBase`** — `lock`, `unlock`, `activate`, `readMetadata`,
+`readTransport`, `getVersionSource` — and every one addresses the *container
+class*, not the include (`CLASS.uri(className)` in `lockClass`, `unlockClass`,
+`activateClass`, `getClassMetadata`, `getClassTransport`;
+`src/core/class/AdtClassMemberBase.ts`). So `getLocalTestClass().activate()`
+activates the whole class, and its `lock` is the class's lock — which is what
+the include `PUT` needs, measured (`B3-cycle` s3-lock → s3-update → s3-unlock).
+These 24 combinations behave exactly as the same members of `getClass()`, and
+take that handler's decisions: **works as inherited** for `lock`, `unlock`,
+`activate`, `readMetadata`; **not measured, kept** for `readTransport` and
+`getVersionSource`. No override: they are the modern handlers' members, and
+7.40 answers them as it answers the class's. `LEGACY.md` says that these
+members act on the container class.
+
+### 10.3a The clients' own members
+
+`AdtClientLegacy` inherits from `AdtClient`, besides the getters,
+`unlockAll()`, `pendingLocks` and `[Symbol.asyncDispose]()`. They send no request
+of their own: `unlockAll` (and the dispose, which calls it) sends, for every
+lock still tracked, the `UNLOCK` of the handler that took it — the type's own
+`unlock` request, measured over RFC for each type that can be locked here (§10.3)
+— and `pendingLocks` sends nothing. **Works as inherited.** A handler whose
+`lock` is refused (package, §8) tracks nothing, so `unlockAll` never unlocks
+one. `AdtExecutorLegacy` has only getters.
 
 `AdtClassLegacy.update` is an override that only calls `super.update` while its
 JSDoc says it holds one stateful session. The measured `PUT` is the inherited
@@ -481,7 +508,15 @@ nothing does.
 - **Refusals:** one table-driven test over every member this spec refuses —
   per handler and member, `ok: false`, `origin: 'refusal'`,
   `UNSUPPORTED_OPERATION`, zero requests. The table *is* the list in §4–§10, so
-  a refused member removed from the code fails it. `REFUSED_WITHOUT_REQUEST` in
+  a refused member removed from the code fails it. **The inventory is built
+  from the handlers, not from this spec:** for every getter of `AdtClientLegacy`
+  and `AdtExecutorLegacy`, the test walks the returned handler's prototype chain
+  (as `absentOnLegacy`'s `membersOf` does) and collects every public method,
+  inherited ones included — `AdtClassMemberBase`'s, `AbapUnitRunner`'s — and
+  every public method of the two clients themselves; each must be in the
+  refused table or in a "sends" table (member → the request it sends, asserted
+  on the recording connection). A member in neither fails the test, so a new or
+  inherited member cannot go undecided. `REFUSED_WITHOUT_REQUEST` in
   `adtHeaders.ts` is extended to the same members, and
   `integrationHeadersOf.test.ts` keeps proving each one sends nothing.
 - **absentOnLegacy:** `legacyAbsentTypes.test.ts` gains transformation, scalar
@@ -555,6 +590,7 @@ asks):
 | `readObjectMetadata`/`Source` for table type | refused | rule 4: not advertised; the other DDIC families answered `404` over RFC |
 | `getActivationRun`, `getActivationResults` | refused | the legacy group activation has no run id (code); not advertised |
 | enhancement readers, `readTransport`, versions other than program's, `validate`, the unmeasured `check`s and `activate`s | kept | rule 3: under advertised collections; worst case a `404` read strictly |
+| the local includes' inherited `readTransport`, `getVersionSource` and own `getVersions`, `validate`, and the non-test-class includes' `update`/`check` | kept | rule 3: `/oo/classes` advertised; the inherited members address the container class |
 | `getRequest()` `updateMetadata`, `delete` | refused | the goal: over RFC create and modify are refused |
 | the other `getRequest()` members | refused | rule 4 (not advertised) |
 | `listRequests`, `getRequestsByUri`, `scheduleTrace` | kept | rule 3: advertised collections |
@@ -638,8 +674,11 @@ or `interfaces-adt-connection`, and no `adt-strategies` reading changes.
 
 ## 16. Done means
 
-- Every member `AdtClientLegacy` and `AdtExecutorLegacy` hand out is in exactly
-  one row of §4–§10, and the refusal table test (§11.1) is that list.
+- Every public member of every handler a getter of `AdtClientLegacy` or
+  `AdtExecutorLegacy` returns — **inherited members included**, through the
+  whole prototype chain — and every public member of the two clients
+  themselves is in exactly one row of §4–§10, and the inventory test (§11.1)
+  checks that list against the handlers.
 - No legacy branch outside the legacy classes, pinned by the source test.
 - `npm run build`, `lint:check`, `test:check` and the unit suite green; the live
   checks of §11.2 run on a 7.40 SP04 system over RFC, and every
