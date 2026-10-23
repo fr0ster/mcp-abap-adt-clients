@@ -97,6 +97,7 @@ const SENDS_NO_REQUEST = new Set([
   'AdtUtilsLegacy.getTableContents',
   // No deletion API on 7.40 (spec §4.3, §5).
   'AdtPackageLegacy.checkDeletion',
+  'AdtPackageLegacy.check',
   'AdtUtilsLegacy.checkDeletionGroup',
   'AdtUtilsLegacy.deleteObjectsGroup',
   'AdtClassLegacy.checkDeletion',

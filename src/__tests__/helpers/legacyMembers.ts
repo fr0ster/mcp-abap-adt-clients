@@ -1527,13 +1527,6 @@ const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
   rows.map((row) => ({ row, assertion: 'sends nothing', task }));
 
 export const PENDING: readonly Pending[] = [
-  // Task 8: the package item resource.
-  ...pendingRefusals(8, [
-    'getPackage.lock',
-    'getPackage.unlock',
-    'getPackage.readTransport',
-    'getPackage.check',
-  ]),
   // Task 9: /sap/bc/adt/cts/* is not advertised.
   ...pendingRefusals(
     9,

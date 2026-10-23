@@ -1,22 +1,39 @@
 /**
  * AdtPackageLegacy - Package handler for legacy SAP systems (BASIS < 7.50)
  *
- * All package operations are refused on legacy — the `/sap/bc/adt/packages`
- * endpoint exists in discovery but does not return usable results over RFC.
+ * Every package operation is refused on legacy. The `/sap/bc/adt/packages`
+ * collection is advertised, but 7.40 SP04 does not serve the item resource over
+ * RFC: `GET /sap/bc/adt/packages/{name}` answered `404`, and
+ * `POST /sap/bc/adt/packages` answered `405`. `lock`, `unlock`, `readTransport`
+ * and `check` address that same item resource, so they refuse without a
+ * request. A package's contents come through `repository/nodestructure`
+ * (`DEVC/K`), another endpoint family that `getPackage()` does not offer.
  */
 
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtAnalyseOptions,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import { PACKAGE } from '../../endpoints/objects';
 import { failed } from '../../utils/adtResponse';
-import { noDeletionCheckNorDelete } from '../shared/refusalLegacy';
+import {
+  legacyRefusal,
+  noDeletionCheckNorDelete,
+} from '../shared/refusalLegacy';
 import { AdtPackage } from './AdtPackage';
 import type { IPackageResults, packageDocuments } from './types';
+
+/** The resource 7.40 SP04 answered 404 to, shown without a name. */
+const ITEM_RESOURCE = `${PACKAGE.collection}/{name}`;
 
 const UNSUPPORTED: IAdtError = {
   origin: 'refusal',
   code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
   message:
-    'Package operations are not supported on legacy SAP systems (BASIS < 7.50) via ADT. ' +
+    'Package operations are not supported on legacy SAP systems (BASIS < 7.50): ' +
+    'the package item resource answers 404 and the collection answers 405 to a create. ' +
     'Use SAP GUI (SE80 or SE21) to manage packages.',
 };
 
@@ -76,5 +93,46 @@ export class AdtPackageLegacy<
     IAdtResponse<ReturnType<R['deletionCheck']>, E>
   > {
     return noDeletionCheckNorDelete<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * `lock`, `unlock`, `readTransport` and `check` address `PACKAGE.uri(name)`
+   * (or name it, for the check run), the item resource 7.40 SP04 answered
+   * `404` to. Refused without a request; not measured themselves (spec §8).
+   */
+  override async lock<E extends IAdtError = IAdtError>(
+    _config?: unknown,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return legacyRefusal<string, E>('lock', ITEM_RESOURCE);
+  }
+
+  override async unlock<E extends IAdtError = IAdtError>(
+    _config?: unknown,
+    _lockHandle?: string,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
+    return legacyRefusal<void, E>('unlock', ITEM_RESOURCE);
+  }
+
+  override async readTransport<E extends IAdtError = IAdtError>(
+    _config?: unknown,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    return legacyRefusal<ReturnType<R['transport']>, E>(
+      'readTransport',
+      `${ITEM_RESOURCE}/transport`,
+    );
+  }
+
+  override async check<E extends IAdtError = IAdtError>(
+    _config?: unknown,
+    _status?: string,
+    _options?: { headers?: unknown } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    return legacyRefusal<ReturnType<R['check']>, E>(
+      'check',
+      `${ITEM_RESOURCE} to check (the check run names it)`,
+    );
   }
 }

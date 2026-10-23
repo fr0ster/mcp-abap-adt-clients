@@ -1111,7 +1111,19 @@ export function headersOf(
  * connection and proves that no request leaves.
  */
 const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
-  [AdtPackageLegacy, ['create', 'updateMetadata', 'delete', 'checkDeletion']],
+  [
+    AdtPackageLegacy,
+    [
+      'create',
+      'updateMetadata',
+      'delete',
+      'checkDeletion',
+      'lock',
+      'unlock',
+      'readTransport',
+      'check',
+    ],
+  ],
   [AdtRequestLegacy, ['create', 'updateMetadata', 'delete']],
   [
     AdtUtilsLegacy,
