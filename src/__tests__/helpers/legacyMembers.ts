@@ -1527,22 +1527,6 @@ const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
   rows.map((row) => ({ row, assertion: 'sends nothing', task }));
 
 export const PENDING: readonly Pending[] = [
-  // Task 9: /sap/bc/adt/cts/* is not advertised.
-  ...pendingRefusals(
-    9,
-    [
-      'searchConfigurations',
-      'checkDeletion',
-      'readObjects',
-      'readActionLog',
-      'addObject',
-      'removeObject',
-      'moveObjects',
-      'sortAndCompress',
-      'createTask',
-      'changeTaskType',
-    ].map((member) => `getRequest.${member}`),
-  ),
   // Task 10: the executors.
   ...pendingRefusals(
     10,

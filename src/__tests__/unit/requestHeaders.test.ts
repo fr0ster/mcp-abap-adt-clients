@@ -93,6 +93,12 @@ const SENDS_NO_REQUEST = new Set([
   'AdtRequestLegacy.create',
   'AdtRequestLegacy.updateMetadata',
   'AdtRequestLegacy.delete',
+  'AdtRequestLegacy.checkDeletion',
+  'AdtRequestLegacy.addObject',
+  'AdtRequestLegacy.removeObject',
+  'AdtRequestLegacy.moveObjects',
+  'AdtRequestLegacy.createTask',
+  'AdtRequestLegacy.changeTaskType',
   'AdtUtilsLegacy.getSqlQuery',
   'AdtUtilsLegacy.getTableContents',
   // No deletion API on 7.40 (spec §4.3, §5).

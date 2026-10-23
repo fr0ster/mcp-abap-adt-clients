@@ -1124,7 +1124,24 @@ const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
       'check',
     ],
   ],
-  [AdtRequestLegacy, ['create', 'updateMetadata', 'delete']],
+  [
+    AdtRequestLegacy,
+    [
+      'create',
+      'updateMetadata',
+      'delete',
+      'searchConfigurations',
+      'checkDeletion',
+      'readObjects',
+      'readActionLog',
+      'addObject',
+      'removeObject',
+      'moveObjects',
+      'sortAndCompress',
+      'createTask',
+      'changeTaskType',
+    ],
+  ],
   [
     AdtUtilsLegacy,
     [

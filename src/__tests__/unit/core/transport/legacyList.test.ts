@@ -5,6 +5,7 @@
  * not have it, while listTransportsLegacy() — written for exactly this — was
  * never called from anywhere.
  */
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -90,5 +91,70 @@ describe('legacy transport update/delete', () => {
 
     expect(failure.message).toMatch(/not supported on legacy/);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('legacy transport members', () => {
+  const cfg = { transportNumber: 'GUARD_REQUEST' };
+  const entry = { type: 'PROG', name: 'ZGUARD', position: '1' };
+  const headers = { headers: {} as IAdtHeaders };
+  type Handler = AdtRequestLegacy;
+  const refused: [string, (h: Handler) => Promise<unknown>][] = [
+    ['searchConfigurations', (h) => h.searchConfigurations()],
+    ['checkDeletion', (h) => h.checkDeletion(cfg, headers)],
+    ['readObjects', (h) => h.readObjects('GUARD_REQUEST')],
+    ['readActionLog', (h) => h.readActionLog('GUARD_REQUEST')],
+    ['addObject', (h) => h.addObject('GUARD_REQUEST', entry, headers)],
+    ['removeObject', (h) => h.removeObject('GUARD_REQUEST', entry, headers)],
+    [
+      'moveObjects',
+      (h) => h.moveObjects('GUARD_TASK', 'GUARD_REQUEST', [entry], headers),
+    ],
+    ['sortAndCompress', (h) => h.sortAndCompress('GUARD_TASK')],
+    [
+      'createTask',
+      (h) => h.createTask('GUARD_REQUEST', { ...headers, targetUser: 'GUARD' }),
+    ],
+    [
+      'changeTaskType',
+      (h) => h.changeTaskType('GUARD_TASK', 'Unclassified' as never, headers),
+    ],
+    ['create', (h) => h.create()],
+    ['updateMetadata', (h) => h.updateMetadata()],
+    ['delete', (h) => h.delete()],
+  ];
+
+  it.each(refused)('%s refuses without a request', async (_member, call) => {
+    const { connection, calls } = recordingConnection();
+
+    const failure = expectFailure(
+      (await call(new AdtRequestLegacy(connection))) as Parameters<
+        typeof expectFailure
+      >[0],
+      'legacy transport member',
+    );
+
+    expect(failure.message).toMatch(/not supported on legacy/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('list and readMetadata send one GET to the legacy collection', async () => {
+    for (const call of [
+      (h: AdtRequestLegacy<typeof transportParsing>) => h.list(),
+      (h: AdtRequestLegacy<typeof transportParsing>) => h.readMetadata(cfg),
+    ]) {
+      const { connection, calls } = recordingConnection();
+      await call(
+        new AdtRequestLegacy(
+          connection,
+          undefined,
+          undefined,
+          transportParsing,
+        ),
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('GET');
+      expect(calls[0].url).toBe('/sap/bc/cts/transportrequests');
+    }
   });
 });
