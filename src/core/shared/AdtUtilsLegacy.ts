@@ -17,12 +17,16 @@
  * - getVirtualFoldersContents → .../informationsystem/virtualfolders/contents
  * - getAllTypes → .../informationsystem/objecttypes
  * - checkDeletionGroup, deleteObjectsGroup → /sap/bc/adt/deletion/*
- * - readObjectMetadata for a domain, a data element, a structure and a
- *   package (`404`), and for a table and a table type, whose families 7.40
- *   does not serve (§10.1); readObjectSource for a structure, a table (`404`)
- *   and a table type. Every alias `objectWire` accepts for those types is
- *   refused, in any case; every other type goes to the base unchanged, so an
- *   unknown type is still thrown.
+ * - readObjectMetadata for a domain, a data element, a structure, a package
+ *   and a table (the table family, §10.1); readObjectSource for a structure
+ *   and a table
+ *
+ * Not measured and not advertised, refused until measured:
+ * - readObjectMetadata and readObjectSource for a table type
+ *
+ * In readObjectMetadata/readObjectSource every alias `objectWire` accepts for
+ * those types is refused, in any case; every other type goes to the base
+ * unchanged, so an unknown type is still thrown.
  *
  * Refused because a legacy group activation has no run:
  * - getActivationRun, getActivationResults → /sap/bc/adt/activation/runs,
@@ -81,6 +85,10 @@ const VIRTUAL_FOLDERS = `${RIS}/virtualfolders/contents`;
 const OBJECT_TYPES = `${RIS}/objecttypes`;
 const ACTIVATION_RUNS = '/sap/bc/adt/activation/runs';
 const ACTIVATION_RESULTS = '/sap/bc/adt/activation/results';
+const WHERE_USED_ON_740 =
+  '7.40 serves where-used through the RIS sequence fullnamemapping → metadata → whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY, which this library does not implement.';
+const OBJECT_TYPES_ON_740 =
+  '7.40 serves object types through repository/typestructure, which this library does not implement.';
 const NO_RUN_ID =
   'A legacy activateObjectsGroup is the synchronous /sap/bc/adt/activation: its answer is the result, and there is no run id to ask about.';
 
@@ -274,6 +282,7 @@ ${objectReferences}
     return legacyRefusal<ReturnType<R['whereUsed']>, E>(
       'getWhereUsed',
       WHERE_USED,
+      WHERE_USED_ON_740,
     );
   }
 
@@ -285,6 +294,7 @@ ${objectReferences}
     return legacyRefusal<ReturnType<R['whereUsedScope']>, E>(
       'getWhereUsedScope',
       WHERE_USED_SCOPE,
+      WHERE_USED_ON_740,
     );
   }
 
@@ -317,6 +327,7 @@ ${objectReferences}
     return legacyRefusal<ReturnType<R['types']>, E>(
       'getAllTypes',
       OBJECT_TYPES,
+      OBJECT_TYPES_ON_740,
     );
   }
 

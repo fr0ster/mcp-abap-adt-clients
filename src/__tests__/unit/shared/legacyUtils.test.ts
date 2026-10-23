@@ -140,6 +140,30 @@ describe('legacy utilities', () => {
       expect(message).toContain('DEVC/K');
     });
 
+    it.each([['getWhereUsed'], ['getWhereUsedScope']] as const)(
+      '%s names the RIS sequence 7.40 serves where-used through',
+      async (member) => {
+        const { utils } = legacyUtils();
+        const answer = (await utils[member](
+          { object_name: 'ZCL_GUARD', object_type: 'class' },
+          { headers: headersOf(utils, member) },
+        )) as Answer;
+        const message = answer.getError?.().message;
+        expect(message).toContain(
+          'fullnamemapping → metadata → whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY',
+        );
+        expect(message).toContain('which this library does not implement');
+      },
+    );
+
+    it('getAllTypes names repository/typestructure, which 7.40 serves object types through', async () => {
+      const { utils } = legacyUtils();
+      const answer = (await utils.getAllTypes()) as Answer;
+      const message = answer.getError?.().message;
+      expect(message).toContain('repository/typestructure');
+      expect(message).toContain('which this library does not implement');
+    });
+
     it.each([['getActivationRun'], ['getActivationResults']] as const)(
       '%s says a legacy group activation has no run id',
       async (member) => {
@@ -191,7 +215,7 @@ describe('legacy utilities', () => {
           'ZGUARD',
         );
         expectRefusal(answer, sent, 'readObjectMetadata', endpoint);
-        expect(answer.ok || answer.getError().message).toContain(alias);
+        expect((answer as Answer).getError?.().message).toContain(alias);
       },
     );
 
@@ -232,7 +256,7 @@ describe('legacy utilities', () => {
           'ZGUARD',
         );
         expectRefusal(answer, sent, 'readObjectSource', endpoint);
-        expect(answer.ok || answer.getError().message).toContain(alias);
+        expect((answer as Answer).getError?.().message).toContain(alias);
       },
     );
 
