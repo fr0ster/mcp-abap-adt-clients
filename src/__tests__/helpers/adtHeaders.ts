@@ -220,10 +220,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/xml',
     contentType: 'application/xml',
   },
-  'AdtClassLegacy.update': {
-    accept: 'text/plain',
-    contentType: 'text/plain',
-  },
   'AdtClassMemberBase.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',

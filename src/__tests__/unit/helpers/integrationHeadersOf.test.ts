@@ -13,6 +13,8 @@ import * as ts from 'typescript';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
+import { AdtClass } from '../../../core/class/AdtClass';
+import { AdtContentTypesBase } from '../../../core/shared/contentTypes';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
@@ -245,6 +247,17 @@ describe('integrationHeadersOf', () => {
     // refusals: each was called, and none sent a request.
     expect(refusals).toBeGreaterThan(50);
     expect(sentWithTestHeaders).toEqual([]);
+  });
+
+  it('hands out the inherited stateless class update on a legacy client', () => {
+    const cls = new AdtClientLegacy(connection(), logger, {
+      contentTypes: new AdtContentTypesBase(false),
+    }).getClass();
+    expect(cls.update).toBe(AdtClass.prototype.update);
+    expect(integrationHeadersOf(cls, 'update')).toEqual({
+      accept: 'text/plain',
+      contentType: 'text/plain',
+    });
   });
 
   it('is the only resolver in tests that reach SAP', () => {
