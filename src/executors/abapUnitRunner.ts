@@ -18,7 +18,6 @@ import type {
   ITestRunInformation,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
@@ -27,7 +26,7 @@ import {
   startUnitTestRunByObject,
   startUnitTestRunSync,
 } from '../core/shared/abapUnit';
-import { answering, failed } from '../utils/adtResponse';
+import { answering } from '../utils/adtResponse';
 import { rawDocument } from '../utils/resultStrategy';
 
 /** One strategy per distinct answer: starting a run, polling it, its result. */
@@ -134,18 +133,4 @@ export abstract class AbapUnitRunner<R extends IAbapUnitRunnerResults>
       options?.analyse,
     );
   }
-}
-
-/**
- * The refusal a legacy runner answers without a request, for an object type
- * whose tests no measured legacy endpoint runs.
- */
-export function refusedBelow750<T, E extends IAdtError>(
-  what: string,
-): IAdtResponse<T, E> {
-  return failed<T, E>({
-    origin: 'refusal',
-    code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-    message: `Running ${what} ABAP Unit tests is not supported below BASIS 7.50: the legacy endpoint answered no tests where there are some.`,
-  } as E);
 }

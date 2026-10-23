@@ -192,9 +192,8 @@ export async function startClassUnitTestRunByObject(
  * request is `startUnitTestRunSync` (`core/shared/abapUnit`), given each
  * class's URI; see there for the format and what was measured.
  *
- * The regular runner's `runSync` and the legacy runner's `run` both send it.
- * `options` absent sends no `<options>` element — the body the legacy runner
- * has always sent, unchanged.
+ * The runner's `runSync` sends it. `options` absent sends no `<options>`
+ * element.
  */
 export async function startClassUnitTestRunSync(
   connection: IAbapConnection,

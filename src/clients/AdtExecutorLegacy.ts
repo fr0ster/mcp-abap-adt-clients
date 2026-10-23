@@ -1,10 +1,12 @@
 /**
  * AdtExecutorLegacy — executors for legacy SAP systems (BASIS < 7.50).
  *
- * The ABAP Unit runners differ: a class's tests run on the legacy endpoint
- * (`ClassTestRunnerLegacy`); a report's, a function group's and a function
- * module's are refused without a request, because that endpoint has not been
- * measured to find them. The rest is inherited.
+ * The ABAP Unit runners differ: 7.40 has no `/abapunit/runs`, so every
+ * runner's inherited `runSync` — `/abapunit/testruns` with `<options>`,
+ * measured for a class, a report, a function group and a function module — is
+ * what runs the tests. A class's, a report's and a group's `run` send that same
+ * request; a function module's `run` is refused (it names no group), and there
+ * is no run to poll or fetch. The rest is inherited.
  */
 
 import type {
@@ -12,16 +14,16 @@ import type {
   IClassTestRunnerResults,
 } from '../executors/class/ClassTestRunner';
 import { ClassTestRunnerLegacy } from '../executors/class/ClassTestRunnerLegacy';
-import {
-  FunctionGroupTestRunnerLegacy,
-  type functionGroupTestRunnerDocuments,
-  type IFunctionGroupTestRunnerResults,
+import type {
+  functionGroupTestRunnerDocuments,
+  IFunctionGroupTestRunnerResults,
 } from '../executors/functionGroup/FunctionGroupTestRunner';
-import {
-  FunctionModuleTestRunnerLegacy,
-  type functionModuleTestRunnerDocuments,
-  type IFunctionModuleTestRunnerResults,
+import { FunctionGroupTestRunnerLegacy } from '../executors/functionGroup/FunctionGroupTestRunnerLegacy';
+import type {
+  functionModuleTestRunnerDocuments,
+  IFunctionModuleTestRunnerResults,
 } from '../executors/functionModule/FunctionModuleTestRunner';
+import { FunctionModuleTestRunnerLegacy } from '../executors/functionModule/FunctionModuleTestRunnerLegacy';
 import type {
   IProgramTestRunnerResults,
   programTestRunnerDocuments,

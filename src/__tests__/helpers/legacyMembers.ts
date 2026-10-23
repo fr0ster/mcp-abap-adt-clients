@@ -1531,19 +1531,6 @@ const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
   rows.map((row) => ({ row, assertion: 'sends nothing', task }));
 
 export const PENDING: readonly Pending[] = [
-  // Task 3: every legacy runner sends the modern synchronous body.
-  { row: 'getClassTestRunner.run', assertion: 'body', task: 3 },
-  { row: 'getClassTestRunner.runSync', assertion: 'body', task: 3 },
-  ...[
-    'getProgramTestRunner.run',
-    'getProgramTestRunner.runSync',
-    'getFunctionGroupTestRunner.run',
-    'getFunctionGroupTestRunner.runSync',
-    'getFunctionModuleTestRunner.runSync',
-  ].flatMap((row): Pending[] => [
-    { row, assertion: 'request', task: 3 },
-    { row, assertion: 'body', task: 3 },
-  ]),
   // Task 5: no deletion service on 7.40.
   ...pendingRefusals(5, [
     'getClass.checkDeletion',
