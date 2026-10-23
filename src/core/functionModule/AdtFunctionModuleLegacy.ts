@@ -3,6 +3,7 @@
  * (BASIS < 7.50).
  *
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
+ * checkDeletion() is refused without a request: 7.40 has no deletion API.
  */
 
 import type {
@@ -16,6 +17,7 @@ import { FUNCTION_MODULE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
+import { noDeletionCheck } from '../shared/refusalLegacy';
 import { AdtFunctionModule } from './AdtFunctionModule';
 import type {
   functionModuleDocuments,
@@ -46,5 +48,17 @@ export class AdtFunctionModuleLegacy<
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
+  }
+
+  /**
+   * Refused without a request: 7.40 has no deletion API —
+   * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5). `delete` with
+   * the object's lock handle is the delete.
+   */
+  override async checkDeletion<E extends IAdtError = IAdtError>(
+    _config: Partial<IFunctionModuleConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
   }
 }

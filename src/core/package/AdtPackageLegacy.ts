@@ -8,6 +8,7 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { failed } from '../../utils/adtResponse';
+import { noDeletionCheckNorDelete } from '../shared/refusalLegacy';
 import { AdtPackage } from './AdtPackage';
 import type { IPackageResults, packageDocuments } from './types';
 
@@ -64,5 +65,16 @@ export class AdtPackageLegacy<
     IAdtResponse<ReturnType<R['deletion']>, E>
   > {
     return failed<ReturnType<R['deletion']>, E>(UNSUPPORTED as E);
+  }
+
+  /**
+   * Refused without a request, on its own grounds: 7.40 has no deletion API —
+   * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5) — and the
+   * package `delete` refuses as well (§8).
+   */
+  override async checkDeletion<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['deletionCheck']>, E>
+  > {
+    return noDeletionCheckNorDelete<ReturnType<R['deletionCheck']>, E>();
   }
 }

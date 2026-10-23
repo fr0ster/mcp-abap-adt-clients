@@ -1531,24 +1531,6 @@ const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
   rows.map((row) => ({ row, assertion: 'sends nothing', task }));
 
 export const PENDING: readonly Pending[] = [
-  // Task 5: no deletion service on 7.40.
-  ...pendingRefusals(5, [
-    'getClass.checkDeletion',
-    'getProgram.checkDeletion',
-    'getInterface.checkDeletion',
-    'getFunctionGroup.checkDeletion',
-    'getFunctionModule.checkDeletion',
-    'getDdl.checkDeletion',
-    'getPackage.checkDeletion',
-    'getInclude.checkDeletion',
-    'getFunctionInclude.checkDeletion',
-    'getMessageClass.checkDeletion',
-    'getUtils.checkDeletionGroup',
-    'getInclude.delete',
-    'getFunctionInclude.delete',
-    'getMessageClass.delete',
-    'getUtils.deleteObjectsGroup',
-  ]),
   // Task 6: four more types absentOnLegacy.
   ...Object.entries(TO_BE_ABSENT).flatMap(([getter, members]) =>
     pendingRefusals(

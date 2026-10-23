@@ -26,7 +26,16 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
+import { AdtClassLegacy } from '../../core/class/AdtClassLegacy';
+import { AdtDdlLegacy } from '../../core/ddl/AdtDdlLegacy';
+import { AdtFunctionGroupLegacy } from '../../core/functionGroup/AdtFunctionGroupLegacy';
+import { AdtFunctionIncludeLegacy } from '../../core/functionInclude/AdtFunctionIncludeLegacy';
+import { AdtFunctionModuleLegacy } from '../../core/functionModule/AdtFunctionModuleLegacy';
+import { AdtIncludeLegacy } from '../../core/include/AdtIncludeLegacy';
+import { AdtInterfaceLegacy } from '../../core/interface/AdtInterfaceLegacy';
+import { AdtMessageClassLegacy } from '../../core/messageClass/AdtMessageClassLegacy';
 import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
+import { AdtProgramLegacy } from '../../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
 
@@ -1102,9 +1111,27 @@ export function headersOf(
  * connection and proves that no request leaves.
  */
 const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
-  [AdtPackageLegacy, ['create', 'updateMetadata', 'delete']],
+  [AdtPackageLegacy, ['create', 'updateMetadata', 'delete', 'checkDeletion']],
   [AdtRequestLegacy, ['create', 'updateMetadata', 'delete']],
-  [AdtUtilsLegacy, ['getSqlQuery', 'getTableContents']],
+  [
+    AdtUtilsLegacy,
+    [
+      'getSqlQuery',
+      'getTableContents',
+      'checkDeletionGroup',
+      'deleteObjectsGroup',
+    ],
+  ],
+  // No deletion API on 7.40 (spec §4.3, §5).
+  [AdtClassLegacy, ['checkDeletion']],
+  [AdtProgramLegacy, ['checkDeletion']],
+  [AdtInterfaceLegacy, ['checkDeletion']],
+  [AdtFunctionGroupLegacy, ['checkDeletion']],
+  [AdtFunctionModuleLegacy, ['checkDeletion']],
+  [AdtDdlLegacy, ['checkDeletion']],
+  [AdtIncludeLegacy, ['checkDeletion', 'delete']],
+  [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
+  [AdtMessageClassLegacy, ['checkDeletion', 'delete']],
 ];
 
 function isLegacyRefusal(handler: object, member: string): boolean {

@@ -3,7 +3,8 @@
  *
  * Extends AdtClient and overrides methods that differ on legacy systems:
  * - Object types absent on legacy answer a refusal from every member, without a request
- * - Supported types use legacy-compatible deletion (direct DELETE vs /deletion/delete)
+ * - Supported types use legacy-compatible deletion (direct DELETE vs /deletion/delete);
+ *   every checkDeletion, and the deletes that need /sap/bc/adt/deletion/*, refuse
  * - Content-Type defaults to v1 (AdtContentTypesBase)
  * - Transport requests use /sap/bc/cts/ instead of /sap/bc/adt/cts/
  *
@@ -71,8 +72,15 @@ import {
   type IFunctionModuleResults,
 } from '../core/functionModule';
 import { AdtFunctionModuleLegacy } from '../core/functionModule/AdtFunctionModuleLegacy';
+import { type IIncludeResults, includeDocuments } from '../core/include';
+import { AdtIncludeLegacy } from '../core/include/AdtIncludeLegacy';
 import { type IInterfaceResults, interfaceDocuments } from '../core/interface';
 import { AdtInterfaceLegacy } from '../core/interface/AdtInterfaceLegacy';
+import {
+  type IMessageClassResults,
+  messageClassDocuments,
+} from '../core/messageClass';
+import { AdtMessageClassLegacy } from '../core/messageClass/AdtMessageClassLegacy';
 import {
   AdtMetadataExtension,
   type IMetadataExtensionResults,
@@ -181,6 +189,32 @@ export class AdtClientLegacy extends AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
+    );
+  }
+
+  override getInclude<R extends IIncludeResults = typeof includeDocuments>(
+    results: R = includeDocuments as unknown as R,
+  ): AdtIncludeLegacy<R> {
+    return new AdtIncludeLegacy<R>(
+      this.connection,
+      this.logger,
+      this.contentTypes,
+      results,
+      this.systemContext,
+    );
+  }
+
+  override getMessageClass<
+    R extends IMessageClassResults = typeof messageClassDocuments,
+  >(
+    results: R = messageClassDocuments as unknown as R,
+  ): AdtMessageClassLegacy<R> {
+    return new AdtMessageClassLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
       this.lockRegistry,
       results,
     );

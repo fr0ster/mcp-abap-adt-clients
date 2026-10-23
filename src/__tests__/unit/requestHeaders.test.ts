@@ -95,6 +95,22 @@ const SENDS_NO_REQUEST = new Set([
   'AdtRequestLegacy.delete',
   'AdtUtilsLegacy.getSqlQuery',
   'AdtUtilsLegacy.getTableContents',
+  // No deletion API on 7.40 (spec §4.3, §5).
+  'AdtPackageLegacy.checkDeletion',
+  'AdtUtilsLegacy.checkDeletionGroup',
+  'AdtUtilsLegacy.deleteObjectsGroup',
+  'AdtClassLegacy.checkDeletion',
+  'AdtProgramLegacy.checkDeletion',
+  'AdtInterfaceLegacy.checkDeletion',
+  'AdtFunctionGroupLegacy.checkDeletion',
+  'AdtFunctionModuleLegacy.checkDeletion',
+  'AdtDdlLegacy.checkDeletion',
+  'AdtIncludeLegacy.checkDeletion',
+  'AdtIncludeLegacy.delete',
+  'AdtFunctionIncludeLegacy.checkDeletion',
+  'AdtFunctionIncludeLegacy.delete',
+  'AdtMessageClassLegacy.checkDeletion',
+  'AdtMessageClassLegacy.delete',
 ]);
 
 /**

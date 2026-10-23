@@ -6,6 +6,7 @@
  * - getTableContents → /sap/bc/adt/datapreview/ddic (not available)
  * - getSqlQuery → /sap/bc/adt/datapreview/freestyle (not available)
  * - activateObjectsGroup → /sap/bc/adt/activation/runs (not available, uses /sap/bc/adt/activation)
+ * - checkDeletionGroup, deleteObjectsGroup → /sap/bc/adt/deletion/* (not served; refused)
  *
  * A fourth override refused `getTransaction`
  * (/sap/bc/adt/repository/informationsystem/objectproperties, also absent). It
@@ -29,6 +30,7 @@ import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
 import { requestHeaders } from '../../utils/requestHeaders';
 import { AdtUtils } from './AdtUtils';
+import { noDeletionApi, noDeletionCheck } from './refusalLegacy';
 import type {
   IGetSqlQueryParams,
   IGetTableContentsParams,
@@ -144,6 +146,35 @@ ${objectReferences}
     return this.refuse(
       'Object properties',
       '/sap/bc/adt/repository/informationsystem/objectproperties/values',
+    );
+  }
+
+  /**
+   * Refused without a request: 7.40 has no deletion API —
+   * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5, §10.2).
+   */
+  override async checkDeletionGroup<E extends IAdtError = IAdtError>(
+    _objects: IObjectReference[],
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>(
+      'checkDeletionGroup',
+    );
+  }
+
+  /**
+   * Refused without a request: the group delete is
+   * `/sap/bc/adt/deletion/check` then `/deletion/delete`, which 7.40 does not
+   * serve (spec §4.3, §10.2).
+   */
+  override async deleteObjectsGroup<E extends IAdtError = IAdtError>(
+    _objects: IObjectReference[],
+    _transportRequest: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    return noDeletionApi<ReturnType<R['deletion']>, E>(
+      'deleteObjectsGroup',
+      "Delete each object through its handler's delete() with the object's lock handle, from lock().",
     );
   }
 
