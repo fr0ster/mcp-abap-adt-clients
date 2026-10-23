@@ -43,7 +43,19 @@ const absent = [
   'getEnhancement',
   'getAuthorizationField',
   'getFeatureToggle',
+  'getTransformation',
+  'getScalarFunction',
+  'getScalarFunctionImplementation',
+  'getAppendStructure',
 ] as const;
+
+/** The endpoint each type's refusal names (its collection). */
+const endpointOf: Record<string, string> = {
+  getTransformation: '/sap/bc/adt/xslt/transformations',
+  getScalarFunction: '/sap/bc/adt/ddic/dsfd/sources',
+  getScalarFunctionImplementation: '/sap/bc/adt/ddic/dsfi',
+  getAppendStructure: '/sap/bc/adt/ddic/structures',
+};
 
 type Handler = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -112,6 +124,9 @@ describe('AdtClientLegacy: object types absent on legacy', () => {
         expect(error.origin).toBe('refusal');
         expect(error.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
         expect(error.message).toContain('/sap/bc/adt/');
+        expect(error.message).not.toContain('discovery');
+        const endpoint = endpointOf[getter];
+        if (endpoint) expect(error.message).toContain(endpoint);
       }
       expect(makeAdtRequest).not.toHaveBeenCalled();
     },

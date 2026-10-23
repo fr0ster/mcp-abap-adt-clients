@@ -23,6 +23,11 @@ import {
   type IAccessControlResults,
 } from '../core/accessControl';
 import {
+  AdtAppendStructure,
+  type appendStructureDocuments,
+  type IAppendStructureResults,
+} from '../core/appendStructure';
+import {
   AdtAuthorizationField,
   type authorizationFieldDocuments,
   type IAuthorizationFieldResults,
@@ -91,6 +96,16 @@ import { AdtPackageLegacy } from '../core/package/AdtPackageLegacy';
 import { type IProgramResults, programDocuments } from '../core/program';
 import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
 import {
+  AdtScalarFunction,
+  type IScalarFunctionResults,
+  type scalarFunctionDocuments,
+} from '../core/scalarFunction';
+import {
+  AdtScalarFunctionImplementation,
+  type IScalarFunctionImplementationResults,
+  type scalarFunctionImplementationDocuments,
+} from '../core/scalarFunctionImplementation';
+import {
   AdtServiceBinding,
   type IServiceResults,
   type serviceDocuments,
@@ -118,6 +133,11 @@ import {
   type ITableTypeResults,
   type tableTypeDocuments,
 } from '../core/tabletype';
+import {
+  AdtTransformation,
+  type ITransformationResults,
+  type transformationDocuments,
+} from '../core/transformation';
 import { type ITransportResults, transportDocuments } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
 import {
@@ -129,11 +149,14 @@ import {
   ENHANCEMENT,
   FEATURE_TOGGLE,
   METADATA_EXTENSION,
+  SCALAR_FUNCTION,
+  SCALAR_FUNCTION_IMPLEMENTATION,
   SERVICE_BINDING,
   SERVICE_DEFINITION,
   STRUCTURE,
   TABLE,
   TABLE_TYPE,
+  TRANSFORMATION,
 } from '../endpoints/objects';
 import { AdtClient } from './AdtClient';
 import { absentOnLegacy } from './absentOnLegacy';
@@ -478,6 +501,47 @@ export class AdtClientLegacy extends AdtClient {
       AdtFeatureToggle,
       'FeatureToggle',
       FEATURE_TOGGLE.collection,
+    );
+  }
+
+  override getTransformation<
+    R extends ITransformationResults = typeof transformationDocuments,
+  >(_results?: R): AdtTransformation<R> {
+    return absentOnLegacy<AdtTransformation<R>>(
+      AdtTransformation,
+      'Transformation',
+      TRANSFORMATION.collection,
+    );
+  }
+
+  override getScalarFunction<
+    R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
+  >(_results?: R): AdtScalarFunction<R> {
+    return absentOnLegacy<AdtScalarFunction<R>>(
+      AdtScalarFunction,
+      'ScalarFunction',
+      SCALAR_FUNCTION.collection,
+    );
+  }
+
+  override getScalarFunctionImplementation<
+    R extends
+      IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
+  >(_results?: R): AdtScalarFunctionImplementation<R> {
+    return absentOnLegacy<AdtScalarFunctionImplementation<R>>(
+      AdtScalarFunctionImplementation,
+      'ScalarFunctionImplementation',
+      SCALAR_FUNCTION_IMPLEMENTATION.collection,
+    );
+  }
+
+  override getAppendStructure<
+    R extends IAppendStructureResults = typeof appendStructureDocuments,
+  >(_results?: R): AdtAppendStructure<R> {
+    return absentOnLegacy<AdtAppendStructure<R>>(
+      AdtAppendStructure,
+      'AppendStructure',
+      STRUCTURE.collection,
     );
   }
 }

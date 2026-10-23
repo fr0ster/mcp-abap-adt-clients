@@ -1163,6 +1163,10 @@ const ABSENT_ON_LEGACY = [
   'Enhancement',
   'AuthorizationField',
   'FeatureToggle',
+  'Transformation',
+  'ScalarFunction',
+  'ScalarFunctionImplementation',
+  'AppendStructure',
 ];
 
 /** A connection that refuses every request: the reference handlers send none. */

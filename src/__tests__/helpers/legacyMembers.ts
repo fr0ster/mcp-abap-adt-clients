@@ -492,17 +492,10 @@ const INCLUDE_URI = PROGRAM_INCLUDE.uri('ZGUARD_INC');
 const DDL_URI = DDL_SOURCE.uri('ZGUARD_DDL');
 const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 
-/** A §10.1 type whose handler is not absentOnLegacy yet; Task 6 makes it so. */
-const TO_BE_ABSENT = {
-  getTransformation: [...SOURCE_OBJECT_MEMBERS],
-  getScalarFunction: [...SOURCE_OBJECT_MEMBERS],
-  getScalarFunctionImplementation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
-  getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
-} as const;
-
 /** The handlers absentOnLegacy builds today (§10.1), by their public members. */
 const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS],
+  getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
   getAuthorizationField: [
     'activate',
     'check',
@@ -564,6 +557,8 @@ const ABSENT = {
     'validate',
   ],
   getMetadataExtension: [...SOURCE_OBJECT_MEMBERS],
+  getScalarFunction: [...SOURCE_OBJECT_MEMBERS],
+  getScalarFunctionImplementation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getServiceBinding: [
     'activate',
     'check',
@@ -583,6 +578,7 @@ const ABSENT = {
   getServiceDefinition: [...SOURCE_OBJECT_MEMBERS],
   getStructure: [...SOURCE_OBJECT_MEMBERS],
   getTable: [...SOURCE_OBJECT_MEMBERS],
+  getTransformation: [...SOURCE_OBJECT_MEMBERS],
   getTableType: [
     'activate',
     'check',
@@ -911,7 +907,7 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
     listProcessTypes: { section: '§6.3', call: calling('listProcessTypes') },
   },
   ...Object.fromEntries(
-    Object.entries({ ...ABSENT, ...TO_BE_ABSENT }).map(([getter, members]) => [
+    Object.entries(ABSENT).map(([getter, members]) => [
       getter,
       absent(getter, members),
     ]),
@@ -1531,13 +1527,6 @@ const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
   rows.map((row) => ({ row, assertion: 'sends nothing', task }));
 
 export const PENDING: readonly Pending[] = [
-  // Task 6: four more types absentOnLegacy.
-  ...Object.entries(TO_BE_ABSENT).flatMap(([getter, members]) =>
-    pendingRefusals(
-      6,
-      members.map((member) => `${getter}.${member}`),
-    ),
-  ),
   // Task 7: utilities.
   ...pendingRefusals(7, [
     'getUtils.getWhereUsed',

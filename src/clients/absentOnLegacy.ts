@@ -4,10 +4,11 @@
  *
  * The legacy client still hands one out, so a caller of `AdtClient` that is
  * given the legacy client carries on instead of crashing at the factory. Every
- * member answers the same refusal and sends no request: the endpoint is absent
- * from the system's discovery catalog, so a request could only be refused by
- * SAP for a reason already known here. Decision 11, "The exception: legacy
- * endpoints".
+ * member answers the same refusal and sends no request: the endpoint is
+ * not served (missing from the system's discovery or, where discovery is
+ * silent, answered `404` when measured), so a request could only be refused
+ * by SAP for a reason already known here. Decision 11, "The exception:
+ * legacy endpoints".
  */
 
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -48,10 +49,9 @@ export function absentOnLegacy<T>(
     origin: 'refusal',
     code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
     message:
-      `${objectType} is not supported on this SAP system. ` +
-      `The required endpoint ${endpoint} was not found in the system's ` +
-      'ADT discovery catalog (/sap/bc/adt/discovery). ' +
-      "This typically means the system's BASIS version is too old.",
+      `${objectType} is not supported on this SAP system: ` +
+      `a legacy system (SAP_BASIS 7.40) does not serve ${endpoint}, ` +
+      'the endpoint this type needs.',
   };
   const handler: Record<string, unknown> = {};
   for (const name of membersOf(implementation)) {
