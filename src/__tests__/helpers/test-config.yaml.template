@@ -3179,8 +3179,10 @@ batch:
 # Live checks of the legacy client (AdtClientLegacy, AdtExecutorLegacy) on a
 # SAP_BASIS 7.40 SP04 system. They run only when environment.is_legacy is true
 # and environment.connection_type is "rfc"; elsewhere they skip and say why.
-# Disabled by default: each creates and deletes objects of its own, so name
-# objects that do not exist and that you may create (Z* / Y*).
+# Disabled by default. legacy_deletes and legacy_function_include create
+# objects of their own in $TMP (no transport: the deletes were measured in a
+# local package) and delete them afterwards, so name objects that do not exist
+# and that you may create (Z* / Y*); the other cases read existing objects.
 legacy_740:
   test_cases:
     - name: "legacy_deletes"
@@ -3194,13 +3196,14 @@ legacy_740:
         function_group_name: "ZAC_LG_FG"          # ← CHANGE
         function_module_name: "ZAC_LG_FM"         # ← CHANGE
         ddl_name: "ZAC_LG_DDL"                    # ← CHANGE
-        # package_name and transport_request fall back to environment defaults.
     - name: "legacy_refusals_send_nothing"
       enabled: false
       available_in: ["legacy"]
-      description: "checkDeletion, the absentOnLegacy handlers and the other refused members answer the refusal and send no request (asserted on the wire recorder)"
+      description: "checkDeletion, the absentOnLegacy handlers and the other refused members answer the refusal and send no request (asserted on the wire recorder); readObjectMetadata/readObjectSource for a program and a class answer 200"
       params:
-        class_name: "ZAC_LG_CLS"                  # ← CHANGE: any name, nothing is sent for it
+        # The refused members are called with placeholders; nothing is sent.
+        class_name: "ZAC_LG_UT_CLS"               # ← CHANGE: an existing class, read for the 200 cases
+        program_name: "ZAC_LG_UT_PROG"            # ← CHANGE: an existing report, read for the 200 cases
     - name: "legacy_unit_runners"
       enabled: false
       available_in: ["legacy"]
@@ -3215,8 +3218,10 @@ legacy_740:
       available_in: ["legacy"]
       description: "A function include created with the v1 pair, written and activated"
       params:
-        function_group_name: "ZAC_LG_FG"          # ← CHANGE: an existing function group
-        include_name: "LZAC_LG_FGU01"             # ← CHANGE: a name that does not exist yet
+        # The include's own delete is refused on 7.40, so the test creates this
+        # group, creates the include in it, and deletes the group with it.
+        function_group_name: "ZAC_LG_FI"          # ← CHANGE: a name that does not exist yet
+        include_name: "LZAC_LG_FIF01"             # ← CHANGE: L<group>F01, a name that does not exist yet
     - name: "legacy_transports"
       enabled: false
       available_in: ["legacy"]
