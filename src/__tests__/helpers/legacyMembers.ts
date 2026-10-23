@@ -1523,17 +1523,4 @@ export interface Pending {
   readonly task: number;
 }
 
-const pendingRefusals = (task: number, rows: readonly string[]): Pending[] =>
-  rows.map((row) => ({ row, assertion: 'sends nothing', task }));
-
-export const PENDING: readonly Pending[] = [
-  // Task 10: the executors.
-  ...pendingRefusals(
-    10,
-    ['getClassExecutor', 'getProgramExecutor'].flatMap((getter) =>
-      ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'].map(
-        (member) => `${getter}.${member}`,
-      ),
-    ),
-  ),
-];
+export const PENDING: readonly Pending[] = [];

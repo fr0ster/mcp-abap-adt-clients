@@ -5,6 +5,7 @@ export {
 } from './abapUnitRunner';
 export {
   ClassExecutor,
+  ClassExecutorLegacy,
   ClassTestRunner,
   ClassTestRunnerLegacy,
   classExecutorDocuments,
@@ -30,6 +31,7 @@ export {
   type IProgramExecutorResults,
   type IProgramTestRunnerResults,
   ProgramExecutor,
+  ProgramExecutorLegacy,
   ProgramTestRunner,
   ProgramTestRunnerLegacy,
   programExecutorDocuments,

@@ -10,6 +10,11 @@
  */
 
 import type {
+  classExecutorDocuments,
+  IClassExecutorResults,
+} from '../executors/class/ClassExecutor';
+import { ClassExecutorLegacy } from '../executors/class/ClassExecutorLegacy';
+import type {
   classTestRunnerDocuments,
   IClassTestRunnerResults,
 } from '../executors/class/ClassTestRunner';
@@ -25,6 +30,11 @@ import type {
 } from '../executors/functionModule/FunctionModuleTestRunner';
 import { FunctionModuleTestRunnerLegacy } from '../executors/functionModule/FunctionModuleTestRunnerLegacy';
 import type {
+  IProgramExecutorResults,
+  programExecutorDocuments,
+} from '../executors/program/ProgramExecutor';
+import { ProgramExecutorLegacy } from '../executors/program/ProgramExecutorLegacy';
+import type {
   IProgramTestRunnerResults,
   programTestRunnerDocuments,
 } from '../executors/program/ProgramTestRunner';
@@ -32,6 +42,20 @@ import { ProgramTestRunnerLegacy } from '../executors/program/ProgramTestRunnerL
 import { AdtExecutor } from './AdtExecutor';
 
 export class AdtExecutorLegacy extends AdtExecutor {
+  /** Runs and the trace type lists refuse on 7.40; the trace schedule is inherited. */
+  override getClassExecutor<
+    R extends IClassExecutorResults = typeof classExecutorDocuments,
+  >(results?: R): ClassExecutorLegacy<R> {
+    return new ClassExecutorLegacy<R>(this.connection, this.logger, results);
+  }
+
+  /** Runs and the trace type lists refuse on 7.40; the trace schedule is inherited. */
+  override getProgramExecutor<
+    R extends IProgramExecutorResults = typeof programExecutorDocuments,
+  >(results?: R): ProgramExecutorLegacy<R> {
+    return new ProgramExecutorLegacy<R>(this.connection, this.logger, results);
+  }
+
   override getClassTestRunner<
     R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
   >(results?: R): ClassTestRunnerLegacy<R> {
