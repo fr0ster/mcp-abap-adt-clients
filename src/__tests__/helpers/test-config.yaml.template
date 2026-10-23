@@ -3175,3 +3175,50 @@ batch:
     - name: "debugger_client"
       enabled: false
       available_in: ["onprem", "cloud"]
+
+# Live checks of the legacy client (AdtClientLegacy, AdtExecutorLegacy) on a
+# SAP_BASIS 7.40 SP04 system. They run only when environment.is_legacy is true
+# and environment.connection_type is "rfc"; elsewhere they skip and say why.
+# Disabled by default: each creates and deletes objects of its own, so name
+# objects that do not exist and that you may create (Z* / Y*).
+legacy_740:
+  test_cases:
+    - name: "legacy_deletes"
+      enabled: false
+      available_in: ["legacy"]
+      description: "Lock, delete with the lock handle, unlock, read answers 404 — class, program, interface, function group, function module, DDL source; a delete without a handle answers 400 for the first four"
+      params:
+        class_name: "ZAC_LG_CLS"                  # ← CHANGE: a name that does not exist yet
+        program_name: "ZAC_LG_PROG"               # ← CHANGE
+        interface_name: "ZAC_LG_IF"               # ← CHANGE
+        function_group_name: "ZAC_LG_FG"          # ← CHANGE
+        function_module_name: "ZAC_LG_FM"         # ← CHANGE
+        ddl_name: "ZAC_LG_DDL"                    # ← CHANGE
+        # package_name and transport_request fall back to environment defaults.
+    - name: "legacy_refusals_send_nothing"
+      enabled: false
+      available_in: ["legacy"]
+      description: "checkDeletion, the absentOnLegacy handlers and the other refused members answer the refusal and send no request (asserted on the wire recorder)"
+      params:
+        class_name: "ZAC_LG_CLS"                  # ← CHANGE: any name, nothing is sent for it
+    - name: "legacy_unit_runners"
+      enabled: false
+      available_in: ["legacy"]
+      description: "Class, program and function group run/runSync and function module runSync answer the methods of an object with tests, with <options> sent"
+      params:
+        class_name: "ZAC_LG_UT_CLS"               # ← CHANGE: an existing class with local tests
+        program_name: "ZAC_LG_UT_PROG"            # ← CHANGE: an existing report with local tests
+        function_group_name: "ZAC_LG_UT_FG"       # ← CHANGE: an existing group whose include holds tests
+        function_module_name: "ZAC_LG_UT_FM"      # ← CHANGE: a module of that group
+    - name: "legacy_function_include"
+      enabled: false
+      available_in: ["legacy"]
+      description: "A function include created with the v1 pair, written and activated"
+      params:
+        function_group_name: "ZAC_LG_FG"          # ← CHANGE: an existing function group
+        include_name: "LZAC_LG_FGU01"             # ← CHANGE: a name that does not exist yet
+    - name: "legacy_transports"
+      enabled: false
+      available_in: ["legacy"]
+      description: "Transport list and readMetadata answer the user's list from /sap/bc/cts"
+      params: {}
