@@ -13,6 +13,10 @@
  *
  * - an identifier containing `legacy`, in any case — a main file that names a
  *   legacy class, imports one, or keeps a `legacy` flag is a branch;
+ * - a module specifier containing `legacy`, in any case — of an import, an
+ *   `export … from` or a dynamic `import()`: a main file that loads a legacy
+ *   module under a name of its own (`import * as v`, a side-effect import,
+ *   `export *`) names no legacy identifier, and is a branch all the same;
  * - a string or template literal containing `/sap/bc/cts` — the legacy CTS
  *   endpoint, which only the legacy transport handler addresses.
  *
@@ -29,7 +33,11 @@ const ROOT = path.resolve(__dirname, '../../..');
 const LEGACY_CTS = '/sap/bc/cts';
 
 /** What a node is, as far as this check is concerned. */
-type Hit = { kind: 'identifier' | 'literal'; node: ts.Node; text: string };
+type Hit = {
+  kind: 'identifier' | 'literal' | 'module';
+  node: ts.Node;
+  text: string;
+};
 
 interface Exception {
   readonly reason: string;
@@ -61,10 +69,10 @@ const EXCEPTIONS: readonly Exception[] = [
   },
   {
     reason:
-      'A barrel re-exports the legacy classes so consumers reach them; a re-export is not a branch. An import, or any other use, in a barrel is.',
+      'A barrel re-exports the legacy classes so consumers reach them; a re-export (its names and the legacy module it names) is not a branch. An import, or any other use, in a barrel is.',
     allows: (file, hit) =>
       baseName(file).startsWith('index') &&
-      hit.kind === 'identifier' &&
+      (hit.kind === 'identifier' || hit.kind === 'module') &&
       within(hit.node, ts.isExportDeclaration),
   },
   {
@@ -103,11 +111,33 @@ function literalText(node: ts.Node): string | null {
   return null;
 }
 
-/** Every legacy identifier and legacy-endpoint literal in a source text. */
+/** The module an import, an `export … from` or an `import()` names. */
+function moduleSpecifierOf(node: ts.Node): ts.StringLiteralLike | null {
+  if (
+    (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+    node.moduleSpecifier &&
+    ts.isStringLiteralLike(node.moduleSpecifier)
+  )
+    return node.moduleSpecifier;
+  if (
+    ts.isCallExpression(node) &&
+    node.expression.kind === ts.SyntaxKind.ImportKeyword
+  ) {
+    const [argument] = node.arguments;
+    if (argument && ts.isStringLiteralLike(argument)) return argument;
+  }
+  return null;
+}
+
+/** Every legacy identifier, module and legacy-endpoint literal in a text. */
 function hitsIn(file: string, text: string): Hit[] {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const hits: Hit[] = [];
   const visit = (node: ts.Node): void => {
+    const specifier = moduleSpecifierOf(node);
+    if (specifier && specifier.text.toLowerCase().includes('legacy')) {
+      hits.push({ kind: 'module', node: specifier, text: specifier.text });
+    }
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
       if (node.text.toLowerCase().includes('legacy'))
         hits.push({ kind: 'identifier', node, text: node.text });
@@ -180,10 +210,43 @@ describe('legacy stays in legacy classes', () => {
         'new AdtClassLegacy();',
       ].join('\n');
       expect(findings(MAIN, text)).toEqual([
+        `${MAIN}:1  module ./AdtClassLegacy`,
         `${MAIN}:1  identifier AdtClassLegacy`,
         `${MAIN}:2  identifier isLegacy`,
         `${MAIN}:3  identifier LEGACY_MODE`,
         `${MAIN}:4  identifier AdtClassLegacy`,
+      ]);
+    });
+
+    it('flags a legacy module specifier however the import names nothing legacy', () => {
+      const text = [
+        "import './AdtClassLegacy';",
+        "import * as variant from './AdtClassLegacy';",
+        "import plain from '../shared/refusalLegacy';",
+        "export * from './AdtClassLegacy';",
+        "export { a as b } from '../shared/deleteLegacy';",
+        "const lazy = () => import('./AdtClassLegacy');",
+        "import { AdtClass } from './AdtClass';",
+      ].join('\n');
+      expect(findings(MAIN, text)).toEqual([
+        `${MAIN}:1  module ./AdtClassLegacy`,
+        `${MAIN}:2  module ./AdtClassLegacy`,
+        `${MAIN}:3  module ../shared/refusalLegacy`,
+        `${MAIN}:4  module ./AdtClassLegacy`,
+        `${MAIN}:5  module ../shared/deleteLegacy`,
+        `${MAIN}:6  module ./AdtClassLegacy`,
+      ]);
+    });
+
+    it('lets a barrel re-export from a legacy module, but not import from one', () => {
+      const barrel = 'src/executors/index.ts';
+      const text = [
+        "export * from './abapUnitRunLegacy';",
+        "export { x } from './abapUnitRunLegacy';",
+        "import './abapUnitRunLegacy';",
+      ].join('\n');
+      expect(findings(barrel, text)).toEqual([
+        `${barrel}:3  module ./abapUnitRunLegacy`,
       ]);
     });
 
@@ -218,6 +281,7 @@ describe('legacy stays in legacy classes', () => {
         "import { AdtClassLegacy as L } from './AdtClassLegacy';",
       ].join('\n');
       expect(findings(barrel, text)).toEqual([
+        `${barrel}:2  module ./AdtClassLegacy`,
         `${barrel}:2  identifier AdtClassLegacy`,
       ]);
     });
@@ -242,7 +306,10 @@ describe('legacy stays in legacy classes', () => {
       expect(findings('src/clients/absentOnLegacy.ts', text)).toEqual([]);
       expect(findings('src/clients/createAdtClient.ts', text)).toEqual([]);
       expect(findings('src/clients/createAdtExecutor.ts', text)).toEqual([]);
-      expect(findings('src/clients/AdtClient.ts', text)).toHaveLength(1);
+      expect(findings('src/clients/AdtClient.ts', text)).toEqual([
+        'src/clients/AdtClient.ts:1  module ./AdtClientLegacy',
+        'src/clients/AdtClient.ts:1  identifier AdtClientLegacy',
+      ]);
     });
   });
 });
