@@ -1,12 +1,17 @@
 /**
- * What the three legacy-env admin runs share: a legacy session over RFC, the
+ * What the three legacy-env admin runs share: a legacy session over RFC on a
+ * system that is legacy (a modern one is refused before anything runs), the
  * env action, and its report in `.legacy-env/<action>.json` (gitignored — it
  * names the request the system gave) and through the tests logger.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { describeRun, type EnvRun } from '../../helpers/legacyEnv';
+import {
+  assertLegacySystem,
+  describeRun,
+  type EnvRun,
+} from '../../helpers/legacyEnv';
 import {
   closeLegacySession,
   type LegacySession,
@@ -30,6 +35,8 @@ export function legacyEnvAdmin(
 
     beforeAll(async () => {
       session = await openLegacySession();
+      // Before anything is installed: a modern system is refused.
+      await assertLegacySystem(session.connection);
     }, 120000);
 
     afterAll(async () => {

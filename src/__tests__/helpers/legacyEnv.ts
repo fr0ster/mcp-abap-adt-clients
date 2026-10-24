@@ -36,11 +36,13 @@ import type {
   IAdtHeaders,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import type { AdtExecutorLegacy } from '../../clients/AdtExecutorLegacy';
 import { isUnansweredCredentialRefusal } from '../../utils/adtResponse';
+import { isModernAdtSystem } from '../../utils/systemInfo';
 import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
 import {
@@ -812,6 +814,28 @@ function requireClean(run: EnvRun, problems: readonly string[]): void {
     throw new Error(
       `legacy env ${run.result.action} reported ${all.length} problem(s):\n  ${all.join('\n  ')}`,
     );
+}
+
+/**
+ * The admin runs install classes and delete objects on the system they are
+ * pointed at, so they run only on a legacy one: a system that answers
+ * `/sap/bc/adt/core/discovery` (`isModernAdtSystem()` true) is refused before
+ * anything is installed — a 7.40 configuration pointed at the wrong host must
+ * not set up, or tear down, anything there.
+ */
+export async function assertLegacySystem(
+  connection: IAbapConnection,
+  isModern: (
+    connection: IAbapConnection,
+  ) => Promise<boolean> = isModernAdtSystem,
+): Promise<void> {
+  if (await isModern(connection)) {
+    throw new Error(
+      'The legacy test environment refuses this system: it answers ' +
+        '/sap/bc/adt/core/discovery, so it is not a legacy (7.40) system. ' +
+        'Nothing was installed or deleted.',
+    );
+  }
 }
 
 /**

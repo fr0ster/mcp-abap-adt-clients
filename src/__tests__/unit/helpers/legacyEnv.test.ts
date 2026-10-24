@@ -4,6 +4,7 @@ import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   ABAP_DIR,
   abapNameValue,
+  assertLegacySystem,
   assertOwnName,
   CredentialRefused,
   combineRuns,
@@ -596,5 +597,30 @@ describe('legacy env: the ABAP sources', () => {
     expect(first).not.toMatch(/delete_package|delete_requests/);
     expect(second).toContain('delete_package( ).');
     expect(second).toContain('delete_requests( ).');
+  });
+});
+
+describe('legacy env: the admin runs refuse a modern system', () => {
+  const connection = {} as Parameters<typeof assertLegacySystem>[0];
+
+  it('refuses before anything is installed when the system is modern', async () => {
+    await expect(
+      assertLegacySystem(connection, async () => true),
+    ).rejects.toThrow(/not a legacy .*system.*nothing was installed/i);
+  });
+
+  it('lets a legacy system through', async () => {
+    await expect(
+      assertLegacySystem(connection, async () => false),
+    ).resolves.toBeUndefined();
+  });
+
+  it('asks the connection it was given', async () => {
+    const asked: unknown[] = [];
+    await assertLegacySystem(connection, async (c: unknown) => {
+      asked.push(c);
+      return false;
+    });
+    expect(asked).toEqual([connection]);
   });
 });
