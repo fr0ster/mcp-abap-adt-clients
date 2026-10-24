@@ -47,6 +47,16 @@
 # "create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params.implementation_name": "<NAME>"
 # Name of the append structure, if the base name collides.
 # "create_append_structure.test_cases[adt_append_structure].params.append_structure_name": "<NAME>"
+# false where the system has no scalar functions (DSFD): a refused create fails, it is not skipped.
+# "create_scalar_function.test_cases[adt_scalar_function].enabled": false
+# false where the system has no scalar function implementations (DSFI).
+# "create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].enabled": false
+# false where the system has no append structures.
+# "create_append_structure.test_cases[adt_append_structure].enabled": false
+# true only where the system allows creating feature toggles (#131); a refusal fails the test.
+# "create_feature_toggle.test_cases[adt_feature_toggle].enabled": true
+# false where the system refuses `check` (e.g. S_ABPLNGVS); a refusal fails the test.
+# "check_run.test_cases[class_check].enabled": false
 # true once a check variant that runs on this system is set.
 # "atc_run.test_cases[adt_atc_run].enabled": true
 # ATC check variant, or "" for the system's own.

@@ -45,8 +45,8 @@ import {
 } from '../helpers/testLogger';
 import { integrationHeadersOf } from './adtHeaders';
 import { BaseTester } from './BaseTester';
+import { gateOn } from './caseGate';
 import { failureOf } from './contract';
-import { logTestSkip } from './testProgressLogger';
 
 const {
   getEnabledTestCase,
@@ -224,41 +224,37 @@ describe('ObjectType (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should run the full workflow', async () => {
-      if (!tester) return;
-      if (!crudHasConfig) {
-        await tester.flowTestAuto();
-        return;
-      }
+    // Applicability is decided at registration, never in the body and never
+    // from a refusal: a capability the system lacks is the config's to state
+    // (the case's `enabled` / `available_in`) or a predicate on the configured
+    // system, here "not cloud" — the collection declares no app:accept there.
+    gateOn(({ isCloud }) => !isCloud)(
+      'should run the full workflow',
+      async () => {
+        if (!tester) return;
+        if (!crudHasConfig) {
+          await tester.flowTestAuto();
+          return;
+        }
 
-      // Gate on the CAPABILITY and name it. A skip that says "not supported"
-      // without saying why is how a gap stays invisible — say what the system
-      // lacks, so a reader can check whether it is still true.
-      if (isCloudSystem) {
-        logTestSkip(
-          testsLogger,
-          'ObjectType - full workflow',
-          'the collection declares no app:accept on this system, so it is not a creation target',
-        );
-        return;
-      }
+        const config = tester.getConfig();
+        if (!config) {
+          await tester.flowTestAuto();
+          return;
+        }
 
-      const config = tester.getConfig();
-      if (!config) {
-        await tester.flowTestAuto();
-        return;
-      }
+        const testCase = tester.getTestCaseDefinition();
+        const source = testCase?.params?.source_code || config.source || '';
 
-      const testCase = tester.getTestCaseDefinition();
-      const source = testCase?.params?.source_code || config.source || '';
-
-      await tester.flowTestAuto({
-        source,
-        updateConfig: {
-          ...config,
-          source: testCase?.params?.update_source_code || source,
-        },
-      });
-    }, 900000);
+        await tester.flowTestAuto({
+          source,
+          updateConfig: {
+            ...config,
+            source: testCase?.params?.update_source_code || source,
+          },
+        });
+      },
+      900000,
+    );
   });
 });

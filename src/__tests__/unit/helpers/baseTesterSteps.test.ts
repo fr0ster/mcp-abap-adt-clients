@@ -136,6 +136,16 @@ describe('BaseTester flowTest reads every step answer', () => {
     ).rejects.toThrow('update failed [refusal]: the write was refused');
   });
 
+  it('fails at a refused validation — 404 included — and creates nothing', async () => {
+    const handler = fakeHandler({
+      validate: jest.fn(async () => refused('no validation resource', 404)),
+    });
+    await expect(
+      testerOver(handler).flowTest(config, {}, { updateConfig }),
+    ).rejects.toThrow('validate failed [refusal]: no validation resource');
+    expect(handler.create).not.toHaveBeenCalled();
+  });
+
   it('fails at a refused readMetadata step', async () => {
     const handler = fakeHandler({
       readMetadata: jest.fn(async () => refused('no document')),

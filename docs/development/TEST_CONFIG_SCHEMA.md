@@ -55,6 +55,7 @@ appear; anything else is refused by name. The list:
 | `create_transport.test_cases[builder_transport].params.target_system` | required |
 | `environment.connection_type` | optional (`"rfc"` / `"http"`) |
 | `…[adt_scalar_function].params.scalar_function_name`, `…[adt_scalar_function_implementation].params.implementation_name`, `…[adt_append_structure].params.append_structure_name` | optional |
+| `create_scalar_function…[adt_scalar_function].enabled`, `create_scalar_function_implementation…[adt_scalar_function_implementation].enabled`, `create_append_structure…[adt_append_structure].enabled`, `create_feature_toggle…[adt_feature_toggle].enabled`, `check_run…[class_check].enabled` — whether the case runs on this system; a refusal fails the test, it is never read as "not available here" | optional |
 | `atc_run…[adt_atc_run].enabled`, `.params.check_variant`, `.params.expected_message_id`, `.params.expected_priority`; `atc_object_kinds…[adt_atc_object_kinds].enabled`, `.params.check_variant` | optional |
 | `enhancement.test_cases[program_host].params.program_name`, `[function_group_host].params.function_group_name`, `[include_host].params.include_name`, `.main_program` | optional |
 

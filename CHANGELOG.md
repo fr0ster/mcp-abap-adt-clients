@@ -82,10 +82,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   the setup error, which `flowTestAuto()`, `modifyFlowTestAuto()`,
   `readTestAuto()` and the new `requireConfig()` raise, and it no longer
   decides `available_in` a second time. The hand-rolled `skipReason` of the
-  other suites became the same kind of failure. Whether a feature exists on a
-  system is the configuration's to say, never inferred from an answer: the
-  append-structure and scalar-function suites no longer skip when the create
-  answers `404`/`405`/`501`, they fail with what SAP said. Every
+  other suites became the same kind of failure. Whether something is
+  available on a system is the configuration's to say — the case's `enabled` /
+  `available_in` at registration — never inferred from a refusal: a refused
+  call fails with what SAP said, whatever its status. So the append-structure
+  and scalar-function creates no longer skip on `404`/`405`/`501`, a
+  validation answering `404`/`405`/`501` is no longer stepped over
+  (`BaseTester`, `groupActivation`), the feature-toggle suite no longer skips
+  on its `403` "not allowed to create/update feature toggles", and
+  `shared/checkRun` no longer skips on an `S_ABPLNGVS` /
+  `ExceptionResourceNoAccess` refusal — returned as a failure or as an
+  exception document inside a 200 (`helpers/checkReport.ts`,
+  `expectCheckReport`). The checks now register under a case of their own,
+  `check_run` / `class_check`, and the overlay accepts `enabled` for it and
+  for the scalar-function, scalar-function-implementation, append-structure
+  and feature-toggle cases, so a system that cannot run one turns it off in its
+  configuration. Only two answers stay accepted: an HTTP `406` where
+  `allow_406` says so, and a binding already in the publication state the
+  test asks for. Every
   expected-success call in the suites and helpers is read for its answer
   (`expectResult`, and in `helpers/contract.ts` the new `releasing` for a
   lock window, `cleanupRefusal` / `noteCleanupRefusal` / `raiseAfterCleanup`

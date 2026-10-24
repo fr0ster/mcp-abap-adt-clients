@@ -16,11 +16,9 @@ import * as path from 'node:path';
 // the package's built entry point does not carry it until it is released.
 import {
   analyseDeletion,
-  analyseUnsupportedStatus,
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -361,24 +359,14 @@ describe('Group Activation (Shared)', () => {
           !!name?.startsWith('ZAC_SHR_');
 
         // A name validation answers in its document, and a leftover of an
-        // earlier run is what it reports as "already exists". The one refusal
-        // accepted is a system with no validation resource (404/405/501), read
-        // as `UNSUPPORTED_OPERATION`: it has not judged the name, and the create
-        // that follows does. Any other refusal fails with what SAP said.
+        // earlier run is what it reports as "already exists". A refusal —
+        // 404/405/501 included — fails with what SAP said: whether this case
+        // runs on a system is its `enabled` / `available_in`.
         const expectNameFree = (
           answer: IAdtResponse<unknown>,
           label: string,
           name: string,
         ): void => {
-          if (
-            !answer.ok &&
-            answer.getError().code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION
-          ) {
-            testsLogger.warn?.(
-              `⚠️ ${label} validation unavailable: ${answer.getError().message}`,
-            );
-            return;
-          }
           const document = String(
             expectResult(answer, `validate ${label}`) ?? '',
           );
@@ -388,25 +376,19 @@ describe('Group Activation (Shared)', () => {
             );
           }
         };
-        const validation = {
-          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
-        };
 
         try {
           // Step 0: Validate domain
           currentStep = 'validate domain';
           logTestStep(currentStep, testsLogger);
           expectNameFree(
-            await client.getDomain().validate(
-              {
-                domainName: domainName,
-                packageName: packageName,
-                description:
-                  testCase.params.description ||
-                  `Test domain for group activation`,
-              },
-              validation,
-            ),
+            await client.getDomain().validate({
+              domainName: domainName,
+              packageName: packageName,
+              description:
+                testCase.params.description ||
+                `Test domain for group activation`,
+            }),
             'Domain',
             domainName,
           );
@@ -442,16 +424,13 @@ describe('Group Activation (Shared)', () => {
             currentStep = 'validate data element';
             logTestStep(currentStep, testsLogger);
             expectNameFree(
-              await client.getDataElement().validate(
-                {
-                  dataElementName: dataElementName,
-                  packageName: packageName,
-                  description:
-                    testCase.params.description ||
-                    `Test data element for group activation`,
-                },
-                validation,
-              ),
+              await client.getDataElement().validate({
+                dataElementName: dataElementName,
+                packageName: packageName,
+                description:
+                  testCase.params.description ||
+                  `Test data element for group activation`,
+              }),
               'Data element',
               dataElementName,
             );
@@ -494,15 +473,12 @@ describe('Group Activation (Shared)', () => {
             currentStep = 'validate structure';
             logTestStep(currentStep, testsLogger);
             expectNameFree(
-              await client.getStructure().validate(
-                {
-                  structureName: structureName,
-                  description:
-                    testCase.params.description ||
-                    `Test structure for group activation`,
-                },
-                validation,
-              ),
+              await client.getStructure().validate({
+                structureName: structureName,
+                description:
+                  testCase.params.description ||
+                  `Test structure for group activation`,
+              }),
               'Structure',
               structureName,
             );

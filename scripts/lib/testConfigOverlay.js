@@ -67,6 +67,8 @@ const SCALAR_IMPL =
   'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params';
 const APPEND = 'create_append_structure.test_cases[adt_append_structure].params';
 const ATC_RUN = 'atc_run.test_cases[adt_atc_run]';
+const FEATURE_TOGGLE = 'create_feature_toggle.test_cases[adt_feature_toggle]';
+const CHECK_RUN = 'check_run.test_cases[class_check]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
 
@@ -93,6 +95,16 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${SCALAR}.scalar_function_name`, {}],
     [`${SCALAR_IMPL}.implementation_name`, {}],
     [`${APPEND}.append_structure_name`, {}],
+    // Whether a case runs on this system is the configuration's: a refusal
+    // fails the test, it never turns into a skip.
+    ['create_scalar_function.test_cases[adt_scalar_function].enabled', { type: 'boolean' }],
+    [
+      'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].enabled',
+      { type: 'boolean' },
+    ],
+    ['create_append_structure.test_cases[adt_append_structure].enabled', { type: 'boolean' }],
+    [`${FEATURE_TOGGLE}.enabled`, { type: 'boolean' }],
+    [`${CHECK_RUN}.enabled`, { type: 'boolean' }],
     // ATC needs a check variant the system can run.
     [`${ATC_RUN}.enabled`, { type: 'boolean' }],
     [`${ATC_RUN}.params.check_variant`, { empty: true }],

@@ -26,10 +26,7 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
-import {
-  analyseDeletion,
-  analyseUnsupportedStatus,
-} from '@mcp-abap-adt/adt-strategies';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtActivatable,
   IAdtCreatable,
@@ -44,7 +41,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
 } from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
@@ -969,35 +965,16 @@ export class BaseTester<TConfig, TState = unknown> {
       currentStep = 'validate';
       logTestStep(currentStep, this.logger);
       // No status check: a non-2xx is a returned failure since 31.0.0, and
-      // `expectResult` reports it with what SAP said.
-      //
-      // One failure is not the flow's: a system that has no validation resource
-      // at all answers `UNSUPPORTED_OPERATION`, and it has therefore not judged
-      // the name. There is nothing to read, and the rest of the flow is still
-      // worth running — so it is logged and stepped over. Every other failure
-      // still fails the test.
-      // A system without a validation resource answers 404, 405 or 501. The
-      // library reports that as it came; the test names it unsupported, so a
-      // missing resource skips the step instead of failing it.
-      const validationAnswer = await this.adtObject.validate(
-        config as Partial<TConfig>,
-        {
-          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
-        },
+      // `expectResult` reports it with what SAP said. A system with no
+      // validation resource (404/405/501) fails too: whether a type is tested
+      // on a system is its case's `enabled` / `available_in`, never something
+      // read off a refusal.
+      const validationDocument = String(
+        expectResult(
+          await this.adtObject.validate(config as Partial<TConfig>),
+          'validate',
+        ) ?? '',
       );
-      const validationUnavailable =
-        !validationAnswer.ok &&
-        validationAnswer.getError().code ===
-          AdtObjectErrorCodes.UNSUPPORTED_OPERATION;
-      if (validationUnavailable && !validationAnswer.ok) {
-        logTestStep(
-          `validate skipped: ${validationAnswer.getError().message}`,
-          this.logger,
-        );
-      }
-      const validationDocument = validationUnavailable
-        ? ''
-        : String(expectResult(validationAnswer, 'validate') ?? '');
 
       // The document still has to be read: validation reports a rejected name
       // inside a 200, in an error table.

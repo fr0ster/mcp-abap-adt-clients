@@ -27,13 +27,12 @@
  * That is the whole argument for injecting the reading and the verdict rather
  * than assuming them, so this file reads the status too.
  *
- * A third shape is possible and is not asserted here: an authorization refusal
- * naming `S_ABPLNGVS`, the ABAP **language version**, which newer systems raise
- * when the version the sent source implies cannot be satisfied — including for
- * reasons that have nothing to do with rights. It can
- * arrive as a transport failure or as an exception document inside a 200, so it
- * is recognised and skipped with the server's own sentence rather than reported
- * as a contract violation.
+ * A refusal — an authorization refusal naming `S_ABPLNGVS`, the ABAP
+ * **language version**, included — can arrive as a returned failure or as an
+ * exception document inside a 200. Both fail the test with what SAP said
+ * (`expectCheckReport`). Whether these checks can run on a system is the
+ * configuration's to say, through the cases' `enabled` / `available_in`;
+ * a refusal is never read as "not available here".
  *
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/checkRun
  */
@@ -46,7 +45,8 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
-import { gateOn } from '../../helpers/caseGate';
+import { gate, gateAll, gateOn } from '../../helpers/caseGate';
+import { expectCheckReport } from '../../helpers/checkReport';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -55,7 +55,7 @@ import {
 } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const testsLogger: ILogger = createTestsLogger();
 
@@ -70,15 +70,6 @@ const statusTextOf = (report: string): string =>
 
 const messageCountOf = (report: string): number =>
   (report.match(/<chkrun:checkMessage[\s>]/g) ?? []).length;
-
-/**
- * The language-version refusal, in either shape it arrives in.
- *
- * Not a contract failure: the server is declining to check at all, and on a
- * system where the SACF scenario is off this never appears.
- */
-const isLanguageVersionRefusal = (text: string): boolean =>
-  /S_ABPLNGVS|ExceptionResourceNoAccess/.test(text);
 
 /** ABAP that cannot compile, so the server has findings to report. */
 const BROKEN_SOURCE = `CLASS zac_shr_broken DEFINITION PUBLIC FINAL CREATE PUBLIC.
@@ -105,8 +96,14 @@ function configuredClassName(isLegacy: boolean): string | undefined {
   );
 }
 
-// Applies where a class is configured to check.
-const withClass = gateOn(({ isLegacy }) => !!configuredClassName(isLegacy));
+// Whether `check` runs on this system is check_run/class_check's `enabled` /
+// `available_in`: a refusal fails, it is never read as "not available here".
+const checkCase = gate('check_run', 'class_check');
+// Applies where the case is on and a class is configured to check.
+const withClass = gateAll(
+  checkCase,
+  gateOn(({ isLegacy }) => !!configuredClassName(isLegacy)),
+);
 
 describe('Shared - what check answers', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
@@ -146,24 +143,11 @@ describe('Shared - what check answers', () => {
       });
 
       // `ok` first, but it is not the assertion — it only says there is a
-      // document to read.
-      expect(answer.ok).toBe(true);
-      if (!answer.ok) {
-        throw new Error(answer.getError().message);
-      }
-      const report = String(answer.getResult().value ?? '');
+      // document to read. A refusal, in either shape, fails here.
+      const report = expectCheckReport(answer, 'check the stored class');
       testsLogger.info?.(
         `status=${statusOf(report)} text=${statusTextOf(report)} messages=${messageCountOf(report)}`,
       );
-
-      if (isLanguageVersionRefusal(report)) {
-        logTestSkip(
-          testsLogger,
-          'check — stored source',
-          `the server declined on the ABAP language version: ${statusTextOf(report) || report.slice(0, 200)}`,
-        );
-        return;
-      }
 
       // The assertion. `notProcessed` carries no messages either, so counting
       // them would call a refusal a clean check.
@@ -193,32 +177,11 @@ describe('Shared - what check answers', () => {
           headers: integrationHeadersOf(client.getClass(), 'check'),
         });
 
-      if (!answer.ok) {
-        const message = answer.getError().message;
-        if (isLanguageVersionRefusal(message)) {
-          logTestSkip(
-            testsLogger,
-            'check — broken source',
-            `the server declined on the ABAP language version: ${message.slice(0, 200)}`,
-          );
-          return;
-        }
-        throw new Error(message);
-      }
-
-      const report = String(answer.getResult().value ?? '');
+      // A refusal, in either shape, fails here with what SAP said.
+      const report = expectCheckReport(answer, 'check — broken source');
       testsLogger.info?.(
         `status=${statusOf(report)} text=${statusTextOf(report)} messages=${messageCountOf(report)}`,
       );
-
-      if (isLanguageVersionRefusal(report)) {
-        logTestSkip(
-          testsLogger,
-          'check — broken source',
-          `the server declined on the ABAP language version: ${statusTextOf(report) || report.slice(0, 200)}`,
-        );
-        return;
-      }
 
       // The check ran, and it found something. Both halves matter: `processed`
       // without findings would mean the source never reached the checker, and
@@ -240,7 +203,7 @@ describe('Shared - what check answers', () => {
    * This is why the verdict is injected. A member that counted messages would
    * have reported this object as compiling cleanly.
    */
-  gateOn(() => true)(
+  checkCase(
     'answers notProcessed for an object that is not there, with no messages',
     async () => {
       logTestStep(`check ${NEVER_EXISTS}, which does not exist`, testsLogger);
@@ -251,32 +214,11 @@ describe('Shared - what check answers', () => {
           headers: integrationHeadersOf(client.getClass(), 'check'),
         });
 
-      if (!answer.ok) {
-        const message = answer.getError().message;
-        if (isLanguageVersionRefusal(message)) {
-          logTestSkip(
-            testsLogger,
-            'check — absent object',
-            `the server declined on the ABAP language version: ${message.slice(0, 200)}`,
-          );
-          return;
-        }
-        throw new Error(message);
-      }
-
-      const report = String(answer.getResult().value ?? '');
+      // A refusal, in either shape, fails here with what SAP said.
+      const report = expectCheckReport(answer, 'check — absent object');
       testsLogger.info?.(
         `status=${statusOf(report)} text=${statusTextOf(report)} messages=${messageCountOf(report)}`,
       );
-
-      if (isLanguageVersionRefusal(report)) {
-        logTestSkip(
-          testsLogger,
-          'check — absent object',
-          `the server declined on the ABAP language version: ${statusTextOf(report) || report.slice(0, 200)}`,
-        );
-        return;
-      }
 
       expect(statusOf(report)).toBe('notProcessed');
       // The half that makes counting messages unsafe.
