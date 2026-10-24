@@ -3,7 +3,9 @@
 #
 # Copy it to ../test-config.overlay.yaml (gitignored) — or run
 #   npm run test:init -- onprem
-# Every `<LIKE_THIS>` must be replaced: the loader refuses a placeholder.
+# Every `<LIKE_THIS>` must be replaced: the loader refuses a placeholder. An empty
+# entry (`key:` with nothing) is refused; write "" where empty is meant. Flags
+# are unquoted true/false. Turning an optional ATC case on needs its check_variant.
 # Keys are written FLAT (one path per line); a case inside a list is picked by
 # its name in [brackets]. Only these keys are allowed; the rest is the base,
 # ../test-config.yaml.template.

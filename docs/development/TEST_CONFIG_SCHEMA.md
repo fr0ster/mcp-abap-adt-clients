@@ -65,6 +65,24 @@ default in the base. `testConfigOverlay.test.ts` keeps the list and the template
 `← CHANGE` markers in step: a required key without the marker, and a marked line
 whose key is not in the list, both fail the unit tests.
 
+**Values are typed** (the rules live next to each key in `ALLOWED_OVERLAY_KEYS`).
+An empty entry (`key:` with nothing after it, YAML `null`) is refused for every
+key, because a consumer that finds a value absent falls back to another key
+(an empty `shared_dependencies.package` once meant "use `default_package`").
+`record_changes` and the `enabled` flags must be real booleans (`"true"` in quotes
+is refused), `expected_priority` an integer, `environment.system` one of `onprem` /
+`cloud`, `connection_type` one of `rfc` / `http`. A string must be non-empty except
+where `""` is a statement: `default_transport` and the transport layers (a local
+package or a cloud system has none), `default_master_system` and `target_system`
+(cloud), the shared `software_component` (cloud), and `check_variant` (`""` asks
+the system for its nominated variant). Every invalid key is reported in one error.
+
+**The merged result is checked too.** After the merge, no `<PLACEHOLDER>` may remain
+in `environment`, in `shared_dependencies`, or in any param of an *enabled* test
+case. So turning `atc_run` on (`enabled: true`) without a `check_variant` of your own
+is refused: the base's `<CHECK_VARIANT>` would reach the system. A disabled case may
+keep its placeholders.
+
 Also refused, each with the key named: a value that is still a `<PLACEHOLDER>`, a
 nested value (keys are flat), a path the base does not have, and an overlay that is
 not YAML. With **no overlay** the base alone is loaded with a warning, its values

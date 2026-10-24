@@ -43,6 +43,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   copies the tracked form (`src/__tests__/helpers/overlays/`); `test:reinit` is
   gone. `check:config` now verifies the overlay's keys instead of counting
   sections. Details: `docs/development/TEST_CONFIG_SCHEMA.md`.
+  Overlay values are typed (no `null`, real booleans, non-empty strings except
+  where `""` is a statement), and the merged result may keep no `<PLACEHOLDER>`
+  in `environment`, `shared_dependencies` or an enabled case.
 - **`shared_dependencies.package` is marked `← CHANGE`** in the template, as the
   other system-specific keys were. Its being unmarked is what let a realignment
   replace it with a placeholder unnoticed and cost a full run on 2026-09-01.

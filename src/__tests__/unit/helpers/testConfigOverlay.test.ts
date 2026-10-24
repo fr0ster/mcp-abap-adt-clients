@@ -47,6 +47,19 @@ const BASE = [
   '    - name: "builder_transport"',
   '      params:',
   '        target_system: ""   # ← CHANGE',
+  'atc_run:',
+  '  test_cases:',
+  '    - name: "adt_atc_run"',
+  '      enabled: false',
+  '      params:',
+  '        class_name: "ZAC_SHR_ATC_DIRTY"',
+  '        check_variant: "<CHECK_VARIANT>"   # ← CHANGE',
+  'other:',
+  '  test_cases:',
+  '    - name: "always_on"',
+  '      enabled: true',
+  '      params:',
+  '        thing: "fine"',
   '',
 ].join('\n');
 
@@ -200,6 +213,134 @@ describe('merging the base and the overlay', () => {
   });
 });
 
+describe('values are validated by type, not only by presence', () => {
+  const ATC = 'atc_run.test_cases[adt_atc_run]';
+  const refuses = (entries: Record<string, unknown>, fragment: string) => {
+    put(OVERLAY_FILE, overlayText({ ...FULL_OVERLAY, ...entries }));
+    expect(refusal(() => loadTestConfigFrom(directory))).toContain(fragment);
+  };
+
+  it('refuses an empty entry (null) for a required key, naming it', () => {
+    put(
+      OVERLAY_FILE,
+      overlayText(FULL_OVERLAY).replace(
+        'shared_dependencies.package: ZSHR',
+        'shared_dependencies.package:',
+      ),
+    );
+    expect(refusal(() => loadTestConfigFrom(directory))).toContain(
+      '"shared_dependencies.package" has no value',
+    );
+  });
+
+  it('refuses null for a key where "" is allowed', () => {
+    refuses(
+      { 'environment.default_transport': null },
+      '"environment.default_transport" has no value',
+    );
+  });
+
+  it('refuses a quoted boolean', () => {
+    refuses(
+      { 'shared_dependencies.record_changes': 'true' },
+      '"shared_dependencies.record_changes" must be true or false',
+    );
+  });
+
+  it('refuses an empty string where it is not a statement', () => {
+    refuses(
+      { 'environment.default_package': '' },
+      '"environment.default_package" must not be empty',
+    );
+  });
+
+  it('accepts "" where it means something', () => {
+    put(
+      OVERLAY_FILE,
+      overlayText({
+        ...FULL_OVERLAY,
+        'environment.default_transport': '',
+        'shared_dependencies.transport_layer': '',
+      }),
+    );
+    expect(() => loadTestConfigFrom(directory)).not.toThrow();
+  });
+
+  it('refuses a system outside onprem and cloud and a non-integer priority', () => {
+    refuses(
+      { 'environment.system': 'prod' },
+      '"environment.system" must be one of onprem, cloud',
+    );
+    refuses({ [`${ATC}.params.expected_priority`]: '2' }, 'must be an integer');
+  });
+
+  it('reports every invalid key together', () => {
+    put(
+      OVERLAY_FILE,
+      overlayText({
+        ...FULL_OVERLAY,
+        'environment.default_package': '',
+        'shared_dependencies.record_changes': 'yes',
+      }),
+    );
+    const message = refusal(() => loadTestConfigFrom(directory));
+    expect(message).toContain('"environment.default_package"');
+    expect(message).toContain('"shared_dependencies.record_changes"');
+  });
+});
+
+describe('the merged configuration keeps no placeholder where it is read', () => {
+  const ATC = 'atc_run.test_cases[adt_atc_run]';
+
+  it('refuses enabling the ATC case without overriding its variant', () => {
+    put(
+      OVERLAY_FILE,
+      overlayText({ ...FULL_OVERLAY, [`${ATC}.enabled`]: true }),
+    );
+    const message = refusal(() => loadTestConfigFrom(directory));
+    expect(message).toContain(
+      'atc_run.test_cases[adt_atc_run].params.check_variant',
+    );
+    expect(message).toContain('<CHECK_VARIANT>');
+  });
+
+  it('accepts the enabled case with a variant, or "" for the system\'s own', () => {
+    for (const variant of ['DEFAULT', '']) {
+      put(
+        OVERLAY_FILE,
+        overlayText({
+          ...FULL_OVERLAY,
+          [`${ATC}.enabled`]: true,
+          [`${ATC}.params.check_variant`]: variant,
+        }),
+      );
+      expect(() => loadTestConfigFrom(directory)).not.toThrow();
+    }
+  });
+
+  it('leaves the disabled case alone', () => {
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    expect(() => loadTestConfigFrom(directory)).not.toThrow();
+  });
+
+  it('refuses a placeholder left in any enabled case of the base', () => {
+    put(BASE_FILE, BASE.replace('thing: "fine"', 'thing: "<SOMETHING>"'));
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    expect(refusal(() => loadTestConfigFrom(directory))).toContain(
+      'other.test_cases[always_on].params.thing',
+    );
+  });
+
+  it('loads the real template with a complete, valid overlay', () => {
+    fs.copyFileSync(
+      path.join(HELPERS, BASE_FILE),
+      path.join(directory, BASE_FILE),
+    );
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    expect(() => loadTestConfigFrom(directory)).not.toThrow();
+  });
+});
+
 describe('the old full test-config.yaml', () => {
   it('is refused, with or without an overlay, and the words say how to migrate', () => {
     put(OLD_FULL_FILE, BASE);
@@ -238,10 +379,15 @@ describe('migrating the old full config', () => {
   it('writes only the allowed keys, and the overlay then loads', () => {
     put(OLD_FULL_FILE, oldConfig());
     const written: string[] = migrateFullConfig(directory);
+    // The required keys, plus the optional one the old file holds with a valid
+    // value (its placeholder `check_variant` is not carried).
     expect(written.sort()).toEqual(
-      ALLOWED_OVERLAY_KEYS.filter((k: { required: boolean }) => k.required)
-        .map((k: { path: string }) => k.path)
-        .sort(),
+      [
+        ...ALLOWED_OVERLAY_KEYS.filter(
+          (k: { required: boolean }) => k.required,
+        ).map((k: { path: string }) => k.path),
+        'atc_run.test_cases[adt_atc_run].enabled',
+      ].sort(),
     );
     const text = fs.readFileSync(path.join(directory, OVERLAY_FILE), 'utf8');
     expect(text).not.toContain(OLD_SECRET);

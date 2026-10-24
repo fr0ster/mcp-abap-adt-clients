@@ -43,56 +43,77 @@ const HELPERS_DIRECTORY = path.resolve(
   'helpers',
 );
 
-const APPEND = 'create_append_structure.test_cases[adt_append_structure].params';
+/**
+ * Every key an overlay may carry.
+ *
+ * - `required`: the overlay must state it, the base value is only a placeholder.
+ * - `type`: `string` (default), `boolean` or `integer`. `null` is refused for
+ *   every key (an empty YAML value must never read as "not set": consumers fall
+ *   back to another key when a value is absent), and a quoted `"true"` is not a
+ *   boolean.
+ * - `empty`: a string key where "" is a legitimate stated value; every other
+ *   string must be non-empty. The exceptions, each by what "" means:
+ *     default_transport, shared transport_layer, create_package transport_layer
+ *       — a local ($TMP) package or a cloud system has none;
+ *     default_master_system, target_system — cloud supplies / needs none;
+ *     shared_dependencies.software_component — cloud has none;
+ *     check_variant — "" asks the system for its nominated variant.
+ * - `values`: the only values a string may take.
+ */
 const PACKAGE = 'create_package.test_cases[adt_package].params';
+const TRANSPORT = 'create_transport.test_cases[builder_transport].params';
 const SCALAR = 'create_scalar_function.test_cases[adt_scalar_function].params';
 const SCALAR_IMPL =
   'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params';
-const TRANSPORT = 'create_transport.test_cases[builder_transport].params';
+const APPEND = 'create_append_structure.test_cases[adt_append_structure].params';
 const ATC_RUN = 'atc_run.test_cases[adt_atc_run]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
 
-/**
- * Every key an overlay may carry. `required`: the overlay must state it, the
- * base value is only a placeholder.
- */
 const ALLOWED_OVERLAY_KEYS = Object.freeze(
   [
     // Which system, and where its objects go.
-    ['environment.system', true],
-    ['environment.default_package', true],
-    ['environment.default_transport', true],
-    ['environment.default_master_system', true],
-    ['environment.connection_type', false],
+    ['environment.system', { required: true, values: ['onprem', 'cloud'] }],
+    ['environment.default_package', { required: true }],
+    ['environment.default_transport', { required: true, empty: true }],
+    ['environment.default_master_system', { required: true, empty: true }],
+    ['environment.connection_type', { values: ['rfc', 'http'] }],
     // The shared package (the template's "Lego library").
-    ['shared_dependencies.package', true],
-    ['shared_dependencies.super_package', true],
-    ['shared_dependencies.software_component', true],
-    ['shared_dependencies.transport_layer', true],
-    ['shared_dependencies.record_changes', true],
+    ['shared_dependencies.package', { required: true }],
+    ['shared_dependencies.super_package', { required: true }],
+    ['shared_dependencies.software_component', { required: true, empty: true }],
+    ['shared_dependencies.transport_layer', { required: true, empty: true }],
+    ['shared_dependencies.record_changes', { required: true, type: 'boolean' }],
     // Cases that create a package or a transport request.
-    [`${PACKAGE}.package_name`, true],
-    [`${PACKAGE}.software_component`, true],
-    [`${PACKAGE}.transport_layer`, true],
-    [`${TRANSPORT}.target_system`, true],
+    [`${PACKAGE}.package_name`, { required: true }],
+    [`${PACKAGE}.software_component`, { required: true }],
+    [`${PACKAGE}.transport_layer`, { required: true, empty: true }],
+    [`${TRANSPORT}.target_system`, { required: true, empty: true }],
     // Names that may collide with something on a particular system.
-    [`${SCALAR}.scalar_function_name`, false],
-    [`${SCALAR_IMPL}.implementation_name`, false],
-    [`${APPEND}.append_structure_name`, false],
+    [`${SCALAR}.scalar_function_name`, {}],
+    [`${SCALAR_IMPL}.implementation_name`, {}],
+    [`${APPEND}.append_structure_name`, {}],
     // ATC needs a check variant the system can run.
-    [`${ATC_RUN}.enabled`, false],
-    [`${ATC_RUN}.params.check_variant`, false],
-    [`${ATC_RUN}.params.expected_message_id`, false],
-    [`${ATC_RUN}.params.expected_priority`, false],
-    [`${ATC_KINDS}.enabled`, false],
-    [`${ATC_KINDS}.params.check_variant`, false],
+    [`${ATC_RUN}.enabled`, { type: 'boolean' }],
+    [`${ATC_RUN}.params.check_variant`, { empty: true }],
+    [`${ATC_RUN}.params.expected_message_id`, {}],
+    [`${ATC_RUN}.params.expected_priority`, { type: 'integer' }],
+    [`${ATC_KINDS}.enabled`, { type: 'boolean' }],
+    [`${ATC_KINDS}.params.check_variant`, { empty: true }],
     // Standard objects the enhancement hosts expect, if the system lacks them.
-    [`${ENHANCEMENT}[program_host].params.program_name`, false],
-    [`${ENHANCEMENT}[function_group_host].params.function_group_name`, false],
-    [`${ENHANCEMENT}[include_host].params.include_name`, false],
-    [`${ENHANCEMENT}[include_host].params.main_program`, false],
-  ].map(([keyPath, required]) => Object.freeze({ path: keyPath, required })),
+    [`${ENHANCEMENT}[program_host].params.program_name`, {}],
+    [`${ENHANCEMENT}[function_group_host].params.function_group_name`, {}],
+    [`${ENHANCEMENT}[include_host].params.include_name`, {}],
+    [`${ENHANCEMENT}[include_host].params.main_program`, {}],
+  ].map(([keyPath, rule]) =>
+    Object.freeze({
+      path: keyPath,
+      required: rule.required === true,
+      type: rule.type ?? 'string',
+      empty: rule.empty === true,
+      values: rule.values,
+    }),
+  ),
 );
 
 class TestConfigError extends Error {
@@ -179,10 +200,23 @@ function isPlaceholder(value) {
   );
 }
 
-function isScalar(value) {
-  return (
-    value === null || ['string', 'number', 'boolean'].includes(typeof value)
-  );
+/** Why `value` is not acceptable for `rule`, or null. */
+function invalidValue(rule, value) {
+  if (value === null || value === undefined) {
+    return 'has no value (an empty entry is not "unset" — write the value, or "" where that is allowed)';
+  }
+  if (rule.type === 'boolean') {
+    return typeof value === 'boolean' ? null : 'must be true or false, unquoted';
+  }
+  if (rule.type === 'integer') {
+    return Number.isInteger(value) ? null : 'must be an integer';
+  }
+  if (typeof value !== 'string') return 'must be a string';
+  if (rule.values !== undefined && !rule.values.includes(value)) {
+    return `must be one of ${rule.values.join(', ')}`;
+  }
+  if (value === '' && !rule.empty) return 'must not be empty';
+  return null;
 }
 
 /**
@@ -208,6 +242,45 @@ function parseOverlay(text, yaml) {
 }
 
 /**
+ * Placeholders that survive the merge where a consumer would read them: the
+ * `environment` and `shared_dependencies` values, and every param of an ENABLED
+ * test case. A disabled case may keep its placeholders (the ATC case is off
+ * until the overlay turns it on — and then its `<CHECK_VARIANT>` must have been
+ * replaced). Returns problem texts naming the key path.
+ */
+function leftoverPlaceholders(config) {
+  const found = [];
+  const scan = (node, prefix) => {
+    if (isPlaceholder(node)) {
+      found.push(
+        `"${prefix}" is still the placeholder ${node} where it is read — set it in the overlay`,
+      );
+    } else if (Array.isArray(node)) {
+      node.forEach((item, index) => {
+        const name = isObject(item) && typeof item.name === 'string' ? item.name : null;
+        scan(item, name === null ? `${prefix}[${index}]` : `${prefix}[${name}]`);
+      });
+    } else if (isObject(node)) {
+      for (const [key, value] of Object.entries(node)) {
+        scan(value, prefix === '' ? key : `${prefix}.${key}`);
+      }
+    }
+  };
+  scan(config.environment, 'environment');
+  scan(config.shared_dependencies, 'shared_dependencies');
+  for (const [section, body] of Object.entries(config)) {
+    const cases = isObject(body) ? body.test_cases : undefined;
+    if (!Array.isArray(cases)) continue;
+    for (const testCase of cases) {
+      if (isObject(testCase) && testCase.enabled === true) {
+        scan(testCase, `${section}.test_cases[${testCase.name}]`);
+      }
+    }
+  }
+  return found;
+}
+
+/**
  * base + overlay → a new config. Every defect of the overlay is collected and
  * thrown together, so one run names them all.
  */
@@ -217,11 +290,12 @@ function applyOverlay(base, overlay) {
   const config = structuredClone(base);
 
   for (const [keyPath, value] of Object.entries(overlay)) {
-    if (!allowed.has(keyPath)) {
+    const rule = allowed.get(keyPath);
+    if (rule === undefined) {
       problems.push(
         `unknown key "${keyPath}" — only system-specific keys belong in the overlay (the list is in scripts/lib/testConfigOverlay.js)`,
       );
-    } else if (!isScalar(value)) {
+    } else if (isObject(value) || Array.isArray(value)) {
       problems.push(
         `"${keyPath}" must be a single value; keys are written flat, one path per line`,
       );
@@ -229,6 +303,8 @@ function applyOverlay(base, overlay) {
       problems.push(
         `"${keyPath}" is still the placeholder ${value} — replace it`,
       );
+    } else if (invalidValue(rule, value) !== null) {
+      problems.push(`"${keyPath}" ${invalidValue(rule, value)}`);
     } else {
       const error = setAt(config, keyPath, value);
       if (error !== null) problems.push(`"${keyPath}" ${error}`);
@@ -241,6 +317,7 @@ function applyOverlay(base, overlay) {
       );
     }
   }
+  if (problems.length === 0) problems.push(...leftoverPlaceholders(config));
   if (problems.length > 0) {
     throw new TestConfigError(
       `${OVERLAY_FILE} is not usable:\n  - ${problems.join('\n  - ')}`,
@@ -323,17 +400,17 @@ function migrateFullConfig(directory = HELPERS_DIRECTORY) {
   const old = yaml.parse(fs.readFileSync(oldPath, 'utf8')) || {};
   const overlay = {};
   const missing = [];
-  for (const { path: keyPath, required } of ALLOWED_OVERLAY_KEYS) {
-    const value = readAt(old, keyPath);
-    if (value !== undefined && isScalar(value)) {
-      overlay[keyPath] = value;
-    } else if (required) {
-      missing.push(keyPath);
+  for (const rule of ALLOWED_OVERLAY_KEYS) {
+    const value = readAt(old, rule.path);
+    if (value !== undefined && !isPlaceholder(value) && invalidValue(rule, value) === null) {
+      overlay[rule.path] = value;
+    } else if (rule.required) {
+      missing.push(rule.path);
     }
   }
   if (missing.length > 0) {
     throw new TestConfigError(
-      `${OLD_FULL_FILE} has no value for ${missing.join(', ')}; nothing written. Add them there (or write the overlay by hand from a form under src/__tests__/helpers/overlays/).`,
+      `${OLD_FULL_FILE} has no valid value for ${missing.join(', ')}; nothing written. Add them there (or write the overlay by hand from a form under src/__tests__/helpers/overlays/).`,
     );
   }
   fs.writeFileSync(
