@@ -7,8 +7,8 @@ Answers [`2026-10-24-client-contract-goal.md`](../2026-10-24-client-contract-goa
 - `src/clients/AdtClient.ts` has 35 factories. Each has two overloads,
   `getX(): IXContract<typeof xDocuments>` and `getX<R extends IXResults>(results: R): IXContract<R>`,
   and one implementation `getX<R …>(results: R = xDocuments …): AdtX<R>`.
-- The 35 compositions `IXContract<R>` are declared in `AdtClient.ts` (lines 261–1040). They are
-  built only from atoms (`IAdtCreatable`, `IAdtReadable`, …) and config types that
+- The 35 compositions `IXContract<R>` are declared in `AdtClient.ts` (lines 261–1040); mcp-abap-adt
+  imports none of them. They are built only from atoms (`IAdtCreatable`, `IAdtReadable`, …) and config types that
   `@mcp-abap-adt/interfaces-adt` already exports, with two exceptions:
   - `IServiceBindingPublicationConfig`, local to `core/service/types.ts:128`, which
     `IServiceBindingContract` names in its `IAdtUpdatable`;
@@ -30,78 +30,76 @@ Answers [`2026-10-24-client-contract-goal.md`](../2026-10-24-client-contract-goa
 
 ## 2. What goes to `@mcp-abap-adt/interfaces-adt` (a minor: 20.1.0 → 20.2.0)
 
-Only contracts are added. Nothing concrete moves (goal: contracts only).
+Only contracts are added. Nothing concrete moves, and no composition is named (goal):
 
-1. **The result-set contracts**, under their names, in `src/adt/` beside each object's existing
-   `IAdtX.ts`:
+1. **The result-set contracts**, under their names, in each object's existing `src/adt/IAdtX.ts`
+   beside its config:
    - all 35 `IXResults`, each a `readonly` slot map of `IResultStrategy<unknown>`;
    - `IMessageClassMessageResults<TRead, TWritten, TDeleted>` keeps its generic parameters and
-     their defaults.
-   - The ones that are reused stay one interface: `IClassResults` serves class, behavior
-     implementation and the local includes.
-2. **The compositions** `IXContract<R extends IXResults>`, with the same names and definitions as
-   in `AdtClient.ts` today, one definition each. Two quirks move as they are, because this task
-   changes no behaviour and no type:
-   - the class, behavior-implementation and local-include contracts hard-code
-     `IAdtTransportAware<…, string>`;
-   - `IRequestContract` reads `NonNullable<R['searchConfigurations']>`.
-3. **Two input and answer types the contracts name:**
-   - `IServiceBindingPublicationConfig` moves as it is. It is the input of a contract's member,
-     so the contract package must hold it.
+     their defaults;
+   - a shared one stays one interface: `IClassResults` serves class, behavior implementation and
+     the local includes.
+2. **Two input and answer types the client names:**
+   - `IServiceBindingPublicationConfig` moves as it is, because it is the input of a member
+     `IAdtClient` declares;
    - `IAdtLockFailure` (`{ readonly key: string; readonly error: unknown }`) is the answer of
      `unlockAll()`.
-4. **`IAdtClient`**, composed and not inherited (decision 23):
-   - For every factory, the two overloads `getX(): IXContract<IXResults>` and
-     `getX<R extends IXResults>(results: R): IXContract<R>`.
-   - `unlockAll(): Promise<IAdtLockFailure[]>`.
-   - `readonly pendingLocks: string[]`.
-   - `[Symbol.asyncDispose](): Promise<void>`, whose typing comes from `@types/node` as it does in
-     adt-clients today. The plan confirms that the published declaration needs nothing more from
-     a consumer than adt-clients already needs.
-5. **Bookkeeping:**
-   - every new symbol goes into `tools/package-map.json` (`check-surface` and `check-graph` enforce
-     placement);
+3. **`IAdtClient`** (decision 23: composed, never inherited):
+   - **one signature per factory**: `getX<R extends IXResults = IXResults>(results?: R): A₁ & A₂ & …`,
+     where the `Aᵢ` are the atoms the factory offers today, written inline with the same type
+     arguments as today's `IXContract<R>`. Today's two overloads become this one signature: a call
+     without a result set answers over `IXResults` (its slots are `unknown`), and a call with one
+     answers over the set passed. Two quirks are written as they are, because this task changes no
+     type: the class, behavior-implementation and local-include factories offer
+     `IAdtTransportAware<…, string>`, and the request factory reads
+     `NonNullable<R['searchConfigurations']>`;
+   - `unlockAll(): Promise<IAdtLockFailure[]>`;
+   - `readonly pendingLocks: string[]`;
+   - `[Symbol.asyncDispose](): Promise<void>`, typed from `@types/node` as it is in adt-clients
+     today. The plan confirms that the published declaration needs nothing from a consumer beyond
+     what adt-clients already needs.
+4. **Bookkeeping:**
+   - every new symbol goes into `tools/package-map.json`;
    - a type-only check under `src/__typechecks__/` proves an object literal can implement
-     `IAdtClient` without any adt-clients import;
+     `IAdtClient` with no adt-clients import;
    - README and CHANGELOG entries.
-
-The no-argument overload answers the composition over the result-set contract, so its slots
-answer `unknown`. A typed answer needs a result set, which the consumer passes (goal).
 
 ## 3. What changes in adt-clients (a major: 38.0.0)
 
-1. **The contracts come from interfaces-adt.**
-   - `AdtClient.ts` and each `core/<dir>/types.ts` import the compositions and result-set
-     contracts from there. Their local declarations are deleted, so each is defined only once.
-   - `IServiceBindingPublicationConfig` and `LockFailure` are deleted locally. `LockRegistry`
-     answers `IAdtLockFailure`.
-   - adt-clients stops exporting these names. A consumer imports them from interfaces-adt; the
-     migration note says so.
-2. **The values stay here.**
-   - Every `xDocuments` stays, keeps `satisfies IXResults` against the contract it now imports, and
-     stays unannotated, so `typeof xDocuments` keeps its narrow slots.
-   - `rawDocument` and `nothing` stay.
-3. **`AdtClient` implements `IAdtClient`.**
-   - Its no-argument overloads keep answering `IXContract<typeof xDocuments>`, which is narrower
-     than the contract's `IXContract<IXResults>`. The compiler checks the class against the
-     contract.
+1. **The compositions go.** `IClassContract<R>` and its 34 siblings are deleted from `AdtClient.ts`.
+   What a factory answers is written only in `IAdtClient`.
+2. **The result-set contracts come from interfaces-adt.** Each `core/<dir>/types.ts` imports its
+   `IXResults` from there and deletes the local declaration.
+   `IServiceBindingPublicationConfig` and `LockFailure` are deleted locally, and `LockRegistry`
+   answers `IAdtLockFailure`. adt-clients stops exporting all of these names; the migration note
+   says where to import them from.
+3. **The values stay here.** Every `xDocuments` stays, keeps `satisfies IXResults` against the
+   contract it now imports, and stays unannotated. `rawDocument` and `nothing` stay too.
+4. **`AdtClient implements IAdtClient`.**
+   - Its factories are implementations: each is
+     `getX<R extends IXResults = typeof xDocuments>(results: R = …): AdtX<R>`, answering its own
+     class. The two contract-typed overloads it declares today go. The compiler checks every
+     factory against the one signature in `IAdtClient`. No composition is written a second time.
    - `AdtClient` stays an exported class, because mcp-abap-adt extends it (`GuardedAdtClient`).
-4. **`AdtClientLegacy`.** Its overrides keep their concrete return types. A type-level check proves
-   that an `AdtClientLegacy` is assignable to `IAdtClient`.
-5. **`createAdtClient()` answers `Promise<IAdtClient>`.** The same goes for every other factory
-   function that answers the client, if there is one.
-6. **The shape check.** The capability manifest types its factories as `(client: IAdtClient) => …`.
-   `factoryReturnsCoverClass.ts` imports the three contracts from interfaces-adt. The runtime
-   completeness test, which walks the prototypes of `AdtClient` and `AdtClientLegacy`, stays as
-   it is.
-7. **A substitution check.** One type-level test passes a hand-written object that implements
-   `IAdtClient` where the library takes a client. It proves that a consumer can substitute its own
-   client.
-8. **No behaviour change.** No member's request or answer changes, and the unit suite passes
+5. **`AdtClientLegacy`.** Its overrides keep answering their own legacy classes. A type-level
+   check proves an `AdtClientLegacy` is assignable to `IAdtClient`.
+6. **`createAdtClient()` answers `Promise<IAdtClient>`.** This is where a consumer receives the
+   client, so it sees the contract and never the classes.
+7. **The shape check.** The capability manifest types its factories as `(client: IAdtClient) => …`,
+   so `ReturnType` reads the contract's factory. `factoryReturnsCoverClass.ts` reads the same
+   factories from `IAdtClient` instead of the deleted compositions. The runtime completeness
+   test, which walks the prototypes of `AdtClient` and `AdtClientLegacy`, stays.
+8. **A substitution check.** A type-level test passes a hand-written object that implements
+   `IAdtClient` where a client is taken. It proves a consumer can substitute its own client.
+9. **No behaviour change.** No member's request or answer changes, and the unit suite passes
    unchanged apart from type imports.
-9. **Docs.** README, `CLIENT_API_REFERENCE.md`, a migration note for 38.0.0 (the client type, where
-   the contracts are imported from now, and that `IAdtClient` without a result set answers
-   `unknown` slots) and CHANGELOG.
+10. **Docs.** README, `CLIENT_API_REFERENCE.md`, a migration note for 38.0.0 and the CHANGELOG. The
+    migration note covers:
+    - the client type;
+    - where the result-set contracts are imported from now;
+    - that the named compositions are gone, so a consumer that needs a name composes it from the
+      atoms;
+    - that `IAdtClient` without a result set answers `unknown` slots.
 
 ## 4. What changes in mcp-abap-adt (with its next major, 21.0.0)
 
@@ -138,4 +136,4 @@ Each step depends only on published versions (goal, the registry rule).
 - **No executor, runtime client or WebSocket contract.** `AdtExecutor`, `AdtRuntimeClient` and
   `AdtClientsWS` keep their current types.
 - **The two quirks stay.** Changing them would change types beyond the move.
-- **No rename** of any composition or result-set contract.
+- **No rename** of any result-set contract.
