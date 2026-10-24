@@ -2,9 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  gateAll,
+  gateOn,
   MISSING_TEST_CONFIG,
   missingCaseMessage,
   gate as registrationGate,
+  gateStandardObject as registrationGateStandardObject,
 } from '../../helpers/caseGate';
 
 const gate: typeof registrationGate = (handler, name, loader) =>
@@ -12,6 +15,18 @@ const gate: typeof registrationGate = (handler, name, loader) =>
     loadEnv: () => {},
     sapConfigured: () => true,
     templateInUse: () => false,
+  });
+
+const gateStandardObject = (
+  type: string,
+  parsed: unknown,
+  standardObject: (type: string, cloud: boolean, legacy: boolean) => unknown,
+) =>
+  registrationGateStandardObject(type, () => parsed, {
+    loadEnv: () => {},
+    sapConfigured: () => true,
+    templateInUse: () => false,
+    standardObject,
   });
 
 function config(system = 'onprem', enabled = true, availableIn = ['onprem']) {
@@ -312,5 +327,104 @@ describe('enhancement configuration failure messages', () => {
     expect(missingCaseMessage('enhancement', 'enhoxhh')).toBe(
       'case enhancement/enhoxhh not in test-config.yaml',
     );
+  });
+});
+
+describe('standard object registration gate', () => {
+  it('registers when the system holds a standard object of the type', () => {
+    expect(
+      gateStandardObject('class', config(), () => ({ name: 'CL_ABAP_CHAR' })),
+    ).toBe(it);
+  });
+
+  it('skips when the system holds none of the type', () => {
+    expect(gateStandardObject('class', config(), () => null)).toBe(it.skip);
+  });
+
+  it('asks about the configured system, cloud and legacy included', () => {
+    const asked: unknown[][] = [];
+    const record = (...args: unknown[]) => {
+      asked.push(args);
+      return null;
+    };
+    gateStandardObject('table', config('cloud'), record);
+    const legacy = config();
+    gateStandardObject(
+      'table',
+      { ...legacy, environment: { ...legacy.environment, is_legacy: true } },
+      record,
+    );
+    expect(asked).toEqual([
+      ['table', true, false],
+      ['table', false, true],
+    ]);
+  });
+
+  it.each([undefined, {}, config('invalid')])(
+    'registers normally when config or system is missing or invalid: %p',
+    (parsed) => {
+      expect(gateStandardObject('class', parsed, () => null)).toBe(it);
+    },
+  );
+
+  it('skips without SAP before reading even broken configuration', () => {
+    expect(
+      registrationGateStandardObject(
+        'class',
+        () => {
+          throw new Error('Configuration must not be read without SAP');
+        },
+        { loadEnv: () => {}, sapConfigured: () => false },
+      ),
+    ).toBe(it.skip);
+  });
+});
+
+describe('gates combined', () => {
+  it('registers only when every gate registers', () => {
+    expect(gateAll(it, it)).toBe(it);
+    expect(gateAll(it, it.skip)).toBe(it.skip);
+    expect(gateAll(it.skip, it)).toBe(it.skip);
+    expect(gateAll(it.skip, it.skip)).toBe(it.skip);
+  });
+});
+
+describe('applicability gate', () => {
+  const on = (applies: Parameters<typeof gateOn>[0], parsed: unknown) =>
+    gateOn(applies, () => parsed, {
+      loadEnv: () => {},
+      sapConfigured: () => true,
+      templateInUse: () => false,
+    });
+
+  it('registers where the predicate holds and skips where it does not', () => {
+    expect(on(() => true, config())).toBe(it);
+    expect(on(() => false, config())).toBe(it.skip);
+  });
+
+  it('hands the predicate the configured system', () => {
+    const seen: unknown[] = [];
+    on((system) => !!seen.push(system), config('cloud'));
+    expect(seen).toEqual([{ isCloud: true, isLegacy: false }]);
+  });
+
+  it('registers normally when the predicate cannot decide', () => {
+    expect(
+      on(() => {
+        throw new Error('Unreadable configuration');
+      }, config()),
+    ).toBe(it);
+  });
+
+  it('skips without SAP before asking the predicate', () => {
+    expect(
+      gateOn(
+        () => {
+          throw new Error('Must not be asked without SAP');
+        },
+        () => config(),
+        { loadEnv: () => {}, sapConfigured: () => false },
+      ),
+    ).toBe(it.skip);
   });
 });
