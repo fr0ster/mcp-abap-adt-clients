@@ -1,5 +1,5 @@
 /**
- * The refusal a legacy handler answers for an operation SAP_BASIS 7.40 does
+ * The refusal a legacy handler answers for an operation 7.40 SP04 does
  * not serve (spec §2.1): answered through `failed()`, never thrown, with
  * `origin: 'refusal'` and `AdtObjectErrorCodes.UNSUPPORTED_OPERATION`, and a
  * message naming the operation, the endpoint 7.40 lacks and — where there is
@@ -11,13 +11,13 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { failed } from '../../utils/adtResponse';
 
-/** `operation` refused: SAP_BASIS 7.40 has no `endpoint`; `instead`, if any. */
+/** `operation` refused: 7.40 SP04 has no `endpoint`; `instead`, if any. */
 export function legacyRefusal<T, E extends IAdtError = IAdtError>(
   operation: string,
   endpoint: string,
   instead?: string,
 ): IAdtResponse<T, E> {
-  const message = `${operation}: a legacy system (SAP_BASIS 7.40) has no ${endpoint}.`;
+  const message = `${operation}: a legacy system (7.40 SP04) has no ${endpoint}.`;
   // The library's own verdict, so `E` is its default `IAdtError` here — the
   // same cast `answering` makes when no strategy supplied one.
   return failed<T, E>({

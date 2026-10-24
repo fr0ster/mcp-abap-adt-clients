@@ -56,6 +56,22 @@ describe('legacy package', () => {
     expect(calls).toHaveLength(0);
   });
 
+  // The refusals built by legacyRefusal name the measured basis, not a release.
+  it.each(cases.slice(0, 4))(
+    '%s names 7.40 SP04 as the basis',
+    async (_member, call) => {
+      const { connection } = recordingConnection();
+      const failure = expectFailure(
+        (await call(new AdtPackageLegacy(connection))) as Parameters<
+          typeof expectFailure
+        >[0],
+        'legacy package',
+      );
+      expect(failure.message).toContain('a legacy system (7.40 SP04) has no');
+      expect(failure.message).not.toContain('SAP_BASIS');
+    },
+  );
+
   it('a refused lock tracks nothing, so unlockAll sends nothing', async () => {
     const { connection, calls } = recordingConnection();
     const registry = new LockRegistry(connection);

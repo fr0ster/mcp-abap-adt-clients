@@ -424,7 +424,12 @@ export class AdtClientLegacy extends AdtClient {
     _results?: R,
   ): AdtDomain<R> {
     this.assertConnected();
-    return absentOnLegacy<AdtDomain<R>>(AdtDomain, 'Domain', DOMAIN.collection);
+    return absentOnLegacy<AdtDomain<R>>(
+      AdtDomain,
+      'Domain',
+      DOMAIN.collection,
+      'measured',
+    );
   }
 
   override getDataElement<
@@ -435,6 +440,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtDataElement,
       'DataElement',
       DATA_ELEMENT.collection,
+      'measured',
     );
   }
 
@@ -446,6 +452,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtStructure,
       'Structure',
       STRUCTURE.collection,
+      'measured',
     );
   }
 
@@ -453,7 +460,12 @@ export class AdtClientLegacy extends AdtClient {
     _results?: R,
   ): AdtTable<R> {
     this.assertConnected();
-    return absentOnLegacy<AdtTable<R>>(AdtTable, 'Table', TABLE.collection);
+    return absentOnLegacy<AdtTable<R>>(
+      AdtTable,
+      'Table',
+      TABLE.collection,
+      'measured',
+    );
   }
 
   override getTableType<
@@ -464,6 +476,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtDdicTableType,
       'TableType',
       TABLE_TYPE.collection,
+      'not-advertised',
     );
   }
 
@@ -475,6 +488,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtAccessControl,
       'AccessControl',
       ACCESS_CONTROL.collection,
+      'not-advertised',
     );
   }
 
@@ -486,6 +500,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtServiceDefinition,
       'ServiceDefinition',
       SERVICE_DEFINITION.collection,
+      'not-advertised',
     );
   }
 
@@ -497,6 +512,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtServiceBinding,
       'ServiceBinding',
       SERVICE_BINDING.collection,
+      'not-advertised',
     );
   }
 
@@ -508,6 +524,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtBehaviorDefinition,
       'BehaviorDefinition',
       BEHAVIOR_DEFINITION.collection,
+      'not-advertised',
     );
   }
 
@@ -519,6 +536,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtBehaviorImplementation,
       'BehaviorImplementation',
       BEHAVIOR_DEFINITION.collection,
+      'not-advertised',
     );
   }
 
@@ -530,6 +548,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtMetadataExtension,
       'MetadataExtension',
       METADATA_EXTENSION.collection,
+      'not-advertised',
     );
   }
 
@@ -541,6 +560,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtEnhancement,
       'Enhancement',
       ENHANCEMENT.root,
+      'measured',
     );
   }
 
@@ -552,6 +572,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtAuthorizationField,
       'AuthorizationField',
       AUTHORIZATION_FIELD.collection,
+      'not-advertised',
     );
   }
 
@@ -563,6 +584,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtFeatureToggle,
       'FeatureToggle',
       FEATURE_TOGGLE.collection,
+      'not-advertised',
     );
   }
 
@@ -582,6 +604,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtTransformation,
       'Transformation',
       TRANSFORMATION.collection,
+      'measured',
     );
   }
 
@@ -601,6 +624,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtScalarFunction,
       'ScalarFunction',
       SCALAR_FUNCTION.collection,
+      'measured',
     );
   }
 
@@ -621,6 +645,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtScalarFunctionImplementation,
       'ScalarFunctionImplementation',
       SCALAR_FUNCTION_IMPLEMENTATION.collection,
+      'not-advertised',
     );
   }
 
@@ -640,6 +665,7 @@ export class AdtClientLegacy extends AdtClient {
       AdtAppendStructure,
       'AppendStructure',
       STRUCTURE.collection,
+      'measured',
     );
   }
 }

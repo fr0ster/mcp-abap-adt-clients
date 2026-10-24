@@ -15,6 +15,9 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { failed } from '../utils/adtResponse';
 
+/** What a type's refusal rests on: a measurement, or absence from discovery. */
+export type AbsenceEvidence = 'measured' | 'not-advertised';
+
 /** The members of a class, read from its prototype chain. */
 function membersOf(implementation: abstract new (...args: never[]) => unknown) {
   const names = new Set<string>();
@@ -39,19 +42,29 @@ function membersOf(implementation: abstract new (...args: never[]) => unknown) {
  *
  * `objectType` must be that handler's `objectType` value: it is also the one
  * data member the handlers declare, and the test compares the two.
+ *
+ * `evidence` is what the refusal rests on, and the message says which:
+ * `'measured'` — 7.40 SP04 answered `404` for the endpoint over RFC;
+ * `'not-advertised'` — the endpoint is only absent from 7.40 SP04's discovery,
+ * not measured, so the type is refused until a run measures it.
  */
 export function absentOnLegacy<T>(
   implementation: abstract new (...args: never[]) => unknown,
   objectType: string,
   endpoint: string,
+  evidence: AbsenceEvidence,
 ): T {
+  const why =
+    evidence === 'measured'
+      ? `a legacy system (7.40 SP04) was measured not to serve ${endpoint}, ` +
+        'the endpoint this type needs.'
+      : `${endpoint}, the endpoint this type needs, is absent from the ` +
+        'discovery of a legacy system (7.40 SP04): not advertised, not ' +
+        'measured, so the type is refused until a run measures it.';
   const refusal: IAdtError = {
     origin: 'refusal',
     code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-    message:
-      `${objectType} is not supported on this SAP system: ` +
-      `a legacy system (SAP_BASIS 7.40) does not serve ${endpoint}, ` +
-      'the endpoint this type needs.',
+    message: `${objectType} is not supported on this SAP system: ${why}`,
   };
   const handler: Record<string, unknown> = {};
   for (const name of membersOf(implementation)) {
