@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  configurationDefect,
   gateAll,
   gateOn,
   MISSING_TEST_CONFIG,
@@ -73,7 +74,9 @@ describe('case registration gate', () => {
   it.each([undefined, {}, { environment: {} }, config('invalid')])(
     'registers normally when config or system is missing or invalid: %p',
     (parsed) => {
-      expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(it);
+      expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(
+        configurationDefect,
+      );
     },
   );
 
@@ -82,15 +85,19 @@ describe('case registration gate', () => {
       gate('enhancement', 'enhoxhh', () => {
         throw new Error('Unreadable config');
       }),
-    ).toBe(it);
+    ).toBe(configurationDefect);
   });
 
   it('registers a missing case in an otherwise configured system normally', () => {
-    expect(gate('enhancement', 'missing', () => config())).toBe(it);
+    expect(gate('enhancement', 'missing', () => config())).toBe(
+      configurationDefect,
+    );
   });
 
   it('registers normally when the handler section is absent', () => {
-    expect(gate('missing', 'enhoxhh', () => config())).toBe(it);
+    expect(gate('missing', 'enhoxhh', () => config())).toBe(
+      configurationDefect,
+    );
   });
 
   it('skips a case with enabled omitted', () => {
@@ -228,7 +235,7 @@ describe('SAP configuration at registration', () => {
           templateInUse: () => true,
         },
       ),
-    ).toBe(it);
+    ).toBe(configurationDefect);
   });
 });
 
@@ -299,10 +306,13 @@ describe('real environment loader and config provenance', () => {
     const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.isolateModules(() => {
       const helper = require('../../helpers/test-helper');
-      const { gate } = require('../../helpers/caseGate');
+      const {
+        gate,
+        configurationDefect: isolatedDefect,
+      } = require('../../helpers/caseGate');
       expect(
         gate('enhancement', 'enhoxhh', () => helper.loadTestConfig(directory)),
-      ).toBe(it);
+      ).toBe(isolatedDefect);
       expect(helper.isTestConfigTemplate()).toBe(true);
     });
     expect(warning.mock.calls).toEqual([
@@ -363,7 +373,9 @@ describe('standard object registration gate', () => {
   it.each([undefined, {}, config('invalid')])(
     'registers normally when config or system is missing or invalid: %p',
     (parsed) => {
-      expect(gateStandardObject('class', parsed, () => null)).toBe(it);
+      expect(gateStandardObject('class', parsed, () => null)).toBe(
+        configurationDefect,
+      );
     },
   );
 
@@ -413,7 +425,7 @@ describe('applicability gate', () => {
       on(() => {
         throw new Error('Unreadable configuration');
       }, config()),
-    ).toBe(it);
+    ).toBe(configurationDefect);
   });
 
   it('skips without SAP before asking the predicate', () => {
@@ -426,5 +438,63 @@ describe('applicability gate', () => {
         { loadEnv: () => {}, sapConfigured: () => false },
       ),
     ).toBe(it.skip);
+  });
+});
+
+describe('a configuration defect wins over every applicability predicate', () => {
+  const quiet = {
+    loadEnv: () => {},
+    sapConfigured: () => true,
+    templateInUse: () => false,
+  };
+
+  it('keeps a missing case a failing test when another gate says skip', () => {
+    const absent = gate('enhancement', 'missing', () => config());
+    expect(absent).toBe(configurationDefect);
+    const falsePredicate = gateOn(
+      () => false,
+      () => config(),
+      quiet,
+    );
+    expect(falsePredicate).toBe(it.skip);
+    expect(gateAll(absent, falsePredicate)).toBe(configurationDefect);
+    expect(gateAll(falsePredicate, absent)).toBe(configurationDefect);
+    expect(gateAll(absent, it.skip)).toBe(configurationDefect);
+  });
+
+  it('keeps a defect from a broken configuration over a skip', () => {
+    const broken = gate(
+      'enhancement',
+      'enhoxhh',
+      () => {
+        throw new Error('Unreadable config');
+      },
+      quiet,
+    );
+    expect(gateAll(broken, it.skip)).toBe(configurationDefect);
+  });
+
+  it('still skips an existing case that the predicate rules out', () => {
+    expect(
+      gateAll(
+        gate('enhancement', 'enhoxhh', () => config(), quiet),
+        it.skip,
+      ),
+    ).toBe(it.skip);
+  });
+
+  it('runs the defect as a real test, under the name it was given', () => {
+    const seen: string[] = [];
+    const real = global.it;
+    (global as { it: unknown }).it = Object.assign(
+      (name: string) => seen.push(name),
+      real,
+    );
+    try {
+      configurationDefect('the case');
+    } finally {
+      (global as { it: unknown }).it = real;
+    }
+    expect(seen).toEqual(['the case']);
   });
 });

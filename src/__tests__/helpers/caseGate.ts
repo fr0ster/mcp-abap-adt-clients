@@ -29,6 +29,17 @@ export function configuredCase(
   );
 }
 
+/**
+ * How a test is registered when the configuration itself is defective (broken,
+ * a template, a case or section missing): it runs, so the setup can fail with
+ * the reason. It is `it` under another name so that `gateAll` can tell it from
+ * an applicable case, and no applicability predicate can turn it into a skip.
+ */
+export const configurationDefect: jest.It = Object.assign(
+  ((...args: Parameters<jest.It>) => it(...args)) as jest.It,
+  it,
+);
+
 type GateDependencies = {
   loadEnv?: () => void;
   sapConfigured?: () => boolean;
@@ -57,14 +68,14 @@ function preflight(
   try {
     config = loadConfig();
     if ((dependencies.templateInUse ?? isTestConfigTemplate)())
-      return { register: it };
+      return { register: configurationDefect };
   } catch {
     // Broken configuration must still reach the normal setup failure path.
-    return { register: it };
+    return { register: configurationDefect };
   }
   const environment = config?.environment;
   if (!['onprem', 'cloud'].includes(environment?.system))
-    return { register: it };
+    return { register: configurationDefect };
   return { config, environment };
 }
 
@@ -97,7 +108,7 @@ export function gate(
   // Match TestConfigResolver's named lookup and strict enabled semantics;
   // getTestCaseDefinition cannot be used because it filters via getEnvironmentType.
   const testCase = configuredCase(handlerName, testCaseName, () => config);
-  if (!testCase) return it;
+  if (!testCase) return configurationDefect;
   return testCase.enabled === true &&
     TestConfigResolver.isTestAvailable(
       testCase,
@@ -136,7 +147,7 @@ export function gateOn(
       : it.skip;
   } catch {
     // A configuration that cannot be read must fail the test, not skip it.
-    return it;
+    return configurationDefect;
   }
 }
 
@@ -167,7 +178,12 @@ export function gateStandardObject(
   );
 }
 
-/** A test that needs every one of its gates: it.skip as soon as one skips. */
+/**
+ * A test that needs every one of its gates: it.skip as soon as one skips,
+ * except that a configuration defect in any gate wins over every skip, so a
+ * deleted or misspelled case fails instead of removing the coverage.
+ */
 export function gateAll(...gates: jest.It[]): jest.It {
+  if (gates.includes(configurationDefect)) return configurationDefect;
   return gates.every((registered) => registered === it) ? it : it.skip;
 }
