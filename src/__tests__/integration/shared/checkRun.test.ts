@@ -259,25 +259,6 @@ describe('Shared - what check answers', () => {
       expect(failure.origin).toBe('refusal');
       // The document reached the strategy, rather than a summary of it.
       expect(failure.message).toContain('chkrun:');
-
-      // Recorded beside it rather than asserted, because it is a fact about the
-      // server: a strategy that reads severity finds this source an error.
-      // Measured 2026-09-12 — the same exchange came back a failure.
-      const bySeverity: IAnalyse<IAdtError> = (verdict, wire) => {
-        const document = String(wire?.data ?? '');
-        return /type="E"/.test(document)
-          ? { origin: 'refusal', message: document }
-          : verdict;
-      };
-      const realistic = await client
-        .getClass()
-        .check({ className, source: BROKEN_SOURCE }, 'inactive', {
-          headers: integrationHeadersOf(client.getClass(), 'check'),
-          analyse: bySeverity,
-        });
-      testsLogger.info?.(
-        `a severity-reading strategy called it: ${realistic.ok ? 'no failure' : 'a failure'}`,
-      );
     },
     60000,
   );
