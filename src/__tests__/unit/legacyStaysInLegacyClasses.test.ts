@@ -8,13 +8,14 @@
  * connection and the header pairs stay as they are.
  *
  * So this reads `src` with the TypeScript parser (skipping `src/__tests__/`,
- * as `noHardcodedObjectAddresses.test.ts` does) and fails on two things
+ * as `noHardcodedObjectAddresses.test.ts` does) and fails on three things
  * outside the places listed in {@link EXCEPTIONS}:
  *
  * - an identifier containing `legacy`, in any case — a main file that names a
  *   legacy class, imports one, or keeps a `legacy` flag is a branch;
  * - a module specifier containing `legacy`, in any case — of an import, an
- *   `export … from` or a dynamic `import()`: a main file that loads a legacy
+ *   `export … from`, an `import x = require()`, an import type, a dynamic
+ *   `import()` or a `require()`: a main file that loads a legacy
  *   module under a name of its own (`import * as v`, a side-effect import,
  *   `export *`) names no legacy identifier, and is a branch all the same;
  * - a string or template literal containing `/sap/bc/cts` — the legacy CTS
@@ -111,7 +112,11 @@ function literalText(node: ts.Node): string | null {
   return null;
 }
 
-/** The module an import, an `export … from` or an `import()` names. */
+/**
+ * The module an import, an `export … from`, an `import x = require()`, an
+ * import type (`typeof import()`, `import().T`), an `import()` or a
+ * `require()` names.
+ */
 function moduleSpecifierOf(node: ts.Node): ts.StringLiteralLike | null {
   if (
     (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -120,8 +125,21 @@ function moduleSpecifierOf(node: ts.Node): ts.StringLiteralLike | null {
   )
     return node.moduleSpecifier;
   if (
+    ts.isImportEqualsDeclaration(node) &&
+    ts.isExternalModuleReference(node.moduleReference) &&
+    ts.isStringLiteralLike(node.moduleReference.expression)
+  )
+    return node.moduleReference.expression;
+  if (
+    ts.isImportTypeNode(node) &&
+    ts.isLiteralTypeNode(node.argument) &&
+    ts.isStringLiteralLike(node.argument.literal)
+  )
+    return node.argument.literal;
+  if (
     ts.isCallExpression(node) &&
-    node.expression.kind === ts.SyntaxKind.ImportKeyword
+    (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
   ) {
     const [argument] = node.arguments;
     if (argument && ts.isStringLiteralLike(argument)) return argument;
@@ -235,6 +253,23 @@ describe('legacy stays in legacy classes', () => {
         `${MAIN}:4  module ./AdtClassLegacy`,
         `${MAIN}:5  module ../shared/deleteLegacy`,
         `${MAIN}:6  module ./AdtClassLegacy`,
+      ]);
+    });
+
+    it('flags a legacy module loaded by require, import = require or an import type', () => {
+      const text = [
+        "import variant = require('./AdtClassLegacy');",
+        "const loaded = require('../shared/refusalLegacy');",
+        "type Variant = typeof import('./AdtClassLegacy');",
+        "let shape: import('../shared/deleteLegacy').Shape;",
+        "const plain = require('./AdtClass');",
+        "other('./AdtClassLegacy');",
+      ].join('\n');
+      expect(findings(MAIN, text)).toEqual([
+        `${MAIN}:1  module ./AdtClassLegacy`,
+        `${MAIN}:2  module ../shared/refusalLegacy`,
+        `${MAIN}:3  module ./AdtClassLegacy`,
+        `${MAIN}:4  module ../shared/deleteLegacy`,
       ]);
     });
 
