@@ -21,7 +21,7 @@ Tests for complete workflows from start to finish.
 
 ### 📁 `helpers/` - Shared Test Utilities
 Common helpers used across all tests:
-- `sessionConfig.ts` - Load configuration from `.env` and `test-config.yaml`
+- `sessionConfig.ts` - Load configuration from `.env` and the test configuration (`test-config.yaml.template` + `test-config.overlay.yaml`)
 - `sessionConfig.ts` - Builds the connection from configuration; `createTestConnection()` / `releaseTestConnection()`
 - Test helper functions
 
@@ -157,7 +157,7 @@ DEBUG_TESTS=true DEBUG_ADT_TESTS=true npm test -- integration/view
 
 All tests require:
 - `.env` file with SAP credentials
-- `test-config.yaml` with test parameters
+- `test-config.overlay.yaml` with your system's values over the tracked `test-config.yaml.template` (`npm run test:init -- onprem|cloud`; `npm run test-config:migrate` from an old full `test-config.yaml`)
 - **Root package must exist** — the package specified in `environment.default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do NOT create this package automatically — they only create objects inside it. Create it via ADT or SE80.
 - FUGR tests: Package must exist (e.g., `ZOK_TEST_PKG_01`)
 - FM tests: FUGR must be created first (for integration workflow)

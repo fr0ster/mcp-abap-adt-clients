@@ -1,6 +1,6 @@
 /**
  * Test configuration helper for @mcp-abap-adt/adt-clients
- * Loads test parameters from test-config.yaml
+ * Loads test parameters from test-config.yaml.template + test-config.overlay.yaml
  */
 
 const fs = require('node:fs');
@@ -11,6 +11,9 @@ const { XMLParser } = require('fast-xml-parser');
 // Every member that takes `options.headers` gets the recorded pair; a member
 // with none fails loudly instead of sending a fake one to SAP.
 const { integrationHeadersOf } = require('./adtHeaders');
+const {
+  loadTestConfigFrom,
+} = require('../../../scripts/lib/testConfigOverlay');
 
 let cachedConfig = null;
 let configLoadedFrom = null;
@@ -172,47 +175,30 @@ function isTestAvailableForEnv(testCase) {
 }
 
 /**
- * Load test configuration from YAML
+ * Load test configuration: the tracked base (`test-config.yaml.template`)
+ * merged with the local overlay (`test-config.overlay.yaml`), see
+ * scripts/lib/testConfigOverlay.js. Without an overlay the base alone is
+ * returned and `isTestConfigTemplate()` is true. A defective overlay, or the
+ * old full `test-config.yaml`, throws a TestConfigError naming the fault.
  */
 function loadTestConfig(configDirectory = __dirname) {
   if (cachedConfig) {
     return cachedConfig;
   }
 
-  const configPath = path.resolve(configDirectory, 'test-config.yaml');
-  const templatePath = path.resolve(
-    configDirectory,
-    'test-config.yaml.template',
-  );
-
-  if (fs.existsSync(configPath)) {
-    const configContent = fs.readFileSync(configPath, 'utf8');
-    cachedConfig = yaml.parse(configContent) || {};
-    configLoadedFrom = 'custom';
-    return cachedConfig;
+  const { config, source } = loadTestConfigFrom(configDirectory);
+  if (source === 'base-only' && !displayedTemplateWarning) {
+    console.warn(
+      '⚠️ test-config.overlay.yaml not found. Using test-config.yaml.template alone; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
+    );
+    console.warn(
+      '   Run `npm run test:init -- onprem` (or `cloud`) and fill in your SAP system details.',
+    );
+    displayedTemplateWarning = true;
   }
-
-  if (fs.existsSync(templatePath)) {
-    if (!displayedTemplateWarning) {
-      console.warn(
-        '⚠️ test-config.yaml not found. Using test-config.yaml.template; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
-      );
-      console.warn(
-        '   Copy the template to test-config.yaml and fill in your SAP system details.',
-      );
-      displayedTemplateWarning = true;
-    }
-    const templateContent = fs.readFileSync(templatePath, 'utf8');
-    cachedConfig = yaml.parse(templateContent) || {};
-    configLoadedFrom = 'template';
-    return cachedConfig;
-  }
-
-  console.error('❌ Test configuration files not found.');
-  console.error(
-    'Please copy tests/test-config.yaml.template to tests/test-config.yaml and configure test parameters.',
-  );
-  process.exit(1);
+  cachedConfig = config;
+  configLoadedFrom = source === 'base-only' ? 'template' : 'custom';
+  return cachedConfig;
 }
 
 /** Whether the cached configuration came from the placeholder template. */
@@ -342,7 +328,12 @@ function getDefaultTransport() {
  */
 function getDefaultMasterSystem() {
   const envConfig = getEnvironmentConfig();
-  return envConfig.default_master_system || process.env.SAP_SYSTEM_ID || '';
+  // A configured string is a statement, "" included (a cloud system has no
+  // master system); the environment answers only when the key is absent.
+  if (typeof envConfig.default_master_system === 'string') {
+    return envConfig.default_master_system;
+  }
+  return process.env.SAP_SYSTEM_ID || '';
 }
 
 /**

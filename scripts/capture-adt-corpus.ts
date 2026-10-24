@@ -51,7 +51,7 @@
  *
  * Side effects on the SAP system: creates ONE scratch class
  * (`SCRATCH_CLASS_NAME` below) in `environment.default_package`
- * (src/__tests__/helpers/test-config.yaml), exercises it (lock/unlock/update/check/activate/
+ * (from the test configuration), exercises it (lock/unlock/update/check/activate/
  * delete), and deletes it at the end. Never touches the 29 restored shared
  * polygon objects (`ZMCP_SHR_PKG`) beyond reading them.
  *
@@ -79,7 +79,6 @@ import {
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
-import * as yaml from 'yaml';
 import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
@@ -843,7 +842,7 @@ async function main(): Promise<void> {
   recorder.setCaseFilter(caseFilter);
 
   // This repository's own helper: it reads the target system and the
-  // authentication from `src/__tests__/helpers/test-config.yaml`, picks the
+  // authentication from the test configuration, picks the
   // connector and returns the session open.
   const connection = await createTestConnection(createConnectionLogger());
   recorder.instrument(connection);
@@ -871,19 +870,11 @@ async function main(): Promise<void> {
 
   // Dev package to hold the scratch class — read from test-config.yaml so
   // this script never guesses an environment value.
-  const testConfigPath = path.join(
-    __dirname,
-    '..',
-    'src',
-    '__tests__',
-    'helpers',
-    'test-config.yaml',
-  );
-  const testConfig = yaml.parse(fs.readFileSync(testConfigPath, 'utf-8'));
+  const testConfig = require('../src/__tests__/helpers/test-helper').loadTestConfig();
   const devPackage: string = testConfig?.environment?.default_package;
-  if (!devPackage) {
+  if (!devPackage || devPackage.startsWith('<')) {
     throw new Error(
-      `src/__tests__/helpers/test-config.yaml has no environment.default_package — refusing to guess a package for the scratch class.`,
+      `The test configuration has no environment.default_package — refusing to guess a package for the scratch class.`,
     );
   }
   console.log(`dev package for scratch class: ${devPackage}`);

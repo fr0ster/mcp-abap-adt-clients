@@ -3,7 +3,7 @@
 ## Getting a connection
 
 No test builds its own. `createTestConnection()` reads **where** to connect and
-**how** to authenticate from `.env` and `test-config.yaml`, picks the connector
+**how** to authenticate from `.env` and the test configuration (`test-config.yaml.template` + `test-config.overlay.yaml`), picks the connector
 for the system stated in `environment.system`, opens the session, and hands back
 a connection that is ready to use. A test that constructs a connector names a
 system, and the one it names is the one it was written against — which is how a

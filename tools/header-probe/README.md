@@ -11,7 +11,7 @@ package (`tools/` is outside `src/`, so nothing here reaches `dist/`, and
 
 - `.env` in the repository root with the SAP connection (`SAP_URL`,
   `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`), as the integration tests use.
-- `src/__tests__/helpers/test-config.yaml` (`npm run test:init`): `environment.system`,
+- `src/__tests__/helpers/test-config.overlay.yaml` (`npm run test:init -- onprem|cloud`): `environment.system`,
   and `default_package` and `default_transport`, where the clients run and
   phase 2 make their temporary objects and delete them again (a package
   object also takes `create_package`'s software component and transport

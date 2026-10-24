@@ -1,0 +1,69 @@
+# Overlay form for a cloud system. A FORM, not a filled copy: nothing here names a
+# real package, system, transport or component. Fill in your own.
+#
+# Copy it to ../test-config.overlay.yaml (gitignored) — or run
+#   npm run test:init -- cloud
+# Every `<LIKE_THIS>` must be replaced: the loader refuses a placeholder. An empty
+# entry (`key:` with nothing) is refused; write "" where empty is meant. Flags
+# are unquoted true/false. Turning an optional ATC case on needs its check_variant.
+# Keys are written FLAT (one path per line); a case inside a list is picked by
+# its name in [brackets]. Only these keys are allowed; the rest is the base,
+# ../test-config.yaml.template.
+
+# --- Required ---
+# Which kind of system. Stated, never guessed.
+"environment.system": "cloud"
+# Your dev package (Z*/Y*) or "$TMP" for local objects. Create it by hand first; tests only create objects inside it.
+"environment.default_package": "<DEV_PACKAGE>"
+# The ONE transport request every run reuses and never releases ("" for $TMP/local packages).
+"environment.default_transport": "<TRANSPORT_REQUEST>"
+# SAP system id (on-prem only; "" on cloud, which supplies it).
+"environment.default_master_system": ""
+# Name of the shared package on THIS system (created by `npm run shared:setup` inside super_package).
+"shared_dependencies.package": "<SHARED_PACKAGE>"
+# Parent of the shared package; normally the same as environment.default_package.
+"shared_dependencies.super_package": "<DEV_PACKAGE>"
+# Software component of the shared package ("" on cloud).
+"shared_dependencies.software_component": ""
+# Transport layer of the shared package ("" on cloud).
+"shared_dependencies.transport_layer": ""
+# Change recording of the shared package: true under a transportable component (SAP refuses it otherwise, TR432), false on cloud.
+"shared_dependencies.record_changes": false
+# Existing parent package for the package the create test makes (structure/main type).
+"create_package.test_cases[adt_package].params.package_name": "<PARENT_PACKAGE>"
+# Software component for that package; cloud systems use their own local component.
+"create_package.test_cases[adt_package].params.software_component": "<SOFTWARE_COMPONENT>"
+# Transport layer for that package (required on-prem while change recording is on; "" on cloud).
+"create_package.test_cases[adt_package].params.transport_layer": ""
+# Transport target as SE10 shows it, WITHOUT the slashes (on-prem; "" on cloud).
+"create_transport.test_cases[builder_transport].params.target_system": ""
+
+# --- Optional: uncomment to override the base default ---
+# Transport mechanism: "rfc" or "http".
+# "environment.connection_type": "rfc"
+# Name of the scalar function the test creates, if the base name collides.
+# "create_scalar_function.test_cases[adt_scalar_function].params.scalar_function_name": "<NAME>"
+# Name of its implementation, if the base name collides.
+# "create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params.implementation_name": "<NAME>"
+# Name of the append structure, if the base name collides.
+# "create_append_structure.test_cases[adt_append_structure].params.append_structure_name": "<NAME>"
+# true once a check variant that runs on this system is set.
+# "atc_run.test_cases[adt_atc_run].enabled": true
+# ATC check variant, or "" for the system's own.
+# "atc_run.test_cases[adt_atc_run].params.check_variant": "<CHECK_VARIANT>"
+# Pin the finding's message id (set with expected_priority, or neither).
+# "atc_run.test_cases[adt_atc_run].params.expected_message_id": "<MESSAGE_ID>"
+# Pin the finding's priority (set with expected_message_id, or neither).
+# "atc_run.test_cases[adt_atc_run].params.expected_priority": 2
+# true once the system holds the objects to check.
+# "atc_object_kinds.test_cases[adt_atc_object_kinds].enabled": true
+# ATC check variant when the system's nominated one does not run.
+# "atc_object_kinds.test_cases[adt_atc_object_kinds].params.check_variant": "<CHECK_VARIANT>"
+# On-prem: a standard program the system has, if it lacks the base one.
+# "enhancement.test_cases[program_host].params.program_name": "<PROGRAM>"
+# On-prem: a standard function group, if the system lacks the base one.
+# "enhancement.test_cases[function_group_host].params.function_group_name": "<FUNCTION_GROUP>"
+# On-prem: a standard include, if the system lacks the base one (set with main_program).
+# "enhancement.test_cases[include_host].params.include_name": "<INCLUDE>"
+# On-prem: the main program of that include.
+# "enhancement.test_cases[include_host].params.main_program": "<MAIN_PROGRAM>"

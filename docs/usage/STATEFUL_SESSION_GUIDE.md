@@ -124,5 +124,5 @@ T100 key; pass nothing and it is the document, for you to read. Until 23.0.0
 `AdtPackage.delete()` applied that reading on its own.
 
 The test harness does exactly this, in `recycleTestSession()`, under the
-`cleanup_session_after_test` flag in `test-config.yaml`. That is harness code on
+`cleanup_session_after_test` flag in the test configuration (`test-config.yaml.template`). That is harness code on
 the consumer side, not a library method, for the reasons above.

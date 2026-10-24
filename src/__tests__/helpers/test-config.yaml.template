@@ -1,8 +1,17 @@
-# Test Configuration for @mcp-abap-adt/adt-clients
+# Test Configuration for @mcp-abap-adt/adt-clients — the BASE
 #
-# Usage:
-#   cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml
-#   # Edit ONLY the lines marked with "# ← CHANGE" below
+# This file is tracked and holds everything shared: fixtures, test cases, object
+# names, timeouts. Do NOT copy it and edit the copy. What differs per system
+# goes into a small local overlay, which the loader merges over this file:
+#
+#   npm run test:init -- onprem      # or: cloud — writes test-config.overlay.yaml
+#   # then fill in the keys of src/__tests__/helpers/test-config.overlay.yaml
+#
+# The overlay is gitignored; its allowed keys are the lines below marked
+# "# ← CHANGE" (required) and the optional ones that say "if needed"/"optional".
+# Any other key in the overlay is refused by name, and so is a required key it
+# omits. A leftover full test-config.yaml is refused too:
+# `npm run test-config:migrate` writes the overlay from it.
 #
 # ┌──────────────────────────────────────────────────────────────────┐
 # │  PREREQUISITE (do this BEFORE running any tests):                │
@@ -18,7 +27,7 @@
 # │  CTS, so transport defects stay invisible and suites pass on a   │
 # │  lie; a second request meets CTS_WBO_API 019 on the first write. │
 # │                                                                  │
-# │  REQUIRED CHANGES (edit these after copying):                    │
+# │  REQUIRED KEYS (state these in the overlay):                      │
 # │                                                                  │
 # │  1. environment.default_package       — your dev package (Z*/Y*) │
 # │  2. environment.default_transport     — transport request or ""  │
@@ -141,7 +150,8 @@ environment:
 # Names are fixed across all systems — no placeholders needed.
 # Naming convention: ZAC_SHR_{COMPONENT}_{OBJTYPE}
 shared_dependencies:
-  package: "ZAC_SHR_PKG"
+  package: "ZAC_SHR_PKG"                     # ← CHANGE: the shared package on THIS system (stated in the overlay,
+                                              #   never taken from the base)
   super_package: "<DEV_PACKAGE>"              # ← CHANGE: parent package (same as environment.default_package)
   software_component: ""                     # ← CHANGE (on-prem): e.g. HOME (leave empty for cloud)
   transport_layer: ""                        # ← CHANGE (on-prem): e.g. Z<SID> (leave empty for cloud)
