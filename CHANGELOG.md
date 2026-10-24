@@ -171,6 +171,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   (`helpers/sharedActivation.ts`): stricter than the library's reading — an
   activation that did not execute fails, since the objects were written
   inactive — and composed through `judged()`.
+  The guard resolves both ends through the type checker: which member a call
+  is (computed, bound and destructured members included; `call` / `apply` and
+  `any` receivers refused) and which judge it passes (imported aliases,
+  shorthand, `const` options and spreads in their order; an `analyse` that
+  may be `undefined` is refused). It fails closed, and its allow-list is
+  keyed by the judge each allowed call passes.
 
 ## [37.2.0] - 2026-10-23
 

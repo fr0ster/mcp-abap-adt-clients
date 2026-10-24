@@ -179,7 +179,10 @@ describe('AdtClient read operations', () => {
           adtObject.read
             ? adtObject.read(params, version, { analyse: analyseException })
             : // biome-ignore lint/style/noNonNullAssertion: one of the two is always there
-              adtObject.readMetadata!(params, { version });
+              adtObject.readMetadata!(params, {
+                version,
+                analyse: analyseException,
+              });
 
         const readMetadata = (version: 'active' | 'inactive') => {
           if (!adtObject.readMetadata) {

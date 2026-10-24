@@ -427,7 +427,13 @@ export class BaseTester<TConfig, TState = unknown> {
   private readWhatItHas(
     config: Partial<TConfig>,
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+    // No `analyse` among them: the strategy is this harness's own
+    // (analyseException), and an options object carrying one — possibly
+    // `undefined` — would override it.
+    options?: { withLongPolling?: boolean } & Omit<
+      IAdtOperationOptions,
+      'analyse'
+    >,
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.read) {
       return this.adtObject.read(config, version, {
@@ -491,7 +497,8 @@ export class BaseTester<TConfig, TState = unknown> {
 
   private writeWhatItHas(
     config: Partial<TConfig>,
-    options?: IAdtOperationOptions,
+    // No `analyse`: the strategy is the harness's own (analyseException).
+    options?: Omit<IAdtOperationOptions, 'analyse'>,
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.update) {
       return this.adtObject.update(config, {

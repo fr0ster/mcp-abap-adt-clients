@@ -1,27 +1,38 @@
 /**
  * Every call an integration suite or a test helper makes to an adt-clients
- * member is judged: it passes an `analyse` strategy.
+ * member is judged: it passes an `analyse` strategy, and the effective one
+ * is `analyseException` or `judged(<specific judge>)`.
  *
  * A member answers what came off the wire, so an `exc:exception` inside an
  * HTTP 200 — an authorization refusal, say — is `ok: true` unless the call
- * asked for a reading. A test that only checked `ok` then passed over a
- * refusal. So:
+ * asked for a reading. A specific judge of adt-strategies
+ * (`analyseActivation`, `analyseDeletion`, `analyseValidation`, …) reads only
+ * its own document form and answers an exception document as "no failure",
+ * so it is passed composed: `judged(analyseX)` (helpers/judged.ts) reads the
+ * exception first. Judges that read exception documents themselves
+ * (`analyseDebuggeeEnd`, …) count as judged.
  *
- * - every call to a member whose options take `analyse` passes one —
- *   `analyseException` by default;
- * - a specific judge of adt-strategies (`analyseActivation`,
- *   `analyseDeletion`, `analyseValidation`, …) reads only its own document
- *   form and answers an exception document as "no failure", so it is passed
- *   composed: `judged(analyseX)` (helpers/judged.ts) reads the exception
- *   first;
- * - options passed as an expression count only when its type carries a
- *   required `analyse`.
+ * Everything is resolved with the compiler's type checker, never by text:
  *
- * The TypeScript files are read with the compiler's type checker: a call is
- * a member's when its declaration lives in this package's source or in an
- * `@mcp-abap-adt` contract package and one of its parameters takes
- * `analyse`. test-helper.js has no types, so its calls are found by member
- * name on a client handler (`client.getX().member(…)`, `handler.member(…)`).
+ * - **which member a call is** — through the call's resolved signature, so a
+ *   computed member (`h['readMetadata'](…)`), a bound one
+ *   (`const read = h.readMetadata.bind(h); read(…)`) and a destructured one
+ *   (`const { readMetadata } = h; readMetadata(…)`) are all that member. A
+ *   member invoked through `call` / `apply`, and a call on an `any`-typed
+ *   receiver, are refused outright; so is a local declaration that narrows a
+ *   member and drops its `analyse` option;
+ * - **which judge is passed** — through symbols, so an imported alias
+ *   (`analyseDeletion as del`), a shorthand `{ analyse }`, options held in a
+ *   `const`, and spreads are followed to the judge they carry. Properties are
+ *   evaluated in order, so a later spread overrides an earlier `analyse`; a
+ *   spread whose `analyse` cannot be resolved statically — an options
+ *   parameter typed with an optional `analyse`, which may be `undefined` — is
+ *   refused.
+ *
+ * The guard fails closed: a form it cannot resolve is refused, not accepted.
+ * test-helper.js has no types, so its calls are found by member name on a
+ * client handler, and its judge must be written as `analyseException` or
+ * `judged(analyseX)`, nothing else.
  *
  * A call deliberately judged otherwise goes into ALLOWED, with its reason.
  * An entry that no longer matches a call fails too, so the list cannot rot.
@@ -34,26 +45,44 @@ import * as ts from 'typescript';
 const ROOT = join(__dirname, '../../..');
 const SCOPES = ['src/__tests__/integration', 'src/__tests__/helpers'];
 
-/**
- * `<file>:<member>:<first 60 characters of the call>` → why it is judged
- * otherwise. Empty: every call in scope passes a strategy today.
- */
-const ALLOWED: ReadonlyMap<string, string> = new Map([]);
-
-/** adt-strategies' judges that read one document form only. */
-const SPECIFIC = new Set([
-  'analyseActivation',
-  'analyseDeletion',
-  'analyseValidation',
-  'analyseCheck',
-  'analyseUnitTest',
-  'analyseCdsTestDoubles',
-  'analysePublication',
-  'analyseMessageClassMessage',
-  'analyseAny',
-  // The test side's own stricter activation verdict (helpers/sharedActivation.ts).
-  'analyseActivationExecuted',
+/** `<file>:<member>:<first 60 characters of the call>` → why it is allowed. */
+const ALLOWED: ReadonlyMap<string, string> = new Map([
+  [
+    'src/__tests__/integration/shared/responseContract.test.ts:activate:client.getClass().activate( { className: NEVER_EXISTS }, { h [analyse: refusalIsAFailure]',
+    'The test exists to show a consumer judging the answer with its own strategy (refusalIsAFailure); the call before it uses analyseException.',
+  ],
+  [
+    'src/__tests__/integration/shared/checkRun.test.ts:check:client .getClass() .check({ className, source: BROKEN_SOURCE [analyse: everythingIsAFailure]',
+    "The test proves the caller's strategy is consulted: everythingIsAFailure refuses every answer, and the test asserts that refusal.",
+  ],
+  [
+    'src/__tests__/helpers/sessionConfig.ts:getSystemInformation:getSystemInformation(connection)',
+    "Its own reading decides: a 404 is the endpoint absent on premise ({ present: false }), a 2xx that is no JSON object a failure. analyseException would turn the 404's exception body into a failure on every on-premise system.",
+  ],
+  [
+    'src/__tests__/integration/core/transport/Transport.test.ts:getSystemInformation:getSystemInformation(connection)',
+    "As in sessionConfig: getSystemInformation's own reading of the 404 (absent on premise) and of a non-JSON 2xx (a failure) is the judge.",
+  ],
 ]);
+
+/** Judges that read exception documents themselves: they count as judged. */
+const SELF_JUDGING = new Set([
+  'analyseException',
+  'analyseDebuggeeEnd',
+  'analyseDebuggerFreed',
+  'analysePublicationLock',
+  'analyseUnitTestStart',
+  'analyseUnsupportedStatus',
+]);
+
+type Verdict =
+  | { kind: 'judged' }
+  | { kind: 'absent' }
+  | { kind: 'refused'; why: string };
+
+const JUDGED: Verdict = { kind: 'judged' };
+const ABSENT: Verdict = { kind: 'absent' };
+const refused = (why: string): Verdict => ({ kind: 'refused', why });
 
 function filesUnder(dir: string, ext: RegExp): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -61,48 +90,6 @@ function filesUnder(dir: string, ext: RegExp): string[] {
     if (statSync(full).isDirectory()) return filesUnder(full, ext);
     return ext.test(name) ? [full] : [];
   });
-}
-
-/** What is wrong with the `analyse` of an options argument, or `undefined`. */
-function analyseProblem(
-  arg: ts.Expression | undefined,
-  checker?: ts.TypeChecker,
-): string | undefined {
-  if (!arg) return 'no options, so no analyse';
-  if (ts.isObjectLiteralExpression(arg)) {
-    const own = arg.properties.find(
-      (p) => p.name !== undefined && p.name.getText() === 'analyse',
-    );
-    if (own) {
-      if (!ts.isPropertyAssignment(own)) return undefined;
-      const value = own.initializer;
-      const judge = ts.isCallExpression(value)
-        ? value.expression.getText()
-        : value.getText();
-      return SPECIFIC.has(judge)
-        ? `${judge} alone reads no exception document — pass judged(${judge})`
-        : undefined;
-    }
-    // A spread that carries a required `analyse` counts.
-    const spread = arg.properties.find(
-      (p) =>
-        ts.isSpreadAssignment(p) &&
-        checker !== undefined &&
-        requiresAnalyse(checker.getTypeAtLocation(p.expression), checker),
-    );
-    return spread ? undefined : 'options without analyse';
-  }
-  if (checker && requiresAnalyse(checker.getTypeAtLocation(arg), checker)) {
-    return undefined;
-  }
-  return 'options whose type carries no required analyse';
-}
-
-function requiresAnalyse(type: ts.Type, checker: ts.TypeChecker): boolean {
-  const property = checker.getNonNullableType(type).getProperty('analyse');
-  return (
-    property !== undefined && (property.flags & ts.SymbolFlags.Optional) === 0
-  );
 }
 
 function isContractDeclaration(declaration: ts.Declaration): boolean {
@@ -113,60 +100,24 @@ function isContractDeclaration(declaration: ts.Declaration): boolean {
   );
 }
 
-/** The index of a declaration's parameter that takes `analyse`, or -1. */
-function analyseIndexOf(
-  declaration: ts.Declaration,
-  checker: ts.TypeChecker,
-): number {
-  const parameters = parametersOf(declaration);
-  for (const [index, parameter] of (parameters ?? []).entries()) {
-    const type = checker.getNonNullableType(
-      checker.getTypeAtLocation(parameter),
-    );
-    const members = type.isUnion() ? type.types : [type];
-    if (members.some((member) => member.getProperty('analyse'))) return index;
-  }
-  return -1;
-}
-
-/** The index of the parameter that takes `analyse`, across every overload. */
-function optionsIndex(symbol: ts.Symbol, checker: ts.TypeChecker): number {
-  for (const declaration of symbol.declarations ?? []) {
-    if (!isContractDeclaration(declaration)) continue;
-    const parameters =
-      ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)
-        ? declaration.parameters
-        : ts.isPropertySignature(declaration) &&
-            declaration.type &&
-            ts.isFunctionTypeNode(declaration.type)
-          ? declaration.type.parameters
-          : undefined;
-    if (!parameters) continue;
-    for (const [index, parameter] of parameters.entries()) {
-      const type = checker.getNonNullableType(
-        checker.getTypeAtLocation(parameter),
-      );
-      const members = type.isUnion() ? type.types : [type];
-      if (members.some((member) => member.getProperty('analyse'))) {
-        return index;
-      }
-    }
-  }
-  return -1;
-}
-
-function keyOf(file: string, member: string, call: ts.Node): string {
-  return `${relative(ROOT, file)}:${member}:${call
-    .getText()
-    .replace(/\s+/g, ' ')
-    .slice(0, 60)}`;
+function isStrategyFile(file: string): boolean {
+  return (
+    file.includes('/adt-strategies/') ||
+    file.includes('node_modules/@mcp-abap-adt/adt-strategies')
+  );
 }
 
 /** The parameters of a method-like declaration, or `undefined`. */
 function parametersOf(
   declaration: ts.Declaration,
 ): ts.NodeArray<ts.ParameterDeclaration> | undefined {
-  if (ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration))
+  if (
+    ts.isMethodSignature(declaration) ||
+    ts.isMethodDeclaration(declaration) ||
+    ts.isFunctionDeclaration(declaration) ||
+    ts.isArrowFunction(declaration) ||
+    ts.isFunctionExpression(declaration)
+  )
     return declaration.parameters;
   if (
     (ts.isPropertySignature(declaration) ||
@@ -178,10 +129,48 @@ function parametersOf(
   return undefined;
 }
 
-/**
- * Every method name the contracts declare with an `analyse`-taking
- * parameter, read off the program's own contract files.
- */
+/** The index of a declaration's parameter that takes `analyse`, or -1. */
+function analyseIndexOf(
+  declaration: ts.Declaration,
+  checker: ts.TypeChecker,
+): number {
+  for (const [index, parameter] of (
+    parametersOf(declaration) ?? []
+  ).entries()) {
+    const type = checker.getNonNullableType(
+      checker.getTypeAtLocation(parameter),
+    );
+    const members = type.isUnion() ? type.types : [type];
+    if (members.some((member) => member.getProperty('analyse'))) return index;
+  }
+  return -1;
+}
+
+/** The analyse-taking parameter of a member, across all its overloads. */
+function memberOptionsIndex(
+  declaration: ts.Declaration,
+  checker: ts.TypeChecker,
+): number {
+  const named = declaration as ts.Declaration & { name?: ts.Node };
+  const symbol = named.name
+    ? checker.getSymbolAtLocation(named.name)
+    : undefined;
+  for (const candidate of symbol?.declarations ?? [declaration]) {
+    if (!isContractDeclaration(candidate)) continue;
+    const index = analyseIndexOf(candidate, checker);
+    if (index >= 0) return index;
+  }
+  return -1;
+}
+
+function nameOf(declaration: ts.Declaration): string | undefined {
+  const named = declaration as ts.Declaration & { name?: ts.Node };
+  return named.name && ts.isIdentifier(named.name)
+    ? named.name.text
+    : undefined;
+}
+
+/** Every method name the contracts declare with an `analyse` parameter. */
 function contractMemberNames(
   program: ts.Program,
   checker: ts.TypeChecker,
@@ -198,16 +187,9 @@ function contractMemberNames(
     const visit = (node: ts.Node): void => {
       if (
         (ts.isMethodSignature(node) || ts.isMethodDeclaration(node)) &&
-        node.name &&
         ts.isIdentifier(node.name) &&
         !names.has(node.name.text) &&
-        node.parameters.some((parameter) => {
-          const type = checker.getNonNullableType(
-            checker.getTypeAtLocation(parameter),
-          );
-          const members = type.isUnion() ? type.types : [type];
-          return members.some((member) => member.getProperty('analyse'));
-        })
+        analyseIndexOf(node, checker) >= 0
       ) {
         names.add(node.name.text);
       }
@@ -219,26 +201,257 @@ function contractMemberNames(
 }
 
 /**
- * A local declaration that stands in for an adt-clients member: a method of
- * that name, declared in the suites or helpers, answering a contract or
- * anything (`Promise<IAdtResponse<…>>`, `Promise<any>`).
+ * A local declaration that stands in for an adt-clients member: declared in
+ * the suites or helpers, taking arguments, answering a contract or anything.
+ * A thunk (`list: () => client.getX().getVersions(…)`) narrows nothing.
  */
 function isLocalNarrowing(
   declaration: ts.Declaration,
   checker: ts.TypeChecker,
 ): boolean {
   if (isContractDeclaration(declaration)) return false;
+  // A function with a body is a wrapper, not a narrowing: the member calls
+  // inside it are checked where they are made. A narrowing is a declaration
+  // without one — a method or property of a local interface or type.
+  if (
+    !ts.isMethodSignature(declaration) &&
+    !ts.isPropertySignature(declaration) &&
+    !ts.isFunctionTypeNode(declaration) &&
+    !ts.isCallSignatureDeclaration(declaration)
+  ) {
+    return false;
+  }
   const signatures =
     ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)
       ? [checker.getSignatureFromDeclaration(declaration)]
       : checker.getTypeAtLocation(declaration).getCallSignatures();
   return signatures.some((signature) => {
-    // A thunk (`list: () => client.getX().getVersions(…)`) narrows nothing:
-    // it takes no argument, and the call inside it is checked on its own.
     if (!signature || signature.getParameters().length === 0) return false;
     const answered = checker.typeToString(signature.getReturnType());
     return /IAdtResponse|^Promise<any>$|^any$/.test(answered);
   });
+}
+
+function strip(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function resolved(symbol: ts.Symbol | undefined, checker: ts.TypeChecker) {
+  return symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0
+    ? checker.getAliasedSymbol(symbol)
+    : symbol;
+}
+
+/** The `const` initializer a symbol stands for, or `undefined`. */
+function constInitializer(
+  symbol: ts.Symbol | undefined,
+): ts.Expression | undefined {
+  const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+  if (
+    declaration &&
+    ts.isVariableDeclaration(declaration) &&
+    declaration.initializer &&
+    ts.isVariableDeclarationList(declaration.parent) &&
+    (declaration.parent.flags & ts.NodeFlags.Const) !== 0 &&
+    ts.isIdentifier(declaration.name)
+  ) {
+    return declaration.initializer;
+  }
+  return undefined;
+}
+
+/** What a judge expression is: judged, an uncomposed judge, or unknown. */
+function judgeVerdict(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+  depth = 0,
+): Verdict {
+  if (depth > 8) return refused('a judge the guard cannot resolve');
+  const node = strip(expression);
+  if (
+    node.kind === ts.SyntaxKind.UndefinedKeyword ||
+    (ts.isIdentifier(node) && node.text === 'undefined') ||
+    node.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return refused('analyse may be undefined');
+  }
+  if (ts.isConditionalExpression(node)) {
+    const sides = [
+      judgeVerdict(node.whenTrue, checker, depth + 1),
+      judgeVerdict(node.whenFalse, checker, depth + 1),
+    ];
+    return sides.find((side) => side.kind !== 'judged') ?? JUDGED;
+  }
+  if (ts.isCallExpression(node)) {
+    const callee = resolved(
+      checker.getSymbolAtLocation(strip(node.expression)),
+      checker,
+    );
+    const declaration = callee?.valueDeclaration ?? callee?.declarations?.[0];
+    const file = declaration?.getSourceFile().fileName ?? '';
+    if (callee?.name === 'judged' && file.endsWith('/helpers/judged.ts')) {
+      return node.arguments.length > 0
+        ? JUDGED
+        : refused('judged() of nothing');
+    }
+    if (callee && isStrategyFile(file)) {
+      return refused(
+        `${callee.name}(…) alone reads no exception document — pass judged(${callee.name}(…))`,
+      );
+    }
+    return refused('a judge the guard cannot resolve');
+  }
+  if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+    const symbol = resolved(checker.getSymbolAtLocation(node), checker);
+    const initializer = constInitializer(symbol);
+    const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+    const file = declaration?.getSourceFile().fileName ?? '';
+    if (symbol && isStrategyFile(file)) {
+      return SELF_JUDGING.has(symbol.name)
+        ? JUDGED
+        : refused(
+            `${symbol.name} alone reads no exception document — pass judged(${symbol.name})`,
+          );
+    }
+    if (symbol && file.endsWith('/helpers/sharedActivation.ts')) {
+      return refused(
+        `${symbol.name} alone reads no exception document — pass judged(${symbol.name})`,
+      );
+    }
+    if (initializer) return judgeVerdict(initializer, checker, depth + 1);
+    return refused('a judge the guard cannot resolve');
+  }
+  return refused('a judge the guard cannot resolve');
+}
+
+/** `{ analyse }`: the judge is the variable the shorthand names. */
+function shorthandVerdict(
+  property: ts.ShorthandPropertyAssignment,
+  checker: ts.TypeChecker,
+  depth: number,
+): Verdict {
+  const symbol = resolved(
+    checker.getShorthandAssignmentValueSymbol(property),
+    checker,
+  );
+  const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+  const file = declaration?.getSourceFile().fileName ?? '';
+  if (symbol && isStrategyFile(file)) {
+    return SELF_JUDGING.has(symbol.name)
+      ? JUDGED
+      : refused(
+          `${symbol.name} alone reads no exception document — pass judged(${symbol.name})`,
+        );
+  }
+  const initializer = constInitializer(symbol);
+  return initializer
+    ? judgeVerdict(initializer, checker, depth)
+    : refused('a judge the guard cannot resolve');
+}
+
+/** Whether a type may carry an `analyse` property. */
+function mayCarryAnalyse(type: ts.Type, checker: ts.TypeChecker): boolean {
+  const target = checker.getNonNullableType(type);
+  const members = target.isUnion() ? target.types : [target];
+  return (
+    (target.flags & ts.TypeFlags.Any) !== 0 ||
+    members.some((member) => member.getProperty('analyse') !== undefined)
+  );
+}
+
+/** The effective `analyse` of an options expression. */
+function optionsVerdict(
+  expression: ts.Expression | undefined,
+  checker: ts.TypeChecker,
+  depth = 0,
+): Verdict {
+  if (!expression) return ABSENT;
+  if (depth > 8) return refused('options the guard cannot resolve');
+  const node = strip(expression);
+  if (
+    node.kind === ts.SyntaxKind.UndefinedKeyword ||
+    (ts.isIdentifier(node) && node.text === 'undefined')
+  ) {
+    return ABSENT;
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    let state: Verdict = ABSENT;
+    for (const property of node.properties) {
+      if (ts.isSpreadAssignment(property)) {
+        const spread = optionsVerdict(property.expression, checker, depth + 1);
+        if (spread.kind !== 'absent') state = spread;
+        continue;
+      }
+      const name = property.name;
+      if (!name) continue;
+      if (ts.isComputedPropertyName(name)) {
+        return refused('a computed key in the options');
+      }
+      const key =
+        ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : '';
+      if (key !== 'analyse') continue;
+      if (ts.isPropertyAssignment(property)) {
+        state = judgeVerdict(property.initializer, checker, depth + 1);
+      } else if (ts.isShorthandPropertyAssignment(property)) {
+        state = shorthandVerdict(property, checker, depth + 1);
+      } else {
+        state = refused('analyse declared as a method or accessor');
+      }
+    }
+    return state;
+  }
+  if (ts.isConditionalExpression(node)) {
+    const sides = [
+      optionsVerdict(node.whenTrue, checker, depth + 1),
+      optionsVerdict(node.whenFalse, checker, depth + 1),
+    ];
+    return (
+      sides.find((side) => side.kind === 'refused') ??
+      (sides.every((side) => side.kind === 'judged')
+        ? JUDGED
+        : sides.every((side) => side.kind === 'absent')
+          ? ABSENT
+          : refused('analyse present on one branch only'))
+    );
+  }
+  if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+    const initializer = constInitializer(
+      resolved(checker.getSymbolAtLocation(node), checker),
+    );
+    if (initializer) return optionsVerdict(initializer, checker, depth + 1);
+  }
+  return mayCarryAnalyse(checker.getTypeAtLocation(node), checker)
+    ? refused('options whose analyse cannot be resolved — it may be undefined')
+    : ABSENT;
+}
+
+function keyOf(file: string, member: string, call: ts.Node): string {
+  return `${relative(ROOT, file)}:${member}:${call
+    .getText()
+    .replace(/\s+/g, ' ')
+    .slice(0, 60)}`;
+}
+
+/** The name a call is made by, whatever form its callee takes. */
+function calleeName(callee: ts.Expression): string | undefined {
+  const node = strip(callee);
+  if (ts.isPropertyAccessExpression(node)) return node.name.text;
+  if (ts.isElementAccessExpression(node)) {
+    const argument = node.argumentExpression;
+    return ts.isStringLiteralLike(argument) ? argument.text : undefined;
+  }
+  if (ts.isIdentifier(node)) return node.text;
+  return undefined;
 }
 
 /**
@@ -264,63 +477,100 @@ function typedFindings(
   host.getSourceFile = (name, language, ...rest) => {
     const text = virtual.get(name);
     return text !== undefined
-      ? ts.createSourceFile(name, text, language)
+      ? ts.createSourceFile(name, text, language, true)
       : getSourceFile(name, language, ...rest);
   };
-  const program = ts.createProgram(
-    [...files, ...virtual.keys()],
-    options,
-    host,
-  );
+  const roots = [...files, ...virtual.keys()];
+  const program = ts.createProgram(roots, options, host);
   const checker = program.getTypeChecker();
   const members = contractMemberNames(program, checker);
   const findings: string[] = [];
-  for (const file of [...files, ...virtual.keys()]) {
+  for (const file of roots) {
     const source = program.getSourceFile(file);
     if (!source) continue;
     const visit = (node: ts.Node): void => {
-      if (
-        ts.isCallExpression(node) &&
-        ts.isPropertyAccessExpression(node.expression)
-      ) {
-        const name = node.expression.name;
-        const key = keyOf(file, name.text, node);
-        const symbol = checker.getSymbolAtLocation(name);
-        const index = symbol ? optionsIndex(symbol, checker) : -1;
-        const receiver = checker.getTypeAtLocation(node.expression.expression);
-        if (index >= 0) {
-          const problem = analyseProblem(node.arguments[index], checker);
-          if (problem) findings.push(`${key} — ${problem}`);
-        } else if (members.has(name.text)) {
-          // Not a contract declaration, but a member's name: an `any`
-          // receiver hides which member it is, and a local declaration that
-          // narrows one hides its `analyse`. Both are refused outright —
-          // type the receiver from the client's own types.
-          if (receiver.flags & ts.TypeFlags.Any) {
-            findings.push(
-              `${key} — called on an any-typed receiver: type it from the client`,
+      if (ts.isCallExpression(node)) {
+        const callee = strip(node.expression);
+        const name = calleeName(callee) ?? '(computed)';
+        // The key names the judge the call passes, so an allow-list entry
+        // covers that call and not its judged neighbour of the same text.
+        const passed = node.arguments
+          .flatMap((argument) =>
+            ts.isObjectLiteralExpression(argument) ? argument.properties : [],
+          )
+          .find(
+            (property): property is ts.PropertyAssignment =>
+              ts.isPropertyAssignment(property) &&
+              property.name.getText() === 'analyse',
+          );
+        const key = `${keyOf(file, name, node)}${
+          passed ? ` [analyse: ${passed.initializer.getText()}]` : ''
+        }`;
+        const report = (why: string) => findings.push(`${key} — ${why}`);
+        const declaration = checker.getResolvedSignature(node)?.declaration;
+        const receiverType =
+          ts.isPropertyAccessExpression(callee) ||
+          ts.isElementAccessExpression(callee)
+            ? checker.getTypeAtLocation(callee.expression)
+            : undefined;
+
+        // `member.call(…)` / `member.apply(…)`: the arguments are shifted and
+        // the member is hidden behind Function's own signature.
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          (callee.name.text === 'call' || callee.name.text === 'apply')
+        ) {
+          const target = checker
+            .getTypeAtLocation(callee.expression)
+            .getCallSignatures()
+            .some(
+              (signature) =>
+                signature.declaration !== undefined &&
+                isContractDeclaration(signature.declaration) &&
+                memberOptionsIndex(signature.declaration, checker) >= 0,
+            );
+          if (target) report(`invoked through ${callee.name.text}()`);
+        } else if (
+          ts.isElementAccessExpression(callee) &&
+          !ts.isStringLiteralLike(callee.argumentExpression) &&
+          (receiverType
+            ?.getProperties()
+            .some((property) => members.has(property.getName())) ??
+            false)
+        ) {
+          report('a member reached by a computed key the guard cannot resolve');
+        } else if (
+          receiverType !== undefined &&
+          receiverType.flags & ts.TypeFlags.Any &&
+          members.has(name)
+        ) {
+          report('called on an any-typed receiver: type it from the client');
+        } else if (
+          declaration &&
+          !ts.isJSDocSignature(declaration) &&
+          isContractDeclaration(declaration)
+        ) {
+          const index = memberOptionsIndex(declaration, checker);
+          if (index >= 0) {
+            const verdict = optionsVerdict(node.arguments[index], checker);
+            if (verdict.kind === 'absent') report('no analyse');
+            if (verdict.kind === 'refused') report(verdict.why);
+          }
+        } else if (
+          declaration &&
+          !ts.isJSDocSignature(declaration) &&
+          members.has(nameOf(declaration) ?? name) &&
+          isLocalNarrowing(declaration, checker)
+        ) {
+          const index = analyseIndexOf(declaration, checker);
+          if (index < 0) {
+            report(
+              'a local declaration narrows the adt-clients member and drops its analyse option: build the type from the client (Pick<…>, the contract interface)',
             );
           } else {
-            const narrowing = (symbol?.declarations ?? []).filter(
-              (declaration) => isLocalNarrowing(declaration, checker),
-            );
-            // A local declaration that narrows a member is judged like the
-            // member when it carries the `analyse` option; one that drops it
-            // hides the option from the compiler, and is refused.
-            const localIndex = narrowing
-              .map((declaration) => analyseIndexOf(declaration, checker))
-              .find((found) => found >= 0);
-            if (narrowing.length > 0 && localIndex === undefined) {
-              findings.push(
-                `${key} — a local declaration narrows the adt-clients member and drops its analyse option: build the type from the client (Pick<…>, the contract interface)`,
-              );
-            } else if (localIndex !== undefined) {
-              const problem = analyseProblem(
-                node.arguments[localIndex],
-                checker,
-              );
-              if (problem) findings.push(`${key} — ${problem}`);
-            }
+            const verdict = optionsVerdict(node.arguments[index], checker);
+            if (verdict.kind === 'absent') report('no analyse');
+            if (verdict.kind === 'refused') report(verdict.why);
           }
         }
       }
@@ -347,15 +597,55 @@ const JS_OPTIONS_INDEX: Record<string, number> = {
   getInactiveObjects: 0,
 };
 
-function jsFindings(): string[] {
-  const files = SCOPES.flatMap((scope) =>
-    filesUnder(join(ROOT, scope), /\.js$/),
-  );
+/**
+ * test-helper.js has no types: its judge is read as written, and only two
+ * spellings pass — `analyseException` and `judged(analyseX)` — with the
+ * file's own require of them unaliased. Anything else is refused.
+ */
+function jsJudgeProblem(arg: ts.Expression | undefined): string | undefined {
+  if (!arg || !ts.isObjectLiteralExpression(arg)) {
+    return 'options the guard cannot read in a file without types';
+  }
+  let judge: ts.Expression | undefined;
+  for (const property of arg.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      return 'a spread in options the guard cannot read in a file without types';
+    }
+    if (
+      ts.isPropertyAssignment(property) &&
+      property.name.getText() === 'analyse'
+    ) {
+      judge = property.initializer;
+    } else if (property.name?.getText() === 'analyse') {
+      return 'an analyse the guard cannot read in a file without types';
+    }
+  }
+  if (!judge) return 'no analyse';
+  const text = judge.getText().replace(/\s+/g, '');
+  return text === 'analyseException' || /^judged\(analyse\w+\)$/.test(text)
+    ? undefined
+    : `${text} is neither analyseException nor judged(analyseX)`;
+}
+
+function jsFindings(
+  sources: ReadonlyMap<string, string> = new Map(
+    SCOPES.flatMap((scope) => filesUnder(join(ROOT, scope), /\.js$/)).map(
+      (file) => [file, readFileSync(file, 'utf8')],
+    ),
+  ),
+): string[] {
   const findings: string[] = [];
-  for (const file of files) {
+  for (const [file, text] of sources) {
+    // The two names must be the strategies' own, not a rename of something
+    // else.
+    if (/\banalyse\w+\s*:\s*(analyseException|judged)\b/.test(text)) {
+      findings.push(
+        `${relative(ROOT, file)}:require: a judge renamed on import`,
+      );
+    }
     const source = ts.createSourceFile(
       file,
-      readFileSync(file, 'utf8'),
+      text,
       ts.ScriptTarget.Latest,
       true,
       ts.ScriptKind.JS,
@@ -371,13 +661,10 @@ function jsFindings(): string[] {
           .replace(/\s+/g, '');
         if (/^client\..*get\w+\(|^handler$/.test(receiver)) {
           const member = node.expression.name.text;
-          const problem = analyseProblem(
+          const problem = jsJudgeProblem(
             node.arguments[JS_OPTIONS_INDEX[member] ?? -1],
           );
-          if (
-            problem &&
-            problem !== 'options whose type carries no required analyse'
-          ) {
+          if (problem) {
             findings.push(`${keyOf(file, member, node)} — ${problem}`);
           }
         }
@@ -410,21 +697,26 @@ describe('integration suites and helpers judge every adt-clients call', () => {
 });
 
 /**
- * The guard's own fixtures: the three shapes that hid unjudged calls — a
- * hand-written handler type, a hand-written runner interface, a
- * hand-written client — and an `any` receiver, each refused; the same calls
- * typed from the client and judged pass.
+ * The guard's own fixtures, in memory beside the helpers so their imports
+ * resolve as a helper's would. Each refused form is refused for its own
+ * reason; the judged forms pass.
  */
-describe('the guard sees through locally narrowed receivers', () => {
+describe('the guard resolves receivers and judges by symbol', () => {
   const at = (name: string) => join(ROOT, 'src/__tests__/helpers', name);
-  const HEAD = `import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtResponse, IAdtRunnable, ITestRunInformation } from '@mcp-abap-adt/interfaces-adt';
+  const HEAD = `import { analyseDeletion, analyseException, analyseDeletion as del } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtAnalyseOptions, IAdtResponse, IAdtRunnable, ITestRunInformation } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../../clients/AdtClient';
+import { judged } from './judged';
+type Domain = ReturnType<AdtClient['getDomain']>;
 `;
+  const fixture = (name: string, body: string): [string, string] => [
+    at(name),
+    `${HEAD}${body}`,
+  ];
   const fixtures = new Map<string, string>([
-    [
-      at('__guardHandler.ts'),
-      `${HEAD}type Handler = {
+    fixture(
+      '__guardHandler.ts',
+      `type Handler = {
   readMetadata(config: any): Promise<any>;
   delete(config: any, options?: any): Promise<any>;
 };
@@ -433,10 +725,10 @@ export async function f(handler: Handler) {
   await handler.delete({}, {});
 }
 `,
-    ],
-    [
-      at('__guardRunner.ts'),
-      `${HEAD}interface IRunner {
+    ),
+    fixture(
+      '__guardRunner.ts',
+      `interface IRunner {
   getStatus(runId: string, withLongPolling?: boolean): Promise<IAdtResponse<unknown>>;
   getResult(runId: string): Promise<IAdtResponse<unknown>>;
 }
@@ -445,10 +737,10 @@ export async function f(runner: IRunner) {
   await runner.getResult('R');
 }
 `,
-    ],
-    [
-      at('__guardClient.ts'),
-      `${HEAD}interface IGroupClient {
+    ),
+    fixture(
+      '__guardClient.ts',
+      `interface IGroupClient {
   getFunctionGroup(): {
     readMetadata(config: { functionGroupName: string }): Promise<IAdtResponse<unknown>>;
   };
@@ -457,57 +749,195 @@ export async function f(client: IGroupClient) {
   await client.getFunctionGroup().readMetadata({ functionGroupName: 'Z' });
 }
 `,
-    ],
-    [
-      at('__guardAny.ts'),
-      `${HEAD}export async function f(handler: any) {
+    ),
+    fixture(
+      '__guardAny.ts',
+      `export async function f(handler: any) {
   await handler.readMetadata({}, { analyse: analyseException });
 }
 `,
-    ],
-    [
-      at('__guardTyped.ts'),
-      `${HEAD}type IRunner = IAdtRunnable<string, unknown, object> & ITestRunInformation<unknown, unknown>;
-type Handler = Pick<ReturnType<AdtClient['getDomain']>, 'readMetadata' | 'delete'>;
-export async function judged(runner: IRunner, handler: Handler, client: Pick<AdtClient, 'getFunctionGroup'>) {
+    ),
+    fixture(
+      '__guardComputed.ts',
+      `export async function f(h: Domain, key: 'readMetadata' | 'delete') {
+  await h['readMetadata']({});
+  await h[key]({});
+}
+`,
+    ),
+    fixture(
+      '__guardBound.ts',
+      `export async function f(h: Domain) {
+  const read = h.readMetadata.bind(h);
+  await read({});
+}
+`,
+    ),
+    fixture(
+      '__guardDestructured.ts',
+      `export async function f(h: Domain) {
+  const { readMetadata } = h;
+  await readMetadata({});
+}
+`,
+    ),
+    fixture(
+      '__guardCallApply.ts',
+      `export async function f(h: Domain) {
+  await h.readMetadata.call(h, {}, { analyse: analyseException });
+}
+`,
+    ),
+    fixture(
+      '__guardAlias.ts',
+      `export async function f(h: Domain) {
+  await h.delete({}, { analyse: del });
+}
+`,
+    ),
+    fixture(
+      '__guardShorthand.ts',
+      `export async function f(h: Domain) {
+  const analyse = analyseDeletion;
+  await h.delete({}, { analyse });
+}
+`,
+    ),
+    fixture(
+      '__guardVariable.ts',
+      `export async function f(h: Domain) {
+  const opts = { analyse: analyseDeletion };
+  await h.delete({}, opts);
+}
+`,
+    ),
+    fixture(
+      '__guardSpreadUndefined.ts',
+      `export async function f(h: Domain, opts: IAdtAnalyseOptions) {
+  await h.readMetadata({}, { analyse: analyseException, ...opts });
+}
+`,
+    ),
+    fixture(
+      '__guardSpreadSpecific.ts',
+      `export async function f(h: Domain) {
+  const opts = { analyse: analyseDeletion };
+  await h.delete({}, { analyse: judged(analyseDeletion), ...opts });
+}
+`,
+    ),
+    fixture(
+      '__guardUndefined.ts',
+      `export async function f(h: Domain, flag: boolean) {
+  await h.readMetadata({}, { analyse: flag ? analyseException : undefined });
+}
+`,
+    ),
+    fixture(
+      '__guardJudged.ts',
+      `type IRunner = IAdtRunnable<string, unknown, object> & ITestRunInformation<unknown, unknown>;
+export async function judgedCalls(h: Domain, runner: IRunner) {
+  const opts = { analyse: judged(del) };
+  const analyse = analyseException;
+  const { readMetadata } = h;
+  await h.delete({}, opts);
+  await h.readMetadata({}, { analyse });
+  await readMetadata({}, { analyse: analyseException });
+  await h['readMetadata']({}, { headers: undefined, analyse: analyseException });
+  await h.delete({}, { analyse: analyseDeletion, ...opts });
   await runner.getStatus('R', true, { analyse: analyseException });
-  await handler.readMetadata({}, { analyse: analyseException });
-  await client.getFunctionGroup().readMetadata({ functionGroupName: 'Z' }, { analyse: analyseException });
-}
-export async function unjudged(runner: IRunner, handler: Handler) {
-  await runner.getResult('R');
-  await handler.delete({}, {});
 }
 `,
-    ],
+    ),
   ]);
   const findings = typedFindings([], fixtures);
   const of = (name: string) =>
     findings.filter((finding) => finding.includes(`/${name}:`));
 
-  it('refuses a hand-written handler type that drops analyse', () => {
-    expect(of('__guardHandler.ts')).toHaveLength(2);
-    expect(of('__guardHandler.ts').join('\n')).toMatch(/drops its analyse/);
+  it.each([
+    ['__guardHandler.ts', 2, /drops its analyse/],
+    ['__guardRunner.ts', 2, /drops its analyse/],
+    ['__guardClient.ts', 1, /drops its analyse/],
+    ['__guardAny.ts', 1, /any-typed receiver/],
+    ['__guardComputed.ts', 2, /no analyse|computed key/],
+    ['__guardBound.ts', 1, /no analyse/],
+    ['__guardDestructured.ts', 1, /no analyse/],
+    ['__guardCallApply.ts', 1, /call\(\)/],
+    ['__guardAlias.ts', 1, /analyseDeletion alone/],
+    ['__guardShorthand.ts', 1, /analyseDeletion alone/],
+    ['__guardVariable.ts', 1, /analyseDeletion alone/],
+    ['__guardSpreadUndefined.ts', 1, /may be undefined/],
+    ['__guardSpreadSpecific.ts', 1, /analyseDeletion alone/],
+    ['__guardUndefined.ts', 1, /may be undefined/],
+  ])('refuses %s', (name, count, why) => {
+    expect(of(name)).toHaveLength(count);
+    for (const finding of of(name)) expect(finding).toMatch(why);
   });
 
-  it('refuses a hand-written runner interface', () => {
-    expect(of('__guardRunner.ts')).toHaveLength(2);
+  it('passes the judged forms: aliases, shorthand, variables, destructured and computed members, spreads that keep the judge', () => {
+    expect(of('__guardJudged.ts')).toEqual([]);
   });
+});
 
-  it('refuses a hand-written client interface', () => {
-    expect(of('__guardClient.ts')).toHaveLength(1);
-  });
+describe('the guard reads test-helper.js as written', () => {
+  const js = (name: string, body: string): [string, string] => [
+    join(ROOT, 'src/__tests__/helpers', name),
+    body,
+  ];
+  const findings = jsFindings(
+    new Map([
+      js(
+        '__guardSpread.js',
+        `async function f(client, options) {
+  await client.getDomain().readMetadata({}, { analyse: analyseException, ...options });
+}`,
+      ),
+      js(
+        '__guardRenamed.js',
+        `const { analyseDeletion: analyseException } = require('@mcp-abap-adt/adt-strategies');
+async function f(client) {
+  await client.getDomain().delete({}, { analyse: analyseException });
+}`,
+      ),
+      js(
+        '__guardWrongJudge.js',
+        `async function f(handler) {
+  await handler.delete({}, { analyse: analyseDeletion });
+  await handler.lock({});
+}`,
+      ),
+      js(
+        '__guardJudged.js',
+        `async function f(client, handler) {
+  await client.getDomain().readMetadata({}, { analyse: analyseException });
+  await handler.delete({}, { analyse: judged(analyseDeletion) });
+}`,
+      ),
+    ]),
+  );
+  const of = (name: string) =>
+    findings.filter((finding) => finding.includes(`/${name}:`));
 
-  it('refuses an any-typed receiver, analyse or not', () => {
-    expect(of('__guardAny.ts')).toEqual([
-      expect.stringMatching(/any-typed receiver/),
+  it('refuses a spread in the options', () => {
+    expect(of('__guardSpread.js')).toEqual([
+      expect.stringMatching(/a spread in options/),
     ]);
   });
 
-  it('passes the same calls typed from the client and judged, and refuses them unjudged', () => {
-    const typed = of('__guardTyped.ts');
-    expect(typed).toHaveLength(2);
-    expect(typed.join('\n')).toMatch(/getResult/);
-    expect(typed.join('\n')).toMatch(/delete/);
+  it('refuses a judge renamed on import', () => {
+    expect(of('__guardRenamed.js')).toEqual([
+      expect.stringMatching(/renamed on import/),
+    ]);
+  });
+
+  it('refuses an uncomposed judge and a missing one', () => {
+    expect(of('__guardWrongJudge.js')).toEqual([
+      expect.stringMatching(/analyseDeletion is neither/),
+      expect.stringMatching(/no options|cannot read/),
+    ]);
+  });
+
+  it('passes analyseException and judged(analyseX)', () => {
+    expect(of('__guardJudged.js')).toEqual([]);
   });
 });

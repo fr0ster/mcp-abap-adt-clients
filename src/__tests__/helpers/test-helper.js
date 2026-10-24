@@ -88,12 +88,22 @@ async function writeSource(handler, config, options, logger) {
     // element, a package, a table type, a function group and their neighbours
     // are their own document. Written as a capability question rather than a
     // list of type names, so a new document-only type needs nothing here.
-    const written = { ...options, lockHandle: handle };
+    //
+    // The write carries `source` and nothing else from the caller, written
+    // out rather than spread: a spread could bring an `analyse` of its own
+    // over this one, and a key nobody expected is refused instead of sent.
+    const { source, ...unexpected } = options ?? {};
+    if (Object.keys(unexpected).length > 0) {
+      throw new Error(
+        `writeSource takes { source } only, got ${Object.keys(unexpected).join(', ')}`,
+      );
+    }
     if (typeof handler.update === 'function')
       raise(
         await handler.update(config, {
           analyse: analyseException,
-          ...written,
+          source,
+          lockHandle: handle,
           headers: integrationHeadersOf(handler, 'update', config),
         }),
         'update',
@@ -102,7 +112,8 @@ async function writeSource(handler, config, options, logger) {
       raise(
         await handler.updateMetadata(config, {
           analyse: analyseException,
-          ...written,
+          source,
+          lockHandle: handle,
           headers: integrationHeadersOf(handler, 'updateMetadata', config),
         }),
         'updateMetadata',
