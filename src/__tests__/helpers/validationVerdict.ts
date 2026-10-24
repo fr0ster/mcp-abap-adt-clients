@@ -3,13 +3,15 @@
  *
  * `analyseValidation` (adt-strategies) is passed with the call and judges the
  * forms it knows — SAP's `asx:abap/values/DATA/SEVERITY` envelope among them.
- * This reads every other table form a validation may answer with, by
+ * An `exc:exception` document is answered as the refusal it is, before any
+ * table is read. This reads every other table form a validation may answer with, by
  * structure rather than by prefix: any element, at any depth, whose `type` or
  * `severity` attribute — or whose `TYPE` / `SEVERITY` child — says error. A
  * message nested inside an `errorTable` or a `messageTable` is found as
  * well as one that is the table itself, whatever its namespace prefix.
  */
 
+import { readExceptionRefusal } from '@mcp-abap-adt/adt-strategies';
 import {
   attributeOf,
   elementsNamed,
@@ -55,6 +57,10 @@ function says(element: XmlElement, name: string): string {
 /** The texts of the error messages in `document`; `[]` when it holds none. */
 export function validationErrors(document: string): string[] {
   if (document.trim() === '') return [];
+  // An exception document is a refusal before anything else: it carries no
+  // message table, and read as one it would say "no errors".
+  const exception = readExceptionRefusal(document);
+  if (exception) return [exception.message];
   const tree = parseXmlDocument(document, 'the validation answer');
   return everyElement(tree)
     .filter(

@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IGetVirtualFoldersContentsParams,
@@ -100,6 +101,7 @@ class VirtualFoldersContentsObject
     return this.client
       .getUtils()
       .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams, {
+        analyse: analyseException,
         headers: integrationHeadersOf(
           this.client.getUtils(),
           'getVirtualFoldersContents',

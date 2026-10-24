@@ -152,6 +152,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   for a new object). On, any refusal — the 404 included — fails; off, nothing
   is sent and the run logs a line naming the key. `VERIFY_LOCK_RELEASED` is
   no longer read. **Migration:** add both keys to `test-config.overlay.yaml`.
+  Every call the integration suites and the test helpers make to an
+  adt-clients member now passes an `analyse` strategy — `analyseException` by
+  default, and a specific judge only composed with it
+  (`helpers/judged.ts`, `judged(analyseX)`), since a specific judge answers an
+  exception document inside a 200 as "no failure". The validation reading
+  rejects an exception document before any table. A source test
+  (`unit/integrationCallsAreJudged.test.ts`, the compiler's type checker over
+  the suites and helpers) fails on any call without one, outside a commented
+  allow-list. `tools/discovery-to-markdown.ts` refuses a missing or unknown
+  `SAP_AUTH_TYPE` too; no document names a default for it any more.
 
 ## [37.2.0] - 2026-10-23
 

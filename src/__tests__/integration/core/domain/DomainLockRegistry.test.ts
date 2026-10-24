@@ -19,6 +19,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -144,7 +145,7 @@ describe('Domain lock registry (using AdtClient)', () => {
         // registry. Deliberately do NOT unlock here.
         const domain = client.getDomain();
         const lockHandle = expectResult(
-          await domain.lock(config),
+          await domain.lock(config, { analyse: analyseException }),
           'lockHandle',
         );
         expect(typeof lockHandle).toBe('string');

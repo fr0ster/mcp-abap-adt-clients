@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -41,6 +42,7 @@ import {
   noteCleanupRefusal,
   releasing,
 } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
 import {
@@ -195,13 +197,21 @@ describe('AppendStructure (TABL/DS) integration', () => {
             // Check readResult for the table case to detect a missing base.
             if (baseKey === 'base_table') {
               const baseState = expectResult(
-                await client.getTable().read({ tableName: baseObject }),
+                await client
+                  .getTable()
+                  .read({ tableName: baseObject }, undefined, {
+                    analyse: analyseException,
+                  }),
                 'baseState',
               );
               baseExists = !!baseState;
             } else {
               const baseState = expectResult(
-                await client.getStructure().read({ structureName: baseObject }),
+                await client
+                  .getStructure()
+                  .read({ structureName: baseObject }, undefined, {
+                    analyse: analyseException,
+                  }),
                 'baseState',
               );
               baseExists = !!baseState;
@@ -229,7 +239,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
             await as.delete(
               { appendStructureName, transportRequest },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(as, 'delete'),
               },
             ),
@@ -248,7 +258,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
               transportRequest,
               description: 'ADT integration test append structure',
             },
-            { headers: integrationHeadersOf(as, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(as, 'create'),
+            },
           );
           if (!created.ok) {
             const createError = new Error(
@@ -279,7 +292,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
             // PUT and takes the handle it is given, so the three calls are
             // here, in the order this test decides.
             const appendLock = expectResult(
-              await as.lock({ appendStructureName }),
+              await as.lock(
+                { appendStructureName },
+                { analyse: analyseException },
+              ),
               'lock append structure',
             );
             await releasing(
@@ -288,6 +304,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
                   await as.update(
                     { appendStructureName, transportRequest },
                     {
+                      analyse: analyseException,
                       headers: integrationHeadersOf(as, 'update'),
                       source: source,
                       lockHandle: appendLock,
@@ -295,7 +312,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
                   ),
                   'update append structure',
                 ),
-              () => as.unlock({ appendStructureName }, appendLock),
+              () =>
+                as.unlock({ appendStructureName }, appendLock, {
+                  analyse: analyseException,
+                }),
               'unlock append structure',
             );
             await expectLockReleased(
@@ -308,7 +328,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
               await as.activate(
                 { appendStructureName },
                 {
-                  analyse: analyseActivation,
+                  analyse: judged(analyseActivation),
                   headers: integrationHeadersOf(as, 'activate'),
                 },
               ),
@@ -326,7 +346,9 @@ describe('AppendStructure (TABL/DS) integration', () => {
             //
             // Assert the field actually arrived.
             const writtenSource = expectResult(
-              await as.read({ appendStructureName }, 'active'),
+              await as.read({ appendStructureName }, 'active', {
+                analyse: analyseException,
+              }),
               'read append structure source',
             );
             expect(typeof writtenSource).toBe('string');
@@ -343,7 +365,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
                   transportRequest,
                 },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(as, 'delete'),
                 },
               ),
@@ -362,7 +384,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
                 as.delete(
                   { appendStructureName, transportRequest },
                   {
-                    analyse: analyseDeletion,
+                    analyse: judged(analyseDeletion),
                     headers: integrationHeadersOf(as, 'delete'),
                   },
                 ),

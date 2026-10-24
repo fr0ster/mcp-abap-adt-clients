@@ -24,6 +24,7 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAmdpBreakpoint,
@@ -194,7 +195,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
   async function until(...kinds: string[]): Promise<IEvent[]> {
     const seen: IEvent[] = [];
     for (let reads = 0; reads < 6; reads++) {
-      const answer = await onSession.getEvents(mainId);
+      const answer = await onSession.getEvents(mainId, {
+        analyse: analyseException,
+      });
       expect(answer.ok).toBe(true);
       const batch = eventsOf(String(answer.ok ? answer.getResult().value : ''));
       seen.push(...batch);
@@ -221,9 +224,12 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
   function runClass(): void {
     needs(trigger, 'the trigger connection');
-    run = new ClassExecutor(trigger as Connection, connectionLogger).run({
-      className: CLASS_NAME,
-    });
+    run = new ClassExecutor(trigger as Connection, connectionLogger).run(
+      {
+        className: CLASS_NAME,
+      },
+      { analyse: analyseException },
+    );
   }
 
   beforeAll(async () => {
@@ -291,13 +297,20 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       if (lastBreak && debuggeeId) {
         await steps.run(
           'release the debuggee',
-          () => onCommands.deleteDebuggee(mainId, debuggeeId),
+          () =>
+            onCommands.deleteDebuggee(mainId, debuggeeId, {
+              analyse: analyseException,
+            }),
           { checkAnswer: true },
         );
       }
-      await steps.run('stop the debug session', () => onCommands.stop(mainId), {
-        checkAnswer: true,
-      });
+      await steps.run(
+        'stop the debug session',
+        () => onCommands.stop(mainId, { analyse: analyseException }),
+        {
+          checkAnswer: true,
+        },
+      );
     }
     if (run) {
       // The run must come back, with its output or a termination's 500, and
@@ -320,7 +333,10 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       const user = (await abapUserOf(session as Connection)).toUpperCase();
       // A session left behind by an interrupted run locks the user's AMDP
       // debugging (500 DEBUGGEE_CONTEXT_LOCKED_BY_ME, SY 530); a test takes it over.
-      const started = await onSession.start(user, { stopExisting: true });
+      const started = await onSession.start(user, {
+        analyse: analyseException,
+        stopExisting: true,
+      });
       expect(started.ok).toBe(true);
       mainId = /\/main\/([^/?]+)/.exec(locationOf(started))?.[1] ?? '';
       expect(mainId).toMatch(/^[0-9A-F]{32}$/);
@@ -335,7 +351,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     'syncs breakpoints: the request id at once, the outcome as an event',
     async () => {
       needs(mainId, 'a debug session');
-      const synced = await onCommands.syncBreakpoints(mainId, breakpoints());
+      const synced = await onCommands.syncBreakpoints(mainId, breakpoints(), {
+        analyse: analyseException,
+      });
       expect(synced.ok).toBe(true);
       const requestId = locationOf(synced);
       expect(requestId).toMatch(/^[0-9A-F]{32}$/);
@@ -373,7 +391,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     'steps over a statement and sees the variable change',
     async () => {
       needs(debuggeeId, 'a debuggee');
-      const stepped = await onCommands.step(mainId, debuggeeId, 'over');
+      const stepped = await onCommands.step(mainId, debuggeeId, 'over', {
+        analyse: analyseException,
+      });
       expect(stepped.ok).toBe(true);
       expect(locationOf(stepped)).toMatch(/^[0-9A-F]{32}$/);
       await until('ON_BREAK');
@@ -388,7 +408,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     async () => {
       needs(debuggeeId, 'a debuggee');
       expectResult(
-        await onCommands.step(mainId, debuggeeId, 'continue'),
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
         'continue',
       );
       await until('ON_BREAK');
@@ -396,14 +418,18 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       expect(variablesOf(lastBreak as IEvent).get('LV_I')).toBe('2');
 
       expectResult(
-        await onCommands.step(mainId, debuggeeId, 'continue'),
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
         'continue',
       );
       await until('ON_BREAK');
       expect(variablesOf(lastBreak as IEvent).get('LV_I')).toBe('3');
 
       expectResult(
-        await onCommands.step(mainId, debuggeeId, 'continue'),
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
         'continue',
       );
       const end = await until('ON_EXECUTION_END', 'ON_BREAK');
@@ -429,7 +455,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       needs(debuggeeId, 'a debuggee in the table function');
       // One more iteration, so the table holds a row.
       expectResult(
-        await onCommands.step(mainId, debuggeeId, 'continue'),
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
         'continue',
       );
       await until('ON_BREAK');
@@ -457,6 +485,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
       // No body: the server selects every column, the row id included.
       const whole = await onCommands.getDataPreview({
+        analyse: analyseException,
         headers: integrationHeadersOf(onCommands, 'getDataPreview'),
         ...where,
         provideRowId: true,
@@ -468,6 +497,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
       // A SELECT of the caller's.
       const selected = await onCommands.getDataPreview({
+        analyse: analyseException,
         headers: integrationHeadersOf(onCommands, 'getDataPreview'),
         ...where,
         query: 'SELECT ":LT_ROWS"."SQUARE" AS "SQUARE" FROM ":LT_ROWS"',
@@ -484,9 +514,17 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     'lets the run finish: no breakpoints, continue, and the run returns its output',
     async () => {
       needs(debuggeeId, 'a debuggee');
-      expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
+      expect(
+        (
+          await onCommands.syncBreakpoints(mainId, [], {
+            analyse: analyseException,
+          })
+        ).ok,
+      ).toBe(true);
       expectResult(
-        await onCommands.step(mainId, debuggeeId, 'continue'),
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
         'continue',
       );
       await until('ON_EXECUTION_END');
@@ -508,14 +546,18 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     async () => {
       needs(mainId, 'a debug session');
       expectResult(
-        await onCommands.syncBreakpoints(mainId, breakpoints()),
+        await onCommands.syncBreakpoints(mainId, breakpoints(), {
+          analyse: analyseException,
+        }),
         'set the breakpoints',
       );
       await until('SYNC_BREAKPOINTS');
       runClass();
       await until('ON_BREAK');
 
-      const deleted = await onCommands.deleteDebuggee(mainId, debuggeeId);
+      const deleted = await onCommands.deleteDebuggee(mainId, debuggeeId, {
+        analyse: analyseException,
+      });
       expect(deleted.ok).toBe(true);
       const events = await until('ON_EXECUTION_END');
       const warning = events.find((e) => e.kind === 'ON_WARNING');
@@ -534,8 +576,16 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     'stops the debug session',
     async () => {
       needs(mainId, 'a debug session');
-      expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
-      const stopped = await onCommands.stop(mainId);
+      expect(
+        (
+          await onCommands.syncBreakpoints(mainId, [], {
+            analyse: analyseException,
+          })
+        ).ok,
+      ).toBe(true);
+      const stopped = await onCommands.stop(mainId, {
+        analyse: analyseException,
+      });
       expect(stopped.ok).toBe(true);
       mainId = '';
     },

@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -190,7 +191,9 @@ describe('ClassExecutor (integration)', () => {
     const leftovers: string[] = [];
     for (const traceId of tracesCreated) {
       try {
-        const answer = await profilerReading.delete(traceId);
+        const answer = await profilerReading.delete(traceId, {
+          analyse: analyseException,
+        });
         if (!answer.ok) {
           leftovers.push(`${traceId}: ${answer.getError().message}`);
         }
@@ -243,7 +246,7 @@ describe('ClassExecutor (integration)', () => {
       // The run answers what the reading makes of the response, and the shipped
       // one is the document. A failed run is a failure, not a body to retry.
       lastOutput = expectResult(
-        await classRunner.run({ className }),
+        await classRunner.run({ className }, { analyse: analyseException }),
         'run class',
       );
       if (!isMissingClassRunMainMessage(lastOutput)) return lastOutput;
@@ -337,6 +340,7 @@ describe('ClassExecutor (integration)', () => {
         const profiledRun = async () => {
           const profilerId = expectResult(
             await classExecutor.scheduleTrace({
+              analyse: analyseException,
               ...profilerParameters,
               headers: integrationHeadersOf(classExecutor, 'scheduleTrace'),
             }),
@@ -346,7 +350,7 @@ describe('ClassExecutor (integration)', () => {
             run: expectResult(
               await classExecutor.runWithProfiler(
                 { className },
-                { profilerId },
+                { analyse: analyseException, profilerId },
               ),
               'result',
             ),
@@ -358,6 +362,7 @@ describe('ClassExecutor (integration)', () => {
         if (isMissingClassRunMainMessage(result.run)) {
           expectResult(
             await client.getClass().read({ className }, 'active', {
+              analyse: analyseException,
               withLongPolling: true,
             }),
             'read the class until it is active',
@@ -390,18 +395,21 @@ describe('ClassExecutor (integration)', () => {
         logTestStep('read all three views', testsLogger);
         const hitlist = expectResult(
           await profiler.read(traceId, 'hitlist', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'hitlist',
         );
         const statements = expectResult(
           await profiler.read(traceId, 'statements', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'statements',
         );
         const dbAccesses = expectResult(
           await profiler.read(traceId, 'dbAccesses', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'dbAccesses',

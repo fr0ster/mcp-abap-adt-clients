@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
@@ -33,6 +34,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -90,7 +92,11 @@ describe('Class local includes (using BaseTester)', () => {
       // either way, so this reported "the class is already there" for a class
       // that was not, and never created it.
       const existing = presenceOf(
-        await client.getClass().read({ className: config.className }),
+        await client
+          .getClass()
+          .read({ className: config.className }, undefined, {
+            analyse: analyseException,
+          }),
         `class ${config.className}`,
       );
       if (existing.present === 'unknown') {
@@ -110,7 +116,10 @@ describe('Class local includes (using BaseTester)', () => {
             transportRequest: config.transportRequest,
             description: config.description || `Test class ${config.className}`,
           },
-          { headers: integrationHeadersOf(client.getClass(), 'create') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(client.getClass(), 'create'),
+          },
         ),
         `create parent class ${config.className}`,
       );
@@ -119,7 +128,7 @@ describe('Class local includes (using BaseTester)', () => {
         await client.getClass().activate(
           { className: config.className },
           {
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(client.getClass(), 'activate'),
           },
         ),
@@ -325,7 +334,7 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(client.getClass(), 'delete'),
               },
             ),
@@ -392,7 +401,7 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(client.getClass(), 'delete'),
               },
             ),
@@ -459,7 +468,7 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(client.getClass(), 'delete'),
               },
             ),
@@ -526,7 +535,7 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(client.getClass(), 'delete'),
               },
             ),
@@ -561,7 +570,9 @@ describe('Class local includes (using BaseTester)', () => {
         expectResult(
           await client
             .getLocalMacros()
-            .read({ className: config.className }, 'active'),
+            .read({ className: config.className }, 'active', {
+              analyse: analyseException,
+            }),
           'read the macros include',
         );
 

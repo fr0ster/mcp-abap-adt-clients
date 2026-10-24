@@ -15,6 +15,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -77,7 +78,7 @@ describe('Shared - getObjectProperties', () => {
       // The exchange itself, so the status is there to assert.
       const answer = await client
         .getUtils({ ...utilDocuments, objectProperties: wireItself })
-        .getObjectProperties(SE38);
+        .getObjectProperties(SE38, { analyse: analyseException });
 
       expect(answer.ok).toBe(true);
       if (!answer.ok) {

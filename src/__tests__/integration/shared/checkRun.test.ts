@@ -37,6 +37,7 @@
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/checkRun
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -139,6 +140,7 @@ describe('Shared - what check answers', () => {
       logTestStep(`check ${className} as stored`, testsLogger);
 
       const answer = await client.getClass().check({ className }, 'active', {
+        analyse: analyseException,
         headers: integrationHeadersOf(client.getClass(), 'check'),
       });
 
@@ -174,6 +176,7 @@ describe('Shared - what check answers', () => {
       const answer = await client
         .getClass()
         .check({ className, source: BROKEN_SOURCE }, 'inactive', {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getClass(), 'check'),
         });
 
@@ -211,6 +214,7 @@ describe('Shared - what check answers', () => {
       const answer = await client
         .getClass()
         .check({ className: NEVER_EXISTS }, 'active', {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getClass(), 'check'),
         });
 

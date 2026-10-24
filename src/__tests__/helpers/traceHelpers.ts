@@ -15,6 +15,7 @@
  */
 
 import {
+  analyseException,
   compareRecordedAt,
   profilerDbAccesses,
   profilerHitList,
@@ -92,9 +93,10 @@ export async function traceIdsNow(
   options?: IProfilerListOptions,
 ): Promise<Set<string>> {
   return new Set(
-    expectResult(await profiler.list(options), 'profiler.list').map(
-      (entry) => entry.id,
-    ),
+    expectResult(
+      await profiler.list({ analyse: analyseException, ...options }),
+      'profiler.list',
+    ).map((entry) => entry.id),
   );
 }
 
@@ -114,7 +116,7 @@ export async function waitForNewTrace(
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const entries = expectResult(
-      await profiler.list(listOptions),
+      await profiler.list({ analyse: analyseException, ...listOptions }),
       'profiler.list',
     );
     const fresh = entries.filter((entry) => !before.has(entry.id));

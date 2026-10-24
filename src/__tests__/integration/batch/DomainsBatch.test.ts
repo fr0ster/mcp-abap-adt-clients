@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   analyseActivation,
+  analyseException,
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -13,6 +14,7 @@ import { escapeXmlAttr } from '../../../utils/xml';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { finaliseBatch } from '../../helpers/batchFinalisation';
 import { configuredCase, gate } from '../../helpers/caseGate';
+import { judged } from '../../helpers/judged';
 import { createTestConnection } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
@@ -112,6 +114,7 @@ gate('batch', 'domains')(
     async function remove(label: string, mustDelete: boolean): Promise<void> {
       const pending = configs.map((config) =>
         domain.delete(config, {
+          analyse: analyseException,
           headers: integrationHeadersOf(domain, 'delete'),
         }),
       );
@@ -134,10 +137,13 @@ gate('batch', 'domains')(
       await remove('delete_leftovers_ms', false);
       const created = configs.map((config) =>
         domain.create(config, {
+          analyse: analyseException,
           headers: integrationHeadersOf(domain, 'create'),
         }),
       );
-      const locked = configs.map((config) => domain.lock(config));
+      const locked = configs.map((config) =>
+        domain.lock(config, { analyse: analyseException }),
+      );
       await execute('create_lock_ms');
       const handles = await Promise.all(
         created.map(async (create, i) => {
@@ -150,13 +156,14 @@ gate('batch', 'domains')(
       const writes = configs.map((config, i) => {
         const source = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXmlAttr(config.domainName)}" adtcore:type="DOMA/DD" adtcore:description="Batch domain CHAR 1" adtcore:language="EN" adtcore:masterLanguage="EN"><adtcore:packageRef adtcore:name="${escapeXmlAttr(config.packageName)}"/><doma:content><doma:typeInformation><doma:datatype>CHAR</doma:datatype><doma:length>000001</doma:length><doma:decimals>000000</doma:decimals></doma:typeInformation><doma:outputInformation><doma:length>000001</doma:length><doma:style>00</doma:style><doma:conversionExit/><doma:signExists>false</doma:signExists><doma:lowercase>false</doma:lowercase><doma:ampmFormat>false</doma:ampmFormat></doma:outputInformation><doma:valueInformation><doma:valueTableRef/><doma:appendExists>false</doma:appendExists><doma:fixValues/></doma:valueInformation></doma:content></doma:domain>`;
         return domain.updateMetadata(config, {
+          analyse: analyseException,
           headers: integrationHeadersOf(domain, 'updateMetadata'),
           source,
           lockHandle: handles[i],
         });
       });
       const unlocked = configs.map((config, i) =>
-        domain.unlock(config, handles[i]),
+        domain.unlock(config, handles[i], { analyse: analyseException }),
       );
       await execute('update_unlock_ms');
       for (const answer of await Promise.all([...writes, ...unlocked]))
@@ -173,14 +180,18 @@ gate('batch', 'domains')(
           false,
           {
             headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           },
         ),
       );
       expect(runId).not.toBe('');
       const deadline = start + 300_000;
       for (;;) {
-        const run = String(value(await utils.getActivationRun(runId)));
+        const run = String(
+          value(
+            await utils.getActivationRun(runId, { analyse: analyseException }),
+          ),
+        );
         const status = /\b(?:\w+:)?status\s*=\s*["']([^"']*)["']/.exec(
           run,
         )?.[1];
@@ -197,7 +208,7 @@ gate('batch', 'domains')(
       const activation = String(
         value(
           await utils.getActivationResults(runId, {
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
         ),
       );
@@ -205,7 +216,9 @@ gate('batch', 'domains')(
         /<chkl:properties\b[^>]*\bactivationExecuted\s*=\s*["']true["']/,
       );
       expect(activation).not.toMatch(/type\s*=\s*["']E["']/);
-      const reads = configs.map((config) => domain.readMetadata(config));
+      const reads = configs.map((config) =>
+        domain.readMetadata(config, { analyse: analyseException }),
+      );
       await execute('read_active_ms');
       for (const answer of await Promise.all(reads)) {
         const source = String(value(answer));
@@ -222,7 +235,9 @@ gate('batch', 'domains')(
       [
         async () => {
           await remove('delete_ms', true);
-          const missing = configs.map((config) => domain.readMetadata(config));
+          const missing = configs.map((config) =>
+            domain.readMetadata(config, { analyse: analyseException }),
+          );
           await execute('read_deleted_ms');
           for (const answer of await Promise.all(missing)) {
             expect(answer.ok).toBe(false);

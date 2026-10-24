@@ -18,6 +18,7 @@
 import {
   abapGitExternalRepo,
   abapGitRepos,
+  analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
@@ -87,7 +88,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
   gate('abapgit', 'list_repos')(
     'should list abapGit repositories',
     async () => {
-      const repos = expectResult(await abapGit.listRepos(), 'list repos');
+      const repos = expectResult(
+        await abapGit.listRepos({ analyse: analyseException }),
+        'list repos',
+      );
       expect(Array.isArray(repos)).toBe(true);
       for (const r of repos) {
         expect(typeof r.package).toBe('string');
@@ -105,7 +109,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       const info = expectResult(
         await abapGit.checkExternalRepo(
           { url: checkCase.params.url },
-          { headers: integrationHeadersOf(abapGit, 'checkExternalRepo') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(abapGit, 'checkExternalRepo'),
+          },
         ),
         'check external repo',
       );
@@ -126,7 +133,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
             url: flowCaseDef.params.url,
             branchName: flowCaseDef.params.branch,
           },
-          { headers: integrationHeadersOf(abapGit, 'link') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(abapGit, 'link'),
+          },
         ),
         'link',
       );
@@ -134,7 +144,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       // Four steps since 19.0.0, because a pull was four requests: find the
       // link, post, wait, and read the log if the status says to. The waiting
       // is here because it belongs to whoever is waiting.
-      const repos = expectResult(await abapGit.listRepos(), 'repositories');
+      const repos = expectResult(
+        await abapGit.listRepos({ analyse: analyseException }),
+        'repositories',
+      );
       const repo = repos.find(
         (r) =>
           r.package.toUpperCase() === flowCaseDef.params.package.toUpperCase(),
@@ -152,7 +165,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
             pullLink: repo.pullLink,
             branchName: flowCaseDef.params.branch,
           },
-          { headers: integrationHeadersOf(abapGit, 'pull') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(abapGit, 'pull'),
+          },
         ),
         'pull',
       );
@@ -165,7 +181,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       // row is the caller's.
       const readStatus = async () => {
         const row = expectResult(
-          await abapGit.listRepos(),
+          await abapGit.listRepos({ analyse: analyseException }),
           'repository status',
         ).find((r) => r.repositoryId === repo.repositoryId);
         if (!row) throw new Error(`repository ${repo.repositoryId} vanished`);
@@ -186,7 +202,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         );
       }
       expectResult(
-        await abapGit.unlink({ repositoryId: repo.repositoryId }),
+        await abapGit.unlink(
+          { repositoryId: repo.repositoryId },
+          { analyse: analyseException },
+        ),
         'unlink',
       );
     },

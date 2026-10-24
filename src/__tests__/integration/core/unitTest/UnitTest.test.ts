@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   analyseUnitTestStart,
   analyseValidation,
   unitTestRunId,
@@ -35,6 +36,7 @@ import { readRunResult, runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -156,7 +158,11 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           // find out fails the test: "unknown" is never "absent", and the
           // create that would follow writes over an object that may be there.
           const existingClass = presenceOf(
-            await client.getClass().read({ className: containerClass }),
+            await client
+              .getClass()
+              .read({ className: containerClass }, undefined, {
+                analyse: analyseException,
+              }),
             `class ${containerClass}`,
           );
           if (existingClass.present === 'unknown') {
@@ -183,7 +189,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   packageName,
                   source,
                 },
-                { analyse: analyseValidation },
+                { analyse: judged(analyseValidation) },
               ),
               'validate the container class name',
             );
@@ -198,7 +204,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   transportRequest,
                   description: `Test container class for ${testClassName}`,
                 },
-                { headers: integrationHeadersOf(client.getClass(), 'create') },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(client.getClass(), 'create'),
+                },
               ),
               'create the container class',
             );
@@ -223,7 +232,9 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             transportRequest,
           };
           const containerLock = expectResult(
-            await client.getClass().lock(containerConfig),
+            await client
+              .getClass()
+              .lock(containerConfig, { analyse: analyseException }),
             'lock container class',
           );
           const containerHandle = String(containerLock);
@@ -231,13 +242,17 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             async () =>
               expectResult(
                 await client.getClass().update(containerConfig, {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(client.getClass(), 'update'),
                   source,
                   lockHandle: containerHandle,
                 }),
                 'write container class source',
               ),
-            () => client.getClass().unlock(containerConfig, containerHandle),
+            () =>
+              client.getClass().unlock(containerConfig, containerHandle, {
+                analyse: analyseException,
+              }),
             'unlock container class',
           );
           await expectLockReleased(
@@ -259,7 +274,9 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           // found`, and the suite passed anyway because the answer went unread.
           logTestStep('update (test class)', testsLogger);
           const includeLock = expectResult(
-            await client.getClass().lock(containerConfig),
+            await client
+              .getClass()
+              .lock(containerConfig, { analyse: analyseException }),
             'lock container class for its testclasses include',
           );
           const includeHandle = String(includeLock);
@@ -269,6 +286,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                 await client.getLocalTestClass().update(
                   { className: containerClass, transportRequest },
                   {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(
                       client.getLocalTestClass(),
                       'update',
@@ -279,7 +297,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                 ),
                 'write the test class include',
               ),
-            () => client.getClass().unlock(containerConfig, includeHandle),
+            () =>
+              client.getClass().unlock(containerConfig, includeHandle, {
+                analyse: analyseException,
+              }),
             'unlock after write the test class include',
           );
           // The include was written under the CLASS lock, so the class lock is
@@ -298,7 +319,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             await client.getClass().activate(
               { className: containerClass, transportRequest },
               {
-                analyse: analyseActivation,
+                analyse: judged(analyseActivation),
                 headers: integrationHeadersOf(client.getClass(), 'activate'),
               },
             ),
@@ -321,16 +342,21 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           const readState = expectResult(
             await client
               .getLocalTestClass()
-              .read({ className: containerClass }, 'active'),
+              .read({ className: containerClass }, 'active', {
+                analyse: analyseException,
+              }),
             'readState',
           );
           expect(readState).toBeDefined();
           testsLogger.info?.('Tests read back from the container class');
 
           const metadataState = expectResult(
-            await client.getLocalTestClass().readMetadata({
-              className: containerClass,
-            }),
+            await client.getLocalTestClass().readMetadata(
+              {
+                className: containerClass,
+              },
+              { analyse: analyseException },
+            ),
             'metadataState',
           );
           expect(metadataState).toBeDefined();
@@ -355,6 +381,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             await unitTest.getStatus(
               runId,
               unitTestStatus.with_long_polling ?? true,
+              { analyse: analyseException },
             ),
             'statusResponse',
           );
@@ -400,6 +427,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           logTestStep('getResult (run)', testsLogger);
           const resultResponse = expectResult(
             await unitTest.getResult(runId, {
+              analyse: analyseException,
               withNavigationUris: unitTestResult.with_navigation_uris || false,
               format: unitTestResult.format || 'abapunit',
             }),
@@ -472,7 +500,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   transportRequest,
                 },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(client.getClass(), 'delete'),
                 },
               ),

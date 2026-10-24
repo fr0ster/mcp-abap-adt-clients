@@ -12,7 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -24,6 +27,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -146,13 +150,17 @@ describe('ServiceBinding (using AdtClient)', () => {
             // is not there — which is the state this flow wants. The answer
             // decides, on either version.
             const active = presenceOf(
-              await client.getServiceBinding().read({ bindingName }, 'active'),
+              await client
+                .getServiceBinding()
+                .read({ bindingName }, 'active', { analyse: analyseException }),
               `service binding ${bindingName} (active)`,
             );
             const inactive = presenceOf(
               await client
                 .getServiceBinding()
-                .read({ bindingName }, 'inactive'),
+                .read({ bindingName }, 'inactive', {
+                  analyse: analyseException,
+                }),
               `service binding ${bindingName} (inactive)`,
             );
             if (active.present === 'unknown') {
@@ -189,6 +197,7 @@ describe('ServiceBinding (using AdtClient)', () => {
                   serviceVersion,
                 },
                 {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(
                     client.getServiceBinding(),
                     'update',
@@ -209,7 +218,7 @@ describe('ServiceBinding (using AdtClient)', () => {
                 ),
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   client.getServiceBinding(),
                   'delete',
@@ -282,7 +291,12 @@ describe('ServiceBinding (using AdtClient)', () => {
     // the setup instead of falling back to the YAML values.
     {
       const parentState = expectResult(
-        await client.getPackage().readMetadata({ packageName: parentPackage }),
+        await client
+          .getPackage()
+          .readMetadata(
+            { packageName: parentPackage },
+            { analyse: analyseException },
+          ),
         `read parent package ${parentPackage}`,
       );
       const raw = parentState;
@@ -337,7 +351,12 @@ describe('ServiceBinding (using AdtClient)', () => {
     }
 
     const existing = presenceOf(
-      await client.getPackage().readMetadata({ packageName: testSubpackage }),
+      await client
+        .getPackage()
+        .readMetadata(
+          { packageName: testSubpackage },
+          { analyse: analyseException },
+        ),
       `package ${testSubpackage}`,
     );
     if (existing.present === 'unknown') {
@@ -354,10 +373,13 @@ describe('ServiceBinding (using AdtClient)', () => {
     const waitForPackage = async (): Promise<boolean> => {
       for (let i = 0; i < 4; i += 1) {
         const state = presenceOf(
-          await client.getPackage().readMetadata({
-            packageName: testSubpackage,
-            ...(i > 0 ? { withLongPolling: true } : {}),
-          } as { packageName: string }),
+          await client.getPackage().readMetadata(
+            {
+              packageName: testSubpackage,
+              ...(i > 0 ? { withLongPolling: true } : {}),
+            } as { packageName: string },
+            { analyse: analyseException },
+          ),
           `package ${testSubpackage}`,
         );
         if (state.present === 'unknown') throw new Error(state.reason);
@@ -385,7 +407,10 @@ describe('ServiceBinding (using AdtClient)', () => {
         recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
         transportRequest: resolveTransportRequest(params.transport_request),
       },
-      { headers: integrationHeadersOf(client.getPackage(), 'create') },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(client.getPackage(), 'create'),
+      },
     );
     // A refused create fails, a 404 or 409 included: a package that a later
     // read finds does not forgive it.

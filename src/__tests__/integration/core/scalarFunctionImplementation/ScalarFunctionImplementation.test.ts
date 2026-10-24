@@ -24,6 +24,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -47,6 +48,7 @@ import {
   releasing,
   saysAbsent,
 } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
   createTestAdtClient,
@@ -220,7 +222,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 transportRequest,
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(dsfi, 'delete'),
               },
             ),
@@ -229,7 +231,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             cls.delete(
               { className: amdpName },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(cls, 'delete'),
               },
             ),
@@ -238,7 +240,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             sf.delete(
               { scalarFunctionName: funcName, transportRequest },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(sf, 'delete'),
               },
             ),
@@ -264,11 +266,17 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               transportRequest,
               description: 'DSFI integration companion function',
             },
-            { headers: integrationHeadersOf(sf, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(sf, 'create'),
+            },
           );
           expectResult(funcCreated, 'create scalar function');
           const funcLock = expectResult(
-            await sf.lock({ scalarFunctionName: funcName }),
+            await sf.lock(
+              { scalarFunctionName: funcName },
+              { analyse: analyseException },
+            ),
             'lock scalar function',
           );
           await releasing(
@@ -277,6 +285,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 await sf.update(
                   { scalarFunctionName: funcName, transportRequest },
                   {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(sf, 'update'),
                     source: sigSource,
                     lockHandle: funcLock,
@@ -284,7 +293,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 ),
                 'update scalar function',
               ),
-            () => sf.unlock({ scalarFunctionName: funcName }, funcLock),
+            () =>
+              sf.unlock({ scalarFunctionName: funcName }, funcLock, {
+                analyse: analyseException,
+              }),
             'unlock scalar function',
           );
           await expectLockReleased(
@@ -297,7 +309,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             await sf.activate(
               { scalarFunctionName: funcName },
               {
-                analyse: analyseActivation,
+                analyse: judged(analyseActivation),
                 headers: integrationHeadersOf(sf, 'activate'),
               },
             ),
@@ -313,12 +325,18 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 transportRequest,
                 description: 'DSFI integration AMDP implementation',
               },
-              { headers: integrationHeadersOf(cls, 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(cls, 'create'),
+              },
             ),
             'create AMDP class',
           );
           const amdpLock = expectResult(
-            await cls.lock({ className: amdpName }),
+            await cls.lock(
+              { className: amdpName },
+              { analyse: analyseException },
+            ),
             'lock AMDP class',
           );
           await releasing(
@@ -327,6 +345,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 await cls.update(
                   { className: amdpName, transportRequest },
                   {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(cls, 'update'),
                     source: amdpSource,
                     lockHandle: amdpLock,
@@ -334,7 +353,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 ),
                 'update AMDP class',
               ),
-            () => cls.unlock({ className: amdpName }, amdpLock),
+            () =>
+              cls.unlock({ className: amdpName }, amdpLock, {
+                analyse: analyseException,
+              }),
             'unlock AMDP class',
           );
           await expectLockReleased(
@@ -354,7 +376,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               transportRequest,
               description: 'DSFI integration implementation',
             },
-            { headers: integrationHeadersOf(dsfi, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(dsfi, 'create'),
+            },
           );
           expectResult(implCreated, 'create DSFI');
           // Under its own lock, and its answer read. Without the handle the
@@ -364,7 +389,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           // the window is the caller's, and an unread answer is an unasked
           // question.
           const implLock = expectResult(
-            await dsfi.lock({ implementationName: implName }),
+            await dsfi.lock(
+              { implementationName: implName },
+              { analyse: analyseException },
+            ),
             'lock DSFI',
           );
           await releasing(
@@ -373,6 +401,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 await dsfi.update(
                   { implementationName: implName, transportRequest },
                   {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(dsfi, 'update'),
                     source: implSource,
                     lockHandle: implLock,
@@ -380,7 +409,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 ),
                 'update DSFI source',
               ),
-            () => dsfi.unlock({ implementationName: implName }, implLock),
+            () =>
+              dsfi.unlock({ implementationName: implName }, implLock, {
+                analyse: analyseException,
+              }),
             'unlock DSFI',
           );
           await expectLockReleased(
@@ -406,7 +438,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 { type: 'DSFI/SFI', name: implName },
               ],
               undefined,
-              { headers: integrationHeadersOf(utils, 'activateObjectsGroup') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
+              },
             ),
             'activation run id',
           );
@@ -417,7 +452,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           const runDeadline = Date.now() + 120_000;
           while (runStatus !== 'finished' && Date.now() < runDeadline) {
             const run = expectResult(
-              await utils.getActivationRun(runId, { withLongPolling: true }),
+              await utils.getActivationRun(runId, {
+                analyse: analyseException,
+                withLongPolling: true,
+              }),
               'activation run status',
             );
             runStatus = activationStatusIn(String(run));
@@ -435,7 +473,9 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           expectActivationExecuted(
             String(
               expectResult(
-                await utils.getActivationResults(runId),
+                await utils.getActivationResults(runId, {
+                  analyse: analyseException,
+                }),
                 'activation results',
               ) ?? '',
             ),
@@ -447,16 +487,21 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           // on the way in — so the shipped reading re-serialises it rather than
           // stringifying an object into `[object Object]`.
           const sourceText = expectResult(
-            await dsfi.read({ implementationName: implName }, 'active'),
+            await dsfi.read({ implementationName: implName }, 'active', {
+              analyse: analyseException,
+            }),
             'read implementation source',
           );
           expect(sourceText).toContain(`${amdpName}=>GET_SUM`);
 
           // 6) Read metadata (blues v2 XML).
           const metaState = expectResult(
-            await dsfi.readMetadata({
-              implementationName: implName,
-            }),
+            await dsfi.readMetadata(
+              {
+                implementationName: implName,
+              },
+              { analyse: analyseException },
+            ),
             'metaState',
           );
           expect(metaState).toBeDefined();
@@ -469,7 +514,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 transportRequest,
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(dsfi, 'delete'),
               },
             ),
@@ -480,7 +525,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             await cls.delete(
               { className: amdpName, transportRequest },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(cls, 'delete'),
               },
             ),
@@ -490,7 +535,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             await sf.delete(
               { scalarFunctionName: funcName, transportRequest },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(sf, 'delete'),
               },
             ),

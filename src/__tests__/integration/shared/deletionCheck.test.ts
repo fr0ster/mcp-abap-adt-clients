@@ -24,6 +24,7 @@
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/deletionCheck
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -85,6 +86,7 @@ describe('Shared - the deletion check, per type', () => {
         const answer = await client.getInclude().checkDeletion(
           { includeName: NEVER_EXISTS },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(client.getInclude(), 'checkDeletion'),
           },
         );
@@ -99,6 +101,7 @@ describe('Shared - the deletion check, per type', () => {
         const answer = await client.getMetadataExtension().checkDeletion(
           { name: NEVER_EXISTS },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(
               client.getMetadataExtension(),
               'checkDeletion',
@@ -116,6 +119,7 @@ describe('Shared - the deletion check, per type', () => {
         const answer = await client.getRequest().checkDeletion(
           { transportNumber: NEVER_EXISTS },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(client.getRequest(), 'checkDeletion'),
           },
         );
@@ -153,12 +157,13 @@ describe('Shared - the deletion check, per type', () => {
         testsLogger,
       );
 
-      const answer = await client
-        .getClass()
-        .checkDeletion(
-          { className: NEVER_EXISTS },
-          { headers: integrationHeadersOf(client.getClass(), 'checkDeletion') },
-        );
+      const answer = await client.getClass().checkDeletion(
+        { className: NEVER_EXISTS },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getClass(), 'checkDeletion'),
+        },
+      );
 
       // A class is one of the twenty-six the service is known to resolve, so this
       // is the control: whatever the three above do, this one has to answer, and

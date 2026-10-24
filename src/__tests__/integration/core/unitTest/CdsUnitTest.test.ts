@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   analyseUnitTestStart,
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
@@ -37,6 +38,7 @@ import {
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -210,7 +212,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                 transportRequest,
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(client.getClass(), 'delete'),
               },
             ),
@@ -229,7 +231,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
             );
             const checkResponse = await client
               .getDdl()
-              .checkCdsTestDoubles(ddlName);
+              .checkCdsTestDoubles(ddlName, { analyse: analyseException });
             expect(checkResponse.ok).toBe(true);
             testsLogger.info?.('CDS view check passed');
           }
@@ -250,7 +252,10 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                   `CDS unit test for ${ddlName}`,
                 transportRequest,
               },
-              { headers: integrationHeadersOf(client.getClass(), 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(client.getClass(), 'create'),
+              },
             ),
             'createState',
           );
@@ -266,7 +271,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                 transportRequest,
               },
               {
-                analyse: analyseActivation,
+                analyse: judged(analyseActivation),
                 headers: integrationHeadersOf(client.getClass(), 'activate'),
               },
             ),
@@ -278,13 +283,17 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           // Step 4: Read the created test class
           logTestStep('read', testsLogger);
           const readState = expectResult(
-            await client.getClass().read({ className }),
+            await client
+              .getClass()
+              .read({ className }, undefined, { analyse: analyseException }),
             'readState',
           );
           expect(readState).toBeDefined();
           testsLogger.info?.('CDS unit test class read successfully');
           const metadataState = expectResult(
-            await client.getClass().readMetadata({ className }),
+            await client
+              .getClass()
+              .readMetadata({ className }, { analyse: analyseException }),
             'metadataState',
           );
           expect(metadataState).toBeDefined();
@@ -322,6 +331,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
             await unitTest.getStatus(
               runId,
               testCase.params.unit_test_status?.with_long_polling ?? true,
+              { analyse: analyseException },
             ),
             'statusResponse',
           );
@@ -332,6 +342,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           logTestStep('getResult (run)', testsLogger);
           const resultResponse = expectResult(
             await unitTest.getResult(runId, {
+              analyse: analyseException,
               withNavigationUris:
                 testCase.params.unit_test_result?.with_navigation_uris || false,
               format: testCase.params.unit_test_result?.format || 'abapunit',
@@ -376,7 +387,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                     transportRequest,
                   },
                   {
-                    analyse: analyseDeletion,
+                    analyse: judged(analyseDeletion),
                     headers: integrationHeadersOf(client.getClass(), 'delete'),
                   },
                 ),

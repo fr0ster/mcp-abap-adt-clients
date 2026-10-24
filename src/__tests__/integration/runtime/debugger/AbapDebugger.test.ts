@@ -24,7 +24,10 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDebuggeeEnd,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAdtRunnable,
@@ -238,6 +241,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     target: TTarget,
   ): Promise<{ debuggeeId: string; server?: string }> {
     const listener = listenerApi.listen(identity, {
+      analyse: analyseException,
       holdSeconds: HOLD_SECONDS,
     });
     const early = await Promise.race([
@@ -253,7 +257,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     }
     const trigger = triggerConnection;
     needs(trigger, 'the trigger connection');
-    run = runnable(trigger as Connection).run(target);
+    run = runnable(trigger as Connection).run(target, {
+      analyse: analyseException,
+    });
     const caught = await listener;
     const document = documentOf(caught);
     expect(caught.ok).toBe(true);
@@ -300,7 +306,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
   }
 
   async function topFrame(): Promise<IFrame> {
-    const stack = await debuggerApi.getStack();
+    const stack = await debuggerApi.getStack({ analyse: analyseException });
     const top = frames(documentOf(stack))[0];
     needs(stack.ok && top, 'a stack');
     return top;
@@ -351,7 +357,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
     for (const id of armed) {
       await steps.run(
         `delete breakpoint ${id}`,
-        () => listenerApi.deleteBreakpoint(identity, id),
+        () =>
+          listenerApi.deleteBreakpoint(identity, id, {
+            analyse: analyseException,
+          }),
         { checkAnswer: true },
       );
     }
@@ -365,7 +374,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     await steps.logOff('the debug session', sessionConnection);
     await steps.run(
       'stop the listener',
-      () => listenerApi.stopListener(identity),
+      () => listenerApi.stopListener(identity, { analyse: analyseException }),
       { checkAnswer: true },
     );
     if (run) {
@@ -394,6 +403,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
       ];
       const answer = await listenerApi.setBreakpoints(identity, all, {
+        analyse: analyseException,
         headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
         validationOnly: true,
       });
@@ -423,7 +433,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.catch}` },
           { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
         ],
-        { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+        },
       );
       expect(answer.ok).toBe(true);
       const ids = [
@@ -450,6 +463,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       });
       await openDebugSession();
       const answer = await debuggerApi.attach(identity, debuggeeId, {
+        analyse: analyseException,
         server,
       });
       const document = documentOf(answer);
@@ -483,6 +497,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       needs(attached, 'an attached debuggee');
       const root = await debuggerApi.getChildVariables(['@ROOT'], {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       expect(root.ok).toBe(true);
@@ -491,6 +506,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       ].map((m) => m[1]);
       expect(scopes).toContain('@LOCALS');
       const all = await debuggerApi.getChildVariables(scopes, {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       expect(all.ok).toBe(true);
@@ -506,6 +522,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       needs(attached, 'an attached debuggee');
       const answer = await debuggerApi.getVariables(['LV_TOTAL'], {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getVariables'),
       });
       expect(answer.ok).toBe(true);
@@ -518,13 +535,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'steps into the called method and sees its parameters',
     async () => {
       needs(attached, 'an attached debuggee');
-      expect((await debuggerApi.step('stepInto')).ok).toBe(true);
+      expect(
+        (await debuggerApi.step('stepInto', { analyse: analyseException })).ok,
+      ).toBe(true);
       const top = await topFrame();
       expect(top.event).toBe('ADD');
       expect(top.line).toBe(LINE.add);
       const params = values(
         documentOf(
           await debuggerApi.getVariables(['IV_A', 'IV_B'], {
+            analyse: analyseException,
             headers: integrationHeadersOf(debuggerApi, 'getVariables'),
           }),
         ),
@@ -539,11 +559,14 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'moves the read cursor to the caller frame without moving the program',
     async () => {
       needs(attached, 'an attached debuggee');
-      const stack = frames(documentOf(await debuggerApi.getStack()));
+      const stack = frames(
+        documentOf(await debuggerApi.getStack({ analyse: analyseException })),
+      );
       const caller = stack.find((f) => f.event === 'IF_OO_ADT_CLASSRUN~MAIN');
       needs(caller, 'the caller frame');
       const moved = await debuggerApi.setStackPosition(
         (caller as IFrame).position,
+        { analyse: analyseException },
       );
       expect(moved.ok).toBe(true);
       // The caller's local is readable from here…
@@ -551,6 +574,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -566,13 +590,17 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'returns from the method to the caller',
     async () => {
       needs(attached, 'an attached debuggee');
-      expect((await debuggerApi.step('stepReturn')).ok).toBe(true);
+      expect(
+        (await debuggerApi.step('stepReturn', { analyse: analyseException }))
+          .ok,
+      ).toBe(true);
       const top = await topFrame();
       expect(top.event).toBe('IF_OO_ADT_CLASSRUN~MAIN');
       expect(
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -586,7 +614,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'creates and lists a watchpoint, and continues to the next breakpoint',
     async () => {
       needs(attached, 'an attached debuggee');
-      const created = await debuggerApi.createWatchpoint('LV_TOTAL');
+      const created = await debuggerApi.createWatchpoint('LV_TOTAL', {
+        analyse: analyseException,
+      });
       expect(created.ok).toBe(true);
       watchpointId = attr(documentOf(created), 'id');
       needs(
@@ -594,12 +624,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
         `a watchpoint id: ${documentOf(created).slice(0, 300)}`,
       );
 
-      const listed = await debuggerApi.listWatchpoints();
+      const listed = await debuggerApi.listWatchpoints({
+        analyse: analyseException,
+      });
       expect(listed.ok).toBe(true);
       expect(documentOf(listed)).toContain(`id="${watchpointId}"`);
 
       // The loop breakpoint comes first: the assignment is on its line.
-      const step = await debuggerApi.step('stepContinue');
+      const step = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toContain('KIND=0.');
       expect((await topFrame()).line).toBe(LINE.loop);
@@ -611,13 +645,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'stops on the watchpoint when the watched variable changes, then removes it',
     async () => {
       needs(watchpointId, 'a watchpoint');
-      const step = await debuggerApi.step('stepContinue');
+      const step = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toMatch(/reachedWatchpoints/);
       expect(
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -626,6 +663,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
       const deleted = await debuggerApi.deleteWatchpoint(
         watchpointId as string,
+        { analyse: analyseException },
       );
       expect(deleted.ok).toBe(true);
       watchpointId = undefined;
@@ -637,12 +675,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'writes a variable at the stop and reads the new value back',
     async () => {
       needs(attached, 'an attached debuggee');
-      const written = await debuggerApi.setVariableValue('LV_TOTAL', '100');
+      const written = await debuggerApi.setVariableValue('LV_TOTAL', '100', {
+        analyse: analyseException,
+      });
       expect(written.ok).toBe(true);
       expect(
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -660,6 +701,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const ran = await debuggerApi.stepToLine(
         'stepRunToLine',
         `${SOURCE_URI}#start=${LINE.after}`,
+        { analyse: analyseException },
       );
       expect(ran.ok).toBe(true);
       const top = await topFrame();
@@ -670,6 +712,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
             await debuggerApi.stepToLine(
               'stepRunToLine',
               `${SOURCE_URI}#start=${LINE.after}`,
+              { analyse: analyseException },
             )
           ).ok,
         ).toBe(true);
@@ -684,7 +727,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       needs(attached, 'an attached debuggee');
       const before = (await topFrame()).line;
-      expect((await debuggerApi.step('stepOver')).ok).toBe(true);
+      expect(
+        (await debuggerApi.step('stepOver', { analyse: analyseException })).ok,
+      ).toBe(true);
       expect((await topFrame()).line).toBeGreaterThan(before);
     },
     STEP_TIMEOUT,
@@ -694,7 +739,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'stops on the exception breakpoint, reported at the CATCH line',
     async () => {
       needs(attached, 'an attached debuggee');
-      const step = await debuggerApi.step('stepContinue');
+      const step = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toContain(
         'KIND=5.EXCEPTION_CLASS=CX_SY_ZERODIVIDE',
@@ -711,7 +758,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       needs(attached, 'an attached debuggee');
       // The CATCH line breakpoint, then the end.
-      const toCatch = await debuggerApi.step('stepContinue');
+      const toCatch = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(toCatch.ok).toBe(true);
       expect((await topFrame()).line).toBe(LINE.catch);
 
@@ -744,6 +793,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       });
       await openDebugSession();
       const second = await debuggerApi.attach(identity, debuggeeId, {
+        analyse: analyseException,
         server,
       });
       if (!second.ok) {
@@ -759,6 +809,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const jumped = await debuggerApi.stepToLine(
         'stepJumpToLine',
         `${SOURCE_URI}#start=${LINE.after}`,
+        { analyse: analyseException },
       );
       expect(jumped.ok).toBe(true);
       expect((await topFrame()).line).toBe(LINE.after);
@@ -771,7 +822,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(terminated.ok).toBe(true);
       attached = false;
 
-      const afterwards = await debuggerApi.getStack();
+      const afterwards = await debuggerApi.getStack({
+        analyse: analyseException,
+      });
       expect(afterwards.ok).toBe(false);
 
       needs(run, 'the run');
@@ -790,11 +843,21 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'deletes the armed breakpoints and the listener',
     async () => {
       for (const id of armed.splice(0)) {
-        expect((await listenerApi.deleteBreakpoint(identity, id)).ok).toBe(
-          true,
-        );
+        expect(
+          (
+            await listenerApi.deleteBreakpoint(identity, id, {
+              analyse: analyseException,
+            })
+          ).ok,
+        ).toBe(true);
       }
-      expect((await listenerApi.stopListener(identity)).ok).toBe(true);
+      expect(
+        (
+          await listenerApi.stopListener(identity, {
+            analyse: analyseException,
+          })
+        ).ok,
+      ).toBe(true);
     },
     STEP_TIMEOUT,
   );
@@ -819,10 +882,14 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+          const holding = holder.listen(holderIdentity, {
+            analyse: analyseException,
+            holdSeconds: 10,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
           const refused = await listenerApi.listen(identity, {
+            analyse: analyseException,
             holdSeconds: 10,
           });
           expect(statusOf(refused)).toBe(409);
@@ -835,7 +902,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
         async (steps) => {
           await steps.run(
             'stop the holder',
-            () => holder.stopListener(holderIdentity),
+            () =>
+              holder.stopListener(holderIdentity, {
+                analyse: analyseException,
+              }),
             { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
@@ -868,10 +938,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = holder.listen(holderIdentity, { holdSeconds: 20 });
+          const holding = holder.listen(holderIdentity, {
+            analyse: analyseException,
+            holdSeconds: 20,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          const taking = taker.listen(identity, { holdSeconds: 5 });
+          const taking = taker.listen(identity, {
+            analyse: analyseException,
+            holdSeconds: 5,
+          });
           // Measured on premise (2026-10-09): the displaced long poll returns
           // at once, 409 with the subtype conflictNotification — the notice
           // Eclipse shows.
@@ -884,12 +960,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
         async (steps) => {
           await steps.run(
             'stop the taker',
-            () => taker.stopListener(identity),
+            () => taker.stopListener(identity, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.run(
             'stop the holder',
-            () => holder.stopListener(holderIdentity),
+            () =>
+              holder.stopListener(holderIdentity, {
+                analyse: analyseException,
+              }),
             { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
@@ -915,12 +994,18 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+          const holding = holder.listen(holderIdentity, {
+            analyse: analyseException,
+            holdSeconds: 10,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
           // Measured on premise (2026-10-09): the conflict is seen whatever
           // parameters the other listener registered with.
-          const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
+          const beside = await listenerApi.listen(identity, {
+            analyse: analyseException,
+            holdSeconds: 3,
+          });
           expect(statusOf(beside)).toBe(409);
           expect(subtypeOf(beside)).toBe('conflictDetected');
 
@@ -931,12 +1016,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
         async (steps) => {
           await steps.run(
             'stop the listener',
-            () => listenerApi.stopListener(identity),
+            () =>
+              listenerApi.stopListener(identity, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.run(
             'stop the holder',
-            () => holder.stopListener(holderIdentity),
+            () =>
+              holder.stopListener(holderIdentity, {
+                analyse: analyseException,
+              }),
             { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
@@ -965,10 +1054,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = other.listen(sameIde, { holdSeconds: 10 });
+          const holding = other.listen(sameIde, {
+            analyse: analyseException,
+            holdSeconds: 10,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
           // Measured on premise (2026-10-09): 200 after the hold, no 409.
-          const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
+          const beside = await listenerApi.listen(identity, {
+            analyse: analyseException,
+            holdSeconds: 3,
+          });
           expect(statusOf(beside)).toBe(200);
           // The holder's own long poll ends when its hold runs out, with
           // nothing caught: an answer, not a refusal.
@@ -977,12 +1072,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
         async (steps) => {
           await steps.run(
             'stop the listener',
-            () => listenerApi.stopListener(identity),
+            () =>
+              listenerApi.stopListener(identity, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.run(
             'stop the other listener',
-            () => other.stopListener(sameIde),
+            () => other.stopListener(sameIde, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.logOff('the other session', otherConnection);

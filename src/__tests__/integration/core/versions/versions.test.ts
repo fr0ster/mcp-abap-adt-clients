@@ -11,6 +11,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   type IObjectVersion,
   objectVersions,
 } from '@mcp-abap-adt/adt-strategies';
@@ -72,21 +73,30 @@ describe('Object version history', () => {
       list: () =>
         client
           .getTable({ ...tableDocuments, versions: objectVersions })
-          .getVersions({ tableName: 'ZAC_SHR_BTABL' }),
+          .getVersions(
+            { tableName: 'ZAC_SHR_BTABL' },
+            { analyse: analyseException },
+          ),
     },
     {
       label: 'class',
       list: () =>
         client
           .getClass({ ...classDocuments, versions: objectVersions })
-          .getVersions({ className: 'ZAC_SHR_DMP01' }),
+          .getVersions(
+            { className: 'ZAC_SHR_DMP01' },
+            { analyse: analyseException },
+          ),
     },
     {
       label: 'interface',
       list: () =>
         client
           .getInterface({ ...interfaceDocuments, versions: objectVersions })
-          .getVersions({ interfaceName: 'ZAC_SHR_IF01' }),
+          .getVersions(
+            { interfaceName: 'ZAC_SHR_IF01' },
+            { analyse: analyseException },
+          ),
     },
     {
       label: 'serviceDefinition',
@@ -96,7 +106,10 @@ describe('Object version history', () => {
             ...serviceDefinitionDocuments,
             versions: objectVersions,
           })
-          .getVersions({ serviceDefinitionName: 'ZAC_SHR_SRVD01' }),
+          .getVersions(
+            { serviceDefinitionName: 'ZAC_SHR_SRVD01' },
+            { analyse: analyseException },
+          ),
     },
   ];
 
@@ -114,7 +127,9 @@ describe('Object version history', () => {
 
         // getVersionSource is the same opaque-URI fetch on every handler.
         const src = expectResult(
-          await client.getTable().getVersionSource(v.contentUri),
+          await client
+            .getTable()
+            .getVersionSource(v.contentUri, { analyse: analyseException }),
           'src',
         );
         expect(typeof src).toBe('string');

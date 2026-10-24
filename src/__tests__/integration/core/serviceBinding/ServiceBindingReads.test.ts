@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -83,7 +84,10 @@ describe('Service binding reads (getServiceBinding contract)', () => {
 
   readsBinding('lists the binding types the system offers', async () => {
     const document = String(
-      expectResult(await bindings.getServiceBindingTypes(), 'binding types'),
+      expectResult(
+        await bindings.getServiceBindingTypes({ analyse: analyseException }),
+        'binding types',
+      ),
     );
     const names = [...document.matchAll(/<nameditem:name>([^<]*)</g)].map(
       (m) => m[1],
@@ -101,7 +105,10 @@ describe('Service binding reads (getServiceBinding contract)', () => {
       const binding = shared as ISharedBinding;
       const metadata = String(
         expectResult(
-          await bindings.readMetadata({ bindingName: binding.name }),
+          await bindings.readMetadata(
+            { bindingName: binding.name },
+            { analyse: analyseException },
+          ),
           'binding metadata',
         ),
       );
@@ -112,13 +119,16 @@ describe('Service binding reads (getServiceBinding contract)', () => {
       const srvd = binding.service_definition ?? binding.name;
       const group = String(
         expectResult(
-          await bindings.getServiceGroup({
-            objectname: binding.name,
-            serviceType,
-            servicename: binding.service_name ?? srvd,
-            serviceversion: '0001',
-            srvdname: srvd,
-          }),
+          await bindings.getServiceGroup(
+            {
+              objectname: binding.name,
+              serviceType,
+              servicename: binding.service_name ?? srvd,
+              serviceversion: '0001',
+              srvdname: srvd,
+            },
+            { analyse: analyseException },
+          ),
           'service group',
         ),
       );

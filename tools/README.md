@@ -37,7 +37,7 @@ The script automatically loads variables from a `.env` file in the project root 
 - Set variables directly in the environment
 
 - `SAP_URL` - SAP system URL (required)
-- `SAP_AUTH_TYPE` - Authentication type: `'basic'` or `'jwt'` (default: `'basic'`)
+- `SAP_AUTH_TYPE` - Authentication type: `'basic'`, `'jwt'` or `'xsuaa'` (required: a missing or other value is refused, naming the key)
 - `SAP_USERNAME` - Username for basic auth (required if authType is `'basic'`)
 - `SAP_PASSWORD` - Password for basic auth (required if authType is `'basic'`)
 - `SAP_JWT_TOKEN` - JWT token for JWT auth (required if authType is `'jwt'`)

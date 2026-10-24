@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
@@ -133,7 +134,11 @@ describe('Shared - readSource', () => {
       // status check passes whether or not the read worked.
       const source = expectResult(
         await withAcceptHandling(
-          client.getUtils().readObjectSource('class', className),
+          client
+            .getUtils()
+            .readObjectSource('class', className, undefined, undefined, {
+              analyse: analyseException,
+            }),
         ),
         'read class source',
       ) as string;
@@ -170,7 +175,9 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, 'inactive'),
+            .readObjectSource('class', className, undefined, 'inactive', {
+              analyse: analyseException,
+            }),
         ),
         'read class source (inactive)',
       ) as string;
@@ -208,7 +215,9 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, 'active'),
+            .readObjectSource('class', className, undefined, 'active', {
+              analyse: analyseException,
+            }),
         ),
         'read class source (active)',
       ) as string;
@@ -222,7 +231,9 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, 'inactive'),
+            .readObjectSource('class', className, undefined, 'inactive', {
+              analyse: analyseException,
+            }),
         ),
         'read class source (inactive)',
       ) as string;
@@ -258,6 +269,9 @@ describe('Shared - readSource', () => {
           .readObjectSource(
             'domain' as unknown as AdtSourceObjectType,
             domainName,
+            undefined,
+            undefined,
+            { analyse: analyseException },
           ),
       ).rejects.toThrow('does not support source code reading');
     },

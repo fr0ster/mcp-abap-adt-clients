@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -238,13 +239,20 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read class source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read class source',
-      client.getClass().read({ className: standardClassName }, 'active'),
+      client.getClass().read({ className: standardClassName }, 'active', {
+        analyse: analyseException,
+      }),
     );
     assertReadResult(state, 'class source', standardClassName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read class metadata',
-      client.getClass().readMetadata({ className: standardClassName }),
+      client
+        .getClass()
+        .readMetadata(
+          { className: standardClassName },
+          { analyse: analyseException },
+        ),
     );
     assertMetadataResult(metadataState, 'class metadata', standardClassName);
   });
@@ -263,7 +271,9 @@ describe('Shared - read Accept headers', () => {
         'read local definitions',
         client
           .getLocalDefinitions()
-          .read({ className: standardClassName }, 'active'),
+          .read({ className: standardClassName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'local definitions', standardClassName);
 
@@ -271,7 +281,10 @@ describe('Shared - read Accept headers', () => {
         'read local definitions metadata',
         client
           .getLocalDefinitions()
-          .readMetadata({ className: standardClassName }),
+          .readMetadata(
+            { className: standardClassName },
+            { analyse: analyseException },
+          ),
       );
       assertMetadataResult(
         metadataState,
@@ -291,13 +304,20 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read local types', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read local types',
-      client.getLocalTypes().read({ className: standardClassName }, 'active'),
+      client.getLocalTypes().read({ className: standardClassName }, 'active', {
+        analyse: analyseException,
+      }),
     );
     assertReadResult(state, 'local types', standardClassName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read local types metadata',
-      client.getLocalTypes().readMetadata({ className: standardClassName }),
+      client
+        .getLocalTypes()
+        .readMetadata(
+          { className: standardClassName },
+          { analyse: analyseException },
+        ),
     );
     assertMetadataResult(
       metadataState,
@@ -320,7 +340,9 @@ describe('Shared - read Accept headers', () => {
         'read local test classes',
         client
           .getLocalTestClass()
-          .read({ className: standardClassName }, 'active'),
+          .read({ className: standardClassName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'local test classes', standardClassName);
 
@@ -328,7 +350,10 @@ describe('Shared - read Accept headers', () => {
         'read local test classes metadata',
         client
           .getLocalTestClass()
-          .readMetadata({ className: standardClassName }),
+          .readMetadata(
+            { className: standardClassName },
+            { analyse: analyseException },
+          ),
       );
       assertMetadataResult(
         metadataState,
@@ -352,13 +377,20 @@ describe('Shared - read Accept headers', () => {
         'read local macros',
         client
           .getLocalMacros()
-          .read({ className: standardClassName }, 'active'),
+          .read({ className: standardClassName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'local macros', standardClassName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read local macros metadata',
-        client.getLocalMacros().readMetadata({ className: standardClassName }),
+        client
+          .getLocalMacros()
+          .readMetadata(
+            { className: standardClassName },
+            { analyse: analyseException },
+          ),
       );
       assertMetadataResult(
         metadataState,
@@ -382,15 +414,20 @@ describe('Shared - read Accept headers', () => {
         'read interface source',
         client
           .getInterface()
-          .read({ interfaceName: standardInterfaceName }, 'active'),
+          .read({ interfaceName: standardInterfaceName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'interface source', standardInterfaceName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read interface metadata',
-        client.getInterface().readMetadata({
-          interfaceName: standardInterfaceName,
-        }),
+        client.getInterface().readMetadata(
+          {
+            interfaceName: standardInterfaceName,
+          },
+          { analyse: analyseException },
+        ),
       );
       assertMetadataResult(
         metadataState,
@@ -412,13 +449,17 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read program source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read program source',
-      client.getProgram().read({ programName }, 'active'),
+      client
+        .getProgram()
+        .read({ programName }, 'active', { analyse: analyseException }),
     );
     assertReadResult(state, 'program source', programName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read program metadata',
-      client.getProgram().readMetadata({ programName }),
+      client
+        .getProgram()
+        .readMetadata({ programName }, { analyse: analyseException }),
     );
     assertMetadataResult(metadataState, 'program metadata', programName);
   });
@@ -435,13 +476,17 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read domain', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read domain',
-      client.getDomain().readMetadata({ domainName }),
+      client
+        .getDomain()
+        .readMetadata({ domainName }, { analyse: analyseException }),
     );
     assertReadResult(state, 'domain', domainName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read domain metadata',
-      client.getDomain().readMetadata({ domainName }),
+      client
+        .getDomain()
+        .readMetadata({ domainName }, { analyse: analyseException }),
     );
     assertMetadataResult(metadataState, 'domain metadata', domainName);
   });
@@ -460,13 +505,17 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read data element', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read data element',
-      client.getDataElement().readMetadata({ dataElementName }),
+      client
+        .getDataElement()
+        .readMetadata({ dataElementName }, { analyse: analyseException }),
     );
     assertReadResult(state, 'data element', dataElementName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read data element metadata',
-      client.getDataElement().readMetadata({ dataElementName }),
+      client
+        .getDataElement()
+        .readMetadata({ dataElementName }, { analyse: analyseException }),
     );
     assertMetadataResult(
       metadataState,
@@ -489,13 +538,17 @@ describe('Shared - read Accept headers', () => {
       logTestStep('read structure source', testsLogger);
       const state = await runReadWithAcceptLogging(
         'read structure source',
-        client.getStructure().read({ structureName }, 'active'),
+        client
+          .getStructure()
+          .read({ structureName }, 'active', { analyse: analyseException }),
       );
       assertReadResult(state, 'structure source', structureName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read structure metadata',
-        client.getStructure().readMetadata({ structureName }),
+        client
+          .getStructure()
+          .readMetadata({ structureName }, { analyse: analyseException }),
       );
       assertMetadataResult(metadataState, 'structure metadata', structureName);
     },
@@ -513,13 +566,17 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read table source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read table source',
-      client.getTable().read({ tableName }, 'active'),
+      client
+        .getTable()
+        .read({ tableName }, 'active', { analyse: analyseException }),
     );
     assertReadResult(state, 'table source', tableName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read table metadata',
-      client.getTable().readMetadata({ tableName }),
+      client
+        .getTable()
+        .readMetadata({ tableName }, { analyse: analyseException }),
     );
     assertMetadataResult(metadataState, 'table metadata', tableName);
   });
@@ -538,13 +595,17 @@ describe('Shared - read Accept headers', () => {
       logTestStep('read table type', testsLogger);
       const state = await runReadWithAcceptLogging(
         'read table type',
-        client.getTableType().readMetadata({ tableTypeName }),
+        client
+          .getTableType()
+          .readMetadata({ tableTypeName }, { analyse: analyseException }),
       );
       assertReadResult(state, 'table type', tableTypeName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read table type metadata',
-        client.getTableType().readMetadata({ tableTypeName }),
+        client
+          .getTableType()
+          .readMetadata({ tableTypeName }, { analyse: analyseException }),
       );
       assertMetadataResult(metadataState, 'table type metadata', tableTypeName);
     },
@@ -562,13 +623,15 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read view source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read view source',
-      client.getDdl().read({ ddlName }, 'active'),
+      client
+        .getDdl()
+        .read({ ddlName }, 'active', { analyse: analyseException }),
     );
     assertReadResult(state, 'view source', ddlName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read view metadata',
-      client.getDdl().readMetadata({ ddlName }),
+      client.getDdl().readMetadata({ ddlName }, { analyse: analyseException }),
     );
     assertMetadataResult(metadataState, 'view metadata', ddlName);
   });
@@ -589,13 +652,17 @@ describe('Shared - read Accept headers', () => {
       logTestStep('read function group', testsLogger);
       const state = await runReadWithAcceptLogging(
         'read function group',
-        client.getFunctionGroup().readMetadata({ functionGroupName }),
+        client
+          .getFunctionGroup()
+          .readMetadata({ functionGroupName }, { analyse: analyseException }),
       );
       assertReadResult(state, 'function group', functionGroupName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read function group metadata',
-        client.getFunctionGroup().readMetadata({ functionGroupName }),
+        client
+          .getFunctionGroup()
+          .readMetadata({ functionGroupName }, { analyse: analyseException }),
       );
       assertMetadataResult(
         metadataState,
@@ -629,16 +696,21 @@ describe('Shared - read Accept headers', () => {
         'read function module',
         client
           .getFunctionModule()
-          .read({ functionModuleName, functionGroupName }, 'active'),
+          .read({ functionModuleName, functionGroupName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'function module', functionModuleName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read function module metadata',
-        client.getFunctionModule().readMetadata({
-          functionModuleName,
-          functionGroupName,
-        }),
+        client.getFunctionModule().readMetadata(
+          {
+            functionModuleName,
+            functionGroupName,
+          },
+          { analyse: analyseException },
+        ),
       );
       assertMetadataResult(
         metadataState,
@@ -660,13 +732,17 @@ describe('Shared - read Accept headers', () => {
     logTestStep('read package', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read package',
-      client.getPackage().readMetadata({ packageName }),
+      client
+        .getPackage()
+        .readMetadata({ packageName }, { analyse: analyseException }),
     );
     assertReadResult(state, 'package', packageName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read package metadata',
-      client.getPackage().readMetadata({ packageName }),
+      client
+        .getPackage()
+        .readMetadata({ packageName }, { analyse: analyseException }),
     );
     assertMetadataResult(metadataState, 'package metadata', packageName);
   });
@@ -688,13 +764,22 @@ describe('Shared - read Accept headers', () => {
       logTestStep('read service definition', testsLogger);
       const state = await runReadWithAcceptLogging(
         'read service definition',
-        client.getServiceDefinition().read({ serviceDefinitionName }, 'active'),
+        client
+          .getServiceDefinition()
+          .read({ serviceDefinitionName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'service definition', serviceDefinitionName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read service definition metadata',
-        client.getServiceDefinition().readMetadata({ serviceDefinitionName }),
+        client
+          .getServiceDefinition()
+          .readMetadata(
+            { serviceDefinitionName },
+            { analyse: analyseException },
+          ),
       );
       assertMetadataResult(
         metadataState,
@@ -724,7 +809,9 @@ describe('Shared - read Accept headers', () => {
         'read behavior definition',
         client
           .getBehaviorDefinition()
-          .read({ name: behaviorDefinitionName }, 'active'),
+          .read({ name: behaviorDefinitionName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'behavior definition', behaviorDefinitionName);
 
@@ -732,7 +819,10 @@ describe('Shared - read Accept headers', () => {
         'read behavior definition metadata',
         client
           .getBehaviorDefinition()
-          .readMetadata({ name: behaviorDefinitionName }),
+          .readMetadata(
+            { name: behaviorDefinitionName },
+            { analyse: analyseException },
+          ),
       );
       assertMetadataResult(
         metadataState,
@@ -760,7 +850,9 @@ describe('Shared - read Accept headers', () => {
         'read behavior implementation',
         client
           .getBehaviorImplementation()
-          .read({ className: behaviorImplementationClassName }, 'active'),
+          .read({ className: behaviorImplementationClassName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(
         state,
@@ -770,9 +862,12 @@ describe('Shared - read Accept headers', () => {
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read behavior implementation metadata',
-        client.getBehaviorImplementation().readMetadata({
-          className: behaviorImplementationClassName,
-        }),
+        client.getBehaviorImplementation().readMetadata(
+          {
+            className: behaviorImplementationClassName,
+          },
+          { analyse: analyseException },
+        ),
       );
       assertMetadataResult(
         metadataState,
@@ -798,15 +893,20 @@ describe('Shared - read Accept headers', () => {
         'read metadata extension',
         client
           .getMetadataExtension()
-          .read({ name: metadataExtensionName }, 'active'),
+          .read({ name: metadataExtensionName }, 'active', {
+            analyse: analyseException,
+          }),
       );
       assertReadResult(state, 'metadata extension', metadataExtensionName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read metadata extension metadata',
-        client.getMetadataExtension().readMetadata({
-          name: metadataExtensionName,
-        }),
+        client.getMetadataExtension().readMetadata(
+          {
+            name: metadataExtensionName,
+          },
+          { analyse: analyseException },
+        ),
       );
       assertMetadataResult(
         metadataState,
@@ -839,16 +939,20 @@ describe('Shared - read Accept headers', () => {
             enhancementType,
           },
           'active',
+          { analyse: analyseException },
         ),
       );
       assertReadResult(state, 'enhancement', enhancementName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
         'read enhancement metadata',
-        client.getEnhancement().readMetadata({
-          enhancementName,
-          enhancementType,
-        }),
+        client.getEnhancement().readMetadata(
+          {
+            enhancementName,
+            enhancementType,
+          },
+          { analyse: analyseException },
+        ),
       );
       assertMetadataResult(
         metadataState,

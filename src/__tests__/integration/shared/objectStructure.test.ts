@@ -5,6 +5,7 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/objectStructure.test
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -93,7 +94,9 @@ class ObjectStructureObject implements TestableObject<IObjectStructureParams> {
     }
     return this.client
       .getUtils()
-      .getObjectStructure(config.object_type, config.object_name);
+      .getObjectStructure(config.object_type, config.object_name, {
+        analyse: analyseException,
+      });
   }
 
   readMetadata() {

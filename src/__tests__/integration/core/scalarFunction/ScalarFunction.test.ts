@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -38,6 +39,7 @@ import {
   noteCleanupRefusal,
   releasing,
 } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
 import {
@@ -158,7 +160,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               transportRequest,
             },
             {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(sf, 'delete'),
             },
           ),
@@ -176,7 +178,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             transportRequest,
             description: 'ADT integration test scalar function',
           },
-          { headers: integrationHeadersOf(sf, 'create') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(sf, 'create'),
+          },
         );
         if (!created.ok) {
           const createError = new Error(
@@ -206,7 +211,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           if (configuredSource) {
             // ── 3a) Full flow: update source + activate ──
             const sfLock = expectResult(
-              await sf.lock({ scalarFunctionName }),
+              await sf.lock(
+                { scalarFunctionName },
+                { analyse: analyseException },
+              ),
               'lock scalar function',
             );
             await releasing(
@@ -215,6 +223,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                   await sf.update(
                     { scalarFunctionName, transportRequest },
                     {
+                      analyse: analyseException,
                       headers: integrationHeadersOf(sf, 'update'),
                       source: configuredSource,
                       lockHandle: sfLock,
@@ -222,7 +231,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                   ),
                   'update scalar function',
                 ),
-              () => sf.unlock({ scalarFunctionName }, sfLock),
+              () =>
+                sf.unlock({ scalarFunctionName }, sfLock, {
+                  analyse: analyseException,
+                }),
               'unlock scalar function',
             );
             await expectLockReleased(
@@ -235,7 +247,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               await sf.activate(
                 { scalarFunctionName },
                 {
-                  analyse: analyseActivation,
+                  analyse: judged(analyseActivation),
                   headers: integrationHeadersOf(sf, 'activate'),
                 },
               ),
@@ -244,14 +256,18 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
 
             // ── 4a) Read active ──
             const readState = expectResult(
-              await sf.read({ scalarFunctionName }, 'active'),
+              await sf.read({ scalarFunctionName }, 'active', {
+                analyse: analyseException,
+              }),
               'readState',
             );
             expect(typeof readState).toBe('string');
           } else {
             // ── 3b) Metadata-only validation: read the inactive object back ──
             const readState = expectResult(
-              await sf.read({ scalarFunctionName }, 'inactive'),
+              await sf.read({ scalarFunctionName }, 'inactive', {
+                analyse: analyseException,
+              }),
               'readState',
             );
             expect(typeof readState).toBe('string');
@@ -265,7 +281,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                 transportRequest,
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(sf, 'delete'),
               },
             ),
@@ -284,7 +300,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               sf.delete(
                 { scalarFunctionName, transportRequest },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(sf, 'delete'),
                 },
               ),

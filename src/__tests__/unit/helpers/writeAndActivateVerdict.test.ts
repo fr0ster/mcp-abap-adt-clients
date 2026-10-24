@@ -13,7 +13,6 @@ jest.mock('../../helpers/adtHeaders', () => ({
 const { writeAndActivate } = require('../../helpers/test-helper');
 
 describe('writeAndActivate asks for the activation verdict', () => {
-  const { analyseActivation } = require('@mcp-abap-adt/adt-strategies');
   const answer = (ok: boolean, value: unknown = '') =>
     ok
       ? { ok: true, getResult: () => ({ value }) }
@@ -31,13 +30,21 @@ describe('writeAndActivate asks for the activation verdict', () => {
     activate: jest.fn(async () => answer(activated)),
   });
 
-  it('passes analyseActivation', async () => {
+  it('passes a judge that refuses activationExecuted="false" and an exception document', async () => {
+    const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
     const h = handler(true);
     await writeAndActivate(h, { className: 'ZX' }, { source: 'x' });
-    expect(h.activate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ analyse: analyseActivation }),
-    );
+    const { analyse } = (h.activate.mock.calls[0] as unknown[])[1] as {
+      analyse: (v: unknown, w: unknown) => unknown;
+    };
+    for (const data of [
+      '<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/><msg type="W" objDescr="Class ZX"><shortText><txt>Object is locked in another session</txt></shortText></msg></chkl:messages>',
+      '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message lang="EN">No authorization</message></exc:exception>',
+    ]) {
+      expect(analyse(ADT_NO_FAILURE, { status: 200, data })).not.toBe(
+        ADT_NO_FAILURE,
+      );
+    }
   });
 
   it('fails on a refused activation', async () => {

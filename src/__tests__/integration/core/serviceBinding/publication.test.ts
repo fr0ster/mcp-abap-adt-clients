@@ -49,6 +49,7 @@
  */
 
 import {
+  analyseException,
   analysePublication,
   analysePublicationLock,
 } from '@mcp-abap-adt/adt-strategies';
@@ -65,6 +66,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -115,7 +117,9 @@ async function stateOf(
   // state nobody asked for, and the wait below took it for "not yet".
   const doc = String(
     expectResult(
-      await client.getServiceBinding().read({ bindingName }, 'active'),
+      await client
+        .getServiceBinding()
+        .read({ bindingName }, 'active', { analyse: analyseException }),
       `read binding ${bindingName}`,
     ),
   );
@@ -269,7 +273,7 @@ describe('Service binding publication (deliberate runs)', () => {
       {
         headers: integrationHeadersOf(bindings, 'update'),
         timeout: c.timeoutMs,
-        analyse: analysePublication,
+        analyse: judged(analysePublication),
       },
     );
     const spent = Math.round((Date.now() - started) / 1000);
@@ -279,6 +283,7 @@ describe('Service binding publication (deliberate runs)', () => {
       const released = await bindings.unlock(
         { bindingName: c.bindingName },
         handle,
+        { analyse: analyseException },
       );
       if (!released.ok) {
         throw new Error(`unlock: ${released.getError().message}`);

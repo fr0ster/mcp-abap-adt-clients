@@ -8,6 +8,7 @@
  * case: neither activates alone.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../core/shared/AdtUtils';
@@ -40,6 +41,7 @@ export async function activateSharedGroup(
     activation: wireItself,
   });
   const started = await utils.activateObjectsGroup(objects, undefined, {
+    analyse: analyseException,
     headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
   });
   if (!started.ok) {
@@ -59,7 +61,10 @@ export async function activateSharedGroup(
     // Every poll is read: a refused one fails with what SAP said, it is not
     // an empty status to retry past.
     const state = expectResult(
-      await utils.getActivationRun(runId, { withLongPolling: true }),
+      await utils.getActivationRun(runId, {
+        analyse: analyseException,
+        withLongPolling: true,
+      }),
       `poll group activation run ${runId} of ${what}`,
     );
     const status = attributeValues(
@@ -73,7 +78,7 @@ export async function activateSharedGroup(
   }
   const results = String(
     expectResult(
-      await utils.getActivationResults(runId),
+      await utils.getActivationResults(runId, { analyse: analyseException }),
       `read the results of group activation run ${runId} of ${what}`,
     ) ?? '',
   );

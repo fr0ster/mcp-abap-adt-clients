@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -39,6 +40,7 @@ import {
   raiseAfterCleanup,
   releasing,
 } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -150,12 +152,20 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit test include',
             },
-            { headers: integrationHeadersOf(client.getInclude(), 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(client.getInclude(), 'create'),
+            },
           ),
           'create include',
         );
         const includeHandle = String(
-          expectResult(await client.getInclude().lock(include), 'lock include'),
+          expectResult(
+            await client
+              .getInclude()
+              .lock(include, { analyse: analyseException }),
+            'lock include',
+          ),
         );
         await releasing(
           async () =>
@@ -163,6 +173,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               await client.getInclude().update(
                 { ...include, transportRequest },
                 {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(client.getInclude(), 'update'),
                   lockHandle: includeHandle,
                   source: params.include_source,
@@ -170,7 +181,10 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               ),
               'write the test class',
             ),
-          () => client.getInclude().unlock(include, includeHandle),
+          () =>
+            client
+              .getInclude()
+              .unlock(include, includeHandle, { analyse: analyseException }),
           'unlock after write the test class',
         );
 
@@ -184,12 +198,20 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit test report',
             },
-            { headers: integrationHeadersOf(client.getProgram(), 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(client.getProgram(), 'create'),
+            },
           ),
           'create program',
         );
         const programHandle = String(
-          expectResult(await client.getProgram().lock(program), 'lock program'),
+          expectResult(
+            await client
+              .getProgram()
+              .lock(program, { analyse: analyseException }),
+            'lock program',
+          ),
         );
         await releasing(
           async () =>
@@ -197,6 +219,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               await client.getProgram().update(
                 { ...program, transportRequest },
                 {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(client.getProgram(), 'update'),
                   lockHandle: programHandle,
                   source: params.program_source,
@@ -204,21 +227,24 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               ),
               'write the report',
             ),
-          () => client.getProgram().unlock(program, programHandle),
+          () =>
+            client
+              .getProgram()
+              .unlock(program, programHandle, { analyse: analyseException }),
           'unlock after write the report',
         );
 
         logTestStep('activate', testsLogger);
         expectResult(
           await client.getInclude().activate(include, {
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(client.getInclude(), 'activate'),
           }),
           'activate include',
         );
         expectResult(
           await client.getProgram().activate(program, {
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(client.getProgram(), 'activate'),
           }),
           'activate program',
@@ -258,7 +284,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               client.getProgram().delete(
                 { ...program, transportRequest },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(client.getProgram(), 'delete'),
                 },
               ),
@@ -269,7 +295,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               client.getInclude().delete(
                 { ...include, transportRequest },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(client.getInclude(), 'delete'),
                 },
               ),

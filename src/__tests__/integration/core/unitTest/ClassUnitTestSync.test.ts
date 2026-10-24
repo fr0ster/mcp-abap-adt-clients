@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -43,6 +44,7 @@ import {
   gateOn,
 } from '../../../helpers/caseGate';
 import { expectResult, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -175,7 +177,9 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
 
         // Idempotent: a class left by an earlier, interrupted run goes first.
         const before = presenceOf(
-          await cls.read({ className }),
+          await cls.read({ className }, undefined, {
+            analyse: analyseException,
+          }),
           `class ${className}`,
         );
         if (before.present === 'unknown') throw new Error(before.reason);
@@ -183,7 +187,7 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           logTestStep('delete (leftover)', testsLogger);
           expectResult(
             await cls.delete(config, {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(cls, 'delete'),
             }),
             'delete the leftover class',
@@ -199,36 +203,49 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
               transportRequest,
               description: 'ABAP Unit: async and sync runners',
             },
-            { headers: integrationHeadersOf(cls, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(cls, 'create'),
+            },
           ),
           'create the class',
         );
 
         try {
           logTestStep('update (source)', testsLogger);
-          const handle = String(expectResult(await cls.lock(config), 'lock'));
+          const handle = String(
+            expectResult(
+              await cls.lock(config, { analyse: analyseException }),
+              'lock',
+            ),
+          );
           await releasing(
             async () =>
               expectResult(
                 await cls.update(config, {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(cls, 'update'),
                   source: testCase.params.source_code,
                   lockHandle: handle,
                 }),
                 'write the class source',
               ),
-            () => cls.unlock(config, handle),
+            () => cls.unlock(config, handle, { analyse: analyseException }),
             'unlock after write the class source',
           );
 
           logTestStep('update (testclasses)', testsLogger);
           const includeHandle = String(
-            expectResult(await cls.lock(config), 'lock for testclasses'),
+            expectResult(
+              await cls.lock(config, { analyse: analyseException }),
+              'lock for testclasses',
+            ),
           );
           await releasing(
             async () =>
               expectResult(
                 await client.getLocalTestClass().update(config, {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(
                     client.getLocalTestClass(),
                     'update',
@@ -238,14 +255,15 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
                 }),
                 'write the testclasses include',
               ),
-            () => cls.unlock(config, includeHandle),
+            () =>
+              cls.unlock(config, includeHandle, { analyse: analyseException }),
             'unlock after write the testclasses include',
           );
 
           logTestStep('activate', testsLogger);
           expectResult(
             await cls.activate(config, {
-              analyse: analyseActivation,
+              analyse: judged(analyseActivation),
               headers: integrationHeadersOf(cls, 'activate'),
             }),
             'activate the class',
@@ -270,7 +288,10 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           logTestStep('runSync (synchronous)', testsLogger);
           const syncStarted = Date.now();
           const syncDocument = String(
-            expectResult(await runner.runSync(className), 'runSync'),
+            expectResult(
+              await runner.runSync(className, { analyse: analyseException }),
+              'runSync',
+            ),
           );
           const syncMs = Date.now() - syncStarted;
           const syncReading = readRunResult(syncDocument);
@@ -315,7 +336,10 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           const syncFiltered = readRunResult(
             String(
               expectResult(
-                await runner.runSync(className, noHarmless),
+                await runner.runSync(className, {
+                  analyse: analyseException,
+                  ...noHarmless,
+                }),
                 'runSync without harmless tests',
               ),
             ),
@@ -335,13 +359,15 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           logTestStep('delete (cleanup)', testsLogger);
           expectResult(
             await cls.delete(config, {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(cls, 'delete'),
             }),
             'delete the class',
           );
           const after = presenceOf(
-            await cls.read({ className }),
+            await cls.read({ className }, undefined, {
+              analyse: analyseException,
+            }),
             `class ${className}`,
           );
           expect(after).toEqual({ present: false });

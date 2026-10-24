@@ -9,6 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
@@ -104,7 +105,10 @@ describe('Shared - getSqlQuery', () => {
               sql_query: sqlQuery,
               row_number: rowNumber,
             },
-            { headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery'),
+            },
           ),
         ),
         'SQL query',
@@ -152,7 +156,10 @@ describe('Shared - getSqlQuery', () => {
             {
               sql_query: sqlQuery,
             },
-            { headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery'),
+            },
           ),
         ),
         'SQL query',
@@ -179,12 +186,13 @@ describe('Shared - getSqlQuery', () => {
       // So what is asserted is what is true — it is refused — and not the
       // wording of a check that no longer exists.
       logTestStep('validate error if SQL query is missing', testsLogger);
-      const answer = await client
-        .getUtils()
-        .getSqlQuery(
-          { sql_query: '' },
-          { headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery') },
-        );
+      const answer = await client.getUtils().getSqlQuery(
+        { sql_query: '' },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getUtils(), 'getSqlQuery'),
+        },
+      );
       if (answer.ok) throw new Error('expected an empty query to be refused');
       expect(answer.getError().message).toMatch(/\S/);
       testsLogger.info?.(`empty query refused: ${answer.getError().message}`);

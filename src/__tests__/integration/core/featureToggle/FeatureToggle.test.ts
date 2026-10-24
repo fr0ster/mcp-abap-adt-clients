@@ -19,6 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   analyseDeletion,
+  analyseException,
   featureToggleCheckState,
   featureToggleRuntimeState,
 } from '@mcp-abap-adt/adt-strategies';
@@ -40,6 +41,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -145,7 +147,9 @@ describe('FeatureToggle (using AdtClient)', () => {
     // The answer decides. A read does not throw for a missing object, so
     // "no throw" read as "it exists" for every toggle — see `presenceOf`.
     const existing = presenceOf(
-      await client.getFeatureToggle().readMetadata({ featureToggleName }),
+      await client
+        .getFeatureToggle()
+        .readMetadata({ featureToggleName }, { analyse: analyseException }),
       `feature toggle ${featureToggleName}`,
     );
     if (existing.present === false) return { success: true };
@@ -245,7 +249,9 @@ describe('FeatureToggle (using AdtClient)', () => {
     featureToggleName: string,
   ): Promise<string | null> {
     const existing = presenceOf(
-      await client.getFeatureToggle().readMetadata({ featureToggleName }),
+      await client
+        .getFeatureToggle()
+        .readMetadata({ featureToggleName }, { analyse: analyseException }),
       `feature toggle ${featureToggleName}`,
     );
     if (existing.present === true) return null;
@@ -258,6 +264,7 @@ describe('FeatureToggle (using AdtClient)', () => {
       });
       const config = buildConfig(testCase, resolver);
       const created = await client.getFeatureToggle().create(config, {
+        analyse: analyseException,
         headers: integrationHeadersOf(client.getFeatureToggle(), 'create'),
       });
       return created.ok
@@ -300,7 +307,7 @@ describe('FeatureToggle (using AdtClient)', () => {
                   ),
                 },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(
                     client.getFeatureToggle(),
                     'delete',
@@ -419,7 +426,10 @@ describe('FeatureToggle (using AdtClient)', () => {
         // asserted below are strategies the test passes.
         const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
-          await handler.getRuntimeState({ featureToggleName }),
+          await handler.getRuntimeState(
+            { featureToggleName },
+            { analyse: analyseException },
+          ),
           'getRuntimeState',
         );
         expect(state.name).toBe(featureToggleName.toUpperCase());
@@ -439,6 +449,7 @@ describe('FeatureToggle (using AdtClient)', () => {
         const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
           await handler.checkState({ featureToggleName }, undefined, {
+            analyse: analyseException,
             headers: integrationHeadersOf(handler, 'checkState'),
           }),
           'checkState',
@@ -461,7 +472,9 @@ describe('FeatureToggle (using AdtClient)', () => {
         // `IFeatureToggleSource` parsed out of it supplies a strategy that does
         // it — this member does not decide that for everyone.
         const source = expectResult(
-          await handler.readSource({ featureToggleName }),
+          await handler.readSource({ featureToggleName }, undefined, {
+            analyse: analyseException,
+          }),
           'readSource',
         );
         expect(typeof source).toBe('string');
@@ -492,11 +505,18 @@ describe('FeatureToggle (using AdtClient)', () => {
         // second request, and the test makes it because the library no longer
         // makes it for the caller.
         expectResult(
-          await handler.switchOn({ featureToggleName }, { transportRequest }),
+          await handler.switchOn(
+            { featureToggleName },
+            { transportRequest },
+            { analyse: analyseException },
+          ),
           'switchOn',
         );
         const onState = expectResult(
-          await handler.getRuntimeState({ featureToggleName }),
+          await handler.getRuntimeState(
+            { featureToggleName },
+            { analyse: analyseException },
+          ),
           'onState',
         );
         expect(
@@ -504,11 +524,18 @@ describe('FeatureToggle (using AdtClient)', () => {
         ).toBe(true);
 
         expectResult(
-          await handler.switchOff({ featureToggleName }, { transportRequest }),
+          await handler.switchOff(
+            { featureToggleName },
+            { transportRequest },
+            { analyse: analyseException },
+          ),
           'switchOff',
         );
         const offState = expectResult(
-          await handler.getRuntimeState({ featureToggleName }),
+          await handler.getRuntimeState(
+            { featureToggleName },
+            { analyse: analyseException },
+          ),
           'offState',
         );
         expect(

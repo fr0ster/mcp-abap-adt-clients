@@ -9,6 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
@@ -107,6 +108,7 @@ describe('Shared - getTableContents', () => {
               sql_query: await selectEveryColumn(connection, tableName),
             },
             {
+              analyse: analyseException,
               headers: integrationHeadersOf(
                 client.getUtils(),
                 'getTableContents',
@@ -157,6 +159,7 @@ describe('Shared - getTableContents', () => {
               sql_query: await selectEveryColumn(connection, tableName),
             },
             {
+              analyse: analyseException,
               headers: integrationHeadersOf(
                 client.getUtils(),
                 'getTableContents',
@@ -186,6 +189,7 @@ describe('Shared - getTableContents', () => {
           sql_query: 'SELECT 1 FROM T000',
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getUtils(), 'getTableContents'),
         },
       );

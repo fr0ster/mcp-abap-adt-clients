@@ -14,7 +14,10 @@
  * Every answer here is read, and a failed cleanup throws.
  */
 
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { AdtClient } from '../../clients/AdtClient';
 import type { IDataElementConfig } from '../../core/dataElement';
 import type { IDomainConfig } from '../../core/domain';
@@ -100,12 +103,17 @@ export async function recreateActiveDomain(
   await removeLeftover(domain, key, config.domainName);
   mustSucceed(
     await domain.create(config, {
+      analyse: analyseException,
       headers: integrationHeadersOf(domain, 'create'),
     }),
     `create ${config.domainName}`,
   );
   const shell = await readDocumentForUpdate(
-    () => domain.readMetadata({ domainName: config.domainName }),
+    () =>
+      domain.readMetadata(
+        { domainName: config.domainName },
+        { analyse: analyseException },
+      ),
     `read ${config.domainName} after create`,
   );
   mustSucceed(
@@ -146,12 +154,19 @@ export async function recreateActiveDataElement(
         typeKind: 'domain',
         typeName: domainName,
       } as IDataElementConfig,
-      { headers: integrationHeadersOf(element, 'create') },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(element, 'create'),
+      },
     ),
     `create ${config.dataElementName}`,
   );
   const shell = await readDocumentForUpdate(
-    () => element.readMetadata({ dataElementName: config.dataElementName }),
+    () =>
+      element.readMetadata(
+        { dataElementName: config.dataElementName },
+        { analyse: analyseException },
+      ),
     `read ${config.dataElementName} after create`,
   );
   mustSucceed(

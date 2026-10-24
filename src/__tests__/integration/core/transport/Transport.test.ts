@@ -13,7 +13,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ITransportObjectEntry } from '@mcp-abap-adt/adt-strategies';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -35,6 +38,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult, failureOf, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -122,12 +126,13 @@ describe('AdtRequest', () => {
     // server protecting them — and a run that left objects in it.
     const leftovers: string[] = [];
     for (const number of createdTransports) {
-      const answer = await client
-        .getRequest()
-        .delete(
-          { transportNumber: number },
-          { headers: integrationHeadersOf(client.getRequest(), 'delete') },
-        );
+      const answer = await client.getRequest().delete(
+        { transportNumber: number },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getRequest(), 'delete'),
+        },
+      );
       if (answer.ok) {
         testsLogger.info?.(`Deleted test transport ${number}`);
       } else {
@@ -197,6 +202,7 @@ describe('AdtRequest', () => {
             await client
               .getRequest(transportParsing)
               .create(buildConfig(testCase) as any, {
+                analyse: analyseException,
                 headers: integrationHeadersOf(
                   client.getRequest(transportParsing),
                   'create',
@@ -216,9 +222,12 @@ describe('AdtRequest', () => {
           if (transportNumber) {
             logTestStep('read', testsLogger);
             const document = expectResult(
-              await client.getRequest(transportParsing).readMetadata({
-                transportNumber,
-              }),
+              await client.getRequest(transportParsing).readMetadata(
+                {
+                  transportNumber,
+                },
+                { analyse: analyseException },
+              ),
               `read transport ${transportNumber}`,
             );
             expect(document).toBeDefined();
@@ -294,7 +303,9 @@ describe('AdtRequest', () => {
       // A refused read fails: read as an empty list, it would prove an entry
       // gone that was never looked at.
       return expectResult(
-        await client.getRequest(transportParsing).readObjects(number),
+        await client
+          .getRequest(transportParsing)
+          .readObjects(number, { analyse: analyseException }),
         `read the objects of ${number}`,
       );
     };
@@ -320,7 +331,10 @@ describe('AdtRequest', () => {
         expectResult(
           await client
             .getRequest()
-            .readMetadata({ transportNumber: taskNumber }),
+            .readMetadata(
+              { transportNumber: taskNumber },
+              { analyse: analyseException },
+            ),
           `read task ${taskNumber}`,
         ) ?? '',
       );
@@ -334,9 +348,12 @@ describe('AdtRequest', () => {
     const tasksOf = async (number: string): Promise<string[]> => {
       const document = String(
         expectResult(
-          await client.getRequest(transportParsing).readMetadata({
-            transportNumber: number,
-          }),
+          await client.getRequest(transportParsing).readMetadata(
+            {
+              transportNumber: number,
+            },
+            { analyse: analyseException },
+          ),
           `read request ${number}`,
         ) ?? '',
       );
@@ -399,6 +416,7 @@ describe('AdtRequest', () => {
           logTestStep('create the request this block works in', testsLogger);
           const created = expectResult(
             await request.create(buildConfig(testCase) as any, {
+              analyse: analyseException,
               headers: integrationHeadersOf(request, 'create'),
             }),
             'create transport request',
@@ -410,7 +428,9 @@ describe('AdtRequest', () => {
           // Read-only, and the record a `removeObject` lands in later.
           logTestStep('read the action log', testsLogger);
           const log = expectResult(
-            await request.readActionLog(transportNumber as string),
+            await request.readActionLog(transportNumber as string, {
+              analyse: analyseException,
+            }),
             'read the action log',
           );
           expect(String(log ?? '').length).toBeGreaterThan(0);
@@ -455,6 +475,7 @@ describe('AdtRequest', () => {
           }
           logTestStep(`the task will be owned by ${targetUser}`, testsLogger);
           const task = await request.createTask(transportNumber as string, {
+            analyse: analyseException,
             headers: integrationHeadersOf(request, 'createTask'),
             targetUser,
           });
@@ -499,7 +520,10 @@ describe('AdtRequest', () => {
             await request.changeTaskType(
               taskNumber,
               ADT_TASK_TYPE.developmentCorrection,
-              { headers: integrationHeadersOf(request, 'changeTaskType') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(request, 'changeTaskType'),
+              },
             ),
             'give the task its type',
           );
@@ -573,7 +597,10 @@ describe('AdtRequest', () => {
                   type: 'DOMA',
                   position: stale.position,
                 },
-                { headers: integrationHeadersOf(request, 'removeObject') },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(request, 'removeObject'),
+                },
               ),
               `clear the stale entry for ${domainName}`,
             );
@@ -585,7 +612,10 @@ describe('AdtRequest', () => {
           // The answer decides — see `presenceOf`; "could not find out" is
           // not "absent".
           const leftover = presenceOf(
-            await domain.readMetadata({ domainName }),
+            await domain.readMetadata(
+              { domainName },
+              { analyse: analyseException },
+            ),
             `domain ${domainName}`,
           );
           if (leftover.present === 'unknown') throw new Error(leftover.reason);
@@ -601,7 +631,7 @@ describe('AdtRequest', () => {
                   transportRequest: sharedRequest,
                 },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(domain, 'delete'),
                 },
               ),
@@ -616,7 +646,10 @@ describe('AdtRequest', () => {
               transportRequest: sharedRequest,
               description: 'AdtRequest object-list round trip',
             },
-            { headers: integrationHeadersOf(domain, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(domain, 'create'),
+            },
           );
           if (!madeIt.ok) {
             throw new Error(
@@ -638,7 +671,10 @@ describe('AdtRequest', () => {
           logTestStep(`give ${domainName} its data type`, testsLogger);
           const shellDocument = String(
             expectResult(
-              await domain.readMetadata({ domainName }),
+              await domain.readMetadata(
+                { domainName },
+                { analyse: analyseException },
+              ),
               `read ${domainName} after create`,
             ) ?? '',
           );
@@ -655,7 +691,10 @@ describe('AdtRequest', () => {
             'doma:length',
             '000004',
           );
-          const domainLock = await domain.lock({ domainName });
+          const domainLock = await domain.lock(
+            { domainName },
+            { analyse: analyseException },
+          );
           if (!domainLock.ok) {
             throw new Error(
               `could not lock ${domainName}: ${domainLock.getError().message}`,
@@ -672,6 +711,7 @@ describe('AdtRequest', () => {
                     transportRequest: sharedRequest,
                   },
                   {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(domain, 'updateMetadata'),
                     source: typed,
                     lockHandle: domainHandle,
@@ -679,7 +719,10 @@ describe('AdtRequest', () => {
                 ),
                 `give ${domainName} its data type`,
               ),
-            () => domain.unlock({ domainName }, domainHandle),
+            () =>
+              domain.unlock({ domainName }, domainHandle, {
+                analyse: analyseException,
+              }),
             `unlock ${domainName}`,
           );
           await expectLockReleased(
@@ -693,7 +736,7 @@ describe('AdtRequest', () => {
             await domain.delete(
               { domainName, transportRequest: sharedRequest },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(domain, 'delete'),
               },
             ),
@@ -724,7 +767,9 @@ describe('AdtRequest', () => {
             'sort and compress the task, then find the entry again',
             testsLogger,
           );
-          const sorted = await request.sortAndCompress(entry.task);
+          const sorted = await request.sortAndCompress(entry.task, {
+            analyse: analyseException,
+          });
           expect(sorted.ok).toBe(true);
           const sortedList = await objectsOn(entry.task);
           expect(
@@ -749,7 +794,10 @@ describe('AdtRequest', () => {
               type: 'DOMA',
               position: resorted.position,
             },
-            { headers: integrationHeadersOf(request, 'removeObject') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(request, 'removeObject'),
+            },
           );
           expect(removed.ok).toBe(true);
 
@@ -804,6 +852,7 @@ describe('AdtRequest', () => {
               await client
                 .getRequest(transportParsing)
                 .create(buildConfig(testCase) as any, {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(
                     client.getRequest(transportParsing),
                     'create',
@@ -821,7 +870,9 @@ describe('AdtRequest', () => {
           // system's first one, which is the choice `list` used to make itself
           // when a system held exactly one.
           const configs = expectResult(
-            await client.getRequest(transportParsing).searchConfigurations(),
+            await client
+              .getRequest(transportParsing)
+              .searchConfigurations({ analyse: analyseException }),
             'transport search configurations',
           );
           expect(configs.length).toBeGreaterThan(0);
@@ -830,7 +881,7 @@ describe('AdtRequest', () => {
           const tree = expectResult(
             await client
               .getRequest(transportParsing)
-              .list({ configUri: configs[0].uri }),
+              .list({ analyse: analyseException, configUri: configs[0].uri }),
             'list transport requests',
           );
 

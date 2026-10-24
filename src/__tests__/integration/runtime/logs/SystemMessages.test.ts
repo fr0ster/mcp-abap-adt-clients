@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -103,7 +104,7 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
       try {
         logTestStep('list system messages', testsLogger);
         const response = expectResult(
-          await runtime.getSystemMessages().list(),
+          await runtime.getSystemMessages().list({ analyse: analyseException }),
           'response',
         );
         expect(response).toBeDefined();
@@ -152,7 +153,9 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
       try {
         logTestStep('list system messages with maxResults: 5', testsLogger);
         const response = expectResult(
-          await runtime.getSystemMessages().list({ maxResults: 5 }),
+          await runtime
+            .getSystemMessages()
+            .list({ analyse: analyseException, maxResults: 5 }),
           'response',
         );
         expect(response).toBeDefined();

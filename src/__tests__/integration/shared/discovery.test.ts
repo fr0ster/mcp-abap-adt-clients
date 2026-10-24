@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAdtResponse, IAdtResult } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -76,7 +77,7 @@ describe('Shared - discovery', () => {
       // so the contract has to be named here or the assertions below type as
       // `unknown` and stop checking anything.
       const answer = (await withAcceptHandling(
-        client.getUtils().discovery(),
+        client.getUtils().discovery(undefined, { analyse: analyseException }),
       )) as IAdtResponse<string>;
       const xml = expectResult(answer, 'discovery');
       expect(xml.length).toBeGreaterThan(0);

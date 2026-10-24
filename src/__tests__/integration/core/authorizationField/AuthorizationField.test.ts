@@ -31,6 +31,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -231,7 +232,7 @@ describe('AuthorizationField (using AdtClient)', () => {
                   ),
                 },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(
                     client.getAuthorizationField(),
                     'delete',

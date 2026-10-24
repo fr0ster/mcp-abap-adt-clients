@@ -13,8 +13,10 @@ const { XMLParser } = require('fast-xml-parser');
 const { integrationHeadersOf } = require('./adtHeaders');
 const {
   analyseActivation,
-  analyseDeletion,
+  analyseException,
 } = require('@mcp-abap-adt/adt-strategies');
+// Every expected-success call is judged, the exception document first.
+const { judged } = require('./judged');
 const {
   loadTestConfigFrom,
 } = require('../../../scripts/lib/testConfigOverlay');
@@ -45,7 +47,7 @@ async function writeAndActivate(handler, config, options, logger) {
     // activationExecuted="false" or a message of type E is a refusal.
     const activated = await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate', config),
-      analyse: analyseActivation,
+      analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
       const failure = activated.getError();
@@ -73,7 +75,10 @@ async function writeSource(handler, config, options, logger) {
 
   let handle;
   if (typeof handler.lock === 'function') {
-    handle = raise(await handler.lock(config), 'lock');
+    handle = raise(
+      await handler.lock(config, { analyse: analyseException }),
+      'lock',
+    );
   }
   let writeFailed = true;
   let unlockRefusal = '';
@@ -87,6 +92,7 @@ async function writeSource(handler, config, options, logger) {
     if (typeof handler.update === 'function')
       raise(
         await handler.update(config, {
+          analyse: analyseException,
           ...written,
           headers: integrationHeadersOf(handler, 'update', config),
         }),
@@ -95,6 +101,7 @@ async function writeSource(handler, config, options, logger) {
     else
       raise(
         await handler.updateMetadata(config, {
+          analyse: analyseException,
           ...written,
           headers: integrationHeadersOf(handler, 'updateMetadata', config),
         }),
@@ -103,7 +110,9 @@ async function writeSource(handler, config, options, logger) {
     writeFailed = false;
   } finally {
     if (handle && typeof handler.unlock === 'function') {
-      const released = await handler.unlock(config, handle);
+      const released = await handler.unlock(config, handle, {
+        analyse: analyseException,
+      });
       if (released && released.ok === false) {
         const refusal = `unlock failed, the handle may still be held: ${released.getError().message}`;
         // A refused unlock is a failure of its own: the handle left held is
@@ -1460,7 +1469,9 @@ async function ensureSharedPackage(client, logger) {
   // Only an answer naming the package as absent leads to the create. A read
   // that was refused for another reason, or threw, is "could not find out",
   // and fails setup with what was said.
-  const answer = await client.getPackage().readMetadata({ packageName });
+  const answer = await client
+    .getPackage()
+    .readMetadata({ packageName }, { analyse: analyseException });
   if (answer.ok) {
     logger?.info?.(`Shared package ${packageName} already exists`);
     _sharedPackageReady = true;
@@ -1495,7 +1506,10 @@ async function ensureSharedPackage(client, logger) {
         // (ZLOCAL, LOCAL, $) does not want it. Stated in the config, not guessed.
         recordChanges: sharedConfig.record_changes === true,
       },
-      { headers: integrationHeadersOf(client.getPackage(), 'create') },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(client.getPackage(), 'create'),
+      },
     ),
     `shared package create ${packageName}`,
   );
@@ -1630,18 +1644,38 @@ async function writeShared(handler, config, depConfig, logger) {
  */
 function readActiveSharedSource(client, type, name, depConfig) {
   const read = {
-    tables: () => client.getTable().read({ tableName: name }, 'active'),
+    tables: () =>
+      client
+        .getTable()
+        .read({ tableName: name }, 'active', { analyse: analyseException }),
     structures: () =>
-      client.getStructure().read({ structureName: name }, 'active'),
-    views: () => client.getDdl().read({ ddlName: name }, 'active'),
-    programs: () => client.getProgram().read({ programName: name }, 'active'),
+      client
+        .getStructure()
+        .read({ structureName: name }, 'active', { analyse: analyseException }),
+    views: () =>
+      client
+        .getDdl()
+        .read({ ddlName: name }, 'active', { analyse: analyseException }),
+    programs: () =>
+      client
+        .getProgram()
+        .read({ programName: name }, 'active', { analyse: analyseException }),
     behavior_definitions: () =>
-      client.getBehaviorDefinition().read({ name }, 'active'),
-    classes: () => client.getClass().read({ className: name }, 'active'),
+      client
+        .getBehaviorDefinition()
+        .read({ name }, 'active', { analyse: analyseException }),
+    classes: () =>
+      client
+        .getClass()
+        .read({ className: name }, 'active', { analyse: analyseException }),
     access_controls: () =>
-      client.getAccessControl().read({ accessControlName: name }, 'active'),
+      client.getAccessControl().read({ accessControlName: name }, 'active', {
+        analyse: analyseException,
+      }),
     interfaces: () =>
-      client.getInterface().read({ interfaceName: name }, 'active'),
+      client
+        .getInterface()
+        .read({ interfaceName: name }, 'active', { analyse: analyseException }),
     function_modules: () =>
       client.getFunctionModule().read(
         {
@@ -1649,6 +1683,7 @@ function readActiveSharedSource(client, type, name, depConfig) {
           functionGroupName: depConfig.function_group,
         },
         'active',
+        { analyse: analyseException },
       ),
     function_group_includes: () =>
       client
@@ -1656,11 +1691,14 @@ function readActiveSharedSource(client, type, name, depConfig) {
         .read(
           { functionGroupName: depConfig.function_group, includeName: name },
           'active',
+          { analyse: analyseException },
         ),
     service_definitions: () =>
       client
         .getServiceDefinition()
-        .read({ serviceDefinitionName: name }, 'active'),
+        .read({ serviceDefinitionName: name }, 'active', {
+          analyse: analyseException,
+        }),
   }[type];
   return read ? read() : undefined;
 }
@@ -1880,7 +1918,7 @@ async function activateSharedFunctionGroup(
     { functionGroupName: name, transportRequest },
     {
       headers: integrationHeadersOf(client.getFunctionGroup(), 'activate'),
-      analyse: analyseActivation,
+      analyse: judged(analyseActivation),
     },
   );
   if (!answer.ok) {
@@ -1906,7 +1944,7 @@ async function activateSharedFunctionGroup(
   const { utilInactiveObjects } = require('@mcp-abap-adt/adt-strategies');
   const listed = await client
     .getUtils({ ...utilDocuments, inactive: utilInactiveObjects })
-    .getInactiveObjects();
+    .getInactiveObjects({ analyse: analyseException });
   if (!listed.ok) {
     throw new Error(
       `Shared function group ${name} was activated, but the inactive list ` +
@@ -1979,61 +2017,96 @@ async function ensureSharedDependency(client, type, name, logger) {
   // definition and a package.
   const readShared = async () => {
     if (type === 'domains') {
-      return client.getDomain().readMetadata({ domainName: name });
+      return client
+        .getDomain()
+        .readMetadata({ domainName: name }, { analyse: analyseException });
     }
     if (type === 'data_elements') {
-      return client.getDataElement().readMetadata({ dataElementName: name });
+      return client
+        .getDataElement()
+        .readMetadata({ dataElementName: name }, { analyse: analyseException });
     }
     if (type === 'structures') {
-      return client.getStructure().readMetadata({ structureName: name });
+      return client
+        .getStructure()
+        .readMetadata({ structureName: name }, { analyse: analyseException });
     }
     if (type === 'tables') {
-      return client.getTable().readMetadata({ tableName: name });
+      return client
+        .getTable()
+        .readMetadata({ tableName: name }, { analyse: analyseException });
     }
     if (type === 'views') {
-      return client.getDdl().readMetadata({ ddlName: name });
+      return client
+        .getDdl()
+        .readMetadata({ ddlName: name }, { analyse: analyseException });
     }
     if (type === 'programs') {
-      return client.getProgram().readMetadata({ programName: name });
+      return client
+        .getProgram()
+        .readMetadata({ programName: name }, { analyse: analyseException });
     }
     if (type === 'behavior_definitions') {
-      return client.getBehaviorDefinition().readMetadata({ name });
+      return client
+        .getBehaviorDefinition()
+        .readMetadata({ name }, { analyse: analyseException });
     }
     if (type === 'classes') {
-      return client.getClass().readMetadata({ className: name });
+      return client
+        .getClass()
+        .readMetadata({ className: name }, { analyse: analyseException });
     }
     if (type === 'access_controls') {
       return client
         .getAccessControl()
-        .readMetadata({ accessControlName: name });
+        .readMetadata(
+          { accessControlName: name },
+          { analyse: analyseException },
+        );
     }
     if (type === 'interfaces') {
-      return client.getInterface().readMetadata({ interfaceName: name });
+      return client
+        .getInterface()
+        .readMetadata({ interfaceName: name }, { analyse: analyseException });
     }
     if (type === 'function_groups') {
       return client
         .getFunctionGroup()
-        .readMetadata({ functionGroupName: name });
+        .readMetadata(
+          { functionGroupName: name },
+          { analyse: analyseException },
+        );
     }
     if (type === 'function_modules') {
-      return client.getFunctionModule().readMetadata({
-        functionModuleName: name,
-        functionGroupName: depConfig.function_group,
-      });
+      return client.getFunctionModule().readMetadata(
+        {
+          functionModuleName: name,
+          functionGroupName: depConfig.function_group,
+        },
+        { analyse: analyseException },
+      );
     }
     if (type === 'function_group_includes') {
-      return client.getFunctionInclude().readMetadata({
-        functionGroupName: depConfig.function_group,
-        includeName: name,
-      });
+      return client.getFunctionInclude().readMetadata(
+        {
+          functionGroupName: depConfig.function_group,
+          includeName: name,
+        },
+        { analyse: analyseException },
+      );
     }
     if (type === 'service_definitions') {
       return client
         .getServiceDefinition()
-        .readMetadata({ serviceDefinitionName: name });
+        .readMetadata(
+          { serviceDefinitionName: name },
+          { analyse: analyseException },
+        );
     }
     if (type === 'service_bindings') {
-      return client.getServiceBinding().readMetadata({ bindingName: name });
+      return client
+        .getServiceBinding()
+        .readMetadata({ bindingName: name }, { analyse: analyseException });
     }
     return undefined;
   };
@@ -2123,7 +2196,13 @@ async function ensureSharedDependency(client, type, name, logger) {
           // Reading inside the lock window would invent a sequence the library
           // no longer performs.
           const current = await readDocumentForUpdate(
-            () => client.getDomain().readMetadata({ domainName: name }),
+            () =>
+              client
+                .getDomain()
+                .readMetadata(
+                  { domainName: name },
+                  { analyse: analyseException },
+                ),
             `read shared domain ${name}`,
             logger,
           );
@@ -2142,7 +2221,12 @@ async function ensureSharedDependency(client, type, name, logger) {
         } else {
           const current = await readDocumentForUpdate(
             () =>
-              client.getDataElement().readMetadata({ dataElementName: name }),
+              client
+                .getDataElement()
+                .readMetadata(
+                  { dataElementName: name },
+                  { analyse: analyseException },
+                ),
             `read shared data element ${name}`,
             logger,
           );
@@ -2217,7 +2301,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           length: depConfig.length || 10,
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getDomain(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getDomain(), 'create'),
+        },
       ),
       `shared domain create ${name}`,
     );
@@ -2229,7 +2316,10 @@ async function ensureSharedDependency(client, type, name, logger) {
     // stayed a shell. The document the create just answered is read back,
     // patched, and written whole.
     const createdDomain = await readDocumentForUpdate(
-      () => client.getDomain().readMetadata({ domainName: name }),
+      () =>
+        client
+          .getDomain()
+          .readMetadata({ domainName: name }, { analyse: analyseException }),
       `read shared domain ${name} after create`,
       logger,
     );
@@ -2261,12 +2351,21 @@ async function ensureSharedDependency(client, type, name, logger) {
           typeName: depConfig.domain_name,
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getDataElement(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getDataElement(), 'create'),
+        },
       ),
       `shared dataelement create ${name}`,
     );
     const createdElement = await readDocumentForUpdate(
-      () => client.getDataElement().readMetadata({ dataElementName: name }),
+      () =>
+        client
+          .getDataElement()
+          .readMetadata(
+            { dataElementName: name },
+            { analyse: analyseException },
+          ),
       `read shared data element ${name} after create`,
       logger,
     );
@@ -2293,7 +2392,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           description: depConfig.description || 'Shared test structure',
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getStructure(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getStructure(), 'create'),
+        },
       ),
       `shared structure create ${name}`,
     );
@@ -2322,7 +2424,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           description: depConfig.description || 'Shared test table',
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getTable(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getTable(), 'create'),
+        },
       ),
       `shared table create ${name}`,
     );
@@ -2351,7 +2456,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           description: depConfig.description || 'Shared test view',
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getDdl(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getDdl(), 'create'),
+        },
       ),
       `shared ddl create ${name}`,
     );
@@ -2373,7 +2481,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           description: depConfig.description || 'Shared test program',
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getProgram(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getProgram(), 'create'),
+        },
       ),
       `shared program create ${name}`,
     );
@@ -2404,6 +2515,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           transportRequest,
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(
             client.getBehaviorDefinition(),
             'create',
@@ -2437,7 +2549,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           description: depConfig.description || 'Shared test class',
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getClass(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getClass(), 'create'),
+        },
       ),
       `shared class create ${name}`,
     );
@@ -2461,6 +2576,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           transportRequest,
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getAccessControl(), 'create'),
         },
       ),
@@ -2491,7 +2607,10 @@ async function ensureSharedDependency(client, type, name, logger) {
           description: depConfig.description || 'Shared test interface',
           transportRequest,
         },
-        { headers: integrationHeadersOf(client.getInterface(), 'create') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getInterface(), 'create'),
+        },
       ),
       `shared interface create ${name}`,
     );
@@ -2523,6 +2642,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           transportRequest,
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getFunctionGroup(), 'create'),
         },
       ),
@@ -2541,6 +2661,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           transportRequest,
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getFunctionModule(), 'create'),
         },
       ),
@@ -2577,6 +2698,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           transportRequest,
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(client.getFunctionInclude(), 'create'),
         },
       ),
@@ -2611,6 +2733,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           source: depConfig.source,
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(
             client.getServiceDefinition(),
             'create',
@@ -2668,6 +2791,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           transportRequest,
         },
         {
+          analyse: analyseException,
           activateOnCreate: !depConfig.skip_activation,
           headers: integrationHeadersOf(client.getServiceBinding(), 'create'),
         },

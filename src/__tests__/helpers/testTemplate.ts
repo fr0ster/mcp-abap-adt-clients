@@ -48,6 +48,7 @@ import { integrationHeadersOf } from './adtHeaders';
 import { BaseTester } from './BaseTester';
 import { gateOn } from './caseGate';
 import { failureOf } from './contract';
+import { judged } from './judged';
 
 const {
   getEnabledTestCase,
@@ -189,7 +190,7 @@ describe('ObjectType (using AdtClient)', () => {
                 transportRequest: tester.getTransportRequest(),
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   cleanupClient.getInclude(),
                   'delete',

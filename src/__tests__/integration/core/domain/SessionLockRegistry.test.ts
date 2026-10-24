@@ -17,6 +17,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -175,11 +176,15 @@ describe('Session lock registry (using AdtClient)', () => {
 
         // Lock both through the SAME client session — deliberately no unlock.
         expectResult(
-          await client.getDomain().lock(domainConfig),
+          await client
+            .getDomain()
+            .lock(domainConfig, { analyse: analyseException }),
           'lock the domain',
         );
         expectResult(
-          await client.getDataElement().lock(dataElementConfig),
+          await client
+            .getDataElement()
+            .lock(dataElementConfig, { analyse: analyseException }),
           'lock the data element',
         );
 

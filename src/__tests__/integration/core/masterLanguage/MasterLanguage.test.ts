@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -27,6 +28,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { gateOn } from '../../../helpers/caseGate';
 import { expectResult, noteCleanupRefusal } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -118,14 +120,17 @@ describe('Master language on create (#105)', () => {
             { className, transportRequest },
             {
               headers: integrationHeadersOf(cls, 'delete'),
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
             },
           ),
           what,
         );
 
       // Idempotent: remove a leftover from a run that died before cleanup.
-      const existing = await cls.readMetadata({ className });
+      const existing = await cls.readMetadata(
+        { className },
+        { analyse: analyseException },
+      );
       if (existing.ok) {
         await deleteClass('delete leftover');
       } else if (existing.getError().response?.status !== 404) {
@@ -142,7 +147,10 @@ describe('Master language on create (#105)', () => {
               transportRequest,
               description: 'master language integration probe',
             },
-            { headers: integrationHeadersOf(cls, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(cls, 'create'),
+            },
           ),
           'create',
         );
@@ -173,7 +181,7 @@ describe('Master language on create (#105)', () => {
           await cls.activate(
             { className },
             {
-              analyse: analyseActivation,
+              analyse: judged(analyseActivation),
               headers: integrationHeadersOf(cls, 'activate'),
             },
           ),
@@ -181,7 +189,7 @@ describe('Master language on create (#105)', () => {
         );
 
         const meta = expectResult(
-          await cls.readMetadata({ className }),
+          await cls.readMetadata({ className }, { analyse: analyseException }),
           'meta',
         );
         const persisted = masterLangOf(String(meta ?? ''));
@@ -197,7 +205,7 @@ describe('Master language on create (#105)', () => {
               { className, transportRequest },
               {
                 headers: integrationHeadersOf(cls, 'delete'),
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
               },
             ),
           'cleanup delete',

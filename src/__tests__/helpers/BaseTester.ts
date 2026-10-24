@@ -29,6 +29,7 @@
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -51,6 +52,7 @@ import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
+import { judged } from './judged';
 import {
   expectLockReleased,
   factoryOf,
@@ -381,7 +383,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // into it; the test wants the real outcome, so it asks for the reading.
     const answer = await this.adtObject.delete(config, {
       headers: integrationHeadersOf(this.adtObject, 'delete'),
-      analyse: analyseDeletion,
+      analyse: judged(analyseDeletion),
     });
     if (!answer.ok) {
       const failure = answer.getError();
@@ -428,10 +430,17 @@ export class BaseTester<TConfig, TState = unknown> {
     options?: { withLongPolling?: boolean } & IAdtOperationOptions,
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.read) {
-      return this.adtObject.read(config, version, options);
+      return this.adtObject.read(config, version, {
+        analyse: analyseException,
+        ...options,
+      });
     }
     if (this.adtObject.readMetadata) {
-      return this.adtObject.readMetadata(config, { ...options, version });
+      return this.adtObject.readMetadata(config, {
+        analyse: analyseException,
+        ...options,
+        version,
+      });
     }
     throw new Error(
       `${this.loggerPrefix} offers neither read() nor readMetadata() — every ` +
@@ -452,7 +461,10 @@ export class BaseTester<TConfig, TState = unknown> {
     config: Partial<TConfig>,
     options?: { withLongPolling?: boolean },
   ): Promise<void> {
-    const answer = await this.adtObject.readMetadata?.(config, options);
+    const answer = await this.adtObject.readMetadata?.(config, {
+      analyse: analyseException,
+      ...options,
+    });
     if (!answer) {
       throw new Error(
         `${this.loggerPrefix} offers no readMetadata() — the flow asked for ` +
@@ -483,12 +495,14 @@ export class BaseTester<TConfig, TState = unknown> {
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.update) {
       return this.adtObject.update(config, {
+        analyse: analyseException,
         ...options,
         headers: integrationHeadersOf(this.adtObject, 'update'),
       });
     }
     if (this.adtObject.updateMetadata) {
       return this.adtObject.updateMetadata(config, {
+        analyse: analyseException,
         ...options,
         headers: integrationHeadersOf(this.adtObject, 'updateMetadata'),
       });
@@ -509,7 +523,10 @@ export class BaseTester<TConfig, TState = unknown> {
       return await this.writeWhatItHas(config, options);
     }
 
-    const handle = expectResult(await this.adtObject.lock(config), 'lock');
+    const handle = expectResult(
+      await this.adtObject.lock(config, { analyse: analyseException }),
+      'lock',
+    );
     this.objectLocked = true;
     this.lockHandle = handle;
     let unlocked = false;
@@ -525,7 +542,9 @@ export class BaseTester<TConfig, TState = unknown> {
       writeThrew = true;
       throw error;
     } finally {
-      const released = await this.adtObject.unlock(config, handle);
+      const released = await this.adtObject.unlock(config, handle, {
+        analyse: analyseException,
+      });
       this.objectLocked = false;
       this.lockHandle = undefined;
       unlocked = released.ok;
@@ -800,7 +819,10 @@ export class BaseTester<TConfig, TState = unknown> {
       logTestStep(label, this.logger);
       const answer = await this.adtObject.readMetadata?.(
         config as Partial<TConfig>,
-        withLongPolling ? { withLongPolling: true } : undefined,
+        {
+          analyse: analyseException,
+          ...(withLongPolling ? { withLongPolling: true } : undefined),
+        },
       );
       if (!answer) {
         throw new Error(
@@ -968,7 +990,7 @@ export class BaseTester<TConfig, TState = unknown> {
       const validationDocument = String(
         expectResult(
           await this.adtObject.validate(config as Partial<TConfig>, {
-            analyse: analyseValidation,
+            analyse: judged(analyseValidation),
           }),
           'validate',
         ) ?? '',
@@ -1022,6 +1044,7 @@ export class BaseTester<TConfig, TState = unknown> {
         await this.adtObject.create(
           createConfig as Omit<TConfig, 'source'> & { source?: never },
           {
+            analyse: analyseException,
             ...createOptions,
             headers: integrationHeadersOf(this.adtObject, 'create'),
           },
@@ -1040,7 +1063,7 @@ export class BaseTester<TConfig, TState = unknown> {
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate after create',
         );
@@ -1138,7 +1161,7 @@ export class BaseTester<TConfig, TState = unknown> {
           expectResult(
             await this.adtObject.activate(config as Partial<TConfig>, {
               headers: integrationHeadersOf(this.adtObject, 'activate'),
-              analyse: analyseActivation,
+              analyse: judged(analyseActivation),
             }),
             'activate after update',
           );
@@ -1172,7 +1195,7 @@ export class BaseTester<TConfig, TState = unknown> {
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate',
         );
@@ -1888,7 +1911,7 @@ export class BaseTester<TConfig, TState = unknown> {
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate',
         );

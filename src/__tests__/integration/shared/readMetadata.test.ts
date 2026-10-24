@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
@@ -112,11 +113,13 @@ describe('Shared - readMetadata', () => {
 
         const activeResult = await orThrow(
           client.getUtils().readObjectMetadata('class', className, undefined, {
+            analyse: analyseException,
             version: 'active',
           }),
         );
         const inactiveResult = await orThrow(
           client.getUtils().readObjectMetadata('class', className, undefined, {
+            analyse: analyseException,
             version: 'inactive',
           }),
         );
@@ -178,7 +181,11 @@ describe('Shared - readMetadata', () => {
         testsLogger.info?.('📖 Reading metadata...');
 
         const result = await orThrow(
-          client.getUtils().readObjectMetadata('domain', domainName),
+          client
+            .getUtils()
+            .readObjectMetadata('domain', domainName, undefined, {
+              analyse: analyseException,
+            }),
         );
 
         expect(result).toBeDefined();
@@ -226,7 +233,9 @@ describe('Shared - readMetadata', () => {
       try {
         logTestStep('read table metadata', testsLogger);
         const result = await orThrow(
-          client.getUtils().readObjectMetadata('table', tableName),
+          client.getUtils().readObjectMetadata('table', tableName, undefined, {
+            analyse: analyseException,
+          }),
         );
         expect(result).toBeDefined();
       } catch (error: any) {
@@ -258,6 +267,8 @@ describe('Shared - readMetadata', () => {
           .readObjectMetadata(
             'unsupported_type' as unknown as AdtObjectType,
             'TEST',
+            undefined,
+            { analyse: analyseException },
           ),
       ).rejects.toThrow('Unsupported object type for metadata');
     },

@@ -12,7 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -27,6 +30,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -136,7 +140,9 @@ describe('View (using AdtClient)', () => {
         ensureObjectReady: async (ddlName: string) => {
           if (!connection || !ddlName) return { success: true };
           const existing = presenceOf(
-            await client.getDdl().read({ ddlName }),
+            await client
+              .getDdl()
+              .read({ ddlName }, undefined, { analyse: analyseException }),
             `DDL source ${ddlName}`,
           );
           // "Could not find out" is not "absent": the create would meet it.
@@ -150,7 +156,7 @@ describe('View (using AdtClient)', () => {
               transportRequest: tester.getTransportRequest(),
             },
             {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(client.getDdl(), 'delete'),
             },
           );
@@ -228,7 +234,9 @@ describe('View (using AdtClient)', () => {
       // A refused read (absent object, no authorisation, server error) fails
       // with the reason; an empty body fails on the content below.
       const answer = expectResult(
-        await client.getDdl().read({ ddlName }, 'active'),
+        await client
+          .getDdl()
+          .read({ ddlName }, 'active', { analyse: analyseException }),
         `read table function ${ddlName}`,
       );
 

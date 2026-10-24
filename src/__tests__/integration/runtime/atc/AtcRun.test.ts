@@ -29,6 +29,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   atcRunStatus,
   atcStartedRun,
   atcSystemCheckVariant,
@@ -120,7 +121,10 @@ async function checkVariantFor(
     );
   }
   if (pinned) return pinned;
-  return expectResult(await atc.resolveCheckVariant(), 'check variant');
+  return expectResult(
+    await atc.resolveCheckVariant({ analyse: analyseException }),
+    'check variant',
+  );
 }
 const CASE = 'adt_atc_run';
 
@@ -210,14 +214,14 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         const atc = new AdtAtc(connection, libraryLogger, atcReading);
         const variant = await checkVariantFor(atc, testCase);
         const worklistId = expectResult(
-          await atc.createWorklist(variant),
+          await atc.createWorklist(variant, { analyse: analyseException }),
           'worklist',
         );
         const result = expectResult(
           await atc.startRun(
             worklistId,
             { objects: [{ objectType: 'class', objectName: className }] },
-            { wait: true },
+            { analyse: analyseException, wait: true },
           ),
           'ATC run',
         );
@@ -300,13 +304,17 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestStep(`start ATC run over class ${className}`, testsLogger);
         const variant = await checkVariantFor(atc, testCase);
         const worklistId = expectResult(
-          await atc.createWorklist(variant),
+          await atc.createWorklist(variant, { analyse: analyseException }),
           'worklist',
         );
         const started = expectResult(
-          await atc.startRun(worklistId, {
-            objects: [{ objectType: 'class', objectName: className }],
-          }),
+          await atc.startRun(
+            worklistId,
+            {
+              objects: [{ objectType: 'class', objectName: className }],
+            },
+            { analyse: analyseException },
+          ),
           'ATC run',
         );
 
@@ -320,13 +328,15 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestStep(`poll run ${started.runId} until it finishes`, testsLogger);
         const giveUpAt = Date.now() + deadlineMs;
         let status = expectResult(
-          await atc.getRunStatus(started.runId),
+          await atc.getRunStatus(started.runId, { analyse: analyseException }),
           'ATC run status',
         );
         while (!status.isFinished && Date.now() < giveUpAt) {
           await new Promise((resolve) => setTimeout(resolve, intervalMs));
           status = expectResult(
-            await atc.getRunStatus(started.runId),
+            await atc.getRunStatus(started.runId, {
+              analyse: analyseException,
+            }),
             'ATC run status',
           );
         }
@@ -336,7 +346,7 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
 
         logTestStep(`read worklist ${worklistId}`, testsLogger);
         const worklist = expectResult(
-          await atc.getFindings(worklistId),
+          await atc.getFindings(worklistId, { analyse: analyseException }),
           'ATC findings',
         );
         expect(typeof worklist).toBe('string');

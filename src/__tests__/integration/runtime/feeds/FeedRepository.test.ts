@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   feedDescriptors,
   feedEntries,
   feedGatewayErrorDetail,
@@ -117,7 +118,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list feed catalog', testsLogger);
-        const catalog = expectResult(await feeds.list(), 'feed catalog');
+        const catalog = expectResult(
+          await feeds.list({ analyse: analyseException }),
+          'feed catalog',
+        );
         expect(Array.isArray(catalog)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -163,7 +167,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         // No cast since `@mcp-abap-adt/interfaces@26.0.0` — `IFeedRepository`
         // declares the parameter, so the contract and the endpoint agree.
         const variants = expectResult(
-          await feeds.variants('dumps'),
+          await feeds.variants('dumps', { analyse: analyseException }),
           'feed variants',
         );
         expect(Array.isArray(variants)).toBe(true);
@@ -202,7 +206,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('get dumps via feed', testsLogger);
-        const entries = expectResult(await feeds.dumps(), 'dumps feed');
+        const entries = expectResult(
+          await feeds.dumps({ analyse: analyseException }),
+          'dumps feed',
+        );
         expect(Array.isArray(entries)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -244,7 +251,9 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       try {
         logTestStep('fetch feed by URL /sap/bc/adt/runtime/dumps', testsLogger);
         const entries = expectResult(
-          await feeds.byUrl('/sap/bc/adt/runtime/dumps'),
+          await feeds.byUrl('/sap/bc/adt/runtime/dumps', {
+            analyse: analyseException,
+          }),
           'feed by URL',
         );
         expect(Array.isArray(entries)).toBe(true);

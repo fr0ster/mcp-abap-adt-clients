@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -136,10 +137,13 @@ describe('FunctionInclude (using AdtClient)', () => {
           // The answer decides, not the absence of a throw — see
           // `presenceOf` for what that mistake cost.
           const presence = presenceOf(
-            await client.getFunctionInclude().readMetadata({
-              functionGroupName,
-              includeName,
-            }),
+            await client.getFunctionInclude().readMetadata(
+              {
+                functionGroupName,
+                includeName,
+              },
+              { analyse: analyseException },
+            ),
             `Function Include ${functionGroupName}/${includeName}`,
           );
           if (presence.present === 'unknown') {
@@ -285,7 +289,9 @@ describe('FunctionInclude (using AdtClient)', () => {
         );
         const answer = await client
           .getFunctionInclude()
-          .read({ functionGroupName, includeName });
+          .read({ functionGroupName, includeName }, undefined, {
+            analyse: analyseException,
+          });
 
         // No skip-on-absence branch any more. A shared dependency that is not
         // there is a broken environment — `npm run shared:setup` fixes it — and

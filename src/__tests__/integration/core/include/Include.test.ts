@@ -21,7 +21,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IIncludeConfig } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -33,6 +36,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateAll, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -137,7 +141,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
               const removed = await cleanupClient.getInclude().delete(
                 { includeName, transportRequest },
                 {
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(
                     cleanupClient.getInclude(),
                     'delete',
@@ -242,7 +246,10 @@ describe('Include (PROG/I, using AdtClient)', () => {
           const body = expectResult(
             await client
               .getInclude()
-              .readMetadata({ includeName: standard.name }),
+              .readMetadata(
+                { includeName: standard.name },
+                { analyse: analyseException },
+              ),
             'read include metadata',
           );
 

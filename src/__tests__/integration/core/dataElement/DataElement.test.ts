@@ -34,6 +34,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -319,7 +320,7 @@ describe('DataElement (using AdtClient)', () => {
               transportRequest: cleanupResolver.getTransportRequest(),
             },
             {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(client.getDomain(), 'delete'),
             },
           ),

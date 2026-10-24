@@ -10,6 +10,7 @@ import * as path from 'node:path';
 // The source path, not the package: this reading is new in adt-strategies and
 // the package's built entry point does not carry it until it is released.
 import {
+  analyseException,
   type IWhereUsedListResult,
   utilWhereUsedReferences,
 } from '@mcp-abap-adt/adt-strategies';
@@ -134,7 +135,10 @@ describe('Shared - getWhereUsed', () => {
               object_name: objectName,
               object_type: objectType,
             },
-            { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsedScope'),
+            },
           ),
         ),
         'where-used scope',
@@ -154,7 +158,10 @@ describe('Shared - getWhereUsed', () => {
               object_type: objectType,
               scopeXml: scopeXml,
             },
-            { headers: integrationHeadersOf(utils, 'getWhereUsed') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsed'),
+            },
           ),
         ),
         'where-used search',
@@ -213,7 +220,10 @@ describe('Shared - getWhereUsed', () => {
               object_name: objectName,
               object_type: objectType,
             },
-            { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsedScope'),
+            },
           ),
         ),
         'where-used scope',
@@ -256,7 +266,10 @@ describe('Shared - getWhereUsed', () => {
               object_type: objectType,
               scopeXml: modifiedScope,
             },
-            { headers: integrationHeadersOf(utils, 'getWhereUsed') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsed'),
+            },
           ),
         ),
         'where-used search',
@@ -311,6 +324,7 @@ describe('Shared - getWhereUsed', () => {
                 object_type: objectType,
               },
               {
+                analyse: analyseException,
                 headers: integrationHeadersOf(
                   new AdtUtils(connection, testsLogger),
                   'getWhereUsed',
@@ -383,6 +397,7 @@ describe('Shared - getWhereUsed', () => {
           object_type: 'class',
         },
         {
+          analyse: analyseException,
           headers: integrationHeadersOf(
             new AdtUtils(connection, testsLogger),
             'getWhereUsed',
@@ -410,6 +425,7 @@ describe('Shared - getWhereUsed', () => {
             object_type: '',
           },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(
               new AdtUtils(connection, testsLogger),
               'getWhereUsed',
@@ -465,7 +481,10 @@ describe('Shared - getWhereUsed', () => {
               object_name: objectName,
               object_type: objectType,
             },
-            { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsedScope'),
+            },
           ),
         )) ?? '',
       );
@@ -478,7 +497,10 @@ describe('Shared - getWhereUsed', () => {
               ? utils.modifyWhereUsedScope(scope, { enableAll: true })
               : scope,
           },
-          { headers: integrationHeadersOf(utils, 'getWhereUsed') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(utils, 'getWhereUsed'),
+          },
         ),
       );
       const result: IWhereUsedListResult = utilWhereUsedReferences({
@@ -562,7 +584,10 @@ describe('Shared - getWhereUsed', () => {
             object_name: objectName,
             object_type: objectType,
           },
-          { headers: integrationHeadersOf(utils, 'getWhereUsed') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(utils, 'getWhereUsed'),
+          },
         ),
         'where-used document',
       );
@@ -618,7 +643,10 @@ describe('Shared - getWhereUsed', () => {
                 object_name: objectName,
                 object_type: objectType,
               },
-              { headers: integrationHeadersOf(utils, 'getWhereUsedScope') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(utils, 'getWhereUsedScope'),
+              },
             ),
           )) ?? '',
         );
@@ -633,7 +661,10 @@ describe('Shared - getWhereUsed', () => {
               object_type: objectType,
               ...(scopeXml ? { scopeXml } : {}),
             },
-            { headers: integrationHeadersOf(utils, 'getWhereUsed') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsed'),
+            },
           ),
         );
         return utilWhereUsedReferences({ data: String(document) } as never);

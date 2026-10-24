@@ -21,6 +21,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   atcSystemCheckVariant,
   atcWaitingRun,
   atcWorklistId,
@@ -150,7 +151,10 @@ describe('ATC over programs and every kind of include', () => {
         const pinned = String(testCase.params.check_variant ?? '').trim();
         const variant =
           pinned ||
-          expectResult(await atc.resolveCheckVariant(), 'check variant');
+          expectResult(
+            await atc.resolveCheckVariant({ analyse: analyseException }),
+            'check variant',
+          );
 
         for (const c of cases) {
           logTestStep(
@@ -158,20 +162,23 @@ describe('ATC over programs and every kind of include', () => {
             testsLogger,
           );
           const worklistId = expectResult(
-            await atc.createWorklist(variant),
+            await atc.createWorklist(variant, { analyse: analyseException }),
             'worklist',
           );
           const run = expectResult(
             await atc.startRun(
               worklistId,
               { objects: [c.ref] },
-              { wait: true },
+              { analyse: analyseException, wait: true },
             ),
             'ATC run',
           );
           expect(run.waited).toBe(true);
           const worklist = String(
-            expectResult(await atc.getFindings(worklistId), 'worklist read'),
+            expectResult(
+              await atc.getFindings(worklistId, { analyse: analyseException }),
+              'worklist read',
+            ),
           );
           expect(listedObjects(worklist)).toContain(
             `${c.ownerType} ${c.ownerName}`,

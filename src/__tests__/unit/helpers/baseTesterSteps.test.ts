@@ -306,27 +306,40 @@ describe('BaseTester flowTest reads what it is answered beside the steps', () =>
 });
 
 describe('BaseTester asks the library to judge what answers inside a 200', () => {
-  const {
-    analyseActivation,
-    analyseDeletion,
-    analyseValidation,
-  } = require('@mcp-abap-adt/adt-strategies');
-
-  it('passes analyseValidation, analyseActivation and analyseDeletion', async () => {
+  it('passes judges that refuse their own refusal form and an exception document', async () => {
+    const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
     const handler = fakeHandler();
     await testerOver(handler).flowTest(config, {}, { updateConfig });
-    expect(handler.validate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ analyse: analyseValidation }),
-    );
-    expect(handler.activate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ analyse: analyseActivation }),
-    );
-    expect(handler.delete).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ analyse: analyseDeletion }),
-    );
+    const judgeOf = (member: jest.Mock) =>
+      (member.mock.calls[0] as unknown[])[1] as {
+        analyse: (v: unknown, w: unknown) => unknown;
+      };
+    const refuses = (member: jest.Mock, data: string) =>
+      judgeOf(member).analyse(ADT_NO_FAILURE, { status: 200, data }) !==
+      ADT_NO_FAILURE;
+    const EXC =
+      '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceNoAccess"/><message lang="EN">No authorization</message></exc:exception>';
+    for (const member of [handler.validate, handler.activate, handler.delete]) {
+      expect(refuses(member, EXC)).toBe(true);
+    }
+    expect(
+      refuses(
+        handler.validate,
+        '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><SEVERITY>ERROR</SEVERITY><SHORT_TEXT>taken</SHORT_TEXT></DATA></asx:values></asx:abap>',
+      ),
+    ).toBe(true);
+    expect(
+      refuses(
+        handler.activate,
+        '<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/><msg type="W" objDescr="Class ZX"><shortText><txt>Object is locked in another session</txt></shortText></msg></chkl:messages>',
+      ),
+    ).toBe(true);
+    expect(
+      refuses(
+        handler.delete,
+        '<del:deletionResult xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object del:isDeleted="false" adtcore:name="ZX"><del:message del:type="E"><del:text>no</del:text></del:message></del:object></del:deletionResult>',
+      ),
+    ).toBe(true);
   });
 
   it('fails on a validation 200 carrying the SEVERITY ERROR envelope', async () => {

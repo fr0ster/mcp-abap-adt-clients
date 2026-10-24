@@ -8,7 +8,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -20,6 +23,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
 import { expectResult, failureOf, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -130,7 +134,9 @@ describe('BehaviorImplementation (using AdtClient)', () => {
         ensureObjectReady: async (className: string) => {
           if (!connection || !className) return { success: true };
           const existing = presenceOf(
-            await client.getBehaviorImplementation().read({ className }),
+            await client
+              .getBehaviorImplementation()
+              .read({ className }, undefined, { analyse: analyseException }),
             `behavior implementation ${className}`,
           );
           // "Could not find out" is not "absent": the create would meet it.
@@ -144,7 +150,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
               transportRequest: tester.getTransportRequest(),
             },
             {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(
                 client.getBehaviorImplementation(),
                 'delete',
@@ -250,7 +256,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
             const bimpl = client.getClass();
             const target = { className: config.className };
             const locked = expectResult(
-              await bimpl.lock(target),
+              await bimpl.lock(target, { analyse: analyseException }),
               'lock for the generated shell',
             );
             await releasing(
@@ -270,6 +276,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
                       transportRequest: config.transportRequest,
                     },
                     {
+                      analyse: analyseException,
                       headers: integrationHeadersOf(bimpl, 'update'),
                       lockHandle: locked,
                       source: mainSourceFor(
@@ -280,7 +287,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
                   ),
                   'write the generated shell',
                 ),
-              () => bimpl.unlock(target, locked),
+              () => bimpl.unlock(target, locked, { analyse: analyseException }),
               'unlock after the generated shell',
             );
             await expectLockReleased(

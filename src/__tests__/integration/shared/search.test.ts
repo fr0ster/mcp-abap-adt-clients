@@ -10,6 +10,7 @@ import * as path from 'node:path';
 // The source path, not the package: these readings are new in adt-strategies
 // and the package's built entry point does not carry them until it is released.
 import {
+  analyseException,
   type ISearchResult,
   utilSearchHits,
 } from '@mcp-abap-adt/adt-strategies';
@@ -86,7 +87,10 @@ describe('Shared - searchObjects', () => {
       // never asserted, so it found nothing for as long as it existed.
       const hits = expectResult(
         await withAcceptHandling(
-          hitsUtils().search({ query: 'CL_ABAP*', maxResults: 10 }),
+          hitsUtils().search(
+            { query: 'CL_ABAP*', maxResults: 10 },
+            { analyse: analyseException },
+          ),
         ),
         'search CL_ABAP*',
       ) as ISearchResult[];
@@ -113,11 +117,14 @@ describe('Shared - searchObjects', () => {
 
       const hits = expectResult(
         await withAcceptHandling(
-          hitsUtils().search({
-            query: 'T*',
-            objectType: 'TABL',
-            maxResults: 10,
-          }),
+          hitsUtils().search(
+            {
+              query: 'T*',
+              objectType: 'TABL',
+              maxResults: 10,
+            },
+            { analyse: analyseException },
+          ),
         ),
         'search tables',
       ) as ISearchResult[];
@@ -141,7 +148,12 @@ describe('Shared - searchObjects', () => {
     async () => {
       logTestStep('search objects with default maxResults', testsLogger);
       const hits = expectResult(
-        await withAcceptHandling(hitsUtils().search({ query: 'CL_ABAP*' })),
+        await withAcceptHandling(
+          hitsUtils().search(
+            { query: 'CL_ABAP*' },
+            { analyse: analyseException },
+          ),
+        ),
         'search without maxResults',
       ) as ISearchResult[];
 

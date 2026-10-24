@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -128,10 +129,13 @@ describe('FunctionModule (using AdtClient)', () => {
           // to "it exists" every time and this flow refused to run against a
           // system that was in exactly the state it wanted.
           const presence = presenceOf(
-            await client.getFunctionModule().readMetadata({
-              functionGroupName,
-              functionModuleName,
-            }),
+            await client.getFunctionModule().readMetadata(
+              {
+                functionGroupName,
+                functionModuleName,
+              },
+              { analyse: analyseException },
+            ),
             `FM ${functionGroupName}/${functionModuleName}`,
           );
           if (presence.present === 'unknown') {

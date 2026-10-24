@@ -28,7 +28,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 // The source path, not the package: these readings are new in adt-strategies
 // and the package's built entry point does not carry them until it is released.
-import { utilSearchHits } from '@mcp-abap-adt/adt-strategies';
+import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -96,7 +96,7 @@ describe('Response contract - 17.0.0', () => {
         // The hits are a reading the caller asks for; the default is the document.
         const answer = await client
           .getUtils({ ...utilDocuments, search: utilSearchHits })
-          .search({ query: 'CL_ABAP*' });
+          .search({ query: 'CL_ABAP*' }, { analyse: analyseException });
 
         expect(answer.ok).toBe(true);
         if (!answer.ok) {
@@ -119,7 +119,9 @@ describe('Response contract - 17.0.0', () => {
     gateOn(() => true)(
       'has no error on the successful half',
       async () => {
-        const answer = await client.getUtils().getAllTypes(50);
+        const answer = await client
+          .getUtils()
+          .getAllTypes(50, undefined, undefined, { analyse: analyseException });
 
         expect(answer.ok).toBe(true);
         if (!answer.ok) {
@@ -143,7 +145,9 @@ describe('Response contract - 17.0.0', () => {
 
         const answer = await client
           .getUtils()
-          .readObjectMetadata('class', NEVER_EXISTS);
+          .readObjectMetadata('class', NEVER_EXISTS, undefined, {
+            analyse: analyseException,
+          });
 
         // Before 17.0.0 this same call could answer 200 with an exception document
         // and be stored as a result. If this assertion fails, that is still what
@@ -180,7 +184,9 @@ describe('Response contract - 17.0.0', () => {
       async () => {
         const answer = await client
           .getUtils()
-          .readObjectSource('class', NEVER_EXISTS);
+          .readObjectSource('class', NEVER_EXISTS, undefined, undefined, {
+            analyse: analyseException,
+          });
 
         expect(answer.ok).toBe(false);
         if (answer.ok) throw new Error('expected a refusal');
@@ -214,6 +220,7 @@ describe('Response contract - 17.0.0', () => {
         const answer = await client
           .getUtils()
           .fetchNodeStructure('DEVC/K', NEVER_EXISTS, {
+            analyse: analyseException,
             headers: integrationHeadersOf(
               client.getUtils(),
               'fetchNodeStructure',
@@ -257,7 +264,9 @@ describe('Response contract - 17.0.0', () => {
 
         const answer = await client
           .getClass()
-          .read({ className: NEVER_EXISTS });
+          .read({ className: NEVER_EXISTS }, undefined, {
+            analyse: analyseException,
+          });
 
         // **Two shapes, both honest, and which one you get is the system's.**
         // Some systems answer a read for an object that is not there with 200 and
@@ -299,12 +308,13 @@ describe('Response contract - 17.0.0', () => {
         // called it a failure. It no longer reads bodies at all, so the exchange
         // arrives as a success carrying the checklist, and whether the checklist
         // means "not activated" is the caller's to decide.
-        const unjudged = await client
-          .getClass()
-          .activate(
-            { className: NEVER_EXISTS },
-            { headers: integrationHeadersOf(client.getClass(), 'activate') },
-          );
+        const unjudged = await client.getClass().activate(
+          { className: NEVER_EXISTS },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(client.getClass(), 'activate'),
+          },
+        );
 
         expect(unjudged.ok).toBe(true);
         if (!unjudged.ok) throw new Error('expected the answer, not a verdict');

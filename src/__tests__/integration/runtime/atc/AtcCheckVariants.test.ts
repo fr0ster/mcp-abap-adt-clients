@@ -12,7 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { atcSystemCheckVariant } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  atcSystemCheckVariant,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -80,7 +83,12 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
     'lists every variant for *, the stated count being the count returned',
     async () => {
       const { names, total } = namesOf(
-        String(expectResult(await atc.listCheckVariants('*'), 'variants')),
+        String(
+          expectResult(
+            await atc.listCheckVariants('*', { analyse: analyseException }),
+            'variants',
+          ),
+        ),
       );
       logTestStep(`${names.length} check variants`, testsLogger);
       expect(names.length).toBeGreaterThan(0);
@@ -92,19 +100,29 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
   variantsCase(
     'finds the system variant by its name, in any case, and not by a prefix',
     async () => {
-      const system = expectResult(await atc.resolveCheckVariant(), 'variant');
+      const system = expectResult(
+        await atc.resolveCheckVariant({ analyse: analyseException }),
+        'variant',
+      );
       if (!system) {
         throw new Error('the system names no default check variant');
       }
       const exact = namesOf(
-        String(expectResult(await atc.listCheckVariants(system), 'exact')),
+        String(
+          expectResult(
+            await atc.listCheckVariants(system, { analyse: analyseException }),
+            'exact',
+          ),
+        ),
       ).names;
       expect(exact).toEqual([system]);
 
       const lower = namesOf(
         String(
           expectResult(
-            await atc.listCheckVariants(system.toLowerCase()),
+            await atc.listCheckVariants(system.toLowerCase(), {
+              analyse: analyseException,
+            }),
             'lower case',
           ),
         ),
@@ -113,7 +131,12 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
 
       const prefix = system.slice(0, 3);
       const byPrefix = namesOf(
-        String(expectResult(await atc.listCheckVariants(prefix), 'prefix')),
+        String(
+          expectResult(
+            await atc.listCheckVariants(prefix, { analyse: analyseException }),
+            'prefix',
+          ),
+        ),
       ).names;
       expect(byPrefix).not.toContain(system);
     },
@@ -125,7 +148,10 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
     const limited = namesOf(
       String(
         expectResult(
-          await atc.listCheckVariants('*', { maxItemCount: 3 }),
+          await atc.listCheckVariants('*', {
+            analyse: analyseException,
+            maxItemCount: 3,
+          }),
           'limited',
         ),
       ),

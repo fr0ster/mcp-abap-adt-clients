@@ -17,7 +17,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -34,6 +37,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
 import { expectResult, failureOf, saysAbsent } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -167,7 +171,12 @@ describe('MessageClass (using AdtClient)', () => {
           // so it leaves no lingering enqueue.)
           if (!connection) return { success: true };
           const read = () =>
-            client.getMessageClass().readMetadata({ name: msgClassName });
+            client
+              .getMessageClass()
+              .readMetadata(
+                { name: msgClassName },
+                { analyse: analyseException },
+              );
           // The answer decides — see `presenceOf`; "could not find out" is
           // not "absent".
           const existing = presenceOf(
@@ -184,7 +193,7 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: resolvedTransport,
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   client.getMessageClass(),
                   'delete',
@@ -212,7 +221,7 @@ describe('MessageClass (using AdtClient)', () => {
             await client
               .getMessageClass()
               .delete(config as Partial<IMessageClassConfig>, {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   client.getMessageClass(),
                   'delete',
@@ -262,6 +271,7 @@ describe('MessageClass (using AdtClient)', () => {
           logTestStep('create message class', testsLogger);
           const createState = expectResult(
             await mcHandler.create(config, {
+              analyse: analyseException,
               headers: integrationHeadersOf(mcHandler, 'create'),
             }),
             'createState',
@@ -282,7 +292,10 @@ describe('MessageClass (using AdtClient)', () => {
             // A later successful read never erases an earlier refusal.
             let readState = String(
               expectResult(
-                await mcHandler.readMetadata({ name: msgClassName }),
+                await mcHandler.readMetadata(
+                  { name: msgClassName },
+                  { analyse: analyseException },
+                ),
                 'readState',
               ) ?? '',
             );
@@ -293,7 +306,10 @@ describe('MessageClass (using AdtClient)', () => {
               // yet — is polled again.
               readState = String(
                 expectResult(
-                  await mcHandler.readMetadata({ name: msgClassName }),
+                  await mcHandler.readMetadata(
+                    { name: msgClassName },
+                    { analyse: analyseException },
+                  ),
                   `poll message class ${msgClassName}`,
                 ) ?? '',
               );
@@ -322,17 +338,24 @@ describe('MessageClass (using AdtClient)', () => {
                 msgtext: msgTextInitial,
                 transportRequest: config.transportRequest,
               },
-              { headers: integrationHeadersOf(msgHandler, 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(msgHandler, 'create'),
+              },
             );
           expectResult(await createMessage(), `create message ${msgNo}`);
 
           // ── Step 4: Read message ───────────────────────────────────────────
           logTestStep(`read message ${msgNo}`, testsLogger);
           const msgReadState = expectResult(
-            await msgHandler.read({
-              className: msgClassName,
-              msgno: msgNo,
-            }),
+            await msgHandler.read(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+              },
+              undefined,
+              { analyse: analyseException },
+            ),
             'msgReadState',
           );
           // A message is read through its class's document — there is no
@@ -352,7 +375,10 @@ describe('MessageClass (using AdtClient)', () => {
                 msgtext: msgTextUpdated,
                 transportRequest: config.transportRequest,
               },
-              { headers: integrationHeadersOf(msgHandler, 'update') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(msgHandler, 'update'),
+              },
             ),
             'msgUpdateState',
           );
@@ -360,10 +386,14 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 6: Read-back to verify update ────────────────────────────
           logTestStep(`read-back message ${msgNo} after update`, testsLogger);
           const msgReadAfterUpdate = expectResult(
-            await msgHandler.read({
-              className: msgClassName,
-              msgno: msgNo,
-            }),
+            await msgHandler.read(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+              },
+              undefined,
+              { analyse: analyseException },
+            ),
             'msgReadAfterUpdate',
           );
           const updatedMessage = parseMessageClass(
@@ -386,7 +416,7 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: config.transportRequest,
               },
               {
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   msgHandler as unknown as AdtMessageClassMessage,
                   'delete',
@@ -399,9 +429,12 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 8: Verify message is gone from class ──────────────────────
           logTestStep('verify message removal', testsLogger);
           const readAfterMsgDelete = expectResult(
-            await mcHandler.readMetadata({
-              name: msgClassName,
-            }),
+            await mcHandler.readMetadata(
+              {
+                name: msgClassName,
+              },
+              { analyse: analyseException },
+            ),
             'readAfterMsgDelete',
           );
           const remaining = parseMessageClass(
@@ -430,13 +463,17 @@ describe('MessageClass (using AdtClient)', () => {
           const removed = await mcHandler.delete(
             config as Partial<IMessageClassConfig>,
             {
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(mcHandler, 'delete'),
             },
           );
           leftover = removed.ok
             ? await untilMessageClassGone(
-                () => mcHandler.readMetadata({ name: msgClassName }),
+                () =>
+                  mcHandler.readMetadata(
+                    { name: msgClassName },
+                    { analyse: analyseException },
+                  ),
                 msgClassName,
               )
             : saysAbsent(removed.getError())

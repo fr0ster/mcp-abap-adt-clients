@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -103,7 +104,9 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
       try {
         logTestStep('list gateway error log entries', testsLogger);
         const response = expectResult(
-          await runtime.getGatewayErrorLog().list(),
+          await runtime
+            .getGatewayErrorLog()
+            .list({ analyse: analyseException }),
           'response',
         );
         expect(response).toBeDefined();
@@ -155,7 +158,9 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
           testsLogger,
         );
         const response = expectResult(
-          await runtime.getGatewayErrorLog().list({ maxResults: 10 }),
+          await runtime
+            .getGatewayErrorLog()
+            .list({ analyse: analyseException, maxResults: 10 }),
           'response',
         );
         expect(response).toBeDefined();

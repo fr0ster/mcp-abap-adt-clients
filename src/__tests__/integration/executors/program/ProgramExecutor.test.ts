@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -184,7 +185,9 @@ describe('ProgramExecutor (integration)', () => {
     const leftovers: string[] = [];
     for (const traceId of tracesCreated) {
       try {
-        const answer = await profiler.delete(traceId);
+        const answer = await profiler.delete(traceId, {
+          analyse: analyseException,
+        });
         if (!answer.ok) {
           leftovers.push(`${traceId}: ${answer.getError().message}`);
         }
@@ -241,7 +244,10 @@ describe('ProgramExecutor (integration)', () => {
         const programName = sharedRunnableProgram(testCase);
         logTestStep('run', testsLogger);
         const response = expectResult(
-          await programRunner.run({ programName }),
+          await programRunner.run(
+            { programName },
+            { analyse: analyseException },
+          ),
           'response',
         );
 
@@ -308,6 +314,7 @@ describe('ProgramExecutor (integration)', () => {
         const programExecutor = programRunner;
         const profilerId = expectResult(
           await programExecutor.scheduleTrace({
+            analyse: analyseException,
             ...profilerParameters,
             headers: integrationHeadersOf(programExecutor, 'scheduleTrace'),
           }),
@@ -317,7 +324,7 @@ describe('ProgramExecutor (integration)', () => {
           run: expectResult(
             await programExecutor.runWithProfiler(
               { programName },
-              { profilerId },
+              { analyse: analyseException, profilerId },
             ),
             'result',
           ),
@@ -366,17 +373,22 @@ describe('ProgramExecutor (integration)', () => {
 
         logTestStep('read all three views', testsLogger);
         const hitlist = expectResult(
-          await profiler.read(traceId, 'hitlist', { withSystemEvents: false }),
+          await profiler.read(traceId, 'hitlist', {
+            analyse: analyseException,
+            withSystemEvents: false,
+          }),
           'read hitlist',
         );
         const statements = expectResult(
           await profiler.read(traceId, 'statements', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'read statements',
         );
         const dbAccesses = expectResult(
           await profiler.read(traceId, 'dbAccesses', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'read dbAccesses',

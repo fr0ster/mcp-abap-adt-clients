@@ -6,6 +6,7 @@
  */
 
 import {
+  analyseException,
   type IRepositoryNodeContents,
   utilNodeContents,
 } from '@mcp-abap-adt/adt-strategies';
@@ -108,6 +109,7 @@ class NodeStructureObject implements TestableObject<INodeStructureParams> {
     return this.client
       .getUtils({ ...utilDocuments, node: utilNodeContents })
       .fetchNodeStructure(config.parent_type, config.parent_name, {
+        analyse: analyseException,
         headers: integrationHeadersOf(
           this.client.getUtils({ ...utilDocuments, node: utilNodeContents }),
           'fetchNodeStructure',

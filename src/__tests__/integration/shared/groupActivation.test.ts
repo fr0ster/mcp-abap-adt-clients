@@ -16,6 +16,7 @@ import * as path from 'node:path';
 // the package's built entry point does not carry it until it is released.
 import {
   analyseDeletion,
+  analyseException,
   analyseValidation,
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
@@ -38,6 +39,7 @@ import {
 } from '../../helpers/caseGate';
 import { CleanupSteps } from '../../helpers/cleanupSteps';
 import { expectResult, releasing } from '../../helpers/contract';
+import { judged } from '../../helpers/judged';
 import { expectLockReleased } from '../../helpers/lockReleased';
 import { expectRemovedOrAbsent } from '../../helpers/objectPresence';
 import {
@@ -207,7 +209,7 @@ describe('Group Activation (Shared)', () => {
               { structureName: structureName!, transportRequest },
               {
                 headers: integrationHeadersOf(client.getStructure(), 'delete'),
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
               },
             ),
           { checkAnswer: true },
@@ -227,7 +229,7 @@ describe('Group Activation (Shared)', () => {
                   client.getDataElement(),
                   'delete',
                 ),
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
               },
             ),
           { checkAnswer: true },
@@ -244,7 +246,7 @@ describe('Group Activation (Shared)', () => {
               { domainName: domainName!, transportRequest },
               {
                 headers: integrationHeadersOf(client.getDomain(), 'delete'),
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
               },
             ),
           { checkAnswer: true },
@@ -303,7 +305,7 @@ describe('Group Activation (Shared)', () => {
                     client.getStructure(),
                     'delete',
                   ),
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                 },
               ),
           ],
@@ -317,7 +319,7 @@ describe('Group Activation (Shared)', () => {
                     client.getDataElement(),
                     'delete',
                   ),
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                 },
               ),
           ],
@@ -328,7 +330,7 @@ describe('Group Activation (Shared)', () => {
                 { domainName: domainName!, transportRequest },
                 {
                   headers: integrationHeadersOf(client.getDomain(), 'delete'),
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                 },
               ),
           ],
@@ -392,7 +394,7 @@ describe('Group Activation (Shared)', () => {
                   testCase.params.description ||
                   `Test domain for group activation`,
               },
-              { analyse: analyseValidation },
+              { analyse: judged(analyseValidation) },
             ),
             'Domain',
             domainName,
@@ -416,7 +418,10 @@ describe('Group Activation (Shared)', () => {
                     `Test domain for group activation`,
                   transportRequest: transportRequest,
                 },
-                { headers: integrationHeadersOf(client.getDomain(), 'create') },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(client.getDomain(), 'create'),
+                },
               ),
               'create domain',
             );
@@ -437,7 +442,7 @@ describe('Group Activation (Shared)', () => {
                     testCase.params.description ||
                     `Test data element for group activation`,
                 },
-                { analyse: analyseValidation },
+                { analyse: judged(analyseValidation) },
               ),
               'Data element',
               dataElementName,
@@ -464,6 +469,7 @@ describe('Group Activation (Shared)', () => {
                   transportRequest: transportRequest,
                 },
                 {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(
                     client.getDataElement(),
                     'create',
@@ -488,7 +494,7 @@ describe('Group Activation (Shared)', () => {
                     testCase.params.description ||
                     `Test structure for group activation`,
                 },
-                { analyse: analyseValidation },
+                { analyse: judged(analyseValidation) },
               ),
               'Structure',
               structureName,
@@ -518,6 +524,7 @@ define structure ${structureName} {
                 transportRequest: transportRequest,
               },
               {
+                analyse: analyseException,
                 headers: integrationHeadersOf(client.getStructure(), 'create'),
               },
             ),
@@ -535,7 +542,10 @@ define structure ${structureName} {
           // Narrowed once here: the closures below do not keep the narrowing.
           const updatedStructure: string = structureName;
           const structureLockHandle = expectResult(
-            await structureHandler.lock({ structureName }),
+            await structureHandler.lock(
+              { structureName },
+              { analyse: analyseException },
+            ),
             'lock structure',
           );
           await releasing(
@@ -548,6 +558,7 @@ define structure ${structureName} {
                     transportRequest: transportRequest,
                   },
                   {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(structureHandler, 'update'),
                     lockHandle: structureLockHandle,
                   },
@@ -558,6 +569,7 @@ define structure ${structureName} {
               structureHandler.unlock(
                 { structureName: updatedStructure },
                 structureLockHandle,
+                { analyse: analyseException },
               ),
             'unlock structure',
           );
@@ -594,6 +606,7 @@ define structure ${structureName} {
           });
           const runId = expectResult(
             await utils.activateObjectsGroup(objectsToActivate, false, {
+              analyse: analyseException,
               headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
             }),
             'activation run id',
@@ -607,7 +620,10 @@ define structure ${structureName} {
           const runDeadline = Date.now() + 120_000;
           while (runStatus !== 'finished' && Date.now() < runDeadline) {
             const run = expectResult(
-              await utils.getActivationRun(runId, { withLongPolling: true }),
+              await utils.getActivationRun(runId, {
+                analyse: analyseException,
+                withLongPolling: true,
+              }),
               'activation run status',
             );
             runStatus = activationStatusIn(String(run));
@@ -618,7 +634,9 @@ define structure ${structureName} {
           expect(runStatus).toBe('finished');
 
           const results = expectResult(
-            await utils.getActivationResults(runId),
+            await utils.getActivationResults(runId, {
+              analyse: analyseException,
+            }),
             'activation results',
           );
           // A finished run is not an activation that happened: the results
