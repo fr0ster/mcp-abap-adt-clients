@@ -42,7 +42,7 @@ npm test -- e2e 2>&1 | tee test-run.log            # End-to-end tests (excluded 
 npm run shared:setup 2>&1 | tee shared-setup.log   # Create shared dependencies
 DEBUG_TESTS=true npm test -- integration/class 2>&1 | tee test-run.log   # With connection debug logs
 DEBUG_ADT_TESTS=true npm test -- integration/view 2>&1 | tee test-run.log # With ADT operation logs
-VERIFY_LOCK_RELEASED=false npm test 2>&1 | tee test-run.log   # Skip the second-session proof that each UNLOCK released its lock (on by default; one extra logon per check)
+# The second-session proof that each UNLOCK released its lock is the overlay's `environment.verify_lock_released` (required; true on premise, false on cloud, where a second session may land on another application server)
 
 # Ask SAP directly: one request to several systems, every answer printed whole
 # (status, headers, body). Targets are session files under ~/.config/mcp-abap-adt/sessions/;
