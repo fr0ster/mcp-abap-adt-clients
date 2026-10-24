@@ -1,51 +1,48 @@
-# Goal: the client a consumer receives is a contract
+# Goal: a contract lives where it is accepted
 
 ## Goal
 
-`createAdtClient()` answers a contract, `IAdtClient`, instead of the concrete `AdtClient`
-class. A consumer types its code against `IAdtClient`, can pass its own implementation
-wherever the library's client is taken, and the compiler checks that `AdtClient` and
-`AdtClientLegacy` each satisfy it.
+Every contract lives in the package that accepts it as a parameter. The consumer decides where
+that contract's implementation comes from: the library's, or its own.
 
-`IAdtClient` names the whole surface a consumer reaches through the client:
+For the ADT client this means two things.
 
-- every factory (`getClass()`, `getProgram()`, … — 35 today), each declared once: one generic
-  signature whose result set is optional, so a call without one answers over the result-set
-  contract and a call with one answers over the set passed;
-- the client-level members: `unlockAll()`, `pendingLocks` and `[Symbol.asyncDispose]()`.
+- **adt-clients accepts result sets.** `getClass(results)` and its 34 siblings take a result set,
+  so the result-set contracts (`IClassResults` and its siblings, slots of `IResultStrategy`) are
+  contracts. They move to `@mcp-abap-adt/interfaces-adt`, the package of the contracts adt-clients
+  accepts, beside the atoms and the config types already there. A consumer passes the library's
+  result sets (`classDocuments`, …) or its own. adt-clients keeps the values; they are
+  implementations of the contracts.
+- **The consumer accepts the client.** mcp-abap-adt takes a client and calls part of it, so it
+  defines the client contract it needs. That contract is composed from the atoms
+  (`IAdtCreatable`, `IAdtReadable`, `IAdtLockable`, …) and names only what the server calls. The
+  server's code is typed against it, and the server decides where the implementation comes from:
+  adt-clients' `createAdtClient()`, or its own. The compiler checks, at the consumer, that the
+  implementation it takes satisfies its contract.
 
-What a factory answers is written in `IAdtClient` itself, as the atoms it offers
-(`IAdtCreatable`, `IAdtReadable`, `IAdtLockable`, …). There is no named composition per object,
-in interfaces-adt or in adt-clients: a consumer that wants a name for what it holds composes it
-from the atoms itself. The compositions declared in `src/clients/AdtClient.ts` today
-(`IClassContract<R>` and its siblings) are removed, and `AdtClient` takes its factories' types
-from `IAdtClient`, so what a factory answers is defined in one place.
-
-Only contracts move to `@mcp-abap-adt/interfaces-adt`: `IAdtClient` and every result-set contract
-(`IClassResults` and its siblings, which are slots of `IResultStrategy`). Nothing concrete moves:
-the default result sets (`classDocuments` and its siblings) and the types they carry stay in
-adt-clients. This finishes the move of the contracts out of the implementation that was left
-undone.
+adt-clients declares no composition of its own. The named compositions in
+`src/clients/AdtClient.ts` (`IClassContract<R>` and its 34 siblings) are removed, and each factory
+answers its own class (`AdtClass<R>`, …). What a factory offers is the class's members, read by
+the compiler wherever a consumer's contract asks for them.
 
 ## Invariants
 
-- **No behaviour changes.** Every member sends the requests it sends today and answers what
-  it answers today. Only types move or are added.
-- **Contracts only, no concrete types.** What goes to `@mcp-abap-adt/interfaces-adt` is contracts:
-  no implementation, no result-set value and no type that mirrors one (a default result set's
-  shape stays with its value in adt-clients).
-- **The contract package never depends on adt-clients.** The dependency runs one way: adt-clients
-  implements what interfaces-adt declares.
-- **What a factory answers is written once**, in `IAdtClient`. There is no second copy, in a
-  named composition or in the class, that could disagree.
-- **The legacy client implements the same contract.** `AdtClientLegacy` answers refusals through
-  the same `IAdtClient` (decision 11). It is not a separate contract.
-- **A consumer composes its own result sets through the contract** exactly as it does through
-  the class today: same generics, same inference. Through `IAdtClient` without a result set, a
-  consumer gets the contract's slots as `unknown`; to get a typed answer it passes a result set,
-  which is the consumer's choice anyway.
-- **Dependencies come from the registry.** Each package depends on a published version: the
-  contract package first, then adt-clients, then its consumers (mcp-abap-adt), in that order.
-- **Breaking where the types break, nowhere else.** Answering a contract instead of the class
-  is a major for adt-clients and for every consumer that typed against the class. The contract
-  package takes a minor.
+- **No behaviour changes.** Every member sends the requests it sends today and answers what it
+  answers today. Only types move, go or are added.
+- **Contracts only in the contract package.** What moves to `@mcp-abap-adt/interfaces-adt` is
+  contracts: no implementation, no result-set value and no type that mirrors one. A default
+  result set and its shape stay with their value in adt-clients.
+- **The dependency runs one way.** The contract package never depends on adt-clients, and
+  adt-clients never depends on a consumer.
+- **Nothing is written twice.** No composition is declared by the library beside the one a
+  consumer composes for itself.
+- **The legacy client stays a subclass** that answers refusals through the same members
+  (decision 11). A consumer's contract is satisfied by it or by `AdtClient`, as the compiler
+  checks.
+- **A consumer composes its own result sets** exactly as it does today, with the same generics and
+  the same inference.
+- **Dependencies come from the registry**, in order: interfaces-adt is published first, then
+  adt-clients, then mcp-abap-adt.
+- **Breaking where the types break, nowhere else.** For adt-clients, removing the compositions and
+  the local result-set contracts is a major. For mcp-abap-adt, typing against its own contract is
+  a major. For interfaces-adt, adding the result-set contracts is a minor.
