@@ -164,7 +164,16 @@ import {
   TABLE_TYPE,
   TRANSFORMATION,
 } from '../endpoints/objects';
-import { AdtClient } from './AdtClient';
+import {
+  AdtClient,
+  type IAppendStructureContract,
+  type IFunctionIncludeContract,
+  type IIncludeContract,
+  type IMessageClassContract,
+  type IScalarFunctionContract,
+  type IScalarFunctionImplementationContract,
+  type ITransformationContract,
+} from './AdtClient';
 import { absentOnLegacy } from './absentOnLegacy';
 
 export class AdtClientLegacy extends AdtClient {
@@ -185,6 +194,7 @@ export class AdtClientLegacy extends AdtClient {
   override getProgram<R extends IProgramResults = typeof programDocuments>(
     results: R = programDocuments as unknown as R,
   ): AdtProgramLegacy<R> {
+    this.assertConnected();
     return new AdtProgramLegacy<R>(
       this.connection,
       this.logger,
@@ -198,6 +208,7 @@ export class AdtClientLegacy extends AdtClient {
   override getClass<R extends IClassResults = typeof classDocuments>(
     results: R = classDocuments as unknown as R,
   ): AdtClassLegacy<R> {
+    this.assertConnected();
     return new AdtClassLegacy<R>(
       this.connection,
       this.logger,
@@ -208,11 +219,20 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getFunctionInclude(): IFunctionIncludeContract<
+    typeof functionIncludeDocuments
+  >;
+  override getFunctionInclude<R extends IFunctionIncludeResults>(
+    results: R,
+  ): IFunctionIncludeContract<R>;
   override getFunctionInclude<
     R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
   >(
     results: R = functionIncludeDocuments as unknown as R,
   ): AdtFunctionIncludeLegacy<R> {
+    this.assertConnected();
     return new AdtFunctionIncludeLegacy<R>(
       this.connection,
       this.logger,
@@ -223,9 +243,16 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getInclude(): IIncludeContract<typeof includeDocuments>;
+  override getInclude<R extends IIncludeResults>(
+    results: R,
+  ): IIncludeContract<R>;
   override getInclude<R extends IIncludeResults = typeof includeDocuments>(
     results: R = includeDocuments as unknown as R,
   ): AdtIncludeLegacy<R> {
+    this.assertConnected();
     return new AdtIncludeLegacy<R>(
       this.connection,
       this.logger,
@@ -235,11 +262,20 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getMessageClass(): IMessageClassContract<
+    typeof messageClassDocuments
+  >;
+  override getMessageClass<R extends IMessageClassResults>(
+    results: R,
+  ): IMessageClassContract<R>;
   override getMessageClass<
     R extends IMessageClassResults = typeof messageClassDocuments,
   >(
     results: R = messageClassDocuments as unknown as R,
   ): AdtMessageClassLegacy<R> {
+    this.assertConnected();
     return new AdtMessageClassLegacy<R>(
       this.connection,
       this.logger,
@@ -252,6 +288,7 @@ export class AdtClientLegacy extends AdtClient {
   override getInterface<
     R extends IInterfaceResults = typeof interfaceDocuments,
   >(results: R = interfaceDocuments as unknown as R): AdtInterfaceLegacy<R> {
+    this.assertConnected();
     return new AdtInterfaceLegacy<R>(
       this.connection,
       this.logger,
@@ -267,6 +304,7 @@ export class AdtClientLegacy extends AdtClient {
   >(
     results: R = functionGroupDocuments as unknown as R,
   ): AdtFunctionGroupLegacy<R> {
+    this.assertConnected();
     return new AdtFunctionGroupLegacy<R>(
       this.connection,
       this.logger,
@@ -282,6 +320,7 @@ export class AdtClientLegacy extends AdtClient {
   >(
     results: R = functionModuleDocuments as unknown as R,
   ): AdtFunctionModuleLegacy<R> {
+    this.assertConnected();
     return new AdtFunctionModuleLegacy<R>(
       this.connection,
       this.logger,
@@ -295,6 +334,7 @@ export class AdtClientLegacy extends AdtClient {
   override getPackage<R extends IPackageResults = typeof packageDocuments>(
     results: R = packageDocuments as unknown as R,
   ): AdtPackageLegacy<R> {
+    this.assertConnected();
     return new AdtPackageLegacy<R>(
       this.connection,
       this.logger,
@@ -307,6 +347,7 @@ export class AdtClientLegacy extends AdtClient {
   override getDdl<R extends IDdlResults = typeof ddlDocuments>(
     results: R = ddlDocuments as unknown as R,
   ): AdtDdlLegacy<R> {
+    this.assertConnected();
     return new AdtDdlLegacy<R>(
       this.connection,
       this.logger,
@@ -340,6 +381,7 @@ export class AdtClientLegacy extends AdtClient {
   override getRequest<R extends ITransportResults = typeof transportDocuments>(
     results: R = transportDocuments as unknown as R,
   ): AdtRequestLegacy<R> {
+    this.assertConnected();
     return new AdtRequestLegacy<R>(
       this.connection,
       this.logger,
@@ -369,6 +411,7 @@ export class AdtClientLegacy extends AdtClient {
   override getUtils<R extends IUtilResults = typeof utilDocuments>(
     results: R = utilDocuments as unknown as R,
   ): AdtUtilsLegacy<R> {
+    this.assertConnected();
     return new AdtUtilsLegacy<R>(this.connection, this.logger, results);
   }
 
@@ -380,12 +423,14 @@ export class AdtClientLegacy extends AdtClient {
   override getDomain<R extends IDomainResults = typeof domainDocuments>(
     _results?: R,
   ): AdtDomain<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtDomain<R>>(AdtDomain, 'Domain', DOMAIN.collection);
   }
 
   override getDataElement<
     R extends IDataElementResults = typeof dataElementDocuments,
   >(_results?: R): AdtDataElement<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtDataElement<R>>(
       AdtDataElement,
       'DataElement',
@@ -396,6 +441,7 @@ export class AdtClientLegacy extends AdtClient {
   override getStructure<
     R extends IStructureResults = typeof structureDocuments,
   >(_results?: R): AdtStructure<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtStructure<R>>(
       AdtStructure,
       'Structure',
@@ -406,12 +452,14 @@ export class AdtClientLegacy extends AdtClient {
   override getTable<R extends ITableResults = typeof tableDocuments>(
     _results?: R,
   ): AdtTable<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtTable<R>>(AdtTable, 'Table', TABLE.collection);
   }
 
   override getTableType<
     R extends ITableTypeResults = typeof tableTypeDocuments,
   >(_results?: R): AdtDdicTableType<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtDdicTableType<R>>(
       AdtDdicTableType,
       'TableType',
@@ -422,6 +470,7 @@ export class AdtClientLegacy extends AdtClient {
   override getAccessControl<
     R extends IAccessControlResults = typeof accessControlDocuments,
   >(_results?: R): AdtAccessControl<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtAccessControl<R>>(
       AdtAccessControl,
       'AccessControl',
@@ -432,6 +481,7 @@ export class AdtClientLegacy extends AdtClient {
   override getServiceDefinition<
     R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
   >(_results?: R): AdtServiceDefinition<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtServiceDefinition<R>>(
       AdtServiceDefinition,
       'ServiceDefinition',
@@ -442,6 +492,7 @@ export class AdtClientLegacy extends AdtClient {
   override getServiceBinding<
     R extends IServiceResults = typeof serviceDocuments,
   >(_results?: R): AdtServiceBinding<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtServiceBinding<R>>(
       AdtServiceBinding,
       'ServiceBinding',
@@ -452,6 +503,7 @@ export class AdtClientLegacy extends AdtClient {
   override getBehaviorDefinition<
     R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
   >(_results?: R): AdtBehaviorDefinition<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtBehaviorDefinition<R>>(
       AdtBehaviorDefinition,
       'BehaviorDefinition',
@@ -462,6 +514,7 @@ export class AdtClientLegacy extends AdtClient {
   override getBehaviorImplementation<
     R extends IClassResults = typeof classDocuments,
   >(_results?: R): AdtBehaviorImplementation<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtBehaviorImplementation<R>>(
       AdtBehaviorImplementation,
       'BehaviorImplementation',
@@ -472,6 +525,7 @@ export class AdtClientLegacy extends AdtClient {
   override getMetadataExtension<
     R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
   >(_results?: R): AdtMetadataExtension<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtMetadataExtension<R>>(
       AdtMetadataExtension,
       'MetadataExtension',
@@ -482,6 +536,7 @@ export class AdtClientLegacy extends AdtClient {
   override getEnhancement<
     R extends IEnhancementResults = typeof enhancementDocuments,
   >(_results?: R): AdtEnhancement<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtEnhancement<R>>(
       AdtEnhancement,
       'Enhancement',
@@ -492,6 +547,7 @@ export class AdtClientLegacy extends AdtClient {
   override getAuthorizationField<
     R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
   >(_results?: R): AdtAuthorizationField<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtAuthorizationField<R>>(
       AdtAuthorizationField,
       'AuthorizationField',
@@ -502,6 +558,7 @@ export class AdtClientLegacy extends AdtClient {
   override getFeatureToggle<
     R extends IFeatureToggleResults = typeof featureToggleDocuments,
   >(_results?: R): AdtFeatureToggle<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtFeatureToggle<R>>(
       AdtFeatureToggle,
       'FeatureToggle',
@@ -509,9 +566,18 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getTransformation(): ITransformationContract<
+    typeof transformationDocuments
+  >;
+  override getTransformation<R extends ITransformationResults>(
+    results: R,
+  ): ITransformationContract<R>;
   override getTransformation<
     R extends ITransformationResults = typeof transformationDocuments,
   >(_results?: R): AdtTransformation<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtTransformation<R>>(
       AdtTransformation,
       'Transformation',
@@ -519,9 +585,18 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getScalarFunction(): IScalarFunctionContract<
+    typeof scalarFunctionDocuments
+  >;
+  override getScalarFunction<R extends IScalarFunctionResults>(
+    results: R,
+  ): IScalarFunctionContract<R>;
   override getScalarFunction<
     R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
   >(_results?: R): AdtScalarFunction<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtScalarFunction<R>>(
       AdtScalarFunction,
       'ScalarFunction',
@@ -529,10 +604,19 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getScalarFunctionImplementation(): IScalarFunctionImplementationContract<
+    typeof scalarFunctionImplementationDocuments
+  >;
+  override getScalarFunctionImplementation<
+    R extends IScalarFunctionImplementationResults,
+  >(results: R): IScalarFunctionImplementationContract<R>;
   override getScalarFunctionImplementation<
     R extends
       IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
   >(_results?: R): AdtScalarFunctionImplementation<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtScalarFunctionImplementation<R>>(
       AdtScalarFunctionImplementation,
       'ScalarFunctionImplementation',
@@ -540,9 +624,18 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getAppendStructure(): IAppendStructureContract<
+    typeof appendStructureDocuments
+  >;
+  override getAppendStructure<R extends IAppendStructureResults>(
+    results: R,
+  ): IAppendStructureContract<R>;
   override getAppendStructure<
     R extends IAppendStructureResults = typeof appendStructureDocuments,
   >(_results?: R): AdtAppendStructure<R> {
+    this.assertConnected();
     return absentOnLegacy<AdtAppendStructure<R>>(
       AdtAppendStructure,
       'AppendStructure',
