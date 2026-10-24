@@ -135,7 +135,7 @@ function hitsIn(file: string, text: string): Hit[] {
   const hits: Hit[] = [];
   const visit = (node: ts.Node): void => {
     const specifier = moduleSpecifierOf(node);
-    if (specifier && specifier.text.toLowerCase().includes('legacy')) {
+    if (specifier?.text.toLowerCase().includes('legacy')) {
       hits.push({ kind: 'module', node: specifier, text: specifier.text });
     }
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
