@@ -253,7 +253,8 @@ the read before editing it.
 
 `delete` is the delete, and `checkDeletion` is the approval ADT wants first —
 two members, one request each, both against `/sap/bc/adt/deletion/…`, which is
-ADT's own deletion service. There is no lock to take and none to release.
+ADT's own deletion service. There is no lock to take and none to release —
+except on a legacy system, which has no deletion service ([below](#on-a-legacy-system-lock-delete-with-the-handle-unlock)).
 
 Both live on `IAdtDeletable`, because anything that can be deleted can be asked
 whether it can be deleted *now*. Almost everything created can be removed; what
@@ -296,6 +297,42 @@ to a package. The deletion check resolves an object through its package — its
 answer carries `adtcore:packageName` when it found one and says "Object does not
 exist" when it did not — so an unbound object is reported absent while its name
 stays taken, and there is nothing for the delete to act on.
+
+### On a legacy system: lock, delete with the handle, unlock
+
+`AdtClientLegacy` (SAP_BASIS 7.40 SP04, over RFC) has no deletion service:
+`/sap/bc/adt/deletion/check` answers `404`. So, there:
+
+- **`checkDeletion` is refused** without a request (`origin: 'refusal'`,
+  `UNSUPPORTED_OPERATION`), on every handler, and so is
+  `getUtils().checkDeletionGroup`.
+- **`delete` is one `DELETE <object URI>?lockHandle=…`** for a class, program,
+  interface, function group, function module and DDL source, and it needs the
+  object's lock handle — **yours**, from `lock()`. Measured on 7.40 SP04: without
+  one, a class, program, interface or function group answers `400` "Parameter
+  lockHandle could not be found."; with one, all six are deleted. The member
+  does not lock or unlock; the request goes with or without a handle, and SAP's
+  answer is the answer. `&corrNr=` is added when the config's
+  `transportRequest` is given (not measured on 7.40 SP04).
+- The include, function include and message class `delete`, and
+  `deleteObjectsGroup`, went through `/deletion/*` and are refused.
+
+```typescript
+const cls = client.getClass();                    // AdtClientLegacy, over RFC
+const config = { className: 'ZCL_TEST' };
+
+const locked = await cls.lock(config);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+try {
+  const deleted = await cls.delete(config, { headers, lockHandle });   // one DELETE, stateless
+  if (!deleted.ok) throw new Error(deleted.getError().message);
+} finally {
+  await cls.unlock(config, lockHandle);
+}
+```
+
+See [LEGACY.md](../architecture/LEGACY.md#delete-lock-delete-with-the-handle-unlock).
 
 ### A behavior implementation needs a second write, and it is the class's
 

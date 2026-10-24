@@ -1,13 +1,40 @@
 /**
- * AdtUtilsLegacy - Utility operations for legacy SAP systems (BASIS < 7.50)
+ * AdtUtilsLegacy - Utility operations for legacy SAP systems (7.40 SP04)
  *
- * Overrides methods that rely on endpoints absent from legacy /sap/bc/adt/discovery:
- * - getTableColumns → /sap/bc/adt/datapreview/ddic/{name}/metadata (not available)
- * - getTableContents → /sap/bc/adt/datapreview/ddic (not available)
- * - getSqlQuery → /sap/bc/adt/datapreview/freestyle (not available)
- * - activateObjectsGroup → /sap/bc/adt/activation/runs (not available, uses /sap/bc/adt/activation)
+ * Every override below refuses without a request, answered through `failed()`
+ * (spec §2.1, §10.2), except `activateObjectsGroup`, which sends the legacy
+ * request.
  *
- * A fourth override refused `getTransaction`
+ * Not in the legacy discovery catalogue, refused:
+ * - getTableColumns → /sap/bc/adt/datapreview/ddic/{name}/metadata
+ * - getTableContents → /sap/bc/adt/datapreview/ddic
+ * - getSqlQuery → /sap/bc/adt/datapreview/freestyle
+ * - getObjectProperties → /sap/bc/adt/repository/informationsystem/objectproperties/values
+ *
+ * Measured over RFC on SAP_BASIS 7.40 SP04 — the endpoint answered `404` —
+ * refused:
+ * - getWhereUsed, getWhereUsedScope → .../informationsystem/usageReferences
+ * - getVirtualFoldersContents → .../informationsystem/virtualfolders/contents
+ * - getAllTypes → .../informationsystem/objecttypes
+ * - checkDeletionGroup, deleteObjectsGroup → /sap/bc/adt/deletion/*
+ * - readObjectMetadata for a domain, a data element, a structure, a package
+ *   and a table (the table family, §10.1); readObjectSource for a structure
+ *   and a table
+ *
+ * Not measured and not advertised, refused until measured:
+ * - readObjectMetadata and readObjectSource for a table type
+ *
+ * In readObjectMetadata/readObjectSource every alias `objectWire` accepts for
+ * those types is refused, in any case; every other type goes to the base
+ * unchanged, so an unknown type is still thrown.
+ *
+ * Refused because a legacy group activation has no run:
+ * - getActivationRun, getActivationResults → /sap/bc/adt/activation/runs,
+ *   /results (not advertised). `activateObjectsGroup` here sends the
+ *   synchronous /sap/bc/adt/activation, not /activation/runs, and yields no
+ *   run id to ask about.
+ *
+ * A further override refused `getTransaction`
  * (/sap/bc/adt/repository/informationsystem/objectproperties, also absent). It
  * went with the base method, which nobody called: the only code that ever
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
@@ -25,22 +52,107 @@ import {
   type IAdtResponse,
   type IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import {
+  DATA_ELEMENT,
+  DOMAIN,
+  PACKAGE,
+  STRUCTURE,
+  TABLE,
+  TABLE_TYPE,
+} from '../../endpoints/objects';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
 import { requestHeaders } from '../../utils/requestHeaders';
 import { AdtUtils } from './AdtUtils';
+import {
+  legacyRefusal,
+  legacyUnmeasuredRefusal,
+  noDeletionApi,
+  noDeletionCheck,
+} from './refusalLegacy';
 import type {
+  AdtObjectType,
+  AdtSourceObjectType,
   IGetSqlQueryParams,
   IGetTableContentsParams,
+  IGetVirtualFoldersContentsParams,
+  IGetWhereUsedParams,
+  IGetWhereUsedScopeParams,
   IObjectReference,
+  IReadOptions,
 } from './types';
 import type { IUtilResults, utilDocuments } from './utilResultSet';
 
+const RIS = '/sap/bc/adt/repository/informationsystem';
+const WHERE_USED = `${RIS}/usageReferences`;
+const WHERE_USED_SCOPE = `${RIS}/usageReferences/scope`;
+const VIRTUAL_FOLDERS = `${RIS}/virtualfolders/contents`;
+const OBJECT_TYPES = `${RIS}/objecttypes`;
+const ACTIVATION_RUNS = '/sap/bc/adt/activation/runs';
+const ACTIVATION_RESULTS = '/sap/bc/adt/activation/results';
+const WHERE_USED_ON_740 =
+  '7.40 serves where-used through the RIS sequence fullnamemapping → metadata → whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY, which this library does not implement.';
+const OBJECT_TYPES_ON_740 =
+  '7.40 serves object types through repository/typestructure, which this library does not implement.';
+const NO_RUN_ID =
+  'A legacy activateObjectsGroup is the synchronous /sap/bc/adt/activation: its answer is the result, and there is no run id to ask about.';
+
+const PACKAGE_ITEM = `${PACKAGE.collection}/{name}`;
+/**
+ * The DDIC types 7.40 does not serve through these reads, by every alias the
+ * switches in `objectWire` accept (lower case), to the endpoint it lacks.
+ */
+const METADATA_REFUSED: Readonly<Record<string, string>> = {
+  domain: DOMAIN.collection,
+  'doma/dd': DOMAIN.collection,
+  dataelement: DATA_ELEMENT.collection,
+  dtel: DATA_ELEMENT.collection,
+  'dtel/de': DATA_ELEMENT.collection,
+  structure: STRUCTURE.collection,
+  'stru/dt': STRUCTURE.collection,
+  table: TABLE.collection,
+  'tabl/dt': TABLE.collection,
+  tabletype: TABLE_TYPE.collection,
+  'ttyp/df': TABLE_TYPE.collection,
+  package: PACKAGE_ITEM,
+  'devc/k': PACKAGE_ITEM,
+};
+const SOURCE_REFUSED: Readonly<Record<string, string>> = {
+  structure: STRUCTURE.collection,
+  'stru/dt': STRUCTURE.collection,
+  table: TABLE.collection,
+  'tabl/dt': TABLE.collection,
+  tabletype: TABLE_TYPE.collection,
+  'ttyp/df': TABLE_TYPE.collection,
+};
+
+/** The endpoint 7.40 lacks for `objectType`, or `undefined` when it is served. */
+function refusedFor(
+  table: Readonly<Record<string, string>>,
+  objectType: string,
+): string | undefined {
+  const type = objectType.toLowerCase();
+  return Object.hasOwn(table, type) ? table[type] : undefined;
+}
+
+/**
+ * The refusal of a read of `objectType` at `endpoint`: the table type is only
+ * absent from discovery, not measured, so its refusal says that; the other
+ * families answered `404`.
+ */
+function refuseRead<T, E extends IAdtError>(
+  operation: string,
+  endpoint: string,
+): IAdtResponse<T, E> {
+  return endpoint === TABLE_TYPE.collection
+    ? legacyUnmeasuredRefusal<T, E>(operation, endpoint)
+    : legacyRefusal<T, E>(operation, endpoint);
+}
+
 function unsupportedError(operation: string, endpoint: string): string {
   return (
-    `${operation} is not supported on this SAP system (legacy, BASIS < 7.50). ` +
-    `The required endpoint ${endpoint} was not found in the system's ` +
-    `ADT discovery catalog (/sap/bc/adt/discovery).`
+    `${operation} is not supported on a legacy system (7.40 SP04): ` +
+    `its ADT discovery catalogue (/sap/bc/adt/discovery) does not list ${endpoint}.`
   );
 }
 
@@ -144,6 +256,175 @@ ${objectReferences}
     return this.refuse(
       'Object properties',
       '/sap/bc/adt/repository/informationsystem/objectproperties/values',
+    );
+  }
+
+  /**
+   * Refused without a request: 7.40 has no deletion API —
+   * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5, §10.2).
+   */
+  override async checkDeletionGroup<E extends IAdtError = IAdtError>(
+    _objects: IObjectReference[],
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>(
+      'checkDeletionGroup',
+    );
+  }
+
+  /**
+   * Refused without a request: the group delete is
+   * `/sap/bc/adt/deletion/check` then `/deletion/delete`, which 7.40 does not
+   * serve (spec §4.3, §10.2).
+   */
+  override async deleteObjectsGroup<E extends IAdtError = IAdtError>(
+    _objects: IObjectReference[],
+    _transportRequest: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    return noDeletionApi<ReturnType<R['deletion']>, E>(
+      'deleteObjectsGroup',
+      "Delete each object through its handler's delete() with the object's lock handle, from lock().",
+    );
+  }
+
+  /**
+   * Refused without a request: `usageReferences` answered `404` over RFC on
+   * 7.40 SP04 (spec §10.2). Refused before the type is read, so an unknown
+   * type is not thrown here: the member itself is not offered.
+   */
+  override async getWhereUsed<E extends IAdtError = IAdtError>(
+    _params: IGetWhereUsedParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
+    return legacyRefusal<ReturnType<R['whereUsed']>, E>(
+      'getWhereUsed',
+      WHERE_USED,
+      WHERE_USED_ON_740,
+    );
+  }
+
+  /** Refused without a request, like {@link getWhereUsed} (spec §10.2). */
+  override async getWhereUsedScope<E extends IAdtError = IAdtError>(
+    _params: IGetWhereUsedScopeParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
+    return legacyRefusal<ReturnType<R['whereUsedScope']>, E>(
+      'getWhereUsedScope',
+      WHERE_USED_SCOPE,
+      WHERE_USED_ON_740,
+    );
+  }
+
+  /**
+   * Refused without a request: `virtualfolders/contents` answered `404` over
+   * RFC on 7.40 SP04 (spec §10.2). A package's contents are served by
+   * `fetchNodeStructure` with `DEVC/K`, measured on 7.40.
+   */
+  override async getVirtualFoldersContents<E extends IAdtError = IAdtError>(
+    _params: IGetVirtualFoldersContentsParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['folders']>, E>> {
+    return legacyRefusal<ReturnType<R['folders']>, E>(
+      'getVirtualFoldersContents',
+      VIRTUAL_FOLDERS,
+      "A package's contents: fetchNodeStructure with the package and type DEVC/K.",
+    );
+  }
+
+  /**
+   * Refused without a request: `objecttypes` answered `404` over RFC on 7.40
+   * SP04 (spec §10.2).
+   */
+  override async getAllTypes<E extends IAdtError = IAdtError>(
+    _maxItemCount?: number,
+    _name?: string,
+    _data?: string,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+    return legacyRefusal<ReturnType<R['types']>, E>(
+      'getAllTypes',
+      OBJECT_TYPES,
+      OBJECT_TYPES_ON_740,
+    );
+  }
+
+  /**
+   * Refused without a request: a legacy group activation is synchronous and
+   * yields no run id, and `/activation/runs` is not advertised (spec §10.2).
+   */
+  override async getActivationRun<E extends IAdtError = IAdtError>(
+    _runId: string,
+    _options?: { withLongPolling?: boolean } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+    return legacyRefusal<ReturnType<R['run']>, E>(
+      'getActivationRun',
+      ACTIVATION_RUNS,
+      NO_RUN_ID,
+    );
+  }
+
+  /** Refused without a request, like {@link getActivationRun} (spec §10.2). */
+  override async getActivationResults<E extends IAdtError = IAdtError>(
+    _runId: string,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['results']>, E>> {
+    return legacyRefusal<ReturnType<R['results']>, E>(
+      'getActivationResults',
+      ACTIVATION_RESULTS,
+      NO_RUN_ID,
+    );
+  }
+
+  /**
+   * A domain, a data element, a structure, a table, a table type or a package
+   * is refused without a request — a known type 7.40 lacks is answered, not
+   * thrown (spec §10.2). Every other type goes to the base as it is, so an
+   * unknown one is still the caller's mistake and thrown.
+   */
+  override async readObjectMetadata<E extends IAdtError = IAdtError>(
+    objectType: AdtObjectType,
+    objectName: string,
+    functionGroup?: string,
+    options?: IReadOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    const endpoint = refusedFor(METADATA_REFUSED, objectType);
+    if (endpoint)
+      return refuseRead<ReturnType<R['metadata']>, E>(
+        `readObjectMetadata(${objectType})`,
+        endpoint,
+      );
+    return super.readObjectMetadata(
+      objectType,
+      objectName,
+      functionGroup,
+      options,
+    );
+  }
+
+  /**
+   * A structure, a table or a table type is refused without a request (spec
+   * §10.2); every other type goes to the base as it is.
+   */
+  override async readObjectSource<E extends IAdtError = IAdtError>(
+    objectType: AdtSourceObjectType,
+    objectName: string,
+    functionGroup?: string,
+    version?: 'active' | 'inactive',
+    options?: IReadOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const endpoint = refusedFor(SOURCE_REFUSED, objectType);
+    if (endpoint)
+      return refuseRead<ReturnType<R['source']>, E>(
+        `readObjectSource(${objectType})`,
+        endpoint,
+      );
+    return super.readObjectSource(
+      objectType,
+      objectName,
+      functionGroup,
+      version,
+      options,
     );
   }
 

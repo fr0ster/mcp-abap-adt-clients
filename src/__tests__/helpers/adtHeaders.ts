@@ -26,9 +26,24 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
+import { AdtClassLegacy } from '../../core/class/AdtClassLegacy';
+import { AdtDdlLegacy } from '../../core/ddl/AdtDdlLegacy';
+import { AdtFunctionGroupLegacy } from '../../core/functionGroup/AdtFunctionGroupLegacy';
+import { AdtFunctionIncludeLegacy } from '../../core/functionInclude/AdtFunctionIncludeLegacy';
+import { AdtFunctionModuleLegacy } from '../../core/functionModule/AdtFunctionModuleLegacy';
+import { AdtIncludeLegacy } from '../../core/include/AdtIncludeLegacy';
+import { AdtInterfaceLegacy } from '../../core/interface/AdtInterfaceLegacy';
+import { AdtMessageClassLegacy } from '../../core/messageClass/AdtMessageClassLegacy';
 import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
+import { AdtProgramLegacy } from '../../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
+import { ClassExecutorLegacy } from '../../executors/class/ClassExecutorLegacy';
+import { ClassTestRunnerLegacy } from '../../executors/class/ClassTestRunnerLegacy';
+import { FunctionGroupTestRunnerLegacy } from '../../executors/functionGroup/FunctionGroupTestRunnerLegacy';
+import { FunctionModuleTestRunnerLegacy } from '../../executors/functionModule/FunctionModuleTestRunnerLegacy';
+import { ProgramExecutorLegacy } from '../../executors/program/ProgramExecutorLegacy';
+import { ProgramTestRunnerLegacy } from '../../executors/program/ProgramTestRunnerLegacy';
 
 /** A pair for a unit test that only needs the call to compile and run. */
 export const TEST_HEADERS: IAdtHeaders = {
@@ -219,10 +234,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtClassLegacy.delete': {
     accept: 'application/xml',
     contentType: 'application/xml',
-  },
-  'AdtClassLegacy.update': {
-    accept: 'text/plain',
-    contentType: 'text/plain',
   },
   'AdtClassMemberBase.activate': {
     accept: 'application/xml',
@@ -427,6 +438,11 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtFunctionGroupLegacy.delete': {
     accept: 'application/xml',
     contentType: 'application/xml',
+  },
+  // measured on 7.40 SP04 over RFC: v2 answers 400 "No content handler found"
+  'AdtFunctionIncludeLegacy.create': {
+    accept: 'application/vnd.sap.adt.functions.fincludes+xml',
+    contentType: 'application/vnd.sap.adt.functions.fincludes+xml',
   },
   'AdtFunctionInclude.activate': {
     accept: 'application/xml',
@@ -1050,6 +1066,15 @@ function recordedPair(
 ): IAdtHeaders | undefined {
   const owner = ownerOf(handler, member);
   if (!owner) return undefined;
+  // A legacy class that inherits `member` may still send another pair: the
+  // library sends what the caller passes, and the measured one is recorded
+  // under the legacy class's own name.
+  const leaf = (handler as { constructor?: { name?: string } }).constructor
+    ?.name;
+  if (leaf && leaf !== owner && leaf.endsWith('Legacy')) {
+    const own = SENT_BEFORE_36[`${leaf}.${member}`];
+    if (own) return own;
+  }
   const key = `${owner}.${member}`;
   // An enhancement's own document has a type per subtype: before 36.0.0
   // `create` and `updateMetadata` chose it from the config.
@@ -1088,13 +1113,95 @@ export function headersOf(
  * overrides the member with one that returns `failed(...)` at once). A member
  * qualifies only when it **is** that class's own function, compared by
  * identity, so a test handler or another class of the same name does not.
- * The unit test `integrationHeadersOf.test.ts` calls each one on a mock
- * connection and proves that no request leaves.
+ * The list is the class-handler rows of `LEGACY_REFUSED`
+ * (`helpers/legacyMembers.ts`), member for member — `integrationHeadersOf.test.ts`
+ * holds the two together, and `legacyMemberInventory.test.ts` calls each row
+ * on a recording connection and proves that no request leaves.
  */
-const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
-  [AdtPackageLegacy, ['create', 'updateMetadata', 'delete']],
-  [AdtRequestLegacy, ['create', 'updateMetadata', 'delete']],
-  [AdtUtilsLegacy, ['getSqlQuery', 'getTableContents']],
+export const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
+  [
+    AdtPackageLegacy,
+    [
+      'create',
+      'updateMetadata',
+      'delete',
+      'checkDeletion',
+      'lock',
+      'unlock',
+      'readTransport',
+      'check',
+      // Refused before this change, and still: the item resource answered
+      // 404 to the read (spec §8).
+      'readMetadata',
+      'validate',
+      'read',
+    ],
+  ],
+  [
+    AdtRequestLegacy,
+    [
+      'create',
+      'updateMetadata',
+      'delete',
+      'searchConfigurations',
+      'checkDeletion',
+      'readObjects',
+      'readActionLog',
+      'addObject',
+      'removeObject',
+      'moveObjects',
+      'sortAndCompress',
+      'createTask',
+      'changeTaskType',
+    ],
+  ],
+  [
+    AdtUtilsLegacy,
+    [
+      'getSqlQuery',
+      'getTableContents',
+      'checkDeletionGroup',
+      'deleteObjectsGroup',
+      // Measured 404 on 7.40, or no run to ask about (spec §10.2).
+      'getWhereUsed',
+      'getWhereUsedScope',
+      'getVirtualFoldersContents',
+      'getAllTypes',
+      'getActivationRun',
+      'getActivationResults',
+      // Refused on legacy before this change, and still (spec §10.2).
+      'getTableColumns',
+      'getObjectProperties',
+    ],
+  ],
+  // No deletion API on 7.40 (spec §4.3, §5).
+  [AdtClassLegacy, ['checkDeletion']],
+  [AdtProgramLegacy, ['checkDeletion']],
+  [AdtInterfaceLegacy, ['checkDeletion']],
+  [AdtFunctionGroupLegacy, ['checkDeletion']],
+  [AdtFunctionModuleLegacy, ['checkDeletion']],
+  // `checkCdsTestDoubles` stays refused (spec §10.3).
+  [AdtDdlLegacy, ['checkDeletion', 'checkCdsTestDoubles']],
+  [AdtIncludeLegacy, ['checkDeletion', 'delete']],
+  [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
+  [AdtMessageClassLegacy, ['checkDeletion', 'delete']],
+  // A legacy run is answered finished, with no run id to ask about; the
+  // function module's `run` takes no function group, which its URI needs
+  // (spec §6.2).
+  [ClassTestRunnerLegacy, ['getStatus', 'getResult']],
+  [ProgramTestRunnerLegacy, ['getStatus', 'getResult']],
+  [FunctionGroupTestRunnerLegacy, ['getStatus', 'getResult']],
+  [FunctionModuleTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
+  // The runs, the profiled runs and the trace type lists: not advertised on
+  // 7.40, or no class run there at all (spec §6.3).
+  [
+    ClassExecutorLegacy,
+    ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'],
+  ],
+  [
+    ProgramExecutorLegacy,
+    ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'],
+  ],
 ];
 
 function isLegacyRefusal(handler: object, member: string): boolean {
@@ -1126,6 +1233,10 @@ const ABSENT_ON_LEGACY = [
   'Enhancement',
   'AuthorizationField',
   'FeatureToggle',
+  'Transformation',
+  'ScalarFunction',
+  'ScalarFunctionImplementation',
+  'AppendStructure',
 ];
 
 /** A connection that refuses every request: the reference handlers send none. */

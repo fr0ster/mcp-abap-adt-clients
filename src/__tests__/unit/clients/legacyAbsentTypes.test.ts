@@ -43,7 +43,35 @@ const absent = [
   'getEnhancement',
   'getAuthorizationField',
   'getFeatureToggle',
+  'getTransformation',
+  'getScalarFunction',
+  'getScalarFunctionImplementation',
+  'getAppendStructure',
 ] as const;
+
+/** The endpoint each type's refusal names (its collection). */
+const endpointOf: Record<string, string> = {
+  getTransformation: '/sap/bc/adt/xslt/transformations',
+  getScalarFunction: '/sap/bc/adt/ddic/dsfd/sources',
+  getScalarFunctionImplementation: '/sap/bc/adt/ddic/dsfi',
+  getAppendStructure: '/sap/bc/adt/ddic/structures',
+};
+
+/**
+ * The types whose family 7.40 SP04 was measured not to serve (`404` over RFC,
+ * `B2-reads-20261023-1749` s11-*). The others are only absent from its
+ * discovery: not advertised, not measured, refused until measured.
+ */
+const measuredNotServed = new Set<string>([
+  'getTransformation',
+  'getScalarFunction',
+  'getAppendStructure',
+  'getStructure',
+  'getEnhancement',
+  'getTable',
+  'getDomain',
+  'getDataElement',
+]);
 
 type Handler = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -112,6 +140,20 @@ describe('AdtClientLegacy: object types absent on legacy', () => {
         expect(error.origin).toBe('refusal');
         expect(error.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
         expect(error.message).toContain('/sap/bc/adt/');
+        expect(error.message).toContain('7.40 SP04');
+        expect(error.message).not.toContain('SAP_BASIS 7.40)');
+        // The message says which kind of evidence the refusal rests on: a
+        // measurement, or only the family's absence from discovery.
+        if (measuredNotServed.has(getter)) {
+          expect(error.message).toContain('measured not to serve');
+          expect(error.message).not.toContain('discovery');
+        } else {
+          expect(error.message).toContain('absent from the discovery');
+          expect(error.message).toContain('not measured');
+          expect(error.message).not.toContain('measured not to serve');
+        }
+        const endpoint = endpointOf[getter];
+        if (endpoint) expect(error.message).toContain(endpoint);
       }
       expect(makeAdtRequest).not.toHaveBeenCalled();
     },

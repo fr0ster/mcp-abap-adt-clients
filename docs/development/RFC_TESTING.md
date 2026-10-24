@@ -67,6 +67,12 @@ environment:
 
 When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.
 
+**A legacy run needs `connection_type: "rfc"`.** The legacy client is supported,
+and measured on SAP_BASIS 7.40 SP04, over RFC only. With `is_legacy: true` and
+`connection_type: "http"` the live checks of the legacy client skip, each with
+the reason "the legacy client is supported over RFC only"
+(`src/__tests__/helpers/legacyRfc.ts`, `describeLegacyRfc`).
+
 `system` is separate from `connection_type` and both are required: the first says
 which system is on the other end, the second says how to reach it. RFC is an
 on-prem transport, but stating one does not state the other — the helper builds
@@ -119,6 +125,83 @@ npm test -- integration/core/functionGroup
 # With debug logs
 DEBUG_ADT_TESTS=true npm test -- integration/core/class
 ```
+
+## The 7.40 system: a configuration and an environment of its own
+
+The live checks of the legacy client (`src/__tests__/integration/legacy/`) run
+against a SAP_BASIS 7.40 SP04 system over RFC, with a configuration of their own
+— not the main system's `test-config.yaml`:
+
+- `src/__tests__/helpers/test-config.legacy-740.yaml.template`: copy it to
+  `test-config.legacy-740.yaml` (gitignored) and edit the lines marked
+  `# ← CHANGE` (the system ID, and the software component and transport layer of
+  the transportable package the environment creates). Only the `legacy_740`
+  cases are in it, all enabled; `is_legacy: true`, `connection_type: "rfc"`.
+- `MCP_TEST_CONFIG_PATH` names the configuration a run loads. Set, it is that
+  file or the run fails naming it — there is no fallback to `test-config.yaml`
+  or a template. `npm run check:config` then compares it with the template
+  beside it (`<file>.template`). `MCP_ENV_PATH` names the `.env` with that
+  system's credentials.
+
+The objects the checks need are prepared and removed by ABAP classes in the
+system, one call each (the idea of mcp-test's environment classes): 7.40 SP04
+has no `IF_OO_ADT_CLASSRUN`, so they run through ABAP Unit
+(`POST /sap/bc/adt/abapunit/testruns`, measured there) and report as alerts,
+`@@LOG {json}` per step and `@@RESULT {json}` last. Sources:
+`src/__tests__/integration/legacy/abap/`; driver: `src/__tests__/helpers/legacyEnv.ts`.
+
+| Command | Does |
+|---|---|
+| `npm run legacy:setup` | installs `ZCL_LG7_ENV` and its runners (`$TMP`, written only when the source differs); runs prepare — releases the user's locks on ZLG7 names, deletes leftovers (not the fixtures) and their inactive versions, reuses or creates the request `ZLG7 LEGACY-TEST …`, creates package `ZLG7_TEST`; deletes leftover DDL sources over ADT; creates or refreshes the fixtures in `$TMP` |
+| `npm run legacy:status` | reads: the open request, the package, every ZLG7 object in scope |
+| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions; deletes the DDL sources over ADT; runs remove — package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT. A credential refusal stops it at once |
+
+Reports go to `.legacy-env/<action>.json` (gitignored). Each command first asks
+`isModernAdtSystem()` and refuses a system that answers
+`/sap/bc/adt/core/discovery` — a modern one — before anything is installed.
+Nothing outside the prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`,
+`Z_LG7_*`) is touched, and of those only what is in package `ZLG7_TEST`, or in
+`$TMP` with the session user as its author: `objects_in_scope` selects a `$TMP`
+object only with TADIR `AUTHOR = sy-uname`, and every delete reads the name,
+the TADIR package and the author again right before it. A ZLG7-named object
+another user put in `$TMP` is never touched. Over ADT, the env classes and
+leftover DDL sources are deleted only when their metadata names `$TMP` and —
+where it names a person responsible (`adtcore:responsible`) — the session user.
+A run of the live checks uses the fixtures and leaves them; only
+`legacy:teardown` removes them.
+
+```bash
+export MCP_TEST_CONFIG_PATH=src/__tests__/helpers/test-config.legacy-740.yaml
+export MCP_ENV_PATH=$HOME/<the 7.40 system>.env
+export SAPNWRFC_HOME=$HOME/sap/nwrfcsdk PATH=$HOME/sap/nwrfcsdk/lib:$PATH \
+  LD_LIBRARY_PATH=$HOME/.local/lib/sap-rfc-lite:$HOME/sap/nwrfcsdk/lib:$LD_LIBRARY_PATH
+npm run legacy:setup
+npm run test:detached -- integration/legacy
+npm run legacy:teardown        # when the environment is no longer needed
+```
+
+### The live checks
+
+Written, not yet run: no result of theirs is recorded in `docs/architecture/LEGACY.md`.
+Each runs under `describeLegacyRfc` — only when the loaded configuration says
+`is_legacy: true` and `connection_type: "rfc"`, a skipped test naming the reason
+otherwise — and every case is a `legacy_740` test case of the configuration
+(`enabled: false` in `test-config.yaml.template`, enabled in the 7.40 template).
+Refused members are asserted on a wire recorder (`helpers/requestRecorder.ts`),
+not on a log: nothing may leave.
+
+| File | `legacy_740` case | Checks |
+|---|---|---|
+| `LegacyDelete.test.ts` | `legacy_deletes` | class, program, interface, function group, function module, DDL source: lock → delete with the handle → unlock → the read answers `404`; a delete without a handle answers `400` for the first four. Creates and deletes only its own objects |
+| `LegacyRefusals.test.ts` | `legacy_refusals_send_nothing` | every refused member — `checkDeletion`, the `absentOnLegacy` handlers, the rest — answers the refusal and sends nothing; `readObjectMetadata`/`readObjectSource` for a program and a class answer `200` |
+| `LegacyUnitTests.test.ts` | `legacy_unit_runners` | class, program, function group `run`/`runSync` and function module `runSync` send one testruns POST with `<options>` and answer the fixtures' methods |
+| `LegacyFunctionInclude.test.ts` | `legacy_function_include` | a function include created with the v1 pair, written under its lock, activated (its group is created and deleted by the test) |
+| `LegacyTransports.test.ts` | `legacy_transports` | `list` and `readMetadata` send one GET to `/sap/bc/cts/transportrequests` and answer the user's list |
+| `LegacyTransportable.test.ts` | `legacy_transportable` | in package `ZLG7_TEST` on the environment's request: create, lock → update with `corrNr` → unlock; the list and `readMetadata` name the request; lock → `DELETE ?lockHandle=&corrNr=` → unlock — measures what is not yet measured (a delete with `corrNr`, a populated list) |
+
+Run them as shown above: `npm run legacy:setup`, then
+`npm run test:detached -- integration/legacy`, with `MCP_TEST_CONFIG_PATH` naming
+the 7.40 configuration and `MCP_ENV_PATH` its `.env`.
 
 ## RFC-Specific Considerations
 

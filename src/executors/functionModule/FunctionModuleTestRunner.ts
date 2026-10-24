@@ -35,7 +35,6 @@ import {
   AbapUnitRunner,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
-  refusedBelow750,
 } from '../abapUnitRunner';
 
 /**
@@ -117,39 +116,5 @@ export class FunctionModuleTestRunner<
       ],
       options,
     );
-  }
-}
-
-/**
- * Below 7.50: refused without a request, as a report's run is — the legacy
- * endpoint has not been measured to find a module's tests, with `<options>` or
- * without. `runSync` is refused the same way.
- */
-export class FunctionModuleTestRunnerLegacy<
-  R extends
-    IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
-> extends FunctionModuleTestRunner<R> {
-  override async run<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['run']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['run']>, E>("a function module's");
-  }
-
-  override async runSync<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['result']>, E>("a function module's");
-  }
-
-  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['status']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['status']>, E>("a function module's");
-  }
-
-  override async getResult<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['result']>, E>("a function module's");
   }
 }

@@ -3,12 +3,13 @@
  * and returns the appropriate ADT client.
  *
  * - Modern systems (BASIS >= 7.50): AdtClient with full CRUD
- * - Legacy systems (BASIS < 7.50): AdtClientLegacy with limited CRUD
+ * - Legacy systems (BASIS < 7.50): AdtClientLegacy, which answers a refusal for
+ *   what 7.40 does not serve
  *
  * The client type depends on the system version (which ADT endpoints exist),
- * NOT on the connection type (HTTP vs RFC). Connection type is orthogonal:
- * - HTTP works for modern systems and read-only on legacy
- * - RFC works for both (and is the only way to get CRUD on legacy)
+ * NOT on the connection type. The legacy client is supported, and was
+ * measured (SAP_BASIS 7.40 SP04), over RFC only: HTTP to a legacy system is
+ * unsupported, and nothing here detects the wire.
  */
 
 import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';

@@ -18,8 +18,7 @@
  * body sent on 2026-09-30, it answers `200` with an empty result: that, not the
  * endpoint, was why that run found nothing. `runSync` therefore always sends
  * `<options>`. An include's own URI answers empty even with `<options>`; its
- * tests run through the report. The legacy runner still refuses: no legacy
- * system has been measured with `<options>` (`ProgramTestRunnerLegacy`).
+ * tests run through the report.
  */
 
 import type {

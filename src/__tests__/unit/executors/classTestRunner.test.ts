@@ -33,23 +33,6 @@ const RUN_RESULT = `<?xml version="1.0" encoding="utf-8"?><aunit:runResult xmlns
 </testMethods></testClass></testClasses></program></aunit:runResult>`;
 
 /**
- * The body the legacy runner sent before the endpoint moved into the shared
- * core, byte for byte: a legacy system must keep receiving exactly this.
- */
-const LEGACY_BODY = `<?xml version="1.0" encoding="UTF-8"?><aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">
-  <external>
-    <coverage active="false"/>
-  </external>
-  <adtcore:objectSets xmlns:adtcore="http://www.sap.com/adt/core">
-    <objectSet kind="inclusive">
-      <adtcore:objectReferences>
-        <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_tests"/>
-      </adtcore:objectReferences>
-    </objectSet>
-  </adtcore:objectSets>
-</aunit:runConfiguration>`;
-
-/**
  * The body `runSync` sends for one class with no options given, byte for byte:
  * the shared request now also serves reports and function groups, and a class
  * must keep receiving exactly this.
@@ -306,33 +289,82 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 });
 
 describe('ClassTestRunnerLegacy', () => {
-  it('run sends the body it always sent — no <options>', async () => {
-    const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+  /** Marks which strategy read the answer. */
+  const marked = {
+    ...classTestRunnerDocuments,
+    run: () => 'read by run',
+    result: () => 'read by result',
+  };
 
-    await runner.run('ZCL_TESTS', { riskLevel: { dangerous: false } });
-
-    expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
-    expect(calls[0].data).toBe(LEGACY_BODY);
-    expect(calls[0].headers).toEqual({
-      'Content-Type': 'application/xml',
-      Accept: 'application/xml',
-    });
-  });
-
-  it('runSync is the same request, read by `result`', async () => {
+  /** The body the modern `runSync` sends for the same target and options. */
+  async function modernBody(
+    target: Parameters<ClassTestRunner['runSync']>[0],
+    options?: Parameters<ClassTestRunner['runSync']>[1],
+  ): Promise<unknown> {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger(), {
-      ...classTestRunnerDocuments,
-      run: () => 'read by run',
-      result: () => 'read by result',
-    });
-
-    expect(expectResult(await runner.runSync('ZCL_TESTS'), 'runSync')).toBe(
-      'read by result',
+    await new ClassTestRunner(conn, createLibraryLogger()).runSync(
+      target,
+      options,
     );
-    expect(calls[0].data).toBe(LEGACY_BODY);
-  });
+    expect(calls).toHaveLength(1);
+    return calls[0].data;
+  }
+
+  it.each([
+    ['run', 'read by run'],
+    ['runSync', 'read by result'],
+  ] as const)(
+    '%s: one POST to /testruns, the modern runSync body byte for byte, read by %s',
+    async (member, readBy) => {
+      const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+      const runner = new ClassTestRunnerLegacy(
+        conn,
+        createLibraryLogger(),
+        marked,
+      );
+
+      expect(expectResult(await runner[member]('ZCL_TESTS'), member)).toBe(
+        readBy,
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('POST');
+      expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
+      expect(calls[0].headers).toEqual({
+        'Content-Type': 'application/xml',
+        Accept: 'application/xml',
+      });
+      expect(calls[0].data).toBe(SYNC_BODY);
+      expect(calls[0].data).toBe(await modernBody('ZCL_TESTS'));
+    },
+  );
+
+  it.each(['run', 'runSync'] as const)(
+    "%s: a caller's scope, risk levels and durations reach the body",
+    async (member) => {
+      const options = {
+        scope: { ownTests: false, foreignTests: true },
+        riskLevel: { dangerous: false },
+        duration: { long: false },
+        analyse: analyseUnitTest,
+      };
+      const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
+      const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+
+      await runner[member]('ZCL_TESTS', options);
+
+      const body = String(calls[0].data);
+      expect(body).toContain(
+        '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="true"/>',
+      );
+      expect(body).toContain(
+        '<testRiskLevels harmless="true" dangerous="false" critical="true"/>',
+      );
+      expect(body).toContain(
+        '<testDurations short="true" medium="true" long="false"/>',
+      );
+      expect(calls[0].data).toBe(await modernBody('ZCL_TESTS', options));
+    },
+  );
 
   it('runs each distinct container whole, on /testruns', async () => {
     const { conn, calls } = makeConn();

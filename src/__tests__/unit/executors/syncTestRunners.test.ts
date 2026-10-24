@@ -3,10 +3,13 @@
  * POST to `/abapunit/testruns` naming the object by its URI, always with the
  * Eclipse-style `<options>` — without it the endpoint answered an empty result
  * for all three on premise (SAP_BASIS 816, 2026-10-23) — read by `result` and
- * judged by the caller's `analyse`. Refused on a legacy system.
+ * judged by the caller's `analyse`. A legacy runner sends the same request, from
+ * `run` as well (on 7.40 it is the run) — but not a function module's `run`,
+ * which names no group.
  */
 
 import { analyseUnitTest } from '@mcp-abap-adt/adt-strategies';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -19,11 +22,11 @@ import {
 import {
   FunctionGroupTestRunner,
   FunctionGroupTestRunnerLegacy,
-} from '../../../executors/functionGroup/FunctionGroupTestRunner';
+} from '../../../executors/functionGroup';
 import {
   FunctionModuleTestRunner,
   FunctionModuleTestRunnerLegacy,
-} from '../../../executors/functionModule/FunctionModuleTestRunner';
+} from '../../../executors/functionModule';
 import { ProgramTestRunner } from '../../../executors/program/ProgramTestRunner';
 import { ProgramTestRunnerLegacy } from '../../../executors/program/ProgramTestRunnerLegacy';
 import { expectFailure, expectResult } from '../../helpers/contract';
@@ -240,20 +243,163 @@ describe('the asynchronous run stays the default, on /runs', () => {
   });
 });
 
-describe('legacy runners refuse runSync without a request', () => {
-  it.each([
-    ['ProgramTestRunnerLegacy', ProgramTestRunnerLegacy],
-    ['FunctionGroupTestRunnerLegacy', FunctionGroupTestRunnerLegacy],
-    ['FunctionModuleTestRunnerLegacy', FunctionModuleTestRunnerLegacy],
-  ] as const)('%s', async (_label, Runner) => {
-    const { conn, calls } = makeConn();
-    const runner = new Runner(conn, createLibraryLogger());
+describe('legacy runners send the synchronous request', () => {
+  /**
+   * Each legacy member beside the modern member whose body it must send, and
+   * the strategy that reads its answer. On 7.40 the testruns POST is the run,
+   * so `run` sends it too, read by `run`.
+   */
+  const legacy = [
+    {
+      label: 'ProgramTestRunnerLegacy.run',
+      call: (conn: IAbapConnection, options?: object) =>
+        new ProgramTestRunnerLegacy(conn, createLibraryLogger(), marked).run(
+          'ZR_REPORT',
+          options,
+        ),
+      modern: (conn: IAbapConnection, options?: object) =>
+        new ProgramTestRunner(conn, createLibraryLogger()).runSync(
+          'ZR_REPORT',
+          options,
+        ),
+      uri: '/sap/bc/adt/programs/programs/zr_report',
+      readBy: 'read by run',
+    },
+    {
+      label: 'ProgramTestRunnerLegacy.runSync',
+      call: (conn: IAbapConnection, options?: object) =>
+        new ProgramTestRunnerLegacy(
+          conn,
+          createLibraryLogger(),
+          marked,
+        ).runSync('ZR_REPORT', options),
+      modern: (conn: IAbapConnection, options?: object) =>
+        new ProgramTestRunner(conn, createLibraryLogger()).runSync(
+          'ZR_REPORT',
+          options,
+        ),
+      uri: '/sap/bc/adt/programs/programs/zr_report',
+      readBy: 'read by result',
+    },
+    {
+      label: 'FunctionGroupTestRunnerLegacy.run',
+      call: (conn: IAbapConnection, options?: object) =>
+        new FunctionGroupTestRunnerLegacy(
+          conn,
+          createLibraryLogger(),
+          marked,
+        ).run('Z_GROUP', options),
+      modern: (conn: IAbapConnection, options?: object) =>
+        new FunctionGroupTestRunner(conn, createLibraryLogger()).runSync(
+          'Z_GROUP',
+          options,
+        ),
+      uri: '/sap/bc/adt/functions/groups/z_group',
+      readBy: 'read by run',
+    },
+    {
+      label: 'FunctionGroupTestRunnerLegacy.runSync',
+      call: (conn: IAbapConnection, options?: object) =>
+        new FunctionGroupTestRunnerLegacy(
+          conn,
+          createLibraryLogger(),
+          marked,
+        ).runSync('Z_GROUP', options),
+      modern: (conn: IAbapConnection, options?: object) =>
+        new FunctionGroupTestRunner(conn, createLibraryLogger()).runSync(
+          'Z_GROUP',
+          options,
+        ),
+      uri: '/sap/bc/adt/functions/groups/z_group',
+      readBy: 'read by result',
+    },
+    {
+      label: 'FunctionModuleTestRunnerLegacy.runSync',
+      call: (conn: IAbapConnection, options?: object) =>
+        new FunctionModuleTestRunnerLegacy(
+          conn,
+          createLibraryLogger(),
+          marked,
+        ).runSync(
+          { functionGroupName: 'Z_GROUP', functionModuleName: 'Z_MODULE' },
+          options,
+        ),
+      modern: (conn: IAbapConnection, options?: object) =>
+        new FunctionModuleTestRunner(conn, createLibraryLogger()).runSync(
+          { functionGroupName: 'Z_GROUP', functionModuleName: 'Z_MODULE' },
+          options,
+        ),
+      uri: '/sap/bc/adt/functions/groups/z_group/fmodules/z_module',
+      readBy: 'read by result',
+    },
+  ];
 
-    const refusal = expectFailure(
-      await runner.runSync(),
-      'no runSync below 7.50',
+  /** The body the modern member sends for the same target and options. */
+  async function modernBody(
+    modern: (conn: IAbapConnection, options?: object) => Promise<unknown>,
+    options?: object,
+  ): Promise<unknown> {
+    const { conn, calls } = makeConn();
+    await modern(conn, options);
+    expect(calls).toHaveLength(1);
+    return calls[0].data;
+  }
+
+  describe.each(legacy)('$label', ({ call, modern, uri, readBy }) => {
+    it('one POST to /testruns, application/xml both ways, read by its own strategy', async () => {
+      const { conn, calls } = makeConn();
+
+      expect(expectResult(await call(conn), 'legacy run')).toBe(readBy);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('POST');
+      expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
+      expect(calls[0].headers).toEqual({
+        'Content-Type': 'application/xml',
+        Accept: 'application/xml',
+      });
+    });
+
+    it('the modern runSync body, byte for byte — <options> though none were given', async () => {
+      const { conn, calls } = makeConn();
+
+      await call(conn);
+
+      expect(calls[0].data).toBe(await modernBody(modern));
+      expect(calls[0].data).toBe(bodyFor(uri));
+    });
+
+    it("a caller's scope, risk levels and durations reach the body", async () => {
+      const options = {
+        scope: { ownTests: false, foreignTests: true },
+        riskLevel: { dangerous: false, critical: false },
+        duration: { long: false },
+        analyse: analyseUnitTest,
+      };
+      const { conn, calls } = makeConn();
+
+      await call(conn, options);
+
+      expect(calls[0].data).toBe(await modernBody(modern, options));
+      expect(String(calls[0].data)).toContain(
+        '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="true"/>',
+      );
+    });
+  });
+
+  it("FunctionModuleTestRunnerLegacy.run refuses without a request: it takes no group, and the module's URI lies under it", async () => {
+    const { conn, calls } = makeConn();
+    const runner = new FunctionModuleTestRunnerLegacy(
+      conn,
+      createLibraryLogger(),
     );
-    expect(refusal.message).toContain('not supported below BASIS 7.50');
+
+    const refusal = expectFailure(await runner.run(), 'no module run on 7.40');
+    expect(refusal.origin).toBe('refusal');
+    expect(refusal.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(refusal.message).toContain('/sap/bc/adt/abapunit/runs');
+    expect(refusal.message).toContain(
+      'runSync({ functionGroupName, functionModuleName })',
+    );
     expect(calls).toHaveLength(0);
   });
 });

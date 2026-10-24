@@ -1,7 +1,7 @@
 export {
   FunctionModuleTestRunner,
-  FunctionModuleTestRunnerLegacy,
   functionModuleTestRunnerDocuments,
   type IFunctionModuleTestRunnerResults,
   type IFunctionModuleTestRunSyncTarget,
 } from './FunctionModuleTestRunner';
+export { FunctionModuleTestRunnerLegacy } from './FunctionModuleTestRunnerLegacy';

@@ -3175,3 +3175,71 @@ batch:
     - name: "debugger_client"
       enabled: false
       available_in: ["onprem", "cloud"]
+
+# Live checks of the legacy client (AdtClientLegacy, AdtExecutorLegacy) on a
+# SAP_BASIS 7.40 SP04 system. They run only when environment.is_legacy is true
+# and environment.connection_type is "rfc"; elsewhere they skip and say why.
+# Disabled by default. The 7.40 system has a configuration of its own:
+# test-config.legacy-740.yaml.template, loaded through MCP_TEST_CONFIG_PATH.
+#
+# Every name here carries the prefix ZLG7 (ZCL_LG7_*, ZIF_LG7_*, ZLG7_*,
+# Z_LG7_*): the test environment (npm run legacy:setup / legacy:teardown,
+# src/__tests__/helpers/legacyEnv.ts) cleans and removes exactly that prefix.
+# - The fixtures (ZCL_LG7_FX_UNIT, ZLG7_FX_UNIT, ZLG7_FX with Z_LG7_FX_UNIT and
+#   its test include) are created by legacy:setup in $TMP; their names are
+#   fixed there (legacyEnv.ts FIXTURES), not here.
+# - legacy_deletes and legacy_function_include create objects of their own in
+#   $TMP and delete them; legacy_transportable creates one in package
+#   ZLG7_TEST on the environment's request. Name objects that do not exist,
+#   keeping the prefix; leftovers of a crashed run are removed by legacy:setup.
+legacy_740:
+  test_cases:
+    - name: "legacy_deletes"
+      enabled: false
+      available_in: ["legacy"]
+      description: "Lock, delete with the lock handle, unlock, read answers 404 — class, program, interface, function group, function module, DDL source; a delete without a handle answers 400 for the first four"
+      params:
+        class_name: "ZCL_LG7_DEL"                 # a ZLG7 name that does not exist yet
+        program_name: "ZLG7_DEL"
+        interface_name: "ZIF_LG7_DEL"
+        function_group_name: "ZLG7_DELG"
+        function_module_name: "Z_LG7_DEL"
+        ddl_name: "ZLG7_DEL_DDL"
+    - name: "legacy_refusals_send_nothing"
+      enabled: false
+      available_in: ["legacy"]
+      description: "checkDeletion, the absentOnLegacy handlers and the other refused members answer the refusal and send no request (asserted on the wire recorder); readObjectMetadata/readObjectSource for a program and a class answer 200"
+      params:
+        # The refused members are called with placeholders; nothing is sent.
+        class_name: "ZCL_LG7_FX_UNIT"             # the fixture (legacy:setup), read for the 200 cases
+        program_name: "ZLG7_FX_UNIT"              # the fixture (legacy:setup), read for the 200 cases
+    - name: "legacy_unit_runners"
+      enabled: false
+      available_in: ["legacy"]
+      description: "Class, program and function group run/runSync and function module runSync answer the methods of an object with tests, with <options> sent"
+      params:
+        class_name: "ZCL_LG7_FX_UNIT"             # the fixtures legacy:setup creates
+        program_name: "ZLG7_FX_UNIT"
+        function_group_name: "ZLG7_FX"
+        function_module_name: "Z_LG7_FX_UNIT"
+    - name: "legacy_function_include"
+      enabled: false
+      available_in: ["legacy"]
+      description: "A function include created with the v1 pair, written and activated"
+      params:
+        # The include's own delete is refused on 7.40, so the test creates this
+        # group, creates the include in it, and deletes the group with it.
+        function_group_name: "ZLG7_FI"            # a ZLG7 name that does not exist yet
+        include_name: "LZLG7_FIF01"               # L<group>F01
+    - name: "legacy_transports"
+      enabled: false
+      available_in: ["legacy"]
+      description: "Transport list and readMetadata answer the user's list from /sap/bc/cts"
+      params: {}
+    - name: "legacy_transportable"
+      enabled: false
+      available_in: ["legacy"]
+      description: "In package ZLG7_TEST on the environment's request: create, lock → update with corrNr → unlock, the transport list and readMetadata show the request, lock → DELETE ?lockHandle=&corrNr= → unlock"
+      params:
+        # The package and the request are the environment's (legacy:setup).
+        program_name: "ZLG7_TR_PROG"              # a ZLG7 name that does not exist yet
