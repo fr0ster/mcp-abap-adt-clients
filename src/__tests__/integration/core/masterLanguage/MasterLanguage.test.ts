@@ -23,7 +23,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { gateOn } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, noteCleanupRefusal } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -181,22 +181,27 @@ describe('Master language on create (#105)', () => {
         const persisted = masterLangOf(String(meta ?? ''));
         expect(persisted).toBe(expectedLang);
         bodyPassed = true;
-      } finally {
-        // A cleanup that fails is a red test — the leftover is what broke this
-        // test before. When the body already failed, its error is the one to
-        // report, so the cleanup's must not replace it.
-        if (bodyPassed) {
-          await deleteClass('cleanup delete');
-        } else {
-          await cls
-            .delete(
+      } catch (error) {
+        // The body failed: its error is the one to report. A refused cleanup
+        // is added to it rather than dropped, and does not replace it.
+        await noteCleanupRefusal(
+          error,
+          () =>
+            cls.delete(
               { className, transportRequest },
               {
                 headers: integrationHeadersOf(cls, 'delete'),
                 analyse: analyseDeletion,
               },
-            )
-            .catch(() => undefined);
+            ),
+          'cleanup delete',
+        );
+        throw error;
+      } finally {
+        // A cleanup that fails is a red test — the leftover is what broke this
+        // test before.
+        if (bodyPassed) {
+          await deleteClass('cleanup delete');
         }
       }
     },

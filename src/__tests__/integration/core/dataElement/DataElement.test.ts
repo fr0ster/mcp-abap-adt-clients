@@ -301,30 +301,27 @@ describe('DataElement (using AdtClient)', () => {
       const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
       if (shouldCleanup && domainCreated && domainName) {
-        try {
-          // Use resolver for consistent parameter resolution
-          const {
-            TestConfigResolver,
-          } = require('../../../helpers/TestConfigResolver');
-          const cleanupResolver = new TestConfigResolver({
-            testCase,
-            isCloud: isCloudSystem,
-            logger: testsLogger,
-          });
+        // Use resolver for consistent parameter resolution
+        const {
+          TestConfigResolver,
+        } = require('../../../helpers/TestConfigResolver');
+        const cleanupResolver = new TestConfigResolver({
+          testCase,
+          isCloud: isCloudSystem,
+          logger: testsLogger,
+        });
+        // The domain this suite created and could not remove fails the suite:
+        // the next run's create meets it.
+        expectResult(
           await client.getDomain().delete(
             {
               domainName: domainName,
               transportRequest: cleanupResolver.getTransportRequest(),
             },
             { headers: integrationHeadersOf(client.getDomain(), 'delete') },
-          );
-        } catch (cleanupError) {
-          // Log but don't fail - cleanup errors are silent
-          testsLogger.warn?.(
-            `Cleanup failed for domain ${domainName}:`,
-            cleanupError,
-          );
-        }
+          ),
+          `cleanup domain ${domainName}`,
+        );
       } else if (!shouldCleanup && domainCreated && domainName) {
         testsLogger.info?.(
           `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis:`,

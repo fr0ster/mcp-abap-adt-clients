@@ -43,7 +43,7 @@ import {
   gateAll,
   gateOn,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, releasing } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -306,21 +306,22 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           const includeHandle = String(
             expectResult(await include.lock(incl), 'lock include'),
           );
-          try {
-            expectResult(
-              await include.update(
-                { ...incl, transportRequest },
-                {
-                  headers: integrationHeadersOf(include, 'update'),
-                  lockHandle: includeHandle,
-                  source: params.include_source,
-                },
+          await releasing(
+            async () =>
+              expectResult(
+                await include.update(
+                  { ...incl, transportRequest },
+                  {
+                    headers: integrationHeadersOf(include, 'update'),
+                    lockHandle: includeHandle,
+                    source: params.include_source,
+                  },
+                ),
+                'write the include',
               ),
-              'write the include',
-            );
-          } finally {
-            await include.unlock(incl, includeHandle);
-          }
+            () => include.unlock(incl, includeHandle),
+            'unlock after write the include',
+          );
 
           for (const [p, source] of [
             [ownProgram, params.own_program_source],
@@ -342,21 +343,22 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             const handle = String(
               expectResult(await program.lock(p), `lock ${p.programName}`),
             );
-            try {
-              expectResult(
-                await program.update(
-                  { ...p, transportRequest },
-                  {
-                    headers: integrationHeadersOf(program, 'update'),
-                    lockHandle: handle,
-                    source,
-                  },
+            await releasing(
+              async () =>
+                expectResult(
+                  await program.update(
+                    { ...p, transportRequest },
+                    {
+                      headers: integrationHeadersOf(program, 'update'),
+                      lockHandle: handle,
+                      source,
+                    },
+                  ),
+                  `write ${p.programName}`,
                 ),
-                `write ${p.programName}`,
-              );
-            } finally {
-              await program.unlock(p, handle);
-            }
+              () => program.unlock(p, handle),
+              `unlock after write ${p.programName}`,
+            );
           }
 
           logTestStep('activate', testsLogger);
@@ -532,21 +534,22 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             const handle = String(
               expectResult(await fm.lock(m), `lock ${m.functionModuleName}`),
             );
-            try {
-              expectResult(
-                await fm.update(
-                  { ...m, transportRequest },
-                  {
-                    headers: integrationHeadersOf(fm, 'update'),
-                    lockHandle: handle,
-                    source,
-                  },
+            await releasing(
+              async () =>
+                expectResult(
+                  await fm.update(
+                    { ...m, transportRequest },
+                    {
+                      headers: integrationHeadersOf(fm, 'update'),
+                      lockHandle: handle,
+                      source,
+                    },
+                  ),
+                  `write ${m.functionModuleName}`,
                 ),
-                `write ${m.functionModuleName}`,
-              );
-            } finally {
-              await fm.unlock(m, handle);
-            }
+              () => fm.unlock(m, handle),
+              `unlock after write ${m.functionModuleName}`,
+            );
           }
 
           logTestStep('create test include', testsLogger);
@@ -564,21 +567,22 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           const includeHandle = String(
             expectResult(await finc.lock(include), 'lock include'),
           );
-          try {
-            expectResult(
-              await finc.update(
-                { ...include, transportRequest },
-                {
-                  headers: integrationHeadersOf(finc, 'update'),
-                  lockHandle: includeHandle,
-                  source: params.include_source,
-                },
+          await releasing(
+            async () =>
+              expectResult(
+                await finc.update(
+                  { ...include, transportRequest },
+                  {
+                    headers: integrationHeadersOf(finc, 'update'),
+                    lockHandle: includeHandle,
+                    source: params.include_source,
+                  },
+                ),
+                'write the test classes',
               ),
-              'write the test classes',
-            );
-          } finally {
-            await finc.unlock(include, includeHandle);
-          }
+            () => finc.unlock(include, includeHandle),
+            'unlock after write the test classes',
+          );
 
           logTestStep('activate', testsLogger);
           for (const m of [module, untested]) {

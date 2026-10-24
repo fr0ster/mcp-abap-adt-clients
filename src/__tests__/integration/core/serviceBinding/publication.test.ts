@@ -64,6 +64,7 @@ import {
   gate,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -110,11 +111,14 @@ async function stateOf(
   client: AdtClient,
   bindingName: string,
 ): Promise<{ published?: string; allowedAction?: string; bytes: number }> {
-  const answer = await client
-    .getServiceBinding()
-    .read({ bindingName }, 'active');
-  if (!answer.ok) return { bytes: 0 };
-  const doc = String(answer.getResult().value);
+  // A refused read fails with what SAP said: read as "no document" it was a
+  // state nobody asked for, and the wait below took it for "not yet".
+  const doc = String(
+    expectResult(
+      await client.getServiceBinding().read({ bindingName }, 'active'),
+      `read binding ${bindingName}`,
+    ),
+  );
   return {
     published: /srvb:published="([^"]*)"/.exec(doc)?.[1],
     allowedAction: /srvb:allowedAction="([^"]*)"/.exec(doc)?.[1],

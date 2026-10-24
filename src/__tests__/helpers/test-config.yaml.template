@@ -1567,12 +1567,13 @@ create_message_class:
 # Create Scalar Function (CDS DSFD/SCF)
 # ScalarFunction is a CDS object (DDL source) available on ABAP Cloud and modern
 # on-premise systems that support the /sap/bc/adt/ddic/dsfd/* endpoints.
-# The suite probes discovery + create at runtime and skips on HTTP 404/405/501.
+# Whether DSFD is on the system is this case's `enabled` / `available_in`: an
+# enabled case whose create is refused (404/405/501 included) fails.
 create_scalar_function:
   test_cases:
     - name: "adt_scalar_function"
       enabled: true
-      # available_in is a hint only; the suite probes discovery + create at runtime
+      # available_in decides where the case runs; a refused create fails the test
       description: "Scalar function reserved for AdtScalarFunction tests"
       params:
         scalar_function_name: "ZADT_SCALAR_FUNC"  # ← CHANGE if needed
@@ -1616,7 +1617,8 @@ create_scalar_function:
 # DSFI implementation JSON inline from the names below — no source params needed.
 # Flow: create DSFD (+activate) → create AMDP class → create DSFI → update() the
 # implementation JSON (PUT /source/main, sets amdpReference) → group-activate the
-# trio → read/readMetadata → delete all three. Skips on HTTP 404/405/501.
+# trio → read/readMetadata → delete all three. Availability is this case's
+# `enabled` / `available_in`: an enabled case whose create is refused fails.
 create_scalar_function_implementation:
   test_cases:
     - name: "adt_scalar_function_implementation"
@@ -1634,12 +1636,13 @@ create_scalar_function_implementation:
 # Create Append Structure (TABL/DS append)
 # Append structures extend an existing transparent table or structure with
 # additional fields. The suite creates two variants — one with a structure base
-# and one with a table base — and skips silently on HTTP 404/405/501.
+# and one with a table base. Availability is this case's `enabled` /
+# `available_in`: an enabled case whose create is refused (404/405/501 included) fails.
 create_append_structure:
   test_cases:
     - name: "adt_append_structure"
       enabled: true
-      # available_in is a hint only; the suite probes create at runtime and skips on 404/405/501
+      # available_in decides where the case runs; a refused create fails the test
       description: "Append structure reserved for AdtAppendStructure tests"
       params:
         append_structure_name: "ZADT_S_APPEND"  # ← CHANGE if needed (suffixed _S/_T per variant)

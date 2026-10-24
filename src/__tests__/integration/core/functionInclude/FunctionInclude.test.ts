@@ -21,7 +21,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateOn } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -240,36 +240,54 @@ describe('FunctionInclude (using AdtClient)', () => {
             const transportRequest = resolveTransportRequest(
               testCase?.params?.transport_request,
             );
-            const readResult = await client
-              .getFunctionGroup()
-              .readMetadata({ functionGroupName });
-            if (readResult) {
+            // `if (readResult)` was true for an answer object either way, so
+            // this said "already exists" for a group that was not there and
+            // the shared failure above vanished. The answer decides.
+            const readGroup = () =>
+              client.getFunctionGroup().readMetadata({ functionGroupName });
+            const existing = presenceOf(
+              await readGroup(),
+              `function group ${functionGroupName}`,
+            );
+            if (existing.present === 'unknown') {
+              throw new Error(existing.reason);
+            }
+            if (existing.present === true) {
               testsLogger.info?.(
                 `Function group ${functionGroupName} already exists`,
               );
             } else {
-              try {
-                await client.getFunctionGroup().create(
-                  {
-                    functionGroupName,
-                    packageName,
-                    description: 'Shared FUGR for FunctionInclude tests',
-                    transportRequest,
-                  },
-                  {
-                    headers: integrationHeadersOf(
-                      client.getFunctionGroup(),
-                      'create',
-                    ),
-                  },
-                );
-              } catch (_createErr) {
-                // Cloud can 404 the post-create read; retry once.
+              const created = await client.getFunctionGroup().create(
+                {
+                  functionGroupName,
+                  packageName,
+                  description: 'Shared FUGR for FunctionInclude tests',
+                  transportRequest,
+                },
+                {
+                  headers: integrationHeadersOf(
+                    client.getFunctionGroup(),
+                    'create',
+                  ),
+                },
+              );
+              if (!created.ok) {
+                // On cloud the create may have happened although its answer
+                // says otherwise (eventual consistency): wait, and let the
+                // object's presence decide. Not there, the refusal stands.
                 await new Promise((r) => setTimeout(r, 5000));
-                const verify = await client
-                  .getFunctionGroup()
-                  .readMetadata({ functionGroupName });
-                if (!verify) throw _createErr;
+                const verify = presenceOf(
+                  await readGroup(),
+                  `function group ${functionGroupName}`,
+                );
+                if (verify.present !== true) {
+                  throw new Error(
+                    failureOf(
+                      created,
+                      `create function group ${functionGroupName}`,
+                    ),
+                  );
+                }
               }
               testsLogger.info?.(
                 `Created function group ${functionGroupName} in ${packageName}`,

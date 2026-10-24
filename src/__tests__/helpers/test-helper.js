@@ -65,6 +65,8 @@ async function writeSource(handler, config, options, logger) {
   if (typeof handler.lock === 'function') {
     handle = raise(await handler.lock(config), 'lock');
   }
+  let writeFailed = true;
+  let unlockRefusal = '';
   try {
     // `update` writes a source; a type that has none writes its document with
     // `updateMetadata`, and since 18.0.0 it offers only that. A domain, a data
@@ -88,16 +90,22 @@ async function writeSource(handler, config, options, logger) {
         }),
         'updateMetadata',
       );
+    writeFailed = false;
   } finally {
     if (handle && typeof handler.unlock === 'function') {
       const released = await handler.unlock(config, handle);
       if (released && released.ok === false) {
-        logger?.warn?.(
-          `unlock failed, the handle may still be held: ${released.getError().message}`,
-        );
+        const refusal = `unlock failed, the handle may still be held: ${released.getError().message}`;
+        // A refused unlock is a failure of its own: the handle left held is
+        // what makes the next write answer 403. When the write already
+        // failed, that failure is the one in flight, so this one is logged
+        // beside it instead of replacing it.
+        if (writeFailed) logger?.warn?.(refusal);
+        else unlockRefusal = refusal;
       }
     }
   }
+  if (unlockRefusal) throw new Error(unlockRefusal);
 }
 
 /**

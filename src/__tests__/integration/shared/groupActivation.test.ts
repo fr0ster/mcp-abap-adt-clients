@@ -14,7 +14,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 // The source path, not the package: this reading is new in adt-strategies and
 // the package's built entry point does not carry it until it is released.
-import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseUnsupportedStatus,
+  utilActivationRunId,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -31,8 +37,10 @@ import {
   gate,
   missingCaseMessage,
 } from '../../helpers/caseGate';
-import { expectResult } from '../../helpers/contract';
+import { CleanupSteps } from '../../helpers/cleanupSteps';
+import { expectResult, releasing } from '../../helpers/contract';
 import { expectLockReleased } from '../../helpers/lockReleased';
+import { expectRemovedOrAbsent } from '../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -182,67 +190,68 @@ describe('Group Activation (Shared)', () => {
         return;
       }
 
+      // Every delete runs whatever the one before answered, and a refused one
+      // fails the suite once all have run: an object this test created and
+      // could not remove is what the next run's create meets.
+      const steps = new CleanupSteps();
+      const pause = () =>
+        new Promise((resolve) =>
+          setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
+        );
       if (structureCreated && structureName) {
-        try {
-          logTestStep('cleanup: delete structure', testsLogger);
-          await client.getStructure().delete(
-            {
-              structureName: structureName,
-              transportRequest: transportRequest,
-            },
-            { headers: integrationHeadersOf(client.getStructure(), 'delete') },
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
-          );
-        } catch (error: any) {
-          testsLogger.warn?.(
-            `⚠️ Failed to delete structure ${structureName}: ${error.message}`,
-          );
-        }
+        logTestStep('cleanup: delete structure', testsLogger);
+        await steps.run(
+          `delete structure ${structureName}`,
+          () =>
+            client.getStructure().delete(
+              { structureName: structureName!, transportRequest },
+              {
+                headers: integrationHeadersOf(client.getStructure(), 'delete'),
+                analyse: analyseDeletion,
+              },
+            ),
+          { checkAnswer: true },
+        );
+        await pause();
       }
 
       if (dataElementCreated && dataElementName) {
-        try {
-          logTestStep('cleanup: delete data element', testsLogger);
-          await client.getDataElement().delete(
-            {
-              dataElementName: dataElementName,
-              transportRequest: transportRequest,
-            },
-            {
-              headers: integrationHeadersOf(client.getDataElement(), 'delete'),
-            },
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
-          );
-        } catch (error: any) {
-          testsLogger.warn?.(
-            `⚠️ Failed to delete data element ${dataElementName}: ${error.message}`,
-          );
-        }
+        logTestStep('cleanup: delete data element', testsLogger);
+        await steps.run(
+          `delete data element ${dataElementName}`,
+          () =>
+            client.getDataElement().delete(
+              { dataElementName: dataElementName!, transportRequest },
+              {
+                headers: integrationHeadersOf(
+                  client.getDataElement(),
+                  'delete',
+                ),
+                analyse: analyseDeletion,
+              },
+            ),
+          { checkAnswer: true },
+        );
+        await pause();
       }
 
       if (domainCreated && domainName) {
-        try {
-          logTestStep('cleanup: delete domain', testsLogger);
-          await client.getDomain().delete(
-            {
-              domainName: domainName,
-              transportRequest: transportRequest,
-            },
-            { headers: integrationHeadersOf(client.getDomain(), 'delete') },
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, getOperationDelay('delete', testCase) || 3000),
-          );
-        } catch (error: any) {
-          testsLogger.warn?.(
-            `⚠️ Failed to delete domain ${domainName}: ${error.message}`,
-          );
-        }
+        logTestStep('cleanup: delete domain', testsLogger);
+        await steps.run(
+          `delete domain ${domainName}`,
+          () =>
+            client.getDomain().delete(
+              { domainName: domainName!, transportRequest },
+              {
+                headers: integrationHeadersOf(client.getDomain(), 'delete'),
+                analyse: analyseDeletion,
+              },
+            ),
+          { checkAnswer: true },
+        );
+        await pause();
       }
+      steps.finish();
     });
 
     gate('group_activation', 'adt_group_activation')(
@@ -294,6 +303,7 @@ describe('Group Activation (Shared)', () => {
                     client.getStructure(),
                     'delete',
                   ),
+                  analyse: analyseDeletion,
                 },
               ),
           ],
@@ -307,6 +317,7 @@ describe('Group Activation (Shared)', () => {
                     client.getDataElement(),
                     'delete',
                   ),
+                  analyse: analyseDeletion,
                 },
               ),
           ],
@@ -317,32 +328,28 @@ describe('Group Activation (Shared)', () => {
                 { domainName: domainName!, transportRequest },
                 {
                   headers: integrationHeadersOf(client.getDomain(), 'delete'),
+                  analyse: analyseDeletion,
                 },
               ),
           ],
         ] as const) {
-          try {
-            if (label !== 'structure' && isSharedName(label)) {
-              continue;
-            }
-            await deleteFn();
-            testsLogger.info?.(`Pre-cleanup: deleted leftover ${label}`);
-          } catch (error) {
-            // Usually "does not exist", which is the expected case — but not
-            // always. A refused deletion is swallowed here too, and then shows up
-            // three steps later as `409 Conflict` on the create, which says
-            // nothing about why. Say why.
-            //
-            // Order matters and is not interchangeable: the structure references
-            // the data element, which references the domain, so they come apart
-            // in exactly this sequence. Removing the data element first leaves a
-            // dangling reference and the delete is refused.
-            testsLogger.info?.(
-              `Pre-cleanup: ${label} not removed — ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
+          if (label !== 'structure' && isSharedName(label)) {
+            continue;
           }
+          // Absence is the expected answer; removed is fine too. Any other
+          // refusal fails here, naming what SAP said, rather than showing up
+          // three steps later as `409 Conflict` on the create, which says
+          // nothing about why.
+          //
+          // Order matters and is not interchangeable: the structure references
+          // the data element, which references the domain, so they come apart
+          // in exactly this sequence. Removing the data element first leaves a
+          // dangling reference and the delete is refused.
+          const removed = expectRemovedOrAbsent(
+            await deleteFn(),
+            `pre-cleanup: delete leftover ${label}`,
+          );
+          testsLogger.info?.(`Pre-cleanup: leftover ${label} ${removed}`);
         }
 
         // Objects taken from shared_dependencies are created once by
@@ -353,31 +360,56 @@ describe('Group Activation (Shared)', () => {
         const isShared = (name: string | null) =>
           !!name?.startsWith('ZAC_SHR_');
 
+        // A name validation answers in its document, and a leftover of an
+        // earlier run is what it reports as "already exists". The one refusal
+        // accepted is a system with no validation resource (404/405/501), read
+        // as `UNSUPPORTED_OPERATION`: it has not judged the name, and the create
+        // that follows does. Any other refusal fails with what SAP said.
+        const expectNameFree = (
+          answer: IAdtResponse<unknown>,
+          label: string,
+          name: string,
+        ): void => {
+          if (
+            !answer.ok &&
+            answer.getError().code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION
+          ) {
+            testsLogger.warn?.(
+              `⚠️ ${label} validation unavailable: ${answer.getError().message}`,
+            );
+            return;
+          }
+          const document = String(
+            expectResult(answer, `validate ${label}`) ?? '',
+          );
+          if (/already exists|does already exist/i.test(document)) {
+            throw new Error(
+              `${label} ${name} already exists: delete it before the run`,
+            );
+          }
+        };
+        const validation = {
+          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
+        };
+
         try {
           // Step 0: Validate domain
           currentStep = 'validate domain';
           logTestStep(currentStep, testsLogger);
-          try {
-            await client.getDomain().validate({
-              domainName: domainName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test domain for group activation`,
-            });
-          } catch (error: any) {
-            // If validation fails with "already exists", skip test
-            if (
-              error.message?.includes('already exists') ||
-              error.message?.includes('does already exist')
-            ) {
-              throw new Error(
-                `Domain ${domainName} already exists: delete it before the run`,
-              );
-            }
-            // Otherwise, log warning but continue
-            testsLogger.warn?.(`⚠️ Domain validation warning: ${error.message}`);
-          }
+          expectNameFree(
+            await client.getDomain().validate(
+              {
+                domainName: domainName,
+                packageName: packageName,
+                description:
+                  testCase.params.description ||
+                  `Test domain for group activation`,
+              },
+              validation,
+            ),
+            'Domain',
+            domainName,
+          );
 
           // Step 1: Create domain — unless it is a shared object
           currentStep = 'create domain';
@@ -387,16 +419,19 @@ describe('Group Activation (Shared)', () => {
             );
           } else {
             logTestStep(currentStep, testsLogger);
-            await client.getDomain().create(
-              {
-                domainName: domainName,
-                packageName: packageName,
-                description:
-                  testCase.params.description ||
-                  `Test domain for group activation`,
-                transportRequest: transportRequest,
-              },
-              { headers: integrationHeadersOf(client.getDomain(), 'create') },
+            expectResult(
+              await client.getDomain().create(
+                {
+                  domainName: domainName,
+                  packageName: packageName,
+                  description:
+                    testCase.params.description ||
+                    `Test domain for group activation`,
+                  transportRequest: transportRequest,
+                },
+                { headers: integrationHeadersOf(client.getDomain(), 'create') },
+              ),
+              'create domain',
             );
             domainCreated = true;
             await new Promise((resolve) =>
@@ -406,29 +441,20 @@ describe('Group Activation (Shared)', () => {
             // Step 1.5: Validate data element
             currentStep = 'validate data element';
             logTestStep(currentStep, testsLogger);
-            try {
-              await client.getDataElement().validate({
-                dataElementName: dataElementName,
-                packageName: packageName,
-                description:
-                  testCase.params.description ||
-                  `Test data element for group activation`,
-              });
-            } catch (error: any) {
-              // If validation fails with "already exists", skip test
-              if (
-                error.message?.includes('already exists') ||
-                error.message?.includes('does already exist')
-              ) {
-                throw new Error(
-                  `Data element ${dataElementName} already exists: delete it before the run`,
-                );
-              }
-              // Otherwise, log warning but continue
-              testsLogger.warn?.(
-                `⚠️ Data element validation warning: ${error.message}`,
-              );
-            }
+            expectNameFree(
+              await client.getDataElement().validate(
+                {
+                  dataElementName: dataElementName,
+                  packageName: packageName,
+                  description:
+                    testCase.params.description ||
+                    `Test data element for group activation`,
+                },
+                validation,
+              ),
+              'Data element',
+              dataElementName,
+            );
           }
 
           // Step 2: Create data element — unless it is a shared object
@@ -439,22 +465,25 @@ describe('Group Activation (Shared)', () => {
             );
           } else {
             logTestStep(currentStep, testsLogger);
-            await client.getDataElement().create(
-              {
-                dataElementName: dataElementName,
-                packageName: packageName,
-                description:
-                  testCase.params.description ||
-                  `Test data element for group activation`,
-                typeKind: testCase.params.data_element_type_kind || 'domain',
-                transportRequest: transportRequest,
-              },
-              {
-                headers: integrationHeadersOf(
-                  client.getDataElement(),
-                  'create',
-                ),
-              },
+            expectResult(
+              await client.getDataElement().create(
+                {
+                  dataElementName: dataElementName,
+                  packageName: packageName,
+                  description:
+                    testCase.params.description ||
+                    `Test data element for group activation`,
+                  typeKind: testCase.params.data_element_type_kind || 'domain',
+                  transportRequest: transportRequest,
+                },
+                {
+                  headers: integrationHeadersOf(
+                    client.getDataElement(),
+                    'create',
+                  ),
+                },
+              ),
+              'create data element',
             );
             dataElementCreated = true;
             await new Promise((resolve) =>
@@ -464,28 +493,19 @@ describe('Group Activation (Shared)', () => {
             // Step 2.5: Validate structure
             currentStep = 'validate structure';
             logTestStep(currentStep, testsLogger);
-            try {
-              await client.getStructure().validate({
-                structureName: structureName,
-                description:
-                  testCase.params.description ||
-                  `Test structure for group activation`,
-              });
-            } catch (error: any) {
-              // If validation fails with "already exists", skip test
-              if (
-                error.message?.includes('already exists') ||
-                error.message?.includes('does already exist')
-              ) {
-                throw new Error(
-                  `Structure ${structureName} already exists: delete it before the run`,
-                );
-              }
-              // Otherwise, log warning but continue
-              testsLogger.warn?.(
-                `⚠️ Structure validation warning: ${error.message}`,
-              );
-            }
+            expectNameFree(
+              await client.getStructure().validate(
+                {
+                  structureName: structureName,
+                  description:
+                    testCase.params.description ||
+                    `Test structure for group activation`,
+                },
+                validation,
+              ),
+              'Structure',
+              structureName,
+            );
           }
 
           // Step 3: Create structure based on data element
@@ -500,16 +520,21 @@ define structure ${structureName} {
  mandt : abap.clnt;
  test_field : ${dataElementName};
 }`;
-          await client.getStructure().create(
-            {
-              structureName: structureName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test structure for group activation`,
-              transportRequest: transportRequest,
-            },
-            { headers: integrationHeadersOf(client.getStructure(), 'create') },
+          expectResult(
+            await client.getStructure().create(
+              {
+                structureName: structureName,
+                packageName: packageName,
+                description:
+                  testCase.params.description ||
+                  `Test structure for group activation`,
+                transportRequest: transportRequest,
+              },
+              {
+                headers: integrationHeadersOf(client.getStructure(), 'create'),
+              },
+            ),
+            'create structure',
           );
           structureCreated = true;
           await new Promise((resolve) =>
@@ -520,28 +545,35 @@ define structure ${structureName} {
           currentStep = 'update structure';
           logTestStep(currentStep, testsLogger);
           const structureHandler = client.getStructure();
+          // Narrowed once here: the closures below do not keep the narrowing.
+          const updatedStructure: string = structureName;
           const structureLockHandle = expectResult(
             await structureHandler.lock({ structureName }),
             'lock structure',
           );
-          try {
-            await structureHandler.update(
-              {
-                structureName: structureName,
-                source: structureDdlCode,
-                transportRequest: transportRequest,
-              },
-              {
-                headers: integrationHeadersOf(structureHandler, 'update'),
-                lockHandle: structureLockHandle,
-              },
-            );
-          } finally {
-            await structureHandler.unlock(
-              { structureName },
-              structureLockHandle,
-            );
-          }
+          await releasing(
+            async () =>
+              expectResult(
+                await structureHandler.update(
+                  {
+                    structureName: updatedStructure,
+                    source: structureDdlCode,
+                    transportRequest: transportRequest,
+                  },
+                  {
+                    headers: integrationHeadersOf(structureHandler, 'update'),
+                    lockHandle: structureLockHandle,
+                  },
+                ),
+                'update structure',
+              ),
+            () =>
+              structureHandler.unlock(
+                { structureName: updatedStructure },
+                structureLockHandle,
+              ),
+            'unlock structure',
+          );
           await expectLockReleased(
             (c) => c.getStructure(),
             { structureName },
@@ -602,8 +634,28 @@ define structure ${structureName} {
             await utils.getActivationResults(runId),
             'activation results',
           );
+          // A finished run is not an activation that happened: the results
+          // say that. `activationExecuted="true"` beside an error message is
+          // still a failure — the object stays inactive — read as
+          // `activateSharedGroup` reads it.
+          const resultsDocument = String(results ?? '');
+          const activationErrors = [
+            ...resultsDocument.matchAll(
+              /<msg\b[^>]*type="E"[^>]*>[\s\S]*?<txt>([^<]*)<\/txt>/g,
+            ),
+          ].map((m) => m[1]);
+          if (
+            !/activationExecuted="true"/.test(resultsDocument) ||
+            activationErrors.length > 0
+          ) {
+            throw new Error(
+              `group activation run ${runId} did not activate: ${
+                activationErrors.join('; ') || resultsDocument.slice(0, 600)
+              }`,
+            );
+          }
           testsLogger.info?.(
-            `✅ run ${runId} finished; results: ${String(results).slice(0, 120)}`,
+            `✅ run ${runId} finished; results: ${resultsDocument.slice(0, 120)}`,
           );
 
           logTestSuccess(testsLogger, 'Group Activation - full workflow');

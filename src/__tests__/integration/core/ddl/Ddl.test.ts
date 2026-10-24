@@ -25,7 +25,7 @@ import {
   gate,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -140,7 +140,11 @@ describe('View (using AdtClient)', () => {
             await client.getDdl().read({ ddlName }),
             `DDL source ${ddlName}`,
           );
-          if (existing.present !== true) return { success: true };
+          // "Could not find out" is not "absent": the create would meet it.
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === false) return { success: true };
           const removed = await client.getDdl().delete(
             {
               ddlName,
@@ -148,10 +152,17 @@ describe('View (using AdtClient)', () => {
             },
             { headers: integrationHeadersOf(client.getDdl(), 'delete') },
           );
+          // A leftover that would not delete is what the create meets next:
+          // the test fails here, naming what SAP said.
           if (!removed.ok) {
-            testsLogger.warn?.(
-              `could not remove leftover ${ddlName}: ${removed.getError().message}`,
-            );
+            return {
+              success: false,
+              objectExists: true,
+              reason: failureOf(
+                removed,
+                `delete leftover DDL source ${ddlName}`,
+              ),
+            };
           }
           await new Promise((resolve) => setTimeout(resolve, 3000));
           return { success: true };

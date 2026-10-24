@@ -26,7 +26,7 @@ import {
   gateOn,
   gateStandardObject,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -151,11 +151,15 @@ describe('Class (using AdtClient)', () => {
               await cleanupClient.getClass().read({ className }),
               `class ${className}`,
             );
+            // "Could not find out" is not "absent": the create would meet it.
+            if (existing.present === 'unknown') {
+              return { success: false, reason: existing.reason };
+            }
             if (existing.present === true) {
               try {
                 // Use BaseTester's config resolver to get transport request (allows overriding global params)
                 const transportRequest = tester.getTransportRequest();
-                await cleanupClient.getClass().delete(
+                const removed = await cleanupClient.getClass().delete(
                   {
                     className,
                     transportRequest,
@@ -167,12 +171,23 @@ describe('Class (using AdtClient)', () => {
                     ),
                   },
                 );
+                if (!removed.ok) {
+                  return {
+                    success: false,
+                    objectExists: true,
+                    reason: failureOf(
+                      removed,
+                      `delete existing class ${className}`,
+                    ),
+                  };
+                }
                 await new Promise((resolve) => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
-                testsLogger.warn(
-                  `Could not delete existing class ${className}: ${cleanupError.message}. Will attempt update instead of create.`,
-                );
-                return { success: true, objectExists: true };
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: `Failed to delete existing class ${className}: ${cleanupError.message}`,
+                };
               }
             }
           } catch (error: any) {

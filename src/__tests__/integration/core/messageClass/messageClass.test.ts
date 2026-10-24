@@ -17,6 +17,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -31,7 +32,8 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf, saysAbsent } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -73,6 +75,29 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/**
+ * Wait for a deleted message class to be gone: the deletion service is
+ * asynchronous, so a same-name re-run would race the still-completing delete.
+ * Absent ends the wait; a read that cannot tell is a failure, named; still
+ * there after the wait is left to the caller's next step, which meets it with
+ * SAP's own answer.
+ */
+async function untilMessageClassGone(
+  read: () => Promise<IAdtResponse<unknown>>,
+  name: string,
+): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const still = presenceOf(await read(), `message class ${name}`);
+    if (still.present === false) return '';
+    if (still.present === 'unknown') return still.reason;
+  }
+  testsLogger.warn?.(
+    `message class ${name} still answers 10 s after its delete was accepted`,
+  );
+  return '';
+}
 
 describe('MessageClass (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -139,54 +164,58 @@ describe('MessageClass (using AdtClient)', () => {
           // absent and we proceed. (Delete uses the stateless deletion service,
           // so it leaves no lingering enqueue.)
           if (!connection) return { success: true };
-          try {
-            const state = await client
-              .getMessageClass()
-              .readMetadata({ name: msgClassName });
-            // `state.ok`, not `state`: the answer is an object either way, so
-            // the bare check was always true and this deleted a class that was
-            // not there on every run.
-            if (state.ok) {
-              await client.getMessageClass().delete(
-                {
-                  name: msgClassName,
-                  transportRequest: resolvedTransport,
-                },
-                {
-                  headers: integrationHeadersOf(
-                    client.getMessageClass(),
-                    'delete',
-                  ),
-                },
-              );
-              // The deletion service is asynchronous — poll until the object is
-              // actually gone (read → 404) before recreating, so a same-name
-              // re-run does not race the still-completing delete.
-              for (let i = 0; i < 20; i++) {
-                await new Promise((r) => setTimeout(r, 500));
-                const still = await client
-                  .getMessageClass()
-                  .readMetadata({ name: msgClassName });
-                if (!still.ok) break;
-              }
-            }
-          } catch (error: any) {
-            if (error?.response?.status !== 404) {
+          const read = () =>
+            client.getMessageClass().readMetadata({ name: msgClassName });
+          // The answer decides — see `presenceOf`; "could not find out" is
+          // not "absent".
+          const existing = presenceOf(
+            await read(),
+            `message class ${msgClassName}`,
+          );
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === true) {
+            const removed = await client.getMessageClass().delete(
+              {
+                name: msgClassName,
+                transportRequest: resolvedTransport,
+              },
+              {
+                headers: integrationHeadersOf(
+                  client.getMessageClass(),
+                  'delete',
+                ),
+              },
+            );
+            if (!removed.ok) {
               return {
                 success: false,
-                reason: `Cannot verify message class existence: ${error.message}`,
+                objectExists: true,
+                reason: failureOf(
+                  removed,
+                  `delete existing message class ${msgClassName}`,
+                ),
               };
             }
+            const unknown = await untilMessageClassGone(read, msgClassName);
+            if (unknown) return { success: false, reason: unknown };
           }
           return { success: true };
         },
         // cleanupObject: called by BaseTester when a pre-existing object is detected
         cleanupObject: async (config: IMessageClassConfig) => {
-          await client
-            .getMessageClass()
-            .delete(config as Partial<IMessageClassConfig>, {
-              headers: integrationHeadersOf(client.getMessageClass(), 'delete'),
-            });
+          expectResult(
+            await client
+              .getMessageClass()
+              .delete(config as Partial<IMessageClassConfig>, {
+                headers: integrationHeadersOf(
+                  client.getMessageClass(),
+                  'delete',
+                ),
+              }),
+            `delete message class ${config.name}`,
+          );
         },
       });
     } catch (error) {
@@ -223,6 +252,7 @@ describe('MessageClass (using AdtClient)', () => {
         const testName = 'MessageClass - Full workflow';
         logTestStart(testsLogger, testName, testCase);
 
+        let bodyError: unknown;
         try {
           // ── Step 1: Create message class ───────────────────────────────────
           logTestStep('create message class', testsLogger);
@@ -274,17 +304,18 @@ describe('MessageClass (using AdtClient)', () => {
               },
               { headers: integrationHeadersOf(msgHandler, 'create') },
             );
-          let created = await createMessage().catch((e: unknown) => e as Error);
+          // The refusal comes back as an answer, not a throw: the retry is on
+          // that answer saying the class does not exist yet, and nothing else.
+          let created = await createMessage();
           for (
             let attempt = 0;
-            created instanceof Error && attempt < 15;
+            !created.ok && saysAbsent(created.getError()) && attempt < 15;
             attempt++
           ) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            created = await createMessage().catch((e: unknown) => e as Error);
+            created = await createMessage();
           }
-          if (created instanceof Error) throw created;
-          const msgCreateState = created;
+          expectResult(created, `create message ${msgNo}`);
 
           // ── Step 4: Read message ───────────────────────────────────────────
           logTestStep(`read message ${msgNo}`, testsLogger);
@@ -372,37 +403,46 @@ describe('MessageClass (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, testName);
         } catch (error) {
+          bodyError = error;
           logTestError(testsLogger, testName, error);
-          throw error;
         } finally {
           logTestEnd(testsLogger, testName);
-          // Cleanup: always delete the message class after the test.
-          // BaseTester.afterAll only closes the connection; object deletion
-          // must happen here so the next run starts with a clean state.
-          try {
-            await mcHandler.delete(config as Partial<IMessageClassConfig>, {
-              headers: integrationHeadersOf(mcHandler, 'delete'),
-            });
-            // The deletion service is asynchronous — wait until the class is
-            // actually gone so a back-to-back re-run does not race an in-flight
-            // delete (create-then-read would otherwise 404 on the same name).
-            // `read` answers a contract, and a contract is always truthy. This
-            // read `if (!still) break`, so the loop never broke: twenty round
-            // trips and ten seconds of sleeping every run, all of them
-            // answering 404, measured in a wire log. The answer says whether
-            // the class is gone; the object it arrives in does not.
-            for (let i = 0; i < 20; i++) {
-              await new Promise((r) => setTimeout(r, 500));
-              const still = await mcHandler.readMetadata({
-                name: msgClassName,
-              });
-              if (!still.ok) break;
-            }
-          } catch {
-            // Swallow — class may already be absent or delete may fail after a
-            // partial test run; this is best-effort cleanup.
-          }
         }
+
+        // Cleanup: always delete the message class after the test.
+        // BaseTester.afterAll only closes the connection; object deletion
+        // must happen here so the next run starts with a clean state.
+        // A refused delete fails the test; when the body already failed it
+        // is added to that failure instead, never replacing it. An absent
+        // class — the body failed before creating it — is no refusal.
+        let leftover = '';
+        try {
+          const removed = await mcHandler.delete(
+            config as Partial<IMessageClassConfig>,
+            { headers: integrationHeadersOf(mcHandler, 'delete') },
+          );
+          leftover = removed.ok
+            ? await untilMessageClassGone(
+                () => mcHandler.readMetadata({ name: msgClassName }),
+                msgClassName,
+              )
+            : saysAbsent(removed.getError())
+              ? ''
+              : failureOf(removed, `delete message class ${msgClassName}`);
+        } catch (cleanupError) {
+          leftover = `delete message class ${msgClassName} threw: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`;
+        }
+        if (bodyError !== undefined) {
+          if (leftover && bodyError instanceof Error) {
+            bodyError.message = `${bodyError.message}; then ${leftover}`;
+          }
+          throw bodyError;
+        }
+        if (leftover) throw new Error(leftover);
       },
       getTimeout('test'),
     );

@@ -22,7 +22,7 @@ import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -135,6 +135,10 @@ describe('FunctionGroup (using AdtClient)', () => {
                 .readMetadata({ functionGroupName }),
               `function group ${functionGroupName}`,
             );
+            // "Could not find out" is not "absent": the create would meet it.
+            if (existing.present === 'unknown') {
+              return { success: false, reason: existing.reason };
+            }
             if (existing.present === true) {
               // Try to release any stale lock before deleting
               try {
@@ -142,12 +146,21 @@ describe('FunctionGroup (using AdtClient)', () => {
                   .getFunctionGroup()
                   .lock({ functionGroupName });
                 if (locked.ok) {
-                  await cleanupClient
+                  const unlocked = await cleanupClient
                     .getFunctionGroup()
                     .unlock({ functionGroupName }, locked.getResult().value);
                   testsLogger.info?.(
                     `Released stale lock on ${functionGroupName}`,
                   );
+                  if (!unlocked.ok) {
+                    return {
+                      success: false,
+                      reason: failureOf(
+                        unlocked,
+                        `release stale lock on ${functionGroupName}`,
+                      ),
+                    };
+                  }
                 }
               } catch (lockError: any) {
                 // Lock failed — object locked by another user/session
@@ -170,7 +183,7 @@ describe('FunctionGroup (using AdtClient)', () => {
 
               try {
                 const transportRequest = tester.getTransportRequest();
-                await cleanupClient.getFunctionGroup().delete(
+                const removed = await cleanupClient.getFunctionGroup().delete(
                   {
                     functionGroupName,
                     transportRequest,
@@ -182,12 +195,23 @@ describe('FunctionGroup (using AdtClient)', () => {
                     ),
                   },
                 );
+                if (!removed.ok) {
+                  return {
+                    success: false,
+                    objectExists: true,
+                    reason: failureOf(
+                      removed,
+                      `delete existing function group ${functionGroupName}`,
+                    ),
+                  };
+                }
                 await new Promise((resolve) => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
-                testsLogger.warn(
-                  `Could not delete existing function group ${functionGroupName}: ${cleanupError.message}. Will attempt update instead of create.`,
-                );
-                return { success: true, objectExists: true };
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: `Failed to delete existing function group ${functionGroupName}: ${cleanupError.message}`,
+                };
               }
             }
           } catch (error: any) {

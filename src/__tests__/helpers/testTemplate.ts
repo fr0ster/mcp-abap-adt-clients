@@ -45,6 +45,7 @@ import {
 } from '../helpers/testLogger';
 import { integrationHeadersOf } from './adtHeaders';
 import { BaseTester } from './BaseTester';
+import { failureOf } from './contract';
 import { logTestSkip } from './testProgressLogger';
 
 const {
@@ -181,7 +182,7 @@ describe('ObjectType (using AdtClient)', () => {
               libraryLogger,
               systemContext,
             );
-            await cleanupClient.getInclude().delete(
+            const removed = await cleanupClient.getInclude().delete(
               {
                 includeName: name,
                 transportRequest: tester.getTransportRequest(),
@@ -193,6 +194,13 @@ describe('ObjectType (using AdtClient)', () => {
                 ),
               },
             );
+            if (!removed.ok) {
+              return {
+                success: false,
+                objectExists: true,
+                reason: failureOf(removed, `delete existing include ${name}`),
+              };
+            }
             await new Promise((resolve) => setTimeout(resolve, 3000));
           } catch (error: any) {
             if (error.response?.status !== 404) {

@@ -356,9 +356,12 @@ describe('ClassExecutor (integration)', () => {
 
         let result = await profiledRun();
         if (isMissingClassRunMainMessage(result.run)) {
-          await client.getClass().read({ className }, 'active', {
-            withLongPolling: true,
-          });
+          expectResult(
+            await client.getClass().read({ className }, 'active', {
+              withLongPolling: true,
+            }),
+            'read the class until it is active',
+          );
           await wait(1000);
           await runClassWithReadinessRetry(className);
           result = await profiledRun();

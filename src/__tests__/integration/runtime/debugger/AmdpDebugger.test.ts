@@ -44,6 +44,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
@@ -382,16 +383,25 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     'continues to the next iteration, then to the end of the procedure',
     async () => {
       needs(debuggeeId, 'a debuggee');
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue'),
+        'continue',
+      );
       await until('ON_BREAK');
       expect(lineOf(lastBreak as IEvent)).toBe(LINE.loop);
       expect(variablesOf(lastBreak as IEvent).get('LV_I')).toBe('2');
 
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue'),
+        'continue',
+      );
       await until('ON_BREAK');
       expect(variablesOf(lastBreak as IEvent).get('LV_I')).toBe('3');
 
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue'),
+        'continue',
+      );
       const end = await until('ON_EXECUTION_END', 'ON_BREAK');
       expect(end.some((e) => e.kind === 'ON_EXECUTION_END')).toBe(true);
     },
@@ -414,7 +424,10 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     async () => {
       needs(debuggeeId, 'a debuggee in the table function');
       // One more iteration, so the table holds a row.
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue'),
+        'continue',
+      );
       await until('ON_BREAK');
       expect(lineOf(lastBreak as IEvent)).toBe(LINE.tf);
 
@@ -468,7 +481,10 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     async () => {
       needs(debuggeeId, 'a debuggee');
       expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue'),
+        'continue',
+      );
       await until('ON_EXECUTION_END');
       lastBreak = undefined;
 
@@ -487,7 +503,10 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     'cancels a debuggee where it stands, and the run fails',
     async () => {
       needs(mainId, 'a debug session');
-      await onCommands.syncBreakpoints(mainId, breakpoints());
+      expectResult(
+        await onCommands.syncBreakpoints(mainId, breakpoints()),
+        'set the breakpoints',
+      );
       await until('SYNC_BREAKPOINTS');
       runClass();
       await until('ON_BREAK');

@@ -31,7 +31,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateAll, gateStandardObject } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -133,7 +133,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
                 libraryLogger,
                 systemContext,
               );
-              await cleanupClient.getInclude().delete(
+              const removed = await cleanupClient.getInclude().delete(
                 { includeName, transportRequest },
                 {
                   headers: integrationHeadersOf(
@@ -142,6 +142,16 @@ describe('Include (PROG/I, using AdtClient)', () => {
                   ),
                 },
               );
+              if (!removed.ok) {
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: failureOf(
+                    removed,
+                    `delete existing include ${includeName}`,
+                  ),
+                };
+              }
               await new Promise((resolve) => setTimeout(resolve, 3000));
             } catch (cleanupError: any) {
               return {

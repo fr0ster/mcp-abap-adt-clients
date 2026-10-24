@@ -34,7 +34,7 @@ import {
   gateAll,
   gateOn,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, releasing } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -199,38 +199,40 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
         try {
           logTestStep('update (source)', testsLogger);
           const handle = String(expectResult(await cls.lock(config), 'lock'));
-          try {
-            expectResult(
-              await cls.update(config, {
-                headers: integrationHeadersOf(cls, 'update'),
-                source: testCase.params.source_code,
-                lockHandle: handle,
-              }),
-              'write the class source',
-            );
-          } finally {
-            await cls.unlock(config, handle);
-          }
+          await releasing(
+            async () =>
+              expectResult(
+                await cls.update(config, {
+                  headers: integrationHeadersOf(cls, 'update'),
+                  source: testCase.params.source_code,
+                  lockHandle: handle,
+                }),
+                'write the class source',
+              ),
+            () => cls.unlock(config, handle),
+            'unlock after write the class source',
+          );
 
           logTestStep('update (testclasses)', testsLogger);
           const includeHandle = String(
             expectResult(await cls.lock(config), 'lock for testclasses'),
           );
-          try {
-            expectResult(
-              await client.getLocalTestClass().update(config, {
-                headers: integrationHeadersOf(
-                  client.getLocalTestClass(),
-                  'update',
-                ),
-                source: testCase.params.test_class_source,
-                lockHandle: includeHandle,
-              }),
-              'write the testclasses include',
-            );
-          } finally {
-            await cls.unlock(config, includeHandle);
-          }
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getLocalTestClass().update(config, {
+                  headers: integrationHeadersOf(
+                    client.getLocalTestClass(),
+                    'update',
+                  ),
+                  source: testCase.params.test_class_source,
+                  lockHandle: includeHandle,
+                }),
+                'write the testclasses include',
+              ),
+            () => cls.unlock(config, includeHandle),
+            'unlock after write the testclasses include',
+          );
 
           logTestStep('activate', testsLogger);
           expectResult(

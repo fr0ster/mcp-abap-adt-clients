@@ -93,22 +93,28 @@ describe('Class local includes (using BaseTester)', () => {
         return { success: true, created: false };
       }
 
-      await client.getClass().create(
-        {
-          className: config.className,
-          packageName: config.packageName,
-          transportRequest: config.transportRequest,
-          description: config.description || `Test class ${config.className}`,
-        },
-        { headers: integrationHeadersOf(client.getClass(), 'create') },
+      expectResult(
+        await client.getClass().create(
+          {
+            className: config.className,
+            packageName: config.packageName,
+            transportRequest: config.transportRequest,
+            description: config.description || `Test class ${config.className}`,
+          },
+          { headers: integrationHeadersOf(client.getClass(), 'create') },
+        ),
+        `create parent class ${config.className}`,
       );
 
-      await client
-        .getClass()
-        .activate(
-          { className: config.className },
-          { headers: integrationHeadersOf(client.getClass(), 'activate') },
-        );
+      expectResult(
+        await client
+          .getClass()
+          .activate(
+            { className: config.className },
+            { headers: integrationHeadersOf(client.getClass(), 'activate') },
+          ),
+        `activate parent class ${config.className}`,
+      );
       return { success: true, created: true };
     } catch (error: any) {
       return {
@@ -298,7 +304,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -307,12 +315,9 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -363,7 +368,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -372,12 +379,9 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -428,7 +432,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -437,12 +443,9 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -493,7 +496,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -502,12 +507,9 @@ describe('Class local includes (using BaseTester)', () => {
                 ),
               },
               { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,

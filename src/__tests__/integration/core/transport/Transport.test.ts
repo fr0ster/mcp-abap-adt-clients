@@ -33,8 +33,9 @@ import {
   gateOn,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf, releasing } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -114,8 +115,11 @@ describe('AdtRequest', () => {
     // and it is not true: ADT deletes an EMPTY request, which is what these are
     // — created, read, never written to.
     //
-    // A refusal is logged, not thrown: cleanup must not turn a green run red,
-    // and a request that holds objects is the server protecting them.
+    // A refusal fails the suite, after every delete ran and the connection is
+    // back: a request this suite created and could not remove is the leftover
+    // this cleanup exists to prevent. One that still holds objects is the
+    // server protecting them — and a run that left objects in it.
+    const leftovers: string[] = [];
     for (const number of createdTransports) {
       const answer = await client
         .getRequest()
@@ -126,15 +130,16 @@ describe('AdtRequest', () => {
       if (answer.ok) {
         testsLogger.info?.(`Deleted test transport ${number}`);
       } else {
-        testsLogger.warn?.(
-          `Could not delete test transport ${number}: ${answer.getError().message}`,
-        );
+        leftovers.push(failureOf(answer, `delete test transport ${number}`));
       }
     }
     createdTransports.length = 0;
 
     if (connection) {
       await releaseTestConnection(connection);
+    }
+    if (leftovers.length > 0) {
+      throw new Error(`Cleanup failed: ${leftovers.join('; ')}`);
     }
   });
 
@@ -409,14 +414,11 @@ describe('AdtRequest', () => {
 
           // Read-only, and the record a `removeObject` lands in later.
           logTestStep('read the action log', testsLogger);
-          const log = await request.readActionLog(transportNumber as string);
-          if (log.ok) {
-            expect(String(log.getResult().value ?? '').length).toBeGreaterThan(
-              0,
-            );
-          } else {
-            testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
-          }
+          const log = expectResult(
+            await request.readActionLog(transportNumber as string),
+            'read the action log',
+          );
+          expect(String(log ?? '').length).toBeGreaterThan(0);
 
           // **The owner is named because the server will not choose one**, and
           // the two systems answer "who is that" in different places.
@@ -568,31 +570,44 @@ describe('AdtRequest', () => {
               `an entry for ${domainName} is present at ${stale.task}/${stale.position} — clearing it`,
               testsLogger,
             );
-            await request.removeObject(
-              stale.task,
-              {
-                name: domainName,
-                type: 'DOMA',
-                position: stale.position,
-              },
-              { headers: integrationHeadersOf(request, 'removeObject') },
+            expectResult(
+              await request.removeObject(
+                stale.task,
+                {
+                  name: domainName,
+                  type: 'DOMA',
+                  position: stale.position,
+                },
+                { headers: integrationHeadersOf(request, 'removeObject') },
+              ),
+              `clear the stale entry for ${domainName}`,
             );
           }
 
           // A previous run may have left the object itself, not just an entry.
           // Read before deleting, for the reason above: a delete aimed at
           // nothing is what registers the name.
-          if ((await domain.readMetadata({ domainName })).ok) {
+          // The answer decides — see `presenceOf`; "could not find out" is
+          // not "absent".
+          const leftover = presenceOf(
+            await domain.readMetadata({ domainName }),
+            `domain ${domainName}`,
+          );
+          if (leftover.present === 'unknown') throw new Error(leftover.reason);
+          if (leftover.present === true) {
             logTestStep(
               `${domainName} still exists — deleting it`,
               testsLogger,
             );
-            await domain.delete(
-              {
-                domainName,
-                transportRequest: sharedRequest,
-              },
-              { headers: integrationHeadersOf(domain, 'delete') },
+            expectResult(
+              await domain.delete(
+                {
+                  domainName,
+                  transportRequest: sharedRequest,
+                },
+                { headers: integrationHeadersOf(domain, 'delete') },
+              ),
+              `delete leftover ${domainName}`,
             );
           }
 
@@ -623,8 +638,12 @@ describe('AdtRequest', () => {
           // read on this side to merge into, so the caller sends the WHOLE
           // document. Read it, fill the two elements in, write it back.
           logTestStep(`give ${domainName} its data type`, testsLogger);
-          const shell = await domain.readMetadata({ domainName });
-          const shellDocument = String(shell.ok ? shell.getResult().value : '');
+          const shellDocument = String(
+            expectResult(
+              await domain.readMetadata({ domainName }),
+              `read ${domainName} after create`,
+            ) ?? '',
+          );
           if (shellDocument.trim() === '') {
             // A 200 with an empty body is how ADT answers a read of something
             // not ready yet, and patching that would build a document out of
@@ -645,27 +664,26 @@ describe('AdtRequest', () => {
             );
           }
           const domainHandle = domainLock.getResult().value;
-          try {
-            const typedIn = await domain.updateMetadata(
-              {
-                domainName,
-                packageName,
-                transportRequest: sharedRequest,
-              },
-              {
-                headers: integrationHeadersOf(domain, 'updateMetadata'),
-                source: typed,
-                lockHandle: domainHandle,
-              },
-            );
-            if (!typedIn.ok) {
-              testsLogger.warn?.(
-                `${domainName} kept its empty type: ${typedIn.getError().message}`,
-              );
-            }
-          } finally {
-            await domain.unlock({ domainName }, domainHandle);
-          }
+          await releasing(
+            async () =>
+              expectResult(
+                await domain.updateMetadata(
+                  {
+                    domainName,
+                    packageName,
+                    transportRequest: sharedRequest,
+                  },
+                  {
+                    headers: integrationHeadersOf(domain, 'updateMetadata'),
+                    source: typed,
+                    lockHandle: domainHandle,
+                  },
+                ),
+                `give ${domainName} its data type`,
+              ),
+            () => domain.unlock({ domainName }, domainHandle),
+            `unlock ${domainName}`,
+          );
           await expectLockReleased(
             (c) => c.getDomain(),
             { domainName },
@@ -673,9 +691,12 @@ describe('AdtRequest', () => {
             testsLogger,
           );
 
-          await domain.delete(
-            { domainName, transportRequest: sharedRequest },
-            { headers: integrationHeadersOf(domain, 'delete') },
+          expectResult(
+            await domain.delete(
+              { domainName, transportRequest: sharedRequest },
+              { headers: integrationHeadersOf(domain, 'delete') },
+            ),
+            `delete ${domainName}`,
           );
 
           logTestStep('find the entry the deletion left behind', testsLogger);

@@ -364,10 +364,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       expect(toEnd.ok).toBe(true);
       expect(documentOf(toEnd)).toContain('debuggeeEnded');
       attached = false;
-      const ran = await run;
-      expect(documentOf(ran as IAdtResponse<unknown>)).toContain(
-        `rows ${ROWS}`,
-      );
+      const ran = (await run) as IAdtResponse<unknown>;
+      expect(ran.ok).toBe(true);
+      expect(documentOf(ran)).toContain(`rows ${ROWS}`);
     },
     STEP_TIMEOUT,
   );

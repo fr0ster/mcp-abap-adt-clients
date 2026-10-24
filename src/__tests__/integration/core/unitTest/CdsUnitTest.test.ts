@@ -31,6 +31,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -195,21 +196,20 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           }
 
           // Delete existing test class if it exists (idempotent test)
-          try {
+          // Absent is the expected answer; any other refusal fails here.
+          const leftover = expectRemovedOrAbsent(
             await client.getClass().delete(
               {
                 className,
                 transportRequest,
               },
               { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-            testsLogger.info?.(
-              'Deleted existing CDS unit test class:',
-              className,
-            );
-          } catch {
-            // Class doesn't exist — continue
-          }
+            ),
+            `delete existing CDS unit test class ${className}`,
+          );
+          testsLogger.info?.(
+            `Existing CDS unit test class ${className}: ${leftover}`,
+          );
 
           // Step 1: Check CDS view availability for unit test doubles
           if (ddlName) {
@@ -335,12 +335,10 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           if (!skipCleanup) {
             // Cleanup test class (shared dependencies are never deleted)
             if (className) {
-              try {
-                logTestStep('delete (cleanup)', testsLogger);
-                testsLogger.info?.(
-                  'Cleaning up CDS unit test class:',
-                  className,
-                );
+              logTestStep('delete (cleanup)', testsLogger);
+              testsLogger.info?.('Cleaning up CDS unit test class:', className);
+              // The class this test created and could not remove fails it.
+              expectResult(
                 await client.getClass().delete(
                   {
                     className,
@@ -349,13 +347,10 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                   {
                     headers: integrationHeadersOf(client.getClass(), 'delete'),
                   },
-                );
-                testsLogger.info?.('CDS unit test class deleted successfully');
-              } catch (cleanupError: any) {
-                testsLogger.warn?.(
-                  `Failed to cleanup CDS unit test class: ${cleanupError.message}`,
-                );
-              }
+                ),
+                `delete CDS unit test class ${className}`,
+              );
+              testsLogger.info?.('CDS unit test class deleted successfully');
             }
           } else {
             testsLogger.info?.('Cleanup skipped - objects left for analysis');

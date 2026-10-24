@@ -33,7 +33,8 @@ import {
   gateAll,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -154,25 +155,23 @@ describe('FeatureToggle (using AdtClient)', () => {
     if (!connection || !client) {
       return { success: true };
     }
-    try {
-      await client.getFeatureToggle().readMetadata({ featureToggleName });
-      return {
-        success: false,
-        objectExists: true,
-        reason:
-          `⚠️ SAFETY: Feature toggle ${featureToggleName} already exists! ` +
-          `Delete manually or use a different test name to avoid accidental deletion.`,
-      };
-    } catch (error: any) {
-      const status = error?.response?.status ?? error?.status;
-      if (status === 404) {
-        return { success: true };
-      }
-      return {
-        success: false,
-        reason: `Cannot verify feature toggle existence: ${error.message}`,
-      };
+    // The answer decides. A read does not throw for a missing object, so
+    // "no throw" read as "it exists" for every toggle — see `presenceOf`.
+    const existing = presenceOf(
+      await client.getFeatureToggle().readMetadata({ featureToggleName }),
+      `feature toggle ${featureToggleName}`,
+    );
+    if (existing.present === false) return { success: true };
+    if (existing.present === 'unknown') {
+      return { success: false, reason: existing.reason };
     }
+    return {
+      success: false,
+      objectExists: true,
+      reason:
+        `⚠️ SAFETY: Feature toggle ${featureToggleName} already exists! ` +
+        `Delete manually or use a different test name to avoid accidental deletion.`,
+    };
   }
 
   function getTestDefinition() {
@@ -258,15 +257,12 @@ describe('FeatureToggle (using AdtClient)', () => {
     testCase: any,
     featureToggleName: string,
   ): Promise<string | null> {
-    try {
-      await client.getFeatureToggle().readMetadata({ featureToggleName });
-      return null;
-    } catch (error: any) {
-      const status = error?.response?.status ?? error?.status;
-      if (status !== 404) {
-        return `Cannot verify feature toggle: ${error.message}`;
-      }
-    }
+    const existing = presenceOf(
+      await client.getFeatureToggle().readMetadata({ featureToggleName }),
+      `feature toggle ${featureToggleName}`,
+    );
+    if (existing.present === true) return null;
+    if (existing.present === 'unknown') return existing.reason;
     try {
       const resolver = new TestConfigResolver({
         testCase,
@@ -274,10 +270,12 @@ describe('FeatureToggle (using AdtClient)', () => {
         logger: testsLogger,
       });
       const config = buildConfig(testCase, resolver);
-      await client.getFeatureToggle().create(config, {
+      const created = await client.getFeatureToggle().create(config, {
         headers: integrationHeadersOf(client.getFeatureToggle(), 'create'),
       });
-      return null;
+      return created.ok
+        ? null
+        : failureOf(created, `create feature toggle ${featureToggleName}`);
     } catch (error: any) {
       return `Failed to create feature toggle for domain test: ${error.message}`;
     }
@@ -306,19 +304,22 @@ describe('FeatureToggle (using AdtClient)', () => {
           cleanup.objectExists
         ) {
           try {
-            await client.getFeatureToggle().delete(
-              {
-                featureToggleName,
-                transportRequest: resolveTransportRequest(
-                  testCase.params.transport_request,
-                ),
-              },
-              {
-                headers: integrationHeadersOf(
-                  client.getFeatureToggle(),
-                  'delete',
-                ),
-              },
+            expectResult(
+              await client.getFeatureToggle().delete(
+                {
+                  featureToggleName,
+                  transportRequest: resolveTransportRequest(
+                    testCase.params.transport_request,
+                  ),
+                },
+                {
+                  headers: integrationHeadersOf(
+                    client.getFeatureToggle(),
+                    'delete',
+                  ),
+                },
+              ),
+              `delete pre-existing feature toggle ${featureToggleName}`,
             );
             testsLogger.info?.(
               `Pre-existing feature toggle ${featureToggleName} deleted before test`,

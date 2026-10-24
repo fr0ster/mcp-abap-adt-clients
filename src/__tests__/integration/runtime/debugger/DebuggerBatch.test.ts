@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAdtRunnable,
@@ -39,6 +40,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { assertBatchStatuses } from '../../../helpers/batchStatuses';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
@@ -349,7 +351,7 @@ describe('Debugger batch wire measurements', () => {
     if (attached) {
       await steps.run(
         'terminate debuggee',
-        () => debuggerApi.terminateDebuggee(),
+        () => debuggerApi.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
         {
           checkAnswer: true,
         },
@@ -398,8 +400,15 @@ describe('Debugger batch wire measurements', () => {
 
   afterEach(async () => {
     if (attached) {
-      await debuggerApi.terminateDebuggee();
       attached = false;
+      // On premise 500 subtype terminateDebuggee, on the cloud 200: either is
+      // the debuggee ended as asked, and analyseDebuggeeEnd reads both so.
+      // Anything else fails the test: a debuggee left attached holds the
+      // work process the next test needs.
+      expectResult(
+        await debuggerApi.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
+        'terminate the debuggee',
+      );
     }
     if (run) {
       await Promise.race([

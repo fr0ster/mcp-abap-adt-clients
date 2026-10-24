@@ -27,7 +27,7 @@ import {
   gateOn,
   gateStandardObject,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -149,7 +149,7 @@ describe('Program (using AdtClient)', () => {
                 libraryLogger,
                 systemContext,
               );
-              await cleanupClient.getProgram().delete(
+              const removed = await cleanupClient.getProgram().delete(
                 {
                   programName,
                   transportRequest,
@@ -161,6 +161,16 @@ describe('Program (using AdtClient)', () => {
                   ),
                 },
               );
+              if (!removed.ok) {
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: failureOf(
+                    removed,
+                    `delete existing program ${programName}`,
+                  ),
+                };
+              }
               await new Promise((resolve) => setTimeout(resolve, 3000));
             } catch (cleanupError: any) {
               return {

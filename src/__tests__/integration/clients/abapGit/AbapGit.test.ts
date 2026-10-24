@@ -119,13 +119,16 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     async () => {
       const flowCaseDef = configured('link_pull_unlink_flow');
 
-      await abapGit.link(
-        {
-          package: flowCaseDef.params.package,
-          url: flowCaseDef.params.url,
-          branchName: flowCaseDef.params.branch,
-        },
-        { headers: integrationHeadersOf(abapGit, 'link') },
+      expectResult(
+        await abapGit.link(
+          {
+            package: flowCaseDef.params.package,
+            url: flowCaseDef.params.url,
+            branchName: flowCaseDef.params.branch,
+          },
+          { headers: integrationHeadersOf(abapGit, 'link') },
+        ),
+        'link',
       );
 
       // Four steps since 19.0.0, because a pull was four requests: find the

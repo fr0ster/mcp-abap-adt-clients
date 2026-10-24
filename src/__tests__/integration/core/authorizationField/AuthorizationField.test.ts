@@ -29,6 +29,7 @@ import {
   gate,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
+import { failureOf } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -221,7 +222,7 @@ describe('AuthorizationField (using AdtClient)', () => {
             /already exists/i.test(cleanup.reason || '')
           ) {
             try {
-              await client.getAuthorizationField().delete(
+              const removed = await client.getAuthorizationField().delete(
                 {
                   authorizationFieldName,
                   transportRequest: resolveTransportRequest(
@@ -235,6 +236,14 @@ describe('AuthorizationField (using AdtClient)', () => {
                   ),
                 },
               );
+              if (!removed.ok) {
+                throw new Error(
+                  failureOf(
+                    removed,
+                    `delete pre-existing authorization field ${authorizationFieldName}`,
+                  ),
+                );
+              }
               testsLogger.info?.(
                 `Pre-existing authorization field ${authorizationFieldName} deleted before test`,
               );

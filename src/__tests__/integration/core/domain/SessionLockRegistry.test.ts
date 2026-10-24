@@ -25,6 +25,7 @@ import type { IDataElementConfig } from '../../../../core/dataElement';
 import type { IDomainConfig } from '../../../../core/domain';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { gate, gateAll } from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
 import {
   deleteDataElement,
   deleteDomain,
@@ -173,8 +174,14 @@ describe('Session lock registry (using AdtClient)', () => {
         );
 
         // Lock both through the SAME client session — deliberately no unlock.
-        await client.getDomain().lock(domainConfig);
-        await client.getDataElement().lock(dataElementConfig);
+        expectResult(
+          await client.getDomain().lock(domainConfig),
+          'lock the domain',
+        );
+        expectResult(
+          await client.getDataElement().lock(dataElementConfig),
+          'lock the data element',
+        );
 
         // The session-scoped registry aggregates both, regardless of type.
         expect(client.pendingLocks.length).toBe(2);

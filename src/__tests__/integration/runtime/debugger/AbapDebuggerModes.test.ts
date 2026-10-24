@@ -64,6 +64,7 @@ import {
   releaseThenLogOff,
   withCleanup,
 } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
@@ -976,6 +977,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         scope.released(session.api);
 
         const second = await relisten;
+        expect(second.ok).toBe(true);
         const secondId = tag(documentOf(second), 'DEBUGGEE_ID');
         // Measured: the external breakpoint catches the same run again, at
         // the next pass over the loop line.
@@ -1282,7 +1284,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           identity.debuggingMode === 'user' ? identity.requestUser : undefined,
         );
 
-        await holding;
+        // The holder's own long poll ends when its hold runs out, with
+        // nothing caught: an answer, not a refusal.
+        expectResult(await holding, "the holder's listen");
       });
     },
     STEP_TIMEOUT,

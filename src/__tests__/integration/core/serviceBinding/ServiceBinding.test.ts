@@ -22,7 +22,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, failureOf } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -173,29 +173,34 @@ describe('ServiceBinding (using AdtClient)', () => {
               params.service_name || params.service_definition_name;
             const serviceVersion = params.service_version || '0001';
 
+            // The unpublish is a step towards the delete, and the delete's
+            // answer is what decides: a binding already unpublished refuses
+            // the unpublish and deletes fine. A refused unpublish is kept and
+            // named beside a refused delete.
+            let unpublishRefusal = '';
             if (active.present === true) {
-              try {
-                await client.getServiceBinding().update(
-                  {
-                    bindingName,
-                    desiredPublicationState: 'unpublished',
-                    serviceType,
-                    serviceName,
-                    serviceVersion,
-                  },
-                  {
-                    headers: integrationHeadersOf(
-                      client.getServiceBinding(),
-                      'update',
-                    ),
-                  },
-                );
-              } catch {
-                // best-effort: deletion may still work if state is already unpublished
-              }
+              const unpublished = await client.getServiceBinding().update(
+                {
+                  bindingName,
+                  desiredPublicationState: 'unpublished',
+                  serviceType,
+                  serviceName,
+                  serviceVersion,
+                },
+                {
+                  headers: integrationHeadersOf(
+                    client.getServiceBinding(),
+                    'update',
+                  ),
+                },
+              );
+              unpublishRefusal = failureOf(
+                unpublished,
+                `unpublish leftover binding ${bindingName}`,
+              );
             }
 
-            await client.getServiceBinding().delete(
+            const removed = await client.getServiceBinding().delete(
               {
                 bindingName,
                 transportRequest: resolveTransportRequest(
@@ -209,6 +214,18 @@ describe('ServiceBinding (using AdtClient)', () => {
                 ),
               },
             );
+            if (!removed.ok) {
+              return {
+                success: false,
+                objectExists: true,
+                reason: [
+                  unpublishRefusal,
+                  failureOf(removed, `delete leftover binding ${bindingName}`),
+                ]
+                  .filter(Boolean)
+                  .join('; '),
+              };
+            }
             await new Promise((resolve) => setTimeout(resolve, 2000));
           } catch (error: any) {
             if (error?.response?.status === 404) {
@@ -342,37 +359,39 @@ describe('ServiceBinding (using AdtClient)', () => {
       return false;
     };
 
-    try {
-      await client.getPackage().create(
-        {
-          packageName: testSubpackage,
-          superPackage: parentPackage,
-          description: `ServiceBinding test package ${testSubpackage}`,
-          softwareComponent: parentSoftwareComponent,
-          packageType: parentPackageType,
-          transportLayer: parentTransportLayer,
-          applicationComponent: parentApplicationComponent,
-          responsible: parentResponsible,
-          // **A package on a transport layer has to record changes.** Without
-          // this the create is refused with `TR 432`, "Change recording must be
-          // activated for package …", and the only symptom here was the package
-          // never becoming readable. It inherits the parent's setting where the
-          // parent states one, and a transport layer means yes either way.
-          recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
-          transportRequest: resolveTransportRequest(params.transport_request),
-        },
-        { headers: integrationHeadersOf(client.getPackage(), 'create') },
-      );
-    } catch (error: any) {
-      // Package create may return 404/409 when package was created but not readable yet.
-      const status = error?.response?.status;
+    const packageCreated = await client.getPackage().create(
+      {
+        packageName: testSubpackage,
+        superPackage: parentPackage,
+        description: `ServiceBinding test package ${testSubpackage}`,
+        softwareComponent: parentSoftwareComponent,
+        packageType: parentPackageType,
+        transportLayer: parentTransportLayer,
+        applicationComponent: parentApplicationComponent,
+        responsible: parentResponsible,
+        // **A package on a transport layer has to record changes.** Without
+        // this the create is refused with `TR 432`, "Change recording must be
+        // activated for package …", and the only symptom here was the package
+        // never becoming readable. It inherits the parent's setting where the
+        // parent states one, and a transport layer means yes either way.
+        recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
+        transportRequest: resolveTransportRequest(params.transport_request),
+      },
+      { headers: integrationHeadersOf(client.getPackage(), 'create') },
+    );
+    if (!packageCreated.ok) {
+      // Package create may answer 404/409 when the package was created but is
+      // not readable yet: its being readable decides. Any other refusal fails.
+      const status = packageCreated.getError().response?.status;
       if (status === 404 || status === 409) {
         const created = await waitForPackage();
         if (created) {
           return testSubpackage;
         }
       }
-      throw error;
+      throw new Error(
+        failureOf(packageCreated, `create test subpackage ${testSubpackage}`),
+      );
     }
 
     const created = await waitForPackage();

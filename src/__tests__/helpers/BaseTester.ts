@@ -447,6 +447,44 @@ export class BaseTester<TConfig, TState = unknown> {
     );
   }
 
+  /**
+   * The `readMetadata` step of a flow: its answer has to be a value.
+   *
+   * The one refusal accepted is the one the configuration accepts — HTTP 406
+   * with `allow_406` on the case or in `test_settings` — and it is read off the
+   * answer's own status. The step used to look for a thrown `response.status`
+   * and a `status` on the answer, neither of which a returned failure has, so
+   * a refused read passed as a read.
+   */
+  private async readMetadataStep(
+    config: Partial<TConfig>,
+    options?: { withLongPolling?: boolean },
+  ): Promise<void> {
+    const answer = await this.adtObject.readMetadata?.(config, options);
+    if (!answer) {
+      throw new Error(
+        `${this.loggerPrefix} offers no readMetadata() — the flow asked for ` +
+          'the object document and this type has none.',
+      );
+    }
+    if (!answer.ok && answer.getError().response?.status === 406) {
+      const { isHttpStatusAllowed, getAcceptHint } = require('./test-helper');
+      if (isHttpStatusAllowed(406, this.testCase)) {
+        const acceptHint = getAcceptHint({
+          response: answer.getError().response,
+        });
+        this.log(
+          LogLevel.WARN,
+          `readMetadata skipped: 406 Not Acceptable (allowed by config)${
+            acceptHint ? `; ${acceptHint}` : ''
+          }`,
+        );
+        return;
+      }
+    }
+    expectResult(answer, 'readMetadata');
+  }
+
   private writeWhatItHas(
     config: Partial<TConfig>,
     options?: IAdtOperationOptions,
@@ -484,23 +522,35 @@ export class BaseTester<TConfig, TState = unknown> {
     this.lockHandle = handle;
     let unlocked = false;
     let written: unknown;
+    let writeThrew = false;
+    let unlockRefusal = '';
     try {
       written = await this.writeWhatItHas(config, {
         ...options,
         lockHandle: handle,
       });
+    } catch (error) {
+      writeThrew = true;
+      throw error;
     } finally {
       const released = await this.adtObject.unlock(config, handle);
       this.objectLocked = false;
       this.lockHandle = undefined;
       unlocked = released.ok;
       if (!released.ok) {
-        this.log(
-          LogLevel.WARN,
-          `unlock after update failed, the handle may still be held: ${released.getError().message}`,
-        );
+        const refusal = `unlock after update failed, the handle may still be held: ${released.getError().message}`;
+        const writeFailed =
+          writeThrew ||
+          (written as IAdtResponse<unknown> | undefined)?.ok === false;
+        // A refused UNLOCK fails the test: the handle left held is what makes
+        // the next run's create answer 403 with nothing appearing to hold it.
+        // When the write itself failed, that failure is the one the caller
+        // raises, so this one is logged beside it instead of replacing it.
+        if (writeFailed) this.log(LogLevel.WARN, refusal);
+        else unlockRefusal = refusal;
       }
     }
+    if (unlockRefusal) throw new Error(unlockRefusal);
     // Only after an UNLOCK that answered ok: that is the answer that can be
     // wrong — a stateless UNLOCK answers 200 and releases nothing.
     if (unlocked) await this.expectLockReleased(config);
@@ -1334,45 +1384,10 @@ export class BaseTester<TConfig, TState = unknown> {
       if (options?.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
-        try {
-          const metadataResponse = await this.adtObject.readMetadata?.(
-            config as Partial<TConfig>,
-            options.readMetadataOptions,
-          );
-          const responseStatus = (metadataResponse as any)?.status;
-          if (
-            responseStatus &&
-            responseStatus !== 200 &&
-            responseStatus !== 204
-          ) {
-            const errorData =
-              typeof (metadataResponse as any)?.data === 'string'
-                ? (metadataResponse as any).data
-                : JSON.stringify((metadataResponse as any)?.data);
-            const error = new Error(
-              `Read metadata failed (HTTP ${responseStatus}): ${errorData}`,
-            );
-            logTestStepError(currentStep, error);
-            throw error;
-          }
-        } catch (error: any) {
-          if (error?.response?.status === 406) {
-            const { isHttpStatusAllowed } = require('./test-helper');
-            if (isHttpStatusAllowed(406, this.testCase)) {
-              const { getAcceptHint } = require('./test-helper');
-              const acceptHint = getAcceptHint(error);
-              this.log(
-                LogLevel.WARN,
-                `readMetadata skipped: 406 Not Acceptable (allowed by config)${
-                  acceptHint ? `; ${acceptHint}` : ''
-                }`,
-              );
-              return validationDocument as unknown as TState;
-            }
-          }
-          logTestStepError(currentStep, error);
-          throw error;
-        }
+        await this.readMetadataStep(
+          config as Partial<TConfig>,
+          options.readMetadataOptions,
+        );
       }
 
       // 5. Cleanup (if enabled)
@@ -1570,30 +1585,15 @@ export class BaseTester<TConfig, TState = unknown> {
         return readState;
       }
 
-      logTestStep('readMetadata', this.logger);
-      try {
-        await this.adtObject.readMetadata?.(
+      // A type whose only read is `readMetadata` was read above.
+      if (this.adtObject.readMetadata) {
+        logTestStep('readMetadata', this.logger);
+        await this.readMetadataStep(
           config,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         );
-      } catch (error: any) {
-        if (error?.response?.status === 406) {
-          const { isHttpStatusAllowed } = require('./test-helper');
-          if (isHttpStatusAllowed(406, this.testCase)) {
-            const { getAcceptHint } = require('./test-helper');
-            const acceptHint = getAcceptHint(error);
-            this.log(
-              LogLevel.WARN,
-              `readMetadata skipped: 406 Not Acceptable (allowed by config)${
-                acceptHint ? `; ${acceptHint}` : ''
-              }`,
-            );
-            return readState;
-          }
-        }
-        throw error;
       }
 
       return readState;
@@ -1945,11 +1945,15 @@ export class BaseTester<TConfig, TState = unknown> {
     ): Promise<string | undefined> => {
       currentStep = label;
       logTestStep(label, this.logger);
-      const state = await this.readWhatItHas(
-        config as Partial<TConfig>,
-        version,
+      // The value, or the test fails with what SAP said. `readResult.data`
+      // was the state bag's field; the bags are gone, so it read `undefined`
+      // for every answer and a refused read passed as an empty one.
+      const payload = payloadOf(
+        expectResult(
+          await this.readWhatItHas(config as Partial<TConfig>, version),
+          label,
+        ),
       );
-      const payload = payloadOf((state as any)?.readResult?.data);
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -1973,6 +1977,7 @@ export class BaseTester<TConfig, TState = unknown> {
         { ...config, ...options?.updateConfig } as Partial<TConfig>,
         updateOptions,
       );
+      expectResult(updateState as IAdtResponse<unknown>, 'update');
       await this.waitDelay(
         this.getOperationDelay('update', testCaseParams),
         'update',
@@ -1983,27 +1988,14 @@ export class BaseTester<TConfig, TState = unknown> {
       if (!options?.activateOnUpdate && this.adtObject.activate) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
-        const activateState = await this.adtObject.activate(
-          config as Partial<TConfig>,
-          { headers: integrationHeadersOf(this.adtObject, 'activate') },
+        // A refused activation is a failure in the answer; the status this
+        // read off a state bag is not on a returned failure.
+        expectResult(
+          await this.adtObject.activate(config as Partial<TConfig>, {
+            headers: integrationHeadersOf(this.adtObject, 'activate'),
+          }),
+          'activate',
         );
-        const activateResponse =
-          (activateState as any)?.activateResponse || activateState;
-        if (
-          activateResponse?.status &&
-          activateResponse.status !== 200 &&
-          activateResponse.status !== 204
-        ) {
-          const errorData =
-            typeof activateResponse?.data === 'string'
-              ? activateResponse.data
-              : JSON.stringify(activateResponse?.data);
-          const error = new Error(
-            `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
-          );
-          logTestStepError(currentStep, error);
-          throw error;
-        }
         await this.waitDelay(
           this.getOperationDelay('activate', testCaseParams),
           'activate',
@@ -2024,7 +2016,7 @@ export class BaseTester<TConfig, TState = unknown> {
       if (options?.readMetadata && this.adtObject.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
-        await this.adtObject.readMetadata?.(
+        await this.readMetadataStep(
           config as Partial<TConfig>,
           options.readMetadataOptions?.withLongPolling
             ? { withLongPolling: true }

@@ -31,7 +31,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, releasing } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -226,15 +226,19 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             'lock container class',
           );
           const containerHandle = String(containerLock);
-          expectResult(
-            await client.getClass().update(containerConfig, {
-              headers: integrationHeadersOf(client.getClass(), 'update'),
-              source,
-              lockHandle: containerHandle,
-            }),
-            'write container class source',
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getClass().update(containerConfig, {
+                  headers: integrationHeadersOf(client.getClass(), 'update'),
+                  source,
+                  lockHandle: containerHandle,
+                }),
+                'write container class source',
+              ),
+            () => client.getClass().unlock(containerConfig, containerHandle),
+            'unlock container class',
           );
-          await client.getClass().unlock(containerConfig, containerHandle);
           await expectLockReleased(
             (c) => c.getClass(),
             containerConfig,
@@ -258,24 +262,25 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             'lock container class for its testclasses include',
           );
           const includeHandle = String(includeLock);
-          try {
-            expectResult(
-              await client.getLocalTestClass().update(
-                { className: containerClass, transportRequest },
-                {
-                  headers: integrationHeadersOf(
-                    client.getLocalTestClass(),
-                    'update',
-                  ),
-                  source: testClassSource,
-                  lockHandle: includeHandle,
-                },
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getLocalTestClass().update(
+                  { className: containerClass, transportRequest },
+                  {
+                    headers: integrationHeadersOf(
+                      client.getLocalTestClass(),
+                      'update',
+                    ),
+                    source: testClassSource,
+                    lockHandle: includeHandle,
+                  },
+                ),
+                'write the test class include',
               ),
-              'write the test class include',
-            );
-          } finally {
-            await client.getClass().unlock(containerConfig, includeHandle);
-          }
+            () => client.getClass().unlock(containerConfig, includeHandle),
+            'unlock after write the test class include',
+          );
           // The include was written under the CLASS lock, so the class lock is
           // the one to prove released.
           await expectLockReleased(
@@ -447,20 +452,20 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
 
           // Step 10: Cleanup - delete class if configured
           if (!skipCleanup && containerClass) {
-            try {
-              logTestStep('delete (cleanup)', testsLogger);
-              testsLogger.info?.('Cleaning up test class:', containerClass);
+            logTestStep('delete (cleanup)', testsLogger);
+            testsLogger.info?.('Cleaning up test class:', containerClass);
+            // The class this test created and could not remove fails it.
+            expectResult(
               await client.getClass().delete(
                 {
                   className: containerClass,
                   transportRequest,
                 },
                 { headers: integrationHeadersOf(client.getClass(), 'delete') },
-              );
-              testsLogger.info?.('Test class deleted successfully');
-            } catch (cleanupError) {
-              testsLogger.warn?.('Failed to cleanup test class:', cleanupError);
-            }
+              ),
+              `delete test class ${containerClass}`,
+            );
+            testsLogger.info?.('Test class deleted successfully');
           } else if (skipCleanup) {
             testsLogger.info?.(
               'Cleanup skipped - test class left for analysis',

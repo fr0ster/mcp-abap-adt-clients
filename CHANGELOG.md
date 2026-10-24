@@ -56,11 +56,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   the setup error, which `flowTestAuto()`, `modifyFlowTestAuto()`,
   `readTestAuto()` and the new `requireConfig()` raise, and it no longer
   decides `available_in` a second time. The hand-rolled `skipReason` of the
-  other suites became the same kind of failure. What stays an in-body
-  `logTestSkip` is what only the system's answer decides: an object absent
-  from the system, an endpoint answering `403`/`404`/`406`/`501`, a lock
-  refused by an editing session, and a few lookups made mid-test from the
-  system's own data (`Transport.test.ts`).
+  other suites became the same kind of failure. Whether a feature exists on a
+  system is the configuration's to say, never inferred from an answer: the
+  append-structure and scalar-function suites no longer skip when the create
+  answers `404`/`405`/`501`, they fail with what SAP said. Every
+  expected-success call in the suites and helpers is read for its answer
+  (`expectResult`, and in `helpers/contract.ts` the new `releasing` for a
+  lock window, `cleanupRefusal` / `noteCleanupRefusal` / `raiseAfterCleanup`
+  for cleanups, `saysAbsent`; `expectRemovedOrAbsent` in
+  `helpers/objectPresence.ts`): a refused create, update, unlock, activation,
+  validation or cleanup fails the test with its reason — a refused cleanup
+  after a failed body is added to that failure rather than replacing it.
+  `BaseTester` fails on a refused unlock after an update, on a refused
+  `readMetadata` step (406 only where `allow_406` says so) and on every
+  refused step of `modifyFlowTest`.
 
 ## [37.2.0] - 2026-10-23
 

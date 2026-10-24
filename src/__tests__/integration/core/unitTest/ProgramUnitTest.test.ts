@@ -29,7 +29,12 @@ import {
   gate,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import {
+  cleanupRefusal,
+  expectResult,
+  raiseAfterCleanup,
+  releasing,
+} from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -129,6 +134,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
       const program = { programName };
       const include = { includeName };
 
+      let failed: { error: unknown } | undefined;
       try {
         // Step 1: the include holding the test class
         logTestStep('create include', testsLogger);
@@ -147,21 +153,22 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         const includeHandle = String(
           expectResult(await client.getInclude().lock(include), 'lock include'),
         );
-        try {
-          expectResult(
-            await client.getInclude().update(
-              { ...include, transportRequest },
-              {
-                headers: integrationHeadersOf(client.getInclude(), 'update'),
-                lockHandle: includeHandle,
-                source: params.include_source,
-              },
+        await releasing(
+          async () =>
+            expectResult(
+              await client.getInclude().update(
+                { ...include, transportRequest },
+                {
+                  headers: integrationHeadersOf(client.getInclude(), 'update'),
+                  lockHandle: includeHandle,
+                  source: params.include_source,
+                },
+              ),
+              'write the test class',
             ),
-            'write the test class',
-          );
-        } finally {
-          await client.getInclude().unlock(include, includeHandle);
-        }
+          () => client.getInclude().unlock(include, includeHandle),
+          'unlock after write the test class',
+        );
 
         // Step 2: the report that pulls it in
         logTestStep('create program', testsLogger);
@@ -180,21 +187,22 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         const programHandle = String(
           expectResult(await client.getProgram().lock(program), 'lock program'),
         );
-        try {
-          expectResult(
-            await client.getProgram().update(
-              { ...program, transportRequest },
-              {
-                headers: integrationHeadersOf(client.getProgram(), 'update'),
-                lockHandle: programHandle,
-                source: params.program_source,
-              },
+        await releasing(
+          async () =>
+            expectResult(
+              await client.getProgram().update(
+                { ...program, transportRequest },
+                {
+                  headers: integrationHeadersOf(client.getProgram(), 'update'),
+                  lockHandle: programHandle,
+                  source: params.program_source,
+                },
+              ),
+              'write the report',
             ),
-            'write the report',
-          );
-        } finally {
-          await client.getProgram().unlock(program, programHandle);
-        }
+          () => client.getProgram().unlock(program, programHandle),
+          'unlock after write the report',
+        );
 
         logTestStep('activate', testsLogger);
         expectResult(
@@ -228,28 +236,41 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
 
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
+        failed = { error };
         logTestError(testsLogger, TITLE, error);
-        throw error;
-      } finally {
-        if (!skipCleanup) {
-          logTestStep('delete (cleanup)', testsLogger);
-          await client
-            .getProgram()
-            .delete(
-              { ...program, transportRequest },
-              { headers: integrationHeadersOf(client.getProgram(), 'delete') },
-            )
-            .catch(() => undefined);
-          await client
-            .getInclude()
-            .delete(
-              { ...include, transportRequest },
-              { headers: integrationHeadersOf(client.getInclude(), 'delete') },
-            )
-            .catch(() => undefined);
-        }
-        logTestEnd(testsLogger, TITLE);
       }
+      // Cleanup runs whatever the body did. A refused delete fails the test;
+      // when the body already failed it is added to that failure instead,
+      // never replacing it. Absent — the body failed before creating it — is
+      // no refusal.
+      const refusals: string[] = [];
+      if (!skipCleanup) {
+        logTestStep('delete (cleanup)', testsLogger);
+        refusals.push(
+          await cleanupRefusal(
+            () =>
+              client.getProgram().delete(
+                { ...program, transportRequest },
+                {
+                  headers: integrationHeadersOf(client.getProgram(), 'delete'),
+                },
+              ),
+            `delete program ${program.programName}`,
+          ),
+          await cleanupRefusal(
+            () =>
+              client.getInclude().delete(
+                { ...include, transportRequest },
+                {
+                  headers: integrationHeadersOf(client.getInclude(), 'delete'),
+                },
+              ),
+            `delete include ${include.includeName}`,
+          ),
+        );
+      }
+      logTestEnd(testsLogger, TITLE);
+      raiseAfterCleanup(failed, refusals);
     },
     getTimeout('test'),
   );

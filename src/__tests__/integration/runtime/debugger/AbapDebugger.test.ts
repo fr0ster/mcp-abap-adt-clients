@@ -49,6 +49,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
@@ -356,7 +357,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     if (attached) {
       await steps.run(
         'terminate the debuggee',
-        () => debuggerApi.terminateDebuggee(),
+        () => debuggerApi.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
         { checkAnswer: true },
       );
     }
@@ -827,7 +828,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
           expect(statusOf(refused)).toBe(409);
           expect(subtypeOf(refused)).toBe('conflictDetected');
 
-          await holding;
+          // The holder's own long poll ends when its hold runs out, with
+          // nothing caught: an answer, not a refusal.
+          expectResult(await holding, "the holder's listen");
         },
         async (steps) => {
           await steps.run(
@@ -921,7 +924,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
           expect(statusOf(beside)).toBe(409);
           expect(subtypeOf(beside)).toBe('conflictDetected');
 
-          await holding;
+          // The holder's own long poll ends when its hold runs out, with
+          // nothing caught: an answer, not a refusal.
+          expectResult(await holding, "the holder's listen");
         },
         async (steps) => {
           await steps.run(
@@ -965,7 +970,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
           // Measured on premise (2026-10-09): 200 after the hold, no 409.
           const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
           expect(statusOf(beside)).toBe(200);
-          await holding;
+          // The holder's own long poll ends when its hold runs out, with
+          // nothing caught: an answer, not a refusal.
+          expectResult(await holding, "the holder's listen");
         },
         async (steps) => {
           await steps.run(
