@@ -46,6 +46,7 @@ import {
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -368,13 +369,13 @@ describe('Debugger batch wire measurements', () => {
       );
     }
     if (run) {
+      // The run must come back, with its output or a termination's 500, and
+      // is let go only once it has: a timeout or another answer fails.
       const pending = run;
-      await steps.run('wait for run', () =>
-        Promise.race([
-          pending,
-          new Promise((resolve) => setTimeout(resolve, 15_000)),
-        ]),
-      );
+      await steps.run('wait for run', async () => {
+        await settleRun(pending, 15_000, 'the run', 'completed-or-terminated');
+        run = undefined;
+      });
     }
     await steps.logOff('the trigger session', triggerConnection);
     await steps.logOff('the listener session', listenerConnection);
@@ -411,10 +412,9 @@ describe('Debugger batch wire measurements', () => {
       );
     }
     if (run) {
-      await Promise.race([
-        run,
-        new Promise((resolve) => setTimeout(resolve, 15_000)),
-      ]);
+      // Kept until it has settled with an accepted answer, so afterAll tries
+      // again when this fails.
+      await settleRun(run, 15_000, 'the run', 'completed-or-terminated');
       run = undefined;
     }
   }, STEP_TIMEOUT);

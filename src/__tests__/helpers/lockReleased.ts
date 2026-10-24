@@ -114,11 +114,6 @@ function statusOf(failure: IAdtError): string {
   return status === undefined ? `[${failure.origin}]` : `HTTP ${status}`;
 }
 
-const NOT_VISIBLE_RETRIES = 3;
-const NOT_VISIBLE_DELAY_MS = 2000;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** SAP says the object is not there: 404. Not a lock, whatever else it is. */
 function isNotVisible(failure: IAdtError): boolean {
   return failure.response?.status === 404;
@@ -149,33 +144,24 @@ export async function verifyLockReleased<TConfig>(
   let failure: unknown;
   try {
     const handler = openHandler(session.client);
-    // A new session may land on another application server, where an object
-    // created seconds ago is not visible yet: its LOCK answers 404 "does not
-    // exist". Measured on an ABAP Cloud system — the same test passed alone. That is
-    // not a lock at all, so it is retried, and if the object stays invisible
-    // the check reports it cannot judge rather than claiming a held lock.
-    let locked = await handler.lock(config, { analyse: analyseException });
-    for (
-      let attempt = 1;
-      !locked.ok &&
-      isNotVisible(locked.getError()) &&
-      attempt <= NOT_VISIBLE_RETRIES;
-      attempt++
-    ) {
-      await sleep(NOT_VISIBLE_DELAY_MS);
-      locked = await handler.lock(config, { analyse: analyseException });
-    }
+    // One LOCK, read as it answers. A new session may land on another
+    // application server where an object created seconds ago is not visible
+    // yet (404, measured on an ABAP Cloud system); that is a refusal too and
+    // fails the check as inconclusive — a later attempt that succeeded would
+    // not erase it, so none is made.
+    const locked = await handler.lock(config, { analyse: analyseException });
     if (!locked.ok) {
       const refusal = locked.getError();
       const detail =
         `(${statusOf(refusal)}): ${whatSapSaid(refusal)}` +
         (refusal.request?.url ? ` (${refusal.request.url})` : '');
       if (isNotVisible(refusal)) {
-        logger?.warn?.(
-          `${what}: lock-release check inconclusive — the object is not ` +
-            `visible from a second ABAP session ${detail}`,
+        throw new Error(
+          `${what}: the lock-release check is inconclusive — the object is ` +
+            `not visible from a second ABAP session ${detail}`,
         );
-      } else if (isLockHeld(refusal)) {
+      }
+      if (isLockHeld(refusal)) {
         throw new Error(
           `${what}: the previous UNLOCK did not release the lock — a second ` +
             `ABAP session was refused it ${detail}`,

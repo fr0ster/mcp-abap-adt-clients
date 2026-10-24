@@ -942,70 +942,6 @@ function extractValidationErrorMessage(response) {
 }
 
 /**
- * Retry check operation after activate - activation is asynchronous and may take time
- * Handles "importing object from the database" errors by retrying
- * @param {Function} checkFunction - Async function that performs the check (e.g., () => client.checkDomain({ domainName }))
- * @param {Object} options - Options for retry behavior
- * @param {number} [options.maxAttempts=5] - Maximum number of retry attempts
- * @param {number} [options.delay=1000] - Delay between retries in milliseconds
- * @param {Object} [options.logger] - Optional logger for debug messages
- * @param {string} [options.objectName] - Optional object name for log messages
- * @returns {Promise<Object>} Check result (ADT response)
- * @throws {Error} If all retry attempts failed
- */
-async function retryCheckAfterActivate(checkFunction, options = {}) {
-  const {
-    maxAttempts = 5,
-    delay = 1000,
-    logger = null,
-    objectName = 'object',
-  } = options;
-
-  let checkAttempts = 0;
-  let lastError = null;
-
-  while (checkAttempts < maxAttempts) {
-    try {
-      const result = await checkFunction();
-      // Success - return result
-      return result;
-    } catch (error) {
-      checkAttempts++;
-      lastError = error;
-
-      if (checkAttempts >= maxAttempts) {
-        // All attempts failed - throw error
-        throw error;
-      }
-
-      // Check if error is about importing from database (activation still in progress)
-      const errorMessage = error?.message || String(error);
-      const isActivationInProgress =
-        errorMessage.includes('importing object') ||
-        errorMessage.includes('from the database') ||
-        errorMessage.includes('Error while importing');
-
-      if (isActivationInProgress) {
-        // Activation still in progress - retry
-        if (logger?.debug) {
-          logger.debug(
-            `Check attempt ${checkAttempts} failed for ${objectName} (activation in progress), retrying in ${delay}ms...`,
-          );
-        }
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        continue;
-      }
-
-      // Other error - don't retry, throw immediately
-      throw error;
-    }
-  }
-
-  // Should never reach here, but just in case
-  throw lastError || new Error(`Check failed after ${maxAttempts} attempts`);
-}
-
-/**
  * Check if package exists using searchObjects
  *
  * Throws when the check itself could not run. It previously answered `false` for
@@ -2784,7 +2720,6 @@ module.exports = {
   getTestTimeout, // Add getTestTimeout from root helper
   resolveStandardObject, // Add resolveStandardObject helper
   getOperationDelay, // Get delay for SAP operations
-  retryCheckAfterActivate, // Retry check operation after activate
   checkPackageExists, // Check if package exists using searchObjects
   validateTestParameters, // Validate test parameters (package, transport)
   checkDefaultTestEnvironment, // Check default test environment before all tests

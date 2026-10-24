@@ -35,7 +35,10 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { runToCompletion } from '../../../helpers/abapUnitRun';
+import {
+  readMethodVerdicts,
+  runToCompletion,
+} from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -93,32 +96,17 @@ interface IRunReading {
 }
 
 function readRunResult(document: string): IRunReading {
-  const methods: string[] = [];
-  const failed: string[] = [];
-  const alerts: string[] = [];
-  const programTypes = [
-    ...document.matchAll(/<program [^>]*adtcore:type="([^"]+)"/g),
-  ].map((m) => m[1]);
-  for (const cls of document.matchAll(
-    /<testClass [^>]*adtcore:name="([^"]+)"[^>]*>([\s\S]*?)<\/testClass>/g,
-  )) {
-    // A method is either self-closing or closes after its alerts.
-    for (const m of cls[2].matchAll(
-      /<testMethod [^>]*adtcore:name="([^"]+)"[^>]*?(\/>|>([\s\S]*?)<\/testMethod>)/g,
-    )) {
-      const name = `${cls[1]}.${m[1]}`;
-      methods.push(name);
-      const kinds = [...(m[3] ?? '').matchAll(/<alert kind="([^"]+)"/g)].map(
-        (a) => a[1],
-      );
-      if (kinds.length > 0) failed.push(name);
-      alerts.push(...kinds);
-    }
-  }
+  // Parsed, not matched: an alert is found whatever its attribute order.
+  const { methods, programTypes } = readMethodVerdicts(document);
+  const named = (m: { testClass: string; name: string }) =>
+    `${m.testClass}.${m.name}`;
   return {
-    methods: methods.sort(),
-    alerts,
-    failed: failed.sort(),
+    methods: methods.map(named).sort(),
+    alerts: methods.flatMap((m) => m.alerts),
+    failed: methods
+      .filter((m) => m.alerts.length > 0)
+      .map(named)
+      .sort(),
     programTypes,
   };
 }

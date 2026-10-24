@@ -50,6 +50,7 @@ import {
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   createTestConnection,
   skipUnlessConfigured,
@@ -299,10 +300,13 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       });
     }
     if (run) {
+      // The run must come back, with its output or a termination's 500, and
+      // is let go only once it has: a timeout or another answer fails.
       const pending = run;
-      await steps.run('wait for the run', () =>
-        Promise.race([pending, new Promise((r) => setTimeout(r, 30_000))]),
-      );
+      await steps.run('wait for the run', async () => {
+        await settleRun(pending, 30_000, 'the run', 'completed-or-terminated');
+        run = undefined;
+      });
     }
     await steps.logOff('the trigger session', trigger);
     await steps.logOff('the commands session', commands);

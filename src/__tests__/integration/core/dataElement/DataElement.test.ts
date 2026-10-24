@@ -60,7 +60,6 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate,
   createDependencyDomain,
   extractValidationErrorMessage,
   getEnvironmentConfig,

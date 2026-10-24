@@ -70,6 +70,7 @@ import {
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   createTestConnection,
   skipUnlessConfigured,
@@ -327,7 +328,7 @@ class Scope {
     [];
   readonly sessions: Connection[] = [];
   readonly attached: Debugger[] = [];
-  readonly runs: Array<Promise<unknown>> = [];
+  readonly runs: Array<Promise<IAdtResponse<unknown>>> = [];
 
   /** Remember the ids a breakpoints answer carries, and the key they live under. */
   arm(
@@ -402,7 +403,9 @@ class Scope {
           await release('stop the listener', () => api.stopListener(identity));
         }
         for (const run of this.runs.splice(0)) {
-          await steps.run('settle a probe run', () => within(run, 45_000));
+          await steps.run('settle a probe run', () =>
+            settleRun(run, 45_000, 'a probe run', 'completed-or-terminated'),
+          );
         }
       },
       this.sessions.splice(0),
@@ -1089,11 +1092,14 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           expect(await continueToEnd(scope, s1.api, runA.run)).toBe(OUTPUT_A);
         } else {
           scope.released(s1.api);
-          const output = await within(runA.run, 60_000);
-          record(
-            6,
-            `the run ${output ? `returned "${documentOf(output).trim()}"` : 'had not returned after 60 s'}`,
+          // The debuggee ended: the run must come back with its output.
+          const output = await settleRun(
+            runA.run,
+            60_000,
+            'the run',
+            'completed',
           );
+          record(6, `the run returned "${documentOf(output).trim()}"`);
         }
       });
     },

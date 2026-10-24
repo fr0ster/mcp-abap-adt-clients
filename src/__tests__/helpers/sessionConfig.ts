@@ -116,6 +116,13 @@ export function getConfig(): SapConfig {
   if (!url || !/^https?:\/\//.test(url)) {
     throw new Error(`Missing or invalid SAP_URL: ${url}`);
   }
+  // A stated authentication type is taken as stated or refused: a value
+  // outside the set is never read as "not stated" and replaced by a guess.
+  if (authType && !['basic', 'jwt', 'xsuaa'].includes(authType)) {
+    throw new Error(
+      `SAP_AUTH_TYPE is "${rawAuthType}", which is not one of basic, jwt, xsuaa — fix it in .env`,
+    );
+  }
 
   // RFC transport overrides auth type — RFC connections use username/password
   // but route through SADT_REST_RFC_ENDPOINT instead of HTTP
@@ -138,18 +145,27 @@ export function getConfig(): SapConfig {
     };
   }
 
-  // Keep tests compatible with both modes:
-  // - explicit SAP_AUTH_TYPE (basic|jwt|xsuaa)
-  // - implicit JWT mode when token is provided without SAP_AUTH_TYPE
+  // SAP_AUTH_TYPE stated (basic | jwt | xsuaa) is taken as stated. Absent —
+  // which the documented setups allow, basic being the documented default —
+  // the mode is read off the credentials only where they leave no choice: a
+  // token and no user/password is JWT, a user/password and no token is
+  // basic. Both, or neither, is refused rather than guessed.
   const hasJwtToken = Boolean(process.env.SAP_JWT_TOKEN);
-  const effectiveAuthType: 'basic' | 'jwt' =
-    authType === 'jwt' || authType === 'xsuaa'
-      ? 'jwt'
-      : authType === 'basic'
-        ? 'basic'
-        : hasJwtToken
-          ? 'jwt'
-          : 'basic';
+  const hasBasic = Boolean(
+    process.env.SAP_USERNAME || process.env.SAP_PASSWORD,
+  );
+  let effectiveAuthType: 'basic' | 'jwt';
+  if (authType === 'jwt' || authType === 'xsuaa') effectiveAuthType = 'jwt';
+  else if (authType === 'basic') effectiveAuthType = 'basic';
+  else if (hasJwtToken && !hasBasic) effectiveAuthType = 'jwt';
+  else if (hasBasic && !hasJwtToken) effectiveAuthType = 'basic';
+  else {
+    throw new Error(
+      hasJwtToken
+        ? 'SAP_AUTH_TYPE is not set and .env holds both SAP_JWT_TOKEN and SAP_USERNAME/SAP_PASSWORD — state SAP_AUTH_TYPE (basic, jwt or xsuaa)'
+        : 'SAP_AUTH_TYPE is not set and .env holds neither SAP_JWT_TOKEN nor SAP_USERNAME/SAP_PASSWORD',
+    );
+  }
 
   const config: SapConfig = {
     url,

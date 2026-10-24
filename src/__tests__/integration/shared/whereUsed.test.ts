@@ -223,6 +223,8 @@ describe('Shared - getWhereUsed', () => {
       const allTypes = (scopeXml.match(/<usagereferences:type/g) || []).length;
       const initialSelected = (scopeXml.match(/isSelected="true"/g) || [])
         .length;
+      // A scope with no types would make "all selected" true of nothing.
+      expect(allTypes).toBeGreaterThan(0);
 
       testsLogger.info?.(
         `📊 Initial scope: ${initialSelected}/${allTypes} types selected`,

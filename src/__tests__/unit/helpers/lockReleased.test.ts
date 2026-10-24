@@ -312,9 +312,9 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
 
   // Measured on an ABAP Cloud system: a class created seconds before answered a
   // second session's LOCK with 404 "does not exist", and the same test passed
-  // alone. A new session can land on another application server. That is not
-  // a held lock, and the check must not say it is.
-  it('retries an object the second session cannot see, and takes the lock once it can', async () => {
+  // alone. That is not a held lock — but it is a refused LOCK, so the check
+  // cannot judge, and a check that cannot judge fails.
+  it('fails as inconclusive on a 404, without retrying it away', async () => {
     const { conn, calls } = fakeConnection('missing', 200, 2);
     const { open, close } = fakeSession();
 
@@ -322,37 +322,14 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
       open,
       () => new AdtClass(conn),
       config,
-      'x',
-    );
-    await jest.advanceTimersByTimeAsync(10_000);
-    await expect(check).resolves.toBeUndefined();
-
-    const locks = calls.filter((c) => c.url.includes('_action=LOCK'));
-    expect(locks).toHaveLength(3);
-    expect(calls.some((c) => c.url.includes('_action=UNLOCK'))).toBe(true);
-    expect(close).toHaveBeenCalledTimes(1);
-  });
-
-  it('warns instead of failing when the object stays invisible', async () => {
-    const { conn } = fakeConnection('missing');
-    const { open, close } = fakeSession();
-    const warn = jest.fn();
-
-    const check = verifyLockReleased(
-      open,
-      () => new AdtClass(conn),
-      config,
       'class ZCL_LOCKREL_UNIT',
-      { warn, debug: jest.fn(), info: jest.fn(), error: jest.fn() },
     );
-    await jest.advanceTimersByTimeAsync(10_000);
-    await expect(check).resolves.toBeUndefined();
-
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /inconclusive.*not visible.*HTTP 404.*does not exist/,
-      ),
+    await expect(check).rejects.toThrow(
+      /inconclusive.*not visible.*HTTP 404.*does not exist/,
     );
+    await expect(check).rejects.not.toThrow(/did not release the lock/);
+    const locks = calls.filter((c) => c.url.includes('_action=LOCK'));
+    expect(locks).toHaveLength(1);
     expect(close).toHaveBeenCalledTimes(1);
   });
 

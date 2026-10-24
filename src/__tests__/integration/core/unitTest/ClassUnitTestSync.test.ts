@@ -26,7 +26,10 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { runToCompletion } from '../../../helpers/abapUnitRun';
+import {
+  readMethodVerdicts,
+  runToCompletion,
+} from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -83,21 +86,16 @@ interface IRunReading {
 }
 
 function readRunResult(document: string): IRunReading {
-  const methods: string[] = [];
-  const failed: string[] = [];
-  const alerts: string[] = [];
-  // A method is either self-closing or closes after its alerts.
-  for (const m of document.matchAll(
-    /<testMethod [^>]*adtcore:name="([^"]+)"[^>]*?(\/>|>([\s\S]*?)<\/testMethod>)/g,
-  )) {
-    methods.push(m[1]);
-    const kinds = [...(m[3] ?? '').matchAll(/<alert kind="([^"]+)"/g)].map(
-      (a) => a[1],
-    );
-    if (kinds.length > 0) failed.push(m[1]);
-    alerts.push(...kinds);
-  }
-  return { methods: methods.sort(), alerts, failed: failed.sort() };
+  // Parsed, not matched: an alert is found whatever its attribute order.
+  const { methods } = readMethodVerdicts(document);
+  return {
+    methods: methods.map((m) => m.name).sort(),
+    alerts: methods.flatMap((m) => m.alerts),
+    failed: methods
+      .filter((m) => m.alerts.length > 0)
+      .map((m) => m.name)
+      .sort(),
+  };
 }
 
 /** The result document's root element and its namespace, for the report. */

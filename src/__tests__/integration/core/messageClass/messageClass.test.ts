@@ -93,10 +93,9 @@ async function untilMessageClassGone(
     if (still.present === false) return '';
     if (still.present === 'unknown') return still.reason;
   }
-  testsLogger.warn?.(
-    `message class ${name} still answers 10 s after its delete was accepted`,
-  );
-  return '';
+  // Still there is a failure, not a warning: the delete was accepted and
+  // removed nothing anyone could see.
+  return `message class ${name} still answers 10 s after its delete was accepted`;
 }
 
 describe('MessageClass (using AdtClient)', () => {
@@ -266,11 +265,9 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 2: Read message class ─────────────────────────────────────
           logTestStep('read message class', testsLogger);
           // No ADT operation that changes system state guarantees when the
-          // change becomes visible, and for MSAG the server answers 404 right
-          // after a create rather than holding the request — `withLongPolling`
-          // is passed but does not cover this resource. So poll until the
-          // object appears, bounded, instead of asking once and calling the
-          // absence a failure.
+          // change becomes visible. A successful read that is still empty is
+          // polled again, bounded; a refused read — a 404 included — fails.
+          // A later successful read never erases an earlier refusal.
           let readState = String(
             expectResult(
               await mcHandler.readMetadata({ name: msgClassName }),
@@ -279,14 +276,15 @@ describe('MessageClass (using AdtClient)', () => {
           );
           for (let attempt = 0; !readState && attempt < 15; attempt++) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            const again = await mcHandler.readMetadata({ name: msgClassName });
-            // Not there yet is the one refusal to poll past; any other fails.
-            if (!again.ok && !saysAbsent(again.getError())) {
-              throw new Error(
-                failureOf(again, `read message class ${msgClassName}`),
-              );
-            }
-            readState = again.ok ? String(again.getResult().value ?? '') : '';
+            // Every poll is read: a refusal fails, absence included. Only a
+            // successful answer that is still empty — the class not visible
+            // yet — is polled again.
+            readState = String(
+              expectResult(
+                await mcHandler.readMetadata({ name: msgClassName }),
+                `poll message class ${msgClassName}`,
+              ) ?? '',
+            );
           }
           // The class document, read into its parts. `parseMessageClass` is
           // this module's own reading — a consumer that wants it composes it
@@ -296,10 +294,9 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 3: Create message ─────────────────────────────────────────
           logTestStep(`create message ${msgNo}`, testsLogger);
-          // Reading the class already succeeds here, yet the messages endpoint
-          // can still answer "Resource MSAG ... does not exist": the two do not
-          // agree on when the class is there. Retry rather than treat the first
-          // answer as final.
+          // One create, read as it answers: a refusal — "Resource MSAG ...
+          // does not exist" included — fails the test; a retry that then
+          // succeeded would not erase it.
           const createMessage = () =>
             msgHandler.create(
               {
@@ -310,18 +307,7 @@ describe('MessageClass (using AdtClient)', () => {
               },
               { headers: integrationHeadersOf(msgHandler, 'create') },
             );
-          // The refusal comes back as an answer, not a throw: the retry is on
-          // that answer saying the class does not exist yet, and nothing else.
-          let created = await createMessage();
-          for (
-            let attempt = 0;
-            !created.ok && saysAbsent(created.getError()) && attempt < 15;
-            attempt++
-          ) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            created = await createMessage();
-          }
-          expectResult(created, `create message ${msgNo}`);
+          expectResult(await createMessage(), `create message ${msgNo}`);
 
           // ── Step 4: Read message ───────────────────────────────────────────
           logTestStep(`read message ${msgNo}`, testsLogger);

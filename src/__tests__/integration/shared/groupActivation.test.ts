@@ -46,6 +46,7 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
+import { expectActivationExecuted } from '../../helpers/sharedActivation';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -615,21 +616,10 @@ define structure ${structureName} {
           // still a failure — the object stays inactive — read as
           // `activateSharedGroup` reads it.
           const resultsDocument = String(results ?? '');
-          const activationErrors = [
-            ...resultsDocument.matchAll(
-              /<msg\b[^>]*type="E"[^>]*>[\s\S]*?<txt>([^<]*)<\/txt>/g,
-            ),
-          ].map((m) => m[1]);
-          if (
-            !/activationExecuted="true"/.test(resultsDocument) ||
-            activationErrors.length > 0
-          ) {
-            throw new Error(
-              `group activation run ${runId} did not activate: ${
-                activationErrors.join('; ') || resultsDocument.slice(0, 600)
-              }`,
-            );
-          }
+          expectActivationExecuted(
+            resultsDocument,
+            `group activation run ${runId}`,
+          );
           testsLogger.info?.(
             `✅ run ${runId} finished; results: ${resultsDocument.slice(0, 120)}`,
           );

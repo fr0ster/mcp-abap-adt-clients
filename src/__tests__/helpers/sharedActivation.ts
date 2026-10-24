@@ -15,6 +15,13 @@ import { utilDocuments } from '../../core/shared/utilResultSet';
 import { wireItself } from '../../utils/resultStrategy';
 import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
+import {
+  attributeOf,
+  attributeValues,
+  elementsNamed,
+  parseXmlDocument,
+  textOf,
+} from './xmlTree';
 
 export interface ISharedGroupMember {
   /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`. */
@@ -55,7 +62,10 @@ export async function activateSharedGroup(
       await utils.getActivationRun(runId, { withLongPolling: true }),
       `poll group activation run ${runId} of ${what}`,
     );
-    const status = /status="([^"]*)"/.exec(String(state ?? ''))?.[1];
+    const status = attributeValues(
+      parseXmlDocument(String(state ?? ''), `group activation run ${runId}`),
+      'status',
+    )[0];
     finished = Boolean(status && status !== 'running' && status !== 'waiting');
   }
   if (!finished) {
@@ -67,17 +77,35 @@ export async function activateSharedGroup(
       `read the results of group activation run ${runId} of ${what}`,
     ) ?? '',
   );
-  // activationExecuted="true" beside an error message is still a failure (the
-  // errata): the object stays inactive.
-  const errors = [
-    ...results.matchAll(
-      /<msg\b[^>]*type="E"[^>]*>[\s\S]*?<txt>([^<]*)<\/txt>/g,
-    ),
-  ].map((m) => m[1]);
-  if (!/activationExecuted="true"/.test(results) || errors.length) {
-    throw new Error(
-      `group activation of ${what}: ${errors.join('; ') || results.slice(0, 600)}`,
-    );
-  }
+  expectActivationExecuted(results, `group activation of ${what}`);
   logger.info?.(`group activation of ${what} finished`);
+}
+
+/**
+ * An activation results document that says the activation happened: some
+ * element carries `activationExecuted="true"` and no `msg` is of type E.
+ *
+ * Read as a tree: an error is every `msg` of type E, whatever its text — an
+ * empty or a namespaced text element included; the text is only the
+ * diagnostic. `activationExecuted="true"` beside an error is still a failure
+ * (the errata): the object stays inactive. Throws naming `what`.
+ */
+export function expectActivationExecuted(results: string, what: string): void {
+  const tree = parseXmlDocument(results, `the results of ${what}`);
+  const errors = elementsNamed(tree, 'msg').filter(
+    (msg) => attributeOf(msg, 'type') === 'E',
+  );
+  const executed = attributeValues(tree, 'activationExecuted').includes('true');
+  if (!executed || errors.length) {
+    const said = errors
+      .map(
+        (msg) =>
+          elementsNamed(msg, 'txt')
+            .map((txt) => textOf(txt))
+            .filter(Boolean)
+            .join(' ') || '(no text)',
+      )
+      .join('; ');
+    throw new Error(`${what}: ${said || results.slice(0, 600)}`);
+  }
 }

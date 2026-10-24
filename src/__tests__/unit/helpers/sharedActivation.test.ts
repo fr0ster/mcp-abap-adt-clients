@@ -20,7 +20,10 @@ jest.mock('../../helpers/adtHeaders', () => ({
   }),
 }));
 
-import { activateSharedGroup } from '../../helpers/sharedActivation';
+import {
+  activateSharedGroup,
+  expectActivationExecuted,
+} from '../../helpers/sharedActivation';
 
 const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
 const refused = (message: string) => ({
@@ -74,5 +77,54 @@ describe('activateSharedGroup', () => {
     ).rejects.toThrow(
       /read the results of group activation run RUN1.*results gone/,
     );
+  });
+});
+
+describe('expectActivationExecuted', () => {
+  const executedWith = (msg: string) =>
+    `<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties activationExecuted="true"/>${msg}</chkl:messages>`;
+
+  it('passes an executed activation with only warnings', () => {
+    expect(() =>
+      expectActivationExecuted(
+        executedWith('<msg type="W"><shortText><txt>w</txt></shortText></msg>'),
+        'x',
+      ),
+    ).not.toThrow();
+  });
+
+  it('fails an error message with an empty text element', () => {
+    expect(() =>
+      expectActivationExecuted(executedWith('<msg type="E"><txt/></msg>'), 'x'),
+    ).toThrow(/x: \(no text\)/);
+  });
+
+  it('fails an error message with no text at all, its type after other attributes', () => {
+    expect(() =>
+      expectActivationExecuted(
+        executedWith('<msg objDescr="ZAC" line="1" type="E"/>'),
+        'x',
+      ),
+    ).toThrow(/\(no text\)/);
+  });
+
+  it('fails an error message whose text element is namespaced, and names the text', () => {
+    expect(() =>
+      expectActivationExecuted(
+        executedWith(
+          '<chkl:msg type="E"><chkl:shortText><chkl:txt>Field X unknown</chkl:txt></chkl:shortText></chkl:msg>',
+        ),
+        'x',
+      ),
+    ).toThrow(/Field X unknown/);
+  });
+
+  it('fails a document that does not say the activation was executed', () => {
+    expect(() =>
+      expectActivationExecuted(
+        '<chkl:messages xmlns:chkl="u"><chkl:properties activationExecuted="false"/></chkl:messages>',
+        'x',
+      ),
+    ).toThrow(/^x: /);
   });
 });

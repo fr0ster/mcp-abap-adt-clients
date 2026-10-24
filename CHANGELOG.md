@@ -123,7 +123,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   an overlay key) chooses the route before the run, and that route's failure
   fails the test. The debugger, batch, CSRF, transport, unit-test and
   deletion-check suites fail on refusals they used to log; a unit-test run is
-  judged by its result on every system, legacy included.
+  judged by its result on every system, legacy included. The lock-release
+  check fails on a refused verification LOCK, a 404 included (no retry, no
+  "inconclusive" warning). A debugger test's run must settle within its wait
+  with its output or a termination's HTTP 500 (`helpers/runSettlement.ts`);
+  a timeout or any other answer fails, and the run is kept until it has.
+  ABAP Unit results and activation results are parsed as XML
+  (`helpers/xmlTree.ts`), so attribute order, whitespace and namespace
+  prefixes do not hide an alert or an error message, and an error is any
+  `msg` of type E whatever its text. A `SAP_AUTH_TYPE` outside `basic`,
+  `jwt`, `xsuaa` is refused; left out, the mode is read off the credentials
+  only when they leave no choice.
 
 ## [37.2.0] - 2026-10-23
 
