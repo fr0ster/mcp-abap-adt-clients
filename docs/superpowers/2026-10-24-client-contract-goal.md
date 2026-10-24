@@ -2,8 +2,10 @@
 
 ## Goal
 
-Every contract lives in the package that accepts it as a parameter. The consumer decides where
-that contract's implementation comes from: the library's, or its own.
+Every contract lives in the package that accepts it as a parameter. A contract is either taken
+from the contract package or composed from that package's contracts, never from an implementation
+package. The consumer decides where the contract's implementation comes from: the library's, or
+its own.
 
 For the ADT client this means two things.
 
@@ -14,7 +16,8 @@ For the ADT client this means two things.
   result sets (`classDocuments`, …) or its own. adt-clients keeps the values; they are
   implementations of the contracts.
 - **The consumer accepts the client.** mcp-abap-adt takes a client and calls part of it, so it
-  defines the client contract it needs. That contract is composed from the atoms
+  defines the client contract it needs. That contract is composed only from interfaces-adt's
+  contracts, the atoms
   (`IAdtCreatable`, `IAdtReadable`, `IAdtLockable`, …) and names only what the server calls. The
   server's code is typed against it, and the server decides where the implementation comes from:
   adt-clients' `createAdtClient()`, or its own. The compiler checks, at the consumer, that the
