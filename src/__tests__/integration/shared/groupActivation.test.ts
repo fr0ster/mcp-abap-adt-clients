@@ -404,23 +404,26 @@ describe('Group Activation (Shared)', () => {
         };
 
         try {
-          // Step 0: Validate domain
+          // Step 0: Validate domain — a name this test creates; a shared
+          // domain exists by design, so its name is never free.
           currentStep = 'validate domain';
-          logTestStep(currentStep, testsLogger);
-          expectNameFree(
-            await client.getDomain().validate(
-              {
-                domainName: domainName,
-                packageName: packageName,
-                description:
-                  testCase.params.description ||
-                  `Test domain for group activation`,
-              },
-              { analyse: judged(analyseValidation) },
-            ),
-            'Domain',
-            domainName,
-          );
+          if (!isShared(domainName)) {
+            logTestStep(currentStep, testsLogger);
+            expectNameFree(
+              await client.getDomain().validate(
+                {
+                  domainName: domainName,
+                  packageName: packageName,
+                  description:
+                    testCase.params.description ||
+                    `Test domain for group activation`,
+                },
+                { analyse: judged(analyseValidation) },
+              ),
+              'Domain',
+              domainName,
+            );
+          }
 
           // Step 1: Create domain — unless it is a shared object
           currentStep = 'create domain';
