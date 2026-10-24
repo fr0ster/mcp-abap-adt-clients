@@ -140,47 +140,10 @@ describe('FunctionGroup (using AdtClient)', () => {
               return { success: false, reason: existing.reason };
             }
             if (existing.present === true) {
-              // Try to release any stale lock before deleting
-              try {
-                const locked = await cleanupClient
-                  .getFunctionGroup()
-                  .lock({ functionGroupName });
-                if (locked.ok) {
-                  const unlocked = await cleanupClient
-                    .getFunctionGroup()
-                    .unlock({ functionGroupName }, locked.getResult().value);
-                  testsLogger.info?.(
-                    `Released stale lock on ${functionGroupName}`,
-                  );
-                  if (!unlocked.ok) {
-                    return {
-                      success: false,
-                      reason: failureOf(
-                        unlocked,
-                        `release stale lock on ${functionGroupName}`,
-                      ),
-                    };
-                  }
-                }
-              } catch (lockError: any) {
-                // Lock failed — object locked by another user/session
-                const msg = lockError.message || String(lockError);
-                if (
-                  lockError.response?.status === 403 ||
-                  msg.includes('currently editing')
-                ) {
-                  testsLogger.warn(
-                    `Cannot release lock on ${functionGroupName}: ${msg}. ` +
-                      `Clear the lock in SM12 or close SE80.`,
-                  );
-                  return {
-                    success: false,
-                    reason: `${functionGroupName} is locked: ${msg}. Clear lock in SM12.`,
-                  };
-                }
-                // Other lock errors (404 etc.) — ignore and try delete anyway
-              }
-
+              // No lock is taken here to "release" one: a lock in this session
+              // cannot release another session's, and this session holds none.
+              // A delete of an object locked elsewhere is refused, and that
+              // refusal fails the setup with what SAP said.
               try {
                 const transportRequest = tester.getTransportRequest();
                 const removed = await cleanupClient.getFunctionGroup().delete(
@@ -215,12 +178,12 @@ describe('FunctionGroup (using AdtClient)', () => {
               }
             }
           } catch (error: any) {
-            if (error.response?.status !== 404) {
-              return {
-                success: false,
-                reason: `Cannot verify function group existence: ${error.message}`,
-              };
-            }
+            // Presence is read from the answer above; a throw is a failure of
+            // the setup itself, whatever its status.
+            return {
+              success: false,
+              reason: `Cannot verify function group existence: ${error.message}`,
+            };
           }
           return { success: true };
         },
