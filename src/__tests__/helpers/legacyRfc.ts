@@ -16,11 +16,15 @@ export const RFC_ONLY_REASON = 'the legacy client is supported over RFC only';
 export interface LegacyRfcProbes {
   isLegacy: () => boolean;
   connectionType: () => 'http' | 'rfc';
+  /** The configuration named through `MCP_TEST_CONFIG_PATH`, if any. */
+  explicitConfigPath: () => string | undefined;
 }
 
 const configured: LegacyRfcProbes = {
   isLegacy: () => require('./sessionConfig').isLegacyEnvironment(),
   connectionType: () => require('./sessionConfig').getConnectionType(),
+  explicitConfigPath: () =>
+    process.env.MCP_TEST_CONFIG_PATH?.trim() || undefined,
 };
 
 /** Why a live legacy check does not run here; `undefined` when it does. */
@@ -30,8 +34,19 @@ export function legacyRfcSkipReason(
   let legacy: boolean;
   try {
     legacy = probes.isLegacy();
-  } catch {
-    // A configuration that cannot be read is not a legacy configuration.
+  } catch (error) {
+    // A configuration named through MCP_TEST_CONFIG_PATH is the 7.40 run's
+    // own: one that cannot be read fails the run, naming the path, rather than
+    // reading as "not a legacy configuration" and skipping as if on purpose.
+    const named = probes.explicitConfigPath();
+    if (named) {
+      throw new Error(
+        `MCP_TEST_CONFIG_PATH names ${named}, which cannot be read as a test configuration: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    // Without one, a configuration that cannot be read is not a legacy one.
     legacy = false;
   }
   if (!legacy) return NOT_LEGACY_REASON;
