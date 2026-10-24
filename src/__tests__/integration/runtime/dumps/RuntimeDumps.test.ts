@@ -213,11 +213,18 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           }),
           'byUserFilteredResponse',
         );
-        for (const id of extractDumpIds(listResponse)) {
-          beforeDumpIds.add(id);
-        }
-        for (const id of extractDumpIds(byUserResponse)) {
-          beforeDumpIds.add(id);
+        // What is on the system before the run, asked the way discovery asks
+        // afterwards: a dump that merely falls into the wider window later is
+        // not this run's.
+        const discoveryQuery = { top: Math.max(top, 50), inlinecount } as const;
+        if (generateArtificialDump) {
+          const before = expectResult(
+            await runtime.getDumps().listByUser(user, discoveryQuery),
+            'dumps before the run',
+          );
+          for (const id of extractDumpIds(before)) {
+            beforeDumpIds.add(id);
+          }
         }
 
         let generatedDumpId: string | undefined;
@@ -227,26 +234,47 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `run shared dump class ${className} (division by zero)`,
             testsLogger,
           );
-          // The answer is ignored on purpose: this run is *meant* to fail —
-          // a division by zero — and what the test is after is the dump SAP
-          // writes because of it, read below. A failure comes back in the
-          // answer now rather than being thrown, so there is nothing to catch.
-          await executor.getClassExecutor().run({ className });
+          // The run is *meant* to fail, with a division by zero, and SAP writes
+          // a dump because of it. Only that failure is accepted: a refusal
+          // (401/403), a missing class (404), a bad request or a failure that
+          // never reached the system produces no dump and fails the test here.
+          const run = await executor.getClassExecutor().run({ className });
+          if (!run.ok) {
+            const failure = run.getError();
+            const status = failure.response?.status;
+            if (status !== 500) {
+              throw new Error(
+                `running ${className} failed [${failure.origin}] with ${status ?? 'no HTTP status'}, not the runtime error that writes a dump: ${failure.message}`,
+              );
+            }
+          }
 
+          // A dump counts only if it is new since before the run and it is the
+          // dump of the class that was run.
+          const checked = new Set<string>();
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             logTestStep(
               `discover generated dump attempt ${attempt}/${maxAttempts}`,
               testsLogger,
             );
             const current = expectResult(
-              await runtime.getDumps().listByUser(user, {
-                top: Math.max(top, 50),
-                inlinecount,
-              }),
+              await runtime.getDumps().listByUser(user, discoveryQuery),
               'current',
             );
-            const ids = extractDumpIds(current);
-            generatedDumpId = ids.find((id) => !beforeDumpIds.has(id));
+            for (const id of extractDumpIds(current)) {
+              if (beforeDumpIds.has(id) || checked.has(id)) continue;
+              checked.add(id);
+              const summary = expectResult(
+                await runtime.getDumps().getById(id, { view: 'summary' }),
+                `summary of new dump ${id}`,
+              );
+              const text =
+                typeof summary === 'string' ? summary : JSON.stringify(summary);
+              if (text.toUpperCase().includes(className.toUpperCase())) {
+                generatedDumpId = id;
+                break;
+              }
+            }
             if (generatedDumpId) {
               break;
             }
@@ -254,14 +282,12 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
               await delay(retryDelayMs);
             }
           }
-          if (generatedDumpId) {
-            logTestStep(
-              `generated dump found: ${generatedDumpId}`,
-              testsLogger,
+          if (!generatedDumpId) {
+            throw new Error(
+              `no new runtime dump of ${className} appeared after ${maxAttempts} attempts: the run wrote none`,
             );
-          } else {
-            logTestStep('generated dump not found after retries', testsLogger);
           }
+          logTestStep(`generated dump found: ${generatedDumpId}`, testsLogger);
         }
 
         const configuredDumpId =
@@ -269,8 +295,12 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             ? params.dump_id.trim()
             : undefined;
         const discoveredDumpId = extractDumpId(listResponse);
-        const dumpId = generatedDumpId || configuredDumpId || discoveredDumpId;
-        const dumpIdSource = generatedDumpId
+        // With generation on, only the dump this run wrote is read; an older
+        // one never stands in for it.
+        const dumpId = generateArtificialDump
+          ? generatedDumpId
+          : configuredDumpId || discoveredDumpId;
+        const dumpIdSource = generateArtificialDump
           ? 'forced_class_failure'
           : configuredDumpId
             ? 'config.dump_id'
@@ -327,12 +357,8 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           );
           expect(formattedResponse).toBeDefined();
         } else {
-          const reason = generateArtificialDump
-            ? 'forced dump was not discovered and no fallback dump_id/feed id'
-            : 'no dump id configured/discovered';
-          logTestStep(
-            `read runtime dump by id: skipped (${reason})`,
-            testsLogger,
+          throw new Error(
+            'generate_artificial_dump is off and there is no dump to read: set params.dump_id or let the run write one',
           );
         }
 

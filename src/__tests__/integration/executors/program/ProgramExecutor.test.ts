@@ -179,17 +179,26 @@ describe('ProgramExecutor (integration)', () => {
     // ours, being the newest entry absent before the run. Nothing is swept by
     // diffing the feed again at teardown: on a shared system a trace that
     // appeared in between belongs to somebody else.
+    // A trace that could not be removed fails the suite, after the connection
+    // is released: the leftover is what this cleanup exists to prevent.
+    const leftovers: string[] = [];
     for (const traceId of tracesCreated) {
       try {
-        await profiler.delete(traceId);
+        const answer = await profiler.delete(traceId);
+        if (!answer.ok) {
+          leftovers.push(`${traceId}: ${answer.getError().message}`);
+        }
       } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        leftovers.push(
+          `${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
     if (connection) {
       await releaseTestConnection(connection);
+    }
+    if (leftovers.length > 0) {
+      throw new Error(`Cleanup failed for trace(s) ${leftovers.join('; ')}`);
     }
   });
 

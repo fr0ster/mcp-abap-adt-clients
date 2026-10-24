@@ -148,13 +148,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     // failed before removing the trace it made — otherwise a red run leaves the
     // very thing this suite exists to clean up.
     if (traceIdFromThisRun && runtime) {
-      try {
-        await profiler.delete(traceIdFromThisRun);
-      } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for trace ${traceIdFromThisRun}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
-      }
+      // A failed cleanup fails the suite: the leftover trace is what this
+      // exists to prevent.
+      expectResult(
+        await profiler.delete(traceIdFromThisRun),
+        `delete trace ${traceIdFromThisRun}`,
+      );
     }
 
     if (connection) {
@@ -668,7 +667,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       try {
         const traceId = traceIdFromThisRun;
         logTestStep(`delete trace ${traceId}`, testsLogger);
-        await profiler.delete(traceId);
+        expectResult(await profiler.delete(traceId), `delete trace ${traceId}`);
 
         // Deleted means gone from the feed. Polled rather than read once,
         // because how quickly the feed reflects a deletion is not measured —

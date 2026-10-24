@@ -185,17 +185,26 @@ describe('ClassExecutor (integration)', () => {
     // appeared in between belongs to somebody else. The retry path can leave a
     // trace from its first attempt untracked, and that is the trade taken
     // knowingly rather than risk deleting a stranger's.
+    // A trace that could not be removed fails the suite, after the connection
+    // is released: the leftover is what this cleanup exists to prevent.
+    const leftovers: string[] = [];
     for (const traceId of tracesCreated) {
       try {
-        await profilerReading.delete(traceId);
+        const answer = await profilerReading.delete(traceId);
+        if (!answer.ok) {
+          leftovers.push(`${traceId}: ${answer.getError().message}`);
+        }
       } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        leftovers.push(
+          `${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
     if (connection) {
       await releaseTestConnection(connection);
+    }
+    if (leftovers.length > 0) {
+      throw new Error(`Cleanup failed for trace(s) ${leftovers.join('; ')}`);
     }
   });
 
