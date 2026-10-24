@@ -13,6 +13,8 @@
 import type {
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
+  IAdtOperationOptions,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -23,7 +25,11 @@ import {
   noDeletionCheckNorDelete,
 } from '../shared/refusalLegacy';
 import { AdtPackage } from './AdtPackage';
-import type { IPackageResults, packageDocuments } from './types';
+import type {
+  IPackageConfig,
+  IPackageResults,
+  packageDocuments,
+} from './types';
 
 /** The resource 7.40 SP04 answered 404 to, shown without a name. */
 const ITEM_RESOURCE = `${PACKAGE.collection}/{name}`;
@@ -89,9 +95,10 @@ export class AdtPackageLegacy<
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5) — and the
    * package `delete` refuses as well (§8).
    */
-  override async checkDeletion<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['deletionCheck']>, E>
-  > {
+  override async checkDeletion<E extends IAdtError = IAdtError>(
+    _config: Partial<IPackageConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheckNorDelete<ReturnType<R['deletionCheck']>, E>();
   }
 
@@ -101,23 +108,23 @@ export class AdtPackageLegacy<
    * `404` to. Refused without a request; not measured themselves (spec §8).
    */
   override async lock<E extends IAdtError = IAdtError>(
-    _config?: unknown,
+    _config: Partial<IPackageConfig>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     return legacyRefusal<string, E>('lock', ITEM_RESOURCE);
   }
 
   override async unlock<E extends IAdtError = IAdtError>(
-    _config?: unknown,
-    _lockHandle?: string,
+    _config: Partial<IPackageConfig>,
+    _lockHandle: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     return legacyRefusal<void, E>('unlock', ITEM_RESOURCE);
   }
 
   override async readTransport<E extends IAdtError = IAdtError>(
-    _config?: unknown,
-    _options?: IAdtAnalyseOptions<E>,
+    _config: Partial<IPackageConfig>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     return legacyRefusal<ReturnType<R['transport']>, E>(
       'readTransport',
@@ -126,9 +133,9 @@ export class AdtPackageLegacy<
   }
 
   override async check<E extends IAdtError = IAdtError>(
-    _config?: unknown,
-    _status?: string,
-    _options?: { headers?: unknown } & IAdtAnalyseOptions<E>,
+    _config: Partial<IPackageConfig>,
+    _status: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     return legacyRefusal<ReturnType<R['check']>, E>(
       'check',

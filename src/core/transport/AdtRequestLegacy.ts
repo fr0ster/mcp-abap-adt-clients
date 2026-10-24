@@ -26,8 +26,10 @@
  */
 
 import type {
+  AdtTaskType,
   IAdtAnalyseOptions,
   IAdtError,
+  IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
@@ -45,6 +47,7 @@ import { answering, failed } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
 import type {
+  IAbapObjectEntry,
   ITransportConfig,
   ITransportResults,
   transportDocuments,
@@ -181,8 +184,8 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: checking the deletion of a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    _config?: Partial<ITransportConfig>,
-    _options?: { headers?: unknown } & IAdtOperationOptions<E>,
+    _config: Partial<ITransportConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return failed<ReturnType<R['deletionCheck']>, E>(
       unsupported(
@@ -194,7 +197,7 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: reading the objects of a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async readObjects<E extends IAdtError = IAdtError>(
-    _transportNumber?: string,
+    _transportNumber: string,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['objects']>, E>> {
     return failed<ReturnType<R['objects']>, E>(
@@ -207,7 +210,7 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: reading the action log of a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async readActionLog<E extends IAdtError = IAdtError>(
-    _transportNumber?: string,
+    _transportNumber: string,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['actionLog']>, E>> {
     return failed<ReturnType<R['actionLog']>, E>(
@@ -220,9 +223,9 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: adding an object to a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async addObject<E extends IAdtError = IAdtError>(
-    _transportNumber?: string,
-    _object?: unknown,
-    _options?: { headers?: unknown } & IAdtOperationOptions<E>,
+    _transportNumber: string,
+    _object: IAbapObjectEntry,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['addedObject']>, E>> {
     return failed<ReturnType<R['addedObject']>, E>(
       unsupported(
@@ -234,9 +237,9 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: removing an object from a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async removeObject<E extends IAdtError = IAdtError>(
-    _transportNumber?: string,
-    _object?: unknown,
-    _options?: { headers?: unknown } & IAdtOperationOptions<E>,
+    _transportNumber: string,
+    _object: IAbapObjectEntry & { position: string },
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['removedObject']>, E>> {
     return failed<ReturnType<R['removedObject']>, E>(
       unsupported(
@@ -248,10 +251,10 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: moving objects between transport requests is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async moveObjects<E extends IAdtError = IAdtError>(
-    _sourceTask?: string,
-    _targetNumber?: string,
-    _objects?: readonly unknown[],
-    _options?: { headers?: unknown } & IAdtOperationOptions<E>,
+    _sourceTask: string,
+    _targetNumber: string,
+    _objects: readonly (IAbapObjectEntry & { position: string })[],
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['movedObjects']>, E>> {
     return failed<ReturnType<R['movedObjects']>, E>(
       unsupported(
@@ -263,7 +266,7 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: sorting and compressing a transport task is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async sortAndCompress<E extends IAdtError = IAdtError>(
-    _taskNumber?: string,
+    _taskNumber: string,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['sortedAndCompressed']>, E>> {
     return failed<ReturnType<R['sortedAndCompressed']>, E>(
@@ -276,10 +279,9 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: creating a task under a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async createTask<E extends IAdtError = IAdtError>(
-    _transportNumber?: string,
-    _options?: {
-      headers?: unknown;
-      targetUser?: string;
+    _transportNumber: string,
+    _options: { headers: IAdtHeaders } & {
+      targetUser: string;
     } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['createdTask']>, E>> {
     return failed<ReturnType<R['createdTask']>, E>(
@@ -292,9 +294,9 @@ export class AdtRequestLegacy<
 
   /** Refused without a request: changing the type of a transport task is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async changeTaskType<E extends IAdtError = IAdtError>(
-    _taskNumber?: string,
-    _type?: unknown,
-    _options?: { headers?: unknown } & IAdtOperationOptions<E>,
+    _taskNumber: string,
+    _type: AdtTaskType,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['taskTypeChanged']>, E>> {
     return failed<ReturnType<R['taskTypeChanged']>, E>(
       unsupported('Changing the type of a transport task', NOT_ADVERTISED) as E,
