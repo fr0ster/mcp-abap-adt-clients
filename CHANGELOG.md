@@ -26,10 +26,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) now matches what a
 SAP_BASIS 7.40 SP04 system serves through ADT, **measured on SAP_BASIS 7.40 SP04
-over RFC**: each member either sends the request 7.40 SP04 accepts or answers a
-refusal without sending a request. No public type changes, no new export, no
-dependency change — nothing to migrate. The full account, with the probe record
-and step behind every claim, is in `docs/architecture/LEGACY.md`.
+over RFC**: each member sends the request measured accepted there, or keeps an
+unmeasured request under a collection 7.40 advertises (listed under *Not
+measured on 7.40 SP04* below), or answers the library's refusal without a
+request. No new export and no change to the package's dependencies. The public
+types are 37.2's, with one exception: the legacy runners' `run` / `runSync`
+that refused in 37.2 declared no parameters there; they now send, and declare
+the base runner's parameters, so a call without arguments — refused at run time
+in 37.2 — no longer compiles. What a consumer on 7.40 does differently is in
+`docs/architecture/LEGACY.md` ("What changes on 7.40 for a consumer of 37.2"),
+with the full account and the probe record and step behind every claim.
 
 ### Changed
 
@@ -72,41 +78,33 @@ and step behind every claim, is in `docs/architecture/LEGACY.md`.
   module's URI under its group — use `runSync({ functionGroupName,
   functionModuleName })`. Every runner's `getStatus` and `getResult` is
   refused: a legacy run answers finished and has no run id.
-- **Members that now refuse without a request** (`UNSUPPORTED_OPERATION`,
-  answered, never thrown; the message names the operation, the missing endpoint
-  and what to use instead), by handler:
-  - every `checkDeletion` (class, program, interface, function group, function
-    module, DDL source, package, include, function include, message class,
-    request) and `getUtils().checkDeletionGroup` — 7.40 has no deletion API
+- **Members that sent a request in 37.2 and now refuse without one**
+  (`UNSUPPORTED_OPERATION`, answered, never thrown; the message names the
+  operation, the missing endpoint and what to use instead), by handler:
+  - every object's `checkDeletion` (class, program, interface, function group,
+    function module, DDL source, package, include, function include, message
+    class) and `getUtils().checkDeletionGroup` — 7.40 has no deletion API
     (`/deletion/check` answers `404`);
   - `delete` of an include, a function include and a message class, and
     `getUtils().deleteObjectsGroup` (a direct `DELETE ?lockHandle=` on the
     three is not measured and is not implemented on inference);
-  - `getTransformation()`, `getScalarFunction()`,
-    `getScalarFunctionImplementation()`, `getAppendStructure()`,
-    `getStructure()`, `getEnhancement()`, `getTable()`, `getDomain()`,
-    `getDataElement()`, `getTableType()`, `getAccessControl()`,
-    `getServiceDefinition()`, `getServiceBinding()`,
-    `getBehaviorDefinition()`, `getBehaviorImplementation()`,
-    `getMetadataExtension()`, `getAuthorizationField()`,
-    `getFeatureToggle()` — every member of these handlers, since their
-    families are absent or not advertised;
-  - `getPackage()`: every member (the item resource answers `404`, create
-    `405`); package contents come through
-    `getUtils().fetchNodeStructure('DEVC/K', name)`;
-  - `getRequest()`: all but `list` and `readMetadata` (the user's list from
-    `/sap/bc/cts/transportrequests`; `create` answers `400`);
+  - every member of `getTransformation()`, `getScalarFunction()`,
+    `getScalarFunctionImplementation()` and `getAppendStructure()`, now
+    `absentOnLegacy` — their families are absent or not advertised;
   - `getUtils()`: `getWhereUsed`, `getWhereUsedScope` (7.40 serves where-used
     only through RIS), `getVirtualFoldersContents`, `getAllTypes`,
-    `getActivationRun`, `getActivationResults`, `getTableColumns`,
-    `getTableContents`, `getSqlQuery`, `getObjectProperties`, and
-    `readObjectMetadata` / `readObjectSource` for the DDIC and package types;
-  - `getDdl().checkCdsTestDoubles`;
+    `getActivationRun`, `getActivationResults`, and `readObjectMetadata` /
+    `readObjectSource` for the DDIC and package types;
+  - `getRequest()`: `searchConfigurations`, `checkDeletion`, `readObjects`,
+    `readActionLog`, `addObject`, `removeObject`, `moveObjects`,
+    `sortAndCompress`, `createTask`, `changeTaskType` — they are on
+    `/sap/bc/adt/cts/*`, which 7.40 does not advertise;
+  - `getPackage()`: `lock`, `unlock`, `readTransport`, `check` (the item
+    resource answers `404`); package contents come through
+    `getUtils().fetchNodeStructure('DEVC/K', name)`;
   - `getClassExecutor()` and `getProgramExecutor()`: `run`, `runWithProfiler`,
     `listObjectTypes`, `listProcessTypes` (7.40 has no `/oo/classrun`;
     `programrun` and the trace type lists are refused until measured).
-- **The function include v1 pair** (above) is what makes `getFunctionInclude()`
-  `create` work on 7.40 SP04.
 
 ### Added (repository only — nothing in the published package)
 

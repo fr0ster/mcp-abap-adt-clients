@@ -233,9 +233,12 @@ see [The reading is injected once](#the-reading-is-injected-once) below.
 `createAdtClient(connection)` returns `AdtClientLegacy` on a system without
 `/sap/bc/adt/core/discovery` (BASIS < 7.50). It is an **RFC client**: supported,
 and measured on SAP_BASIS 7.40 SP04, over RFC only; HTTP to a legacy system is
-unsupported. It hands out every getter of `AdtClient`, with the same types; each
-member sends what 7.40 SP04 serves or answers a refusal without a request
-(`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). In short, per type:
+unsupported. It hands out every getter of `AdtClient`; a getter it overrides
+declares the base's return type or a subclass of it (`AdtClassLegacy` for
+`AdtClass`, …), so code written against `AdtClient` compiles against it. Each
+member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured
+request under a collection 7.40 advertises, or answers a refusal without a
+request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). In short, per type:
 
 | Type (getter) | Legacy handler | On 7.40 SP04 |
 |---|---|---|
@@ -1184,8 +1187,10 @@ if (source.ok) {
 On a legacy system `readObjectMetadata` refuses (answered, not thrown) for
 `domain`, `dataelement`, `structure`, `table`, `tabletype` and `package`, and
 `readObjectSource` for `structure`, `table` and `tabletype` — any alias, any
-case: 7.40 SP04 does not serve those families. The other types send the
-handler's own request.
+case. For the domain, data element, structure, table and package families 7.40
+SP04 was measured not to serve the endpoint (`404`); table types are only absent
+from its discovery — not advertised, not measured — and refused until measured.
+The other types send the handler's own request.
 
 ### What every member answers with
 

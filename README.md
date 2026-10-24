@@ -146,7 +146,7 @@ npm install @mcp-abap-adt/adt-clients
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
-   - `AdtClientLegacy` (from `createAdtClient` on BASIS < 7.50) is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only — HTTP to a legacy system is unsupported. It sends what 7.40 SP04 serves and refuses the rest without a request; a legacy `delete` takes the lock handle from your `lock()`, and there is no `checkDeletion`. See [LEGACY.md](docs/architecture/LEGACY.md)
+   - `AdtClientLegacy` (from `createAdtClient` on BASIS < 7.50) is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only — HTTP to a legacy system is unsupported. Each member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed as not measured in LEGACY.md), or answers a refusal without a request; a legacy `delete` takes the lock handle from your `lock()`, and there is no `checkDeletion`. See [LEGACY.md](docs/architecture/LEGACY.md)
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more

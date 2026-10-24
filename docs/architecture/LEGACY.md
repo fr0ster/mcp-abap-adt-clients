@@ -2,7 +2,7 @@
 
 ## Overview
 
-Legacy SAP systems (BASIS versions older than 7.50) lack many ADT endpoints available on modern systems. The library provides `AdtClientLegacy` — a subclass of `AdtClient` — and `AdtExecutorLegacy` — a subclass of `AdtExecutor`. They hand out the same getters; each member either sends the request a SAP_BASIS 7.40 SP04 system accepts, or answers a refusal **without sending a request** where 7.40 SP04 does not serve the endpoint.
+Legacy SAP systems (BASIS versions older than 7.50) lack many ADT endpoints available on modern systems. The library provides `AdtClientLegacy` — a subclass of `AdtClient` — and `AdtExecutorLegacy` — a subclass of `AdtExecutor`. They hand out the same getters; each member sends the request measured accepted on SAP_BASIS 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed under [Not measured on 7.40 SP04](#not-measured-on-740-sp04)), or answers the library's refusal **without sending a request**.
 
 **What this covers, and what it does not.** The goal is to implement what 7.40 SP04 serves through ADT and to refuse the rest without a request. What ADT does not offer on 7.40 — where-used outside RIS, DDIC sources, transport changes, … — is not this library's: reading and changing it is the work of a separate legacy MCP server, which goes through local reports on the system.
 
@@ -341,7 +341,7 @@ The live checks under `src/__tests__/integration/legacy/` are written; how to ru
 
 ## What changes on 7.40 for a consumer of 37.2
 
-37.3.0 is a minor: no public type changes, and nothing to migrate. On a 7.40 system:
+37.3.0 is a minor. The public types are 37.2's, with one exception: the legacy runners' `run` / `runSync` that refused in 37.2 (the program and function group runners' `run` and `runSync`, the function module runner's `runSync`) declared no parameters there; they now send, and declare the base runner's parameters, so a call without arguments — refused at run time in 37.2 — no longer compiles. On a 7.40 system:
 
 - **Use the legacy client over RFC.** HTTP to a legacy system is unsupported ([why](#http-is-not-a-supported-legacy-wire)).
 - **Lock before `delete`.** A class, program, interface or function group delete without the object's lock handle answers SAP's `400`. Lock, pass the handle as `options.lockHandle`, unlock ([Delete](#delete-lock-delete-with-the-handle-unlock)). 37.2's documentation said a delete needs no lock; on 7.40 SP04 that is wrong.
