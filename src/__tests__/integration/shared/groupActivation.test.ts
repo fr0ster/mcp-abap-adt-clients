@@ -41,7 +41,7 @@ import { CleanupSteps } from '../../helpers/cleanupSteps';
 import { expectResult, releasing } from '../../helpers/contract';
 import { judged } from '../../helpers/judged';
 import { expectLockReleased } from '../../helpers/lockReleased';
-import { expectRemovedOrAbsent } from '../../helpers/objectPresence';
+import { removeLeftover } from '../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -294,9 +294,16 @@ describe('Group Activation (Shared)', () => {
             'ZAC_SHR_',
           ) ?? false;
 
-        for (const [label, deleteFn] of [
+        for (const [label, readFn, deleteFn] of [
           [
             'structure',
+            () =>
+              client
+                .getStructure()
+                .readMetadata(
+                  { structureName: structureName! },
+                  { analyse: analyseException },
+                ),
             () =>
               client.getStructure().delete(
                 { structureName: structureName!, transportRequest },
@@ -312,6 +319,13 @@ describe('Group Activation (Shared)', () => {
           [
             'data element',
             () =>
+              client
+                .getDataElement()
+                .readMetadata(
+                  { dataElementName: dataElementName! },
+                  { analyse: analyseException },
+                ),
+            () =>
               client.getDataElement().delete(
                 { dataElementName: dataElementName!, transportRequest },
                 {
@@ -325,6 +339,13 @@ describe('Group Activation (Shared)', () => {
           ],
           [
             'domain',
+            () =>
+              client
+                .getDomain()
+                .readMetadata(
+                  { domainName: domainName! },
+                  { analyse: analyseException },
+                ),
             () =>
               client.getDomain().delete(
                 { domainName: domainName!, transportRequest },
@@ -347,9 +368,10 @@ describe('Group Activation (Shared)', () => {
           // the data element, which references the domain, so they come apart
           // in exactly this sequence. Removing the data element first leaves a
           // dangling reference and the delete is refused.
-          const removed = expectRemovedOrAbsent(
-            await deleteFn(),
+          const removed = await removeLeftover(
             `pre-cleanup: delete leftover ${label}`,
+            readFn,
+            deleteFn,
           );
           testsLogger.info?.(`Pre-cleanup: leftover ${label} ${removed}`);
         }

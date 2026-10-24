@@ -42,14 +42,10 @@ import {
   gate,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import {
-  expectResult,
-  failureOf,
-  releasing,
-  saysAbsent,
-} from '../../../helpers/contract';
+import { expectResult, releasing } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
+import { removeLeftover } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -202,48 +198,66 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           const refusals: string[] = [];
           const remove = async (
             what: string,
+            read: () => Promise<IAdtResponse<unknown>>,
             call: () => Promise<IAdtResponse<unknown>>,
           ) => {
             try {
-              const answer = await call();
-              if (!answer.ok && !saysAbsent(answer.getError())) {
-                refusals.push(failureOf(answer, what));
-              }
+              await removeLeftover(what, read, call);
             } catch (error) {
               refusals.push(
                 `${what} threw: ${error instanceof Error ? error.message : String(error)}`,
               );
             }
           };
-          await remove(`delete DSFI ${implName}`, () =>
-            dsfi.delete(
-              {
-                implementationName: implName,
-                transportRequest,
-              },
-              {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(dsfi, 'delete'),
-              },
-            ),
+          await remove(
+            `delete DSFI ${implName}`,
+            () =>
+              dsfi.readMetadata(
+                { implementationName: implName },
+                { analyse: analyseException },
+              ),
+            () =>
+              dsfi.delete(
+                {
+                  implementationName: implName,
+                  transportRequest,
+                },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(dsfi, 'delete'),
+                },
+              ),
           );
-          await remove(`delete AMDP class ${amdpName}`, () =>
-            cls.delete(
-              { className: amdpName },
-              {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(cls, 'delete'),
-              },
-            ),
+          await remove(
+            `delete AMDP class ${amdpName}`,
+            () =>
+              cls.read({ className: amdpName }, undefined, {
+                analyse: analyseException,
+              }),
+            () =>
+              cls.delete(
+                { className: amdpName },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(cls, 'delete'),
+                },
+              ),
           );
-          await remove(`delete scalar function ${funcName}`, () =>
-            sf.delete(
-              { scalarFunctionName: funcName, transportRequest },
-              {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(sf, 'delete'),
-              },
-            ),
+          await remove(
+            `delete scalar function ${funcName}`,
+            () =>
+              sf.readMetadata(
+                { scalarFunctionName: funcName },
+                { analyse: analyseException },
+              ),
+            () =>
+              sf.delete(
+                { scalarFunctionName: funcName, transportRequest },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(sf, 'delete'),
+                },
+              ),
           );
           return refusals;
         };

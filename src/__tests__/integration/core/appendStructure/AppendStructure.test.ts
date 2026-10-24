@@ -44,7 +44,7 @@ import {
 } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
-import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
+import { removeLeftover } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -235,15 +235,21 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
           // ── 1) Idempotent cleanup of any leftover object from a previous run ──
           // Absent is the expected answer; any other refusal fails here.
-          expectRemovedOrAbsent(
-            await as.delete(
-              { appendStructureName, transportRequest },
-              {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(as, 'delete'),
-              },
-            ),
+          await removeLeftover(
             `delete leftover append structure ${appendStructureName}`,
+            () =>
+              as.readMetadata(
+                { appendStructureName },
+                { analyse: analyseException },
+              ),
+            () =>
+              as.delete(
+                { appendStructureName, transportRequest },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(as, 'delete'),
+                },
+              ),
           );
 
           // ── 2) Create (also confirms append structures are supported on this system) ──

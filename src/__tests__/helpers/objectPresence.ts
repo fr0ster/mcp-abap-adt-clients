@@ -83,3 +83,27 @@ export function expectRemovedOrAbsent(
   if (presenceOf(answer, what).present === false) return 'absent';
   throw new Error(failureOf(answer, what));
 }
+
+/**
+ * Remove a leftover of an earlier run: read first, delete only what is there.
+ *
+ * A delete alone cannot tell "gone" from "refused". Measured on premise
+ * (2026-10-25): a deleted object whose request is still open reads `404`, yet a
+ * second delete answers `isDeleted="false"` with "Release transport … to remove
+ * the object directory entry" — and a test may not release a request. The read
+ * is the question; the delete runs only when it says the object is there.
+ *
+ * @param what the delete's label, as {@link expectRemovedOrAbsent} takes it
+ * @param read the type's read, judged; absence as {@link presenceOf} reads it
+ * @param remove the type's delete, judged
+ */
+export async function removeLeftover(
+  what: string,
+  read: () => Promise<IAdtResponse<unknown>>,
+  remove: () => Promise<IAdtResponse<unknown>>,
+): Promise<'removed' | 'absent'> {
+  const presence = presenceOf(await read(), what);
+  if (presence.present === 'unknown') throw new Error(presence.reason);
+  if (presence.present === false) return 'absent';
+  return expectRemovedOrAbsent(await remove(), what);
+}

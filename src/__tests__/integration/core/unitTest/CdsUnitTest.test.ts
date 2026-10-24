@@ -39,7 +39,7 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
-import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
+import { removeLeftover } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -205,18 +205,23 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
 
           // Delete existing test class if it exists (idempotent test)
           // Absent is the expected answer; any other refusal fails here.
-          const leftover = expectRemovedOrAbsent(
-            await client.getClass().delete(
-              {
-                className,
-                transportRequest,
-              },
-              {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(client.getClass(), 'delete'),
-              },
-            ),
+          const leftover = await removeLeftover(
             `delete existing CDS unit test class ${className}`,
+            () =>
+              client
+                .getClass()
+                .read({ className }, undefined, { analyse: analyseException }),
+            () =>
+              client.getClass().delete(
+                {
+                  className,
+                  transportRequest,
+                },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(client.getClass(), 'delete'),
+                },
+              ),
           );
           testsLogger.info?.(
             `Existing CDS unit test class ${className}: ${leftover}`,
