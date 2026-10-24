@@ -5,8 +5,14 @@
  * same thing — that the tests it wrote were found and passed.
  */
 
-import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  analyseException,
+  analyseUnitTestStart,
+} from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAdtRunnable,
+  ITestRunInformation,
+} from '@mcp-abap-adt/interfaces-adt';
 import { expectResult } from './contract';
 import {
   attributeOf,
@@ -16,14 +22,14 @@ import {
   type XmlElement,
 } from './xmlTree';
 
-interface IRunner<T> {
-  run(target: T, options?: object): Promise<IAdtResponse<unknown>>;
-  getStatus(
-    runId: string,
-    withLongPolling?: boolean,
-  ): Promise<IAdtResponse<unknown>>;
-  getResult(runId: string): Promise<IAdtResponse<unknown>>;
-}
+/**
+ * A runner as the client declares it: `IAdtRunnable` to start a run and
+ * `ITestRunInformation` to poll it and fetch its result. Built from the
+ * contract types rather than narrowed by hand, so the `analyse` option of
+ * every call is the compiler's to keep.
+ */
+type IRunner<T> = IAdtRunnable<T, unknown, object> &
+  ITestRunInformation<unknown, unknown>;
 
 export interface IFinishedRun {
   runId: string;
@@ -48,9 +54,17 @@ export async function runToCompletion<T>(
       'start an ABAP Unit run',
     ),
   );
-  expectResult(await runner.getStatus(runId, true), 'poll the run');
+  // Every answer is judged: an exception document inside a 200 is a refused
+  // poll or result, not a run that went on.
+  expectResult(
+    await runner.getStatus(runId, true, { analyse: analyseException }),
+    'poll the run',
+  );
   const result = String(
-    expectResult(await runner.getResult(runId), 'fetch the run result'),
+    expectResult(
+      await runner.getResult(runId, { analyse: analyseException }),
+      'fetch the run result',
+    ),
   );
   return { runId, ...readRunResult(result), result };
 }

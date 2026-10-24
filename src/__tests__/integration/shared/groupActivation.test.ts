@@ -49,7 +49,7 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
-import { expectActivationExecuted } from '../../helpers/sharedActivation';
+import { analyseActivationExecuted } from '../../helpers/sharedActivation';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -633,21 +633,17 @@ define structure ${structureName} {
           }
           expect(runStatus).toBe('finished');
 
+          // A finished run is not an activation that happened: the results
+          // say that, and the call's strategy reads them —
+          // `analyseActivationExecuted`, stricter than the library's reading
+          // (see its comment), after the exception document.
           const results = expectResult(
             await utils.getActivationResults(runId, {
-              analyse: analyseException,
+              analyse: judged(analyseActivationExecuted),
             }),
-            'activation results',
-          );
-          // A finished run is not an activation that happened: the results
-          // say that. `activationExecuted="true"` beside an error message is
-          // still a failure — the object stays inactive — read as
-          // `activateSharedGroup` reads it.
-          const resultsDocument = String(results ?? '');
-          expectActivationExecuted(
-            resultsDocument,
             `group activation run ${runId}`,
           );
+          const resultsDocument = String(results ?? '');
           testsLogger.info?.(
             `✅ run ${runId} finished; results: ${resultsDocument.slice(0, 120)}`,
           );

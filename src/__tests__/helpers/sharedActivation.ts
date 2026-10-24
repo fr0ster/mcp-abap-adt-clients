@@ -9,6 +9,11 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../core/shared/AdtUtils';
@@ -16,6 +21,7 @@ import { utilDocuments } from '../../core/shared/utilResultSet';
 import { wireItself } from '../../utils/resultStrategy';
 import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
+import { judged } from './judged';
 import {
   attributeOf,
   attributeValues,
@@ -76,41 +82,59 @@ export async function activateSharedGroup(
   if (!finished) {
     throw new Error(`group activation run ${runId} of ${what} did not finish`);
   }
-  const results = String(
-    expectResult(
-      await utils.getActivationResults(runId, { analyse: analyseException }),
-      `read the results of group activation run ${runId} of ${what}`,
-    ) ?? '',
+  // The verdict is the call's strategy: executed, and no message of type E.
+  expectResult(
+    await utils.getActivationResults(runId, {
+      analyse: judged(analyseActivationExecuted),
+    }),
+    `group activation of ${what} (run ${runId})`,
   );
-  expectActivationExecuted(results, `group activation of ${what}`);
   logger.info?.(`group activation of ${what} finished`);
 }
 
 /**
- * An activation results document that says the activation happened: some
- * element carries `activationExecuted="true"` and no `msg` is of type E.
+ * The verdict this suite asks of a group activation's results, as a strategy
+ * for the call: the activation was executed (`activationExecuted="true"` on
+ * some element) and no `msg` is of type E. Read as a tree, so an error is
+ * every `msg` of type E whatever its text — an empty or a namespaced text
+ * element included; the text is only the diagnostic.
  *
- * Read as a tree: an error is every `msg` of type E, whatever its text — an
- * empty or a namespaced text element included; the text is only the
- * diagnostic. `activationExecuted="true"` beside an error is still a failure
- * (the errata): the object stays inactive. Throws naming `what`.
+ * **Stricter than adt-strategies' `analyseActivation`, on purpose.** The
+ * library reads `activationExecuted="false"` with no messages as "nothing to
+ * activate" and lets it pass — right for a consumer activating objects that
+ * may already be active. The objects a test activates in a group were written
+ * inactive just before, so an activation that did not execute left them
+ * inactive: here that is a refusal. `activationExecuted="true"` beside an
+ * error is a refusal too (the errata): the object stays inactive.
+ *
+ * Pass it composed — `judged(analyseActivationExecuted)` — so an exception
+ * document inside a 200 is read first.
  */
-export function expectActivationExecuted(results: string, what: string): void {
-  const tree = parseXmlDocument(results, `the results of ${what}`);
+export const analyseActivationExecuted: IAnalyse<IAdtError> = (
+  verdict,
+  answer,
+) => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+  const results = String(answer?.data ?? '');
+  const tree = parseXmlDocument(results, 'the activation results');
   const errors = elementsNamed(tree, 'msg').filter(
     (msg) => attributeOf(msg, 'type') === 'E',
   );
   const executed = attributeValues(tree, 'activationExecuted').includes('true');
-  if (!executed || errors.length) {
-    const said = errors
-      .map(
-        (msg) =>
-          elementsNamed(msg, 'txt')
-            .map((txt) => textOf(txt))
-            .filter(Boolean)
-            .join(' ') || '(no text)',
-      )
-      .join('; ');
-    throw new Error(`${what}: ${said || results.slice(0, 600)}`);
-  }
-}
+  if (executed && errors.length === 0) return ADT_NO_FAILURE;
+  const said = errors
+    .map(
+      (msg) =>
+        elementsNamed(msg, 'txt')
+          .map((txt) => textOf(txt))
+          .filter(Boolean)
+          .join(' ') || '(no text)',
+    )
+    .join('; ');
+  return {
+    origin: 'refusal',
+    message:
+      said || `the activation was not executed: ${results.slice(0, 600)}`,
+    response: answer,
+  } as IAdtError;
+};

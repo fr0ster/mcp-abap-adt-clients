@@ -15,6 +15,7 @@ jest.mock('../../helpers/adtHeaders', () => ({
 import {
   ensureFunctionGroupFor,
   functionGroupRouteOf,
+  type IFunctionGroupClient,
   type ISharedSetup,
 } from '../../helpers/functionGroupRoute';
 
@@ -40,8 +41,13 @@ function setupWith(overrides: Partial<ISharedSetup> = {}): ISharedSetup {
   };
 }
 
-function clientWith(read: jest.Mock, create: jest.Mock = jest.fn()) {
-  return { getFunctionGroup: () => ({ readMetadata: read, create }) };
+function clientWith(
+  read: jest.Mock,
+  create: jest.Mock = jest.fn(),
+): IFunctionGroupClient {
+  return {
+    getFunctionGroup: () => ({ readMetadata: read, create }),
+  } as unknown as IFunctionGroupClient;
 }
 
 const LABEL = 'create_function_module[adt_function_module]';
@@ -192,5 +198,55 @@ describe('ensureFunctionGroupFor — the default-package route', () => {
       setup,
     );
     expect(setup.ensureSharedPackage).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureFunctionGroupFor — an exception document inside a 200', () => {
+  const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
+  const EXCEPTION =
+    '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceNoAccess"/><message lang="EN">No authorization</message></exc:exception>';
+  /** A member answering the exception document, honouring its analyse. */
+  const honouring = () =>
+    jest.fn(async (...args: unknown[]) => {
+      const options = args[1] as
+        | { analyse?: (v: unknown, w: unknown) => unknown }
+        | undefined;
+      const verdict = options?.analyse
+        ? options.analyse(ADT_NO_FAILURE, { status: 200, data: EXCEPTION })
+        : ADT_NO_FAILURE;
+      return verdict === ADT_NO_FAILURE
+        ? ok(EXCEPTION)
+        : { ok: false, getError: () => verdict };
+    });
+
+  it('fails a lookup answered with one, and creates nothing', async () => {
+    const create = jest.fn(async () => ok());
+    await expect(
+      ensureFunctionGroupFor(
+        clientWith(honouring(), create),
+        inPackage,
+        LABEL,
+        'd',
+        undefined,
+        setupWith(),
+      ),
+    ).rejects.toThrow(/Cannot verify function group ZFG.*No authorization/);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('fails a create answered with one', async () => {
+    await expect(
+      ensureFunctionGroupFor(
+        clientWith(
+          jest.fn(async () => refused('not found', 404)),
+          honouring(),
+        ),
+        inPackage,
+        LABEL,
+        'd',
+        undefined,
+        setupWith(),
+      ),
+    ).rejects.toThrow(/create function group ZFG.*No authorization/);
   });
 });

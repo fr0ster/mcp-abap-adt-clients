@@ -16,6 +16,7 @@ import { finaliseBatch } from '../../helpers/batchFinalisation';
 import { configuredCase, gate } from '../../helpers/caseGate';
 import { judged } from '../../helpers/judged';
 import { createTestConnection } from '../../helpers/sessionConfig';
+import { analyseActivationExecuted } from '../../helpers/sharedActivation';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 
@@ -205,17 +206,12 @@ gate('batch', 'domains')(
         );
       }
       timings.activation_ms = Date.now() - start;
-      const activation = String(
-        value(
-          await utils.getActivationResults(runId, {
-            analyse: judged(analyseActivation),
-          }),
-        ),
+      // Executed, and no message of type E: the call's strategy reads it.
+      value(
+        await utils.getActivationResults(runId, {
+          analyse: judged(analyseActivationExecuted),
+        }),
       );
-      expect(activation).toMatch(
-        /<chkl:properties\b[^>]*\bactivationExecuted\s*=\s*["']true["']/,
-      );
-      expect(activation).not.toMatch(/type\s*=\s*["']E["']/);
       const reads = configs.map((config) =>
         domain.readMetadata(config, { analyse: analyseException }),
       );

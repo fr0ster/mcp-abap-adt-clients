@@ -56,7 +56,7 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { expectActivationExecuted } from '../../../helpers/sharedActivation';
+import { analyseActivationExecuted } from '../../../helpers/sharedActivation';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -469,16 +469,12 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             );
           }
           // A finished run is not an activation that happened: the results
-          // say that (activationExecuted, and no message of type E).
-          expectActivationExecuted(
-            String(
-              expectResult(
-                await utils.getActivationResults(runId, {
-                  analyse: analyseException,
-                }),
-                'activation results',
-              ) ?? '',
-            ),
+          // say that, read by the call's strategy (executed, and no message
+          // of type E — see `analyseActivationExecuted`).
+          expectResult(
+            await utils.getActivationResults(runId, {
+              analyse: judged(analyseActivationExecuted),
+            }),
             `group activation run ${runId}`,
           );
 

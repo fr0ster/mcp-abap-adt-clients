@@ -162,6 +162,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   the suites and helpers) fails on any call without one, outside a commented
   allow-list. `tools/discovery-to-markdown.ts` refuses a missing or unknown
   `SAP_AUTH_TYPE` too; no document names a default for it any more.
+  The guard also sees through receivers typed by a local interface that
+  narrows a member (refused unless it keeps the `analyse` option) and refuses
+  an `any`-typed receiver; the helpers that had such interfaces
+  (`lockTargets`, `abapUnitRun`, `functionGroupRoute`) now take their types
+  from the client and judge every call. A group activation's verdict is a
+  strategy passed to the results call, `analyseActivationExecuted`
+  (`helpers/sharedActivation.ts`): stricter than the library's reading — an
+  activation that did not execute fails, since the objects were written
+  inactive — and composed through `judged()`.
 
 ## [37.2.0] - 2026-10-23
 

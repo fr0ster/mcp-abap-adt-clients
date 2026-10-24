@@ -22,6 +22,7 @@ import type { AdtClient } from '../../clients/AdtClient';
 import type { IDataElementConfig } from '../../core/dataElement';
 import type { IDomainConfig } from '../../core/domain';
 import { integrationHeadersOf } from './adtHeaders';
+import { judged } from './judged';
 
 const {
   dataElementDocumentFor,
@@ -31,20 +32,39 @@ const {
   writeAndActivate,
 } = require('./test-helper');
 
-type Handler = {
-  readMetadata(config: any): Promise<any>;
-  delete(config: any, options?: any): Promise<any>;
-};
+/**
+ * The two members these helpers call, as the client declares them — not a
+ * hand-written narrowing — so their `analyse` option is the compiler's to
+ * keep, and the source guard sees each call as the adt-clients member it is.
+ * The domain's and the data element's handlers have the same members; the
+ * calls go through the domain's declaration, which is the same contract.
+ */
+type DomainHandler = Pick<
+  ReturnType<AdtClient['getDomain']>,
+  'readMetadata' | 'delete'
+>;
+type ElementHandler = Pick<
+  ReturnType<AdtClient['getDataElement']>,
+  'readMetadata' | 'delete'
+>;
+type Handler = DomainHandler | ElementHandler;
+type HandlerConfig =
+  | Parameters<DomainHandler['delete']>[0]
+  | Parameters<ElementHandler['delete']>[0];
+/** The one declaration the calls are made through. */
+const asDeclared = (handler: Handler) => handler as DomainHandler;
+const asConfig = (config: HandlerConfig) =>
+  config as Parameters<DomainHandler['delete']>[0];
 
 /** Delete, and raise what SAP said when it refused. */
 async function deleteOrRaise(
   handler: Handler,
-  config: Record<string, unknown>,
+  config: HandlerConfig,
   what: string,
 ): Promise<void> {
   mustSucceed(
-    await handler.delete(config, {
-      analyse: analyseDeletion,
+    await asDeclared(handler).delete(asConfig(config), {
+      analyse: judged(analyseDeletion),
       headers: integrationHeadersOf(handler, 'delete'),
     }),
     what,
@@ -54,10 +74,12 @@ async function deleteOrRaise(
 /** Remove what a run that died before its cleanup left behind. */
 async function removeLeftover(
   handler: Handler,
-  config: Record<string, unknown>,
+  config: HandlerConfig,
   what: string,
 ): Promise<void> {
-  const existing = await handler.readMetadata(config);
+  const existing = await asDeclared(handler).readMetadata(asConfig(config), {
+    analyse: analyseException,
+  });
   if (existing.ok) {
     await deleteOrRaise(handler, config, `delete leftover ${what}`);
     return;

@@ -18,8 +18,9 @@
  * never "absent".
  */
 
-import type { IAdtHeaders, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtClient } from '../../clients/AdtClient';
 import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
 import { presenceOf } from './objectPresence';
@@ -27,23 +28,12 @@ import { presenceOf } from './objectPresence';
 const ROUTES = ['shared', 'default_package'] as const;
 export type FunctionGroupRoute = (typeof ROUTES)[number];
 
-/** What the two routes need of the client: the function group handler. */
-export interface IFunctionGroupClient {
-  getFunctionGroup(): {
-    readMetadata(config: {
-      functionGroupName: string;
-    }): Promise<IAdtResponse<unknown>>;
-    create(
-      config: {
-        functionGroupName: string;
-        packageName: string;
-        description: string;
-        transportRequest?: string;
-      },
-      options?: { headers?: IAdtHeaders },
-    ): Promise<IAdtResponse<unknown>>;
-  };
-}
+/**
+ * What the two routes need of the client: its function group handler, as the
+ * client declares it — so the `analyse` option of every call is the
+ * compiler's to keep, not a hand-written narrowing's.
+ */
+export type IFunctionGroupClient = Pick<AdtClient, 'getFunctionGroup'>;
 
 /** The shared-dependency setup, as test-helper.js offers it. */
 export interface ISharedSetup {
@@ -110,7 +100,10 @@ export async function ensureFunctionGroupFor(
 
   const groups = client.getFunctionGroup();
   const existing = presenceOf(
-    await groups.readMetadata({ functionGroupName }),
+    await groups.readMetadata(
+      { functionGroupName },
+      { analyse: analyseException },
+    ),
     `function group ${functionGroupName}`,
   );
   if (existing.present === 'unknown') {
@@ -129,7 +122,10 @@ export async function ensureFunctionGroupFor(
   expectResult(
     await groups.create(
       { functionGroupName, packageName, description, transportRequest },
-      { headers: integrationHeadersOf(groups, 'create') },
+      {
+        headers: integrationHeadersOf(groups, 'create'),
+        analyse: analyseException,
+      },
     ),
     `create function group ${functionGroupName}`,
   );

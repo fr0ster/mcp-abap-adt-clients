@@ -22,7 +22,7 @@ jest.mock('../../helpers/adtHeaders', () => ({
 
 import {
   activateSharedGroup,
-  expectActivationExecuted,
+  analyseActivationExecuted,
 } from '../../helpers/sharedActivation';
 
 const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
@@ -75,56 +75,105 @@ describe('activateSharedGroup', () => {
     await expect(
       activateSharedGroup({} as never, members, logger),
     ).rejects.toThrow(
-      /read the results of group activation run RUN1.*results gone/,
+      /group activation of .* \(run RUN1\) failed .*results gone/,
     );
   });
 });
 
-describe('expectActivationExecuted', () => {
-  const executedWith = (msg: string) =>
-    `<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties activationExecuted="true"/>${msg}</chkl:messages>`;
+describe('activateSharedGroup passes the strategy to the results call', () => {
+  it('fails on activationExecuted="false" with no messages, judged by the call', async () => {
+    const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
+    const data =
+      '<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties activationExecuted="false"/></chkl:messages>';
+    utils.getActivationResults
+      .mockReset()
+      .mockImplementation(
+        async (
+          _id: string,
+          options?: { analyse?: (v: unknown, w: unknown) => unknown },
+        ) => {
+          const verdict = options?.analyse
+            ? options.analyse(ADT_NO_FAILURE, { status: 200, data })
+            : ADT_NO_FAILURE;
+          return verdict === ADT_NO_FAILURE
+            ? ok(data)
+            : { ok: false, getError: () => verdict };
+        },
+      );
+    await expect(
+      activateSharedGroup({} as never, members, logger),
+    ).rejects.toThrow(/not executed/);
+  });
+});
 
-  it('passes an executed activation with only warnings', () => {
-    expect(() =>
-      expectActivationExecuted(
-        executedWith('<msg type="W"><shortText><txt>w</txt></shortText></msg>'),
-        'x',
+describe('analyseActivationExecuted, composed through judged()', () => {
+  const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
+  const { judged } = require('../../helpers/judged');
+  const strategy = judged(analyseActivationExecuted);
+  const verdictOn = (data: string) =>
+    strategy(ADT_NO_FAILURE, {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data,
+    });
+  const results = (properties: string, msg = '') =>
+    `<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties ${properties}/>${msg}</chkl:messages>`;
+
+  it('accepts an executed activation with only warnings', () => {
+    expect(
+      verdictOn(
+        results(
+          'activationExecuted="true"',
+          '<msg type="W"><shortText><txt>w</txt></shortText></msg>',
+        ),
       ),
-    ).not.toThrow();
+    ).toBe(ADT_NO_FAILURE);
   });
 
-  it('fails an error message with an empty text element', () => {
-    expect(() =>
-      expectActivationExecuted(executedWith('<msg type="E"><txt/></msg>'), 'x'),
-    ).toThrow(/x: \(no text\)/);
+  it('refuses activationExecuted="false" with no messages, which the library lets pass', () => {
+    const { analyseActivation } = require('@mcp-abap-adt/adt-strategies');
+    const data = results('activationExecuted="false"');
+    expect(analyseActivation(ADT_NO_FAILURE, { status: 200, data })).toBe(
+      ADT_NO_FAILURE,
+    );
+    expect(verdictOn(data)).toMatchObject({
+      origin: 'refusal',
+      message: expect.stringMatching(/not executed/),
+    });
   });
 
-  it('fails an error message with no text at all, its type after other attributes', () => {
-    expect(() =>
-      expectActivationExecuted(
-        executedWith('<msg objDescr="ZAC" line="1" type="E"/>'),
-        'x',
+  it('refuses an error message with an empty text element', () => {
+    expect(
+      verdictOn(
+        results('activationExecuted="true"', '<msg type="E"><txt/></msg>'),
       ),
-    ).toThrow(/\(no text\)/);
+    ).toMatchObject({ message: '(no text)' });
   });
 
-  it('fails an error message whose text element is namespaced, and names the text', () => {
-    expect(() =>
-      expectActivationExecuted(
-        executedWith(
+  it('refuses a namespaced error message, naming its text', () => {
+    expect(
+      verdictOn(
+        results(
+          'activationExecuted="true"',
           '<chkl:msg type="E"><chkl:shortText><chkl:txt>Field X unknown</chkl:txt></chkl:shortText></chkl:msg>',
         ),
-        'x',
       ),
-    ).toThrow(/Field X unknown/);
+    ).toMatchObject({ message: 'Field X unknown' });
   });
 
-  it('fails a document that does not say the activation was executed', () => {
-    expect(() =>
-      expectActivationExecuted(
-        '<chkl:messages xmlns:chkl="u"><chkl:properties activationExecuted="false"/></chkl:messages>',
-        'x',
+  it('refuses an exception document inside a 200', () => {
+    expect(
+      verdictOn(
+        '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceNoAccess"/><message lang="EN">No authorization</message></exc:exception>',
       ),
-    ).toThrow(/^x: /);
+    ).toMatchObject({ origin: 'refusal', message: 'No authorization' });
+  });
+
+  it('leaves a failure the transport already found as it is', () => {
+    const failure = { origin: 'refusal', message: 'HTTP 500' };
+    expect(analyseActivationExecuted(failure as never, undefined)).toBe(
+      failure,
+    );
   });
 });
