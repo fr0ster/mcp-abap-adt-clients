@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -230,6 +231,7 @@ describe('AuthorizationField (using AdtClient)', () => {
                   ),
                 },
                 {
+                  analyse: analyseDeletion,
                   headers: integrationHeadersOf(
                     client.getAuthorizationField(),
                     'delete',

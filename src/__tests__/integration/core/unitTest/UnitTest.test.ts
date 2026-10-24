@@ -14,7 +14,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseActivation,
+  analyseDeletion,
   analyseUnitTestStart,
+  analyseValidation,
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -174,11 +177,14 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             // and fails with SAP's own sentence.
             logTestStep('validate', testsLogger);
             expectResult(
-              await client.getClass().validate({
-                className: containerClass,
-                packageName,
-                source,
-              }),
+              await client.getClass().validate(
+                {
+                  className: containerClass,
+                  packageName,
+                  source,
+                },
+                { analyse: analyseValidation },
+              ),
               'validate the container class name',
             );
             testsLogger.info?.('Container class validated');
@@ -292,6 +298,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             await client.getClass().activate(
               { className: containerClass, transportRequest },
               {
+                analyse: analyseActivation,
                 headers: integrationHeadersOf(client.getClass(), 'activate'),
               },
             ),
@@ -464,7 +471,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   className: containerClass,
                   transportRequest,
                 },
-                { headers: integrationHeadersOf(client.getClass(), 'delete') },
+                {
+                  analyse: analyseDeletion,
+                  headers: integrationHeadersOf(client.getClass(), 'delete'),
+                },
               ),
               `delete test class ${containerClass}`,
             );

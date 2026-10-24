@@ -18,6 +18,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseDeletion,
   featureToggleCheckState,
   featureToggleRuntimeState,
 } from '@mcp-abap-adt/adt-strategies';
@@ -299,6 +300,7 @@ describe('FeatureToggle (using AdtClient)', () => {
                   ),
                 },
                 {
+                  analyse: analyseDeletion,
                   headers: integrationHeadersOf(
                     client.getFeatureToggle(),
                     'delete',

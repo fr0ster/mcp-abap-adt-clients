@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -208,6 +209,7 @@ describe('ServiceBinding (using AdtClient)', () => {
                 ),
               },
               {
+                analyse: analyseDeletion,
                 headers: integrationHeadersOf(
                   client.getServiceBinding(),
                   'delete',

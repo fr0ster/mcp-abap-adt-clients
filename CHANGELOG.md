@@ -131,9 +131,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   ABAP Unit results and activation results are parsed as XML
   (`helpers/xmlTree.ts`), so attribute order, whitespace and namespace
   prefixes do not hide an alert or an error message, and an error is any
-  `msg` of type E whatever its text. A `SAP_AUTH_TYPE` outside `basic`,
-  `jwt`, `xsuaa` is refused; left out, the mode is read off the credentials
-  only when they leave no choice.
+  `msg` of type E whatever its text. `SAP_AUTH_TYPE` is required by the test
+  helpers and the hand-run scripts (`scripts/lib/adtTarget.ts`): missing, or
+  outside `basic`, `jwt`, `xsuaa`, it is refused naming the key — the mode is
+  never read off the credentials. **Migration:** add `SAP_AUTH_TYPE=basic`
+  (or `jwt` / `xsuaa`) to every `.env` that lacks it. A refusal inside an
+  HTTP 200 is read wherever a test expects success: every activation passes
+  `analyseActivation`, every delete — cleanups included — `analyseDeletion`,
+  `BaseTester`'s validation `analyseValidation`, and the other validation
+  table forms are read by structure (`helpers/validationVerdict.ts`);
+  `cleanupRefusal` and `expectRemovedOrAbsent` read the deletion document of a
+  200. ABAP Unit results must have the format's root (an exception document
+  fails), alerts count at every scope (run, class, method), and a filtered
+  run must show no methods and no failure; CdsUnitTest judges its result.
+  Whether the second-session lock-release check and the message class's read
+  right after its create are made is the system's configuration: the new
+  required overlay keys `environment.verify_lock_released` and
+  `environment.read_message_class_after_create` (booleans; the forms state
+  `true` on premise, `false` on cloud, where a second session can meet a 404
+  for a new object). On, any refusal — the 404 included — fails; off, nothing
+  is sent and the run logs a line naming the key. `VERIFY_LOCK_RELEASED` is
+  no longer read. **Migration:** add both keys to `test-config.overlay.yaml`.
 
 ## [37.2.0] - 2026-10-23
 

@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -317,7 +318,10 @@ describe('DataElement (using AdtClient)', () => {
               domainName: domainName,
               transportRequest: cleanupResolver.getTransportRequest(),
             },
-            { headers: integrationHeadersOf(client.getDomain(), 'delete') },
+            {
+              analyse: analyseDeletion,
+              headers: integrationHeadersOf(client.getDomain(), 'delete'),
+            },
           ),
           `cleanup domain ${domainName}`,
         );

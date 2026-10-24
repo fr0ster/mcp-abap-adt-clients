@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ITransportObjectEntry } from '@mcp-abap-adt/adt-strategies';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -599,7 +600,10 @@ describe('AdtRequest', () => {
                   domainName,
                   transportRequest: sharedRequest,
                 },
-                { headers: integrationHeadersOf(domain, 'delete') },
+                {
+                  analyse: analyseDeletion,
+                  headers: integrationHeadersOf(domain, 'delete'),
+                },
               ),
               `delete leftover ${domainName}`,
             );
@@ -688,7 +692,10 @@ describe('AdtRequest', () => {
           expectResult(
             await domain.delete(
               { domainName, transportRequest: sharedRequest },
-              { headers: integrationHeadersOf(domain, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(domain, 'delete'),
+              },
             ),
             `delete ${domainName}`,
           );

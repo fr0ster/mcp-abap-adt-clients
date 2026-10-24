@@ -65,7 +65,7 @@ written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 "environment.default_master_system": "SID"
 ```
 
-When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.
+`SAP_AUTH_TYPE` is required in every `.env` (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the test session config then overrides `authType` to `"rfc"`.
 
 `system` is separate from `connection_type` and both are required: the first says
 which system is on the other end, the second says how to reach it. RFC is an
@@ -103,7 +103,7 @@ cp <system>.env .env
 Or pass variables inline:
 ```bash
 SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" \
-  SAP_URL=http://saphost:8000 SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_CLIENT=100 \
+  SAP_URL=http://saphost:8000 SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_CLIENT=100 SAP_AUTH_TYPE=basic \
   npm test
 ```
 

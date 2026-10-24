@@ -21,6 +21,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IIncludeConfig } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -136,6 +137,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
               const removed = await cleanupClient.getInclude().delete(
                 { includeName, transportRequest },
                 {
+                  analyse: analyseDeletion,
                   headers: integrationHeadersOf(
                     cleanupClient.getInclude(),
                     'delete',

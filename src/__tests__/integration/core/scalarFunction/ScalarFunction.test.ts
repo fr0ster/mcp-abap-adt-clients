@@ -17,6 +17,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -153,7 +157,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               scalarFunctionName,
               transportRequest,
             },
-            { headers: integrationHeadersOf(sf, 'delete') },
+            {
+              analyse: analyseDeletion,
+              headers: integrationHeadersOf(sf, 'delete'),
+            },
           ),
           `delete leftover scalar function ${scalarFunctionName}`,
         );
@@ -227,7 +234,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             expectResult(
               await sf.activate(
                 { scalarFunctionName },
-                { headers: integrationHeadersOf(sf, 'activate') },
+                {
+                  analyse: analyseActivation,
+                  headers: integrationHeadersOf(sf, 'activate'),
+                },
               ),
               'activate scalar function',
             );
@@ -254,7 +264,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                 scalarFunctionName,
                 transportRequest,
               },
-              { headers: integrationHeadersOf(sf, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(sf, 'delete'),
+              },
             ),
             'deleteState',
           );
@@ -270,7 +283,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             () =>
               sf.delete(
                 { scalarFunctionName, transportRequest },
-                { headers: integrationHeadersOf(sf, 'delete') },
+                {
+                  analyse: analyseDeletion,
+                  headers: integrationHeadersOf(sf, 'delete'),
+                },
               ),
             `delete scalar function ${scalarFunctionName}`,
           );

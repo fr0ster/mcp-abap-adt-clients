@@ -17,6 +17,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -112,12 +116,13 @@ describe('Class local includes (using BaseTester)', () => {
       );
 
       expectResult(
-        await client
-          .getClass()
-          .activate(
-            { className: config.className },
-            { headers: integrationHeadersOf(client.getClass(), 'activate') },
-          ),
+        await client.getClass().activate(
+          { className: config.className },
+          {
+            analyse: analyseActivation,
+            headers: integrationHeadersOf(client.getClass(), 'activate'),
+          },
+        ),
         `activate parent class ${config.className}`,
       );
       return { success: true, created: true };
@@ -319,7 +324,10 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
             ),
             `cleanup parent class ${parentInfo.className}`,
           );
@@ -383,7 +391,10 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
             ),
             `cleanup parent class ${parentInfo.className}`,
           );
@@ -447,7 +458,10 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
             ),
             `cleanup parent class ${parentInfo.className}`,
           );
@@ -511,7 +525,10 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
             ),
             `cleanup parent class ${parentInfo.className}`,
           );

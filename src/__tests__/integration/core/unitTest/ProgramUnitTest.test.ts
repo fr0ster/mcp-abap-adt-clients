@@ -11,7 +11,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -207,12 +211,14 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         logTestStep('activate', testsLogger);
         expectResult(
           await client.getInclude().activate(include, {
+            analyse: analyseActivation,
             headers: integrationHeadersOf(client.getInclude(), 'activate'),
           }),
           'activate include',
         );
         expectResult(
           await client.getProgram().activate(program, {
+            analyse: analyseActivation,
             headers: integrationHeadersOf(client.getProgram(), 'activate'),
           }),
           'activate program',
@@ -252,6 +258,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               client.getProgram().delete(
                 { ...program, transportRequest },
                 {
+                  analyse: analyseDeletion,
                   headers: integrationHeadersOf(client.getProgram(), 'delete'),
                 },
               ),
@@ -262,6 +269,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               client.getInclude().delete(
                 { ...include, transportRequest },
                 {
+                  analyse: analyseDeletion,
                   headers: integrationHeadersOf(client.getInclude(), 'delete'),
                 },
               ),

@@ -100,6 +100,22 @@ export function getConnectionType(): 'http' | 'rfc' {
 }
 
 /**
+ * A boolean the system's configuration must state under `environment` —
+ * `environment.<name>` in the overlay. Required: absent or not a boolean is
+ * refused naming the key; there is no default and no environment variable.
+ */
+export function requiredEnvironmentFlag(name: string): boolean {
+  const { getEnvironmentConfig } = require('./test-helper');
+  const value = getEnvironmentConfig()?.[name];
+  if (typeof value !== 'boolean') {
+    throw new Error(
+      `environment.${name} is not set (found ${JSON.stringify(value)}): state true or false for this system in test-config.overlay.yaml`,
+    );
+  }
+  return value;
+}
+
+/**
  * Get SAP configuration from environment variables
  * Used in tests to create connections
  */
@@ -116,9 +132,14 @@ export function getConfig(): SapConfig {
   if (!url || !/^https?:\/\//.test(url)) {
     throw new Error(`Missing or invalid SAP_URL: ${url}`);
   }
-  // A stated authentication type is taken as stated or refused: a value
-  // outside the set is never read as "not stated" and replaced by a guess.
-  if (authType && !['basic', 'jwt', 'xsuaa'].includes(authType)) {
+  // SAP_AUTH_TYPE is required and taken as stated: absent, or a value
+  // outside the set, is refused — the mode is never read off the credentials.
+  if (!authType) {
+    throw new Error(
+      'SAP_AUTH_TYPE is not set — state basic, jwt or xsuaa in .env',
+    );
+  }
+  if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
     throw new Error(
       `SAP_AUTH_TYPE is "${rawAuthType}", which is not one of basic, jwt, xsuaa — fix it in .env`,
     );
@@ -145,27 +166,8 @@ export function getConfig(): SapConfig {
     };
   }
 
-  // SAP_AUTH_TYPE stated (basic | jwt | xsuaa) is taken as stated. Absent —
-  // which the documented setups allow, basic being the documented default —
-  // the mode is read off the credentials only where they leave no choice: a
-  // token and no user/password is JWT, a user/password and no token is
-  // basic. Both, or neither, is refused rather than guessed.
-  const hasJwtToken = Boolean(process.env.SAP_JWT_TOKEN);
-  const hasBasic = Boolean(
-    process.env.SAP_USERNAME || process.env.SAP_PASSWORD,
-  );
-  let effectiveAuthType: 'basic' | 'jwt';
-  if (authType === 'jwt' || authType === 'xsuaa') effectiveAuthType = 'jwt';
-  else if (authType === 'basic') effectiveAuthType = 'basic';
-  else if (hasJwtToken && !hasBasic) effectiveAuthType = 'jwt';
-  else if (hasBasic && !hasJwtToken) effectiveAuthType = 'basic';
-  else {
-    throw new Error(
-      hasJwtToken
-        ? 'SAP_AUTH_TYPE is not set and .env holds both SAP_JWT_TOKEN and SAP_USERNAME/SAP_PASSWORD — state SAP_AUTH_TYPE (basic, jwt or xsuaa)'
-        : 'SAP_AUTH_TYPE is not set and .env holds neither SAP_JWT_TOKEN nor SAP_USERNAME/SAP_PASSWORD',
-    );
-  }
+  const effectiveAuthType: 'basic' | 'jwt' =
+    authType === 'basic' ? 'basic' : 'jwt';
 
   const config: SapConfig = {
     url,

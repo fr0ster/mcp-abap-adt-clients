@@ -9,7 +9,11 @@ jest.mock('../../helpers/test-helper', () => ({
   getEnvironmentConfig: () => mockEnvironment(),
 }));
 
-import { getConfig, getConnectionType } from '../../helpers/sessionConfig';
+import {
+  getConfig,
+  getConnectionType,
+  requiredEnvironmentFlag,
+} from '../../helpers/sessionConfig';
 
 describe('getConnectionType', () => {
   it('answers the configured wire', () => {
@@ -76,20 +80,48 @@ describe('getConfig: the authentication type', () => {
     expect(getConfig().authType).toBe('jwt');
   });
 
-  it('reads an absent type off credentials that leave no choice', () => {
+  it('refuses a missing type, whatever the credentials, naming the key', () => {
     process.env.SAP_USERNAME = 'U';
     process.env.SAP_PASSWORD = 'P';
-    expect(getConfig().authType).toBe('basic');
+    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is not set/);
     delete process.env.SAP_USERNAME;
     delete process.env.SAP_PASSWORD;
     process.env.SAP_JWT_TOKEN = 'T';
-    expect(getConfig().authType).toBe('jwt');
+    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is not set/);
   });
 
-  it('refuses an absent type beside both a token and a user', () => {
-    process.env.SAP_JWT_TOKEN = 'T';
+  it('refuses a missing type on the RFC wire too', () => {
+    mockEnvironment = () => ({ connection_type: 'rfc' });
     process.env.SAP_USERNAME = 'U';
     process.env.SAP_PASSWORD = 'P';
-    expect(() => getConfig()).toThrow(/state SAP_AUTH_TYPE/);
+    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is not set/);
+  });
+
+  it('takes basic as stated', () => {
+    process.env.SAP_AUTH_TYPE = 'basic';
+    process.env.SAP_USERNAME = 'U';
+    process.env.SAP_PASSWORD = 'P';
+    process.env.SAP_JWT_TOKEN = 'T';
+    expect(getConfig().authType).toBe('basic');
+  });
+});
+
+describe('requiredEnvironmentFlag', () => {
+  it('answers a stated boolean', () => {
+    mockEnvironment = () => ({ read_message_class_after_create: false });
+    expect(requiredEnvironmentFlag('read_message_class_after_create')).toBe(
+      false,
+    );
+  });
+
+  it('refuses a missing or non-boolean value, naming the key', () => {
+    mockEnvironment = () => ({});
+    expect(() =>
+      requiredEnvironmentFlag('read_message_class_after_create'),
+    ).toThrow(/environment\.read_message_class_after_create is not set/);
+    mockEnvironment = () => ({ read_message_class_after_create: 'true' });
+    expect(() =>
+      requiredEnvironmentFlag('read_message_class_after_create'),
+    ).toThrow(/is not set \(found "true"\)/);
   });
 });

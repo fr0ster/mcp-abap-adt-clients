@@ -158,3 +158,33 @@ describe('expectRemovedOrAbsent', () => {
     expect(saysAbsent(errorOf(refused('x', 500)))).toBe(false);
   });
 });
+
+describe('a delete that answered 200 is read for its verdict', () => {
+  const NS =
+    'xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"';
+  const refusedInside = ok(
+    `<del:deletionResult ${NS}><del:object del:isDeleted="false" adtcore:type="BDEF/BDO" adtcore:name="ZX"><del:message del:priority="0" del:type="E"><del:text>Error while deleting object ZX from the database</del:text></del:message></del:object></del:deletionResult>`,
+  );
+  const deleted = ok(
+    `<del:deletionResult ${NS}><del:object del:isDeleted="true" adtcore:type="CLAS/OC" adtcore:name="ZX"><del:message del:priority="0" del:type="S"><del:text/></del:message></del:object></del:deletionResult>`,
+  );
+
+  it('cleanupRefusal answers isDeleted="false" inside a 200 as a refusal', async () => {
+    await expect(
+      cleanupRefusal(async () => refusedInside, 'delete ZX'),
+    ).resolves.toMatch(/delete ZX refused inside a 200: .*ZX/);
+  });
+
+  it('cleanupRefusal answers a deleted document as no refusal', async () => {
+    await expect(
+      cleanupRefusal(async () => deleted, 'delete ZX'),
+    ).resolves.toBe('');
+  });
+
+  it('expectRemovedOrAbsent fails isDeleted="false" inside a 200', () => {
+    expect(() => expectRemovedOrAbsent(refusedInside, 'delete ZX')).toThrow(
+      /refused inside a 200/,
+    );
+    expect(expectRemovedOrAbsent(deleted, 'delete ZX')).toBe('removed');
+  });
+});

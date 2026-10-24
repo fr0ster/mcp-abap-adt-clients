@@ -21,7 +21,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  utilActivationRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -50,6 +54,7 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
+import { expectActivationExecuted } from '../../../helpers/sharedActivation';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -214,19 +219,28 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 implementationName: implName,
                 transportRequest,
               },
-              { headers: integrationHeadersOf(dsfi, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(dsfi, 'delete'),
+              },
             ),
           );
           await remove(`delete AMDP class ${amdpName}`, () =>
             cls.delete(
               { className: amdpName },
-              { headers: integrationHeadersOf(cls, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(cls, 'delete'),
+              },
             ),
           );
           await remove(`delete scalar function ${funcName}`, () =>
             sf.delete(
               { scalarFunctionName: funcName, transportRequest },
-              { headers: integrationHeadersOf(sf, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(sf, 'delete'),
+              },
             ),
           );
           return refusals;
@@ -282,7 +296,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           expectResult(
             await sf.activate(
               { scalarFunctionName: funcName },
-              { headers: integrationHeadersOf(sf, 'activate') },
+              {
+                analyse: analyseActivation,
+                headers: integrationHeadersOf(sf, 'activate'),
+              },
             ),
             'activate scalar function',
           );
@@ -413,6 +430,17 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               `activation run ${runId} had not finished at the deadline`,
             );
           }
+          // A finished run is not an activation that happened: the results
+          // say that (activationExecuted, and no message of type E).
+          expectActivationExecuted(
+            String(
+              expectResult(
+                await utils.getActivationResults(runId),
+                'activation results',
+              ) ?? '',
+            ),
+            `group activation run ${runId}`,
+          );
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
           // The DSFI source resource answers JSON, which the transport parses
@@ -440,7 +468,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
                 implementationName: implName,
                 transportRequest,
               },
-              { headers: integrationHeadersOf(dsfi, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(dsfi, 'delete'),
+              },
             ),
             'del',
           );
@@ -448,14 +479,20 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           expectResult(
             await cls.delete(
               { className: amdpName, transportRequest },
-              { headers: integrationHeadersOf(cls, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(cls, 'delete'),
+              },
             ),
             'delete AMDP class',
           );
           expectResult(
             await sf.delete(
               { scalarFunctionName: funcName, transportRequest },
-              { headers: integrationHeadersOf(sf, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(sf, 'delete'),
+              },
             ),
             'delete scalar function',
           );

@@ -10,6 +10,7 @@
  * These two exist so the failure message is the server's own sentence.
  */
 
+import { readDeletionRefusal } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 /**
@@ -118,9 +119,10 @@ export async function cleanupRefusal(
     const answer = await cleanup();
     // Absent is what the cleanup wanted — the body may have failed before
     // creating anything.
-    return !answer.ok && saysAbsent(answer.getError())
-      ? ''
-      : failureOf(answer, what);
+    if (!answer.ok) {
+      return saysAbsent(answer.getError()) ? '' : failureOf(answer, what);
+    }
+    return deletionRefusedIn(answer, what);
   } catch (error) {
     return `${what} threw: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -168,4 +170,20 @@ export async function noteCleanupRefusal(
   if (refused && failure instanceof Error) {
     failure.message = `${failure.message}; then ${refused}`;
   }
+}
+
+/**
+ * A delete that answered 200 can still have deleted nothing: the deletion
+ * document says so (`isDeleted="false"`, a message of type E), and an
+ * unjudged answer — one asked for without `analyseDeletion` — leaves it
+ * `ok`. This reads the document with the library's own reading and answers
+ * the refusal as one sentence, `''` when the document is no refusal.
+ */
+export function deletionRefusedIn(
+  answer: IAdtResponse<unknown>,
+  what: string,
+): string {
+  if (!answer.ok) return failureOf(answer, what);
+  const refusal = readDeletionRefusal(answer.getResult().value);
+  return refusal ? `${what} refused inside a 200: ${refusal.message}` : '';
 }

@@ -16,8 +16,8 @@
  * released again here. The test's own session cannot answer the question: the
  * session holding a lock is granted it again.
  *
- * It costs one session logon per check, so `VERIFY_LOCK_RELEASED=false` turns
- * it off. A trial ABAP Cloud account grants two sessions — the run's and this one — so the
+ * It costs one session logon per check. Whether it is made is the system's
+ * configuration, `environment.verify_lock_released` (required). A trial ABAP Cloud account grants two sessions — the run's and this one — so the
  * session is always closed before this returns, and never two are open at once.
  */
 
@@ -34,7 +34,11 @@ import {
   createTestAdtClient,
   createTestConnection,
 } from './sessionConfig';
-import { createConnectionLogger, emptyLogger } from './testLogger';
+import {
+  createConnectionLogger,
+  createRunIntegrityLogger,
+  emptyLogger,
+} from './testLogger';
 
 /** The lock window of a handler: the two members this check calls. */
 export interface ILockWindow<TConfig> {
@@ -59,9 +63,39 @@ export type OpenVerifierSession = (
   logger?: ILogger,
 ) => Promise<IVerifierSession>;
 
-/** On unless `VERIFY_LOCK_RELEASED=false`. Read at the call, like the rest. */
-export function lockReleaseCheckEnabled(): boolean {
-  return process.env.VERIFY_LOCK_RELEASED?.trim().toLowerCase() !== 'false';
+/** The configuration key that says whether the check is made on this system. */
+export const LOCK_RELEASE_KEY = 'environment.verify_lock_released';
+
+/**
+ * Whether this system's configuration has the check made — its
+ * `environment.verify_lock_released`, required and boolean: there is no
+ * default and no environment variable. Read at the call, like the rest.
+ *
+ * On a cloud system a second session can land on another application server
+ * where a new object is not visible yet, and its LOCK answers 404 (measured):
+ * there the configuration says `false`. Where it says `true`, every refusal
+ * — that 404 included — fails the test, because the configuration may be
+ * wrong and that must surface.
+ */
+export function lockReleaseCheckEnabled(
+  environment: {
+    verify_lock_released?: unknown;
+  } = require('./test-helper').getEnvironmentConfig(),
+): boolean {
+  const value = environment?.verify_lock_released;
+  if (typeof value !== 'boolean') {
+    throw new Error(
+      `${LOCK_RELEASE_KEY} is not set (found ${JSON.stringify(value)}): state true or false for this system in test-config.overlay.yaml`,
+    );
+  }
+  return value;
+}
+
+/** The visible line a check that is off leaves in the run: nothing is sent. */
+export function noteLockReleaseCheckOff(what: string): void {
+  createRunIntegrityLogger().info?.(
+    `${what}: lock-release check not made — ${LOCK_RELEASE_KEY} is false; no second-session LOCK sent`,
+  );
 }
 
 /**
@@ -225,7 +259,7 @@ export async function expectLockReleased<TConfig>(
   logger?: ILogger,
 ): Promise<void> {
   if (!lockReleaseCheckEnabled()) {
-    logger?.debug?.(`${what}: lock-release check off (VERIFY_LOCK_RELEASED)`);
+    noteLockReleaseCheckOff(what);
     return;
   }
   await verifyLockReleased(openOwnSession, openHandler, config, what, logger);

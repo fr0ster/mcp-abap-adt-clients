@@ -14,6 +14,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseActivation,
+  analyseDeletion,
   analyseUnitTestStart,
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
@@ -28,6 +30,10 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  readMethodVerdicts,
+  readRunResult,
+} from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
@@ -203,7 +209,10 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                 className,
                 transportRequest,
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
             ),
             `delete existing CDS unit test class ${className}`,
           );
@@ -250,12 +259,18 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
 
           // Step 3: Activate class
           logTestStep('activate', testsLogger);
-          const activateState = await client.getClass().activate(
-            {
-              className,
-              transportRequest,
-            },
-            { headers: integrationHeadersOf(client.getClass(), 'activate') },
+          const activateState = expectResult(
+            await client.getClass().activate(
+              {
+                className,
+                transportRequest,
+              },
+              {
+                analyse: analyseActivation,
+                headers: integrationHeadersOf(client.getClass(), 'activate'),
+              },
+            ),
+            'activate the CDS unit test class',
           );
           expect(activateState).toBeDefined();
           testsLogger.info?.('CDS unit test class activated');
@@ -324,6 +339,22 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
             'resultResponse',
           );
           expect(resultResponse).toBeDefined();
+          // The run's verdict, in the format it was asked for: the generated
+          // test class ran at least one method, and nothing failed at any
+          // scope (run, class or method).
+          const resultFormat =
+            testCase.params.unit_test_result?.format || 'abapunit';
+          const run = readRunResult(String(resultResponse), resultFormat);
+          expect(run.methods.length).toBeGreaterThan(0);
+          expect(run.failures).toEqual([]);
+          if (resultFormat === 'abapunit') {
+            const ranInTestClass = readMethodVerdicts(
+              String(resultResponse),
+            ).methods.filter(
+              (m) => m.testClass.toUpperCase() === testClassName.toUpperCase(),
+            );
+            expect(ranInTestClass.length).toBeGreaterThan(0);
+          }
           testsLogger.info?.('CDS unit test result retrieved successfully');
 
           // Step 10: Cleanup
@@ -345,6 +376,7 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
                     transportRequest,
                   },
                   {
+                    analyse: analyseDeletion,
                     headers: integrationHeadersOf(client.getClass(), 'delete'),
                   },
                 ),

@@ -56,8 +56,9 @@ the run is testing two different versions of the code.
 
 ## Proving an UNLOCK released the lock
 
-```bash
-VERIFY_LOCK_RELEASED=false npm test   # turn the check off (on by default)
+```yaml
+# test-config.overlay.yaml — required, stated per system
+"environment.verify_lock_released": true    # false on cloud
 ```
 
 An UNLOCK that answers 200 has not necessarily released anything: sent
@@ -76,8 +77,12 @@ written under.
 
 It costs one session logon per check. A trial ABAP Cloud account grants two sessions — the run's
 and this one — and the check always closes its own before it returns, so the
-two are never exceeded. Turn it off with `VERIFY_LOCK_RELEASED=false` when the
-extra logons matter more than the proof.
+two are never exceeded. Whether the check is made is the system's configuration,
+`environment.verify_lock_released` (required, no default, no environment
+variable). On, any refusal — a 404 included — fails the test. Off, no LOCK is
+sent and the run logs a line naming the key. The cloud form states `false`: a
+second session can land on another application server where a new object is
+not visible yet, and its LOCK answers 404 (measured).
 
 ## Reading the traffic
 

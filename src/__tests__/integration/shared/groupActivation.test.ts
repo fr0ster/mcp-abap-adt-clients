@@ -16,6 +16,7 @@ import * as path from 'node:path';
 // the package's built entry point does not carry it until it is released.
 import {
   analyseDeletion,
+  analyseValidation,
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -383,13 +384,16 @@ describe('Group Activation (Shared)', () => {
           currentStep = 'validate domain';
           logTestStep(currentStep, testsLogger);
           expectNameFree(
-            await client.getDomain().validate({
-              domainName: domainName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test domain for group activation`,
-            }),
+            await client.getDomain().validate(
+              {
+                domainName: domainName,
+                packageName: packageName,
+                description:
+                  testCase.params.description ||
+                  `Test domain for group activation`,
+              },
+              { analyse: analyseValidation },
+            ),
             'Domain',
             domainName,
           );
@@ -425,13 +429,16 @@ describe('Group Activation (Shared)', () => {
             currentStep = 'validate data element';
             logTestStep(currentStep, testsLogger);
             expectNameFree(
-              await client.getDataElement().validate({
-                dataElementName: dataElementName,
-                packageName: packageName,
-                description:
-                  testCase.params.description ||
-                  `Test data element for group activation`,
-              }),
+              await client.getDataElement().validate(
+                {
+                  dataElementName: dataElementName,
+                  packageName: packageName,
+                  description:
+                    testCase.params.description ||
+                    `Test data element for group activation`,
+                },
+                { analyse: analyseValidation },
+              ),
               'Data element',
               dataElementName,
             );
@@ -474,12 +481,15 @@ describe('Group Activation (Shared)', () => {
             currentStep = 'validate structure';
             logTestStep(currentStep, testsLogger);
             expectNameFree(
-              await client.getStructure().validate({
-                structureName: structureName,
-                description:
-                  testCase.params.description ||
-                  `Test structure for group activation`,
-              }),
+              await client.getStructure().validate(
+                {
+                  structureName: structureName,
+                  description:
+                    testCase.params.description ||
+                    `Test structure for group activation`,
+                },
+                { analyse: analyseValidation },
+              ),
               'Structure',
               structureName,
             );

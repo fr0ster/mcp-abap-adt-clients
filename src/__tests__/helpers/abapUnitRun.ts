@@ -8,7 +8,13 @@
 import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { expectResult } from './contract';
-import { attributeOf, elementsNamed, parseXmlDocument } from './xmlTree';
+import {
+  attributeOf,
+  elementsNamed,
+  parseXmlDocument,
+  textOf,
+  type XmlElement,
+} from './xmlTree';
 
 interface IRunner<T> {
   run(target: T, options?: object): Promise<IAdtResponse<unknown>>;
@@ -23,8 +29,10 @@ export interface IFinishedRun {
   runId: string;
   /** Test method names in the result document, as ADT spells them. */
   methods: string[];
-  /** `kind` of every alert — `failedAssertion`, `exception`, … */
+  /** `kind` of every alert, at every scope — `failedAssertion`, `exception`, … */
   alerts: string[];
+  /** The alerts that are failures, run- and class-level ones included. */
+  failures: IRunAlert[];
   result: string;
 }
 
@@ -47,41 +55,132 @@ export async function runToCompletion<T>(
   return { runId, ...readRunResult(result), result };
 }
 
+/** One alert of an abapunit result, and where in the run it was raised. */
+export interface IRunAlert {
+  kind: string;
+  severity: string;
+  scope: 'run' | 'class' | 'method';
+}
+
+/**
+ * An alert that is a failure: everything but a `tolerable` one and a
+ * `warning`. A run-level or class-level failure — a run that could not
+ * start, a class whose setup dumped — counts as much as a method's.
+ */
+export function isFailureAlert(alert: IRunAlert): boolean {
+  return alert.severity !== 'tolerable' && alert.kind !== 'warning';
+}
+
+/** The root element's name (prefix dropped) and the element itself. */
+function rootOf(tree: unknown): { name: string; element: XmlElement } {
+  const entry = Object.entries((tree ?? {}) as XmlElement).find(
+    ([key]) => !key.startsWith('?') && !key.startsWith('@_'),
+  );
+  const [name, element] = entry ?? ['', {}];
+  return {
+    name,
+    element:
+      element && typeof element === 'object' ? (element as XmlElement) : {},
+  };
+}
+
+/** The tree of a result document whose root is one of `roots`; anything else throws. */
+function resultTree(result: string, roots: readonly string[]): unknown {
+  const tree = parseXmlDocument(result, 'the ABAP Unit result');
+  const { name, element } = rootOf(tree);
+  if (name === 'exception') {
+    const message = elementsNamed(element, 'message')[0];
+    throw new Error(
+      `the ABAP Unit result is an exception document: ${message ? textOf(message) : JSON.stringify(element).slice(0, 300)}`,
+    );
+  }
+  if (!roots.includes(name)) {
+    throw new Error(
+      `the ABAP Unit result has root "${name}", not ${roots.map((r) => `"${r}"`).join(' or ')}`,
+    );
+  }
+  return tree;
+}
+
+/** Every alert under `node`, with the scope it was raised in. */
+function alertsIn(node: unknown): IRunAlert[] {
+  const found: IRunAlert[] = [];
+  const visit = (value: unknown, scope: IRunAlert['scope']) => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, scope);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key.startsWith('@_')) continue;
+      const inner: IRunAlert['scope'] =
+        key === 'testMethod'
+          ? 'method'
+          : key === 'testClass' && scope === 'run'
+            ? 'class'
+            : scope;
+      if (key === 'alert') {
+        for (const item of Array.isArray(child) ? child : [child]) {
+          const alert = (
+            item && typeof item === 'object' ? item : {}
+          ) as XmlElement;
+          found.push({
+            kind: attributeOf(alert, 'kind') || 'alert',
+            severity: attributeOf(alert, 'severity'),
+            scope,
+          });
+        }
+      }
+      visit(child, inner);
+    }
+  };
+  visit(node, 'run');
+  return found;
+}
+
 /**
  * The test methods that ran and the failures they raised, read from a result
  * document in the format it was asked for: `abapunit` (`testMethod` names and
- * `alert` kinds) or `junit` (`testcase` names, and `failure` / `error`
- * elements). The document is parsed, so attribute order, whitespace and
- * namespace prefixes do not matter. Any other format is a defect of the
- * caller, thrown; so is a document that does not parse.
+ * the `alert` kinds at every scope — run, class and method) or `junit`
+ * (`testcase` names, and `failure` / `error` elements). The document is
+ * parsed, so attribute order, whitespace and namespace prefixes do not matter.
+ * Its root must be the format's (`runResult`; `testsuites` / `testsuite`): an
+ * exception document, or any other root, throws. So do a document that does
+ * not parse and a format this cannot read.
  */
 export function readRunResult(
   result: string,
   format: 'abapunit' | 'junit' | string = 'abapunit',
-): { methods: string[]; alerts: string[] } {
+): { methods: string[]; alerts: string[]; failures: IRunAlert[] } {
   if (format !== 'abapunit' && format !== 'junit') {
     throw new Error(
       `an ABAP Unit result in format ${JSON.stringify(format)} cannot be read: "abapunit" or "junit"`,
     );
   }
-  const tree = parseXmlDocument(result, 'the ABAP Unit result');
-  const attribute = attributeOf;
   if (format === 'abapunit') {
+    const tree = resultTree(result, ['runResult']);
+    const alerts = alertsIn(tree);
     return {
       methods: elementsNamed(tree, 'testMethod').map((m) =>
-        attribute(m, 'name'),
+        attributeOf(m, 'name'),
       ),
-      alerts: elementsNamed(tree, 'alert').map(
-        (a) => attribute(a, 'kind') || 'alert',
-      ),
+      alerts: alerts.map((a) => a.kind),
+      failures: alerts.filter(isFailureAlert),
     };
   }
+  const tree = resultTree(result, ['testsuites', 'testsuite']);
+  const failures: IRunAlert[] = [
+    ...elementsNamed(tree, 'failure').map(
+      () => ({ kind: 'failure', severity: '', scope: 'method' }) as IRunAlert,
+    ),
+    ...elementsNamed(tree, 'error').map(
+      () => ({ kind: 'error', severity: '', scope: 'method' }) as IRunAlert,
+    ),
+  ];
   return {
-    methods: elementsNamed(tree, 'testcase').map((t) => attribute(t, 'name')),
-    alerts: [
-      ...elementsNamed(tree, 'failure').map(() => 'failure'),
-      ...elementsNamed(tree, 'error').map(() => 'error'),
-    ],
+    methods: elementsNamed(tree, 'testcase').map((t) => attributeOf(t, 'name')),
+    alerts: failures.map((f) => f.kind),
+    failures,
   };
 }
 
@@ -94,31 +193,30 @@ export interface IMethodVerdict {
 }
 
 /**
- * Every test method of an abapunit result with the alerts under it, and the
- * `type` of every `program` element — read from the parsed document, so
- * attribute order, whitespace and namespace prefixes do not matter. A
- * document that does not parse throws.
+ * Every test method of an abapunit result with the alerts under it, every
+ * alert of the run at every scope, and the `type` of every `program` element —
+ * read from the parsed document, so attribute order, whitespace and namespace
+ * prefixes do not matter. The root must be `runResult`: an exception document,
+ * another root, or a document that does not parse throws.
  */
 export function readMethodVerdicts(result: string): {
   methods: IMethodVerdict[];
+  alerts: IRunAlert[];
   programTypes: string[];
 } {
-  const tree = parseXmlDocument(result, 'the ABAP Unit result');
-  const attribute = attributeOf;
+  const tree = resultTree(result, ['runResult']);
   const programTypes = elementsNamed(tree, 'program').map((p) =>
-    attribute(p, 'type'),
+    attributeOf(p, 'type'),
   );
   const methods: IMethodVerdict[] = [];
   for (const testClass of elementsNamed(tree, 'testClass')) {
     for (const method of elementsNamed(testClass, 'testMethod')) {
       methods.push({
-        testClass: attribute(testClass, 'name'),
-        name: attribute(method, 'name'),
-        alerts: elementsNamed(method, 'alert').map(
-          (a) => attribute(a, 'kind') || 'alert',
-        ),
+        testClass: attributeOf(testClass, 'name'),
+        name: attributeOf(method, 'name'),
+        alerts: alertsIn(method).map((a) => a.kind),
       });
     }
   }
-  return { methods, programTypes };
+  return { methods, alerts: alertsIn(tree), programTypes };
 }

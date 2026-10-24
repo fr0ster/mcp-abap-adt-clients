@@ -15,7 +15,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -27,6 +31,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
+  isFailureAlert,
   readMethodVerdicts,
   runToCompletion,
 } from '../../../helpers/abapUnitRun';
@@ -81,16 +86,20 @@ interface IRunReading {
   methods: string[];
   /** `kind` of every alert. */
   alerts: string[];
+  /** Failure alerts at any scope, as `kind@scope`. */
+  failures: string[];
   /** Methods carrying at least one alert. */
   failed: string[];
 }
 
 function readRunResult(document: string): IRunReading {
   // Parsed, not matched: an alert is found whatever its attribute order.
-  const { methods } = readMethodVerdicts(document);
+  const { methods, alerts } = readMethodVerdicts(document);
   return {
     methods: methods.map((m) => m.name).sort(),
-    alerts: methods.flatMap((m) => m.alerts),
+    // Every scope: a run- or class-level alert is not dropped.
+    alerts: alerts.map((a) => a.kind),
+    failures: alerts.filter(isFailureAlert).map((a) => `${a.kind}@${a.scope}`),
     failed: methods
       .filter((m) => m.alerts.length > 0)
       .map((m) => m.name)
@@ -174,6 +183,7 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           logTestStep('delete (leftover)', testsLogger);
           expectResult(
             await cls.delete(config, {
+              analyse: analyseDeletion,
               headers: integrationHeadersOf(cls, 'delete'),
             }),
             'delete the leftover class',
@@ -235,6 +245,7 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           logTestStep('activate', testsLogger);
           expectResult(
             await cls.activate(config, {
+              analyse: analyseActivation,
               headers: integrationHeadersOf(cls, 'activate'),
             }),
             'activate the class',
@@ -253,6 +264,8 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           const asyncRun = await runToCompletion(runner, className);
           const asyncMs = Date.now() - asyncStarted;
           const asyncReading = readRunResult(asyncRun.result);
+          // The reparse keeps what the run reported, at every scope.
+          expect(asyncReading.alerts).toEqual(asyncRun.alerts);
 
           logTestStep('runSync (synchronous)', testsLogger);
           const syncStarted = Date.now();
@@ -311,12 +324,18 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
             async: asyncFiltered,
             sync: syncFiltered,
           });
+          // None ran, and the run itself raised no failure: an empty method
+          // list beside a run- or class-level failure is a run that failed,
+          // not one that excluded everything.
           expect(asyncFiltered.methods).toEqual([]);
+          expect(asyncFiltered.failures).toEqual([]);
           expect(syncFiltered.methods).toEqual([]);
+          expect(syncFiltered.failures).toEqual([]);
         } finally {
           logTestStep('delete (cleanup)', testsLogger);
           expectResult(
             await cls.delete(config, {
+              analyse: analyseDeletion,
               headers: integrationHeadersOf(cls, 'delete'),
             }),
             'delete the class',

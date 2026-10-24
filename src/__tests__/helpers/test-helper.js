@@ -12,6 +12,10 @@ const { XMLParser } = require('fast-xml-parser');
 // with none fails loudly instead of sending a fake one to SAP.
 const { integrationHeadersOf } = require('./adtHeaders');
 const {
+  analyseActivation,
+  analyseDeletion,
+} = require('@mcp-abap-adt/adt-strategies');
+const {
   loadTestConfigFrom,
 } = require('../../../scripts/lib/testConfigOverlay');
 
@@ -37,8 +41,11 @@ let cachedEnvType = null;
 async function writeAndActivate(handler, config, options, logger) {
   await writeSource(handler, config, options, logger);
   if (typeof handler.activate === 'function') {
+    // `analyseActivation` reads the verdict inside the 200:
+    // activationExecuted="false" or a message of type E is a refusal.
     const activated = await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate', config),
+      analyse: analyseActivation,
     });
     if (activated && activated.ok === false) {
       const failure = activated.getError();
@@ -1869,22 +1876,23 @@ async function activateSharedFunctionGroup(
   transportRequest,
   logger,
 ) {
-  const answer = await client
-    .getFunctionGroup()
-    .activate(
-      { functionGroupName: name, transportRequest },
-      { headers: integrationHeadersOf(client.getFunctionGroup(), 'activate') },
-    );
+  const answer = await client.getFunctionGroup().activate(
+    { functionGroupName: name, transportRequest },
+    {
+      headers: integrationHeadersOf(client.getFunctionGroup(), 'activate'),
+      analyse: analyseActivation,
+    },
+  );
   if (!answer.ok) {
     throw new Error(
       `Shared function group ${name} could not be activated: ${answer.getError().message}`,
     );
   }
 
-  // **The POST answering is not the group being active.** No `analyse` is
-  // passed, so `ok` means the request came back — and ADT puts a refusal inside
-  // a 200, which makes `ok` true for "activated" and for "will not activate"
-  // alike. Measured with `scripts/probe-activation-settle.ts` on
+  // **The POST answering is not the group being active.** `analyseActivation`
+  // reads a refusal inside the 200 (activationExecuted="false", a message of
+  // type E), but an activation can be executed and leave the group inactive.
+  // Measured with `scripts/probe-activation-settle.ts` on
   // the ABAP Cloud system: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
   // on the inactive list afterwards — the exact state this repair exists to
   // remove, about to be recorded as removed.

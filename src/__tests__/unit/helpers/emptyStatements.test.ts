@@ -22,6 +22,8 @@ const EMPTY_STATEMENTS: Record<string, string | boolean> = {
   'environment.default_package': 'ZPKG',
   'environment.default_transport': '',
   'environment.default_master_system': '',
+  'environment.verify_lock_released': true,
+  'environment.read_message_class_after_create': true,
   'shared_dependencies.package': 'ZSHR',
   'shared_dependencies.super_package': 'ZPKG',
   'shared_dependencies.software_component': '',

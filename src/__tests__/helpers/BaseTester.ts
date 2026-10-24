@@ -26,7 +26,11 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseValidation,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtActivatable,
   IAdtCreatable,
@@ -52,6 +56,7 @@ import {
   factoryOf,
   type ILockWindow,
   lockReleaseCheckEnabled,
+  noteLockReleaseCheckOff,
 } from './lockReleased';
 import {
   createTestAdtClient,
@@ -70,6 +75,7 @@ import {
   logTestStepError,
   logTestSuccess,
 } from './testProgressLogger';
+import { validationErrors } from './validationVerdict';
 
 export interface ITestCaseParams {
   skip_cleanup?: boolean;
@@ -552,7 +558,10 @@ export class BaseTester<TConfig, TState = unknown> {
    * include's tester locks the class, and so does its check.
    */
   private async expectLockReleased(config: Partial<TConfig>): Promise<void> {
-    if (!lockReleaseCheckEnabled()) return;
+    if (!lockReleaseCheckEnabled()) {
+      noteLockReleaseCheckOff(`${this.loggerPrefix} ${describeObject(config)}`);
+      return;
+    }
     logTestStep('verify unlock released the lock', this.logger);
     // The factory is found on the verifier's own client: it is an AdtClient
     // like any other, and not every tester hands its client to setup().
@@ -568,7 +577,7 @@ export class BaseTester<TConfig, TState = unknown> {
             `${this.loggerPrefix}: no zero-argument factory on the client ` +
               `builds a ${handlerClass.constructor.name}, so the lock-release ` +
               'check cannot open this handler on its own session. Set ' +
-              'VERIFY_LOCK_RELEASED=false to run without it.',
+              'environment.verify_lock_released: false to run without it.',
           );
         }
         return (
@@ -958,113 +967,25 @@ export class BaseTester<TConfig, TState = unknown> {
       // read off a refusal.
       const validationDocument = String(
         expectResult(
-          await this.adtObject.validate(config as Partial<TConfig>),
+          await this.adtObject.validate(config as Partial<TConfig>, {
+            analyse: analyseValidation,
+          }),
           'validate',
         ) ?? '',
       );
 
       // The document still has to be read: validation reports a rejected name
-      // inside a 200, in an error table.
-      if (validationDocument) {
-        const { XMLParser } = require('fast-xml-parser');
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        // Only the parse is guarded, and an unreadable answer fails: whether
-        // the name was rejected cannot be found out from it.
-        let parsed: any;
-        try {
-          parsed = parser.parse(validationDocument);
-        } catch (parseError) {
-          const error = new Error(
-            `validate: the validation answer could not be read as XML: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          );
-          logTestStepError(currentStep, error);
-          throw error;
-        }
-
-        // Check for error table (adtcore:errorTable or similar)
-        const errorTable =
-          parsed['adtcore:errorTable'] ||
-          parsed.errorTable ||
-          parsed['adtcore:messageTable']?.['adtcore:message'] ||
-          parsed.messageTable?.message;
-
-        // Check if there are error messages (type="E" or severity="ERROR")
-        const messages = Array.isArray(errorTable)
-          ? errorTable
-          : errorTable
-            ? [errorTable]
-            : [];
-        const errorMessages = messages.filter((msg: any) => {
-          const type = msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
-          const severity =
-            msg['@_adtcore:severity'] ||
-            msg['@_severity'] ||
-            msg.severity ||
-            '';
-          return type === 'E' || severity === 'ERROR' || type === 'ERROR';
-        });
-
-        if (errorMessages.length > 0) {
-          const errorTexts = errorMessages
-            .map((msg: any) => {
-              return (
-                msg['@_adtcore:text'] ||
-                msg['@_text'] ||
-                msg.text ||
-                msg['adtcore:text'] ||
-                msg.text ||
-                msg['#text'] ||
-                JSON.stringify(msg)
-              );
-            })
-            .filter(Boolean)
-            .join('; ');
-
-          const error = new Error(
-            `Validation failed with errors: ${errorTexts}`,
-          );
-          this.log(
-            LogLevel.ERROR,
-            `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`,
-          );
-          logTestStepError(currentStep, error);
-          throw error;
-        }
-
-        // Log warnings if present (but don't fail)
-        const warningMessages = messages.filter((msg: any) => {
-          const type = msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
-          const severity =
-            msg['@_adtcore:severity'] ||
-            msg['@_severity'] ||
-            msg.severity ||
-            '';
-          return type === 'W' || severity === 'WARNING' || type === 'WARNING';
-        });
-
-        if (warningMessages.length > 0) {
-          const warningTexts = warningMessages
-            .map((msg: any) => {
-              return (
-                msg['@_adtcore:text'] ||
-                msg['@_text'] ||
-                msg.text ||
-                msg['adtcore:text'] ||
-                msg.text ||
-                msg['#text'] ||
-                JSON.stringify(msg)
-              );
-            })
-            .filter(Boolean)
-            .join('; ');
-          this.log(
-            LogLevel.WARN,
-            `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`,
-          );
-        }
+      // inside a 200. `analyseValidation` above judges the forms it knows;
+      // `validationErrors` reads every other table form by structure, nested
+      // messages and any namespace prefix included. An answer that is not XML
+      // fails: whether the name was rejected cannot be read from it.
+      const errorTexts = validationErrors(validationDocument);
+      if (errorTexts.length > 0) {
+        const error = new Error(
+          `Validation failed with errors: ${errorTexts.join('; ')}`,
+        );
+        logTestStepError(currentStep, error);
+        throw error;
       }
 
       // Delay after validate
@@ -1119,6 +1040,7 @@ export class BaseTester<TConfig, TState = unknown> {
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
+            analyse: analyseActivation,
           }),
           'activate after create',
         );
@@ -1216,6 +1138,7 @@ export class BaseTester<TConfig, TState = unknown> {
           expectResult(
             await this.adtObject.activate(config as Partial<TConfig>, {
               headers: integrationHeadersOf(this.adtObject, 'activate'),
+              analyse: analyseActivation,
             }),
             'activate after update',
           );
@@ -1244,11 +1167,12 @@ export class BaseTester<TConfig, TState = unknown> {
       ) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
-        // A refused activation is a failure in the answer — the handlers read
-        // `<msg type="E">` for it, which a status check never could.
+        // A refused activation is a failure in the answer: `analyseActivation`
+        // reads `activationExecuted="false"` and `<msg type="E">` inside the 200.
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
+            analyse: analyseActivation,
           }),
           'activate',
         );
@@ -1964,6 +1888,7 @@ export class BaseTester<TConfig, TState = unknown> {
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
+            analyse: analyseActivation,
           }),
           'activate',
         );

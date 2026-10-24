@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -148,7 +149,10 @@ describe('View (using AdtClient)', () => {
               ddlName,
               transportRequest: tester.getTransportRequest(),
             },
-            { headers: integrationHeadersOf(client.getDdl(), 'delete') },
+            {
+              analyse: analyseDeletion,
+              headers: integrationHeadersOf(client.getDdl(), 'delete'),
+            },
           );
           // A leftover that would not delete is what the create meets next:
           // the test fails here, naming what SAP said.

@@ -18,6 +18,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -224,7 +228,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
           expectRemovedOrAbsent(
             await as.delete(
               { appendStructureName, transportRequest },
-              { headers: integrationHeadersOf(as, 'delete') },
+              {
+                analyse: analyseDeletion,
+                headers: integrationHeadersOf(as, 'delete'),
+              },
             ),
             `delete leftover append structure ${appendStructureName}`,
           );
@@ -300,7 +307,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
             expectResult(
               await as.activate(
                 { appendStructureName },
-                { headers: integrationHeadersOf(as, 'activate') },
+                {
+                  analyse: analyseActivation,
+                  headers: integrationHeadersOf(as, 'activate'),
+                },
               ),
               'activate append structure',
             );
@@ -332,7 +342,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
                   appendStructureName,
                   transportRequest,
                 },
-                { headers: integrationHeadersOf(as, 'delete') },
+                {
+                  analyse: analyseDeletion,
+                  headers: integrationHeadersOf(as, 'delete'),
+                },
               ),
               'deleteState',
             );
@@ -348,7 +361,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
               () =>
                 as.delete(
                   { appendStructureName, transportRequest },
-                  { headers: integrationHeadersOf(as, 'delete') },
+                  {
+                    analyse: analyseDeletion,
+                    headers: integrationHeadersOf(as, 'delete'),
+                  },
                 ),
               `delete append structure ${appendStructureName}`,
             );

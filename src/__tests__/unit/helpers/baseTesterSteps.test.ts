@@ -81,19 +81,17 @@ const config = { thingName: 'ZTHING' };
 const updateConfig = { thingName: 'ZTHING' };
 
 beforeEach(() => {
-  process.env.VERIFY_LOCK_RELEASED = 'false';
   mockConfig = {
     environment: {
       system: 'onprem',
       operation_delays: { default: 1 },
+      verify_lock_released: false,
     },
     session_config: { cleanup_session_after_test: false },
   };
 });
 
-afterAll(() => {
-  delete process.env.VERIFY_LOCK_RELEASED;
-});
+afterAll(() => {});
 
 describe('BaseTester flowTest reads every step answer', () => {
   it('runs every step when each answers ok', async () => {
@@ -304,5 +302,67 @@ describe('BaseTester flowTest reads what it is answered beside the steps', () =>
     ).rejects.toThrow(
       /update failed \[refusal\]: the write was refused.*cleanup after it failed too.*delete refused: locked/,
     );
+  });
+});
+
+describe('BaseTester asks the library to judge what answers inside a 200', () => {
+  const {
+    analyseActivation,
+    analyseDeletion,
+    analyseValidation,
+  } = require('@mcp-abap-adt/adt-strategies');
+
+  it('passes analyseValidation, analyseActivation and analyseDeletion', async () => {
+    const handler = fakeHandler();
+    await testerOver(handler).flowTest(config, {}, { updateConfig });
+    expect(handler.validate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ analyse: analyseValidation }),
+    );
+    expect(handler.activate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ analyse: analyseActivation }),
+    );
+    expect(handler.delete).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ analyse: analyseDeletion }),
+    );
+  });
+
+  it('fails on a validation 200 carrying the SEVERITY ERROR envelope', async () => {
+    const handler = fakeHandler({
+      validate: jest.fn(async () =>
+        ok(
+          '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><SEVERITY>ERROR</SEVERITY><SHORT_TEXT>ZTHING already exists</SHORT_TEXT></DATA></asx:values></asx:abap>',
+        ),
+      ),
+    });
+    await expect(
+      testerOver(handler).flowTest(config, {}, { updateConfig }),
+    ).rejects.toThrow('Validation failed with errors: ZTHING already exists');
+    expect(handler.create).not.toHaveBeenCalled();
+  });
+
+  it('fails on a validation 200 whose error sits nested under another prefix', async () => {
+    const handler = fakeHandler({
+      validate: jest.fn(async () =>
+        ok(
+          '<v:errorTable xmlns:v="x"><v:message v:type="E" v:text="Name is reserved"/></v:errorTable>',
+        ),
+      ),
+    });
+    await expect(
+      testerOver(handler).flowTest(config, {}, { updateConfig }),
+    ).rejects.toThrow('Name is reserved');
+    expect(handler.create).not.toHaveBeenCalled();
+  });
+
+  it('fails on an activation refused as ok=false', async () => {
+    const handler = fakeHandler({
+      activate: jest.fn(async () => refused('activationExecuted="false"')),
+    });
+    await expect(
+      testerOver(handler).flowTest(config, {}, { updateConfig }),
+    ).rejects.toThrow(/activationExecuted="false"/);
   });
 });

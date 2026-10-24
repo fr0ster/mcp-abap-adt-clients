@@ -15,7 +15,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -169,7 +172,10 @@ describe('Master language on create (#105)', () => {
         expectResult(
           await cls.activate(
             { className },
-            { headers: integrationHeadersOf(cls, 'activate') },
+            {
+              analyse: analyseActivation,
+              headers: integrationHeadersOf(cls, 'activate'),
+            },
           ),
           'activate',
         );

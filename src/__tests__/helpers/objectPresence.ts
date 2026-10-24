@@ -21,7 +21,7 @@
  */
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { failureOf, saysAbsent } from './contract';
+import { deletionRefusedIn, failureOf, saysAbsent } from './contract';
 
 export type ObjectPresence =
   | { present: true }
@@ -74,7 +74,12 @@ export function expectRemovedOrAbsent(
   answer: IAdtResponse<unknown>,
   what: string,
 ): 'removed' | 'absent' {
-  if (answer.ok) return 'removed';
+  if (answer.ok) {
+    // A 200 is removed only when its deletion document says so.
+    const refused = deletionRefusedIn(answer, what);
+    if (refused) throw new Error(refused);
+    return 'removed';
+  }
   if (presenceOf(answer, what).present === false) return 'absent';
   throw new Error(failureOf(answer, what));
 }

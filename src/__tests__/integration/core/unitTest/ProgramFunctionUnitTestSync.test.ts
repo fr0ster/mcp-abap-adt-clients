@@ -23,7 +23,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -36,6 +40,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
+  isFailureAlert,
   readMethodVerdicts,
   runToCompletion,
 } from '../../../helpers/abapUnitRun';
@@ -89,6 +94,8 @@ interface IRunReading {
   methods: string[];
   /** `kind` of every alert. */
   alerts: string[];
+  /** Failure alerts at any scope, as `kind@scope`. */
+  failures: string[];
   /** Methods carrying at least one alert, as `TESTCLASS.METHOD`, sorted. */
   failed: string[];
   /** `adtcore:type` of every `program` element: what the run reported on. */
@@ -97,12 +104,14 @@ interface IRunReading {
 
 function readRunResult(document: string): IRunReading {
   // Parsed, not matched: an alert is found whatever its attribute order.
-  const { methods, programTypes } = readMethodVerdicts(document);
+  const { methods, alerts, programTypes } = readMethodVerdicts(document);
   const named = (m: { testClass: string; name: string }) =>
     `${m.testClass}.${m.name}`;
   return {
     methods: methods.map(named).sort(),
-    alerts: methods.flatMap((m) => m.alerts),
+    // Every scope: a run- or class-level alert is not dropped.
+    alerts: alerts.map((a) => a.kind),
+    failures: alerts.filter(isFailureAlert).map((a) => `${a.kind}@${a.scope}`),
     failed: methods
       .filter((m) => m.alerts.length > 0)
       .map(named)
@@ -251,7 +260,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
               expectResult(
                 await program.delete(
                   { ...p, transportRequest },
-                  { headers: integrationHeadersOf(program, 'delete') },
+                  {
+                    analyse: analyseDeletion,
+                    headers: integrationHeadersOf(program, 'delete'),
+                  },
                 ),
                 `delete ${p.programName}`,
               );
@@ -266,7 +278,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             expectResult(
               await include.delete(
                 { ...incl, transportRequest },
-                { headers: integrationHeadersOf(include, 'delete') },
+                {
+                  analyse: analyseDeletion,
+                  headers: integrationHeadersOf(include, 'delete'),
+                },
               ),
               `delete ${incl.includeName}`,
             );
@@ -352,6 +367,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           logTestStep('activate', testsLogger);
           expectResult(
             await include.activate(incl, {
+              analyse: analyseActivation,
               headers: integrationHeadersOf(include, 'activate'),
             }),
             'activate include',
@@ -359,6 +375,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           for (const p of [ownProgram, inclProgram]) {
             expectResult(
               await program.activate(p, {
+                analyse: analyseActivation,
                 headers: integrationHeadersOf(program, 'activate'),
               }),
               `activate ${p.programName}`,
@@ -408,7 +425,9 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
               ),
             ),
           );
+          // None ran, and the run itself raised no failure.
           expect(filtered.methods).toEqual([]);
+          expect(filtered.failures).toEqual([]);
         } finally {
           logTestStep('delete (cleanup)', testsLogger);
           await deletePrograms();
@@ -479,7 +498,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             expectResult(
               await fugr.delete(
                 { ...group, transportRequest },
-                { headers: integrationHeadersOf(fugr, 'delete') },
+                {
+                  analyse: analyseDeletion,
+                  headers: integrationHeadersOf(fugr, 'delete'),
+                },
               ),
               `delete ${functionGroupName}`,
             );
@@ -576,6 +598,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           for (const m of [module, untested]) {
             expectResult(
               await fm.activate(m, {
+                analyse: analyseActivation,
                 headers: integrationHeadersOf(fm, 'activate'),
               }),
               `activate ${m.functionModuleName}`,
@@ -583,12 +606,14 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           }
           expectResult(
             await finc.activate(include, {
+              analyse: analyseActivation,
               headers: integrationHeadersOf(finc, 'activate'),
             }),
             'activate include',
           );
           expectResult(
             await fugr.activate(group, {
+              analyse: analyseActivation,
               headers: integrationHeadersOf(fugr, 'activate'),
             }),
             'activate group',

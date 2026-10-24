@@ -17,6 +17,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -37,6 +38,7 @@ import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
+  requiredEnvironmentFlag,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -44,6 +46,7 @@ import type { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
+  createRunIntegrityLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 import {
@@ -181,6 +184,7 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: resolvedTransport,
               },
               {
+                analyse: analyseDeletion,
                 headers: integrationHeadersOf(
                   client.getMessageClass(),
                   'delete',
@@ -208,6 +212,7 @@ describe('MessageClass (using AdtClient)', () => {
             await client
               .getMessageClass()
               .delete(config as Partial<IMessageClassConfig>, {
+                analyse: analyseDeletion,
                 headers: integrationHeadersOf(
                   client.getMessageClass(),
                   'delete',
@@ -263,34 +268,46 @@ describe('MessageClass (using AdtClient)', () => {
           );
 
           // ── Step 2: Read message class ─────────────────────────────────────
-          logTestStep('read message class', testsLogger);
-          // No ADT operation that changes system state guarantees when the
-          // change becomes visible. A successful read that is still empty is
-          // polled again, bounded; a refused read — a 404 included — fails.
-          // A later successful read never erases an earlier refusal.
-          let readState = String(
-            expectResult(
-              await mcHandler.readMetadata({ name: msgClassName }),
-              'readState',
-            ) ?? '',
-          );
-          for (let attempt = 0; !readState && attempt < 15; attempt++) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            // Every poll is read: a refusal fails, absence included. Only a
-            // successful answer that is still empty — the class not visible
-            // yet — is polled again.
-            readState = String(
+          // Whether the class is read back right after its create is the
+          // system's configuration, `environment.read_message_class_after_create`
+          // (required): on a cloud system the read can land on another
+          // application server where the new class is not visible yet and
+          // answer 404 (measured). Off, no read is sent and the run says so;
+          // on, any refusal — that 404 included — fails.
+          if (requiredEnvironmentFlag('read_message_class_after_create')) {
+            logTestStep('read message class', testsLogger);
+            // No ADT operation that changes system state guarantees when the
+            // change becomes visible. A successful read that is still empty is
+            // polled again, bounded; a refused read — a 404 included — fails.
+            // A later successful read never erases an earlier refusal.
+            let readState = String(
               expectResult(
                 await mcHandler.readMetadata({ name: msgClassName }),
-                `poll message class ${msgClassName}`,
+                'readState',
               ) ?? '',
             );
+            for (let attempt = 0; !readState && attempt < 15; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              // Every poll is read: a refusal fails, absence included. Only a
+              // successful answer that is still empty — the class not visible
+              // yet — is polled again.
+              readState = String(
+                expectResult(
+                  await mcHandler.readMetadata({ name: msgClassName }),
+                  `poll message class ${msgClassName}`,
+                ) ?? '',
+              );
+            }
+            // The class document, read into its parts. `parseMessageClass` is
+            // this module's own reading — a consumer that wants it composes it
+            // into a result strategy; a test composes it here.
+            const parsedClass = parseMessageClass(String(readState ?? ''));
+            expect(parsedClass.name).toBe(msgClassName);
+          } else {
+            createRunIntegrityLogger().info?.(
+              `message class ${msgClassName}: read after create not made — environment.read_message_class_after_create is false`,
+            );
           }
-          // The class document, read into its parts. `parseMessageClass` is
-          // this module's own reading — a consumer that wants it composes it
-          // into a result strategy; a test composes it here.
-          const parsedClass = parseMessageClass(String(readState ?? ''));
-          expect(parsedClass.name).toBe(msgClassName);
 
           // ── Step 3: Create message ─────────────────────────────────────────
           logTestStep(`create message ${msgNo}`, testsLogger);
@@ -369,6 +386,7 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: config.transportRequest,
               },
               {
+                analyse: analyseDeletion,
                 headers: integrationHeadersOf(
                   msgHandler as unknown as AdtMessageClassMessage,
                   'delete',
@@ -411,7 +429,10 @@ describe('MessageClass (using AdtClient)', () => {
         try {
           const removed = await mcHandler.delete(
             config as Partial<IMessageClassConfig>,
-            { headers: integrationHeadersOf(mcHandler, 'delete') },
+            {
+              analyse: analyseDeletion,
+              headers: integrationHeadersOf(mcHandler, 'delete'),
+            },
           );
           leftover = removed.ok
             ? await untilMessageClassGone(

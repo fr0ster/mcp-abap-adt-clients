@@ -222,19 +222,31 @@ describe('verifyLockReleased', () => {
 });
 
 describe('lockReleaseCheckEnabled', () => {
-  const saved = process.env.VERIFY_LOCK_RELEASED;
-  afterEach(() => {
-    if (saved === undefined) delete process.env.VERIFY_LOCK_RELEASED;
-    else process.env.VERIFY_LOCK_RELEASED = saved;
+  it('answers what the configuration states', () => {
+    expect(lockReleaseCheckEnabled({ verify_lock_released: true })).toBe(true);
+    expect(lockReleaseCheckEnabled({ verify_lock_released: false })).toBe(
+      false,
+    );
   });
 
-  it('is on unless VERIFY_LOCK_RELEASED=false', () => {
-    delete process.env.VERIFY_LOCK_RELEASED;
-    expect(lockReleaseCheckEnabled()).toBe(true);
-    process.env.VERIFY_LOCK_RELEASED = 'true';
-    expect(lockReleaseCheckEnabled()).toBe(true);
+  it('refuses a configuration that does not state it, naming the key', () => {
+    expect(() => lockReleaseCheckEnabled({})).toThrow(
+      /environment\.verify_lock_released is not set/,
+    );
+    expect(() =>
+      lockReleaseCheckEnabled({ verify_lock_released: 'false' }),
+    ).toThrow(/environment\.verify_lock_released is not set/);
+  });
+
+  it('reads no environment variable', () => {
     process.env.VERIFY_LOCK_RELEASED = 'false';
-    expect(lockReleaseCheckEnabled()).toBe(false);
+    try {
+      expect(lockReleaseCheckEnabled({ verify_lock_released: true })).toBe(
+        true,
+      );
+    } finally {
+      delete process.env.VERIFY_LOCK_RELEASED;
+    }
   });
 });
 

@@ -80,6 +80,14 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     ['environment.default_transport', { required: true, empty: true }],
     ['environment.default_master_system', { required: true, empty: true }],
     ['environment.connection_type', { values: ['rfc', 'http'] }],
+    // Checks whose outcome depends on how the system routes sessions: stated
+    // per system, required, never defaulted. On, any refusal fails; off, the
+    // check is not made and the run says so.
+    ['environment.verify_lock_released', { required: true, type: 'boolean' }],
+    [
+      'environment.read_message_class_after_create',
+      { required: true, type: 'boolean' },
+    ],
     // The shared package (the template's "Lego library").
     ['shared_dependencies.package', { required: true }],
     ['shared_dependencies.super_package', { required: true }],
