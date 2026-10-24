@@ -328,7 +328,12 @@ function getDefaultTransport() {
  */
 function getDefaultMasterSystem() {
   const envConfig = getEnvironmentConfig();
-  return envConfig.default_master_system || process.env.SAP_SYSTEM_ID || '';
+  // A configured string is a statement, "" included (a cloud system has no
+  // master system); the environment answers only when the key is absent.
+  if (typeof envConfig.default_master_system === 'string') {
+    return envConfig.default_master_system;
+  }
+  return process.env.SAP_SYSTEM_ID || '';
 }
 
 /**
