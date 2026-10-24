@@ -121,7 +121,7 @@ DEBUG_TESTS=true npm test -- e2e
 
 ## Configuration
 
-Test configuration in `test-config.yaml`:
+Test configuration in `test-config.yaml.template` (the base):
 
 ```yaml
 lock_recovery_test:

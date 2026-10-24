@@ -97,7 +97,7 @@ right for comparing headers and wrong for reading what SAP answered.
 ## On-prem
 
 A run on ABAP Cloud skips 19 tests that only apply on-prem, so an on-prem run covers
-more, not less. Set in `src/__tests__/helpers/test-config.yaml`:
+more, not less. Set in your overlay, `src/__tests__/helpers/test-config.overlay.yaml` (flat keys, `environment.` and `shared_dependencies.` prefixes; see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 
 | field | value |
 |---|---|

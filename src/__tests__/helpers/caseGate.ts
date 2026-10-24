@@ -6,7 +6,7 @@ const { loadTestConfig, loadTestEnv, isTestConfigTemplate } =
 export { isTestConfigTemplate };
 
 export const MISSING_TEST_CONFIG =
-  'test-config.yaml missing — copy the template and fill it in';
+  'test-config.overlay.yaml missing — run `npm run test:init -- onprem` (or `cloud`) and fill it in';
 
 export function missingCaseMessage(
   handlerName: string,
@@ -85,7 +85,7 @@ function preflight(
  * | Configuration | Registration |
  * | --- | --- |
  * | No SAP system configured | it.skip |
- * | Template in use | it (configuration defect) |
+ * | Template in use (no overlay) | it (configuration defect) |
  * | Loader throws, or system is missing/invalid | it (normal failure path) |
  * | Case or handler section is absent | it (configuration defect) |
  * | Case exists with enabled !== true | it.skip |

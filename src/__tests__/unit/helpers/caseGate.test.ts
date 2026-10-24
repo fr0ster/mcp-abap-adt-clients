@@ -294,7 +294,7 @@ describe('real environment loader and config provenance', () => {
     });
   });
 
-  it('detects template provenance when the custom config is absent', () => {
+  it('detects template provenance when the overlay is absent', () => {
     writeFileSync(
       process.env.MCP_ENV_PATH!,
       'SAP_URL=https://chosen.invalid\n',
@@ -317,19 +317,39 @@ describe('real environment loader and config provenance', () => {
     });
     expect(warning.mock.calls).toEqual([
       [
-        '⚠️ test-config.yaml not found. Using test-config.yaml.template; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
+        '⚠️ test-config.overlay.yaml not found. Using test-config.yaml.template alone; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',
       ],
       [
-        '   Copy the template to test-config.yaml and fill in your SAP system details.',
+        '   Run `npm run test:init -- onprem` (or `cloud`) and fill in your SAP system details.',
       ],
     ]);
+  });
+});
+
+describe('template provenance follows the overlay', () => {
+  it('a defective overlay makes the loader throw, which gate() sends to the failure path', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'case-gate-overlay-'));
+    try {
+      writeFileSync(
+        join(dir, 'test-config.yaml.template'),
+        'environment:\n  system: onprem\n  default_package: "<DEV_PACKAGE>"\n',
+      );
+      writeFileSync(join(dir, 'test-config.overlay.yaml'), 'unknown.key: 1\n');
+      jest.isolateModules(() => {
+        const helper = require('../../helpers/test-helper');
+        // A defective overlay throws; gate() sends that to the normal failure path.
+        expect(() => helper.loadTestConfig(dir)).toThrow('unknown key');
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
 describe('enhancement configuration failure messages', () => {
   it('reports template use with the exact setup failure text', () => {
     expect(MISSING_TEST_CONFIG).toBe(
-      'test-config.yaml missing — copy the template and fill it in',
+      'test-config.overlay.yaml missing — run `npm run test:init -- onprem` (or `cloud`) and fill it in',
     );
   });
 

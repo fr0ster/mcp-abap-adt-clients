@@ -2,13 +2,13 @@
 
 ## Overview
 
-Test objects (classes, domains, function modules, etc.) must have **unique names** in `test-config.yaml` to avoid conflicts when tests run in parallel or sequentially.
+Test objects (classes, domains, function modules, etc.) must have **unique names** in the test configuration (`test-config.yaml.template`) to avoid conflicts when tests run in parallel or sequentially.
 
 ## Naming Rules
 
 ### 1. Unique Names in YAML
 
-Each test case in `test-config.yaml` must use **unique names** for objects. Names are used directly from YAML without any automatic suffix generation:
+Each test case in `test-config.yaml.template` must use **unique names** for objects. Names are used directly from YAML without any automatic suffix generation:
 
 ```yaml
 create_class:
@@ -157,6 +157,6 @@ create_class:
 
 **Solution**: 
 - Tests automatically delete objects before creation
-- Ensure names are unique across all test files in `test-config.yaml`
+- Ensure names are unique across all test files in `test-config.yaml.template`
 - If error persists, manually delete the class in SAP system
 
