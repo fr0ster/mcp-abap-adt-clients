@@ -7,9 +7,9 @@
  * Uses connection.makeAdtRequest() instead of raw axios so that
  * authentication (Basic / JWT) is handled automatically on all system types.
  *
- * Checks multiple endpoints:
+ * Checks both endpoints, each of which must answer a 2xx with a token:
  * - /sap/bc/adt/core/discovery (used by connection package)
- * - /sap/bc/adt/discovery (fallback for older systems)
+ * - /sap/bc/adt/discovery
  */
 
 import * as fs from 'node:fs';
@@ -86,12 +86,16 @@ describe('CSRF Token diagnostics', () => {
 
       const endpoints = ['/sap/bc/adt/core/discovery', '/sap/bc/adt/discovery'];
 
-      const results: Record<string, string | undefined> = {};
+      // Every endpoint must answer a 2xx carrying a token. A request that
+      // throws, a non-2xx, or a token taken from a failed answer fails the
+      // test — all of them reported together.
+      const failures: string[] = [];
 
       for (const endpoint of endpoints) {
         console.log(`\n--- Trying: ${endpoint} ---`);
+        let response: Awaited<ReturnType<typeof connection.makeAdtRequest>>;
         try {
-          const response = await connection.makeAdtRequest({
+          response = await connection.makeAdtRequest({
             url: endpoint,
             method: 'GET',
             timeout: 30000,
@@ -100,61 +104,47 @@ describe('CSRF Token diagnostics', () => {
               Accept: 'application/atomsvc+xml',
             },
           });
-
-          const status = response.status;
-          const contentType = response.headers?.['content-type'] ?? '';
-          const csrfToken = response.headers?.['x-csrf-token'] as
-            | string
-            | undefined;
-
-          console.log(`  Status: ${status}`);
-          console.log(`  Content-Type: ${contentType}`);
-          // The value never goes to the log. This diagnostic runs against a real
-          // system and its output gets pasted into issues and committed as
-          // evidence — which is how live tokens reached a public repository once
-          // already. What it needs to report is whether one came back.
-          console.log(`  x-csrf-token: ${describeToken(csrfToken)}`);
-
-          results[endpoint] = csrfToken || undefined;
         } catch (error: unknown) {
-          console.log(`\n--- ${endpoint} ERROR ---`);
           const message =
             error instanceof Error ? error.message : String(error);
-          console.log(`  ${message}`);
-          const err = error as {
-            response?: { status?: number; headers?: Record<string, string> };
-          };
-          if (err.response) {
-            console.log(`  Status: ${err.response.status}`);
+          console.log(`  ERROR: ${message}`);
+          failures.push(`${endpoint}: the request failed: ${message}`);
+          continue;
+        }
 
-            // Even failed requests may carry a CSRF token
-            const csrfToken = err.response.headers?.['x-csrf-token'];
-            if (csrfToken) {
-              console.log(
-                `  x-csrf-token (from error): ${describeToken(csrfToken)}`,
-              );
-              results[endpoint] = csrfToken;
-            }
-          }
+        const status = response.status;
+        const contentType = response.headers?.['content-type'] ?? '';
+        const csrfToken = response.headers?.['x-csrf-token'] as
+          | string
+          | undefined;
+
+        console.log(`  Status: ${status}`);
+        console.log(`  Content-Type: ${contentType}`);
+        // The value never goes to the log. This diagnostic runs against a real
+        // system and its output gets pasted into issues and committed as
+        // evidence — which is how live tokens reached a public repository once
+        // already. What it needs to report is whether one came back.
+        console.log(`  x-csrf-token: ${describeToken(csrfToken)}`);
+
+        if (typeof status !== 'number' || status < 200 || status >= 300) {
+          failures.push(`${endpoint}: answered HTTP ${String(status)}`);
+        } else if (
+          !csrfToken ||
+          csrfToken === 'fetch' ||
+          csrfToken === 'required'
+        ) {
+          failures.push(
+            `${endpoint}: answered no CSRF token (${describeToken(csrfToken)})`,
+          );
         }
       }
 
-      // Summary
-      console.log('\n=== Summary ===');
-      for (const [endpoint, token] of Object.entries(results)) {
-        console.log(
-          `  ${endpoint}: ${token ? describeToken(token) : 'FAILED'}`,
-        );
-      }
-
-      // At least one endpoint should return CSRF
-      const anyToken = Object.values(results).find((t) => t);
       console.log(
-        `\n  Result: ${anyToken ? 'CSRF token available' : 'NO CSRF token from any endpoint'}`,
+        `\n  Result: ${failures.length === 0 ? 'CSRF token from every endpoint' : failures.join('; ')}`,
       );
       console.log('=== End Diagnostic ===\n');
 
-      expect(anyToken).toBeTruthy();
+      expect(failures).toEqual([]);
     },
     60000,
   );

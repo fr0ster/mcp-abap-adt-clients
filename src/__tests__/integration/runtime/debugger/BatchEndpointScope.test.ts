@@ -1,12 +1,12 @@
 /**
- * Exploratory test: Can the debugger batch endpoint handle non-debugger ADT requests?
+ * The debugger batch endpoint routes non-debugger ADT requests (measured on
+ * premise and on the cloud, 2026-10-09); this asserts it, part by part.
  *
  * Sends a multipart/mixed batch to /sap/bc/adt/debugger/batch containing:
  *   1. A non-debugger request (GET /sap/bc/adt/discovery)
  *   2. A non-debugger request (GET /sap/bc/adt/oo/classes/{className}/source/main)
  *
- * Purpose: Determine if the batch endpoint is a generic ADT request router
- * or if it only accepts debugger-scoped inner requests.
+ * A refused batch, a refused inner request or a part without its object fails.
  *
  * Run:
  *   DEBUG_ADT_TESTS=true npm test -- src/__tests__/integration/runtime/debugger/BatchEndpointScope.test.ts
@@ -20,6 +20,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
+import { parseBatchResponse } from '../../../../batch/wire';
 import {
   buildDebuggerBatchPayload,
   executeBatchRequest,
@@ -126,23 +127,22 @@ describe('Debugger Batch Endpoint Scope', () => {
           );
         }
 
-        // Check if the response contains discovery XML or an error
-        const hasDiscoveryContent =
-          typeof response.data === 'string' &&
-          (response.data.includes('atomsvc') ||
-            response.data.includes('app:service') ||
-            response.data.includes('collection'));
-
-        const hasError =
-          typeof response.data === 'string' &&
-          (response.data.includes('HTTP/1.1 4') ||
-            response.data.includes('HTTP/1.1 5'));
-
-        logTestStep(
-          `discovery content found: ${hasDiscoveryContent}`,
-          testsLogger,
-        );
-        logTestStep(`error in inner response: ${hasError}`, testsLogger);
+        // Measured on premise and on the cloud (2026-10-09): the batch
+        // endpoint routes inner requests outside the debugger too. So the
+        // batch must answer, its one part must be a 200, and that part must be
+        // the discovery document — a refusal anywhere fails the test.
+        expect(response.status).toBeGreaterThanOrEqual(200);
+        expect(response.status).toBeLessThan(300);
+        const parts = parseBatchResponse(response);
+        expect(parts).toHaveLength(1);
+        const [discovery] = parts;
+        logTestStep(`inner response status: ${discovery.status}`, testsLogger);
+        expect(discovery.status).toBe(200);
+        const discoveryDocument = String(discovery.data ?? '');
+        expect(
+          discoveryDocument.includes('app:service') ||
+            discoveryDocument.includes('atomsvc'),
+        ).toBe(true);
 
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
@@ -156,7 +156,7 @@ describe('Debugger Batch Endpoint Scope', () => {
           logTestStep(`error body:\n${errorData}`, testsLogger);
         }
         logTestError(testsLogger, testName, error);
-        // Don't throw - this is an exploratory test, we want to see the result
+        throw error;
       } finally {
         logTestEnd(testsLogger, testName);
       }
@@ -228,58 +228,29 @@ describe('Debugger Batch Endpoint Scope', () => {
           );
         }
 
-        // Parse multipart response by boundary
-        if (typeof response.data === 'string') {
-          const contentType = String(response.headers?.['content-type'] ?? '');
-          const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-          const respBoundary = boundaryMatch?.[1]?.trim();
-
-          if (process.env.DEBUG_ADT_TESTS === 'true') {
+        // Both inner requests must be answered 200 with their own object:
+        // a refused part, a missing part or an unrelated body fails the test.
+        expect(response.status).toBeGreaterThanOrEqual(200);
+        expect(response.status).toBeLessThan(300);
+        const parts = parseBatchResponse(response);
+        logTestStep(`multipart parts count: ${parts.length}`, testsLogger);
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          for (const [index, part] of parts.entries()) {
             testsLogger.info(
-              `[BATCH-SCOPE] response boundary: ${respBoundary}`,
-            );
-          }
-
-          if (respBoundary) {
-            const parts = response.data
-              .split(`--${respBoundary}`)
-              .filter((p: string) => p.trim() && !p.trim().startsWith('--'));
-            logTestStep(`multipart parts count: ${parts.length}`, testsLogger);
-
-            if (process.env.DEBUG_ADT_TESTS === 'true') {
-              for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                const statusMatch = part.match(
-                  /HTTP\/1\.1\s+(\d+)\s+([^\r\n]*)/,
-                );
-                const status = statusMatch
-                  ? `${statusMatch[1]} ${statusMatch[2]}`
-                  : 'unknown';
-                testsLogger.info(
-                  `[BATCH-SCOPE] part ${i + 1} status: ${status}`,
-                );
-                testsLogger.info(
-                  `[BATCH-SCOPE] part ${i + 1} preview (500 chars): ${part.substring(0, 500)}`,
-                );
-              }
-
-              testsLogger.info(`[BATCH-SCOPE] total parts: ${parts.length}`);
-            }
-            expect(parts.length).toBe(2);
-          }
-
-          const hasClassContent =
-            response.data.includes('cl_abap_typedescr') ||
-            response.data.includes('CL_ABAP_TYPEDESCR');
-          const hasProgramContent =
-            response.data.includes('sapmhttp') ||
-            response.data.includes('SAPMHTTP');
-          if (process.env.DEBUG_ADT_TESTS === 'true') {
-            testsLogger.info(
-              `[BATCH-SCOPE] class content found: ${hasClassContent}, program content found: ${hasProgramContent}`,
+              `[BATCH-SCOPE] part ${index + 1} status: ${part.status} ${part.statusText}`,
             );
           }
         }
+        expect(parts).toHaveLength(2);
+        const [classPart, programPart] = parts;
+        expect(classPart.status).toBe(200);
+        expect(programPart.status).toBe(200);
+        expect(String(classPart.data ?? '').toUpperCase()).toContain(
+          'CL_ABAP_TYPEDESCR',
+        );
+        expect(String(programPart.data ?? '').toUpperCase()).toContain(
+          'SAPMHTTP',
+        );
 
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
@@ -293,6 +264,7 @@ describe('Debugger Batch Endpoint Scope', () => {
           logTestStep(`error body:\n${errorData}`, testsLogger);
         }
         logTestError(testsLogger, testName, error);
+        throw error;
       } finally {
         logTestEnd(testsLogger, testName);
       }

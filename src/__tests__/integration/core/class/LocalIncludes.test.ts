@@ -89,6 +89,11 @@ describe('Class local includes (using BaseTester)', () => {
         await client.getClass().read({ className: config.className }),
         `class ${config.className}`,
       );
+      if (existing.present === 'unknown') {
+        // "Could not find out" is never "absent": no create over a class
+        // that may be there.
+        return { success: false, reason: existing.reason };
+      }
       if (existing.present === true) {
         return { success: true, created: false };
       }

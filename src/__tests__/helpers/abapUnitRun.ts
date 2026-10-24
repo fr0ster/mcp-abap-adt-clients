@@ -43,12 +43,36 @@ export async function runToCompletion<T>(
   const result = String(
     expectResult(await runner.getResult(runId), 'fetch the run result'),
   );
-  return {
-    runId,
-    methods: [
-      ...result.matchAll(/testMethod [^>]*adtcore:name="([^"]+)"/g),
-    ].map((m) => m[1]),
-    alerts: [...result.matchAll(/<alert kind="([^"]+)"/g)].map((m) => m[1]),
-    result,
-  };
+  return { runId, ...readRunResult(result), result };
+}
+
+/**
+ * The test methods that ran and the failures they raised, read from a result
+ * document in the format it was asked for: `abapunit` (methods and `alert`
+ * kinds) or `junit` (`testcase` names, and `failure` / `error` elements).
+ * Any other format is a defect of the caller, thrown.
+ */
+export function readRunResult(
+  result: string,
+  format: 'abapunit' | 'junit' | string = 'abapunit',
+): { methods: string[]; alerts: string[] } {
+  if (format === 'abapunit') {
+    return {
+      methods: [
+        ...result.matchAll(/testMethod [^>]*adtcore:name="([^"]+)"/g),
+      ].map((m) => m[1]),
+      alerts: [...result.matchAll(/<alert kind="([^"]+)"/g)].map((m) => m[1]),
+    };
+  }
+  if (format === 'junit') {
+    return {
+      methods: [...result.matchAll(/<testcase\b[^>]*\bname="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
+      alerts: [...result.matchAll(/<(failure|error)\b/g)].map((m) => m[1]),
+    };
+  }
+  throw new Error(
+    `an ABAP Unit result in format ${JSON.stringify(format)} cannot be read: "abapunit" or "junit"`,
+  );
 }

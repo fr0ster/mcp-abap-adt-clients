@@ -31,6 +31,7 @@ import {
   createTestAdtClient,
   createTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -87,11 +88,8 @@ describe('View (using AdtClient)', () => {
       const envCheck = await checkDefaultTestEnvironment(connection);
       if (!envCheck.success) {
         const reason = envCheck.reason || 'Unknown reason';
-        testsLogger.error?.(
-          `Environment check failed: ${reason}. All tests will be skipped.`,
-        );
-        hasConfig = false;
-        return;
+        // A defective environment fails the suite; it never skips it.
+        throw new Error(`Environment check failed: ${reason}`);
       }
 
       defaultPackage = envCheck.defaultPackage || '';
@@ -205,7 +203,9 @@ describe('View (using AdtClient)', () => {
         );
       }
 
-      hasConfig = false;
+      // Skips only when there is no SAP here; anything else fails naming the
+      // reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 

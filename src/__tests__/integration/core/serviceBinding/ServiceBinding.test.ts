@@ -275,10 +275,13 @@ describe('ServiceBinding (using AdtClient)', () => {
         ? params.record_changes
         : undefined;
 
-    try {
+    // The parent's document fills in what the configuration leaves out. The
+    // read is issued, so it must succeed: a refused or throwing read fails
+    // the setup instead of falling back to the YAML values.
+    {
       const parentState = expectResult(
         await client.getPackage().readMetadata({ packageName: parentPackage }),
-        'parentState',
+        `read parent package ${parentPackage}`,
       );
       const raw = parentState;
       if (typeof raw === 'string') {
@@ -323,8 +326,6 @@ describe('ServiceBinding (using AdtClient)', () => {
           pkg?.['@_adtcore:responsible'] ??
           pkg?.['@_responsible'];
       }
-    } catch {
-      // best-effort: if parent metadata is unavailable, fall back to YAML values
     }
 
     if (!parentSoftwareComponent) {
@@ -337,23 +338,28 @@ describe('ServiceBinding (using AdtClient)', () => {
       await client.getPackage().readMetadata({ packageName: testSubpackage }),
       `package ${testSubpackage}`,
     );
+    if (existing.present === 'unknown') {
+      throw new Error(existing.reason);
+    }
     if (existing.present === true) {
       return testSubpackage;
     }
 
     const wait = async (ms: number): Promise<void> =>
       new Promise((resolve) => setTimeout(resolve, ms));
+    // Readable after its create decides; a read that refuses for any reason
+    // but absence fails the setup.
     const waitForPackage = async (): Promise<boolean> => {
       for (let i = 0; i < 4; i += 1) {
-        const state = await client.getPackage().readMetadata({
-          packageName: testSubpackage,
-          ...(i > 0 ? { withLongPolling: true } : {}),
-        } as { packageName: string });
-        // `state.ok`, not `state`: an answer is an object either way, so this
-        // returned true on the first pass and waited for nothing.
-        if (state.ok) {
-          return true;
-        }
+        const state = presenceOf(
+          await client.getPackage().readMetadata({
+            packageName: testSubpackage,
+            ...(i > 0 ? { withLongPolling: true } : {}),
+          } as { packageName: string }),
+          `package ${testSubpackage}`,
+        );
+        if (state.present === 'unknown') throw new Error(state.reason);
+        if (state.present) return true;
         await wait(1000);
       }
       return false;
@@ -379,20 +385,9 @@ describe('ServiceBinding (using AdtClient)', () => {
       },
       { headers: integrationHeadersOf(client.getPackage(), 'create') },
     );
-    if (!packageCreated.ok) {
-      // Package create may answer 404/409 when the package was created but is
-      // not readable yet: its being readable decides. Any other refusal fails.
-      const status = packageCreated.getError().response?.status;
-      if (status === 404 || status === 409) {
-        const created = await waitForPackage();
-        if (created) {
-          return testSubpackage;
-        }
-      }
-      throw new Error(
-        failureOf(packageCreated, `create test subpackage ${testSubpackage}`),
-      );
-    }
+    // A refused create fails, a 404 or 409 included: a package that a later
+    // read finds does not forgive it.
+    expectResult(packageCreated, `create test subpackage ${testSubpackage}`);
 
     const created = await waitForPackage();
     if (!created) {

@@ -343,26 +343,16 @@ export class BaseTester<TConfig, TState = unknown> {
       );
       return;
     }
-    try {
-      logTestStep('delete (pre-existing object cleanup)', this.logger);
-      if (this.cleanupObjectFn) {
-        await this.cleanupObjectFn(config);
-      } else {
-        await this.deleteOrRaise(config as Partial<TConfig>);
-      }
-      this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
-      this.objectCreated = false;
-    } catch (cleanupError) {
-      // Not raised: this runs on the skip path, where the test was never going
-      // to execute, and turning a legitimate skip red would say the wrong
-      // thing. Recorded at ERROR because the object is still there and the run
-      // after this one will meet it.
-      this.log(
-        LogLevel.ERROR,
-        'Pre-existing object cleanup failed — it is left on the system:',
-        cleanupError,
-      );
+    // A failed removal throws: the caller, which is already failing the
+    // test, reports it beside its own failure.
+    logTestStep('delete (pre-existing object cleanup)', this.logger);
+    if (this.cleanupObjectFn) {
+      await this.cleanupObjectFn(config);
+    } else {
+      await this.deleteOrRaise(config as Partial<TConfig>);
     }
+    this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
+    this.objectCreated = false;
   }
 
   /**
@@ -832,31 +822,28 @@ export class BaseTester<TConfig, TState = unknown> {
       const encodedUri = encodeURIComponent(sourceUrl);
       const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
       logTestStep(label, this.logger);
-      try {
-        const response = await this.connection.makeAdtRequest({
-          url,
-          method: 'GET',
-          timeout: 0,
-          headers: {
-            Accept:
-              'application/vnd.sap.adt.repository.objproperties.result.v1+xml, application/vnd.sap.adt.objectproperties+xml, application/xml',
-          },
-        });
-        const payload = getPayloadText(response?.data);
-        logTestStep(
-          `${label} length: ${payload?.length || 0} characters`,
-          this.logger,
-        );
-      } catch (error: any) {
-        const errorText =
-          error?.message ||
-          error?.response?.data ||
-          'Unknown object properties error';
-        logTestStep(
-          `${label} failed: ${String(errorText).slice(0, 200)}`,
-          this.logger,
+      // A thrown request fails the step, and so does an answer that is not a
+      // 2xx or carries nothing: this read is part of the flow, not a probe.
+      const response = await this.connection.makeAdtRequest({
+        url,
+        method: 'GET',
+        timeout: 0,
+        headers: {
+          Accept:
+            'application/vnd.sap.adt.repository.objproperties.result.v1+xml, application/vnd.sap.adt.objectproperties+xml, application/xml',
+        },
+      });
+      const status = response?.status;
+      if (typeof status !== 'number' || status < 200 || status >= 300) {
+        throw new Error(
+          `${label} failed: object properties answered HTTP ${String(status)}`,
         );
       }
+      const payload = getPayloadText(response.data);
+      if (!payload) {
+        throw new Error(`${label} failed: object properties answered nothing`);
+      }
+      logTestStep(`${label} length: ${payload.length} characters`, this.logger);
     };
 
     const shouldSkipInitialSourceRead = (): boolean => {
@@ -979,103 +966,103 @@ export class BaseTester<TConfig, TState = unknown> {
       // The document still has to be read: validation reports a rejected name
       // inside a 200, in an error table.
       if (validationDocument) {
+        const { XMLParser } = require('fast-xml-parser');
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        // Only the parse is guarded, and an unreadable answer fails: whether
+        // the name was rejected cannot be found out from it.
+        let parsed: any;
         try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const parsed = parser.parse(validationDocument);
-
-          // Check for error table (adtcore:errorTable or similar)
-          const errorTable =
-            parsed['adtcore:errorTable'] ||
-            parsed.errorTable ||
-            parsed['adtcore:messageTable']?.['adtcore:message'] ||
-            parsed.messageTable?.message;
-
-          // Check if there are error messages (type="E" or severity="ERROR")
-          const messages = Array.isArray(errorTable)
-            ? errorTable
-            : errorTable
-              ? [errorTable]
-              : [];
-          const errorMessages = messages.filter((msg: any) => {
-            const type =
-              msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
-            const severity =
-              msg['@_adtcore:severity'] ||
-              msg['@_severity'] ||
-              msg.severity ||
-              '';
-            return type === 'E' || severity === 'ERROR' || type === 'ERROR';
-          });
-
-          if (errorMessages.length > 0) {
-            const errorTexts = errorMessages
-              .map((msg: any) => {
-                return (
-                  msg['@_adtcore:text'] ||
-                  msg['@_text'] ||
-                  msg.text ||
-                  msg['adtcore:text'] ||
-                  msg.text ||
-                  msg['#text'] ||
-                  JSON.stringify(msg)
-                );
-              })
-              .filter(Boolean)
-              .join('; ');
-
-            const error = new Error(
-              `Validation failed with errors: ${errorTexts}`,
-            );
-            this.log(
-              LogLevel.ERROR,
-              `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`,
-            );
-            logTestStepError(currentStep, error);
-            throw error;
-          }
-
-          // Log warnings if present (but don't fail)
-          const warningMessages = messages.filter((msg: any) => {
-            const type =
-              msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
-            const severity =
-              msg['@_adtcore:severity'] ||
-              msg['@_severity'] ||
-              msg.severity ||
-              '';
-            return type === 'W' || severity === 'WARNING' || type === 'WARNING';
-          });
-
-          if (warningMessages.length > 0) {
-            const warningTexts = warningMessages
-              .map((msg: any) => {
-                return (
-                  msg['@_adtcore:text'] ||
-                  msg['@_text'] ||
-                  msg.text ||
-                  msg['adtcore:text'] ||
-                  msg.text ||
-                  msg['#text'] ||
-                  JSON.stringify(msg)
-                );
-              })
-              .filter(Boolean)
-              .join('; ');
-            this.log(
-              LogLevel.WARN,
-              `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`,
-            );
-          }
+          parsed = parser.parse(validationDocument);
         } catch (parseError) {
-          // If parsing fails, continue - validation might be in different format
-          // But log the parse error for debugging
+          const error = new Error(
+            `validate: the validation answer could not be read as XML: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+          );
+          logTestStepError(currentStep, error);
+          throw error;
+        }
+
+        // Check for error table (adtcore:errorTable or similar)
+        const errorTable =
+          parsed['adtcore:errorTable'] ||
+          parsed.errorTable ||
+          parsed['adtcore:messageTable']?.['adtcore:message'] ||
+          parsed.messageTable?.message;
+
+        // Check if there are error messages (type="E" or severity="ERROR")
+        const messages = Array.isArray(errorTable)
+          ? errorTable
+          : errorTable
+            ? [errorTable]
+            : [];
+        const errorMessages = messages.filter((msg: any) => {
+          const type = msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
+          const severity =
+            msg['@_adtcore:severity'] ||
+            msg['@_severity'] ||
+            msg.severity ||
+            '';
+          return type === 'E' || severity === 'ERROR' || type === 'ERROR';
+        });
+
+        if (errorMessages.length > 0) {
+          const errorTexts = errorMessages
+            .map((msg: any) => {
+              return (
+                msg['@_adtcore:text'] ||
+                msg['@_text'] ||
+                msg.text ||
+                msg['adtcore:text'] ||
+                msg.text ||
+                msg['#text'] ||
+                JSON.stringify(msg)
+              );
+            })
+            .filter(Boolean)
+            .join('; ');
+
+          const error = new Error(
+            `Validation failed with errors: ${errorTexts}`,
+          );
           this.log(
-            LogLevel.DEBUG,
-            `Could not parse validation response for error tables: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+            LogLevel.ERROR,
+            `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`,
+          );
+          logTestStepError(currentStep, error);
+          throw error;
+        }
+
+        // Log warnings if present (but don't fail)
+        const warningMessages = messages.filter((msg: any) => {
+          const type = msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
+          const severity =
+            msg['@_adtcore:severity'] ||
+            msg['@_severity'] ||
+            msg.severity ||
+            '';
+          return type === 'W' || severity === 'WARNING' || type === 'WARNING';
+        });
+
+        if (warningMessages.length > 0) {
+          const warningTexts = warningMessages
+            .map((msg: any) => {
+              return (
+                msg['@_adtcore:text'] ||
+                msg['@_text'] ||
+                msg.text ||
+                msg['adtcore:text'] ||
+                msg.text ||
+                msg['#text'] ||
+                JSON.stringify(msg)
+              );
+            })
+            .filter(Boolean)
+            .join('; ');
+          this.log(
+            LogLevel.WARN,
+            `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`,
           );
         }
       }
@@ -1459,14 +1446,21 @@ export class BaseTester<TConfig, TState = unknown> {
             'delete',
           );
         } catch (cleanupError) {
-          // Not rethrown, deliberately: the test already has a failure, and it
-          // is the one worth reporting. This is recorded at ERROR so the object
-          // left behind is not invisible either.
+          // The test's own failure stays the one thrown, and the cleanup's
+          // failure is reported inside it, not only logged: the object is
+          // left on the system and the next run meets it.
           this.log(
             LogLevel.ERROR,
             'Cleanup after a failed test also failed — the object is left on the system:',
             cleanupError,
           );
+          if (error instanceof Error) {
+            error.message = `${error.message} — and the cleanup after it failed too, ${this.objectNameOf(config)} is left on the system: ${
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError)
+            }`;
+          }
         }
       } else if (this.objectCreated && !cleanupSettings.shouldCleanup) {
         this.log(
@@ -2104,6 +2098,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // every following run failed the same way. Measured on an ABAP Cloud system: a
     // function include stayed through three runs, each reporting that cleanup
     // would remove it.
+    let leftover = '';
     if (this.objectCreated && this.config) {
       const { shouldCleanup } = this.getCleanupSettings(
         this.testCase?.params as ITestCaseParams | undefined,
@@ -2112,17 +2107,21 @@ export class BaseTester<TConfig, TState = unknown> {
         try {
           await this.cleanupExistingObject(this.config);
         } catch (cleanupError) {
-          this.log(
-            LogLevel.WARN,
-            `Leftover object could not be removed: ${(cleanupError as Error).message}`,
-          );
+          // Reported in the failure below, not only logged: the object is
+          // still on the system and the next run meets it.
+          leftover = ` The leftover object could not be removed either: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }.`;
+          this.log(LogLevel.ERROR, leftover.trim());
         }
       }
     }
 
     const error = new Error(
       `Test could not be set up: ${this.setupError}. The system was not in a ` +
-        'state this test could run against, so nothing was verified.',
+        `state this test could run against, so nothing was verified.${leftover}`,
     );
     logTestError(this.logger, testName, error);
     logTestEnd(this.logger, testName);

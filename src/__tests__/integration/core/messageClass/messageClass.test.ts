@@ -280,6 +280,12 @@ describe('MessageClass (using AdtClient)', () => {
           for (let attempt = 0; !readState && attempt < 15; attempt++) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             const again = await mcHandler.readMetadata({ name: msgClassName });
+            // Not there yet is the one refusal to poll past; any other fails.
+            if (!again.ok && !saysAbsent(again.getError())) {
+              throw new Error(
+                failureOf(again, `read message class ${msgClassName}`),
+              );
+            }
             readState = again.ok ? String(again.getResult().value ?? '') : '';
           }
           // The class document, read into its parts. `parseMessageClass` is

@@ -105,6 +105,17 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     ['create_append_structure.test_cases[adt_append_structure].enabled', { type: 'boolean' }],
     [`${FEATURE_TOGGLE}.enabled`, { type: 'boolean' }],
     [`${CHECK_RUN}.enabled`, { type: 'boolean' }],
+    // Where the function module / include flows get their function group:
+    // the shared one, or one in the default package (no shared package on
+    // this system). Stated here, never a recovery from a failed shared setup.
+    [
+      'create_function_module.test_cases[adt_function_module].params.function_group_route',
+      { values: ['shared', 'default_package'] },
+    ],
+    [
+      'create_function_include.test_cases[adt_function_include].params.function_group_route',
+      { values: ['shared', 'default_package'] },
+    ],
     // ATC needs a check variant the system can run.
     [`${ATC_RUN}.enabled`, { type: 'boolean' }],
     [`${ATC_RUN}.params.check_variant`, { empty: true }],

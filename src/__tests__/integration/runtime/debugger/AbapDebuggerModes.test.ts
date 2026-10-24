@@ -366,38 +366,31 @@ class Scope {
   }
 
   /**
-   * Debugger state is released quietly — a refusal is logged — but every
-   * session this scope opened is logged off through `steps`, so a failed
-   * log-off is reported.
+   * Every piece of debugger state is released through `steps`, each answer
+   * read: a refused or throwing release is a failure of the test, reported
+   * with the others, and every session this scope opened is logged off
+   * whatever the release did.
    */
   async close(steps: CleanupSteps): Promise<void> {
-    // Every session is logged off, whatever the release did.
     await releaseThenLogOff(
       steps,
       async () => {
-        const quietly = async (what: string, work: () => Promise<unknown>) => {
-          try {
-            await work();
-          } catch (error) {
-            testsLogger.warn?.(
-              `cleanup: ${what}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-          }
-        };
+        const release = (what: string, work: () => Promise<unknown>) =>
+          steps.run(what, work, { checkAnswer: true });
         for (const api of this.attached.splice(0)) {
-          await quietly('terminate the debuggee', () =>
+          await release('terminate the debuggee', () =>
             api.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
           );
         }
         for (const { api, identity, id } of this.armed.splice(0)) {
-          await quietly(`delete breakpoint ${id}`, () =>
+          await release(`delete breakpoint ${id}`, () =>
             api.deleteBreakpoint(identity, id),
           );
         }
         // Anything armed under the key that no answer named: an empty full set
         // clears the key.
         for (const { api, identity } of this.keys.splice(0)) {
-          await quietly('clear the key', () =>
+          await release('clear the key', () =>
             api.syncBreakpoints(
               identity,
               { scope: 'full', breakpoints: [] },
@@ -406,10 +399,10 @@ class Scope {
           );
         }
         for (const { api, identity } of this.listeners.splice(0)) {
-          await quietly('stop the listener', () => api.stopListener(identity));
+          await release('stop the listener', () => api.stopListener(identity));
         }
         for (const run of this.runs.splice(0)) {
-          await within(run, 45_000);
+          await steps.run('settle a probe run', () => within(run, 45_000));
         }
       },
       this.sessions.splice(0),

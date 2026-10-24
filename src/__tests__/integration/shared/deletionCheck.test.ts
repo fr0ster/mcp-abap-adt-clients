@@ -12,8 +12,9 @@
  * `/sap/bc/adt/messageclass/z_msg_test_0001` came back naming
  * `adtcore:type="MSAG/N"` and the package it resolved to. If that holds for an
  * address whose object is deleted another way, the member is honest for those
- * three types; if the server refuses, the refusal is the answer and a caller
- * reads it — which is also honest, and worth knowing rather than assuming.
+ * three types. A refused check fails the test with what SAP said: a test
+ * never passes over a refused operation, so a type the service does not
+ * resolve shows up red, for its case to be decided, rather than green.
  *
  * **Every assertion here is about the shape of the answer, never about a
  * verdict.** Whether a given object can be deleted right now depends on the
@@ -71,9 +72,8 @@ describe('Shared - the deletion check, per type', () => {
   /**
    * The three whose URI had never been put to the service.
    *
-   * Each answers *something* — a document or a refusal — and this records which,
-   * with the server's own sentence, so the next reader does not have to guess
-   * either.
+   * Each must answer the deletion document; a refusal fails, naming the type
+   * and SAP's own sentence.
    */
   const unmeasured: {
     label: string;
@@ -128,18 +128,18 @@ describe('Shared - the deletion check, per type', () => {
 
   for (const { label, ask } of unmeasured) {
     gateOn(() => true)(
-      `answers for a ${label}, one way or the other`,
+      `answers the deletion document for a ${label}`,
       async () => {
         logTestStep(`deletion check for a ${label}`, testsLogger);
 
         const { ok, text } = await ask();
-
-        // Recorded rather than judged. What must not happen is the third thing:
-        // an empty success, which is how a refusal used to reach a caller.
         testsLogger.info?.(
           `📄 ${label}: ${ok ? 'result' : 'failure'} — ${text.slice(0, 200)}`,
         );
-        expect(text.length).toBeGreaterThan(0);
+        if (!ok) {
+          throw new Error(`deletion check for a ${label} refused: ${text}`);
+        }
+        expect(text).toContain('del:');
       },
       60000,
     );
@@ -170,13 +170,11 @@ describe('Shared - the deletion check, per type', () => {
         : answer.getError().message;
       testsLogger.info?.(`📄 class: ${text.slice(0, 200)}`);
 
-      if (answer.ok) {
-        expect(text).toContain('del:');
-        expect(text).not.toContain('chkl:messages');
-      } else {
-        expect(answer.getError().message.length).toBeGreaterThan(0);
-        expect(['connection', 'refusal']).toContain(answer.getError().origin);
+      if (!answer.ok) {
+        throw new Error(`deletion check for a class refused: ${text}`);
       }
+      expect(text).toContain('del:');
+      expect(text).not.toContain('chkl:messages');
     },
     60000,
   );

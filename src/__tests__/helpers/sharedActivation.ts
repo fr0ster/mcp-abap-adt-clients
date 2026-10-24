@@ -14,6 +14,7 @@ import { AdtUtils } from '../../core/shared/AdtUtils';
 import { utilDocuments } from '../../core/shared/utilResultSet';
 import { wireItself } from '../../utils/resultStrategy';
 import { integrationHeadersOf } from './adtHeaders';
+import { expectResult } from './contract';
 
 export interface ISharedGroupMember {
   /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`. */
@@ -48,19 +49,24 @@ export async function activateSharedGroup(
   }
   let finished = false;
   for (let reads = 0; reads < 10 && !finished; reads++) {
-    const state = await utils.getActivationRun(runId, {
-      withLongPolling: true,
-    });
-    const status = /status="([^"]*)"/.exec(
-      String(state.ok ? state.getResult().value : ''),
-    )?.[1];
+    // Every poll is read: a refused one fails with what SAP said, it is not
+    // an empty status to retry past.
+    const state = expectResult(
+      await utils.getActivationRun(runId, { withLongPolling: true }),
+      `poll group activation run ${runId} of ${what}`,
+    );
+    const status = /status="([^"]*)"/.exec(String(state ?? ''))?.[1];
     finished = Boolean(status && status !== 'running' && status !== 'waiting');
   }
   if (!finished) {
     throw new Error(`group activation run ${runId} of ${what} did not finish`);
   }
-  const outcome = await utils.getActivationResults(runId);
-  const results = String(outcome.ok ? outcome.getResult().value : '');
+  const results = String(
+    expectResult(
+      await utils.getActivationResults(runId),
+      `read the results of group activation run ${runId} of ${what}`,
+    ) ?? '',
+  );
   // activationExecuted="true" beside an error message is still a failure (the
   // errata): the object stays inactive.
   const errors = [

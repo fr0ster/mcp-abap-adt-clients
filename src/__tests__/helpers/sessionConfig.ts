@@ -93,12 +93,10 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
  */
 export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
-  try {
-    const envConfig = getEnvironmentConfig();
-    return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
-  } catch {
-    return 'http';
-  }
+  // A configuration that cannot be read throws: reading it as "http" would
+  // run a test on a wire nobody configured.
+  const envConfig = getEnvironmentConfig();
+  return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
 }
 
 /**

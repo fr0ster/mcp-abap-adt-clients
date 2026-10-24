@@ -1857,6 +1857,12 @@ create_function_module:
       params:
         function_module_name: "Z_AC_FM03"  # Must start with Z_ or Y_ (with underscore)
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
+        # Where the function group comes from, chosen here before the run:
+        # "shared" = shared_dependencies.function_groups in the shared package;
+        # "default_package" = the group in package_name / environment.default_package
+        # (a system with no shared package). Either route's failure fails the
+        # test; neither is a recovery from the other.
+        function_group_route: "shared"
         description: "AdtFunctionModule workflow FM"
         # package_name: "ZAC_PKG01"
         # transport_request: ""
@@ -1884,6 +1890,12 @@ create_function_include:
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
+        # Where the function group comes from, chosen here before the run:
+        # "shared" = shared_dependencies.function_groups in the shared package;
+        # "default_package" = the group in package_name / environment.default_package
+        # (a system with no shared package). Either route's failure fails the
+        # test; neither is a recovery from the other.
+        function_group_route: "shared"
         # Z03, not Z02. This case creates the include and deletes it again, and
         # Z02 is the shared one declared in shared_dependencies — pointing both
         # at the same name means every run destroys the shared object, and the

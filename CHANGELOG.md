@@ -108,8 +108,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   validation or cleanup fails the test with its reason — a refused cleanup
   after a failed body is added to that failure rather than replacing it.
   `BaseTester` fails on a refused unlock after an update, on a refused
-  `readMetadata` step (406 only where `allow_406` says so) and on every
-  refused step of `modifyFlowTest`.
+  `readMetadata` step (406 only where `allow_406` says so), on every
+  refused step of `modifyFlowTest`, on an error table in a validation 200
+  and on a refused or throwing post-create object-properties read. Nothing
+  turns a failure into a success afterwards: a read that could not find out
+  is never "absent", a refused create is never forgiven by a later read that
+  finds the object (the shared package, a shared dependency, the
+  service-binding subpackage, the function group), a failed read never falls
+  through into a write (`sharedSourceIsCurrent`), and a shared function group
+  that cannot be activated fails the setup (`activateSharedFunctionGroup`
+  throws). The FunctionModule / FunctionInclude suites no longer fall back to
+  a group in the default package when the shared setup fails: the case's new
+  `params.function_group_route` (`shared`, the base, or `default_package`,
+  an overlay key) chooses the route before the run, and that route's failure
+  fails the test. The debugger, batch, CSRF, transport, unit-test and
+  deletion-check suites fail on refusals they used to log; a unit-test run is
+  judged by its result on every system, legacy included.
 
 ## [37.2.0] - 2026-10-23
 

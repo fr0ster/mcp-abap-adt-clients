@@ -57,6 +57,10 @@
 # "create_feature_toggle.test_cases[adt_feature_toggle].enabled": true
 # false where the system refuses `check` (e.g. S_ABPLNGVS); a refusal fails the test.
 # "check_run.test_cases[class_check].enabled": false
+# "default_package" where the system has no shared package (e.g. a BTP trial without a transport layer); a failed shared setup fails the test.
+# "create_function_module.test_cases[adt_function_module].params.function_group_route": "default_package"
+# "default_package" where the system has no shared package; a failed shared setup fails the test.
+# "create_function_include.test_cases[adt_function_include].params.function_group_route": "default_package"
 # true once a check variant that runs on this system is set.
 # "atc_run.test_cases[adt_atc_run].enabled": true
 # ATC check variant, or "" for the system's own.

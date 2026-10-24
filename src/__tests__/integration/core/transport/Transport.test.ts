@@ -210,6 +210,19 @@ describe('AdtRequest', () => {
           transportNumber = created.transportNumber || null;
           if (transportNumber) createdTransports.push(transportNumber);
 
+          // The read is part of the workflow: a refused or throwing read fails
+          // it (the request is still deleted by afterAll).
+          if (transportNumber) {
+            logTestStep('read', testsLogger);
+            const document = expectResult(
+              await client.getRequest(transportParsing).readMetadata({
+                transportNumber,
+              }),
+              `read transport ${transportNumber}`,
+            );
+            expect(document).toBeDefined();
+          }
+
           logTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
           // A user the system does not know is a defect of the configuration
@@ -235,35 +248,6 @@ describe('AdtRequest', () => {
           logTestError(testsLogger, 'AdtRequest - full workflow', error);
           throw error;
         } finally {
-          // Read the created transport before cleanup (using transportNumber from state)
-          if (transportNumber) {
-            try {
-              logTestStep('read', testsLogger);
-              const readState = expectResult(
-                await client.getRequest(transportParsing).readMetadata({
-                  transportNumber,
-                }),
-                'readState',
-              );
-              expect(readState).toBeDefined();
-              expect(readState).toBeDefined();
-              const metadataState = expectResult(
-                await client.getRequest(transportParsing).readMetadata({
-                  transportNumber,
-                }),
-                'metadataState',
-              );
-              expect(metadataState).toBeDefined();
-              expect(metadataState).toBeDefined();
-            } catch (readError: any) {
-              testsLogger.warn?.(
-                `Failed to read transport ${transportNumber}:`,
-                readError,
-              );
-              // Don't fail the test if read fails
-            }
-          }
-
           logTestEnd(testsLogger, 'AdtRequest - full workflow');
         }
       },
@@ -306,10 +290,12 @@ describe('AdtRequest', () => {
     const objectsOn = async (
       number: string,
     ): Promise<ITransportObjectEntry[]> => {
-      const answer = await client
-        .getRequest(transportParsing)
-        .readObjects(number);
-      return answer.ok ? answer.getResult().value : [];
+      // A refused read fails: read as an empty list, it would prove an entry
+      // gone that was never looked at.
+      return expectResult(
+        await client.getRequest(transportParsing).readObjects(number),
+        `read the objects of ${number}`,
+      );
     };
 
     /**
@@ -329,10 +315,14 @@ describe('AdtRequest', () => {
     const taskTypeOf = async (
       taskNumber: string,
     ): Promise<{ type: string; document: string }> => {
-      const answer = await client
-        .getRequest()
-        .readMetadata({ transportNumber: taskNumber });
-      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      const document = String(
+        expectResult(
+          await client
+            .getRequest()
+            .readMetadata({ transportNumber: taskNumber }),
+          `read task ${taskNumber}`,
+        ) ?? '',
+      );
       const element = (document.match(/<tm:task\s[^>]*?>/g) ?? []).find((t) =>
         t.includes(`tm:number="${taskNumber}"`),
       );
@@ -341,10 +331,14 @@ describe('AdtRequest', () => {
 
     /** The task numbers under a request, in document order. */
     const tasksOf = async (number: string): Promise<string[]> => {
-      const answer = await client.getRequest(transportParsing).readMetadata({
-        transportNumber: number,
-      });
-      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      const document = String(
+        expectResult(
+          await client.getRequest(transportParsing).readMetadata({
+            transportNumber: number,
+          }),
+          `read request ${number}`,
+        ) ?? '',
+      );
       return (document.match(/<tm:task\s[^>]*?>/g) ?? [])
         .map((t) => t.match(/tm:number="([^"]*)"/)?.[1])
         .filter((n): n is string => Boolean(n));
@@ -794,31 +788,25 @@ describe('AdtRequest', () => {
             ? getEnabledTestCase('create_transport', 'builder_transport')
             : null;
 
+          // Configured, the discriminator must be made: a refused or
+          // throwing create, or one that answers no number, fails the test —
+          // it is never downgraded to the shape-only assertion below.
           if (testCase) {
-            try {
-              logTestStep('create (discriminator transport)', testsLogger);
-              const createState = expectResult(
-                await client
-                  .getRequest(transportParsing)
-                  .create(buildConfig(testCase) as any, {
-                    headers: integrationHeadersOf(
-                      client.getRequest(transportParsing),
-                      'create',
-                    ),
-                  }),
-                'createState',
-              );
-              knownTransportNumber = createState.transportNumber || null;
-              if (knownTransportNumber) {
-                createdTransports.push(knownTransportNumber);
-              }
-            } catch (createError: any) {
-              testsLogger.warn?.(
-                'Could not create a discriminator transport for the list ' +
-                  'test; falling back to a shape-only assertion:',
-                createError,
-              );
-            }
+            logTestStep('create (discriminator transport)', testsLogger);
+            const createState = expectResult(
+              await client
+                .getRequest(transportParsing)
+                .create(buildConfig(testCase) as any, {
+                  headers: integrationHeadersOf(
+                    client.getRequest(transportParsing),
+                    'create',
+                  ),
+                }),
+              'create the discriminator transport',
+            );
+            expect(createState.transportNumber).toMatch(/\S/);
+            knownTransportNumber = createState.transportNumber;
+            createdTransports.push(createState.transportNumber);
           }
 
           logTestStep('list', testsLogger);
@@ -853,9 +841,8 @@ describe('AdtRequest', () => {
             );
             expect(numbers).toContain(knownTransportNumber);
           } else {
-            // Fallback case: no discriminator was available (no test case
-            // configured/enabled, or creation itself failed on this system —
-            // e.g. legacy systems without the configured user). This branch
+            // No discriminator configured: `create_transport` /
+            // `builder_transport` is absent or not enabled. This branch
             // only confirms the tree parsed; it does NOT treat zero requests
             // as suspicious. A system that genuinely holds no transport
             // requests must be able to report zero without being flagged as

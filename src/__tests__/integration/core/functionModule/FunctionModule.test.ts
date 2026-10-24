@@ -18,10 +18,9 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
-import { expectResult, failureOf } from '../../../helpers/contract';
+import { ensureFunctionGroupFor } from '../../../helpers/functionGroupRoute';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -47,8 +46,6 @@ const {
   resolveTransportRequest,
   resolveMasterSystem,
   getTimeout,
-  ensureSharedPackage,
-  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -163,82 +160,19 @@ describe('FunctionModule (using AdtClient)', () => {
 
   describe('Full workflow', () => {
     beforeEach(async () => {
-      // Ensure the shared function group exists (created once, never deleted)
+      // The function group the module goes into, by the route the case
+      // states (`params.function_group_route`); a failure of that route fails
+      // the test — the other route is never a recovery from it.
       if (hasConfig && client) {
-        const testCase = tester.getTestCaseDefinition();
-        const functionGroupName = testCase?.params?.function_group_name;
-        if (functionGroupName) {
-          try {
-            await ensureSharedPackage(client, testsLogger);
-            await ensureSharedDependency(
-              client,
-              'function_groups',
-              functionGroupName,
-              testsLogger,
-            );
-          } catch (_sharedError) {
-            // Shared package unavailable (e.g. BTP trial without transport layer) —
-            // fall back to creating the function group in the default package
-            const packageName = resolvePackageName(
-              testCase?.params?.package_name,
-            );
-            const transportRequest = resolveTransportRequest(
-              testCase?.params?.transport_request,
-            );
-            // `if (readResult)` was true for an answer object either way, so
-            // this said "already exists" for a group that was not there and
-            // the shared failure above vanished. The answer decides.
-            const readGroup = () =>
-              client.getFunctionGroup().readMetadata({ functionGroupName });
-            const existing = presenceOf(
-              await readGroup(),
-              `function group ${functionGroupName}`,
-            );
-            if (existing.present === 'unknown') {
-              throw new Error(existing.reason);
-            }
-            if (existing.present === true) {
-              testsLogger.info?.(
-                `Function group ${functionGroupName} already exists`,
-              );
-            } else {
-              const created = await client.getFunctionGroup().create(
-                {
-                  functionGroupName,
-                  packageName,
-                  description: 'Shared FUGR for FM tests',
-                  transportRequest,
-                },
-                {
-                  headers: integrationHeadersOf(
-                    client.getFunctionGroup(),
-                    'create',
-                  ),
-                },
-              );
-              if (!created.ok) {
-                // On cloud the create may have happened although its answer
-                // says otherwise (eventual consistency): wait, and let the
-                // object's presence decide. Not there, the refusal stands.
-                await new Promise((r) => setTimeout(r, 5000));
-                const verify = presenceOf(
-                  await readGroup(),
-                  `function group ${functionGroupName}`,
-                );
-                if (verify.present !== true) {
-                  throw new Error(
-                    failureOf(
-                      created,
-                      `create function group ${functionGroupName}`,
-                    ),
-                  );
-                }
-              }
-              testsLogger.info?.(
-                `Created function group ${functionGroupName} in ${packageName}`,
-              );
-            }
-          }
+        const params = tester.getTestCaseDefinition()?.params;
+        if (params) {
+          await ensureFunctionGroupFor(
+            client,
+            params,
+            'create_function_module[adt_function_module]',
+            'Shared FUGR for FM tests',
+            testsLogger,
+          );
         }
       }
       await tester?.beforeEach()();

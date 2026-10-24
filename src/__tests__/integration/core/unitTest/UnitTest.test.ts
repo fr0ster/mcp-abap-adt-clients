@@ -28,7 +28,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { runToCompletion } from '../../../helpers/abapUnitRun';
+import { readRunResult, runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult, releasing } from '../../../helpers/contract';
@@ -149,25 +149,20 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
         if (!packageName) throw new Error('Package name not configured');
 
         try {
-          // Step 0: Check if class already exists
-          let classExists = false;
-          try {
-            // `expectResult` failed the setup for a container class that is
-            // simply not there — which is the state this flow wants — and
-            // `if (existingClass)` was true either way. The answer decides.
-            const existingClass = presenceOf(
-              await client.getClass().read({ className: containerClass }),
-              `class ${containerClass}`,
-            );
-            if (existingClass.present === true) {
-              classExists = true;
-              testsLogger.info?.(
-                `Class ${containerClass} already exists, will reuse`,
-              );
-            }
-          } catch {
+          // Step 0: Check if class already exists. A read that could not
+          // find out fails the test: "unknown" is never "absent", and the
+          // create that would follow writes over an object that may be there.
+          const existingClass = presenceOf(
+            await client.getClass().read({ className: containerClass }),
+            `class ${containerClass}`,
+          );
+          if (existingClass.present === 'unknown') {
+            throw new Error(existingClass.reason);
+          }
+          const classExists = existingClass.present;
+          if (classExists) {
             testsLogger.info?.(
-              `Class ${containerClass} does not exist, will create`,
+              `Class ${containerClass} already exists, will reuse`,
             );
           }
 
@@ -404,6 +399,14 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             'resultResponse',
           );
           expect(resultResponse).toBeDefined();
+          // The explicit run's verdict, on every system (legacy included):
+          // its tests ran, and none raised an alert.
+          const explicitRun = readRunResult(
+            String(resultResponse),
+            unitTestResult.format || 'abapunit',
+          );
+          expect(explicitRun.methods.length).toBeGreaterThan(0);
+          expect(explicitRun.alerts).toEqual([]);
 
           // Step 9: The same tests run the way Eclipse runs a class — by its
           // name, every test class in it. Legacy runs whole classes either way.

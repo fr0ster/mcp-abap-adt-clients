@@ -225,3 +225,84 @@ describe('BaseTester readTest reads the readMetadata answer', () => {
     await expect(allowing.readTest(config)).resolves.toBe('source');
   });
 });
+
+describe('BaseTester flowTest reads what it is answered beside the steps', () => {
+  it('fails on a validation that answers an error table inside a 200', async () => {
+    const handler = fakeHandler({
+      validate: jest.fn(async () =>
+        ok(
+          '<adtcore:messageTable><adtcore:message adtcore:type="E" adtcore:text="Name ZTHING is taken"/></adtcore:messageTable>',
+        ),
+      ),
+    });
+    await expect(
+      testerOver(handler).flowTest(config, {}, { updateConfig }),
+    ).rejects.toThrow('Validation failed with errors: Name ZTHING is taken');
+    expect(handler.create).not.toHaveBeenCalled();
+  });
+
+  function testerWithProperties(makeAdtRequest: jest.Mock) {
+    const handler = fakeHandler();
+    const tester = new BaseTester<{ programName: string }>(
+      handler as never,
+      'Thing',
+      'create_thing',
+      'adt_thing',
+    );
+    tester.setup({
+      connection: { makeAdtRequest } as never,
+      client: {
+        getUtils: () => ({
+          getObjectSourceUri: () =>
+            '/sap/bc/adt/programs/programs/zthing/source/main',
+        }),
+      } as never,
+      hasConfig: true,
+      isCloudSystem: false,
+      isLegacySystem: false,
+      buildConfig: () => ({ programName: 'ZTHING' }) as never,
+    });
+    return { tester, handler };
+  }
+  const program = { programName: 'ZTHING' };
+
+  it('reads the object properties after create, and passes on an answer', async () => {
+    const request = jest.fn(async () => ({ status: 200, data: '<props/>' }));
+    const { tester, handler } = testerWithProperties(request);
+    await tester.flowTest(program as never, {}, { updateConfig: program });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(handler.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails when the object properties read answers a non-2xx', async () => {
+    const request = jest.fn(async () => ({ status: 500, data: 'dump' }));
+    const { tester, handler } = testerWithProperties(request);
+    await expect(
+      tester.flowTest(program as never, {}, { updateConfig: program }),
+    ).rejects.toThrow(/object properties answered HTTP 500/);
+    expect(handler.update).not.toHaveBeenCalled();
+  });
+
+  it('fails when the object properties read throws', async () => {
+    const request = jest.fn(async () => {
+      throw new Error('Request failed with status code 403');
+    });
+    const { tester, handler } = testerWithProperties(request);
+    await expect(
+      tester.flowTest(program as never, {}, { updateConfig: program }),
+    ).rejects.toThrow('Request failed with status code 403');
+    expect(handler.update).not.toHaveBeenCalled();
+  });
+
+  it('names a failed cleanup inside the failure of the flow it followed', async () => {
+    const handler = fakeHandler({
+      update: jest.fn(async () => refused('the write was refused')),
+      delete: jest.fn(async () => refused('delete refused: locked')),
+    });
+    await expect(
+      testerOver(handler).flowTest(config, {}, { updateConfig }),
+    ).rejects.toThrow(
+      /update failed \[refusal\]: the write was refused.*cleanup after it failed too.*delete refused: locked/,
+    );
+  });
+});

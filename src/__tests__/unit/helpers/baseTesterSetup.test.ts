@@ -134,3 +134,48 @@ describe('BaseTester setup of a registered case', () => {
     );
   });
 });
+
+describe('BaseTester removal of a leftover before a failed setup', () => {
+  function testerWithLeftover(cleanupObject: () => Promise<void>) {
+    const tester = new BaseTester<{ thingName: string }>(
+      {} as never,
+      'Thing',
+      KEY,
+      NAME,
+    );
+    tester.setup({
+      connection: {} as never,
+      client: {} as never,
+      hasConfig: true,
+      isCloudSystem: false,
+      buildConfig: () => ({ thingName: 'ZTHING' }) as never,
+      ensureObjectReady: async () => ({
+        success: false,
+        objectExists: true,
+        reason: 'ZTHING is left from an earlier run',
+      }),
+      cleanupObject,
+    });
+    return tester;
+  }
+
+  it('fails naming the leftover, and a refused removal of it too', async () => {
+    mockConfig = config(ready());
+    const tester = testerWithLeftover(async () => {
+      throw new Error('locked by ZOTHER');
+    });
+    await tester.beforeEach()();
+    await expect(tester.flowTestAuto()).rejects.toThrow(
+      /ZTHING is left from an earlier run.*leftover object could not be removed either: locked by ZOTHER/,
+    );
+  });
+
+  it('fails naming the leftover when its removal worked', async () => {
+    mockConfig = config(ready());
+    const tester = testerWithLeftover(async () => undefined);
+    await tester.beforeEach()();
+    const failure = tester.flowTestAuto();
+    await expect(failure).rejects.toThrow(/ZTHING is left from an earlier run/);
+    await expect(failure).rejects.not.toThrow(/could not be removed/);
+  });
+});

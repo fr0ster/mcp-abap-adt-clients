@@ -10,9 +10,10 @@ const {
 } = require('../../helpers/test-helper');
 
 /**
- * A refused create (409) is "already exists" only when a read after it finds
- * the object. SAP answers 409 to refusals too, and reading every 409 as a
- * concurrent create reported success over an object that was never made.
+ * A refused create (409) is a failed setup, reported with what SAP said —
+ * also when the object turns up afterwards. SAP answers 409 to refusals too,
+ * and an object a later read finds was made by someone else, in a state
+ * nobody configured: it is not this dependency made ready.
  */
 
 const NAME = 'ZAC_SHR_RUN01'; // a shared_dependencies.classes entry of the template
@@ -71,7 +72,7 @@ const logger = { debug() {}, info() {}, warn() {}, error() {} };
 describe('a refused shared create', () => {
   beforeEach(() => resetSharedDependencyCache());
 
-  it('is reported with what SAP said when a read after it does not find the object', async () => {
+  it('is reported with what SAP said, and no read is made to forgive it', async () => {
     const { connection: conn, calls } = connection(false);
     await expect(
       ensureSharedDependency(
@@ -80,16 +81,13 @@ describe('a refused shared create', () => {
         NAME,
         logger,
       ),
-    ).rejects.toThrow(
-      /was not created.*409.*No suitable software component is modifiable/,
-    );
-    // The create was tried, and a read followed it.
+    ).rejects.toThrow(/409.*No suitable software component is modifiable/);
     const post = calls.findIndex((c) => c.startsWith('POST '));
     expect(post).toBeGreaterThanOrEqual(0);
-    expect(calls.slice(post + 1).some((c) => c.startsWith('GET '))).toBe(true);
+    expect(calls.slice(post + 1).some((c) => c.startsWith('GET '))).toBe(false);
   });
 
-  it('counts as existing when a read after it finds the object', async () => {
+  it('fails even when the object is there afterwards', async () => {
     const { connection: conn } = connection(true);
     await expect(
       ensureSharedDependency(
@@ -98,6 +96,19 @@ describe('a refused shared create', () => {
         NAME,
         logger,
       ),
-    ).resolves.toMatchObject({ existed: true, created: false });
+    ).rejects.toThrow(/409.*No suitable software component is modifiable/);
+  });
+
+  it('is not cached as verified: the next call asks again', async () => {
+    const { connection: conn, calls } = connection(true);
+    const client = new AdtClient(conn, logger);
+    await expect(
+      ensureSharedDependency(client, 'classes', NAME, logger),
+    ).rejects.toThrow();
+    const before = calls.length;
+    await ensureSharedDependency(client, 'classes', NAME, logger).catch(
+      () => undefined,
+    );
+    expect(calls.length).toBeGreaterThan(before);
   });
 });
