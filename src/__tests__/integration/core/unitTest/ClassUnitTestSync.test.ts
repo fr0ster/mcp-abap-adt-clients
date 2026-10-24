@@ -329,16 +329,18 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           // HARMLESS, so a run that excludes harmless runs none of them — on
           // both runners.
           logTestStep('both runners, harmless excluded', testsLogger);
-          const noHarmless = { riskLevel: { harmless: false } };
+          // A fresh object per call: one shared object handed to a helper
+          // could be changed before the member call reads it.
+          const noHarmless = () => ({ riskLevel: { harmless: false } });
           const asyncFiltered = readRunResult(
-            (await runToCompletion(runner, className, noHarmless)).result,
+            (await runToCompletion(runner, className, noHarmless())).result,
           );
           const syncFiltered = readRunResult(
             String(
               expectResult(
                 await runner.runSync(className, {
                   analyse: analyseException,
-                  ...noHarmless,
+                  ...noHarmless(),
                 }),
                 'runSync without harmless tests',
               ),

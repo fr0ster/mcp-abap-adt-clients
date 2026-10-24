@@ -359,6 +359,139 @@ function shorthandVerdict(
     : refused('a judge the guard cannot resolve');
 }
 
+const ASSIGNMENTS = new Set([
+  ts.SyntaxKind.EqualsToken,
+  ts.SyntaxKind.PlusEqualsToken,
+  ts.SyntaxKind.MinusEqualsToken,
+  ts.SyntaxKind.AsteriskEqualsToken,
+  ts.SyntaxKind.AsteriskAsteriskEqualsToken,
+  ts.SyntaxKind.SlashEqualsToken,
+  ts.SyntaxKind.PercentEqualsToken,
+  ts.SyntaxKind.LessThanLessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.AmpersandEqualsToken,
+  ts.SyntaxKind.BarEqualsToken,
+  ts.SyntaxKind.CaretEqualsToken,
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
+]);
+
+/**
+ * Why an options object held in a `const` cannot be read from its
+ * initializer, or `undefined` when nothing in its file can change it.
+ *
+ * Every use of the binding in its file is classified, and only two pass:
+ * reading one of its properties (`opts.headers`), and being the options
+ * argument of an adt-clients member call or a spread copied into an object
+ * literal. Anything else — a property assignment or compound assignment,
+ * `delete`, `++`/`--`, a method called on it, being passed to any other call
+ * (`Object.assign`, `Object.defineProperty`, `Reflect.set`, a helper),
+ * returned, stored in another binding, an object or an array — is a way it
+ * could change or escape, and is refused. So is any use not recognised.
+ */
+function changeOf(
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+): string | undefined {
+  const declaration = symbol.valueDeclaration;
+  if (!declaration) return 'options whose declaration cannot be found';
+  const source = declaration.getSourceFile();
+  let change: string | undefined;
+  const visit = (node: ts.Node): void => {
+    if (change) return;
+    if (
+      ts.isIdentifier(node) &&
+      node.text === symbol.name &&
+      node !== (declaration as ts.VariableDeclaration).name &&
+      resolved(checker.getSymbolAtLocation(node), checker) === symbol
+    ) {
+      change = useChange(node, checker);
+      if (change) change = `options ${symbol.name} ${change}`;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return change;
+}
+
+/** What one use of an options binding could do to it, or `undefined`. */
+function useChange(
+  reference: ts.Identifier,
+  checker: ts.TypeChecker,
+): string | undefined {
+  let use: ts.Node = reference;
+  while (
+    ts.isParenthesizedExpression(use.parent) ||
+    ts.isAsExpression(use.parent) ||
+    ts.isNonNullExpression(use.parent) ||
+    ts.isSatisfiesExpression(use.parent) ||
+    ts.isTypeAssertionExpression(use.parent)
+  ) {
+    use = use.parent;
+  }
+  const parent = use.parent;
+  // `opts.x` / `opts['x']`: a read, unless it is written, deleted or called.
+  if (
+    (ts.isPropertyAccessExpression(parent) ||
+      ts.isElementAccessExpression(parent)) &&
+    parent.expression === use
+  ) {
+    const outer = parent.parent;
+    if (
+      ts.isBinaryExpression(outer) &&
+      outer.left === parent &&
+      ASSIGNMENTS.has(outer.operatorToken.kind)
+    ) {
+      return 'has a property assigned';
+    }
+    if (ts.isDeleteExpression(outer)) return 'has a property deleted';
+    if (
+      (ts.isPrefixUnaryExpression(outer) ||
+        ts.isPostfixUnaryExpression(outer)) &&
+      (outer.operator === ts.SyntaxKind.PlusPlusToken ||
+        outer.operator === ts.SyntaxKind.MinusMinusToken)
+    ) {
+      return 'has a property incremented';
+    }
+    if (ts.isCallExpression(outer) && outer.expression === parent) {
+      return 'has a method called on it';
+    }
+    if (
+      (ts.isPropertyAccessExpression(outer) ||
+        ts.isElementAccessExpression(outer)) &&
+      outer.expression === parent
+    ) {
+      return 'is reached into below its first level';
+    }
+    return undefined;
+  }
+  // `{ ...opts }`: copied, not changed.
+  if (ts.isSpreadAssignment(parent)) return undefined;
+  // The options argument of an adt-clients member call.
+  if (
+    ts.isCallExpression(parent) &&
+    parent.arguments.includes(use as ts.Expression)
+  ) {
+    const declaration = checker.getResolvedSignature(parent)?.declaration;
+    if (
+      declaration &&
+      !ts.isJSDocSignature(declaration) &&
+      isContractDeclaration(declaration)
+    ) {
+      const index = memberOptionsIndex(declaration, checker);
+      if (index >= 0 && parent.arguments[index] === use) return undefined;
+    }
+    return 'escapes to a call that may change it';
+  }
+  if (ts.isReturnStatement(parent) || ts.isArrowFunction(parent)) {
+    return 'is returned';
+  }
+  return 'is used in a way the guard cannot prove leaves it unchanged';
+}
+
 /** Whether a type may carry an `analyse` property. */
 function mayCarryAnalyse(type: ts.Type, checker: ts.TypeChecker): boolean {
   const target = checker.getNonNullableType(type);
@@ -425,10 +558,15 @@ function optionsVerdict(
     );
   }
   if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
-    const initializer = constInitializer(
-      resolved(checker.getSymbolAtLocation(node), checker),
-    );
-    if (initializer) return optionsVerdict(initializer, checker, depth + 1);
+    const symbol = resolved(checker.getSymbolAtLocation(node), checker);
+    const initializer = constInitializer(symbol);
+    if (initializer && symbol) {
+      // A `const` binds the object, not its properties: it is read from its
+      // initializer only when nothing in its file can change or leak it.
+      const change = changeOf(symbol, checker);
+      if (change) return refused(change);
+      return optionsVerdict(initializer, checker, depth + 1);
+    }
   }
   return mayCarryAnalyse(checker.getTypeAtLocation(node), checker)
     ? refused('options whose analyse cannot be resolved — it may be undefined')
@@ -834,6 +972,64 @@ export async function f(client: IGroupClient) {
 `,
     ),
     fixture(
+      '__guardMutated.ts',
+      `export async function f(h: Domain) {
+  const opts: { analyse?: unknown } = { analyse: analyseException };
+  opts.analyse = undefined;
+  await h.readMetadata({}, opts as never);
+}
+`,
+    ),
+    fixture(
+      '__guardAliasMutated.ts',
+      `export async function f(h: Domain) {
+  const opts: { analyse?: unknown } = { analyse: analyseException };
+  const alias = opts;
+  alias.analyse = undefined;
+  await h.readMetadata({}, opts as never);
+}
+`,
+    ),
+    fixture(
+      '__guardDeleted.ts',
+      `export async function f(h: Domain) {
+  const opts: { analyse?: unknown } = { analyse: analyseException };
+  delete opts.analyse;
+  await h.readMetadata({}, opts as never);
+}
+`,
+    ),
+    fixture(
+      '__guardAssigned.ts',
+      `export async function f(h: Domain) {
+  const opts = { analyse: analyseException };
+  Object.assign(opts, { analyse: undefined });
+  await h.readMetadata({}, opts);
+}
+`,
+    ),
+    fixture(
+      '__guardEscaped.ts',
+      `function tamper(o: { analyse?: unknown }) { o.analyse = undefined; }
+export async function f(h: Domain) {
+  const opts = { analyse: analyseException };
+  tamper(opts);
+  await h.readMetadata({}, opts);
+}
+`,
+    ),
+    fixture(
+      '__guardCleanConst.ts',
+      `export async function f(h: Domain) {
+  const opts = { analyse: analyseException, headers: undefined };
+  const copied = { ...opts };
+  void opts.headers;
+  await h.readMetadata({}, opts);
+  await h.readMetadata({}, copied);
+}
+`,
+    ),
+    fixture(
       '__guardJudged.ts',
       `type IRunner = IAdtRunnable<string, unknown, object> & ITestRunInformation<unknown, unknown>;
 export async function judgedCalls(h: Domain, runner: IRunner) {
@@ -869,6 +1065,11 @@ export async function judgedCalls(h: Domain, runner: IRunner) {
     ['__guardSpreadUndefined.ts', 1, /may be undefined/],
     ['__guardSpreadSpecific.ts', 1, /analyseDeletion alone/],
     ['__guardUndefined.ts', 1, /may be undefined/],
+    ['__guardMutated.ts', 1, /has a property assigned/],
+    ['__guardAliasMutated.ts', 1, /cannot prove/],
+    ['__guardDeleted.ts', 1, /has a property deleted/],
+    ['__guardAssigned.ts', 1, /escapes to a call/],
+    ['__guardEscaped.ts', 1, /escapes to a call/],
   ])('refuses %s', (name, count, why) => {
     expect(of(name)).toHaveLength(count);
     for (const finding of of(name)) expect(finding).toMatch(why);
@@ -876,6 +1077,10 @@ export async function judgedCalls(h: Domain, runner: IRunner) {
 
   it('passes the judged forms: aliases, shorthand, variables, destructured and computed members, spreads that keep the judge', () => {
     expect(of('__guardJudged.ts')).toEqual([]);
+  });
+
+  it('passes a const options object nothing changes: read, copied, passed to the member', () => {
+    expect(of('__guardCleanConst.ts')).toEqual([]);
   });
 });
 

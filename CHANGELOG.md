@@ -177,6 +177,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   shorthand, `const` options and spreads in their order; an `analyse` that
   may be `undefined` is refused). It fails closed, and its allow-list is
   keyed by the judge each allowed call passes.
+  An options object held in a `const` is read from its initializer only when
+  nothing in its file can change or leak it: a property assignment, `delete`,
+  a method call on it, an alias, or passing it to any call but the member
+  call itself is refused.
 
 ## [37.2.0] - 2026-10-23
 
