@@ -19,6 +19,7 @@ import {
   parseEnvRun,
   renderPrepare,
   requireOwnNames,
+  responsibleOf,
   sameSource,
   settingsOf,
   stopOnCredentialRefusal,
@@ -384,6 +385,100 @@ function stubTarget(metadata: string) {
 const IN = (pkg: string) =>
   `<x adtcore:name="N"><adtcore:packageRef adtcore:name="${pkg}"/></x>`;
 
+/** A `$TMP` object whose metadata names `owner` as the person responsible. */
+const OWNED = (owner: string) =>
+  `<x adtcore:name="N" adtcore:responsible="${owner}"><adtcore:packageRef adtcore:name="$TMP"/></x>`;
+
+/** Run `body` with `SAP_USERNAME` set to `user`, restored afterwards. */
+async function asUser<T>(user: string, body: () => Promise<T>): Promise<T> {
+  const before = process.env.SAP_USERNAME;
+  process.env.SAP_USERNAME = user;
+  try {
+    return await body();
+  } finally {
+    if (before === undefined) delete process.env.SAP_USERNAME;
+    else process.env.SAP_USERNAME = before;
+  }
+}
+
+describe('legacy env: a $TMP object of another user is never touched', () => {
+  it('reads the person responsible from the root element only', () => {
+    expect(responsibleOf(OWNED('TESTER'))).toBe('TESTER');
+    expect(responsibleOf(IN('$TMP'))).toBeUndefined();
+    expect(
+      responsibleOf(
+        '<x adtcore:name="N"><y adtcore:responsible="NESTED"/></x>',
+      ),
+    ).toBeUndefined();
+    expect(
+      responsibleOf('<?xml version="1.0"?><x adtcore:responsible="T"/>'),
+    ).toBe('T');
+  });
+
+  it('refuses a $TMP class another user is responsible for, and writes nothing', async () => {
+    const { target, calls } = stubTarget(OWNED('SOMEONE'));
+    await asUser('tester', async () => {
+      await expect(
+        ensureClass(target, { name: 'ZCL_LG7_X', description: 'd', main: 'm' }),
+      ).rejects.toThrow(
+        'is in $TMP, but another user is responsible for it; not touched',
+      );
+    });
+    expect(calls).toEqual(['readMetadata', 'readMetadata']);
+  });
+
+  it('refuses when the session user is not known and the metadata names one', async () => {
+    const { target, calls } = stubTarget(OWNED('SOMEONE'));
+    await asUser('', async () => {
+      await expect(
+        ensureClass(target, { name: 'ZCL_LG7_X', description: 'd', main: 'm' }),
+      ).rejects.toThrow('the session user is not known; not touched');
+    });
+    expect(calls).toEqual(['readMetadata', 'readMetadata']);
+  });
+
+  it('goes on with a $TMP class the session user is responsible for', async () => {
+    const { target, calls } = stubTarget(OWNED('TESTER'));
+    await asUser('tester', async () => {
+      await ensureClass(target, {
+        name: 'ZCL_LG7_X',
+        description: 'd',
+        main: 'old source',
+      });
+    });
+    expect(calls).toEqual(['readMetadata', 'readMetadata', 'read']);
+  });
+
+  it('leaves a $TMP DDL source of another user', async () => {
+    const run = {
+      result: {
+        ok: true,
+        action: 'prepare',
+        request: '',
+        package: 'ZLG7_TEST',
+        packageExists: true,
+        errors: 0,
+        lines: 1,
+      },
+      log: [
+        {
+          n: 1,
+          step: 'objects',
+          object: 'DDLS ZLG7_DDL',
+          status: 'LEFT-FOR-ADT',
+          message: '$TMP',
+        },
+      ],
+    };
+    const { target, calls } = stubTarget(OWNED('SOMEONE'));
+    const problems = await asUser('tester', () => deleteLeftDdls(target, run));
+    expect(problems).toEqual([
+      'DDL source ZLG7_DDL: is in $TMP, but another user is responsible for it; not touched',
+    ]);
+    expect(calls).toEqual(['readMetadata']);
+  });
+});
+
 describe('legacy env: never writes what is not its own', () => {
   it('refuses a name without the prefix before any request', async () => {
     const { target, calls } = stubTarget(IN('$TMP'));
@@ -503,7 +598,12 @@ describe('legacy env: the ABAP sources', () => {
       env.indexOf('METHOD delete_one.'),
       env.indexOf('ENDMETHOD.', env.indexOf('METHOD delete_one.')),
     );
-    expect(deleteOne).toContain('in_scope_package( lv_devclass ) = abap_false');
+    // The package and, for $TMP, the author are read again right before the
+    // delete: a $TMP object of another user is never touched.
+    expect(deleteOne).toContain('SELECT SINGLE devclass author FROM tadir');
+    expect(deleteOne).toContain(
+      'in_scope( iv_devclass = lv_devclass iv_author = lv_author ) = abap_false',
+    );
     expect(deleteOne).toContain(
       'is_own_name( is_object-obj_name ) = abap_false',
     );
@@ -514,24 +614,42 @@ describe('legacy env: the ABAP sources', () => {
     expect(env).toContain(
       "c_request_marker TYPE as4text VALUE 'ZLG7 LEGACY-TEST'",
     );
-    // Real JSON escapes, so < > & cannot end or bend the line in XML.
-    expect(env).toContain(
-      'REPLACE ALL OCCURRENCES OF `<` IN rv_json WITH `\\u003c`.',
-    );
-    expect(env).toContain(
-      'REPLACE ALL OCCURRENCES OF `>` IN rv_json WITH `\\u003e`.',
-    );
-    expect(env).toContain(
-      'REPLACE ALL OCCURRENCES OF `&` IN rv_json WITH `\\u0026`.',
-    );
-    expect(env).toContain(
-      'REPLACE ALL OCCURRENCES OF `\\` IN rv_json WITH `\\\\`.',
-    );
-    expect(env).toContain(
-      'REPLACE ALL OCCURRENCES OF `"` IN rv_json WITH `\\"`.',
-    );
+    // Real JSON escapes, so < > & cannot end or bend the line in XML, and
+    // every control character below U+0020 is \u00XX (RFC 8259 §7).
+    const json = methodOf(env, 'json_string');
+    expect(json).toContain('WHEN `<`.');
+    expect(json).toContain('`\\u003c`');
+    expect(json).toContain('WHEN `>`.');
+    expect(json).toContain('`\\u003e`');
+    expect(json).toContain('WHEN `&`.');
+    expect(json).toContain('`\\u0026`');
+    expect(json).toContain('WHEN `\\`.');
+    expect(json).toContain('`\\\\`');
+    expect(json).toContain('WHEN `"`.');
+    expect(json).toContain('`\\"`');
+    expect(json).toContain('IF lv_code < 32.');
+    expect(json).toContain('`\\u00`');
+    expect(json).not.toContain('REPLACE ALL OCCURRENCES');
     // Never a release of a request.
     expect(env).not.toMatch(/TR_RELEASE|RELEASE_REQUEST/i);
+  });
+
+  it('take a $TMP object only when its author is the current user', () => {
+    const env = code('zcl_lg7_env.clas.abap');
+    const scope = methodOf(env, 'objects_in_scope');
+    expect(scope).toContain(
+      'AND ( devclass = c_package OR ( devclass = c_local_package AND author = sy-uname ) )',
+    );
+    expect(methodOf(env, 'in_scope')).toContain(
+      'iv_devclass = c_local_package AND iv_author = sy-uname',
+    );
+    // The lock and inactive-version steps ask the same question.
+    const owner = methodOf(env, 'scope_package_of');
+    expect(owner).toContain('SELECT SINGLE devclass author FROM tadir');
+    expect(owner).toContain(
+      'in_scope( iv_devclass = lv_devclass iv_author = lv_author ) = abap_true',
+    );
+    expect(env).not.toContain('in_scope_package');
   });
 
   it('match locks exactly against the scope list, never a substring', () => {

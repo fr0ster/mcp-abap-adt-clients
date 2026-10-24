@@ -7,8 +7,9 @@
 "!
 "! SCOPE — the only things this class ever touches:
 "! - repository objects whose name starts with ZLG7, ZCL_LG7_, ZIF_LG7_ or
-"!   Z_LG7_ AND whose TADIR package is $TMP or ZLG7_TEST (both checked again
-"!   right before every delete);
+"!   Z_LG7_ AND whose TADIR package is ZLG7_TEST, or $TMP with the current
+"!   user as the TADIR author (name, package and author checked again right
+"!   before every delete) — a $TMP object of another user is never touched;
 "! - never ZCL_LG7_ENV* (this class and its runners): the TypeScript helper
 "!   installs and removes those over ADT;
 "! - the package ZLG7_TEST itself, and only when nothing is left in it;
@@ -125,8 +126,9 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     CLASS-METHODS scope_package_of
       IMPORTING iv_name           TYPE csequence
       RETURNING VALUE(rv_devclass) TYPE devclass.
-    CLASS-METHODS in_scope_package
+    CLASS-METHODS in_scope
       IMPORTING iv_devclass   TYPE devclass
+                iv_author     TYPE tadir-author
       RETURNING VALUE(rv_yes) TYPE abap_bool.
     CLASS-METHODS type_rank
       IMPORTING iv_object      TYPE trobjtype
@@ -178,8 +180,11 @@ CLASS zcl_lg7_env IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD in_scope_package.
-    IF iv_devclass = c_local_package OR iv_devclass = c_package.
+  METHOD in_scope.
+    " ZLG7_TEST is the run's own package; in $TMP, which every user shares,
+    " only an object the current user is the TADIR author of.
+    IF iv_devclass = c_package
+        OR ( iv_devclass = c_local_package AND iv_author = sy-uname ).
       rv_yes = abap_true.
     ENDIF.
   ENDMETHOD.
@@ -222,16 +227,18 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
   METHOD scope_package_of.
     " The package of an owner that is in scope, else initial. The name check
-    " and the TADIR package check together: the guard of every step.
+    " and the TADIR package and author check together: the guard of every step.
     DATA lv_name TYPE sobj_name.
     DATA lv_devclass TYPE devclass.
+    DATA lv_author TYPE tadir-author.
     IF is_own_name( iv_name ) = abap_false OR strlen( iv_name ) > 40.
       RETURN.
     ENDIF.
     lv_name = iv_name.
-    SELECT SINGLE devclass FROM tadir INTO lv_devclass
+    SELECT SINGLE devclass author FROM tadir INTO (lv_devclass, lv_author)
       WHERE pgmid = 'R3TR' AND obj_name = lv_name AND object <> 'DEVC'.
-    IF sy-subrc = 0 AND in_scope_package( lv_devclass ) = abap_true.
+    IF sy-subrc = 0
+        AND in_scope( iv_devclass = lv_devclass iv_author = lv_author ) = abap_true.
       rv_devclass = lv_devclass.
     ENDIF.
   ENDMETHOD.
@@ -664,14 +671,15 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD objects_in_scope.
-    " Touches nothing: TADIR entries (not flagged for deletion) in $TMP or
-    " ZLG7_TEST whose name is ours, minus the env classes (and the fixtures,
-    " when asked). The LIKE patterns only narrow the read; is_own_name decides.
+    " Touches nothing: TADIR entries (not flagged for deletion) in ZLG7_TEST,
+    " or in $TMP with the current user as author, whose name is ours, minus
+    " the env classes (and the fixtures, when asked). The LIKE patterns only
+    " narrow the read; is_own_name decides, and delete_one checks again.
     DATA lt_found TYPE tt_object.
     DATA ls_found TYPE ty_object.
     SELECT object obj_name devclass FROM tadir INTO TABLE lt_found
       WHERE pgmid = 'R3TR'
-        AND ( devclass = c_local_package OR devclass = c_package )
+        AND ( devclass = c_package OR ( devclass = c_local_package AND author = sy-uname ) )
         AND object <> 'DEVC'
         AND delflag = space
         AND ( obj_name LIKE 'ZLG7%' OR obj_name LIKE 'ZCL_LG7%'
@@ -758,8 +766,10 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
   METHOD delete_one.
     " Touches: the one object given, only after the guard read again here —
-    " our name, not an env class, TADIR package $TMP or ZLG7_TEST.
+    " our name, not an env class, TADIR package ZLG7_TEST or $TMP with the
+    " current user as author.
     DATA lv_devclass TYPE devclass.
+    DATA lv_author TYPE tadir-author.
     DATA lv_corrnr TYPE trkorr.
     DATA lv_subrc TYPE sy-subrc.
     DATA ls_clskey TYPE seoclskey.
@@ -769,9 +779,10 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     DATA lx_call TYPE REF TO cx_sy_dyn_call_error.
 
     lv_label = |{ is_object-object } { is_object-obj_name }|.
-    SELECT SINGLE devclass FROM tadir INTO lv_devclass
+    SELECT SINGLE devclass author FROM tadir INTO (lv_devclass, lv_author)
       WHERE pgmid = 'R3TR' AND object = is_object-object AND obj_name = is_object-obj_name.
-    IF sy-subrc <> 0 OR in_scope_package( lv_devclass ) = abap_false
+    IF sy-subrc <> 0
+        OR in_scope( iv_devclass = lv_devclass iv_author = lv_author ) = abap_false
         OR is_own_name( is_object-obj_name ) = abap_false
         OR is_env_name( is_object-obj_name ) = abap_true.
       rv_status = `SKIPPED`.
@@ -1113,19 +1124,48 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD json_string.
-    " A JSON string literal. < > & are written as \u escapes so the line
-    " survives being carried in XML unchanged in meaning.
-    DATA lv_cr TYPE c LENGTH 1.
-    lv_cr = cl_abap_char_utilities=>cr_lf.
-    rv_json = iv_value.
-    REPLACE ALL OCCURRENCES OF `\` IN rv_json WITH `\\`.
-    REPLACE ALL OCCURRENCES OF `"` IN rv_json WITH `\"`.
-    REPLACE ALL OCCURRENCES OF `<` IN rv_json WITH `\u003c`.
-    REPLACE ALL OCCURRENCES OF `>` IN rv_json WITH `\u003e`.
-    REPLACE ALL OCCURRENCES OF `&` IN rv_json WITH `\u0026`.
-    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline IN rv_json WITH `\n`.
-    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN rv_json WITH `\t`.
-    REPLACE ALL OCCURRENCES OF lv_cr IN rv_json WITH `\r`.
+    " A JSON string literal. Every character below U+0020 is written as a
+    " \u00XX escape (RFC 8259 section 7), and < > & as \u escapes too, so the
+    " line survives being carried in XML unchanged in meaning.
+    CONSTANTS lc_hex TYPE string VALUE `0123456789abcdef`.
+    DATA lv_value TYPE string.
+    DATA lv_length TYPE i.
+    DATA lv_offset TYPE i.
+    DATA lv_char TYPE string.
+    DATA lv_single TYPE c LENGTH 1.
+    DATA lv_code TYPE i.
+    DATA lv_high TYPE i.
+    DATA lv_low TYPE i.
+    lv_value = iv_value.
+    lv_length = strlen( lv_value ).
+    WHILE lv_offset < lv_length.
+      lv_char = substring( val = lv_value off = lv_offset len = 1 ).
+      lv_single = lv_char.
+      lv_code = cl_abap_conv_out_ce=>uccpi( lv_single ).
+      IF lv_code < 32.
+        lv_high = lv_code DIV 16.
+        lv_low = lv_code MOD 16.
+        rv_json = rv_json && `\u00`
+          && substring( val = lc_hex off = lv_high len = 1 )
+          && substring( val = lc_hex off = lv_low len = 1 ).
+      ELSE.
+        CASE lv_char.
+          WHEN `\`.
+            rv_json = rv_json && `\\`.
+          WHEN `"`.
+            rv_json = rv_json && `\"`.
+          WHEN `<`.
+            rv_json = rv_json && `\u003c`.
+          WHEN `>`.
+            rv_json = rv_json && `\u003e`.
+          WHEN `&`.
+            rv_json = rv_json && `\u0026`.
+          WHEN OTHERS.
+            rv_json = rv_json && lv_char.
+        ENDCASE.
+      ENDIF.
+      lv_offset = lv_offset + 1.
+    ENDWHILE.
     rv_json = |"{ rv_json }"|.
   ENDMETHOD.
 

@@ -145,6 +145,44 @@ export function packageOf(metadata: string): string | undefined {
   return attributeOf(metadata.slice(at, end), 'adtcore:name');
 }
 
+/**
+ * The person responsible an object's metadata names on its root element
+ * (`adtcore:responsible`), or `undefined` when it names none.
+ */
+export function responsibleOf(metadata: string): string | undefined {
+  let at = metadata.indexOf('<');
+  while (at !== -1 && (metadata[at + 1] === '?' || metadata[at + 1] === '!'))
+    at = metadata.indexOf('<', at + 1);
+  if (at === -1) return undefined;
+  const end = metadata.indexOf('>', at);
+  if (end === -1) return undefined;
+  return attributeOf(metadata.slice(at, end), 'adtcore:responsible');
+}
+
+/** The logged-on user, upper-cased as the user master stores it. */
+function sessionUser(): string | undefined {
+  return (
+    process.env.SAP_USERNAME?.split('#')[0]?.trim().toUpperCase() || undefined
+  );
+}
+
+/**
+ * `$TMP` is shared by every user, so a `$TMP` object is touched only when its
+ * metadata names the session user as the person responsible. Why not, when it
+ * may not be touched; `undefined` when it may. Metadata that names no one
+ * leaves the package and name checks as the guard.
+ */
+function notTheSessionUsers(metadata: string): string | undefined {
+  const responsible = responsibleOf(metadata);
+  if (responsible === undefined) return undefined;
+  const user = sessionUser();
+  if (user === undefined)
+    return 'names a person responsible, and the session user is not known';
+  if (responsible.toUpperCase() !== user)
+    return 'is in $TMP, but another user is responsible for it';
+  return undefined;
+}
+
 /** Two sources the same, line ends and trailing blanks aside. */
 export function sameSource(a: string, b: string): boolean {
   const norm = (s: string) =>
@@ -491,7 +529,10 @@ async function isPresent(handler: Writable, config: object, label: string) {
   return there.present;
 }
 
-/** Throw unless the object's metadata names `$TMP`. */
+/**
+ * Throw unless the object's metadata names `$TMP` and, where it names a person
+ * responsible, the session user.
+ */
 async function assertLocal(handler: Writable, config: object, label: string) {
   const answer = await handler.readMetadata(config);
   // By the answer's status, not its words: a 401 here stops the caller's loop.
@@ -502,6 +543,8 @@ async function assertLocal(handler: Writable, config: object, label: string) {
     throw new Error(
       `legacy env: ${label} is in package ${pkg ?? '(none named)'}, not ${LOCAL_PACKAGE}; not touched`,
     );
+  const foreign = notTheSessionUsers(metadata);
+  if (foreign) throw new Error(`legacy env: ${label} ${foreign}; not touched`);
 }
 
 /**
@@ -786,6 +829,9 @@ export async function deleteLeftDdls(
         !(inEnvPackage && pkg === ENV_PACKAGE)
       )
         throw new Error(`in package ${pkg ?? '(none named)'}; not touched`);
+      const foreign =
+        pkg === LOCAL_PACKAGE ? notTheSessionUsers(metadata) : undefined;
+      if (foreign) throw new Error(`${foreign}; not touched`);
       const config = {
         ddlName: name,
         ...(inEnvPackage && { transportRequest: run.result.request }),
