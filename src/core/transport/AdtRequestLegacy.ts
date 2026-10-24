@@ -57,12 +57,12 @@ const unsupported = (what: string, why: string): IAdtError => ({
   origin: 'refusal',
   code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
   message:
-    `${what} is not supported on legacy SAP systems (BASIS < 7.50). ${why} ` +
+    `${what} is not supported on a legacy system (7.40 SP04). ${why} ` +
     'Use SE01/SE09/SE10 to manage transports there.',
 });
 
 /** Why the modern transport members refuse: their collection is not on 7.40. */
-const NOT_ADVERTISED = `${TRANSPORT_REQUEST.collection} is not advertised on 7.40, so this member has no endpoint there.`;
+const NOT_ADVERTISED = `${TRANSPORT_REQUEST.collection} is not advertised on 7.40 SP04, so this member has no endpoint there.`;
 
 export class AdtRequestLegacy<
   R extends ITransportResults = typeof transportDocuments,

@@ -1,5 +1,5 @@
 /**
- * AdtUtilsLegacy - Utility operations for legacy SAP systems (BASIS < 7.50)
+ * AdtUtilsLegacy - Utility operations for legacy SAP systems (7.40 SP04)
  *
  * Every override below refuses without a request, answered through `failed()`
  * (spec §2.1, §10.2), except `activateObjectsGroup`, which sends the legacy
@@ -64,7 +64,12 @@ import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
 import { requestHeaders } from '../../utils/requestHeaders';
 import { AdtUtils } from './AdtUtils';
-import { legacyRefusal, noDeletionApi, noDeletionCheck } from './refusalLegacy';
+import {
+  legacyRefusal,
+  legacyUnmeasuredRefusal,
+  noDeletionApi,
+  noDeletionCheck,
+} from './refusalLegacy';
 import type {
   AdtObjectType,
   AdtSourceObjectType,
@@ -130,11 +135,24 @@ function refusedFor(
   return Object.hasOwn(table, type) ? table[type] : undefined;
 }
 
+/**
+ * The refusal of a read of `objectType` at `endpoint`: the table type is only
+ * absent from discovery, not measured, so its refusal says that; the other
+ * families answered `404`.
+ */
+function refuseRead<T, E extends IAdtError>(
+  operation: string,
+  endpoint: string,
+): IAdtResponse<T, E> {
+  return endpoint === TABLE_TYPE.collection
+    ? legacyUnmeasuredRefusal<T, E>(operation, endpoint)
+    : legacyRefusal<T, E>(operation, endpoint);
+}
+
 function unsupportedError(operation: string, endpoint: string): string {
   return (
-    `${operation} is not supported on this SAP system (legacy, BASIS < 7.50). ` +
-    `The required endpoint ${endpoint} was not found in the system's ` +
-    `ADT discovery catalog (/sap/bc/adt/discovery).`
+    `${operation} is not supported on a legacy system (7.40 SP04): ` +
+    `its ADT discovery catalogue (/sap/bc/adt/discovery) does not list ${endpoint}.`
   );
 }
 
@@ -372,7 +390,7 @@ ${objectReferences}
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const endpoint = refusedFor(METADATA_REFUSED, objectType);
     if (endpoint)
-      return legacyRefusal<ReturnType<R['metadata']>, E>(
+      return refuseRead<ReturnType<R['metadata']>, E>(
         `readObjectMetadata(${objectType})`,
         endpoint,
       );
@@ -397,7 +415,7 @@ ${objectReferences}
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const endpoint = refusedFor(SOURCE_REFUSED, objectType);
     if (endpoint)
-      return legacyRefusal<ReturnType<R['source']>, E>(
+      return refuseRead<ReturnType<R['source']>, E>(
         `readObjectSource(${objectType})`,
         endpoint,
       );

@@ -199,6 +199,21 @@ describe('legacy utilities', () => {
       'ttyp/df',
     ].includes(alias),
   );
+  /**
+   * The table type is the one family here no run measured (it is only absent
+   * from discovery); the others answered `404`, and their refusal says so.
+   */
+  const expectEvidence = (answer: unknown, endpoint: string) => {
+    const message = (answer as Answer).getError?.().message ?? '';
+    if (endpoint === '/sap/bc/adt/ddic/tabletypes') {
+      expect(message).toContain('does not advertise');
+      expect(message).toContain('not measured');
+      expect(message).not.toContain('has no');
+    } else {
+      expect(message).toContain('has no');
+      expect(message).not.toContain('not measured');
+    }
+  };
   const inEveryCase = (rows: [string, string][]) =>
     rows.flatMap(([alias, endpoint]) => [
       [alias, endpoint],
@@ -216,6 +231,7 @@ describe('legacy utilities', () => {
         );
         expectRefusal(answer, sent, 'readObjectMetadata', endpoint);
         expect((answer as Answer).getError?.().message).toContain(alias);
+        expectEvidence(answer, endpoint);
       },
     );
 
@@ -257,6 +273,7 @@ describe('legacy utilities', () => {
         );
         expectRefusal(answer, sent, 'readObjectSource', endpoint);
         expect((answer as Answer).getError?.().message).toContain(alias);
+        expectEvidence(answer, endpoint);
       },
     );
 

@@ -18,7 +18,10 @@ import type {
   IClassExecuteWithProfilerOptions,
   IClassExecutionTarget,
 } from '@mcp-abap-adt/interfaces-adt';
-import { legacyRefusal } from '../../core/shared/refusalLegacy';
+import {
+  legacyRefusal,
+  legacyUnmeasuredRefusal,
+} from '../../core/shared/refusalLegacy';
 import {
   ClassExecutor,
   type classExecutorDocuments,
@@ -52,7 +55,7 @@ export class ClassExecutorLegacy<
   override async listObjectTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyRefusal<ReturnType<R['types']>, E>(
+    return legacyUnmeasuredRefusal<ReturnType<R['types']>, E>(
       'listObjectTypes',
       OBJECT_TYPES,
     );
@@ -62,7 +65,7 @@ export class ClassExecutorLegacy<
   override async listProcessTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyRefusal<ReturnType<R['types']>, E>(
+    return legacyUnmeasuredRefusal<ReturnType<R['types']>, E>(
       'listProcessTypes',
       PROCESS_TYPES,
     );

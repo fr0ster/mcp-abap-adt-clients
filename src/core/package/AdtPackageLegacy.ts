@@ -38,7 +38,7 @@ const UNSUPPORTED: IAdtError = {
   origin: 'refusal',
   code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
   message:
-    'Package operations are not supported on legacy SAP systems (BASIS < 7.50): ' +
+    'Package operations are not supported on a legacy system (7.40 SP04): ' +
     'the package item resource answers 404 and the collection answers 405 to a create. ' +
     'Use SAP GUI (SE80 or SE21) to manage packages.',
 };

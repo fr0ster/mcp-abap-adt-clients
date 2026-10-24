@@ -17,7 +17,7 @@ import type {
   IProgramExecuteWithProfilerOptions,
   IProgramExecutionTarget,
 } from '@mcp-abap-adt/interfaces-adt';
-import { legacyRefusal } from '../../core/shared/refusalLegacy';
+import { legacyUnmeasuredRefusal } from '../../core/shared/refusalLegacy';
 import {
   type IProgramExecutorResults,
   ProgramExecutor,
@@ -36,7 +36,7 @@ export class ProgramExecutorLegacy<
     _target: IProgramExecutionTarget,
     _options?: IProgramExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    return legacyRefusal<ReturnType<R['run']>, E>('run', PROGRAMRUN);
+    return legacyUnmeasuredRefusal<ReturnType<R['run']>, E>('run', PROGRAMRUN);
   }
 
   /** Refused without a request, for the same reason as `run`. */
@@ -44,7 +44,7 @@ export class ProgramExecutorLegacy<
     _target: IProgramExecutionTarget,
     _options: IProgramExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    return legacyRefusal<ReturnType<R['run']>, E>(
+    return legacyUnmeasuredRefusal<ReturnType<R['run']>, E>(
       'runWithProfiler',
       PROGRAMRUN,
     );
@@ -54,7 +54,7 @@ export class ProgramExecutorLegacy<
   override async listObjectTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyRefusal<ReturnType<R['types']>, E>(
+    return legacyUnmeasuredRefusal<ReturnType<R['types']>, E>(
       'listObjectTypes',
       OBJECT_TYPES,
     );
@@ -64,7 +64,7 @@ export class ProgramExecutorLegacy<
   override async listProcessTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyRefusal<ReturnType<R['types']>, E>(
+    return legacyUnmeasuredRefusal<ReturnType<R['types']>, E>(
       'listProcessTypes',
       PROCESS_TYPES,
     );

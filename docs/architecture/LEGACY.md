@@ -64,18 +64,18 @@ createAdtClient(connection)
   │
   └── 404, or anything but XML? → AdtClientLegacy (over RFC)
         ├── Served types: *Legacy handlers (direct DELETE under the caller's lock, v1 content types)
-        ├── Members 7.40 does not serve: answer a refusal, no request
+        ├── Members 7.40 does not serve, or does not advertise and nobody measured: a refusal, no request
         ├── Types 7.40 lacks: absentOnLegacy — every member answers a refusal, no request
         └── Content types: AdtContentTypesBase (versionless headers)
 
 createAdtExecutor(connection) → AdtExecutorLegacy on the same answer
         ├── ABAP Unit runners: the synchronous /abapunit/testruns request, <options> sent
-        └── Class/program executors: runs and trace type lists refused; trace schedule kept
+        └── Class/program executors: class run refused (measured), program run and trace type lists refused until measured; trace schedule kept
 ```
 
 ### The refusal
 
-Every refusal takes one shape: answered, never thrown, through `failed()`, with `ok: false`, `origin: 'refusal'`, `code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION`, and a message naming the operation, the endpoint 7.40 lacks and — where there is one — what to use instead. No request leaves, so `options.analyse` has nothing to read. A consumer branches on `UNSUPPORTED_OPERATION`; the message is for people.
+Every refusal takes one shape: answered, never thrown, through `failed()`, with `ok: false`, `origin: 'refusal'`, `code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION`, and a message naming the operation, the endpoint 7.40 lacks and — where there is one — what to use instead. A member refused until measured (rule 4 below) says only what 7.40 SP04's discovery shows: the endpoint is not advertised and not measured there. No request leaves, so `options.analyse` has nothing to read. A consumer branches on `UNSUPPORTED_OPERATION`; the message is for people.
 
 **Why a refusal, and not SAP's `404`.** The consumer reads "not on this system" instead of a `404` it would have to interpret, and the legacy MCP server, which builds its tools from what the legacy client offers, exposes no tool that can only fail.
 
@@ -178,7 +178,7 @@ await client.getFunctionInclude().create(config, {
 });
 ```
 
-### Types 7.40 does not serve: `absentOnLegacy`
+### Types 7.40 does not serve, or does not advertise: `absentOnLegacy`
 
 The getter still hands out a handler, so code written against `AdtClient` keeps running on a legacy system. Every member of that handler answers the refusal without a request.
 

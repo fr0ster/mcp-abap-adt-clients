@@ -63,7 +63,9 @@ describe('legacy transport list', () => {
       'legacy list with configUri',
     );
 
-    expect(failure.message).toMatch(/not supported on legacy/);
+    expect(failure.message).toMatch(
+      /not supported on a legacy system \(7\.40 SP04\)/,
+    );
     expect(calls).toHaveLength(0);
   });
 });
@@ -77,7 +79,9 @@ describe('legacy transport update/delete', () => {
       'legacy update',
     );
 
-    expect(failure.message).toMatch(/not supported on legacy/);
+    expect(failure.message).toMatch(
+      /not supported on a legacy system \(7\.40 SP04\)/,
+    );
     expect(calls).toHaveLength(0);
   });
 
@@ -89,7 +93,9 @@ describe('legacy transport update/delete', () => {
       'legacy delete',
     );
 
-    expect(failure.message).toMatch(/not supported on legacy/);
+    expect(failure.message).toMatch(
+      /not supported on a legacy system \(7\.40 SP04\)/,
+    );
     expect(calls).toHaveLength(0);
   });
 });
@@ -134,7 +140,9 @@ describe('legacy transport members', () => {
       'legacy transport member',
     );
 
-    expect(failure.message).toMatch(/not supported on legacy/);
+    expect(failure.message).toMatch(
+      /not supported on a legacy system \(7\.40 SP04\)/,
+    );
     expect(calls).toHaveLength(0);
   });
 
