@@ -210,7 +210,7 @@ The getter still hands out a handler, so code written against `AdtClient` keeps 
 | `AdtPackageLegacy` member | decision |
 |---|---|
 | `create`, `readMetadata` | refused — measured |
-| `updateMetadata`, `delete`, `validate` | refused |
+| `updateMetadata`, `delete`, `validate` | refused — not measured |
 | `lock`, `unlock`, `readTransport` | refused: the item resource answered `404` to the read; its `?_action=LOCK` and `/transport` are on the same resource. **Not measured** themselves |
 | `check` | refused: a check of an object 7.40 cannot address through ADT. **Not measured** |
 | `checkDeletion` | refused — measured (no deletion API) |
@@ -281,7 +281,7 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 
 ## The clients' own members
 
-`AdtClientLegacy` inherits `unlockAll()`, `pendingLocks` and `[Symbol.asyncDispose]()` from `AdtClient`. They send nothing of their own: `unlockAll` (and the dispose) sends, for every lock still tracked, the `UNLOCK` of the handler that took it — measured for each type that can be locked here. A handler whose `lock` is refused (package) tracks nothing. `AdtExecutorLegacy` has only getters.
+`AdtClientLegacy` inherits `unlockAll()`, `pendingLocks` and `[Symbol.asyncDispose]()` from `AdtClient`. They send nothing of their own: `unlockAll` (and the dispose) sends, for every lock still tracked, the `UNLOCK` of the handler that took it. That `UNLOCK` is measured for a class, program, interface, function group, function module, DDL source and function include; it is **not measured** for an include and a message class (their `lock`/`unlock` are kept, not measured). A handler whose `lock` is refused (package) tracks nothing. `AdtExecutorLegacy` has only getters.
 
 ## Outside the legacy client: no legacy variant
 
@@ -328,6 +328,11 @@ Each row ships as decided until a run on 7.40 SP04 measures it. The live checks 
 | message class `create`, `updateMetadata`, `lock`, `unlock`, `validate`; message class message `create`, `update`, `delete`, `readMetadata` | kept | advertised |
 | trace `listRequests`, `getRequestsByUri`, `scheduleTrace` | kept | advertised |
 | `activateObjectsGroup` | kept | measured earlier on BASIS 7.40, not in a 7.40 SP04 record |
+| function module runner `run` | refused | not a 7.40 statement: `run(functionModuleName)` names no group, and the measured request needs the module's URI under its group |
+| `getUtils()` `getActivationRun`, `getActivationResults` | refused | a legacy group activation yields no run id; `/activation/runs` is not advertised |
+| `getRequest()` `updateMetadata`, `delete` | refused | changes to a request are refused on legacy |
+| the other `getRequest()` members (`searchConfigurations`, `checkDeletion`, `readObjects`, `readActionLog`, `addObject`, `removeObject`, `moveObjects`, `sortAndCompress`, `createTask`, `changeTaskType`) | refused | not advertised (`/sap/bc/adt/cts/*`) |
+| HTTP as a legacy wire | unsupported, documented; no branch in the library | the HTTP measurements above; the legacy MCP server is RFC-only |
 | the runtime, debugger, batch, abapGit and WS families | no legacy variant | outside the legacy client |
 
 ## Live checks on a 7.40 SP04 system
@@ -339,7 +344,7 @@ The live checks under `src/__tests__/integration/legacy/` are written; how to ru
 37.3.0 is a minor: no public type changes, and nothing to migrate. On a 7.40 system:
 
 - **Use the legacy client over RFC.** HTTP to a legacy system is unsupported ([why](#http-is-not-a-supported-legacy-wire)).
-- **Lock before `delete`.** A class, program, interface or function group delete without the object's lock handle answers SAP's `400`. Lock, pass the handle as `options.lockHandle`, unlock ([Delete](#delete-lock-delete-with-the-handle-unlock)). 37.2's documentation said a delete needs no lock; that was wrong.
+- **Lock before `delete`.** A class, program, interface or function group delete without the object's lock handle answers SAP's `400`. Lock, pass the handle as `options.lockHandle`, unlock ([Delete](#delete-lock-delete-with-the-handle-unlock)). 37.2's documentation said a delete needs no lock; on 7.40 SP04 that is wrong.
 - **No `checkDeletion`.** Every `checkDeletion`, and `checkDeletionGroup`, answers the refusal; 37.2 sent `POST /deletion/check`, which 7.40 answers `404`.
 - **Where-used, virtual folders and object types are refused** — `getWhereUsed`, `getWhereUsedScope`, `getVirtualFoldersContents`, `getAllTypes`.
 - **Members that sent a request in 37.2 and now refuse without one:**

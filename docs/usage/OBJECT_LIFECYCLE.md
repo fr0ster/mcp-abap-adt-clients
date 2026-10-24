@@ -325,7 +325,8 @@ const locked = await cls.lock(config);
 if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 try {
-  await cls.delete(config, { headers, lockHandle });   // one DELETE, stateless
+  const deleted = await cls.delete(config, { headers, lockHandle });   // one DELETE, stateless
+  if (!deleted.ok) throw new Error(deleted.getError().message);
 } finally {
   await cls.unlock(config, lockHandle);
 }
