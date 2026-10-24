@@ -154,7 +154,7 @@ To enable automatic JWT token refresh during test execution, add these variables
 
 ## Test Configuration
 
-All test parameters come from `src/__tests__/helpers/test-config.yaml`:
+All test parameters come from the test configuration: the tracked base `src/__tests__/helpers/test-config.yaml.template` merged with your overlay `test-config.overlay.yaml`:
 
 ```yaml
 create_class:

@@ -4,7 +4,7 @@ Integration tests use configurable delays between ADT operations to avoid transi
 
 ## Configuration
 
-Set defaults in `src/__tests__/helpers/test-config.yaml`:
+The defaults are in the tracked base, `src/__tests__/helpers/test-config.yaml.template`. They are not system-specific, so the local overlay does not carry them (see [Test Config Schema](../development/TEST_CONFIG_SCHEMA.md)); change them in the base:
 
 ```yaml
 test_settings:

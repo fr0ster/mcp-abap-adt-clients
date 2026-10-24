@@ -53,16 +53,16 @@ Without a usable binding every RFC run stops in `globalSetup`:
 @mcp-abap-adt/sap-rfc-lite is not available … Cannot find module
 ```
 
-### test-config.yaml
+### test-config.overlay.yaml
 
-Set `connection_type: "rfc"` in the environment section:
+Set `environment.connection_type` in your overlay (an optional key; keys are
+written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 
 ```yaml
-environment:
-  system: "onprem"              # Which system. Stated, never inferred
-  connection_type: "rfc"        # Use RFC transport instead of HTTP
-  default_package: "$TMP"
-  default_master_system: "SID"
+"environment.system": "onprem"          # Which system. Stated, never inferred
+"environment.connection_type": "rfc"    # Use RFC transport instead of HTTP
+"environment.default_package": "$TMP"
+"environment.default_master_system": "SID"
 ```
 
 When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.

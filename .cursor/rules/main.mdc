@@ -37,4 +37,4 @@ Direct communication with the user must follow the language used by the user in 
 - Client classes: CrudClient, ReadOnlyClient
 - Builder pattern: All object types have corresponding Builder classes
 - Low-level functions: Located in `src/core/*/` modules
-- Testing: YAML-based configuration in `tests/test-config.yaml`
+- Testing: YAML-based configuration: tracked base `src/__tests__/helpers/test-config.yaml.template` + local `test-config.overlay.yaml`

@@ -1,7 +1,75 @@
 # Test Config Schema
 
-All integration tests use `src/__tests__/helpers/test-config.yaml`.
-This document summarizes the current schema used by `BaseTester` and `TestConfigResolver`.
+The integration tests read **a base plus an overlay**, merged by the loader
+(`loadTestConfig` in `src/__tests__/helpers/test-helper.js`, built on
+`scripts/lib/testConfigOverlay.js`):
+
+- **base** — `src/__tests__/helpers/test-config.yaml.template`, tracked. Fixtures,
+  test cases, object names, timeouts: everything shared. Never copy it.
+- **overlay** — `src/__tests__/helpers/test-config.overlay.yaml`, gitignored. Only
+  what differs per system. Nothing that names an installation is tracked: the
+  forms under `src/__tests__/helpers/overlays/` (`onprem.yaml`, `cloud.yaml`) are
+  empty, with a comment per key and only type-level answers.
+
+This document summarizes the schema used by `BaseTester` and `TestConfigResolver`
+(the merged result).
+
+## Setting up
+
+```bash
+npm run test:init -- onprem      # or: cloud — copies the form to test-config.overlay.yaml
+# fill in every <PLACEHOLDER> in src/__tests__/helpers/test-config.overlay.yaml
+npm run check:config             # does the overlay fit the base?
+```
+
+`test:init` does not guess the system type and never overwrites an overlay.
+
+**Migrating from the old full `test-config.yaml`.** A full local copy is no longer
+read: the loader refuses to start while it exists, because a copy goes stale when
+the base moves (a section realigned by hand once replaced three on-prem values with
+template placeholders). Run `npm run test-config:migrate`: it reads the old file,
+writes `test-config.overlay.yaml` with the allowed keys' values (it prints key
+names, never values) and refuses to overwrite an existing overlay. Then delete the
+old file. If the old file lacks a required key, nothing is written and the key is
+named.
+
+## The overlay
+
+Keys are written **flat**: each key is a path into the base, one per line. A test
+case inside a list is picked by its `name` in brackets.
+
+```yaml
+"environment.system": "onprem"
+"environment.default_package": "ZMY_PKG"
+"create_package.test_cases[adt_package].params.package_name": "ZMY_PKG"
+```
+
+Only the keys in `ALLOWED_OVERLAY_KEYS` (`scripts/lib/testConfigOverlay.js`) may
+appear; anything else is refused by name. The list:
+
+| Key | |
+|---|---|
+| `environment.system`, `.default_package`, `.default_transport`, `.default_master_system` | required |
+| `shared_dependencies.package`, `.super_package`, `.software_component`, `.transport_layer`, `.record_changes` | required |
+| `create_package.test_cases[adt_package].params.package_name`, `.software_component`, `.transport_layer` | required |
+| `create_transport.test_cases[builder_transport].params.target_system` | required |
+| `environment.connection_type` | optional (`"rfc"` / `"http"`) |
+| `…[adt_scalar_function].params.scalar_function_name`, `…[adt_scalar_function_implementation].params.implementation_name`, `…[adt_append_structure].params.append_structure_name` | optional |
+| `atc_run…[adt_atc_run].enabled`, `.params.check_variant`, `.params.expected_message_id`, `.params.expected_priority`; `atc_object_kinds…[adt_atc_object_kinds].enabled`, `.params.check_variant` | optional |
+| `enhancement.test_cases[program_host].params.program_name`, `[function_group_host].params.function_group_name`, `[include_host].params.include_name`, `.main_program` | optional |
+
+**Required** keys are those whose base line carries `# ← CHANGE` and holds only a
+placeholder: the overlay must state them (an empty string is a statement), and the
+loader refuses an overlay without one, naming it. An **optional** key has a valid
+default in the base. `testConfigOverlay.test.ts` keeps the list and the template's
+`← CHANGE` markers in step: a required key without the marker, and a marked line
+whose key is not in the list, both fail the unit tests.
+
+Also refused, each with the key named: a value that is still a `<PLACEHOLDER>`, a
+nested value (keys are flat), a path the base does not have, and an overlay that is
+not YAML. With **no overlay** the base alone is loaded with a warning, its values
+being placeholders: the integration tests then register as configuration defects
+(`isTestConfigTemplate()`), not as skips.
 
 ## Top-Level Keys
 

@@ -24,6 +24,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Repository
+
+- **The test configuration is a tracked base plus a small local overlay**
+  (#130). `test-config.yaml.template` stays the base and holds everything
+  shared; `test-config.overlay.yaml` (gitignored) holds only the system-specific
+  keys, written flat (`environment.default_package`,
+  `create_package.test_cases[adt_package].params.package_name`). The loader, the
+  corpus capture script and `check:config` read the merge. An overlay key outside
+  the allowed list, a required key it omits, a value still written as
+  `<PLACEHOLDER>`, and a leftover full `test-config.yaml` are each refused with
+  the key named — no silent fallback to the template. With no overlay the base
+  alone is loaded, as the template was before, and the integration tests keep
+  registering as configuration defects.
+  **Migration:** run `npm run test-config:migrate` (writes the overlay from your
+  full `test-config.yaml`, never printing a value, never overwriting an overlay),
+  then delete the old file. New checkouts: `npm run test:init -- onprem|cloud`
+  copies the tracked form (`src/__tests__/helpers/overlays/`); `test:reinit` is
+  gone. `check:config` now verifies the overlay's keys instead of counting
+  sections. Details: `docs/development/TEST_CONFIG_SCHEMA.md`.
+- **`shared_dependencies.package` is marked `← CHANGE`** in the template, as the
+  other system-specific keys were. Its being unmarked is what let a realignment
+  replace it with a placeholder unnoticed and cost a full run on 2026-09-01.
+
 ### Changed (repository only — nothing in the published package)
 
 - **The tests run on `@mcp-abap-adt/connection` ^19.0.0** (dev dependency, was
