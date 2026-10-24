@@ -9,23 +9,23 @@ wherever the library's client is taken, and the compiler checks that `AdtClient`
 
 `IAdtClient` names the whole surface a consumer reaches through the client:
 
-- every factory (`getClass()`, `getProgram()`, … — 35 today), each in both its overloads:
-  without a result set it answers the composition over the result-set contract, and with one it
-  answers the same composition for the result set passed;
+- every factory (`getClass()`, `getProgram()`, … — 35 today), each declared once: one generic
+  signature whose result set is optional, so a call without one answers over the result-set
+  contract and a call with one answers over the set passed;
 - the client-level members: `unlockAll()`, `pendingLocks` and `[Symbol.asyncDispose]()`.
 
-Each object's composition stays defined once (today `IClassContract<R>` and its siblings in
-`src/clients/AdtClient.ts`), and both the factory overloads and `IAdtClient` read that one
-definition.
+What a factory answers is written in `IAdtClient` itself, as the atoms it offers
+(`IAdtCreatable`, `IAdtReadable`, `IAdtLockable`, …). There is no named composition per object,
+in interfaces-adt or in adt-clients: a consumer that wants a name for what it holds composes it
+from the atoms itself. The compositions declared in `src/clients/AdtClient.ts` today
+(`IClassContract<R>` and its siblings) are removed, and `AdtClient` takes its factories' types
+from `IAdtClient`, so what a factory answers is defined in one place.
 
-Only contracts move to `@mcp-abap-adt/interfaces-adt`: `IAdtClient`, every composition, and every
-result-set contract (`IClassResults` and its siblings, which are slots of `IResultStrategy`).
-Nothing concrete moves: the default result sets (`classDocuments` and its siblings) and the
-types they carry stay in adt-clients. So in `IAdtClient` the overload without a result set
-answers the composition over the result-set contract (`getClass(): IClassContract<IClassResults>`),
-and `AdtClient` keeps answering the narrower composition over its own defaults, which the compiler
-checks is assignable to the contract. This finishes the move of the contracts out of the
-implementation that was left undone.
+Only contracts move to `@mcp-abap-adt/interfaces-adt`: `IAdtClient` and every result-set contract
+(`IClassResults` and its siblings, which are slots of `IResultStrategy`). Nothing concrete moves:
+the default result sets (`classDocuments` and its siblings) and the types they carry stay in
+adt-clients. This finishes the move of the contracts out of the implementation that was left
+undone.
 
 ## Invariants
 
@@ -36,10 +36,10 @@ implementation that was left undone.
   shape stays with its value in adt-clients).
 - **The contract package never depends on adt-clients.** The dependency runs one way: adt-clients
   implements what interfaces-adt declares.
-- **One definition per composition.** No composition is written twice, so two copies can never
-  disagree.
+- **What a factory answers is written once**, in `IAdtClient`. There is no second copy, in a
+  named composition or in the class, that could disagree.
 - **The legacy client implements the same contract.** `AdtClientLegacy` answers refusals through
-  the same compositions (decision 11). It is not a separate contract.
+  the same `IAdtClient` (decision 11). It is not a separate contract.
 - **A consumer composes its own result sets through the contract** exactly as it does through
   the class today: same generics, same inference. Through `IAdtClient` without a result set, a
   consumer gets the contract's slots as `unknown`; to get a typed answer it passes a result set,
