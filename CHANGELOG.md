@@ -22,7 +22,117 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [37.3.0] - 2026-10-24
+
+The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) now matches what a
+SAP_BASIS 7.40 SP04 system serves through ADT, **measured on SAP_BASIS 7.40 SP04
+over RFC**: each member either sends the request 7.40 SP04 accepts or answers a
+refusal without sending a request. No public type changes, no new export, no
+dependency change — nothing to migrate. The full account, with the probe record
+and step behind every claim, is in `docs/architecture/LEGACY.md`.
+
+### Changed
+
+- **RFC is the legacy wire; HTTP to a legacy system is unsupported.** Measured
+  through the library over HTTP on 7.40 SP04: the logon fails without a
+  workaround (no CSRF token from `core/discovery`, which is
+  `@mcp-abap-adt/connection` issue #91); with the CSRF endpoint overridden,
+  `LOCK` succeeds and every source `PUT` under the handle answers `423`, in the
+  stateless and in the stateful session alike; a class that exists reads `404`
+  and its test run answers no methods; families 7.40 does not have answer an
+  empty `200` that reads as success; `/sap/bc/cts/*` is unreachable. The
+  library does not detect the wire and has no branch for it.
+- **The class handler's `update` override is removed.** It claimed to keep lock,
+  update and unlock in one stateful HTTP session (GitHub #11); over HTTP no
+  session shape gets a write through, and over RFC the measured write is the
+  inherited stateless `PUT ?lockHandle=` under a lock taken in the stateful
+  conversation. The override only called the inherited `update`.
+- **A legacy `delete` needs the object's lock handle.** On 7.40 SP04 a
+  `DELETE` without `lockHandle` answers `400` for a class, program, interface
+  and function group (a function module and a DDL source answered `200`).
+  The six `delete` members — class, program, interface, function group,
+  function module, DDL source — send one `DELETE <object>?lockHandle=<handle>`
+  (plus `&corrNr=` when `transportRequest` is given), stateless; the handle is
+  the caller's, from `lock()`. 37.2's documentation said a delete needs no lock;
+  on 7.40 SP04 that is wrong.
+- **Function include create takes the v1 pair.** 7.40 SP04 refused
+  `application/vnd.sap.adt.functions.fincludes.v2+xml` (`400`) and created the
+  include with `application/vnd.sap.adt.functions.fincludes+xml` both ways; the
+  pair is the caller's (`options.headers`), so pass the v1 pair on 7.40.
+
+### Fixed for 7.40
+
+- **Runners that refused now send.** The program and function group runners'
+  `run` and `runSync`, and the function module runner's `runSync`, send one
+  `POST /sap/bc/adt/abapunit/testruns` with `<options>`, measured to run the
+  tests on 7.40 SP04. The class runner's request now carries `<options>` too,
+  so a caller's scope, risk levels and durations reach SAP (37.2 dropped them
+  silently); the measured answer is the same. The function module runner's
+  `run` is refused: it names no group, and the measured request needs the
+  module's URI under its group — use `runSync({ functionGroupName,
+  functionModuleName })`. Every runner's `getStatus` and `getResult` is
+  refused: a legacy run answers finished and has no run id.
+- **Members that now refuse without a request** (`UNSUPPORTED_OPERATION`,
+  answered, never thrown; the message names the operation, the missing endpoint
+  and what to use instead), by handler:
+  - every `checkDeletion` (class, program, interface, function group, function
+    module, DDL source, package, include, function include, message class,
+    request) and `getUtils().checkDeletionGroup` — 7.40 has no deletion API
+    (`/deletion/check` answers `404`);
+  - `delete` of an include, a function include and a message class, and
+    `getUtils().deleteObjectsGroup` (a direct `DELETE ?lockHandle=` on the
+    three is not measured and is not implemented on inference);
+  - `getTransformation()`, `getScalarFunction()`,
+    `getScalarFunctionImplementation()`, `getAppendStructure()`,
+    `getStructure()`, `getEnhancement()`, `getTable()`, `getDomain()`,
+    `getDataElement()`, `getTableType()`, `getAccessControl()`,
+    `getServiceDefinition()`, `getServiceBinding()`,
+    `getBehaviorDefinition()`, `getBehaviorImplementation()`,
+    `getMetadataExtension()`, `getAuthorizationField()`,
+    `getFeatureToggle()` — every member of these handlers, since their
+    families are absent or not advertised;
+  - `getPackage()`: every member (the item resource answers `404`, create
+    `405`); package contents come through
+    `getUtils().fetchNodeStructure('DEVC/K', name)`;
+  - `getRequest()`: all but `list` and `readMetadata` (the user's list from
+    `/sap/bc/cts/transportrequests`; `create` answers `400`);
+  - `getUtils()`: `getWhereUsed`, `getWhereUsedScope` (7.40 serves where-used
+    only through RIS), `getVirtualFoldersContents`, `getAllTypes`,
+    `getActivationRun`, `getActivationResults`, `getTableColumns`,
+    `getTableContents`, `getSqlQuery`, `getObjectProperties`, and
+    `readObjectMetadata` / `readObjectSource` for the DDIC and package types;
+  - `getDdl().checkCdsTestDoubles`;
+  - `getClassExecutor()` and `getProgramExecutor()`: `run`, `runWithProfiler`,
+    `listObjectTypes`, `listProcessTypes` (7.40 has no `/oo/classrun`;
+    `programrun` and the trace type lists are refused until measured).
+- **The function include v1 pair** (above) is what makes `getFunctionInclude()`
+  `create` work on 7.40 SP04.
+
+### Added (repository only — nothing in the published package)
+
+- **An own 7.40 test environment and live checks.** The checks under
+  `src/__tests__/integration/legacy/` run only on a configuration with
+  `is_legacy: true` and `connection_type: "rfc"` (`test-config.legacy-740.yaml.template`,
+  loaded through `MCP_TEST_CONFIG_PATH`) and skip with the reason elsewhere;
+  `npm run legacy:setup`, `legacy:status` and `legacy:teardown` manage the
+  environment (prefix `ZLG7`, its classes run through ABAP Unit), described in
+  `docs/development/RFC_TESTING.md`. **The live checks are written and have not
+  yet been run on the system; no result of theirs is recorded.**
+
+### Not measured on 7.40 SP04
+
+Each ships as decided in `docs/architecture/LEGACY.md` until a run measures it:
+a delete with `corrNr`; `delete` of an include, function include and message
+class (refused until measured); package `lock`, `unlock`, `readTransport`,
+`check` (refused); `programrun` and the trace `objecttypes` / `processtypes`
+(refused); `getScalarFunctionImplementation()` and the table-type reads
+(refused); a populated transport list; enhancement readers, `readTransport`,
+`validate`, and the `check`s and `activate`s not listed as measured (kept; at
+worst SAP's `404`, read strictly); message class create, update, lock and
+message operations (kept); trace `listRequests`, `getRequestsByUri`,
+`scheduleTrace` (kept); `activateObjectsGroup` (kept, measured only on an
+earlier BASIS 7.40); the runtime, debugger, batch, abapGit and WebSocket
+families, which have no legacy variant and were not measured.
 
 ### Changed (repository only — nothing in the published package)
 
