@@ -67,6 +67,12 @@ environment:
 
 When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.
 
+**A legacy run needs `connection_type: "rfc"`.** The legacy client is supported,
+and measured on SAP_BASIS 7.40 SP04, over RFC only. With `is_legacy: true` and
+`connection_type: "http"` the live checks of the legacy client skip, each with
+the reason "the legacy client is supported over RFC only"
+(`src/__tests__/helpers/legacyRfc.ts`, `describeLegacyRfc`).
+
 `system` is separate from `connection_type` and both are required: the first says
 which system is on the other end, the second says how to reach it. RFC is an
 on-prem transport, but stating one does not state the other — the helper builds
@@ -167,6 +173,29 @@ npm run legacy:setup
 npm run test:detached -- integration/legacy
 npm run legacy:teardown        # when the environment is no longer needed
 ```
+
+### The live checks
+
+Written, not yet run: no result of theirs is recorded in `docs/architecture/LEGACY.md`.
+Each runs under `describeLegacyRfc` — only when the loaded configuration says
+`is_legacy: true` and `connection_type: "rfc"`, a skipped test naming the reason
+otherwise — and every case is a `legacy_740` test case of the configuration
+(`enabled: false` in `test-config.yaml.template`, enabled in the 7.40 template).
+Refused members are asserted on a wire recorder (`helpers/requestRecorder.ts`),
+not on a log: nothing may leave.
+
+| File | `legacy_740` case | Checks |
+|---|---|---|
+| `LegacyDelete.test.ts` | `legacy_deletes` | class, program, interface, function group, function module, DDL source: lock → delete with the handle → unlock → the read answers `404`; a delete without a handle answers `400` for the first four. Creates and deletes only its own objects |
+| `LegacyRefusals.test.ts` | `legacy_refusals_send_nothing` | every refused member — `checkDeletion`, the `absentOnLegacy` handlers, the rest — answers the refusal and sends nothing; `readObjectMetadata`/`readObjectSource` for a program and a class answer `200` |
+| `LegacyUnitTests.test.ts` | `legacy_unit_runners` | class, program, function group `run`/`runSync` and function module `runSync` send one testruns POST with `<options>` and answer the fixtures' methods |
+| `LegacyFunctionInclude.test.ts` | `legacy_function_include` | a function include created with the v1 pair, written under its lock, activated (its group is created and deleted by the test) |
+| `LegacyTransports.test.ts` | `legacy_transports` | `list` and `readMetadata` send one GET to `/sap/bc/cts/transportrequests` and answer the user's list |
+| `LegacyTransportable.test.ts` | `legacy_transportable` | in package `ZLG7_TEST` on the environment's request: create, lock → update with `corrNr` → unlock; the list and `readMetadata` name the request; lock → `DELETE ?lockHandle=&corrNr=` → unlock — measures what is not yet measured (a delete with `corrNr`, a populated list) |
+
+Run them as shown above: `npm run legacy:setup`, then
+`npm run test:detached -- integration/legacy`, with `MCP_TEST_CONFIG_PATH` naming
+the 7.40 configuration and `MCP_ENV_PATH` its `.env`.
 
 ## RFC-Specific Considerations
 

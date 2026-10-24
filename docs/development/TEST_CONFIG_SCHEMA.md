@@ -1,6 +1,10 @@
 # Test Config Schema
 
-All integration tests use `src/__tests__/helpers/test-config.yaml`.
+All integration tests use `src/__tests__/helpers/test-config.yaml`, unless
+`MCP_TEST_CONFIG_PATH` names another file — then that file or the run fails
+naming it, with no fallback (the 7.40 system's own configuration,
+`test-config.legacy-740.yaml`, is loaded this way; see
+[RFC_TESTING.md](RFC_TESTING.md#the-740-system-a-configuration-and-an-environment-of-its-own)).
 This document summarizes the current schema used by `BaseTester` and `TestConfigResolver`.
 
 ## Top-Level Keys
@@ -35,6 +39,17 @@ environment:
   default_transport: ""
   skip_cleanup: false
   cleanup_after_test: true
+```
+
+A legacy system (BASIS < 7.50) is `is_legacy: true`, and its live checks need
+`connection_type: "rfc"` beside it — the legacy client is supported over RFC
+only; over HTTP they skip and say so:
+
+```yaml
+environment:
+  system: "onprem"
+  connection_type: "rfc"
+  is_legacy: true
 ```
 
 ## shared_dependencies
@@ -175,6 +190,38 @@ group_activation:
 ```
 
 The test includes pre-cleanup (delete leftovers from failed previous runs) and guaranteed unlock via try/finally.
+
+## legacy_740
+
+The live checks of the legacy client (`src/__tests__/integration/legacy/`) on a
+SAP_BASIS 7.40 SP04 system. Disabled in `test-config.yaml.template`; all enabled
+in `test-config.legacy-740.yaml.template`. They run only when
+`environment.is_legacy` is `true` and `environment.connection_type` is `"rfc"`.
+Every name carries the prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`,
+`Z_LG7_*`), the prefix the test environment (`npm run legacy:setup` /
+`legacy:teardown`) cleans and removes.
+
+| Case | Params |
+|---|---|
+| `legacy_deletes` | the names of a class, program, interface, function group, function module and DDL source that do not exist yet |
+| `legacy_refusals_send_nothing` | `class_name`, `program_name`: the fixtures, read for the `200` cases |
+| `legacy_unit_runners` | `class_name`, `program_name`, `function_group_name`, `function_module_name`: the fixtures `legacy:setup` creates |
+| `legacy_function_include` | `function_group_name`, `include_name` (`L<group>F01`): created and deleted by the test |
+| `legacy_transports` | none |
+| `legacy_transportable` | `program_name`: created in package `ZLG7_TEST` on the environment's request |
+
+The 7.40 template also carries `legacy_env` — `software_component` and
+`transport_layer` of the transportable package `ZLG7_TEST` the environment
+creates.
+
+```yaml
+legacy_740:
+  test_cases:
+    - name: "legacy_transports"
+      enabled: true
+      available_in: ["legacy"]
+      params: {}
+```
 
 ## Notes
 

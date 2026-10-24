@@ -4,7 +4,7 @@ RFC (Remote Function Call) transport allows ADT operations on legacy SAP systems
 
 ## When to Use RFC
 
-- **Legacy systems** (BASIS < 7.50) — HTTP `x-sap-adt-sessiontype: stateful` header is not supported, so lock handles are lost between requests. RFC connections are inherently stateful (one ABAP session per connection), solving this problem.
+- **Legacy systems** (BASIS < 7.50) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. The library does not detect the wire and does not refuse HTTP; it just is not supported. See [LEGACY.md](../architecture/LEGACY.md#http-is-not-a-supported-legacy-wire).
 - **Systems without HTTP stateful support** — some custom configurations disable HTTP stateful sessions.
 
 Modern systems (BASIS >= 7.50, S/4 HANA, BTP) work fine with HTTP connections and don't need RFC.
@@ -101,13 +101,20 @@ await connection.connect();
 ADT clients work transparently with RFC connections — no code changes needed. The `IAbapConnection` interface is the same for both HTTP and RFC.
 
 ```typescript
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '@mcp-abap-adt/adt-clients';
 
-const client = new AdtClient(connection, logger);
-// All operations work the same as with HTTP connections
+// AdtClient on a modern system, AdtClientLegacy on BASIS < 7.50
+const client = await createAdtClient(connection, logger);
 const program = client.getProgram();
 await program.read({ programName: 'ZTEST' });
 ```
+
+On a legacy system the client is `AdtClientLegacy`, and over RFC it sends what
+SAP_BASIS 7.40 SP04 serves and refuses the rest without a request (`origin:
+'refusal'`, `UNSUPPORTED_OPERATION`). Two things differ for a caller: a
+`delete` takes the object's lock handle from your own `lock()`, and there is no
+`checkDeletion`. The member-by-member list is in
+[LEGACY.md](../architecture/LEGACY.md).
 
 ### Legacy Content Types
 
@@ -149,7 +156,8 @@ If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setti
 | Aspect | HTTP | RFC |
 |--------|------|-----|
 | Session | Toggle stateful/stateless | Stateful requests: one persistent conversation; the rest: reset or throwaway ones |
-| Lock handles | May be lost on legacy systems | Always preserved |
+| Lock handles | Lost on legacy systems (`423` on the write) | Preserved in the stateful conversation |
+| Legacy client | Unsupported | Supported (measured on 7.40 SP04) |
 | Content negotiation | Standard HTTP Accept | Some endpoints only accept `*/*` |
 | sap-client | Added to URL query | Not needed (set in RFC params) |
 | Authentication | Basic/JWT/XSUAA | Username/password only |
