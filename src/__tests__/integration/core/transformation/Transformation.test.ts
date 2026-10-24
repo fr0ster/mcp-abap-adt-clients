@@ -41,7 +41,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -241,12 +240,9 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
             transformationName: transformationName,
           });
           if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              'Transformation - read standard object',
+            throw new Error(
               `Standard transformation ${transformationName} not found in system`,
             );
-            return;
           }
           expect(resultState).toBeDefined();
 

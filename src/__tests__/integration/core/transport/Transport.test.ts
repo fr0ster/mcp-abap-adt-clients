@@ -50,7 +50,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -208,27 +207,25 @@ describe('AdtRequest', () => {
 
           logTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
-          // If username not found or user doesn't exist, skip test instead of failing
-          const errorMsg = error.message || '';
+          // A user the system does not know is a defect of the configuration
+          // (create_transport/builder_transport `owner`), not a reason to pass.
           const errorData = error.response?.data || '';
-          const errorText =
+          const fullErrorText = `${error.message || ''} ${
             typeof errorData === 'string'
               ? errorData
-              : JSON.stringify(errorData);
-          const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
+              : JSON.stringify(errorData)
+          }`.toLowerCase();
           if (
             fullErrorText.includes('username not found') ||
             fullErrorText.includes('does not exist in the system') ||
             (fullErrorText.includes('user') &&
               fullErrorText.includes('does not exist'))
           ) {
-            logTestSkip(
-              testsLogger,
-              'AdtRequest - full workflow',
-              'Username not found or user does not exist in system',
+            logTestError(testsLogger, 'AdtRequest - full workflow', error);
+            throw new Error(
+              'create_transport/builder_transport names a user the system does not know: fix params.owner in test-config.yaml',
+              { cause: error },
             );
-            return; // Skip test
           }
           logTestError(testsLogger, 'AdtRequest - full workflow', error);
           throw error;
@@ -454,13 +451,10 @@ describe('AdtRequest', () => {
             (await systemUser()) ||
             '';
           if (!targetUser) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               'SAP_USERNAME is unset and the system named no user — ' +
                 'createTask cannot be measured without an owner',
             );
-            return;
           }
           logTestStep(`the task will be owned by ${targetUser}`, testsLogger);
           const task = await request.createTask(transportNumber as string, {
@@ -470,14 +464,9 @@ describe('AdtRequest', () => {
           if (!task.ok) {
             // A system that organises no tasks has answered, and that is the
             // measurement. Without one there is nothing to hang an object on,
-            // so the round trip below cannot run — and this is a SKIP, not a
-            // pass: nothing below it was measured.
-            logTestSkip(
-              testsLogger,
-              label,
-              `newtask refused: ${task.getError().message}`,
-            );
-            return;
+            // so the round trip below cannot run — and that fails: nothing below
+            // it was measured.
+            throw new Error(`newtask refused: ${task.getError().message}`);
           }
           taskNumber = (task.getResult().value as { transportNumber: string })
             .transportNumber;
@@ -527,12 +516,9 @@ describe('AdtRequest', () => {
 
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               'no package configured — the round trip cannot run',
             );
-            return;
           }
 
           // **The object goes into the suite's ONE request, not the throwaway
@@ -550,12 +536,9 @@ describe('AdtRequest', () => {
           // which is also the only state ADT will delete.
           const sharedRequest = resolveTransportRequest(undefined);
           if (!sharedRequest) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               'no default_transport configured — the round trip cannot run',
             );
-            return;
           }
 
           logTestStep(
@@ -623,12 +606,9 @@ describe('AdtRequest', () => {
             { headers: integrationHeadersOf(domain, 'create') },
           );
           if (!madeIt.ok) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `could not create ${domainName}: ${madeIt.getError().message}`,
             );
-            return;
           }
 
           // **The create makes a shell, and only the update gives it a type.**
@@ -649,12 +629,9 @@ describe('AdtRequest', () => {
             // A 200 with an empty body is how ADT answers a read of something
             // not ready yet, and patching that would build a document out of
             // nothing. Nothing below can run without it.
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `${domainName} was created but its document read back empty`,
             );
-            return;
           }
           const typed = patchXmlElement(
             patchXmlElement(shellDocument, 'doma:datatype', 'CHAR'),
@@ -663,12 +640,9 @@ describe('AdtRequest', () => {
           );
           const domainLock = await domain.lock({ domainName });
           if (!domainLock.ok) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `could not lock ${domainName}: ${domainLock.getError().message}`,
             );
-            return;
           }
           const domainHandle = domainLock.getResult().value;
           try {
@@ -708,14 +682,11 @@ describe('AdtRequest', () => {
           const entry = await findEntry(sharedRequest, domainName);
           if (entry === undefined) {
             // The system detached it by itself; there is nothing to remove and
-            // nothing this member could be measured against. A skip, because
+            // nothing this member could be measured against. A failure, because
             // `removeObject` was never called.
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
             );
-            return;
           }
           logTestStep(
             `entry sits on task ${entry.task} at position ${entry.position}`,

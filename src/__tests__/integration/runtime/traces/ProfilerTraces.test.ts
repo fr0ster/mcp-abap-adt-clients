@@ -506,12 +506,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       }
 
       if (!resolvedTraceId) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'no trace id available (previous tests did not resolve one)',
+        throw new Error(
+          'no trace id available: the earlier tests of this file did not resolve one',
         );
-        return;
       }
 
       try {
@@ -665,12 +662,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // Deliberately NOT falling back to `resolvedTraceId`: that one can come
         // from the feed, and deleting a trace this file did not make is not
         // this test's business.
-        logTestSkip(
-          testsLogger,
-          testName,
-          'the profiled run produced no trace to delete',
-        );
-        return;
+        throw new Error('the profiled run produced no trace to delete');
       }
 
       try {

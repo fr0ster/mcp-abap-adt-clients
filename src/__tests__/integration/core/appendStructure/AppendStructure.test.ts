@@ -208,12 +208,9 @@ describe('AppendStructure (TABL/DS) integration', () => {
             }
           }
           if (!baseExists) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
+            throw new Error(
               `base ${baseKey} '${baseObject}' does not exist — create it or set create_append_structure.params.${baseKey} to an existing object`,
             );
-            return;
           }
 
           const as = client.getAppendStructure();

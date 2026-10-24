@@ -41,7 +41,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -229,12 +228,9 @@ describe('AccessControl (using AdtClient)', () => {
             accessControlName: accessControlName,
           });
           if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              'AccessControl - read standard object',
+            throw new Error(
               `Standard access control ${accessControlName} not found in system`,
             );
-            return;
           }
           expect(resultState).toBeDefined();
 

@@ -39,7 +39,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -458,12 +457,9 @@ describe('ServiceBinding (using AdtClient)', () => {
             bindingName,
           });
           if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              'ServiceBinding - read standard object',
+            throw new Error(
               `Service binding ${bindingName} was not found in current system`,
             );
-            return;
           }
           expect(resultState).toBeDefined();
 

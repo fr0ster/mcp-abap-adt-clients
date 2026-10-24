@@ -38,7 +38,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -293,15 +292,6 @@ describe('FunctionModule (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, 'FunctionModule - read standard object');
         } catch (error: any) {
-          const status = error.response?.status;
-          if (status === 404 || status === 500 || status === 403) {
-            logTestSkip(
-              testsLogger,
-              'FunctionModule - read standard object',
-              `Standard function module ${standardFunctionGroupName}/${standardFunctionModuleName} is not accessible (HTTP ${status}). This may be normal for some systems.`,
-            );
-            return;
-          }
           logTestError(
             testsLogger,
             'FunctionModule - read standard object',

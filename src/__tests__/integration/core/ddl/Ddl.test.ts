@@ -210,13 +210,14 @@ describe('View (using AdtClient)', () => {
       const ddlName = tfCase?.params?.ddl_name;
       if (!ddlName) throw new Error('ddl_name not configured');
 
-      // A table function that is not on this system answers an empty body, and
-      // the assertions below say what it must contain — so absence fails on the
-      // content rather than being caught and skipped.
-      const answer = await client.getDdl().read({ ddlName }, 'active');
-      if (!answer.ok) return; // object absent on this system → skip, not fail
+      // A refused read (absent object, no authorisation, server error) fails
+      // with the reason; an empty body fails on the content below.
+      const answer = expectResult(
+        await client.getDdl().read({ ddlName }, 'active'),
+        `read table function ${ddlName}`,
+      );
 
-      const src = String(answer.getResult().value ?? '').toLowerCase();
+      const src = String(answer ?? '').toLowerCase();
       expect(src).toContain('define table function');
       expect(src).toContain('implemented by method');
     },

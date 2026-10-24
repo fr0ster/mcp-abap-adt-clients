@@ -28,6 +28,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -48,7 +49,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -532,27 +532,14 @@ describe('Class local includes (using BaseTester)', () => {
         const testName = 'Class - LocalMacros - full workflow';
         const config = await localMacrosTester.requireConfig();
 
-        // Some on-premise systems may still not expose the macros include; skip if absent.
-        const existing = await client
-          .getLocalMacros()
-          .read({ className: config.className }, 'active');
-        // `read` answers `IAdtResponse`, an object on both halves, so
-        // `if (!existing)` was never true and this skip never fired. The
-        // question is whether the read succeeded.
-        if (!existing.ok) {
-          const definition = getTestCaseDefinition(
-            'update_class_local_macros',
-            'local_macros',
-          );
-          logTestStart(testsLogger, testName, definition);
-          logTestSkip(
-            testsLogger,
-            testName,
-            'Macros include is not available in this system',
-          );
-          logTestEnd(testsLogger, testName);
-          return;
-        }
+        // The case is on-premise only (its `available_in`), where the macros
+        // include is there; a refused read fails with the reason.
+        expectResult(
+          await client
+            .getLocalMacros()
+            .read({ className: config.className }, 'active'),
+          'read the macros include',
+        );
 
         const tc = localMacrosTester.getTestCase();
         const params = tc?.params || {};

@@ -41,7 +41,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -234,12 +233,9 @@ describe('ServiceDefinition (using AdtClient)', () => {
             serviceDefinitionName: serviceDefinitionName,
           });
           if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              'ServiceDefinition - read standard object',
+            throw new Error(
               `Standard service definition ${serviceDefinitionName} not found in system`,
             );
-            return;
           }
           expect(resultState).toBeDefined();
           // ServiceDefinition read returns service definition config - check if serviceDefinitionName is present

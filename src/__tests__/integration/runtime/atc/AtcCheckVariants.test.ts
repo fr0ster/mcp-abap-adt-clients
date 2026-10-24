@@ -29,7 +29,7 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -94,12 +94,7 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
     async () => {
       const system = expectResult(await atc.resolveCheckVariant(), 'variant');
       if (!system) {
-        logTestSkip(
-          testsLogger,
-          'ATC check variants',
-          'no system check variant',
-        );
-        return;
+        throw new Error('the system names no default check variant');
       }
       const exact = namesOf(
         String(expectResult(await atc.listCheckVariants(system), 'exact')),
@@ -125,7 +120,8 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
   );
 
   variantsCase('returns fewer with a limit', async () => {
-    if (all.length < 10) return;
+    // A limit of 3 can only be seen to cut a list longer than 3.
+    expect(all.length).toBeGreaterThan(3);
     const limited = namesOf(
       String(
         expectResult(

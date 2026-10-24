@@ -171,14 +171,6 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         logTestSuccess(testsLogger, testName);
       } catch (error) {
         const status = (error as any)?.response?.status;
-        if (status === 406) {
-          logTestSkip(
-            testsLogger,
-            testName,
-            `HTTP ${status} — endpoint not acceptable on this system`,
-          );
-          return;
-        }
         // 400 is no longer skipped. It meant one thing and the comment here
         // named it correctly — the missing `category` — and skipping on it left
         // the method broken and the note unread. Measured on premise (BASIS 816): without a

@@ -371,10 +371,9 @@ describe('Group Activation (Shared)', () => {
               error.message?.includes('already exists') ||
               error.message?.includes('does already exist')
             ) {
-              testsLogger.warn?.(
-                `⚠️ Domain ${domainName} already exists, skipping test`,
+              throw new Error(
+                `Domain ${domainName} already exists: delete it before the run`,
               );
-              return;
             }
             // Otherwise, log warning but continue
             testsLogger.warn?.(`⚠️ Domain validation warning: ${error.message}`);
@@ -421,10 +420,9 @@ describe('Group Activation (Shared)', () => {
                 error.message?.includes('already exists') ||
                 error.message?.includes('does already exist')
               ) {
-                testsLogger.warn?.(
-                  `⚠️ Data element ${dataElementName} already exists, skipping test`,
+                throw new Error(
+                  `Data element ${dataElementName} already exists: delete it before the run`,
                 );
-                return;
               }
               // Otherwise, log warning but continue
               testsLogger.warn?.(
@@ -479,10 +477,9 @@ describe('Group Activation (Shared)', () => {
                 error.message?.includes('already exists') ||
                 error.message?.includes('does already exist')
               ) {
-                testsLogger.warn?.(
-                  `⚠️ Structure ${structureName} already exists, skipping test`,
+                throw new Error(
+                  `Structure ${structureName} already exists: delete it before the run`,
                 );
-                return;
               }
               // Otherwise, log warning but continue
               testsLogger.warn?.(

@@ -354,12 +354,6 @@ describe('Shared - read Accept headers', () => {
           .getLocalMacros()
           .read({ className: standardClassName }, 'active'),
       );
-      if (!state) {
-        testsLogger.warn?.(
-          '⚠️ Skipping test: Local macros include not available',
-        );
-        return;
-      }
       assertReadResult(state, 'local macros', standardClassName);
 
       const metadataState = await runReadMetadataWithAcceptLogging(
