@@ -20,6 +20,7 @@ import type { ITableConfig } from '../../../../core/table';
 import { getTableSource } from '../../../../core/table/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -36,7 +37,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -148,21 +148,10 @@ describe('Table (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_table', 'adt_table')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const updatedDdlCode =
@@ -183,7 +172,7 @@ describe('Table (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('table')(
       'should read standard SAP table',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -194,16 +183,9 @@ describe('Table (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('table');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Table - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Table - read standard object',
+          throw new Error(
             `Standard table not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardTableName = standardObject.name;
@@ -211,15 +193,6 @@ describe('Table (using AdtClient)', () => {
           name: 'read_standard',
           params: { table_name: standardTableName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Table - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

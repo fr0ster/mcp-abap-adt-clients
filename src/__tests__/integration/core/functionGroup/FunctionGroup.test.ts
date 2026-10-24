@@ -12,6 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -21,7 +25,9 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -38,7 +44,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -132,71 +137,62 @@ describe('FunctionGroup (using AdtClient)', () => {
             const existing = presenceOf(
               await cleanupClient
                 .getFunctionGroup()
-                .readMetadata({ functionGroupName }),
+                .readMetadata(
+                  { functionGroupName },
+                  { analyse: analyseException },
+                ),
               `function group ${functionGroupName}`,
             );
+            // "Could not find out" is not "absent": the create would meet it.
+            if (existing.present === 'unknown') {
+              return { success: false, reason: existing.reason };
+            }
             if (existing.present === true) {
-              // Try to release any stale lock before deleting
-              try {
-                const locked = await cleanupClient
-                  .getFunctionGroup()
-                  .lock({ functionGroupName });
-                if (locked.ok) {
-                  await cleanupClient
-                    .getFunctionGroup()
-                    .unlock({ functionGroupName }, locked.getResult().value);
-                  testsLogger.info?.(
-                    `Released stale lock on ${functionGroupName}`,
-                  );
-                }
-              } catch (lockError: any) {
-                // Lock failed — object locked by another user/session
-                const msg = lockError.message || String(lockError);
-                if (
-                  lockError.response?.status === 403 ||
-                  msg.includes('currently editing')
-                ) {
-                  testsLogger.warn(
-                    `Cannot release lock on ${functionGroupName}: ${msg}. ` +
-                      `Clear the lock in SM12 or close SE80.`,
-                  );
-                  return {
-                    success: false,
-                    reason: `${functionGroupName} is locked: ${msg}. Clear lock in SM12.`,
-                  };
-                }
-                // Other lock errors (404 etc.) — ignore and try delete anyway
-              }
-
+              // No lock is taken here to "release" one: a lock in this session
+              // cannot release another session's, and this session holds none.
+              // A delete of an object locked elsewhere is refused, and that
+              // refusal fails the setup with what SAP said.
               try {
                 const transportRequest = tester.getTransportRequest();
-                await cleanupClient.getFunctionGroup().delete(
+                const removed = await cleanupClient.getFunctionGroup().delete(
                   {
                     functionGroupName,
                     transportRequest,
                   },
                   {
+                    analyse: judged(analyseDeletion),
                     headers: integrationHeadersOf(
                       cleanupClient.getFunctionGroup(),
                       'delete',
                     ),
                   },
                 );
+                if (!removed.ok) {
+                  return {
+                    success: false,
+                    objectExists: true,
+                    reason: failureOf(
+                      removed,
+                      `delete existing function group ${functionGroupName}`,
+                    ),
+                  };
+                }
                 await new Promise((resolve) => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
-                testsLogger.warn(
-                  `Could not delete existing function group ${functionGroupName}: ${cleanupError.message}. Will attempt update instead of create.`,
-                );
-                return { success: true, objectExists: true };
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: `Failed to delete existing function group ${functionGroupName}: ${cleanupError.message}`,
+                };
               }
             }
           } catch (error: any) {
-            if (error.response?.status !== 404) {
-              return {
-                success: false,
-                reason: `Cannot verify function group existence: ${error.message}`,
-              };
-            }
+            // Presence is read from the answer above; a throw is a failure of
+            // the setup itself, whatever its status.
+            return {
+              success: false,
+              reason: `Cannot verify function group existence: ${error.message}`,
+            };
           }
           return { success: true };
         },
@@ -214,21 +210,10 @@ describe('FunctionGroup (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_function_group', 'adt_function_group')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           updateTakesDocument: (current) =>
@@ -250,7 +235,7 @@ describe('FunctionGroup (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('function_group')(
       'should read standard SAP function group',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -261,16 +246,9 @@ describe('FunctionGroup (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('function_group');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'FunctionGroup - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            libraryLogger,
-            'FunctionGroup - read standard object',
+          throw new Error(
             `Standard function group not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardFunctionGroupName = standardObject.name;
@@ -278,15 +256,6 @@ describe('FunctionGroup (using AdtClient)', () => {
           name: 'read_standard',
           params: { function_group_name: standardFunctionGroupName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'FunctionGroup - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

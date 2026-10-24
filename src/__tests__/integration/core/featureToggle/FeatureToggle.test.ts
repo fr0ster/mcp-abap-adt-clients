@@ -7,12 +7,19 @@
  *  DEBUG_ADT_LIBS=true    - FeatureToggle library logs
  *  DEBUG_CONNECTORS=true  - Connection logs (@mcp-abap-adt/connection)
  *
+ * Whether the write cases run on a system is the configuration's: a system
+ * that refuses feature-toggle writes (on premise: 403 "It is not allowed to
+ * create/update feature toggles in this system.", #131) is excluded by the
+ * case's `enabled` / `available_in`, never by reading the refusal.
+ *
  * Run: npm test -- --testPathPatterns=featureToggle/FeatureToggle
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseDeletion,
+  analyseException,
   featureToggleCheckState,
   featureToggleRuntimeState,
 } from '@mcp-abap-adt/adt-strategies';
@@ -27,7 +34,15 @@ import { featureToggleDocuments } from '../../../../core/featureToggle/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -44,7 +59,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -56,8 +70,6 @@ const featureToggleReadings = {
 };
 
 const {
-  getEnabledTestCase,
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   resolveMasterSystem,
@@ -80,29 +92,17 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-/**
- * The system's own refusal to create feature toggles.
- *
- * the on-premise system answers `403 "It is not allowed to create/update feature toggles in this
- * system."` — a policy, not a defect and not something a test can arrange
- * around. Recognised so the suite can say that instead of failing, and
- * recognised narrowly: any other 403 is a real failure and still is one.
- */
-function isCreationForbiddenBySystem(error: unknown): boolean {
-  const e = error as { response?: { status?: number; data?: unknown } };
-  if (e?.response?.status !== 403) return false;
-  const body =
-    typeof e.response?.data === 'string'
-      ? e.response.data
-      : JSON.stringify(e.response?.data ?? '');
-  return /not allowed to create\/update feature toggles/i.test(body);
+/** A gated test whose setup failed is red with the reason, never a skip. */
+function notReady(reason: string): Error {
+  return new Error(
+    `Test could not be set up: ${reason}. Nothing was verified.`,
+  );
 }
 
 describe('FeatureToggle (using AdtClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -113,10 +113,12 @@ describe('FeatureToggle (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -142,29 +144,29 @@ describe('FeatureToggle (using AdtClient)', () => {
     if (!connection || !client) {
       return { success: true };
     }
-    try {
-      await client.getFeatureToggle().readMetadata({ featureToggleName });
-      return {
-        success: false,
-        objectExists: true,
-        reason:
-          `⚠️ SAFETY: Feature toggle ${featureToggleName} already exists! ` +
-          `Delete manually or use a different test name to avoid accidental deletion.`,
-      };
-    } catch (error: any) {
-      const status = error?.response?.status ?? error?.status;
-      if (status === 404) {
-        return { success: true };
-      }
-      return {
-        success: false,
-        reason: `Cannot verify feature toggle existence: ${error.message}`,
-      };
+    // The answer decides. A read does not throw for a missing object, so
+    // "no throw" read as "it exists" for every toggle — see `presenceOf`.
+    const existing = presenceOf(
+      await client
+        .getFeatureToggle()
+        .readMetadata({ featureToggleName }, { analyse: analyseException }),
+      `feature toggle ${featureToggleName}`,
+    );
+    if (existing.present === false) return { success: true };
+    if (existing.present === 'unknown') {
+      return { success: false, reason: existing.reason };
     }
+    return {
+      success: false,
+      objectExists: true,
+      reason:
+        `⚠️ SAFETY: Feature toggle ${featureToggleName} already exists! ` +
+        `Delete manually or use a different test name to avoid accidental deletion.`,
+    };
   }
 
   function getTestDefinition() {
-    return getTestCaseDefinition('create_feature_toggle', 'adt_feature_toggle');
+    return configuredCase('create_feature_toggle', 'adt_feature_toggle');
   }
 
   function buildConfig(testCase: any, resolver?: any) {
@@ -188,53 +190,33 @@ describe('FeatureToggle (using AdtClient)', () => {
   }
 
   /**
-   * Gather the gating state (skipReason, testCase, featureToggleName) used by
-   * every `it()` block below. Returns `skipReason` non-null when the test
+   * Gather the gating state (setupError, testCase, featureToggleName) used by
+   * every `it()` block below. Returns `setupError` non-null when the test
    * should be skipped. Mirrors the AuthorizationField beforeEach but is
    * callable so the domain-method tests can reuse it.
    */
   async function resolveTestContext(): Promise<{
-    skipReason: string | null;
+    setupError: string | null;
     testCase: any | null;
     featureToggleName: string | null;
   }> {
     if (!hasConfig) {
       return {
-        skipReason: 'No SAP configuration',
+        setupError: 'No SAP configuration',
         testCase: null,
         featureToggleName: null,
       };
     }
 
-    const definition = getTestDefinition();
-    if (!definition) {
-      return {
-        skipReason: 'Test case not defined in test-config.yaml',
-        testCase: null,
-        featureToggleName: null,
-      };
-    }
-
-    if (
-      !TestConfigResolver.isTestAvailable(definition, isCloudSystem, isLegacy)
-    ) {
-      return {
-        skipReason: `Test not available for ${
-          isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'
-        } environment`,
-        testCase: null,
-        featureToggleName: null,
-      };
-    }
-
-    const tc = getEnabledTestCase(
-      'create_feature_toggle',
-      'adt_feature_toggle',
-    );
+    // The gate registered the tests, so the case is configured, enabled and
+    // available here; a case that is not there is a defect, not a skip.
+    const tc = getTestDefinition();
     if (!tc) {
       return {
-        skipReason:
-          'create_feature_toggle is disabled — this is a deliberate run (#131)',
+        setupError: missingCaseMessage(
+          'create_feature_toggle',
+          'adt_feature_toggle',
+        ),
         testCase: null,
         featureToggleName: null,
       };
@@ -243,14 +225,14 @@ describe('FeatureToggle (using AdtClient)', () => {
     const packageCheck = ensurePackageConfig(tc.params, 'FeatureToggle');
     if (!packageCheck.success) {
       return {
-        skipReason: packageCheck.reason || 'Default package is not configured',
+        setupError: packageCheck.reason || 'Default package is not configured',
         testCase: null,
         featureToggleName: null,
       };
     }
 
     return {
-      skipReason: null,
+      setupError: null,
       testCase: tc,
       featureToggleName: tc.params.feature_toggle_name,
     };
@@ -266,15 +248,14 @@ describe('FeatureToggle (using AdtClient)', () => {
     testCase: any,
     featureToggleName: string,
   ): Promise<string | null> {
-    try {
-      await client.getFeatureToggle().readMetadata({ featureToggleName });
-      return null;
-    } catch (error: any) {
-      const status = error?.response?.status ?? error?.status;
-      if (status !== 404) {
-        return `Cannot verify feature toggle: ${error.message}`;
-      }
-    }
+    const existing = presenceOf(
+      await client
+        .getFeatureToggle()
+        .readMetadata({ featureToggleName }, { analyse: analyseException }),
+      `feature toggle ${featureToggleName}`,
+    );
+    if (existing.present === true) return null;
+    if (existing.present === 'unknown') return existing.reason;
     try {
       const resolver = new TestConfigResolver({
         testCase,
@@ -282,10 +263,13 @@ describe('FeatureToggle (using AdtClient)', () => {
         logger: testsLogger,
       });
       const config = buildConfig(testCase, resolver);
-      await client.getFeatureToggle().create(config, {
+      const created = await client.getFeatureToggle().create(config, {
+        analyse: analyseException,
         headers: integrationHeadersOf(client.getFeatureToggle(), 'create'),
       });
-      return null;
+      return created.ok
+        ? null
+        : failureOf(created, `create feature toggle ${featureToggleName}`);
     } catch (error: any) {
       return `Failed to create feature toggle for domain test: ${error.message}`;
     }
@@ -294,15 +278,15 @@ describe('FeatureToggle (using AdtClient)', () => {
   describe('Full workflow', () => {
     let testCase: any = null;
     let featureToggleName: string | null = null;
-    let skipReason: string | null = null;
+    let setupError: string | null = null;
 
     beforeEach(async () => {
       const ctx = await resolveTestContext();
-      skipReason = ctx.skipReason;
+      setupError = ctx.setupError;
       testCase = ctx.testCase;
       featureToggleName = ctx.featureToggleName;
 
-      if (skipReason || !featureToggleName) {
+      if (setupError || !featureToggleName) {
         return;
       }
 
@@ -314,30 +298,34 @@ describe('FeatureToggle (using AdtClient)', () => {
           cleanup.objectExists
         ) {
           try {
-            await client.getFeatureToggle().delete(
-              {
-                featureToggleName,
-                transportRequest: resolveTransportRequest(
-                  testCase.params.transport_request,
-                ),
-              },
-              {
-                headers: integrationHeadersOf(
-                  client.getFeatureToggle(),
-                  'delete',
-                ),
-              },
+            expectResult(
+              await client.getFeatureToggle().delete(
+                {
+                  featureToggleName,
+                  transportRequest: resolveTransportRequest(
+                    testCase.params.transport_request,
+                  ),
+                },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(
+                    client.getFeatureToggle(),
+                    'delete',
+                  ),
+                },
+              ),
+              `delete pre-existing feature toggle ${featureToggleName}`,
             );
             testsLogger.info?.(
               `Pre-existing feature toggle ${featureToggleName} deleted before test`,
             );
           } catch (deleteErr: any) {
-            skipReason = `Pre-existing feature toggle cleanup failed: ${deleteErr.message}`;
+            setupError = `Pre-existing feature toggle cleanup failed: ${deleteErr.message}`;
             testCase = null;
             featureToggleName = null;
           }
         } else {
-          skipReason =
+          setupError =
             cleanup.reason || 'Failed to cleanup feature toggle before test';
           testCase = null;
           featureToggleName = null;
@@ -345,24 +333,18 @@ describe('FeatureToggle (using AdtClient)', () => {
       }
     });
 
-    it(
+    gate('create_feature_toggle', 'adt_feature_toggle')(
       'should execute full workflow and store all results',
       async () => {
         const definition = getTestDefinition();
         logTestStart(testsLogger, 'FeatureToggle - full workflow', definition);
 
-        if (skipReason) {
-          logTestSkip(testsLogger, 'FeatureToggle - full workflow', skipReason);
-          return;
+        if (setupError || !featureToggleName) {
+          throw notReady(setupError ?? 'feature_toggle_name not configured');
         }
 
         if (!testCase || !featureToggleName) {
-          logTestSkip(
-            testsLogger,
-            'FeatureToggle - full workflow',
-            skipReason || 'Test case not available',
-          );
-          return;
+          throw notReady('feature_toggle_name not configured');
         }
 
         const resolver = new TestConfigResolver({
@@ -393,17 +375,10 @@ describe('FeatureToggle (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, 'FeatureToggle - full workflow');
         } catch (error: any) {
-          // The system refusing to have feature toggles created in it is not a
-          // failure of this code, and no arrangement here can get past it.
-          // Anything else is, and still fails.
-          if (isCreationForbiddenBySystem(error)) {
-            logTestSkip(
-              testsLogger,
-              'FeatureToggle - full workflow',
-              'the system does not allow creating feature toggles — 403 "It is not allowed to create/update feature toggles in this system."',
-            );
-            return;
-          }
+          // A system that refuses feature-toggle writes (on premise answers
+          // 403 "It is not allowed to create/update feature toggles in this
+          // system.", #131) fails here like any refusal. Whether the case runs
+          // on a system is its `enabled` / `available_in` in the config.
           logTestError(testsLogger, 'FeatureToggle - full workflow', error);
           throw error;
         } finally {
@@ -417,15 +392,15 @@ describe('FeatureToggle (using AdtClient)', () => {
   describe('Domain methods', () => {
     let testCase: any = null;
     let featureToggleName: string | null = null;
-    let skipReason: string | null = null;
+    let setupError: string | null = null;
 
     beforeEach(async () => {
       const ctx = await resolveTestContext();
-      skipReason = ctx.skipReason;
+      setupError = ctx.setupError;
       testCase = ctx.testCase;
       featureToggleName = ctx.featureToggleName;
 
-      if (skipReason || !featureToggleName || !testCase) {
+      if (setupError || !featureToggleName || !testCase) {
         return;
       }
 
@@ -435,28 +410,26 @@ describe('FeatureToggle (using AdtClient)', () => {
         featureToggleName,
       );
       if (ensureReason) {
-        skipReason = ensureReason;
+        setupError = ensureReason;
         testCase = null;
         featureToggleName = null;
       }
     });
 
-    it(
+    gate('create_feature_toggle', 'adt_feature_toggle')(
       'should fetch runtime state',
       async () => {
-        if (skipReason || !featureToggleName) {
-          logTestSkip(
-            testsLogger,
-            'FeatureToggle - getRuntimeState',
-            skipReason || 'Test case not available',
-          );
-          return;
+        if (setupError || !featureToggleName) {
+          throw notReady(setupError ?? 'feature_toggle_name not configured');
         }
         // The states are JSON documents; the readings that build the shapes
         // asserted below are strategies the test passes.
         const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
-          await handler.getRuntimeState({ featureToggleName }),
+          await handler.getRuntimeState(
+            { featureToggleName },
+            { analyse: analyseException },
+          ),
           'getRuntimeState',
         );
         expect(state.name).toBe(featureToggleName.toUpperCase());
@@ -465,22 +438,18 @@ describe('FeatureToggle (using AdtClient)', () => {
       getTimeout('test'),
     );
 
-    it(
+    gate('create_feature_toggle', 'adt_feature_toggle')(
       'should check state (pre-flight)',
       async () => {
-        if (skipReason || !featureToggleName) {
-          logTestSkip(
-            testsLogger,
-            'FeatureToggle - checkState',
-            skipReason || 'Test case not available',
-          );
-          return;
+        if (setupError || !featureToggleName) {
+          throw notReady(setupError ?? 'feature_toggle_name not configured');
         }
         // The states are JSON documents; the readings that build the shapes
         // asserted below are strategies the test passes.
         const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
           await handler.checkState({ featureToggleName }, undefined, {
+            analyse: analyseException,
             headers: integrationHeadersOf(handler, 'checkState'),
           }),
           'checkState',
@@ -490,16 +459,11 @@ describe('FeatureToggle (using AdtClient)', () => {
       getTimeout('test'),
     );
 
-    it(
+    gate('create_feature_toggle', 'adt_feature_toggle')(
       'should read source',
       async () => {
-        if (skipReason || !featureToggleName) {
-          logTestSkip(
-            testsLogger,
-            'FeatureToggle - readSource',
-            skipReason || 'Test case not available',
-          );
-          return;
+        if (setupError || !featureToggleName) {
+          throw notReady(setupError ?? 'feature_toggle_name not configured');
         }
         // The states are JSON documents; the readings that build the shapes
         // asserted below are strategies the test passes.
@@ -508,7 +472,9 @@ describe('FeatureToggle (using AdtClient)', () => {
         // `IFeatureToggleSource` parsed out of it supplies a strategy that does
         // it — this member does not decide that for everyone.
         const source = expectResult(
-          await handler.readSource({ featureToggleName }),
+          await handler.readSource({ featureToggleName }, undefined, {
+            analyse: analyseException,
+          }),
           'readSource',
         );
         expect(typeof source).toBe('string');
@@ -519,17 +485,15 @@ describe('FeatureToggle (using AdtClient)', () => {
     // Switch on/off requires a transport request. The ABAP Cloud system has no transport
     // system, so gate the test with it.skip when none is configured.
     const resolvedTransport = resolveTransportRequest();
-    const switchIt = resolvedTransport ? it : it.skip;
+    const switchIt = gateAll(
+      gate('create_feature_toggle', 'adt_feature_toggle'),
+      resolvedTransport ? it : it.skip,
+    );
     switchIt(
       'should switch toggle on/off',
       async () => {
-        if (skipReason || !featureToggleName) {
-          logTestSkip(
-            testsLogger,
-            'FeatureToggle - switch on/off',
-            skipReason || 'Test case not available',
-          );
-          return;
+        if (setupError || !featureToggleName) {
+          throw notReady(setupError ?? 'feature_toggle_name not configured');
         }
         const transportRequest = resolveTransportRequest(
           testCase?.params?.transport_request,
@@ -541,11 +505,18 @@ describe('FeatureToggle (using AdtClient)', () => {
         // second request, and the test makes it because the library no longer
         // makes it for the caller.
         expectResult(
-          await handler.switchOn({ featureToggleName }, { transportRequest }),
+          await handler.switchOn(
+            { featureToggleName },
+            { transportRequest },
+            { analyse: analyseException },
+          ),
           'switchOn',
         );
         const onState = expectResult(
-          await handler.getRuntimeState({ featureToggleName }),
+          await handler.getRuntimeState(
+            { featureToggleName },
+            { analyse: analyseException },
+          ),
           'onState',
         );
         expect(
@@ -553,11 +524,18 @@ describe('FeatureToggle (using AdtClient)', () => {
         ).toBe(true);
 
         expectResult(
-          await handler.switchOff({ featureToggleName }, { transportRequest }),
+          await handler.switchOff(
+            { featureToggleName },
+            { transportRequest },
+            { analyse: analyseException },
+          ),
           'switchOff',
         );
         const offState = expectResult(
-          await handler.getRuntimeState({ featureToggleName }),
+          await handler.getRuntimeState(
+            { featureToggleName },
+            { analyse: analyseException },
+          ),
           'offState',
         );
         expect(

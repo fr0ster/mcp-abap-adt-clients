@@ -142,6 +142,14 @@ environment:
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
   default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
+  verify_lock_released: true                  # ← CHANGE: after each UNLOCK, a second ABAP session LOCKs the object
+                                              #   to prove the lock was released. On: any refusal (404 included)
+                                              #   fails. Off: not made, and the run says so. false on cloud, where
+                                              #   the second session can land on a server that cannot see a new
+                                              #   object yet (404, measured).
+  read_message_class_after_create: true       # ← CHANGE: the message-class flow reads the class right after its
+                                              #   create. On: any refusal (404 included) fails. Off: not read, and
+                                              #   the run says so. false on cloud (same 404, measured).
   # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
   # is_legacy: true         # Uncomment for BASIS < 7.50 systems (for example a legacy system). Also set SAP_UNICODE=false in .env for non-unicode systems.
 
@@ -1577,12 +1585,14 @@ create_message_class:
 # Create Scalar Function (CDS DSFD/SCF)
 # ScalarFunction is a CDS object (DDL source) available on ABAP Cloud and modern
 # on-premise systems that support the /sap/bc/adt/ddic/dsfd/* endpoints.
-# The suite probes discovery + create at runtime and skips on HTTP 404/405/501.
+# Whether DSFD is on the system is this case's `enabled` / `available_in`: an
+# enabled case whose create is refused (404/405/501 included) fails.
 create_scalar_function:
   test_cases:
     - name: "adt_scalar_function"
       enabled: true
-      # available_in is a hint only; the suite probes discovery + create at runtime
+      # enabled / available_in decide where the case runs (overlay: …enabled);
+      # a refused create — 404/405/501 included — fails the test
       description: "Scalar function reserved for AdtScalarFunction tests"
       params:
         scalar_function_name: "ZADT_SCALAR_FUNC"  # ← CHANGE if needed
@@ -1626,7 +1636,8 @@ create_scalar_function:
 # DSFI implementation JSON inline from the names below — no source params needed.
 # Flow: create DSFD (+activate) → create AMDP class → create DSFI → update() the
 # implementation JSON (PUT /source/main, sets amdpReference) → group-activate the
-# trio → read/readMetadata → delete all three. Skips on HTTP 404/405/501.
+# trio → read/readMetadata → delete all three. Availability is this case's
+# `enabled` / `available_in`: an enabled case whose create is refused fails.
 create_scalar_function_implementation:
   test_cases:
     - name: "adt_scalar_function_implementation"
@@ -1644,12 +1655,14 @@ create_scalar_function_implementation:
 # Create Append Structure (TABL/DS append)
 # Append structures extend an existing transparent table or structure with
 # additional fields. The suite creates two variants — one with a structure base
-# and one with a table base — and skips silently on HTTP 404/405/501.
+# and one with a table base. Availability is this case's `enabled` /
+# `available_in`: an enabled case whose create is refused (404/405/501 included) fails.
 create_append_structure:
   test_cases:
     - name: "adt_append_structure"
       enabled: true
-      # available_in is a hint only; the suite probes create at runtime and skips on 404/405/501
+      # enabled / available_in decide where the case runs (overlay: …enabled);
+      # a refused create — 404/405/501 included — fails the test
       description: "Append structure reserved for AdtAppendStructure tests"
       params:
         append_structure_name: "ZADT_S_APPEND"  # ← CHANGE if needed (suffixed _S/_T per variant)
@@ -1811,8 +1824,11 @@ create_service_binding:
 # on/off switch then act on an object that was never made. Like service
 # binding publication, this is `enabled: false` by default and turned on by
 # hand, on a system where Switch Framework permits it:
-#   1. set create_feature_toggle.enabled: true
+#   1. set create_feature_toggle.enabled: true (overlay:
+#      "create_feature_toggle.test_cases[adt_feature_toggle].enabled": true)
 #   2. `npm test -- integration/core/featureToggle`
+# On a system that refuses the writes the test FAILS with SAP's 403 — the
+# refusal is never read as "not available here"; leave the case disabled there.
 create_feature_toggle:
   test_cases:
     - name: "adt_feature_toggle"
@@ -1849,6 +1865,12 @@ create_function_module:
       params:
         function_module_name: "Z_AC_FM03"  # Must start with Z_ or Y_ (with underscore)
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
+        # Where the function group comes from, chosen here before the run:
+        # "shared" = shared_dependencies.function_groups in the shared package;
+        # "default_package" = the group in package_name / environment.default_package
+        # (a system with no shared package). Either route's failure fails the
+        # test; neither is a recovery from the other.
+        function_group_route: "shared"
         description: "AdtFunctionModule workflow FM"
         # package_name: "ZAC_PKG01"
         # transport_request: ""
@@ -1876,6 +1898,12 @@ create_function_include:
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
+        # Where the function group comes from, chosen here before the run:
+        # "shared" = shared_dependencies.function_groups in the shared package;
+        # "default_package" = the group in package_name / environment.default_package
+        # (a system with no shared package). Either route's failure fails the
+        # test; neither is a recovery from the other.
+        function_group_route: "shared"
         # Z03, not Z02. This case creates the include and deletes it again, and
         # Z02 is the shared one declared in shared_dependencies — pointing both
         # at the same name means every run destroys the shared object, and the
@@ -2496,6 +2524,20 @@ package_hierarchy:
       enabled: true
       description: "Test getPackageHierarchy for a package"
       # package_name: "<YOUR_PACKAGE_NAME>"  # Uses environment.default_package if omitted
+      params: {}
+
+# Check (integration/shared/checkRun) — what `check` answers for a class.
+# Uses the class of read_source/read_class_source (standard_objects.classes).
+# A system that refuses the check — an authorization refusal such as
+# S_ABPLNGVS (the ABAP language version), as a failure or as an exception
+# document inside a 200 — FAILS these tests with what SAP said; a refusal is
+# never read as "not available here". On such a system set enabled: false
+# (or narrow available_in); the overlay forms carry the key.
+check_run:
+  test_cases:
+    - name: "class_check"
+      enabled: true
+      description: "check a stored class, broken source and an absent class"
       params: {}
 
 # Read Source (readObjectSource)

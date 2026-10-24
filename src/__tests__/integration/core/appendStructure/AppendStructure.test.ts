@@ -4,8 +4,10 @@
  * - structure base (extends an existing DDIC structure)
  * - table base (extends an existing transparent table)
  *
- * Skip gate: HTTP 404/405/501 → feature absent on this system (silently skip).
- * All other errors (401/403/timeout/5xx) are real failures and are rethrown.
+ * Whether the append-structure feature exists on a system is the configuration's to say — the case's
+ * `enabled` / `available_in`, read by the registration gate — never inferred
+ * from an answer: an enabled case whose create is refused, 404/405/501
+ * included, fails with what SAP said.
  *
  * Enable debug logs:
  *  DEBUG_ADT_TESTS=true   - Integration test execution logs
@@ -16,14 +18,33 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
+  expectResult,
+  failureOf,
+  noteCleanupRefusal,
+  releasing,
+} from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
+import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -39,13 +60,11 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -61,13 +80,9 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-/** HTTP status codes that indicate append structures are absent on this system. */
-const SKIP_STATUSES = new Set([404, 405, 501]);
-
 describe('AppendStructure (TABL/DS) integration', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -84,11 +99,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
         systemContext,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -102,16 +116,33 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
   for (const { label, baseKey } of cases) {
     describe(`Full workflow — ${label}`, () => {
-      it(
-        'create → read → update → activate → delete (skips only on 404/405/501)',
+      gateAll(
+        gate('create_append_structure', 'adt_append_structure'),
+        // The base is configured per variant; a variant without one has
+        // nothing to extend.
+        gateOn(
+          () =>
+            !!configuredCase('create_append_structure', 'adt_append_structure')
+              ?.params?.[baseKey],
+        ),
+      )(
+        'create → read → update → activate → delete',
         async () => {
           const TEST_LABEL = `AppendStructure - full workflow (${label})`;
 
           // Resolve test-case params from test-config.yaml (key: create_append_structure)
-          const testCase = getEnabledTestCase(
+          const testCase = configuredCase(
             'create_append_structure',
             'adt_append_structure',
           );
+          if (!testCase) {
+            throw new Error(
+              missingCaseMessage(
+                'create_append_structure',
+                'adt_append_structure',
+              ),
+            );
+          }
 
           const resolver = new TestConfigResolver({
             testCase,
@@ -140,27 +171,16 @@ describe('AppendStructure (TABL/DS) integration', () => {
             },
           });
 
-          if (!hasConfig) {
-            logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
-            return;
-          }
-
           if (!packageName) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
+            throw new Error(
               'package_name not configured — set environment.default_package in test-config.yaml',
             );
-            return;
           }
 
           if (!baseObject) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
+            throw new Error(
               `${baseKey} not configured in test-config.yaml (create_append_structure.params.${baseKey})`,
             );
-            return;
           }
 
           const transportRequest: string | undefined = resolveTransportRequest(
@@ -169,7 +189,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
           // Preflight: the base object is a PREREQUISITE (like the root package) —
           // the suite does not create base tables/structures. If the configured base
-          // does not exist, skip with a clear reason instead of hard-failing on create.
+          // does not exist, the test fails naming the key to fix, before any create.
           let baseExists = true;
           try {
             // NOTE: read() 404 semantics differ — getStructure().read() returns
@@ -177,13 +197,21 @@ describe('AppendStructure (TABL/DS) integration', () => {
             // Check readResult for the table case to detect a missing base.
             if (baseKey === 'base_table') {
               const baseState = expectResult(
-                await client.getTable().read({ tableName: baseObject }),
+                await client
+                  .getTable()
+                  .read({ tableName: baseObject }, undefined, {
+                    analyse: analyseException,
+                  }),
                 'baseState',
               );
               baseExists = !!baseState;
             } else {
               const baseState = expectResult(
-                await client.getStructure().read({ structureName: baseObject }),
+                await client
+                  .getStructure()
+                  .read({ structureName: baseObject }, undefined, {
+                    analyse: analyseException,
+                  }),
                 'baseState',
               );
               baseExists = !!baseState;
@@ -198,49 +226,47 @@ describe('AppendStructure (TABL/DS) integration', () => {
             }
           }
           if (!baseExists) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
+            throw new Error(
               `base ${baseKey} '${baseObject}' does not exist — create it or set create_append_structure.params.${baseKey} to an existing object`,
             );
-            return;
           }
 
           const as = client.getAppendStructure();
 
           // ── 1) Idempotent cleanup of any leftover object from a previous run ──
-          try {
+          // Absent is the expected answer; any other refusal fails here.
+          expectRemovedOrAbsent(
             await as.delete(
               { appendStructureName, transportRequest },
-              { headers: integrationHeadersOf(as, 'delete') },
-            );
-          } catch {
-            // Ignore — object may not exist yet
-          }
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(as, 'delete'),
+              },
+            ),
+            `delete leftover append structure ${appendStructureName}`,
+          );
 
           // ── 2) Create (also confirms append structures are supported on this system) ──
-          try {
-            await as.create(
-              {
-                appendStructureName,
-                baseObject,
-                packageName,
-                transportRequest,
-                description: 'ADT integration test append structure',
-              },
-              { headers: integrationHeadersOf(as, 'create') },
+          // A refused create fails with what SAP said, 404/405/501 included:
+          // whether the feature is there is the case's `enabled` /
+          // `available_in`, not an answer to read it from.
+          const created = await as.create(
+            {
+              appendStructureName,
+              baseObject,
+              packageName,
+              transportRequest,
+              description: 'ADT integration test append structure',
+            },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(as, 'create'),
+            },
+          );
+          if (!created.ok) {
+            const createError = new Error(
+              failureOf(created, 'create append structure'),
             );
-          } catch (createError) {
-            const status = (createError as { response?: { status?: number } })
-              .response?.status;
-            if (status && SKIP_STATUSES.has(status)) {
-              logTestSkip(
-                testsLogger,
-                TEST_LABEL,
-                `Append structures unsupported on this system (HTTP ${status})`,
-              );
-              return;
-            }
             logTestError(testsLogger, TEST_LABEL, createError);
             throw createError;
           }
@@ -266,24 +292,32 @@ describe('AppendStructure (TABL/DS) integration', () => {
             // PUT and takes the handle it is given, so the three calls are
             // here, in the order this test decides.
             const appendLock = expectResult(
-              await as.lock({ appendStructureName }),
+              await as.lock(
+                { appendStructureName },
+                { analyse: analyseException },
+              ),
               'lock append structure',
             );
-            try {
-              expectResult(
-                await as.update(
-                  { appendStructureName, transportRequest },
-                  {
-                    headers: integrationHeadersOf(as, 'update'),
-                    source: source,
-                    lockHandle: appendLock,
-                  },
+            await releasing(
+              async () =>
+                expectResult(
+                  await as.update(
+                    { appendStructureName, transportRequest },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(as, 'update'),
+                      source: source,
+                      lockHandle: appendLock,
+                    },
+                  ),
+                  'update append structure',
                 ),
-                'update append structure',
-              );
-            } finally {
-              await as.unlock({ appendStructureName }, appendLock);
-            }
+              () =>
+                as.unlock({ appendStructureName }, appendLock, {
+                  analyse: analyseException,
+                }),
+              'unlock append structure',
+            );
             await expectLockReleased(
               (c) => c.getAppendStructure(),
               { appendStructureName },
@@ -293,7 +327,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
             expectResult(
               await as.activate(
                 { appendStructureName },
-                { headers: integrationHeadersOf(as, 'activate') },
+                {
+                  analyse: judged(analyseActivation),
+                  headers: integrationHeadersOf(as, 'activate'),
+                },
               ),
               'activate append structure',
             );
@@ -309,7 +346,9 @@ describe('AppendStructure (TABL/DS) integration', () => {
             //
             // Assert the field actually arrived.
             const writtenSource = expectResult(
-              await as.read({ appendStructureName }, 'active'),
+              await as.read({ appendStructureName }, 'active', {
+                analyse: analyseException,
+              }),
               'read append structure source',
             );
             expect(typeof writtenSource).toBe('string');
@@ -325,7 +364,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
                   appendStructureName,
                   transportRequest,
                 },
-                { headers: integrationHeadersOf(as, 'delete') },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(as, 'delete'),
+                },
               ),
               'deleteState',
             );
@@ -334,15 +376,20 @@ describe('AppendStructure (TABL/DS) integration', () => {
             logTestSuccess(testsLogger, TEST_LABEL);
           } catch (error) {
             logTestError(testsLogger, TEST_LABEL, error);
-            // Best-effort cleanup
-            try {
-              await as.delete(
-                { appendStructureName, transportRequest },
-                { headers: integrationHeadersOf(as, 'delete') },
-              );
-            } catch {
-              // Ignore cleanup errors
-            }
+            // The test already failed; a refused cleanup is added to that
+            // failure, not dropped.
+            await noteCleanupRefusal(
+              error,
+              () =>
+                as.delete(
+                  { appendStructureName, transportRequest },
+                  {
+                    analyse: judged(analyseDeletion),
+                    headers: integrationHeadersOf(as, 'delete'),
+                  },
+                ),
+              `delete append structure ${appendStructureName}`,
+            );
             throw error;
           } finally {
             logTestEnd(testsLogger, TEST_LABEL);

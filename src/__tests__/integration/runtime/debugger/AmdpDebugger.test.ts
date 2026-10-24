@@ -24,6 +24,7 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAmdpBreakpoint,
@@ -38,12 +39,19 @@ import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   createTestConnection,
   skipUnlessConfigured,
@@ -55,8 +63,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -66,7 +72,9 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase('runtime_debugger', 'adt_amdp_debugger');
+const testCase = configuredCase('runtime_debugger', 'adt_amdp_debugger');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_amdp_debugger');
 const CLASS_NAME: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_AMDP'
 ).toUpperCase();
@@ -168,7 +176,6 @@ describe('AMDP debugger (AmdpDebugger)', () => {
   let trigger: Connection | undefined;
   let onSession: AmdpDebugger;
   let onCommands: AmdpDebugger;
-  let skipReason: string | undefined;
 
   let mainId = '';
   let hanaSession = '';
@@ -180,14 +187,6 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     if (!condition) throw new Error(`not reached: ${what}`);
   }
 
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
-  }
-
   /**
    * Read events until one of `kinds` arrives; every event on the way is
    * returned too. A read that holds the server's full 200 s answers none, so
@@ -196,7 +195,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
   async function until(...kinds: string[]): Promise<IEvent[]> {
     const seen: IEvent[] = [];
     for (let reads = 0; reads < 6; reads++) {
-      const answer = await onSession.getEvents(mainId);
+      const answer = await onSession.getEvents(mainId, {
+        analyse: analyseException,
+      });
       expect(answer.ok).toBe(true);
       const batch = eventsOf(String(answer.ok ? answer.getResult().value : ''));
       seen.push(...batch);
@@ -223,15 +224,19 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
   function runClass(): void {
     needs(trigger, 'the trigger connection');
-    run = new ClassExecutor(trigger as Connection, connectionLogger).run({
-      className: CLASS_NAME,
-    });
+    run = new ClassExecutor(trigger as Connection, connectionLogger).run(
+      {
+        className: CLASS_NAME,
+      },
+      { analyse: analyseException },
+    );
   }
 
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_amdp_debugger is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_amdp_debugger'),
+      );
     }
     try {
       session = await createTestConnection(connectionLogger, {
@@ -245,8 +250,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     onSession = new AmdpDebugger(session, connectionLogger);
     onCommands = new AmdpDebugger(commands, connectionLogger);
@@ -293,19 +297,29 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       if (lastBreak && debuggeeId) {
         await steps.run(
           'release the debuggee',
-          () => onCommands.deleteDebuggee(mainId, debuggeeId),
+          () =>
+            onCommands.deleteDebuggee(mainId, debuggeeId, {
+              analyse: analyseException,
+            }),
           { checkAnswer: true },
         );
       }
-      await steps.run('stop the debug session', () => onCommands.stop(mainId), {
-        checkAnswer: true,
-      });
+      await steps.run(
+        'stop the debug session',
+        () => onCommands.stop(mainId, { analyse: analyseException }),
+        {
+          checkAnswer: true,
+        },
+      );
     }
     if (run) {
+      // The run must come back, with its output or a termination's 500, and
+      // is let go only once it has: a timeout or another answer fails.
       const pending = run;
-      await steps.run('wait for the run', () =>
-        Promise.race([pending, new Promise((r) => setTimeout(r, 30_000))]),
-      );
+      await steps.run('wait for the run', async () => {
+        await settleRun(pending, 30_000, 'the run', 'completed-or-terminated');
+        run = undefined;
+      });
     }
     await steps.logOff('the trigger session', trigger);
     await steps.logOff('the commands session', commands);
@@ -313,14 +327,16 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     steps.finish();
   }, STEP_TIMEOUT);
 
-  it(
+  debuggerCase(
     'starts a debug session for the user and names it in Location',
     async () => {
-      if (skipped()) return;
       const user = (await abapUserOf(session as Connection)).toUpperCase();
       // A session left behind by an interrupted run locks the user's AMDP
       // debugging (500 DEBUGGEE_CONTEXT_LOCKED_BY_ME, SY 530); a test takes it over.
-      const started = await onSession.start(user, { stopExisting: true });
+      const started = await onSession.start(user, {
+        analyse: analyseException,
+        stopExisting: true,
+      });
       expect(started.ok).toBe(true);
       mainId = /\/main\/([^/?]+)/.exec(locationOf(started))?.[1] ?? '';
       expect(mainId).toMatch(/^[0-9A-F]{32}$/);
@@ -331,12 +347,13 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'syncs breakpoints: the request id at once, the outcome as an event',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
-      const synced = await onCommands.syncBreakpoints(mainId, breakpoints());
+      const synced = await onCommands.syncBreakpoints(mainId, breakpoints(), {
+        analyse: analyseException,
+      });
       expect(synced.ok).toBe(true);
       const requestId = locationOf(synced);
       expect(requestId).toMatch(/^[0-9A-F]{32}$/);
@@ -352,10 +369,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops the procedure on its loop line with its variables',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
       runClass();
       const events = await until('ON_BREAK');
@@ -371,12 +387,13 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'steps over a statement and sees the variable change',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee');
-      const stepped = await onCommands.step(mainId, debuggeeId, 'over');
+      const stepped = await onCommands.step(mainId, debuggeeId, 'over', {
+        analyse: analyseException,
+      });
       expect(stepped.ok).toBe(true);
       expect(locationOf(stepped)).toMatch(/^[0-9A-F]{32}$/);
       await until('ON_BREAK');
@@ -386,31 +403,44 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'continues to the next iteration, then to the end of the procedure',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee');
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
+        'continue',
+      );
       await until('ON_BREAK');
       expect(lineOf(lastBreak as IEvent)).toBe(LINE.loop);
       expect(variablesOf(lastBreak as IEvent).get('LV_I')).toBe('2');
 
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
+        'continue',
+      );
       await until('ON_BREAK');
       expect(variablesOf(lastBreak as IEvent).get('LV_I')).toBe('3');
 
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
+        'continue',
+      );
       const end = await until('ON_EXECUTION_END', 'ON_BREAK');
       expect(end.some((e) => e.kind === 'ON_EXECUTION_END')).toBe(true);
     },
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops in the table function as a debuggee of its own',
     async () => {
-      if (skipped()) return;
       const procedureDebuggee = debuggeeId;
       if (lastBreak && lineOf(lastBreak) !== LINE.tf) await until('ON_BREAK');
       expect(lineOf(lastBreak as IEvent)).toBe(LINE.tf);
@@ -419,13 +449,17 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'reads a table variable: the whole of it, and through a SELECT of its own',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee in the table function');
       // One more iteration, so the table holds a row.
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
+        'continue',
+      );
       await until('ON_BREAK');
       expect(lineOf(lastBreak as IEvent)).toBe(LINE.tf);
 
@@ -451,6 +485,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
       // No body: the server selects every column, the row id included.
       const whole = await onCommands.getDataPreview({
+        analyse: analyseException,
         headers: integrationHeadersOf(onCommands, 'getDataPreview'),
         ...where,
         provideRowId: true,
@@ -462,6 +497,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
       // A SELECT of the caller's.
       const selected = await onCommands.getDataPreview({
+        analyse: analyseException,
         headers: integrationHeadersOf(onCommands, 'getDataPreview'),
         ...where,
         query: 'SELECT ":LT_ROWS"."SQUARE" AS "SQUARE" FROM ":LT_ROWS"',
@@ -474,13 +510,23 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'lets the run finish: no breakpoints, continue, and the run returns its output',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee');
-      expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
-      await onCommands.step(mainId, debuggeeId, 'continue');
+      expect(
+        (
+          await onCommands.syncBreakpoints(mainId, [], {
+            analyse: analyseException,
+          })
+        ).ok,
+      ).toBe(true);
+      expectResult(
+        await onCommands.step(mainId, debuggeeId, 'continue', {
+          analyse: analyseException,
+        }),
+        'continue',
+      );
       await until('ON_EXECUTION_END');
       lastBreak = undefined;
 
@@ -495,17 +541,23 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'cancels a debuggee where it stands, and the run fails',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
-      await onCommands.syncBreakpoints(mainId, breakpoints());
+      expectResult(
+        await onCommands.syncBreakpoints(mainId, breakpoints(), {
+          analyse: analyseException,
+        }),
+        'set the breakpoints',
+      );
       await until('SYNC_BREAKPOINTS');
       runClass();
       await until('ON_BREAK');
 
-      const deleted = await onCommands.deleteDebuggee(mainId, debuggeeId);
+      const deleted = await onCommands.deleteDebuggee(mainId, debuggeeId, {
+        analyse: analyseException,
+      });
       expect(deleted.ok).toBe(true);
       const events = await until('ON_EXECUTION_END');
       const warning = events.find((e) => e.kind === 'ON_WARNING');
@@ -520,13 +572,20 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops the debug session',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
-      expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
-      const stopped = await onCommands.stop(mainId);
+      expect(
+        (
+          await onCommands.syncBreakpoints(mainId, [], {
+            analyse: analyseException,
+          })
+        ).ok,
+      ).toBe(true);
+      const stopped = await onCommands.stop(mainId, {
+        analyse: analyseException,
+      });
       expect(stopped.ok).toBe(true);
       mainId = '';
     },

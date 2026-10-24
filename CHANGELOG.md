@@ -67,6 +67,120 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - `docs/development/RFC_TESTING.md` and `docs/usage/RFC_CONNECTION.md` no
   longer describe a binding compiled at install: on a platform without a
   prebuild, the binding is built from sap-rfc-lite's own repository.
+- **Every integration suite decides whether a case applies when the test is
+  registered** (fr0ster/mcp-abap-adt-clients#230). A case that is disabled,
+  unavailable on the system (`available_in` against `environment.system`) or
+  has nothing to read here registers as `it.skip` and is reported `○ skipped`;
+  before, 80 of 80 suites decided inside the running `it`, returned early, and
+  Jest counted the test as passed — four of the eight cases of one suite did
+  nothing in 0–1 ms and were reported as passing. `helpers/caseGate.ts` gains
+  `gateOn` (an arbitrary predicate on the configured system),
+  `gateStandardObject` (a standard object of that type is configured for the
+  system) and `gateAll` (every gate must register) beside `gate`.
+  `BaseTester` no longer has a skip: `shouldSkip()` and `getSkipReason()` are
+  gone, `beforeEach()` turns a missing, not-enabled or package-less case into
+  the setup error, which `flowTestAuto()`, `modifyFlowTestAuto()`,
+  `readTestAuto()` and the new `requireConfig()` raise, and it no longer
+  decides `available_in` a second time. The hand-rolled `skipReason` of the
+  other suites became the same kind of failure. Whether something is
+  available on a system is the configuration's to say — the case's `enabled` /
+  `available_in` at registration — never inferred from a refusal: a refused
+  call fails with what SAP said, whatever its status. So the append-structure
+  and scalar-function creates no longer skip on `404`/`405`/`501`, a
+  validation answering `404`/`405`/`501` is no longer stepped over
+  (`BaseTester`, `groupActivation`), the feature-toggle suite no longer skips
+  on its `403` "not allowed to create/update feature toggles", and
+  `shared/checkRun` no longer skips on an `S_ABPLNGVS` /
+  `ExceptionResourceNoAccess` refusal — returned as a failure or as an
+  exception document inside a 200 (`helpers/checkReport.ts`,
+  `expectCheckReport`). The checks now register under a case of their own,
+  `check_run` / `class_check`, and the overlay accepts `enabled` for it and
+  for the scalar-function, scalar-function-implementation, append-structure
+  and feature-toggle cases, so a system that cannot run one turns it off in its
+  configuration. Only two answers stay accepted: an HTTP `406` where
+  `allow_406` says so, and a binding already in the publication state the
+  test asks for. Every
+  expected-success call in the suites and helpers is read for its answer
+  (`expectResult`, and in `helpers/contract.ts` the new `releasing` for a
+  lock window, `cleanupRefusal` / `noteCleanupRefusal` / `raiseAfterCleanup`
+  for cleanups, `saysAbsent`; `expectRemovedOrAbsent` in
+  `helpers/objectPresence.ts`): a refused create, update, unlock, activation,
+  validation or cleanup fails the test with its reason — a refused cleanup
+  after a failed body is added to that failure rather than replacing it.
+  `BaseTester` fails on a refused unlock after an update, on a refused
+  `readMetadata` step (406 only where `allow_406` says so), on every
+  refused step of `modifyFlowTest`, on an error table in a validation 200
+  and on a refused or throwing post-create object-properties read. Nothing
+  turns a failure into a success afterwards: a read that could not find out
+  is never "absent", a refused create is never forgiven by a later read that
+  finds the object (the shared package, a shared dependency, the
+  service-binding subpackage, the function group), a failed read never falls
+  through into a write (`sharedSourceIsCurrent`), and a shared function group
+  that cannot be activated fails the setup (`activateSharedFunctionGroup`
+  throws). The FunctionModule / FunctionInclude suites no longer fall back to
+  a group in the default package when the shared setup fails: the case's new
+  `params.function_group_route` (`shared`, the base, or `default_package`,
+  an overlay key) chooses the route before the run, and that route's failure
+  fails the test. The debugger, batch, CSRF, transport, unit-test and
+  deletion-check suites fail on refusals they used to log; a unit-test run is
+  judged by its result on every system, legacy included. The lock-release
+  check fails on a refused verification LOCK, a 404 included (no retry, no
+  "inconclusive" warning). A debugger test's run must settle within its wait
+  with its output or a termination's HTTP 500 (`helpers/runSettlement.ts`);
+  a timeout or any other answer fails, and the run is kept until it has.
+  ABAP Unit results and activation results are parsed as XML
+  (`helpers/xmlTree.ts`), so attribute order, whitespace and namespace
+  prefixes do not hide an alert or an error message, and an error is any
+  `msg` of type E whatever its text. `SAP_AUTH_TYPE` is required by the test
+  helpers and the hand-run scripts (`scripts/lib/adtTarget.ts`): missing, or
+  outside `basic`, `jwt`, `xsuaa`, it is refused naming the key — the mode is
+  never read off the credentials. **Migration:** add `SAP_AUTH_TYPE=basic`
+  (or `jwt` / `xsuaa`) to every `.env` that lacks it. A refusal inside an
+  HTTP 200 is read wherever a test expects success: every activation passes
+  `analyseActivation`, every delete — cleanups included — `analyseDeletion`,
+  `BaseTester`'s validation `analyseValidation`, and the other validation
+  table forms are read by structure (`helpers/validationVerdict.ts`);
+  `cleanupRefusal` and `expectRemovedOrAbsent` read the deletion document of a
+  200. ABAP Unit results must have the format's root (an exception document
+  fails), alerts count at every scope (run, class, method), and a filtered
+  run must show no methods and no failure; CdsUnitTest judges its result.
+  Whether the second-session lock-release check and the message class's read
+  right after its create are made is the system's configuration: the new
+  required overlay keys `environment.verify_lock_released` and
+  `environment.read_message_class_after_create` (booleans; the forms state
+  `true` on premise, `false` on cloud, where a second session can meet a 404
+  for a new object). On, any refusal — the 404 included — fails; off, nothing
+  is sent and the run logs a line naming the key. `VERIFY_LOCK_RELEASED` is
+  no longer read. **Migration:** add both keys to `test-config.overlay.yaml`.
+  Every call the integration suites and the test helpers make to an
+  adt-clients member now passes an `analyse` strategy — `analyseException` by
+  default, and a specific judge only composed with it
+  (`helpers/judged.ts`, `judged(analyseX)`), since a specific judge answers an
+  exception document inside a 200 as "no failure". The validation reading
+  rejects an exception document before any table. A source test
+  (`unit/integrationCallsAreJudged.test.ts`, the compiler's type checker over
+  the suites and helpers) fails on any call without one, outside a commented
+  allow-list. `tools/discovery-to-markdown.ts` refuses a missing or unknown
+  `SAP_AUTH_TYPE` too; no document names a default for it any more.
+  The guard also sees through receivers typed by a local interface that
+  narrows a member (refused unless it keeps the `analyse` option) and refuses
+  an `any`-typed receiver; the helpers that had such interfaces
+  (`lockTargets`, `abapUnitRun`, `functionGroupRoute`) now take their types
+  from the client and judge every call. A group activation's verdict is a
+  strategy passed to the results call, `analyseActivationExecuted`
+  (`helpers/sharedActivation.ts`): stricter than the library's reading — an
+  activation that did not execute fails, since the objects were written
+  inactive — and composed through `judged()`.
+  The guard resolves both ends through the type checker: which member a call
+  is (computed, bound and destructured members included; `call` / `apply` and
+  `any` receivers refused) and which judge it passes (imported aliases,
+  shorthand, `const` options and spreads in their order; an `analyse` that
+  may be `undefined` is refused). It fails closed, and its allow-list is
+  keyed by the judge each allowed call passes.
+  An options object held in a `const` is read from its initializer only when
+  nothing in its file can change or leak it: a property assignment, `delete`,
+  a method call on it, an alias, or passing it to any call but the member
+  call itself is refused.
 
 ## [37.2.0] - 2026-10-23
 

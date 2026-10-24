@@ -12,6 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -20,12 +24,19 @@ import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -41,7 +52,6 @@ const {
   getTimeout,
   ensureSharedPackage,
   ensureSharedDependency,
-  getEnabledTestCase,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -83,11 +93,8 @@ describe('View (using AdtClient)', () => {
       const envCheck = await checkDefaultTestEnvironment(connection);
       if (!envCheck.success) {
         const reason = envCheck.reason || 'Unknown reason';
-        testsLogger.error?.(
-          `Environment check failed: ${reason}. All tests will be skipped.`,
-        );
-        hasConfig = false;
-        return;
+        // A defective environment fails the suite; it never skips it.
+        throw new Error(`Environment check failed: ${reason}`);
       }
 
       defaultPackage = envCheck.defaultPackage || '';
@@ -133,21 +140,37 @@ describe('View (using AdtClient)', () => {
         ensureObjectReady: async (ddlName: string) => {
           if (!connection || !ddlName) return { success: true };
           const existing = presenceOf(
-            await client.getDdl().read({ ddlName }),
+            await client
+              .getDdl()
+              .read({ ddlName }, undefined, { analyse: analyseException }),
             `DDL source ${ddlName}`,
           );
-          if (existing.present !== true) return { success: true };
+          // "Could not find out" is not "absent": the create would meet it.
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === false) return { success: true };
           const removed = await client.getDdl().delete(
             {
               ddlName,
               transportRequest: tester.getTransportRequest(),
             },
-            { headers: integrationHeadersOf(client.getDdl(), 'delete') },
+            {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(client.getDdl(), 'delete'),
+            },
           );
+          // A leftover that would not delete is what the create meets next:
+          // the test fails here, naming what SAP said.
           if (!removed.ok) {
-            testsLogger.warn?.(
-              `could not remove leftover ${ddlName}: ${removed.getError().message}`,
-            );
+            return {
+              success: false,
+              objectExists: true,
+              reason: failureOf(
+                removed,
+                `delete leftover DDL source ${ddlName}`,
+              ),
+            };
           }
           await new Promise((resolve) => setTimeout(resolve, 3000));
           return { success: true };
@@ -190,30 +213,34 @@ describe('View (using AdtClient)', () => {
         );
       }
 
-      hasConfig = false;
+      // Skips only when there is no SAP here; anything else fails naming the
+      // reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterAll(() => tester?.afterAll()());
 
-  it(
+  gate('read_ddl_table_function', 'readonly_read_table_function')(
     'reads an AMDP table function (DDL source) when configured',
     async () => {
-      if (!hasConfig || !client) return; // no connection/config → skip
-      const tfCase = getEnabledTestCase(
+      const tfCase = configuredCase(
         'read_ddl_table_function',
         'readonly_read_table_function',
       );
       const ddlName = tfCase?.params?.ddl_name;
-      if (!ddlName) return; // not configured / disabled → skip
+      if (!ddlName) throw new Error('ddl_name not configured');
 
-      // A table function that is not on this system answers an empty body, and
-      // the assertions below say what it must contain — so absence fails on the
-      // content rather than being caught and skipped.
-      const answer = await client.getDdl().read({ ddlName }, 'active');
-      if (!answer.ok) return; // object absent on this system → skip, not fail
+      // A refused read (absent object, no authorisation, server error) fails
+      // with the reason; an empty body fails on the content below.
+      const answer = expectResult(
+        await client
+          .getDdl()
+          .read({ ddlName }, 'active', { analyse: analyseException }),
+        `read table function ${ddlName}`,
+      );
 
-      const src = String(answer.getResult().value ?? '').toLowerCase();
+      const src = String(answer ?? '').toLowerCase();
       expect(src).toContain('define table function');
       expect(src).toContain('implemented by method');
     },
@@ -256,38 +283,14 @@ describe('View (using AdtClient)', () => {
       await tester.afterEach()();
     });
 
-    it(
+    gate('create_view', 'adt_view')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          testsLogger.warn?.(
-            'Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)',
-          );
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          testsLogger.warn?.(
-            'Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)',
-          );
-          return;
-        }
-
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          const skipReason = tester.getSkipReason() || 'Config is null';
-          testsLogger.warn?.(`Skipping test: ${skipReason}`);
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         if (!testCase) {
-          await tester.flowTestAuto();
-          testsLogger.warn?.(
-            'Skipping test: Test case not found in test-config.yaml',
-          );
-          return;
+          throw new Error(missingCaseMessage('create_view', 'adt_view'));
         }
 
         const ddlSource = testCase?.params?.ddl_source || config.source || '';

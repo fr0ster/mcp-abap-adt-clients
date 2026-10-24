@@ -14,6 +14,11 @@ import type {
 import * as dotenv from 'dotenv';
 import { runClass } from '../../../../core/class/run';
 import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
   createTestConnection,
   releaseTestConnection,
   skipUnlessConfigured,
@@ -23,7 +28,6 @@ import {
   createTestsLogger,
 } from '../../../helpers/testLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
 const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -37,16 +41,14 @@ const testsLogger = createTestsLogger();
 
 describe('Class - Run', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -56,22 +58,17 @@ describe('Class - Run', () => {
     }
   });
 
-  it('should run class and get console output', async () => {
-    if (!hasConfig) {
-      testsLogger.warn(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
+  gate('run_class', 'run_class')(
+    'should run class and get console output',
+    async () => {
+      const testCase = configuredCase('run_class', 'run_class');
+      if (!testCase)
+        throw new Error(missingCaseMessage('run_class', 'run_class'));
 
-    const testCase = getEnabledTestCase('run_class');
-    if (!testCase) {
-      testsLogger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    const result = await runClass(connection, testCase.params.class_name);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-  }, 30000);
+      const result = await runClass(connection, testCase.params.class_name);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+    },
+    30000,
+  );
 });

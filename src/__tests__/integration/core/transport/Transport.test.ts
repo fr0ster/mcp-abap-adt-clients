@@ -13,6 +13,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ITransportObjectEntry } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -27,8 +31,16 @@ import {
 } from '../../../../utils/systemInfo';
 import { patchXmlElement } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import { expectResult, failureOf, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -44,7 +56,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -77,7 +88,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('AdtRequest', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
 
   beforeAll(async () => {
@@ -92,11 +102,10 @@ describe('AdtRequest', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -111,27 +120,32 @@ describe('AdtRequest', () => {
     // and it is not true: ADT deletes an EMPTY request, which is what these are
     // — created, read, never written to.
     //
-    // A refusal is logged, not thrown: cleanup must not turn a green run red,
-    // and a request that holds objects is the server protecting them.
+    // A refusal fails the suite, after every delete ran and the connection is
+    // back: a request this suite created and could not remove is the leftover
+    // this cleanup exists to prevent. One that still holds objects is the
+    // server protecting them — and a run that left objects in it.
+    const leftovers: string[] = [];
     for (const number of createdTransports) {
-      const answer = await client
-        .getRequest()
-        .delete(
-          { transportNumber: number },
-          { headers: integrationHeadersOf(client.getRequest(), 'delete') },
-        );
+      const answer = await client.getRequest().delete(
+        { transportNumber: number },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getRequest(), 'delete'),
+        },
+      );
       if (answer.ok) {
         testsLogger.info?.(`Deleted test transport ${number}`);
       } else {
-        testsLogger.warn?.(
-          `Could not delete test transport ${number}: ${answer.getError().message}`,
-        );
+        leftovers.push(failureOf(answer, `delete test transport ${number}`));
       }
     }
     createdTransports.length = 0;
 
     if (connection) {
       await releaseTestConnection(connection);
+    }
+    if (leftovers.length > 0) {
+      throw new Error(`Cleanup failed: ${leftovers.join('; ')}`);
     }
   });
 
@@ -161,50 +175,23 @@ describe('AdtRequest', () => {
 
   describe('Full workflow', () => {
     let testCase: any = null;
-    let skipReason: string | null = null;
 
     beforeAll(async () => {
-      skipReason = null;
-      testCase = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      const definition = getTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_transport', 'builder_transport');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      testCase = tc;
+      // The gate registered the test, so the case is configured, enabled and
+      // available here; a case that is not there is a defect, not a skip.
+      testCase = configuredCase('create_transport', 'builder_transport');
     });
 
-    it(
+    gate('create_transport', 'builder_transport')(
       'should execute full workflow: create and read transport',
       async () => {
         const definition = getTestDefinition();
         logTestStart(testsLogger, 'AdtRequest - full workflow', definition);
 
-        if (skipReason) {
-          logTestSkip(testsLogger, 'AdtRequest - full workflow', skipReason);
-          return;
-        }
-
         if (!testCase) {
-          logTestSkip(
-            testsLogger,
-            'AdtRequest - full workflow',
-            skipReason || 'Test case not available',
+          throw new Error(
+            missingCaseMessage('create_transport', 'builder_transport'),
           );
-          return;
         }
 
         let transportNumber: string | null = null;
@@ -215,6 +202,7 @@ describe('AdtRequest', () => {
             await client
               .getRequest(transportParsing)
               .create(buildConfig(testCase) as any, {
+                analyse: analyseException,
                 headers: integrationHeadersOf(
                   client.getRequest(transportParsing),
                   'create',
@@ -229,62 +217,47 @@ describe('AdtRequest', () => {
           transportNumber = created.transportNumber || null;
           if (transportNumber) createdTransports.push(transportNumber);
 
+          // The read is part of the workflow: a refused or throwing read fails
+          // it (the request is still deleted by afterAll).
+          if (transportNumber) {
+            logTestStep('read', testsLogger);
+            const document = expectResult(
+              await client.getRequest(transportParsing).readMetadata(
+                {
+                  transportNumber,
+                },
+                { analyse: analyseException },
+              ),
+              `read transport ${transportNumber}`,
+            );
+            expect(document).toBeDefined();
+          }
+
           logTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
-          // If username not found or user doesn't exist, skip test instead of failing
-          const errorMsg = error.message || '';
+          // A user the system does not know is a defect of the configuration
+          // (create_transport/builder_transport `owner`), not a reason to pass.
           const errorData = error.response?.data || '';
-          const errorText =
+          const fullErrorText = `${error.message || ''} ${
             typeof errorData === 'string'
               ? errorData
-              : JSON.stringify(errorData);
-          const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
+              : JSON.stringify(errorData)
+          }`.toLowerCase();
           if (
             fullErrorText.includes('username not found') ||
             fullErrorText.includes('does not exist in the system') ||
             (fullErrorText.includes('user') &&
               fullErrorText.includes('does not exist'))
           ) {
-            logTestSkip(
-              testsLogger,
-              'AdtRequest - full workflow',
-              'Username not found or user does not exist in system',
+            logTestError(testsLogger, 'AdtRequest - full workflow', error);
+            throw new Error(
+              'create_transport/builder_transport names a user the system does not know: fix params.owner in test-config.yaml',
+              { cause: error },
             );
-            return; // Skip test
           }
           logTestError(testsLogger, 'AdtRequest - full workflow', error);
           throw error;
         } finally {
-          // Read the created transport before cleanup (using transportNumber from state)
-          if (transportNumber) {
-            try {
-              logTestStep('read', testsLogger);
-              const readState = expectResult(
-                await client.getRequest(transportParsing).readMetadata({
-                  transportNumber,
-                }),
-                'readState',
-              );
-              expect(readState).toBeDefined();
-              expect(readState).toBeDefined();
-              const metadataState = expectResult(
-                await client.getRequest(transportParsing).readMetadata({
-                  transportNumber,
-                }),
-                'metadataState',
-              );
-              expect(metadataState).toBeDefined();
-              expect(metadataState).toBeDefined();
-            } catch (readError: any) {
-              testsLogger.warn?.(
-                `Failed to read transport ${transportNumber}:`,
-                readError,
-              );
-              // Don't fail the test if read fails
-            }
-          }
-
           logTestEnd(testsLogger, 'AdtRequest - full workflow');
         }
       },
@@ -316,14 +289,6 @@ describe('AdtRequest', () => {
    * touches belongs to anyone else.
    */
   describe('Object list and tasks', () => {
-    let skipReason: string | null = null;
-
-    beforeAll(() => {
-      skipReason = hasConfig ? null : 'No SAP configuration';
-      if (!getEnabledTestCase('create_transport', 'builder_transport'))
-        skipReason = 'Test case disabled or not found';
-    });
-
     /**
      * The entries `readObjects` lists on one request or task.
      *
@@ -335,10 +300,14 @@ describe('AdtRequest', () => {
     const objectsOn = async (
       number: string,
     ): Promise<ITransportObjectEntry[]> => {
-      const answer = await client
-        .getRequest(transportParsing)
-        .readObjects(number);
-      return answer.ok ? answer.getResult().value : [];
+      // A refused read fails: read as an empty list, it would prove an entry
+      // gone that was never looked at.
+      return expectResult(
+        await client
+          .getRequest(transportParsing)
+          .readObjects(number, { analyse: analyseException }),
+        `read the objects of ${number}`,
+      );
     };
 
     /**
@@ -358,10 +327,17 @@ describe('AdtRequest', () => {
     const taskTypeOf = async (
       taskNumber: string,
     ): Promise<{ type: string; document: string }> => {
-      const answer = await client
-        .getRequest()
-        .readMetadata({ transportNumber: taskNumber });
-      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      const document = String(
+        expectResult(
+          await client
+            .getRequest()
+            .readMetadata(
+              { transportNumber: taskNumber },
+              { analyse: analyseException },
+            ),
+          `read task ${taskNumber}`,
+        ) ?? '',
+      );
       const element = (document.match(/<tm:task\s[^>]*?>/g) ?? []).find((t) =>
         t.includes(`tm:number="${taskNumber}"`),
       );
@@ -370,10 +346,17 @@ describe('AdtRequest', () => {
 
     /** The task numbers under a request, in document order. */
     const tasksOf = async (number: string): Promise<string[]> => {
-      const answer = await client.getRequest(transportParsing).readMetadata({
-        transportNumber: number,
-      });
-      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      const document = String(
+        expectResult(
+          await client.getRequest(transportParsing).readMetadata(
+            {
+              transportNumber: number,
+            },
+            { analyse: analyseException },
+          ),
+          `read request ${number}`,
+        ) ?? '',
+      );
       return (document.match(/<tm:task\s[^>]*?>/g) ?? [])
         .map((t) => t.match(/tm:number="([^"]*)"/)?.[1])
         .filter((n): n is string => Boolean(n));
@@ -411,7 +394,7 @@ describe('AdtRequest', () => {
       return undefined;
     };
 
-    it(
+    gate('create_transport', 'builder_transport')(
       'creates a task, frees an object name, and proves the entry is gone',
       async () => {
         const label = 'AdtRequest - object list and tasks';
@@ -420,12 +403,7 @@ describe('AdtRequest', () => {
           params: {},
         });
 
-        if (skipReason) {
-          logTestSkip(testsLogger, label, skipReason);
-          return;
-        }
-
-        const testCase = getEnabledTestCase(
+        const testCase = configuredCase(
           'create_transport',
           'builder_transport',
         );
@@ -438,6 +416,7 @@ describe('AdtRequest', () => {
           logTestStep('create the request this block works in', testsLogger);
           const created = expectResult(
             await request.create(buildConfig(testCase) as any, {
+              analyse: analyseException,
               headers: integrationHeadersOf(request, 'create'),
             }),
             'create transport request',
@@ -448,14 +427,13 @@ describe('AdtRequest', () => {
 
           // Read-only, and the record a `removeObject` lands in later.
           logTestStep('read the action log', testsLogger);
-          const log = await request.readActionLog(transportNumber as string);
-          if (log.ok) {
-            expect(String(log.getResult().value ?? '').length).toBeGreaterThan(
-              0,
-            );
-          } else {
-            testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
-          }
+          const log = expectResult(
+            await request.readActionLog(transportNumber as string, {
+              analyse: analyseException,
+            }),
+            'read the action log',
+          );
+          expect(String(log ?? '').length).toBeGreaterThan(0);
 
           // **The owner is named because the server will not choose one**, and
           // the two systems answer "who is that" in different places.
@@ -490,30 +468,23 @@ describe('AdtRequest', () => {
             (await systemUser()) ||
             '';
           if (!targetUser) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               'SAP_USERNAME is unset and the system named no user — ' +
                 'createTask cannot be measured without an owner',
             );
-            return;
           }
           logTestStep(`the task will be owned by ${targetUser}`, testsLogger);
           const task = await request.createTask(transportNumber as string, {
+            analyse: analyseException,
             headers: integrationHeadersOf(request, 'createTask'),
             targetUser,
           });
           if (!task.ok) {
             // A system that organises no tasks has answered, and that is the
             // measurement. Without one there is nothing to hang an object on,
-            // so the round trip below cannot run — and this is a SKIP, not a
-            // pass: nothing below it was measured.
-            logTestSkip(
-              testsLogger,
-              label,
-              `newtask refused: ${task.getError().message}`,
-            );
-            return;
+            // so the round trip below cannot run — and that fails: nothing below
+            // it was measured.
+            throw new Error(`newtask refused: ${task.getError().message}`);
           }
           taskNumber = (task.getResult().value as { transportNumber: string })
             .transportNumber;
@@ -549,7 +520,10 @@ describe('AdtRequest', () => {
             await request.changeTaskType(
               taskNumber,
               ADT_TASK_TYPE.developmentCorrection,
-              { headers: integrationHeadersOf(request, 'changeTaskType') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(request, 'changeTaskType'),
+              },
             ),
             'give the task its type',
           );
@@ -563,12 +537,9 @@ describe('AdtRequest', () => {
 
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               'no package configured — the round trip cannot run',
             );
-            return;
           }
 
           // **The object goes into the suite's ONE request, not the throwaway
@@ -586,12 +557,9 @@ describe('AdtRequest', () => {
           // which is also the only state ADT will delete.
           const sharedRequest = resolveTransportRequest(undefined);
           if (!sharedRequest) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               'no default_transport configured — the round trip cannot run',
             );
-            return;
           }
 
           logTestStep(
@@ -621,31 +589,53 @@ describe('AdtRequest', () => {
               `an entry for ${domainName} is present at ${stale.task}/${stale.position} — clearing it`,
               testsLogger,
             );
-            await request.removeObject(
-              stale.task,
-              {
-                name: domainName,
-                type: 'DOMA',
-                position: stale.position,
-              },
-              { headers: integrationHeadersOf(request, 'removeObject') },
+            expectResult(
+              await request.removeObject(
+                stale.task,
+                {
+                  name: domainName,
+                  type: 'DOMA',
+                  position: stale.position,
+                },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(request, 'removeObject'),
+                },
+              ),
+              `clear the stale entry for ${domainName}`,
             );
           }
 
           // A previous run may have left the object itself, not just an entry.
           // Read before deleting, for the reason above: a delete aimed at
           // nothing is what registers the name.
-          if ((await domain.readMetadata({ domainName })).ok) {
+          // The answer decides — see `presenceOf`; "could not find out" is
+          // not "absent".
+          const leftover = presenceOf(
+            await domain.readMetadata(
+              { domainName },
+              { analyse: analyseException },
+            ),
+            `domain ${domainName}`,
+          );
+          if (leftover.present === 'unknown') throw new Error(leftover.reason);
+          if (leftover.present === true) {
             logTestStep(
               `${domainName} still exists — deleting it`,
               testsLogger,
             );
-            await domain.delete(
-              {
-                domainName,
-                transportRequest: sharedRequest,
-              },
-              { headers: integrationHeadersOf(domain, 'delete') },
+            expectResult(
+              await domain.delete(
+                {
+                  domainName,
+                  transportRequest: sharedRequest,
+                },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(domain, 'delete'),
+                },
+              ),
+              `delete leftover ${domainName}`,
             );
           }
 
@@ -656,15 +646,15 @@ describe('AdtRequest', () => {
               transportRequest: sharedRequest,
               description: 'AdtRequest object-list round trip',
             },
-            { headers: integrationHeadersOf(domain, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(domain, 'create'),
+            },
           );
           if (!madeIt.ok) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `could not create ${domainName}: ${madeIt.getError().message}`,
             );
-            return;
           }
 
           // **The create makes a shell, and only the update gives it a type.**
@@ -679,55 +669,62 @@ describe('AdtRequest', () => {
           // read on this side to merge into, so the caller sends the WHOLE
           // document. Read it, fill the two elements in, write it back.
           logTestStep(`give ${domainName} its data type`, testsLogger);
-          const shell = await domain.readMetadata({ domainName });
-          const shellDocument = String(shell.ok ? shell.getResult().value : '');
+          const shellDocument = String(
+            expectResult(
+              await domain.readMetadata(
+                { domainName },
+                { analyse: analyseException },
+              ),
+              `read ${domainName} after create`,
+            ) ?? '',
+          );
           if (shellDocument.trim() === '') {
             // A 200 with an empty body is how ADT answers a read of something
             // not ready yet, and patching that would build a document out of
             // nothing. Nothing below can run without it.
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `${domainName} was created but its document read back empty`,
             );
-            return;
           }
           const typed = patchXmlElement(
             patchXmlElement(shellDocument, 'doma:datatype', 'CHAR'),
             'doma:length',
             '000004',
           );
-          const domainLock = await domain.lock({ domainName });
+          const domainLock = await domain.lock(
+            { domainName },
+            { analyse: analyseException },
+          );
           if (!domainLock.ok) {
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `could not lock ${domainName}: ${domainLock.getError().message}`,
             );
-            return;
           }
           const domainHandle = domainLock.getResult().value;
-          try {
-            const typedIn = await domain.updateMetadata(
-              {
-                domainName,
-                packageName,
-                transportRequest: sharedRequest,
-              },
-              {
-                headers: integrationHeadersOf(domain, 'updateMetadata'),
-                source: typed,
-                lockHandle: domainHandle,
-              },
-            );
-            if (!typedIn.ok) {
-              testsLogger.warn?.(
-                `${domainName} kept its empty type: ${typedIn.getError().message}`,
-              );
-            }
-          } finally {
-            await domain.unlock({ domainName }, domainHandle);
-          }
+          await releasing(
+            async () =>
+              expectResult(
+                await domain.updateMetadata(
+                  {
+                    domainName,
+                    packageName,
+                    transportRequest: sharedRequest,
+                  },
+                  {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(domain, 'updateMetadata'),
+                    source: typed,
+                    lockHandle: domainHandle,
+                  },
+                ),
+                `give ${domainName} its data type`,
+              ),
+            () =>
+              domain.unlock({ domainName }, domainHandle, {
+                analyse: analyseException,
+              }),
+            `unlock ${domainName}`,
+          );
           await expectLockReleased(
             (c) => c.getDomain(),
             { domainName },
@@ -735,23 +732,26 @@ describe('AdtRequest', () => {
             testsLogger,
           );
 
-          await domain.delete(
-            { domainName, transportRequest: sharedRequest },
-            { headers: integrationHeadersOf(domain, 'delete') },
+          expectResult(
+            await domain.delete(
+              { domainName, transportRequest: sharedRequest },
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(domain, 'delete'),
+              },
+            ),
+            `delete ${domainName}`,
           );
 
           logTestStep('find the entry the deletion left behind', testsLogger);
           const entry = await findEntry(sharedRequest, domainName);
           if (entry === undefined) {
             // The system detached it by itself; there is nothing to remove and
-            // nothing this member could be measured against. A skip, because
+            // nothing this member could be measured against. A failure, because
             // `removeObject` was never called.
-            logTestSkip(
-              testsLogger,
-              label,
+            throw new Error(
               `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
             );
-            return;
           }
           logTestStep(
             `entry sits on task ${entry.task} at position ${entry.position}`,
@@ -767,7 +767,9 @@ describe('AdtRequest', () => {
             'sort and compress the task, then find the entry again',
             testsLogger,
           );
-          const sorted = await request.sortAndCompress(entry.task);
+          const sorted = await request.sortAndCompress(entry.task, {
+            analyse: analyseException,
+          });
           expect(sorted.ok).toBe(true);
           const sortedList = await objectsOn(entry.task);
           expect(
@@ -792,7 +794,10 @@ describe('AdtRequest', () => {
               type: 'DOMA',
               position: resorted.position,
             },
-            { headers: integrationHeadersOf(request, 'removeObject') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(request, 'removeObject'),
+            },
           );
           expect(removed.ok).toBe(true);
 
@@ -812,22 +817,13 @@ describe('AdtRequest', () => {
   });
 
   describe('List transports', () => {
-    it(
+    gateOn(() => true)(
       'should list transport requests through a saved search configuration',
       async () => {
         logTestStart(testsLogger, 'AdtRequest - list transports', {
           name: 'list_transports',
           params: {},
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'AdtRequest - list transports',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           // A body that merely "exists" is not a detector: the historical
@@ -847,31 +843,26 @@ describe('AdtRequest', () => {
             ? getEnabledTestCase('create_transport', 'builder_transport')
             : null;
 
+          // Configured, the discriminator must be made: a refused or
+          // throwing create, or one that answers no number, fails the test —
+          // it is never downgraded to the shape-only assertion below.
           if (testCase) {
-            try {
-              logTestStep('create (discriminator transport)', testsLogger);
-              const createState = expectResult(
-                await client
-                  .getRequest(transportParsing)
-                  .create(buildConfig(testCase) as any, {
-                    headers: integrationHeadersOf(
-                      client.getRequest(transportParsing),
-                      'create',
-                    ),
-                  }),
-                'createState',
-              );
-              knownTransportNumber = createState.transportNumber || null;
-              if (knownTransportNumber) {
-                createdTransports.push(knownTransportNumber);
-              }
-            } catch (createError: any) {
-              testsLogger.warn?.(
-                'Could not create a discriminator transport for the list ' +
-                  'test; falling back to a shape-only assertion:',
-                createError,
-              );
-            }
+            logTestStep('create (discriminator transport)', testsLogger);
+            const createState = expectResult(
+              await client
+                .getRequest(transportParsing)
+                .create(buildConfig(testCase) as any, {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getRequest(transportParsing),
+                    'create',
+                  ),
+                }),
+              'create the discriminator transport',
+            );
+            expect(createState.transportNumber).toMatch(/\S/);
+            knownTransportNumber = createState.transportNumber;
+            createdTransports.push(createState.transportNumber);
           }
 
           logTestStep('list', testsLogger);
@@ -879,7 +870,9 @@ describe('AdtRequest', () => {
           // system's first one, which is the choice `list` used to make itself
           // when a system held exactly one.
           const configs = expectResult(
-            await client.getRequest(transportParsing).searchConfigurations(),
+            await client
+              .getRequest(transportParsing)
+              .searchConfigurations({ analyse: analyseException }),
             'transport search configurations',
           );
           expect(configs.length).toBeGreaterThan(0);
@@ -888,7 +881,7 @@ describe('AdtRequest', () => {
           const tree = expectResult(
             await client
               .getRequest(transportParsing)
-              .list({ configUri: configs[0].uri }),
+              .list({ analyse: analyseException, configUri: configs[0].uri }),
             'list transport requests',
           );
 
@@ -906,9 +899,8 @@ describe('AdtRequest', () => {
             );
             expect(numbers).toContain(knownTransportNumber);
           } else {
-            // Fallback case: no discriminator was available (no test case
-            // configured/enabled, or creation itself failed on this system —
-            // e.g. legacy systems without the configured user). This branch
+            // No discriminator configured: `create_transport` /
+            // `builder_transport` is absent or not enabled. This branch
             // only confirms the tree parsed; it does NOT treat zero requests
             // as suspicious. A system that genuinely holds no transport
             // requests must be able to report zero without being flagged as

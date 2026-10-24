@@ -23,7 +23,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -35,9 +40,20 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { runToCompletion } from '../../../helpers/abapUnitRun';
+import {
+  isFailureAlert,
+  readMethodVerdicts,
+  runToCompletion,
+} from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+} from '../../../helpers/caseGate';
+import { expectResult, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -46,7 +62,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -54,14 +69,12 @@ import {
 } from '../../../helpers/testLogger';
 import {
   logTestEnd,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -83,6 +96,8 @@ interface IRunReading {
   methods: string[];
   /** `kind` of every alert. */
   alerts: string[];
+  /** Failure alerts at any scope, as `kind@scope`. */
+  failures: string[];
   /** Methods carrying at least one alert, as `TESTCLASS.METHOD`, sorted. */
   failed: string[];
   /** `adtcore:type` of every `program` element: what the run reported on. */
@@ -90,32 +105,19 @@ interface IRunReading {
 }
 
 function readRunResult(document: string): IRunReading {
-  const methods: string[] = [];
-  const failed: string[] = [];
-  const alerts: string[] = [];
-  const programTypes = [
-    ...document.matchAll(/<program [^>]*adtcore:type="([^"]+)"/g),
-  ].map((m) => m[1]);
-  for (const cls of document.matchAll(
-    /<testClass [^>]*adtcore:name="([^"]+)"[^>]*>([\s\S]*?)<\/testClass>/g,
-  )) {
-    // A method is either self-closing or closes after its alerts.
-    for (const m of cls[2].matchAll(
-      /<testMethod [^>]*adtcore:name="([^"]+)"[^>]*?(\/>|>([\s\S]*?)<\/testMethod>)/g,
-    )) {
-      const name = `${cls[1]}.${m[1]}`;
-      methods.push(name);
-      const kinds = [...(m[3] ?? '').matchAll(/<alert kind="([^"]+)"/g)].map(
-        (a) => a[1],
-      );
-      if (kinds.length > 0) failed.push(name);
-      alerts.push(...kinds);
-    }
-  }
+  // Parsed, not matched: an alert is found whatever its attribute order.
+  const { methods, alerts, programTypes } = readMethodVerdicts(document);
+  const named = (m: { testClass: string; name: string }) =>
+    `${m.testClass}.${m.name}`;
   return {
-    methods: methods.sort(),
-    alerts,
-    failed: failed.sort(),
+    methods: methods.map(named).sort(),
+    // Every scope: a run- or class-level alert is not dropped.
+    alerts: alerts.map((a) => a.kind),
+    failures: alerts.filter(isFailureAlert).map((a) => `${a.kind}@${a.scope}`),
+    failed: methods
+      .filter((m) => m.alerts.length > 0)
+      .map(named)
+      .sort(),
     programTypes,
   };
 }
@@ -179,9 +181,7 @@ function verdicts(reading: IRunReading) {
 describe('ABAP Unit on reports and function groups: run (async) and runSync (sync)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -197,10 +197,8 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         systemContext,
       );
       client = resolved.client;
-      isLegacy = resolved.isLegacy;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -210,37 +208,23 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
     }
   });
 
-  /** The test case, or the reason the test skips. */
-  function caseOrSkip(
-    section: string,
-    name: string,
-    title: string,
-    required: string,
-  ) {
-    const testCase = getTestCaseDefinition(section, name);
-    if (!hasConfig) {
-      logTestSkip(testsLogger, title, 'No SAP configuration');
-      return undefined;
-    }
+  /** The test case, configured with the parameter the test cannot run without. */
+  function configuredOrFail(section: string, name: string, required: string) {
+    const testCase = configuredCase(section, name);
     if (!testCase?.params?.[required]) {
-      logTestSkip(
-        testsLogger,
-        title,
-        `${name} not in test-config.yaml (npm run check:config)`,
-      );
-      return undefined;
-    }
-    if (
-      isLegacy ||
-      !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-    ) {
-      logTestSkip(testsLogger, title, 'Not available on this system');
-      return undefined;
+      throw new Error(`${name} not in test-config.yaml (npm run check:config)`);
     }
     return testCase;
   }
 
-  it(
+  // The legacy runner's `run` is the synchronous request already; there is no
+  // asynchronous one to compare it with.
+  const notLegacy = gateOn(({ isLegacy }) => !isLegacy);
+
+  gateAll(
+    gate('run_program_unit_test', 'adt_program_unit_test_sync'),
+    notLegacy,
+  )(
     'reports: both runners find the same tests, the same failure and the same alert',
     async () => {
       const TITLE = 'UnitTest - reports, async and sync compared';
@@ -249,13 +233,11 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         params: {},
       });
       try {
-        const testCase = caseOrSkip(
+        const testCase = configuredOrFail(
           'run_program_unit_test',
           'adt_program_unit_test_sync',
-          TITLE,
           'own_program_name',
         );
-        if (!testCase) return;
         const params = testCase.params;
         const packageName = resolvePackageName(params.package_name);
         const transportRequest = resolveTransportRequest(
@@ -272,7 +254,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         const deletePrograms = async () => {
           for (const p of [ownProgram, inclProgram]) {
             const there = presenceOf(
-              await program.read(p),
+              await program.read(p, undefined, { analyse: analyseException }),
               `program ${p.programName}`,
             );
             if (there.present === 'unknown') throw new Error(there.reason);
@@ -280,14 +262,17 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
               expectResult(
                 await program.delete(
                   { ...p, transportRequest },
-                  { headers: integrationHeadersOf(program, 'delete') },
+                  {
+                    analyse: judged(analyseDeletion),
+                    headers: integrationHeadersOf(program, 'delete'),
+                  },
                 ),
                 `delete ${p.programName}`,
               );
             }
           }
           const there = presenceOf(
-            await include.read(incl),
+            await include.read(incl, undefined, { analyse: analyseException }),
             `include ${incl.includeName}`,
           );
           if (there.present === 'unknown') throw new Error(there.reason);
@@ -295,7 +280,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             expectResult(
               await include.delete(
                 { ...incl, transportRequest },
-                { headers: integrationHeadersOf(include, 'delete') },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(include, 'delete'),
+                },
               ),
               `delete ${incl.includeName}`,
             );
@@ -316,28 +304,39 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
                 transportRequest,
                 description: 'ABAP Unit: async and sync runners',
               },
-              { headers: integrationHeadersOf(include, 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(include, 'create'),
+              },
             ),
             'create include',
           );
           const includeHandle = String(
-            expectResult(await include.lock(incl), 'lock include'),
-          );
-          try {
             expectResult(
-              await include.update(
-                { ...incl, transportRequest },
-                {
-                  headers: integrationHeadersOf(include, 'update'),
-                  lockHandle: includeHandle,
-                  source: params.include_source,
-                },
+              await include.lock(incl, { analyse: analyseException }),
+              'lock include',
+            ),
+          );
+          await releasing(
+            async () =>
+              expectResult(
+                await include.update(
+                  { ...incl, transportRequest },
+                  {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(include, 'update'),
+                    lockHandle: includeHandle,
+                    source: params.include_source,
+                  },
+                ),
+                'write the include',
               ),
-              'write the include',
-            );
-          } finally {
-            await include.unlock(incl, includeHandle);
-          }
+            () =>
+              include.unlock(incl, includeHandle, {
+                analyse: analyseException,
+              }),
+            'unlock after write the include',
+          );
 
           for (const [p, source] of [
             [ownProgram, params.own_program_source],
@@ -352,33 +351,42 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
                   transportRequest,
                   description: 'ABAP Unit: async and sync runners',
                 },
-                { headers: integrationHeadersOf(program, 'create') },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(program, 'create'),
+                },
               ),
               `create ${p.programName}`,
             );
             const handle = String(
-              expectResult(await program.lock(p), `lock ${p.programName}`),
-            );
-            try {
               expectResult(
-                await program.update(
-                  { ...p, transportRequest },
-                  {
-                    headers: integrationHeadersOf(program, 'update'),
-                    lockHandle: handle,
-                    source,
-                  },
+                await program.lock(p, { analyse: analyseException }),
+                `lock ${p.programName}`,
+              ),
+            );
+            await releasing(
+              async () =>
+                expectResult(
+                  await program.update(
+                    { ...p, transportRequest },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(program, 'update'),
+                      lockHandle: handle,
+                      source,
+                    },
+                  ),
+                  `write ${p.programName}`,
                 ),
-                `write ${p.programName}`,
-              );
-            } finally {
-              await program.unlock(p, handle);
-            }
+              () => program.unlock(p, handle, { analyse: analyseException }),
+              `unlock after write ${p.programName}`,
+            );
           }
 
           logTestStep('activate', testsLogger);
           expectResult(
             await include.activate(incl, {
+              analyse: judged(analyseActivation),
               headers: integrationHeadersOf(include, 'activate'),
             }),
             'activate include',
@@ -386,6 +394,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           for (const p of [ownProgram, inclProgram]) {
             expectResult(
               await program.activate(p, {
+                analyse: judged(analyseActivation),
                 headers: integrationHeadersOf(program, 'activate'),
               }),
               `activate ${p.programName}`,
@@ -409,7 +418,8 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
               `PROG ${p.programName}`,
               runner,
               p.programName,
-              () => runner.runSync(p.programName),
+              () =>
+                runner.runSync(p.programName, { analyse: analyseException }),
             );
             expect(verdicts(compared.async)).toEqual({
               methods: [
@@ -429,23 +439,34 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             String(
               expectResult(
                 await runner.runSync(ownProgram.programName, {
+                  analyse: analyseException,
                   riskLevel: { harmless: false },
                 }),
                 'runSync without harmless tests',
               ),
             ),
           );
+          // None ran, and the run itself raised no failure.
           expect(filtered.methods).toEqual([]);
+          expect(filtered.failures).toEqual([]);
         } finally {
           logTestStep('delete (cleanup)', testsLogger);
           await deletePrograms();
           for (const p of [ownProgram, inclProgram]) {
             expect(
-              presenceOf(await program.read(p), `program ${p.programName}`),
+              presenceOf(
+                await program.read(p, undefined, { analyse: analyseException }),
+                `program ${p.programName}`,
+              ),
             ).toEqual({ present: false });
           }
           expect(
-            presenceOf(await include.read(incl), `include ${incl.includeName}`),
+            presenceOf(
+              await include.read(incl, undefined, {
+                analyse: analyseException,
+              }),
+              `include ${incl.includeName}`,
+            ),
           ).toEqual({ present: false });
         }
         logTestSuccess(testsLogger, TITLE);
@@ -456,7 +477,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
     getTimeout('test'),
   );
 
-  it(
+  gateAll(
+    gate('run_function_group_unit_test', 'adt_function_group_unit_test_sync'),
+    notLegacy,
+  )(
     'function group and modules: both runners compared, and what a module run covers',
     async () => {
       const TITLE = 'UnitTest - function group and modules, async and sync';
@@ -465,13 +489,11 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         params: {},
       });
       try {
-        const testCase = caseOrSkip(
+        const testCase = configuredOrFail(
           'run_function_group_unit_test',
           'adt_function_group_unit_test_sync',
-          TITLE,
           'function_group_name',
         );
-        if (!testCase) return;
         const params = testCase.params;
         const packageName = resolvePackageName(params.package_name);
         const transportRequest = resolveTransportRequest(
@@ -497,7 +519,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
 
         const deleteGroup = async () => {
           const there = presenceOf(
-            await fugr.readMetadata(group),
+            await fugr.readMetadata(group, { analyse: analyseException }),
             `function group ${functionGroupName}`,
           );
           if (there.present === 'unknown') throw new Error(there.reason);
@@ -505,7 +527,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             expectResult(
               await fugr.delete(
                 { ...group, transportRequest },
-                { headers: integrationHeadersOf(fugr, 'delete') },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(fugr, 'delete'),
+                },
               ),
               `delete ${functionGroupName}`,
             );
@@ -525,7 +550,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
                 transportRequest,
                 description: 'ABAP Unit: async and sync runners',
               },
-              { headers: integrationHeadersOf(fugr, 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(fugr, 'create'),
+              },
             ),
             'create group',
           );
@@ -541,28 +569,36 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
                   transportRequest,
                   description: 'ABAP Unit: async and sync runners',
                 },
-                { headers: integrationHeadersOf(fm, 'create') },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(fm, 'create'),
+                },
               ),
               `create ${m.functionModuleName}`,
             );
             const handle = String(
-              expectResult(await fm.lock(m), `lock ${m.functionModuleName}`),
-            );
-            try {
               expectResult(
-                await fm.update(
-                  { ...m, transportRequest },
-                  {
-                    headers: integrationHeadersOf(fm, 'update'),
-                    lockHandle: handle,
-                    source,
-                  },
+                await fm.lock(m, { analyse: analyseException }),
+                `lock ${m.functionModuleName}`,
+              ),
+            );
+            await releasing(
+              async () =>
+                expectResult(
+                  await fm.update(
+                    { ...m, transportRequest },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(fm, 'update'),
+                      lockHandle: handle,
+                      source,
+                    },
+                  ),
+                  `write ${m.functionModuleName}`,
                 ),
-                `write ${m.functionModuleName}`,
-              );
-            } finally {
-              await fm.unlock(m, handle);
-            }
+              () => fm.unlock(m, handle, { analyse: analyseException }),
+              `unlock after write ${m.functionModuleName}`,
+            );
           }
 
           logTestStep('create test include', testsLogger);
@@ -573,33 +609,45 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
                 transportRequest,
                 description: 'ABAP Unit tests',
               },
-              { headers: integrationHeadersOf(finc, 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(finc, 'create'),
+              },
             ),
             'create include',
           );
           const includeHandle = String(
-            expectResult(await finc.lock(include), 'lock include'),
-          );
-          try {
             expectResult(
-              await finc.update(
-                { ...include, transportRequest },
-                {
-                  headers: integrationHeadersOf(finc, 'update'),
-                  lockHandle: includeHandle,
-                  source: params.include_source,
-                },
+              await finc.lock(include, { analyse: analyseException }),
+              'lock include',
+            ),
+          );
+          await releasing(
+            async () =>
+              expectResult(
+                await finc.update(
+                  { ...include, transportRequest },
+                  {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(finc, 'update'),
+                    lockHandle: includeHandle,
+                    source: params.include_source,
+                  },
+                ),
+                'write the test classes',
               ),
-              'write the test classes',
-            );
-          } finally {
-            await finc.unlock(include, includeHandle);
-          }
+            () =>
+              finc.unlock(include, includeHandle, {
+                analyse: analyseException,
+              }),
+            'unlock after write the test classes',
+          );
 
           logTestStep('activate', testsLogger);
           for (const m of [module, untested]) {
             expectResult(
               await fm.activate(m, {
+                analyse: judged(analyseActivation),
                 headers: integrationHeadersOf(fm, 'activate'),
               }),
               `activate ${m.functionModuleName}`,
@@ -607,12 +655,14 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           }
           expectResult(
             await finc.activate(include, {
+              analyse: judged(analyseActivation),
               headers: integrationHeadersOf(finc, 'activate'),
             }),
             'activate include',
           );
           expectResult(
             await fugr.activate(group, {
+              analyse: judged(analyseActivation),
               headers: integrationHeadersOf(fugr, 'activate'),
             }),
             'activate group',
@@ -636,7 +686,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             `FUGR ${functionGroupName}`,
             groupRunner,
             functionGroupName,
-            () => groupRunner.runSync(functionGroupName),
+            () =>
+              groupRunner.runSync(functionGroupName, {
+                analyse: analyseException,
+              }),
           );
           expect(verdicts(groupRun.async)).toEqual({
             methods: [...moduleMethods, ...otherMethods].sort(),
@@ -650,7 +703,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             `FUNC ${module.functionModuleName}`,
             moduleRunner,
             module.functionModuleName,
-            () => moduleRunner.runSync(module),
+            () => moduleRunner.runSync(module, { analyse: analyseException }),
           );
 
           logTestStep(
@@ -661,7 +714,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
             `FUNC ${untested.functionModuleName}`,
             moduleRunner,
             untested.functionModuleName,
-            () => moduleRunner.runSync(untested),
+            () => moduleRunner.runSync(untested, { analyse: analyseException }),
           );
 
           // Measured on premise (SAP_BASIS 816, 2026-10-23): neither runner
@@ -687,14 +740,14 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
           await deleteGroup();
           expect(
             presenceOf(
-              await fugr.readMetadata(group),
+              await fugr.readMetadata(group, { analyse: analyseException }),
               `function group ${functionGroupName}`,
             ),
           ).toEqual({ present: false });
           for (const m of [module, untested]) {
             expect(
               presenceOf(
-                await fm.readMetadata(m),
+                await fm.readMetadata(m, { analyse: analyseException }),
                 `module ${m.functionModuleName}`,
               ),
             ).toEqual({ present: false });

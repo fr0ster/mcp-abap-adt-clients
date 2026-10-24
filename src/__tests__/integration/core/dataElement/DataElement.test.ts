@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -25,7 +26,15 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateStandardObject,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -42,21 +51,17 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate,
   createDependencyDomain,
   extractValidationErrorMessage,
   getEnvironmentConfig,
@@ -148,7 +153,7 @@ describe('DataElement (using AdtClient)', () => {
   }
 
   function getTestDefinition() {
-    return getTestCaseDefinition('create_data_element', 'adt_data_element');
+    return configuredCase('create_data_element', 'adt_data_element');
   }
 
   function buildConfig(testCase: any, resolver?: any) {
@@ -179,37 +184,28 @@ describe('DataElement (using AdtClient)', () => {
     let dataElementName: string | null = null;
     let domainName: string | null = null;
     let domainCreated: boolean = false;
-    let skipReason: string | null = null;
+    let setupError: string | null = null;
 
     beforeAll(async () => {
-      skipReason = null;
+      setupError = null;
       testCase = null;
       dataElementName = null;
       domainName = null;
       domainCreated = false;
 
       if (!hasConfig) {
-        skipReason = 'No SAP configuration';
+        setupError = 'No SAP configuration';
         return;
       }
 
-      const definition = getTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      // Check environment availability
-      if (
-        !TestConfigResolver.isTestAvailable(definition, isCloudSystem, isLegacy)
-      ) {
-        skipReason = `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`;
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_data_element', 'adt_data_element');
+      // The gate registered the test, so the case is configured, enabled and
+      // available here; a case that is not there is a defect, not a skip.
+      const tc = getTestDefinition();
       if (!tc) {
-        skipReason = 'Test case disabled or not found';
+        setupError = missingCaseMessage(
+          'create_data_element',
+          'adt_data_element',
+        );
         return;
       }
 
@@ -218,7 +214,7 @@ describe('DataElement (using AdtClient)', () => {
         'DataElement - full workflow',
       );
       if (!packageCheck.success) {
-        skipReason = packageCheck.reason || 'Default package is not configured';
+        setupError = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -242,8 +238,8 @@ describe('DataElement (using AdtClient)', () => {
         });
         const packageName = domainResolver.getPackageName();
         if (!packageName) {
-          skipReason =
-            'environment problem, test skipped: package_name not configured for domain creation';
+          setupError =
+            'environment problem: package_name not configured for domain creation';
           testCase = null;
           dataElementName = null;
           return;
@@ -267,9 +263,9 @@ describe('DataElement (using AdtClient)', () => {
         );
 
         if (!domainResult.success) {
-          skipReason =
+          setupError =
             domainResult.reason ||
-            `environment problem, test skipped: Failed to create required dependency domain ${domainNameToUse}`;
+            `environment problem: Failed to create required dependency domain ${domainNameToUse}`;
           testCase = null;
           dataElementName = null;
           return;
@@ -283,7 +279,7 @@ describe('DataElement (using AdtClient)', () => {
       if (dataElementName) {
         const cleanup = await ensureDataElementReady(dataElementName);
         if (!cleanup.success) {
-          skipReason =
+          setupError =
             cleanup.reason || 'Failed to cleanup data element before test';
           testCase = null;
           dataElementName = null;
@@ -306,30 +302,30 @@ describe('DataElement (using AdtClient)', () => {
       const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
       if (shouldCleanup && domainCreated && domainName) {
-        try {
-          // Use resolver for consistent parameter resolution
-          const {
-            TestConfigResolver,
-          } = require('../../../helpers/TestConfigResolver');
-          const cleanupResolver = new TestConfigResolver({
-            testCase,
-            isCloud: isCloudSystem,
-            logger: testsLogger,
-          });
+        // Use resolver for consistent parameter resolution
+        const {
+          TestConfigResolver,
+        } = require('../../../helpers/TestConfigResolver');
+        const cleanupResolver = new TestConfigResolver({
+          testCase,
+          isCloud: isCloudSystem,
+          logger: testsLogger,
+        });
+        // The domain this suite created and could not remove fails the suite:
+        // the next run's create meets it.
+        expectResult(
           await client.getDomain().delete(
             {
               domainName: domainName,
               transportRequest: cleanupResolver.getTransportRequest(),
             },
-            { headers: integrationHeadersOf(client.getDomain(), 'delete') },
-          );
-        } catch (cleanupError) {
-          // Log but don't fail - cleanup errors are silent
-          testsLogger.warn?.(
-            `Cleanup failed for domain ${domainName}:`,
-            cleanupError,
-          );
-        }
+            {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(client.getDomain(), 'delete'),
+            },
+          ),
+          `cleanup domain ${domainName}`,
+        );
       } else if (!shouldCleanup && domainCreated && domainName) {
         testsLogger.info?.(
           `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis:`,
@@ -338,24 +334,20 @@ describe('DataElement (using AdtClient)', () => {
       }
     });
 
-    it(
+    gate('create_data_element', 'adt_data_element')(
       'should execute full workflow and store all results',
       async () => {
         const definition = getTestDefinition();
         logTestStart(testsLogger, 'DataElement - full workflow', definition);
 
-        if (skipReason) {
-          logTestSkip(testsLogger, 'DataElement - full workflow', skipReason);
-          return;
+        if (setupError) {
+          throw new Error(
+            `Test could not be set up: ${setupError}. Nothing was verified.`,
+          );
         }
 
         if (!testCase || !dataElementName) {
-          logTestSkip(
-            testsLogger,
-            'DataElement - full workflow',
-            skipReason || 'Test case not available',
-          );
-          return;
+          throw new Error('data_element_name not configured');
         }
 
         // Create resolver for consistent parameter resolution
@@ -414,7 +406,11 @@ describe('DataElement (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    // Applies where the case does and where a standard data element is set.
+    gateAll(
+      gate('create_data_element', 'adt_data_element'),
+      gateStandardObject('dataElement'),
+    )(
       'should read standard SAP data element',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -426,28 +422,12 @@ describe('DataElement (using AdtClient)', () => {
           testCaseName: 'adt_data_element',
         });
 
-        if (!resolver.isAvailableForEnvironment()) {
-          logTestSkip(
-            testsLogger,
-            'DataElement - read standard object',
-            `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`,
-          );
-          return;
-        }
-
         const standardObject = resolver.getStandardObject('dataElement');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'DataElement - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'DataElement - read standard object',
+          throw new Error(
             `Standard data element not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardDataElementName = standardObject.name;
@@ -455,15 +435,6 @@ describe('DataElement (using AdtClient)', () => {
           name: 'read_standard',
           params: { data_element_name: standardDataElementName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'DataElement - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           // Create BaseTester instance

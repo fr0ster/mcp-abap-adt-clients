@@ -5,6 +5,7 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/objectStructure.test
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -14,6 +15,7 @@ import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
+import { gate } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -92,7 +94,9 @@ class ObjectStructureObject implements TestableObject<IObjectStructureParams> {
     }
     return this.client
       .getUtils()
-      .getObjectStructure(config.object_type, config.object_name);
+      .getObjectStructure(config.object_type, config.object_name, {
+        analyse: analyseException,
+      });
   }
 
   readMetadata() {
@@ -177,27 +181,9 @@ describe('Shared - getObjectStructure', () => {
   beforeEach(() => tester?.beforeEach()());
   afterEach(() => tester?.afterEach()());
 
-  it(
+  gate('object_structure', 'get_object_structure')(
     'should fetch object structure',
     async () => {
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          'ObjectStructure - fetch',
-          'No SAP configuration',
-        );
-        return;
-      }
-
-      if (!tester) {
-        logTestSkip(
-          testsLogger,
-          'ObjectStructure - fetch',
-          'Tester not initialized',
-        );
-        return;
-      }
-
       const testName = 'ObjectStructure - fetch';
       const testCase = tester.getTestCase() || {
         name: 'get_object_structure',
@@ -205,22 +191,7 @@ describe('Shared - getObjectStructure', () => {
       };
       logTestStart(testsLogger, testName, testCase);
 
-      if (tester.shouldSkip()) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          tester.getSkipReason() || 'Test case not available',
-        );
-        logTestEnd(testsLogger, testName);
-        return;
-      }
-
-      const config = tester.getConfig();
-      if (!config) {
-        logTestSkip(testsLogger, testName, 'Config not available');
-        logTestEnd(testsLogger, testName);
-        return;
-      }
+      const config = await tester.requireConfig();
 
       try {
         // The document itself, not an envelope: a status check never saw the

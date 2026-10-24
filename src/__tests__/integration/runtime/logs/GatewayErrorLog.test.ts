@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -19,6 +20,11 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -40,7 +46,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -58,17 +63,15 @@ const testsLogger: ILogger = createTestsLogger();
 describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let runtime: AdtRuntimeClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -78,11 +81,11 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('runtime_gateway_errors', 'adt_gateway_errors')(
     'should list gateway error log entries',
     async () => {
       const testName = 'GatewayErrorLog - list';
-      const testCase = getEnabledTestCase(
+      const testCase = configuredCase(
         'runtime_gateway_errors',
         'adt_gateway_errors',
       );
@@ -93,23 +96,17 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_gateway_errors/adt_gateway_errors not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('runtime_gateway_errors', 'adt_gateway_errors'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {
         logTestStep('list gateway error log entries', testsLogger);
         const response = expectResult(
-          await runtime.getGatewayErrorLog().list(),
+          await runtime
+            .getGatewayErrorLog()
+            .list({ analyse: analyseException }),
           'response',
         );
         expect(response).toBeDefined();
@@ -135,11 +132,11 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_gateway_errors', 'adt_gateway_errors')(
     'should list gateway error log entries with maxResults filter',
     async () => {
       const testName = 'GatewayErrorLog - list with maxResults';
-      const testCase = getEnabledTestCase(
+      const testCase = configuredCase(
         'runtime_gateway_errors',
         'adt_gateway_errors',
       );
@@ -150,17 +147,9 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_gateway_errors/adt_gateway_errors not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('runtime_gateway_errors', 'adt_gateway_errors'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {
@@ -169,7 +158,9 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
           testsLogger,
         );
         const response = expectResult(
-          await runtime.getGatewayErrorLog().list({ maxResults: 10 }),
+          await runtime
+            .getGatewayErrorLog()
+            .list({ analyse: analyseException, maxResults: 10 }),
           'response',
         );
         expect(response).toBeDefined();

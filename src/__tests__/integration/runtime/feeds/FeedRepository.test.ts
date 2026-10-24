@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   feedDescriptors,
   feedEntries,
   feedGatewayErrorDetail,
@@ -26,8 +27,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -49,7 +54,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -75,23 +79,19 @@ const testsLogger: ILogger = createTestsLogger();
 
 describe('FeedRepository (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let runtime: AdtRuntimeClient;
   // Built here rather than taken from `feeds`: the repository
   // answers each feed as its document by default, and these cases assert the
   // entries, so they construct it with the Atom readings.
   let feeds: FeedRepository<typeof feedReading>;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      runtime = new AdtRuntimeClient(connection, libraryLogger);
       feeds = new FeedRepository(connection, libraryLogger, feedReading);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -101,11 +101,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should list available feeds from feed catalog',
     async () => {
       const testName = 'FeedRepository - list';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -113,22 +113,15 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
         logTestStep('list feed catalog', testsLogger);
-        const catalog = expectResult(await feeds.list(), 'feed catalog');
+        const catalog = expectResult(
+          await feeds.list({ analyse: analyseException }),
+          'feed catalog',
+        );
         expect(Array.isArray(catalog)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -152,11 +145,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should list feed variants',
     async () => {
       const testName = 'FeedRepository - variants';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -164,17 +157,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
@@ -184,7 +167,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         // No cast since `@mcp-abap-adt/interfaces@26.0.0` — `IFeedRepository`
         // declares the parameter, so the contract and the endpoint agree.
         const variants = expectResult(
-          await feeds.variants('dumps'),
+          await feeds.variants('dumps', { analyse: analyseException }),
           'feed variants',
         );
         expect(Array.isArray(variants)).toBe(true);
@@ -192,14 +175,6 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         logTestSuccess(testsLogger, testName);
       } catch (error) {
         const status = (error as any)?.response?.status;
-        if (status === 406) {
-          logTestSkip(
-            testsLogger,
-            testName,
-            `HTTP ${status} — endpoint not acceptable on this system`,
-          );
-          return;
-        }
         // 400 is no longer skipped. It meant one thing and the comment here
         // named it correctly — the missing `category` — and skipping on it left
         // the method broken and the note unread. Measured on premise (BASIS 816): without a
@@ -214,11 +189,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should get dumps via feed',
     async () => {
       const testName = 'FeedRepository - dumps';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -226,22 +201,15 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
         logTestStep('get dumps via feed', testsLogger);
-        const entries = expectResult(await feeds.dumps(), 'dumps feed');
+        const entries = expectResult(
+          await feeds.dumps({ analyse: analyseException }),
+          'dumps feed',
+        );
         expect(Array.isArray(entries)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -265,11 +233,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should fetch arbitrary feed by URL',
     async () => {
       const testName = 'FeedRepository - byUrl';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -277,23 +245,15 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
         logTestStep('fetch feed by URL /sap/bc/adt/runtime/dumps', testsLogger);
         const entries = expectResult(
-          await feeds.byUrl('/sap/bc/adt/runtime/dumps'),
+          await feeds.byUrl('/sap/bc/adt/runtime/dumps', {
+            analyse: analyseException,
+          }),
           'feed by URL',
         );
         expect(Array.isArray(entries)).toBe(true);

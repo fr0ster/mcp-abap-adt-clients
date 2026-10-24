@@ -16,6 +16,7 @@ import type { IBehaviorDefinitionConfig } from '../../../../core/behaviorDefinit
 import { read as readBdef } from '../../../../core/behaviorDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -168,21 +169,10 @@ describe('BehaviorDefinition (using AdtClient)', () => {
       await tester.afterEach()();
     });
 
-    it(
+    gate('create_behavior_definition', 'adt_behavior_definition')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode = testCase?.params?.source_code || config.source || '';

@@ -17,6 +17,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -30,10 +35,14 @@ import type { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMe
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import { gate } from '../../../helpers/caseGate';
+import { expectResult, failureOf, saysAbsent } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
+  requiredEnvironmentFlag,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -41,6 +50,7 @@ import type { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
+  createRunIntegrityLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 import {
@@ -72,6 +82,28 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/**
+ * Wait for a deleted message class to be gone: the deletion service is
+ * asynchronous, so a same-name re-run would race the still-completing delete.
+ * Absent ends the wait; a read that cannot tell is a failure, named; still
+ * there after the wait is left to the caller's next step, which meets it with
+ * SAP's own answer.
+ */
+async function untilMessageClassGone(
+  read: () => Promise<IAdtResponse<unknown>>,
+  name: string,
+): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const still = presenceOf(await read(), `message class ${name}`);
+    if (still.present === false) return '';
+    if (still.present === 'unknown') return still.reason;
+  }
+  // Still there is a failure, not a warning: the delete was accepted and
+  // removed nothing anyone could see.
+  return `message class ${name} still answers 10 s after its delete was accepted`;
+}
 
 describe('MessageClass (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -138,54 +170,65 @@ describe('MessageClass (using AdtClient)', () => {
           // absent and we proceed. (Delete uses the stateless deletion service,
           // so it leaves no lingering enqueue.)
           if (!connection) return { success: true };
-          try {
-            const state = await client
+          const read = () =>
+            client
               .getMessageClass()
-              .readMetadata({ name: msgClassName });
-            // `state.ok`, not `state`: the answer is an object either way, so
-            // the bare check was always true and this deleted a class that was
-            // not there on every run.
-            if (state.ok) {
-              await client.getMessageClass().delete(
-                {
-                  name: msgClassName,
-                  transportRequest: resolvedTransport,
-                },
-                {
-                  headers: integrationHeadersOf(
-                    client.getMessageClass(),
-                    'delete',
-                  ),
-                },
+              .readMetadata(
+                { name: msgClassName },
+                { analyse: analyseException },
               );
-              // The deletion service is asynchronous — poll until the object is
-              // actually gone (read → 404) before recreating, so a same-name
-              // re-run does not race the still-completing delete.
-              for (let i = 0; i < 20; i++) {
-                await new Promise((r) => setTimeout(r, 500));
-                const still = await client
-                  .getMessageClass()
-                  .readMetadata({ name: msgClassName });
-                if (!still.ok) break;
-              }
-            }
-          } catch (error: any) {
-            if (error?.response?.status !== 404) {
+          // The answer decides — see `presenceOf`; "could not find out" is
+          // not "absent".
+          const existing = presenceOf(
+            await read(),
+            `message class ${msgClassName}`,
+          );
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === true) {
+            const removed = await client.getMessageClass().delete(
+              {
+                name: msgClassName,
+                transportRequest: resolvedTransport,
+              },
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(
+                  client.getMessageClass(),
+                  'delete',
+                ),
+              },
+            );
+            if (!removed.ok) {
               return {
                 success: false,
-                reason: `Cannot verify message class existence: ${error.message}`,
+                objectExists: true,
+                reason: failureOf(
+                  removed,
+                  `delete existing message class ${msgClassName}`,
+                ),
               };
             }
+            const unknown = await untilMessageClassGone(read, msgClassName);
+            if (unknown) return { success: false, reason: unknown };
           }
           return { success: true };
         },
         // cleanupObject: called by BaseTester when a pre-existing object is detected
         cleanupObject: async (config: IMessageClassConfig) => {
-          await client
-            .getMessageClass()
-            .delete(config as Partial<IMessageClassConfig>, {
-              headers: integrationHeadersOf(client.getMessageClass(), 'delete'),
-            });
+          expectResult(
+            await client
+              .getMessageClass()
+              .delete(config as Partial<IMessageClassConfig>, {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(
+                  client.getMessageClass(),
+                  'delete',
+                ),
+              }),
+            `delete message class ${config.name}`,
+          );
         },
       });
     } catch (error) {
@@ -201,26 +244,12 @@ describe('MessageClass (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_message_class', 'adt_message_class')(
       'should execute full MessageClass lifecycle',
       async () => {
-        if (!tester) {
-          return;
-        }
-
-        // Delegate standard skip/cleanup to tester.
-        // flowTestAuto() returns early (without calling validate/create) when shouldSkip() is true,
-        // and cleans up any pre-existing object that was detected by ensureObjectReady.
-        if (tester.shouldSkip()) {
-          await tester.flowTestAuto();
-          return;
-        }
-
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        // A setup that failed is raised here, after the tester has cleaned up
+        // any pre-existing object that ensureObjectReady detected.
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCase();
         const params = testCase?.params || {};
@@ -236,47 +265,71 @@ describe('MessageClass (using AdtClient)', () => {
         const testName = 'MessageClass - Full workflow';
         logTestStart(testsLogger, testName, testCase);
 
+        let bodyError: unknown;
         try {
           // ── Step 1: Create message class ───────────────────────────────────
           logTestStep('create message class', testsLogger);
           const createState = expectResult(
             await mcHandler.create(config, {
+              analyse: analyseException,
               headers: integrationHeadersOf(mcHandler, 'create'),
             }),
             'createState',
           );
 
           // ── Step 2: Read message class ─────────────────────────────────────
-          logTestStep('read message class', testsLogger);
-          // No ADT operation that changes system state guarantees when the
-          // change becomes visible, and for MSAG the server answers 404 right
-          // after a create rather than holding the request — `withLongPolling`
-          // is passed but does not cover this resource. So poll until the
-          // object appears, bounded, instead of asking once and calling the
-          // absence a failure.
-          let readState = String(
-            expectResult(
-              await mcHandler.readMetadata({ name: msgClassName }),
-              'readState',
-            ) ?? '',
-          );
-          for (let attempt = 0; !readState && attempt < 15; attempt++) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            const again = await mcHandler.readMetadata({ name: msgClassName });
-            readState = again.ok ? String(again.getResult().value ?? '') : '';
+          // Whether the class is read back right after its create is the
+          // system's configuration, `environment.read_message_class_after_create`
+          // (required): on a cloud system the read can land on another
+          // application server where the new class is not visible yet and
+          // answer 404 (measured). Off, no read is sent and the run says so;
+          // on, any refusal — that 404 included — fails.
+          if (requiredEnvironmentFlag('read_message_class_after_create')) {
+            logTestStep('read message class', testsLogger);
+            // No ADT operation that changes system state guarantees when the
+            // change becomes visible. A successful read that is still empty is
+            // polled again, bounded; a refused read — a 404 included — fails.
+            // A later successful read never erases an earlier refusal.
+            let readState = String(
+              expectResult(
+                await mcHandler.readMetadata(
+                  { name: msgClassName },
+                  { analyse: analyseException },
+                ),
+                'readState',
+              ) ?? '',
+            );
+            for (let attempt = 0; !readState && attempt < 15; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              // Every poll is read: a refusal fails, absence included. Only a
+              // successful answer that is still empty — the class not visible
+              // yet — is polled again.
+              readState = String(
+                expectResult(
+                  await mcHandler.readMetadata(
+                    { name: msgClassName },
+                    { analyse: analyseException },
+                  ),
+                  `poll message class ${msgClassName}`,
+                ) ?? '',
+              );
+            }
+            // The class document, read into its parts. `parseMessageClass` is
+            // this module's own reading — a consumer that wants it composes it
+            // into a result strategy; a test composes it here.
+            const parsedClass = parseMessageClass(String(readState ?? ''));
+            expect(parsedClass.name).toBe(msgClassName);
+          } else {
+            createRunIntegrityLogger().info?.(
+              `message class ${msgClassName}: read after create not made — environment.read_message_class_after_create is false`,
+            );
           }
-          // The class document, read into its parts. `parseMessageClass` is
-          // this module's own reading — a consumer that wants it composes it
-          // into a result strategy; a test composes it here.
-          const parsedClass = parseMessageClass(String(readState ?? ''));
-          expect(parsedClass.name).toBe(msgClassName);
 
           // ── Step 3: Create message ─────────────────────────────────────────
           logTestStep(`create message ${msgNo}`, testsLogger);
-          // Reading the class already succeeds here, yet the messages endpoint
-          // can still answer "Resource MSAG ... does not exist": the two do not
-          // agree on when the class is there. Retry rather than treat the first
-          // answer as final.
+          // One create, read as it answers: a refusal — "Resource MSAG ...
+          // does not exist" included — fails the test; a retry that then
+          // succeeded would not erase it.
           const createMessage = () =>
             msgHandler.create(
               {
@@ -285,27 +338,24 @@ describe('MessageClass (using AdtClient)', () => {
                 msgtext: msgTextInitial,
                 transportRequest: config.transportRequest,
               },
-              { headers: integrationHeadersOf(msgHandler, 'create') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(msgHandler, 'create'),
+              },
             );
-          let created = await createMessage().catch((e: unknown) => e as Error);
-          for (
-            let attempt = 0;
-            created instanceof Error && attempt < 15;
-            attempt++
-          ) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            created = await createMessage().catch((e: unknown) => e as Error);
-          }
-          if (created instanceof Error) throw created;
-          const msgCreateState = created;
+          expectResult(await createMessage(), `create message ${msgNo}`);
 
           // ── Step 4: Read message ───────────────────────────────────────────
           logTestStep(`read message ${msgNo}`, testsLogger);
           const msgReadState = expectResult(
-            await msgHandler.read({
-              className: msgClassName,
-              msgno: msgNo,
-            }),
+            await msgHandler.read(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+              },
+              undefined,
+              { analyse: analyseException },
+            ),
             'msgReadState',
           );
           // A message is read through its class's document — there is no
@@ -325,7 +375,10 @@ describe('MessageClass (using AdtClient)', () => {
                 msgtext: msgTextUpdated,
                 transportRequest: config.transportRequest,
               },
-              { headers: integrationHeadersOf(msgHandler, 'update') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(msgHandler, 'update'),
+              },
             ),
             'msgUpdateState',
           );
@@ -333,10 +386,14 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 6: Read-back to verify update ────────────────────────────
           logTestStep(`read-back message ${msgNo} after update`, testsLogger);
           const msgReadAfterUpdate = expectResult(
-            await msgHandler.read({
-              className: msgClassName,
-              msgno: msgNo,
-            }),
+            await msgHandler.read(
+              {
+                className: msgClassName,
+                msgno: msgNo,
+              },
+              undefined,
+              { analyse: analyseException },
+            ),
             'msgReadAfterUpdate',
           );
           const updatedMessage = parseMessageClass(
@@ -359,6 +416,7 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: config.transportRequest,
               },
               {
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   msgHandler as unknown as AdtMessageClassMessage,
                   'delete',
@@ -371,9 +429,12 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 8: Verify message is gone from class ──────────────────────
           logTestStep('verify message removal', testsLogger);
           const readAfterMsgDelete = expectResult(
-            await mcHandler.readMetadata({
-              name: msgClassName,
-            }),
+            await mcHandler.readMetadata(
+              {
+                name: msgClassName,
+              },
+              { analyse: analyseException },
+            ),
             'readAfterMsgDelete',
           );
           const remaining = parseMessageClass(
@@ -385,37 +446,53 @@ describe('MessageClass (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, testName);
         } catch (error) {
+          bodyError = error;
           logTestError(testsLogger, testName, error);
-          throw error;
         } finally {
           logTestEnd(testsLogger, testName);
-          // Cleanup: always delete the message class after the test.
-          // BaseTester.afterAll only closes the connection; object deletion
-          // must happen here so the next run starts with a clean state.
-          try {
-            await mcHandler.delete(config as Partial<IMessageClassConfig>, {
-              headers: integrationHeadersOf(mcHandler, 'delete'),
-            });
-            // The deletion service is asynchronous — wait until the class is
-            // actually gone so a back-to-back re-run does not race an in-flight
-            // delete (create-then-read would otherwise 404 on the same name).
-            // `read` answers a contract, and a contract is always truthy. This
-            // read `if (!still) break`, so the loop never broke: twenty round
-            // trips and ten seconds of sleeping every run, all of them
-            // answering 404, measured in a wire log. The answer says whether
-            // the class is gone; the object it arrives in does not.
-            for (let i = 0; i < 20; i++) {
-              await new Promise((r) => setTimeout(r, 500));
-              const still = await mcHandler.readMetadata({
-                name: msgClassName,
-              });
-              if (!still.ok) break;
-            }
-          } catch {
-            // Swallow — class may already be absent or delete may fail after a
-            // partial test run; this is best-effort cleanup.
-          }
         }
+
+        // Cleanup: always delete the message class after the test.
+        // BaseTester.afterAll only closes the connection; object deletion
+        // must happen here so the next run starts with a clean state.
+        // A refused delete fails the test; when the body already failed it
+        // is added to that failure instead, never replacing it. An absent
+        // class — the body failed before creating it — is no refusal.
+        let leftover = '';
+        try {
+          const removed = await mcHandler.delete(
+            config as Partial<IMessageClassConfig>,
+            {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(mcHandler, 'delete'),
+            },
+          );
+          leftover = removed.ok
+            ? await untilMessageClassGone(
+                () =>
+                  mcHandler.readMetadata(
+                    { name: msgClassName },
+                    { analyse: analyseException },
+                  ),
+                msgClassName,
+              )
+            : saysAbsent(removed.getError())
+              ? ''
+              : failureOf(removed, `delete message class ${msgClassName}`);
+        } catch (cleanupError) {
+          leftover = `delete message class ${msgClassName} threw: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`;
+        }
+        if (bodyError !== undefined) {
+          if (leftover && bodyError instanceof Error) {
+            bodyError.message = `${bodyError.message}; then ${leftover}`;
+          }
+          throw bodyError;
+        }
+        if (leftover) throw new Error(leftover);
       },
       getTimeout('test'),
     );

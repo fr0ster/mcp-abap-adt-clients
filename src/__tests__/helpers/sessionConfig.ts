@@ -93,12 +93,26 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
  */
 export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
-  try {
-    const envConfig = getEnvironmentConfig();
-    return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
-  } catch {
-    return 'http';
+  // A configuration that cannot be read throws: reading it as "http" would
+  // run a test on a wire nobody configured.
+  const envConfig = getEnvironmentConfig();
+  return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
+}
+
+/**
+ * A boolean the system's configuration must state under `environment` —
+ * `environment.<name>` in the overlay. Required: absent or not a boolean is
+ * refused naming the key; there is no default and no environment variable.
+ */
+export function requiredEnvironmentFlag(name: string): boolean {
+  const { getEnvironmentConfig } = require('./test-helper');
+  const value = getEnvironmentConfig()?.[name];
+  if (typeof value !== 'boolean') {
+    throw new Error(
+      `environment.${name} is not set (found ${JSON.stringify(value)}): state true or false for this system in test-config.overlay.yaml`,
+    );
   }
+  return value;
 }
 
 /**
@@ -117,6 +131,18 @@ export function getConfig(): SapConfig {
 
   if (!url || !/^https?:\/\//.test(url)) {
     throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  }
+  // SAP_AUTH_TYPE is required and taken as stated: absent, or a value
+  // outside the set, is refused — the mode is never read off the credentials.
+  if (!authType) {
+    throw new Error(
+      'SAP_AUTH_TYPE is not set — state basic, jwt or xsuaa in .env',
+    );
+  }
+  if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
+    throw new Error(
+      `SAP_AUTH_TYPE is "${rawAuthType}", which is not one of basic, jwt, xsuaa — fix it in .env`,
+    );
   }
 
   // RFC transport overrides auth type — RFC connections use username/password
@@ -140,18 +166,8 @@ export function getConfig(): SapConfig {
     };
   }
 
-  // Keep tests compatible with both modes:
-  // - explicit SAP_AUTH_TYPE (basic|jwt|xsuaa)
-  // - implicit JWT mode when token is provided without SAP_AUTH_TYPE
-  const hasJwtToken = Boolean(process.env.SAP_JWT_TOKEN);
   const effectiveAuthType: 'basic' | 'jwt' =
-    authType === 'jwt' || authType === 'xsuaa'
-      ? 'jwt'
-      : authType === 'basic'
-        ? 'basic'
-        : hasJwtToken
-          ? 'jwt'
-          : 'basic';
+    authType === 'basic' ? 'basic' : 'jwt';
 
   const config: SapConfig = {
     url,

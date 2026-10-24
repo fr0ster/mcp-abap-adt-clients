@@ -12,15 +12,17 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { ensureFunctionGroupFor } from '../../../helpers/functionGroupRoute';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -34,15 +36,13 @@ import {
   createRunIntegrityLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
 
 const {
   resolvePackageName,
   resolveTransportRequest,
   resolveMasterSystem,
   getTimeout,
-  ensureSharedPackage,
-  ensureSharedDependency,
   getSharedDependenciesConfig,
   activateSharedFunctionGroup,
 } = require('../../../helpers/test-helper');
@@ -61,6 +61,13 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** The shared include the read-source case reads, set up by `shared:setup`. */
+function sharedIncludeConfigured(): boolean {
+  const shared = getSharedDependenciesConfig()?.function_group_includes;
+  const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
+  return !!sharedInclude?.name && !!sharedInclude?.function_group;
+}
 
 describe('FunctionInclude (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -130,10 +137,13 @@ describe('FunctionInclude (using AdtClient)', () => {
           // The answer decides, not the absence of a throw — see
           // `presenceOf` for what that mistake cost.
           const presence = presenceOf(
-            await client.getFunctionInclude().readMetadata({
-              functionGroupName,
-              includeName,
-            }),
+            await client.getFunctionInclude().readMetadata(
+              {
+                functionGroupName,
+                includeName,
+              },
+              { analyse: analyseException },
+            ),
             `Function Include ${functionGroupName}/${includeName}`,
           );
           if (presence.present === 'unknown') {
@@ -170,13 +180,10 @@ describe('FunctionInclude (using AdtClient)', () => {
    * itself reported two passing tests. It is a shared dependency, so the next
    * suite to read it inherits that.
    *
-   * A refusal is logged rather than thrown: the tests here already ran, and
-   * their verdict is not this cleanup's to overturn. But it is logged where it
-   * can be seen — `createRunIntegrityLogger`, not `testsLogger`, which answers
-   * `emptyLogger` unless someone set `DEBUG_ADT_TESTS` beforehand. A shared
-   * group left inactive is a fact about the run, not a diagnostic: the suite
-   * it breaks is the next one, and without the line that reads as the next
-   * suite being at fault.
+   * A refusal fails the suite: `activateSharedFunctionGroup` throws when the
+   * group could not be activated, the inactive list could not be read, or the
+   * group is still inactive. A group left inactive is a failure of this run,
+   * not of the next suite that reads it.
    *
    * The repair goes BEFORE `tester.afterAll()`, which releases the connection.
    * On a run that shares one session it is a no-op and the order would not
@@ -199,75 +206,27 @@ describe('FunctionInclude (using AdtClient)', () => {
       }
     } finally {
       // `finally`, because releasing the connection is the part that must
-      // happen either way: the repair answers rather than throws, but the
-      // request carrying that answer can still fail outright, and a session
-      // this file owns would then stay open for the rest of the run.
+      // happen either way: a refused repair throws, and a session this file
+      // owns would then stay open for the rest of the run.
       await tester?.afterAll()();
     }
   });
 
   describe('Full workflow', () => {
     beforeEach(async () => {
-      // Ensure the shared parent function group exists before the include test
-      // runs. We mirror FunctionModule's approach: prefer the shared FUGR so a
-      // single group is reused, but fall back to the default package if the
-      // shared package isn't provisioned (typical on BTP trial without a
-      // transport layer).
+      // The parent function group, by the route the case states
+      // (`params.function_group_route`); a failure of that route fails the
+      // test — the other route is never a recovery from it.
       if (hasConfig && client) {
-        const testCase = tester.getTestCaseDefinition();
-        const functionGroupName = testCase?.params?.function_group_name;
-        if (functionGroupName) {
-          try {
-            await ensureSharedPackage(client, testsLogger);
-            await ensureSharedDependency(
-              client,
-              'function_groups',
-              functionGroupName,
-              testsLogger,
-            );
-          } catch (_sharedError) {
-            const packageName = resolvePackageName(
-              testCase?.params?.package_name,
-            );
-            const transportRequest = resolveTransportRequest(
-              testCase?.params?.transport_request,
-            );
-            const readResult = await client
-              .getFunctionGroup()
-              .readMetadata({ functionGroupName });
-            if (readResult) {
-              testsLogger.info?.(
-                `Function group ${functionGroupName} already exists`,
-              );
-            } else {
-              try {
-                await client.getFunctionGroup().create(
-                  {
-                    functionGroupName,
-                    packageName,
-                    description: 'Shared FUGR for FunctionInclude tests',
-                    transportRequest,
-                  },
-                  {
-                    headers: integrationHeadersOf(
-                      client.getFunctionGroup(),
-                      'create',
-                    ),
-                  },
-                );
-              } catch (_createErr) {
-                // Cloud can 404 the post-create read; retry once.
-                await new Promise((r) => setTimeout(r, 5000));
-                const verify = await client
-                  .getFunctionGroup()
-                  .readMetadata({ functionGroupName });
-                if (!verify) throw _createErr;
-              }
-              testsLogger.info?.(
-                `Created function group ${functionGroupName} in ${packageName}`,
-              );
-            }
-          }
+        const params = tester.getTestCaseDefinition()?.params;
+        if (params) {
+          await ensureFunctionGroupFor(
+            client,
+            params,
+            'create_function_include[adt_function_include]',
+            'Shared FUGR for FunctionInclude tests',
+            testsLogger,
+          );
         }
       }
       await tester?.beforeEach()();
@@ -277,21 +236,10 @@ describe('FunctionInclude (using AdtClient)', () => {
       tester?.afterEach()();
     });
 
-    it(
+    gate('create_function_include', 'adt_function_include')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const source = testCase?.params?.source_code || config.source || '';
@@ -310,17 +258,9 @@ describe('FunctionInclude (using AdtClient)', () => {
       getTimeout('test'),
     );
 
-    it(
+    gateOn(sharedIncludeConfigured)(
       'should read source via read()',
       async () => {
-        if (!tester || !hasConfig || !client) {
-          logTestSkip(
-            testsLogger,
-            'FunctionInclude - read source',
-            'No SAP configuration',
-          );
-          return;
-        }
         // **The shared include, not the flow's own.** This used to read
         // `params.include_name` — the same object the flow above creates and
         // deletes — so by the time it ran the include was gone, and the test
@@ -333,12 +273,9 @@ describe('FunctionInclude (using AdtClient)', () => {
         const shared = getSharedDependenciesConfig()?.function_group_includes;
         const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
         if (!sharedInclude?.name || !sharedInclude?.function_group) {
-          logTestSkip(
-            testsLogger,
-            'FunctionInclude - read source',
+          throw new Error(
             'shared_dependencies.function_group_includes is not configured',
           );
-          return;
         }
         const functionGroupName = String(sharedInclude.function_group);
         const includeName = String(sharedInclude.name);
@@ -352,7 +289,9 @@ describe('FunctionInclude (using AdtClient)', () => {
         );
         const answer = await client
           .getFunctionInclude()
-          .read({ functionGroupName, includeName });
+          .read({ functionGroupName, includeName }, undefined, {
+            analyse: analyseException,
+          });
 
         // No skip-on-absence branch any more. A shared dependency that is not
         // there is a broken environment — `npm run shared:setup` fixes it — and

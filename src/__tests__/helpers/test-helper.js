@@ -12,6 +12,12 @@ const { XMLParser } = require('fast-xml-parser');
 // with none fails loudly instead of sending a fake one to SAP.
 const { integrationHeadersOf } = require('./adtHeaders');
 const {
+  analyseActivation,
+  analyseException,
+} = require('@mcp-abap-adt/adt-strategies');
+// Every expected-success call is judged, the exception document first.
+const { judged } = require('./judged');
+const {
   loadTestConfigFrom,
 } = require('../../../scripts/lib/testConfigOverlay');
 
@@ -37,8 +43,11 @@ let cachedEnvType = null;
 async function writeAndActivate(handler, config, options, logger) {
   await writeSource(handler, config, options, logger);
   if (typeof handler.activate === 'function') {
+    // `analyseActivation` reads the verdict inside the 200:
+    // activationExecuted="false" or a message of type E is a refusal.
     const activated = await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate', config),
+      analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
       const failure = activated.getError();
@@ -66,19 +75,35 @@ async function writeSource(handler, config, options, logger) {
 
   let handle;
   if (typeof handler.lock === 'function') {
-    handle = raise(await handler.lock(config), 'lock');
+    handle = raise(
+      await handler.lock(config, { analyse: analyseException }),
+      'lock',
+    );
   }
+  let writeFailed = true;
+  let unlockRefusal = '';
   try {
     // `update` writes a source; a type that has none writes its document with
     // `updateMetadata`, and since 18.0.0 it offers only that. A domain, a data
     // element, a package, a table type, a function group and their neighbours
     // are their own document. Written as a capability question rather than a
     // list of type names, so a new document-only type needs nothing here.
-    const written = { ...options, lockHandle: handle };
+    //
+    // The write carries `source` and nothing else from the caller, written
+    // out rather than spread: a spread could bring an `analyse` of its own
+    // over this one, and a key nobody expected is refused instead of sent.
+    const { source, ...unexpected } = options ?? {};
+    if (Object.keys(unexpected).length > 0) {
+      throw new Error(
+        `writeSource takes { source } only, got ${Object.keys(unexpected).join(', ')}`,
+      );
+    }
     if (typeof handler.update === 'function')
       raise(
         await handler.update(config, {
-          ...written,
+          analyse: analyseException,
+          source,
+          lockHandle: handle,
           headers: integrationHeadersOf(handler, 'update', config),
         }),
         'update',
@@ -86,21 +111,31 @@ async function writeSource(handler, config, options, logger) {
     else
       raise(
         await handler.updateMetadata(config, {
-          ...written,
+          analyse: analyseException,
+          source,
+          lockHandle: handle,
           headers: integrationHeadersOf(handler, 'updateMetadata', config),
         }),
         'updateMetadata',
       );
+    writeFailed = false;
   } finally {
     if (handle && typeof handler.unlock === 'function') {
-      const released = await handler.unlock(config, handle);
+      const released = await handler.unlock(config, handle, {
+        analyse: analyseException,
+      });
       if (released && released.ok === false) {
-        logger?.warn?.(
-          `unlock failed, the handle may still be held: ${released.getError().message}`,
-        );
+        const refusal = `unlock failed, the handle may still be held: ${released.getError().message}`;
+        // A refused unlock is a failure of its own: the handle left held is
+        // what makes the next write answer 403. When the write already
+        // failed, that failure is the one in flight, so this one is logged
+        // beside it instead of replacing it.
+        if (writeFailed) logger?.warn?.(refusal);
+        else unlockRefusal = refusal;
       }
     }
   }
+  if (unlockRefusal) throw new Error(unlockRefusal);
 }
 
 /**
@@ -934,195 +969,6 @@ function extractValidationErrorMessage(response) {
 }
 
 /**
- * Parse validation response from ADT
- * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
- * @param {Object} response - ADT response from the validation endpoint
- * @returns {Object} Parsed validation result with valid, severity, message, exists fields
- */
-function parseValidationResponse(response) {
-  try {
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-    });
-    const result = parser.parse(response.data);
-
-    // Check for exception format (<exc:exception>)
-    const exception = result['exc:exception'];
-    if (exception) {
-      const message = exception.message || '';
-      const localizedMessage = exception.localizedMessage || message;
-      const msgText = localizedMessage || message;
-      const msgLower = msgText.toLowerCase();
-
-      // Check exception type - ExceptionResourceAlreadyExists means object exists
-      const exceptionType = exception.type || '';
-      const isResourceAlreadyExists =
-        exceptionType === 'ExceptionResourceAlreadyExists' ||
-        exceptionType.includes('ResourceAlreadyExists') ||
-        exceptionType.includes('AlreadyExists');
-
-      // InvalidClifName with "already exists" message also means object exists
-      // Also check if exception type is InvalidClifName - this usually means object exists for OO objects
-      const isInvalidClifName = exceptionType === 'InvalidClifName';
-
-      // Check if message indicates object already exists
-      const exists =
-        isResourceAlreadyExists ||
-        (isInvalidClifName && msgLower.includes('already exists')) ||
-        msgLower.includes('already exists') ||
-        msgLower.includes('does already exist') ||
-        (msgLower.includes('exist') &&
-          (msgLower.includes('table') ||
-            msgLower.includes('database') ||
-            msgLower.includes('resource') ||
-            msgLower.includes('interface') ||
-            msgLower.includes('class')));
-
-      return {
-        valid: false,
-        severity: 'ERROR',
-        message: msgText,
-        exists: exists ? true : undefined,
-      };
-    }
-
-    // Check for standard format (<asx:abap><asx:values><DATA>)
-    const data = result['asx:abap']?.['asx:values']?.DATA;
-    if (!data) {
-      // No data means validation passed
-      return { valid: true };
-    }
-
-    // Check for CHECK_RESULT=X (success)
-    if (data.CHECK_RESULT === 'X') {
-      return { valid: true };
-    }
-
-    // Check for SEVERITY (error/warning)
-    const severity = data.SEVERITY;
-    const shortText = data.SHORT_TEXT || '';
-    const longText = data.LONG_TEXT || '';
-
-    // Check if message indicates object already exists
-    const msgLower = shortText.toLowerCase();
-    const exists =
-      msgLower.includes('already exists') ||
-      msgLower.includes('does already exist') ||
-      (msgLower.includes('exist') &&
-        (msgLower.includes('resource') ||
-          msgLower.includes('definition') ||
-          msgLower.includes('object')));
-
-    return {
-      valid: severity !== 'ERROR',
-      severity: severity,
-      message: shortText,
-      longText: longText,
-      exists: exists || undefined,
-    };
-  } catch (error) {
-    // If parsing fails, assume validation passed (fallback)
-    return { valid: true };
-  }
-}
-
-/**
- * Check validation result and throw error if validation failed
- * Simple check: if status is not 200, throw error with raw message
- * @param {Object} validationResponse - ADT response from validation
- * @param {string} objectName - Name of the object being validated
- * @param {string} objectType - Type of object (e.g., 'Interface', 'Class', 'Table')
- * @throws {Error} If validation failed (status !== 200)
- */
-function checkValidationResult(validationResponse, _objectName, objectType) {
-  if (!validationResponse) {
-    return; // No validation response, assume OK
-  }
-
-  const status = validationResponse.status;
-
-  // If status is 200, validation passed
-  if (status === 200) {
-    return;
-  }
-
-  // If status is not 200, get raw error message and throw
-  const rawData =
-    typeof validationResponse.data === 'string'
-      ? validationResponse.data
-      : JSON.stringify(validationResponse.data);
-
-  throw new Error(
-    `${objectType} validation failed (HTTP ${status}): ${rawData}`,
-  );
-}
-
-/**
- * Retry check operation after activate - activation is asynchronous and may take time
- * Handles "importing object from the database" errors by retrying
- * @param {Function} checkFunction - Async function that performs the check (e.g., () => client.checkDomain({ domainName }))
- * @param {Object} options - Options for retry behavior
- * @param {number} [options.maxAttempts=5] - Maximum number of retry attempts
- * @param {number} [options.delay=1000] - Delay between retries in milliseconds
- * @param {Object} [options.logger] - Optional logger for debug messages
- * @param {string} [options.objectName] - Optional object name for log messages
- * @returns {Promise<Object>} Check result (ADT response)
- * @throws {Error} If all retry attempts failed
- */
-async function retryCheckAfterActivate(checkFunction, options = {}) {
-  const {
-    maxAttempts = 5,
-    delay = 1000,
-    logger = null,
-    objectName = 'object',
-  } = options;
-
-  let checkAttempts = 0;
-  let lastError = null;
-
-  while (checkAttempts < maxAttempts) {
-    try {
-      const result = await checkFunction();
-      // Success - return result
-      return result;
-    } catch (error) {
-      checkAttempts++;
-      lastError = error;
-
-      if (checkAttempts >= maxAttempts) {
-        // All attempts failed - throw error
-        throw error;
-      }
-
-      // Check if error is about importing from database (activation still in progress)
-      const errorMessage = error?.message || String(error);
-      const isActivationInProgress =
-        errorMessage.includes('importing object') ||
-        errorMessage.includes('from the database') ||
-        errorMessage.includes('Error while importing');
-
-      if (isActivationInProgress) {
-        // Activation still in progress - retry
-        if (logger?.debug) {
-          logger.debug(
-            `Check attempt ${checkAttempts} failed for ${objectName} (activation in progress), retrying in ${delay}ms...`,
-          );
-        }
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        continue;
-      }
-
-      // Other error - don't retry, throw immediately
-      throw error;
-    }
-  }
-
-  // Should never reach here, but just in case
-  throw lastError || new Error(`Check failed after ${maxAttempts} attempts`);
-}
-
-/**
  * Check if package exists using searchObjects
  *
  * Throws when the check itself could not run. It previously answered `false` for
@@ -1281,293 +1127,6 @@ function logDefaultTestEnvironment(
 }
 
 /**
- * Create dependency table with full workflow (validate → create → lock → update → unlock → activate)
- * Includes cleanup (unlock + delete) if update fails
- * @param {Object} client - CrudClient instance
- * @param {Object} config - Table configuration
- *   - tableName: string - Table name
- *   - packageName: string - Package name
- *   - description: string - Table description
- *   - ddlCode: string - DDL source code
- *   - transportRequest: string - Transport request (optional)
- * @param {Object} testCase - Test case for delays
- * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
- */
-async function createDependencyTable(client, config, testCase) {
-  if (!client || !config || !config.tableName) {
-    return {
-      success: false,
-      reason: 'Invalid parameters for createDependencyTable',
-      created: false,
-    };
-  }
-
-  let tableCreated = false;
-  let tableLocked = false;
-  let currentStep = '';
-
-  try {
-    // Step 1: Validate
-    currentStep = 'validate';
-    const validationResponse = await client.validateTable({
-      tableName: config.tableName,
-      packageName: config.packageName,
-      description: config.description || '',
-    });
-
-    if (validationResponse?.status !== 200) {
-      const errorMessage = extractValidationErrorMessage(validationResponse);
-      const errorTextLower = errorMessage.toLowerCase();
-
-      // If table already exists, return skip reason (environment problem)
-      if (
-        errorTextLower.includes('already exists') ||
-        errorTextLower.includes('does already exist') ||
-        errorTextLower.includes('exceptionresourcealreadyexists')
-      ) {
-        return {
-          success: false,
-          reason: `Dependency table ${config.tableName} already exists (may be owned by another user) - environment problem, test skipped`,
-          created: false,
-        };
-      }
-
-      // Other validation errors (environment problem)
-      return {
-        success: false,
-        reason: `Dependency table validation failed: ${errorMessage} - environment problem, test skipped`,
-        created: false,
-      };
-    }
-
-    // Step 2: Create
-    currentStep = 'create';
-    await client.createTable({
-      tableName: config.tableName,
-      packageName: config.packageName,
-      description: config.description || '',
-      ddlCode: config.ddlCode || '',
-      transportRequest: config.transportRequest,
-    });
-    tableCreated = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('create', testCase) || 1000),
-    );
-
-    // Step 3: Lock
-    currentStep = 'lock';
-    await client.lockTable({ tableName: config.tableName });
-    tableLocked = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('lock', testCase) || 1000),
-    );
-
-    // Step 4: Update
-    currentStep = 'update';
-    await client.updateTable({
-      tableName: config.tableName,
-      ddlCode: config.ddlCode || '',
-    });
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('update', testCase) || 1000),
-    );
-
-    // Step 5: Unlock
-    currentStep = 'unlock';
-    await client.unlockTable({ tableName: config.tableName });
-    tableLocked = false;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000),
-    );
-
-    // Step 6: Activate
-    currentStep = 'activate';
-    await client.activateTable({ tableName: config.tableName });
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
-    );
-
-    return {
-      success: true,
-      created: true,
-    };
-  } catch (error) {
-    // Cleanup: unlock and delete if table was created/locked
-    if (tableLocked || tableCreated) {
-      try {
-        if (tableLocked) {
-          await client.unlockTable({ tableName: config.tableName });
-        }
-        if (tableCreated) {
-          await client.deleteTable({
-            tableName: config.tableName,
-            transportRequest: config.transportRequest,
-          });
-        }
-      } catch (cleanupError) {
-        // Log but don't fail - original error is more important
-        // Cleanup errors are silent to avoid noise
-      }
-    }
-
-    // Any error = environment problem, test should be skipped
-    return {
-      success: false,
-      reason: `Failed to create dependency table ${config.tableName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
-      created: false,
-    };
-  }
-}
-
-/**
- * Create dependency CDS view with full workflow (validate → create → lock → update → unlock → activate)
- * Includes cleanup (unlock + delete) if update fails
- * @param {Object} client - CrudClient instance
- * @param {Object} config - View configuration
- *   - viewName: string - View name
- *   - packageName: string - Package name
- *   - description: string - View description
- *   - ddlSource: string - DDL source code
- *   - transportRequest: string - Transport request (optional)
- * @param {Object} testCase - Test case for delays
- * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
- */
-async function createDependencyCdsView(client, config, testCase) {
-  if (!client || !config || !config.viewName) {
-    return {
-      success: false,
-      reason:
-        'Invalid parameters for createDependencyCdsView - environment problem, test skipped',
-      created: false,
-    };
-  }
-
-  let viewCreated = false;
-  let viewLocked = false;
-  let currentStep = '';
-
-  try {
-    // Step 1: Validate
-    currentStep = 'validate';
-    const validationResponse = await client.validateView({
-      viewName: config.viewName,
-      packageName: config.packageName,
-      description: config.description || '',
-    });
-
-    if (validationResponse?.status !== 200) {
-      const errorMessage = extractValidationErrorMessage(validationResponse);
-      const errorTextLower = errorMessage.toLowerCase();
-
-      // If view already exists, return skip reason (environment problem)
-      if (
-        errorTextLower.includes('already exists') ||
-        errorTextLower.includes('does already exist') ||
-        errorTextLower.includes('exceptionresourcealreadyexists')
-      ) {
-        return {
-          success: false,
-          reason: `Dependency view ${config.viewName} already exists (may be owned by another user) - environment problem, test skipped`,
-          created: false,
-        };
-      }
-
-      // Other validation errors (environment problem)
-      return {
-        success: false,
-        reason: `Dependency view validation failed: ${errorMessage} - environment problem, test skipped`,
-        created: false,
-      };
-    }
-
-    // Step 2: Create
-    currentStep = 'create';
-    if (!config.ddlSource) {
-      return {
-        success: false,
-        reason:
-          'ddlSource is required for view creation - environment problem, test skipped',
-        created: false,
-      };
-    }
-    await client.createView({
-      viewName: config.viewName,
-      packageName: config.packageName,
-      description: config.description || '',
-      ddlSource: config.ddlSource,
-      transportRequest: config.transportRequest,
-    });
-    viewCreated = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('create', testCase) || 1000),
-    );
-
-    // Step 3: Lock
-    currentStep = 'lock';
-    await client.lockView({ viewName: config.viewName });
-    viewLocked = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('lock', testCase) || 1000),
-    );
-
-    // Step 4: Update
-    currentStep = 'update';
-    await client.updateView({
-      viewName: config.viewName,
-      ddlSource: config.ddlSource,
-    });
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('update', testCase) || 1000),
-    );
-
-    // Step 5: Unlock
-    currentStep = 'unlock';
-    await client.unlockView({ viewName: config.viewName });
-    viewLocked = false;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000),
-    );
-
-    // Step 6: Activate
-    currentStep = 'activate';
-    await client.activateView({ viewName: config.viewName });
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
-    );
-
-    return {
-      success: true,
-      created: true,
-    };
-  } catch (error) {
-    // Cleanup: unlock and delete if view was created/locked
-    if (viewLocked || viewCreated) {
-      try {
-        if (viewLocked) {
-          await client.unlockView({ viewName: config.viewName });
-        }
-        if (viewCreated) {
-          await client.deleteView({
-            viewName: config.viewName,
-            transportRequest: config.transportRequest,
-          });
-        }
-      } catch (cleanupError) {
-        // Log but don't fail - original error is more important
-        // Cleanup errors are silent to avoid noise
-      }
-    }
-
-    // Any error = environment problem, test should be skipped
-    return {
-      success: false,
-      reason: `Failed to create dependency view ${config.viewName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
-      created: false,
-    };
-  }
-}
-
-/**
  * Create dependency domain with full workflow (validate → create → lock → update → unlock → activate)
  * Includes cleanup (unlock + delete) if update fails
  * @param {Object} client - CrudClient instance
@@ -1586,8 +1145,7 @@ async function createDependencyDomain(client, config, testCase) {
   if (!client || !config || !config.domainName) {
     return {
       success: false,
-      reason:
-        'Invalid parameters for createDependencyDomain - environment problem, test skipped',
+      reason: 'Invalid parameters for createDependencyDomain',
       created: false,
     };
   }
@@ -1617,7 +1175,7 @@ async function createDependencyDomain(client, config, testCase) {
       ) {
         return {
           success: false,
-          reason: `Dependency domain ${config.domainName} already exists (may be owned by another user) - environment problem, test skipped`,
+          reason: `Dependency domain ${config.domainName} already exists (may be owned by another user)`,
           created: false,
         };
       }
@@ -1625,18 +1183,21 @@ async function createDependencyDomain(client, config, testCase) {
       // Other validation errors (environment problem)
       return {
         success: false,
-        reason: `Dependency domain validation failed: ${errorMessage} - environment problem, test skipped`,
+        reason: `Dependency domain validation failed: ${errorMessage}`,
         created: false,
       };
     }
 
     // Step 2: Create
     currentStep = 'create';
-    await client.createDomain({
-      domainName: config.domainName,
-      packageName: config.packageName,
-      description: config.description || '',
-    });
+    mustSucceed(
+      await client.createDomain({
+        domainName: config.domainName,
+        packageName: config.packageName,
+        description: config.description || '',
+      }),
+      'dependency domain createDomain',
+    );
     domainCreated = true;
     await new Promise((resolve) =>
       setTimeout(resolve, getOperationDelay('create', testCase) || 1000),
@@ -1644,7 +1205,10 @@ async function createDependencyDomain(client, config, testCase) {
 
     // Step 3: Lock
     currentStep = 'lock';
-    await client.lockDomain({ domainName: config.domainName });
+    mustSucceed(
+      await client.lockDomain({ domainName: config.domainName }),
+      'dependency domain lockDomain',
+    );
     domainLocked = true;
     await new Promise((resolve) =>
       setTimeout(resolve, getOperationDelay('lock', testCase) || 1000),
@@ -1666,14 +1230,20 @@ async function createDependencyDomain(client, config, testCase) {
     if (config.decimals !== undefined) {
       updateConfig.decimals = config.decimals;
     }
-    await client.updateDomain(updateConfig);
+    mustSucceed(
+      await client.updateDomain(updateConfig),
+      'dependency domain updateDomain',
+    );
     await new Promise((resolve) =>
       setTimeout(resolve, getOperationDelay('update', testCase) || 1000),
     );
 
     // Step 5: Unlock
     currentStep = 'unlock';
-    await client.unlockDomain({ domainName: config.domainName });
+    mustSucceed(
+      await client.unlockDomain({ domainName: config.domainName }),
+      'dependency domain unlockDomain',
+    );
     domainLocked = false;
     await new Promise((resolve) =>
       setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000),
@@ -1681,7 +1251,10 @@ async function createDependencyDomain(client, config, testCase) {
 
     // Step 6: Activate
     currentStep = 'activate';
-    await client.activateDomain({ domainName: config.domainName });
+    mustSucceed(
+      await client.activateDomain({ domainName: config.domainName }),
+      'dependency domain activateDomain',
+    );
     await new Promise((resolve) =>
       setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
     );
@@ -1691,314 +1264,36 @@ async function createDependencyDomain(client, config, testCase) {
       created: true,
     };
   } catch (error) {
-    // Cleanup: unlock and delete if domain was created/locked
+    // Cleanup: unlock and delete if domain was created/locked. The original
+    // error is the one returned; a cleanup that fails too is named beside it,
+    // since the domain may be left on the system.
+    let cleanupNote = '';
     if (domainLocked || domainCreated) {
       try {
         if (domainLocked) {
-          await client.unlockDomain({ domainName: config.domainName });
+          mustSucceed(
+            await client.unlockDomain({ domainName: config.domainName }),
+            'dependency domain unlockDomain',
+          );
         }
         if (domainCreated) {
-          await client.deleteDomain({
-            domainName: config.domainName,
-            transportRequest: config.transportRequest || '',
-          });
+          mustSucceed(
+            await client.deleteDomain({
+              domainName: config.domainName,
+              transportRequest: config.transportRequest || '',
+            }),
+            'dependency domain deleteDomain',
+          );
         }
       } catch (cleanupError) {
-        // Log but don't fail - original error is more important
-        // Cleanup errors are silent to avoid noise
+        cleanupNote = `; the cleanup after it failed too: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`;
       }
     }
 
-    // Any error = environment problem, test should be skipped
+    // Any error fails the setup of the test that needs the domain.
     return {
       success: false,
-      reason: `Failed to create dependency domain ${config.domainName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
-      created: false,
-    };
-  }
-}
-
-/**
- * Create dependency function group with full workflow (validate → create → lock → unlock → activate)
- * Note: FunctionGroup doesn't have update operation
- * Includes cleanup (unlock + delete) if creation fails
- * @param {Object} client - CrudClient instance
- * @param {Object} config - FunctionGroup configuration
- *   - functionGroupName: string - Function group name
- *   - packageName: string - Package name
- *   - description: string - Function group description
- *   - transportRequest: string - Transport request (optional)
- * @param {Object} testCase - Test case for delays
- * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
- */
-async function createDependencyFunctionGroup(client, config, testCase) {
-  if (!client || !config || !config.functionGroupName) {
-    return {
-      success: false,
-      reason:
-        'Invalid parameters for createDependencyFunctionGroup - environment problem, test skipped',
-      created: false,
-    };
-  }
-
-  let functionGroupCreated = false;
-  let functionGroupLocked = false;
-  let currentStep = '';
-
-  try {
-    // Step 1: Validate
-    currentStep = 'validate';
-    // packageName is required for function group validation
-    // Without it, SAP ADT returns "Resource FUGR_MAINPROGRAM: wrong input data"
-    const validationResponse = await client.validateFunctionGroup({
-      functionGroupName: config.functionGroupName,
-      packageName: config.packageName, // Required for validation
-      description: config.description || '',
-    });
-
-    if (validationResponse?.status !== 200) {
-      const errorMessage = extractValidationErrorMessage(validationResponse);
-      const errorTextLower = errorMessage.toLowerCase();
-
-      // If function group already exists, return skip reason (environment problem)
-      if (
-        errorTextLower.includes('already exists') ||
-        errorTextLower.includes('does already exist') ||
-        errorTextLower.includes('exceptionresourcealreadyexists')
-      ) {
-        return {
-          success: false,
-          reason: `Dependency function group ${config.functionGroupName} already exists (may be owned by another user) - environment problem, test skipped`,
-          created: false,
-        };
-      }
-
-      // Other validation errors (environment problem)
-      return {
-        success: false,
-        reason: `Dependency function group validation failed: ${errorMessage} - environment problem, test skipped`,
-        created: false,
-      };
-    }
-
-    // Step 2: Create
-    currentStep = 'create';
-    await client.createFunctionGroup({
-      functionGroupName: config.functionGroupName,
-      packageName: config.packageName,
-      description: config.description || '',
-      transportRequest: config.transportRequest,
-    });
-    functionGroupCreated = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('create', testCase) || 1000),
-    );
-
-    // Step 3: Lock
-    currentStep = 'lock';
-    await client.lockFunctionGroup({
-      functionGroupName: config.functionGroupName,
-    });
-    functionGroupLocked = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('lock', testCase) || 1000),
-    );
-
-    // Step 4: Unlock (FunctionGroup doesn't have update operation)
-    currentStep = 'unlock';
-    await client.unlockFunctionGroup({
-      functionGroupName: config.functionGroupName,
-    });
-    functionGroupLocked = false;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000),
-    );
-
-    // Step 5: Activate
-    currentStep = 'activate';
-    await client.activateFunctionGroup({
-      functionGroupName: config.functionGroupName,
-    });
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
-    );
-
-    return {
-      success: true,
-      created: true,
-    };
-  } catch (error) {
-    // Cleanup: unlock and delete if function group was created/locked
-    if (functionGroupLocked || functionGroupCreated) {
-      try {
-        if (functionGroupLocked) {
-          await client.unlockFunctionGroup({
-            functionGroupName: config.functionGroupName,
-          });
-        }
-        if (functionGroupCreated) {
-          await client.deleteFunctionGroup({
-            functionGroupName: config.functionGroupName,
-            transportRequest: config.transportRequest || '',
-          });
-        }
-      } catch (cleanupError) {
-        // Log but don't fail - original error is more important
-        // Cleanup errors are silent to avoid noise
-      }
-    }
-
-    // Any error = environment problem, test should be skipped
-    return {
-      success: false,
-      reason: `Failed to create dependency function group ${config.functionGroupName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
-      created: false,
-    };
-  }
-}
-
-/**
- * Create dependency behavior definition with full workflow (validate → create → lock → update → unlock → activate)
- * Includes cleanup (unlock + delete) if update fails
- * @param {Object} client - CrudClient instance
- * @param {Object} config - BehaviorDefinition configuration
- *   - bdefName: string - Behavior definition name
- *   - packageName: string - Package name
- *   - description: string - Behavior definition description
- *   - rootEntity: string - Root entity name
- *   - implementationType: string - Implementation type ('Managed' | 'Unmanaged' | 'Abstract' | 'Projection')
- *   - sourceCode: string - Source code (optional, for update)
- *   - transportRequest: string - Transport request (optional)
- * @param {Object} testCase - Test case for delays
- * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
- */
-async function createDependencyBehaviorDefinition(client, config, testCase) {
-  if (!client || !config || !config.bdefName) {
-    return {
-      success: false,
-      reason:
-        'Invalid parameters for createDependencyBehaviorDefinition - environment problem, test skipped',
-      created: false,
-    };
-  }
-
-  let behaviorDefinitionCreated = false;
-  let behaviorDefinitionLocked = false;
-  let currentStep = '';
-
-  try {
-    // Step 1: Validate
-    currentStep = 'validate';
-    await client.validateBehaviorDefinition({
-      rootEntity: config.rootEntity,
-      packageName: config.packageName,
-      description: config.description,
-      implementationType: config.implementationType,
-    });
-    const validationResponse = client.getValidationResponse();
-
-    if (validationResponse?.status !== 200) {
-      const errorMessage = extractValidationErrorMessage(validationResponse);
-      const errorTextLower = errorMessage.toLowerCase();
-
-      // If behavior definition already exists, return skip reason (environment problem)
-      if (
-        errorTextLower.includes('already exists') ||
-        errorTextLower.includes('does already exist') ||
-        errorTextLower.includes('exceptionresourcealreadyexists')
-      ) {
-        return {
-          success: false,
-          reason: `Dependency behavior definition ${config.bdefName} already exists (may be owned by another user) - environment problem, test skipped`,
-          created: false,
-        };
-      }
-
-      // Other validation errors (environment problem)
-      return {
-        success: false,
-        reason: `Dependency behavior definition validation failed: ${errorMessage} - environment problem, test skipped`,
-        created: false,
-      };
-    }
-
-    // Step 2: Create
-    currentStep = 'create';
-    await client.createBehaviorDefinition({
-      name: config.bdefName,
-      packageName: config.packageName,
-      description: config.description,
-      rootEntity: config.rootEntity,
-      implementationType: config.implementationType,
-      transportRequest: config.transportRequest,
-    });
-    behaviorDefinitionCreated = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('create', testCase) || 1000),
-    );
-
-    // Step 3: Lock
-    currentStep = 'lock';
-    await client.lockBehaviorDefinition({ name: config.bdefName });
-    behaviorDefinitionLocked = true;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('lock', testCase) || 1000),
-    );
-
-    // Step 4: Update (if sourceCode provided)
-    if (config.sourceCode) {
-      currentStep = 'update';
-      await client.updateBehaviorDefinition({
-        name: config.bdefName,
-        sourceCode: config.sourceCode,
-      });
-      await new Promise((resolve) =>
-        setTimeout(resolve, getOperationDelay('update', testCase) || 1000),
-      );
-    }
-
-    // Step 5: Unlock
-    currentStep = 'unlock';
-    await client.unlockBehaviorDefinition({ name: config.bdefName });
-    behaviorDefinitionLocked = false;
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000),
-    );
-
-    // Step 6: Activate
-    currentStep = 'activate';
-    await client.activateBehaviorDefinition({ name: config.bdefName });
-    await new Promise((resolve) =>
-      setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
-    );
-
-    return {
-      success: true,
-      created: true,
-    };
-  } catch (error) {
-    // Cleanup: unlock and delete if behavior definition was created/locked
-    if (behaviorDefinitionLocked || behaviorDefinitionCreated) {
-      try {
-        if (behaviorDefinitionLocked) {
-          await client.unlockBehaviorDefinition({ name: config.bdefName });
-        }
-        if (behaviorDefinitionCreated) {
-          await client.deleteBehaviorDefinition({
-            name: config.bdefName,
-            transportRequest: config.transportRequest || '',
-          });
-        }
-      } catch (cleanupError) {
-        // Log but don't fail - original error is more important
-        // Cleanup errors are silent to avoid noise
-      }
-    }
-
-    // Any error = environment problem, test should be skipped
-    return {
-      success: false,
-      reason: `Failed to create dependency behavior definition ${config.bdefName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
+      reason: `Failed to create dependency domain ${config.domainName}: ${error instanceof Error ? error.message : String(error)}${cleanupNote}`,
       created: false,
     };
   }
@@ -2176,84 +1471,60 @@ async function ensureSharedPackage(client, logger) {
   //
   // `readResult` was a field on the state bag, and the state bags are gone: this
   // read `readResult?.readResult`, which is now always `undefined`, so the
-  // package was re-created on every run and the "already exists" recovery below
-  // was doing the real work.
-  try {
-    // A package is its own document: `getPackage()` offers `readMetadata`
-    // and no `read`, since 18.0.0 named each member for the resource it
-    // addresses. This file is JavaScript, so `tsc` could not say so.
-    const answer = await client.getPackage().readMetadata({ packageName });
-    if (answer.ok && String(answer.getResult().value ?? '').trim() !== '') {
-      logger?.info?.(`Shared package ${packageName} already exists`);
-      _sharedPackageReady = true;
-      return;
-    }
-  } catch (_error) {
-    // Package doesn't exist — will create below
+  // package was re-created on every run.
+  //
+  // A package is its own document: `getPackage()` offers `readMetadata`
+  // and no `read`, since 18.0.0 named each member for the resource it
+  // addresses. This file is JavaScript, so `tsc` could not say so.
+  //
+  // Only an answer naming the package as absent leads to the create. A read
+  // that was refused for another reason, or threw, is "could not find out",
+  // and fails setup with what was said.
+  const answer = await client
+    .getPackage()
+    .readMetadata({ packageName }, { analyse: analyseException });
+  if (answer.ok) {
+    logger?.info?.(`Shared package ${packageName} already exists`);
+    _sharedPackageReady = true;
+    return;
+  }
+  const failure = answer.getError();
+  if (!answerSaysAbsent(failure)) {
+    throw new Error(
+      `Could not determine whether shared package ${packageName} exists: ${failure.message}. ` +
+        'Refusing to assume it is missing.',
+    );
   }
 
-  // Create the package
-  try {
-    const transportRequest = resolveTransportRequest(
-      sharedConfig.transport_request,
-    );
-    mustSucceed(
-      await client.getPackage().create(
-        {
-          packageName,
-          description: 'Shared test dependencies package',
-          superPackage: sharedConfig.super_package,
-          softwareComponent: sharedConfig.software_component,
-          transportLayer: sharedConfig.transport_layer,
-          packageType: 'development',
-          transportRequest,
-          // A transportable software component (HOME on an on-premise system)
-          // refuses a package without change recording (TR432); a local one
-          // (ZLOCAL, LOCAL, $) does not want it. Stated in the config, not guessed.
-          recordChanges: sharedConfig.record_changes === true,
-        },
-        { headers: integrationHeadersOf(client.getPackage(), 'create') },
-      ),
-      `shared package create ${packageName}`,
-    );
-    logger?.info?.(`Created shared package ${packageName}`);
-  } catch (error) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
-      logger?.info?.(`Shared package ${packageName} already exists`);
-    } else {
-      // Create failed (e.g. missing softwareComponent on cloud) —
-      // verify the package exists via search before giving up
-      let exists = false;
-      try {
-        // `searchObjects` never existed: the call threw, this catch hid it,
-        // and the fallback always reported the package missing. `search`
-        // answers the result document as it arrived.
-        const searchResult = await client
-          .getUtils()
-          .search({ query: packageName, objectType: 'DEVC' });
-        exists =
-          searchResult.ok &&
-          String(searchResult.getResult().value)
-            .toUpperCase()
-            .includes(packageName.toUpperCase());
-      } catch (_searchError) {
-        exists = false;
-      }
-      if (exists) {
-        logger?.info?.(
-          `Shared package ${packageName} already exists (verified via search)`,
-        );
-      } else {
-        logger?.warn?.(
-          `Failed to create shared package ${packageName}: ${error.message}`,
-        );
-        throw error;
-      }
-    }
-  }
+  // Create the package. A refused create fails setup — a 409 or "already
+  // exists" included: the read above said the package is absent, so such an
+  // answer is a refusal of this create, not a package made ready.
+  const transportRequest = resolveTransportRequest(
+    sharedConfig.transport_request,
+  );
+  mustSucceed(
+    await client.getPackage().create(
+      {
+        packageName,
+        description: 'Shared test dependencies package',
+        superPackage: sharedConfig.super_package,
+        softwareComponent: sharedConfig.software_component,
+        transportLayer: sharedConfig.transport_layer,
+        packageType: 'development',
+        transportRequest,
+        // A transportable software component (HOME on an on-premise system)
+        // refuses a package without change recording (TR432); a local one
+        // (ZLOCAL, LOCAL, $) does not want it. Stated in the config, not guessed.
+        recordChanges: sharedConfig.record_changes === true,
+      },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(client.getPackage(), 'create'),
+      },
+    ),
+    `shared package create ${packageName}`,
+  );
+  logger?.info?.(`Created shared package ${packageName}`);
 
   _sharedPackageReady = true;
 }
@@ -2384,18 +1655,38 @@ async function writeShared(handler, config, depConfig, logger) {
  */
 function readActiveSharedSource(client, type, name, depConfig) {
   const read = {
-    tables: () => client.getTable().read({ tableName: name }, 'active'),
+    tables: () =>
+      client
+        .getTable()
+        .read({ tableName: name }, 'active', { analyse: analyseException }),
     structures: () =>
-      client.getStructure().read({ structureName: name }, 'active'),
-    views: () => client.getDdl().read({ ddlName: name }, 'active'),
-    programs: () => client.getProgram().read({ programName: name }, 'active'),
+      client
+        .getStructure()
+        .read({ structureName: name }, 'active', { analyse: analyseException }),
+    views: () =>
+      client
+        .getDdl()
+        .read({ ddlName: name }, 'active', { analyse: analyseException }),
+    programs: () =>
+      client
+        .getProgram()
+        .read({ programName: name }, 'active', { analyse: analyseException }),
     behavior_definitions: () =>
-      client.getBehaviorDefinition().read({ name }, 'active'),
-    classes: () => client.getClass().read({ className: name }, 'active'),
+      client
+        .getBehaviorDefinition()
+        .read({ name }, 'active', { analyse: analyseException }),
+    classes: () =>
+      client
+        .getClass()
+        .read({ className: name }, 'active', { analyse: analyseException }),
     access_controls: () =>
-      client.getAccessControl().read({ accessControlName: name }, 'active'),
+      client.getAccessControl().read({ accessControlName: name }, 'active', {
+        analyse: analyseException,
+      }),
     interfaces: () =>
-      client.getInterface().read({ interfaceName: name }, 'active'),
+      client
+        .getInterface()
+        .read({ interfaceName: name }, 'active', { analyse: analyseException }),
     function_modules: () =>
       client.getFunctionModule().read(
         {
@@ -2403,6 +1694,7 @@ function readActiveSharedSource(client, type, name, depConfig) {
           functionGroupName: depConfig.function_group,
         },
         'active',
+        { analyse: analyseException },
       ),
     function_group_includes: () =>
       client
@@ -2410,11 +1702,14 @@ function readActiveSharedSource(client, type, name, depConfig) {
         .read(
           { functionGroupName: depConfig.function_group, includeName: name },
           'active',
+          { analyse: analyseException },
         ),
     service_definitions: () =>
       client
         .getServiceDefinition()
-        .read({ serviceDefinitionName: name }, 'active'),
+        .read({ serviceDefinitionName: name }, 'active', {
+          analyse: analyseException,
+        }),
   }[type];
   return read ? read() : undefined;
 }
@@ -2439,20 +1734,25 @@ function sameSource(a, b) {
 /**
  * Whether an existing shared object's **active** source is already the
  * configured one. Then it is both right and active, and is left as it is:
- * no lock, no write, no activation. Any doubt — the read refused, or no read
- * for this type — answers `false`, and the object is written.
+ * no lock, no write, no activation.
+ *
+ * `false` only for what was found out: the active source read and differing,
+ * an answer naming it absent (the object has no active version), or a type
+ * with no source read here. A read refused for any other reason, or one that
+ * throws, fails setup with what was said — a failed read never falls through
+ * into a write over a shared object.
  */
-async function sharedSourceIsCurrent(client, type, name, depConfig, logger) {
-  try {
-    const answer = await readActiveSharedSource(client, type, name, depConfig);
-    if (!answer || !answer.ok) return false;
-    return sameSource(answer.getResult().value, depConfig.source);
-  } catch (error) {
-    logger?.warn?.(
-      `Could not read the active source of shared ${type} ${name}: ${error.message}`,
+async function sharedSourceIsCurrent(client, type, name, depConfig) {
+  const answer = await readActiveSharedSource(client, type, name, depConfig);
+  if (answer === undefined) return false;
+  if (!answer.ok) {
+    const failure = answer.getError();
+    if (answerSaysAbsent(failure)) return false;
+    throw new Error(
+      `Could not read the active source of shared ${type} ${name}: ${failure.message}`,
     );
-    return false;
   }
+  return sameSource(answer.getResult().value, depConfig.source);
 }
 
 /**
@@ -2470,7 +1770,7 @@ async function updateAndActivateShared(
   // An object at the configured source and active is left alone: a lock and a
   // write on every run put it into whatever request the system chooses, and
   // gain nothing.
-  if (await sharedSourceIsCurrent(client, type, name, depConfig, logger)) {
+  if (await sharedSourceIsCurrent(client, type, name, depConfig)) {
     logger?.info?.(
       `Shared ${type} ${name} is at the configured source and active — left as it is`,
     );
@@ -2610,15 +1910,14 @@ async function updateAndActivateShared(
  * which comes back inactive, and the module's branch activates the module,
  * not the group.
  *
- * **Answers the state, not the request.** `true` here means the group is off
- * the inactive list, which took two requests to establish and is the only
- * claim worth making: a caller uses this answer to decide whether the
- * dependency may be cached as verified, and caching an activation that did not
- * land writes down exactly what this exists to remove.
+ * **Answers the state, not the request.** It resolves only when the group is
+ * off the inactive list, which takes two requests to establish and is the only
+ * claim worth making.
  *
- * A refusal is logged rather than thrown: this is a dependency being made
- * ready, and a suite that reads the group should not go red because the group
- * could not be activated — it should fail on what it was actually testing.
+ * Every other outcome throws — a refused activation, an inactive list that
+ * could not be read, and a group still inactive after it: a dependency that
+ * could not be made ready is a failed setup, never a setup that went on and
+ * let the suite pass over an object nobody made ready.
  */
 async function activateSharedFunctionGroup(
   client,
@@ -2626,23 +1925,23 @@ async function activateSharedFunctionGroup(
   transportRequest,
   logger,
 ) {
-  const answer = await client
-    .getFunctionGroup()
-    .activate(
-      { functionGroupName: name, transportRequest },
-      { headers: integrationHeadersOf(client.getFunctionGroup(), 'activate') },
-    );
+  const answer = await client.getFunctionGroup().activate(
+    { functionGroupName: name, transportRequest },
+    {
+      headers: integrationHeadersOf(client.getFunctionGroup(), 'activate'),
+      analyse: judged(analyseActivation),
+    },
+  );
   if (!answer.ok) {
-    logger?.warn?.(
+    throw new Error(
       `Shared function group ${name} could not be activated: ${answer.getError().message}`,
     );
-    return false;
   }
 
-  // **The POST answering is not the group being active.** No `analyse` is
-  // passed, so `ok` means the request came back — and ADT puts a refusal inside
-  // a 200, which makes `ok` true for "activated" and for "will not activate"
-  // alike. Measured with `scripts/probe-activation-settle.ts` on
+  // **The POST answering is not the group being active.** `analyseActivation`
+  // reads a refusal inside the 200 (activationExecuted="false", a message of
+  // type E), but an activation can be executed and leave the group inactive.
+  // Measured with `scripts/probe-activation-settle.ts` on
   // the ABAP Cloud system: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
   // on the inactive list afterwards — the exact state this repair exists to
   // remove, about to be recorded as removed.
@@ -2656,13 +1955,12 @@ async function activateSharedFunctionGroup(
   const { utilInactiveObjects } = require('@mcp-abap-adt/adt-strategies');
   const listed = await client
     .getUtils({ ...utilDocuments, inactive: utilInactiveObjects })
-    .getInactiveObjects();
+    .getInactiveObjects({ analyse: analyseException });
   if (!listed.ok) {
-    logger?.warn?.(
+    throw new Error(
       `Shared function group ${name} was activated, but the inactive list ` +
         `could not be read to confirm it: ${listed.getError().message}`,
     );
-    return false;
   }
 
   // The group and the main program the server regenerates for it — both were
@@ -2673,11 +1971,10 @@ async function activateSharedFunctionGroup(
     wanted.includes(String(o.name ?? '').toUpperCase()),
   );
   if (stillInactive.length > 0) {
-    logger?.warn?.(
+    throw new Error(
       `Shared function group ${name} answered an activation but is still ` +
         `inactive: ${stillInactive.map((o) => `${o.type} ${o.name}`).join(', ')}`,
     );
-    return false;
   }
 
   logger?.info?.(`Shared function group ${name} activated`);
@@ -2731,61 +2028,96 @@ async function ensureSharedDependency(client, type, name, logger) {
   // definition and a package.
   const readShared = async () => {
     if (type === 'domains') {
-      return client.getDomain().readMetadata({ domainName: name });
+      return client
+        .getDomain()
+        .readMetadata({ domainName: name }, { analyse: analyseException });
     }
     if (type === 'data_elements') {
-      return client.getDataElement().readMetadata({ dataElementName: name });
+      return client
+        .getDataElement()
+        .readMetadata({ dataElementName: name }, { analyse: analyseException });
     }
     if (type === 'structures') {
-      return client.getStructure().readMetadata({ structureName: name });
+      return client
+        .getStructure()
+        .readMetadata({ structureName: name }, { analyse: analyseException });
     }
     if (type === 'tables') {
-      return client.getTable().readMetadata({ tableName: name });
+      return client
+        .getTable()
+        .readMetadata({ tableName: name }, { analyse: analyseException });
     }
     if (type === 'views') {
-      return client.getDdl().readMetadata({ ddlName: name });
+      return client
+        .getDdl()
+        .readMetadata({ ddlName: name }, { analyse: analyseException });
     }
     if (type === 'programs') {
-      return client.getProgram().readMetadata({ programName: name });
+      return client
+        .getProgram()
+        .readMetadata({ programName: name }, { analyse: analyseException });
     }
     if (type === 'behavior_definitions') {
-      return client.getBehaviorDefinition().readMetadata({ name });
+      return client
+        .getBehaviorDefinition()
+        .readMetadata({ name }, { analyse: analyseException });
     }
     if (type === 'classes') {
-      return client.getClass().readMetadata({ className: name });
+      return client
+        .getClass()
+        .readMetadata({ className: name }, { analyse: analyseException });
     }
     if (type === 'access_controls') {
       return client
         .getAccessControl()
-        .readMetadata({ accessControlName: name });
+        .readMetadata(
+          { accessControlName: name },
+          { analyse: analyseException },
+        );
     }
     if (type === 'interfaces') {
-      return client.getInterface().readMetadata({ interfaceName: name });
+      return client
+        .getInterface()
+        .readMetadata({ interfaceName: name }, { analyse: analyseException });
     }
     if (type === 'function_groups') {
       return client
         .getFunctionGroup()
-        .readMetadata({ functionGroupName: name });
+        .readMetadata(
+          { functionGroupName: name },
+          { analyse: analyseException },
+        );
     }
     if (type === 'function_modules') {
-      return client.getFunctionModule().readMetadata({
-        functionModuleName: name,
-        functionGroupName: depConfig.function_group,
-      });
+      return client.getFunctionModule().readMetadata(
+        {
+          functionModuleName: name,
+          functionGroupName: depConfig.function_group,
+        },
+        { analyse: analyseException },
+      );
     }
     if (type === 'function_group_includes') {
-      return client.getFunctionInclude().readMetadata({
-        functionGroupName: depConfig.function_group,
-        includeName: name,
-      });
+      return client.getFunctionInclude().readMetadata(
+        {
+          functionGroupName: depConfig.function_group,
+          includeName: name,
+        },
+        { analyse: analyseException },
+      );
     }
     if (type === 'service_definitions') {
       return client
         .getServiceDefinition()
-        .readMetadata({ serviceDefinitionName: name });
+        .readMetadata(
+          { serviceDefinitionName: name },
+          { analyse: analyseException },
+        );
     }
     if (type === 'service_bindings') {
-      return client.getServiceBinding().readMetadata({ bindingName: name });
+      return client
+        .getServiceBinding()
+        .readMetadata({ bindingName: name }, { analyse: analyseException });
     }
     return undefined;
   };
@@ -2794,9 +2126,13 @@ async function ensureSharedDependency(client, type, name, logger) {
   try {
     const answer = await readShared();
     if (answer === undefined) {
-      // A type this function has no read for. Unknown, not absent.
-      exists = false;
-    } else if (answer.ok) {
+      // A type this function has no read for: whether it exists cannot be
+      // found out, and "could not find out" is never "absent".
+      throw new Error(
+        `Shared dependency type ${type} has no existence read here — ${name} cannot be made ready`,
+      );
+    }
+    if (answer.ok) {
       // A 2xx on the object's own URI is the object — even an empty one: a
       // document read too soon after its create answers `200` and no body.
       exists = true;
@@ -2871,7 +2207,13 @@ async function ensureSharedDependency(client, type, name, logger) {
           // Reading inside the lock window would invent a sequence the library
           // no longer performs.
           const current = await readDocumentForUpdate(
-            () => client.getDomain().readMetadata({ domainName: name }),
+            () =>
+              client
+                .getDomain()
+                .readMetadata(
+                  { domainName: name },
+                  { analyse: analyseException },
+                ),
             `read shared domain ${name}`,
             logger,
           );
@@ -2890,7 +2232,12 @@ async function ensureSharedDependency(client, type, name, logger) {
         } else {
           const current = await readDocumentForUpdate(
             () =>
-              client.getDataElement().readMetadata({ dataElementName: name }),
+              client
+                .getDataElement()
+                .readMetadata(
+                  { dataElementName: name },
+                  { analyse: analyseException },
+                ),
             `read shared data element ${name}`,
             logger,
           );
@@ -2937,19 +2284,12 @@ async function ensureSharedDependency(client, type, name, logger) {
     // inactive list, because the answer to the first says only that the server
     // replied — see `activateSharedFunctionGroup`.
     //
-    // A refusal is not cached as verified. The cache is what makes the next
-    // call skip this check outright, so caching a group that could not be
-    // activated would write down exactly the state this change exists to
-    // remove — and the next call is the one chance left to fix it.
-    const ready =
-      type !== 'function_groups' ||
-      (await activateSharedFunctionGroup(
-        client,
-        name,
-        transportRequest,
-        logger,
-      ));
-    if (ready) _verifiedDependencies[cacheKey] = true;
+    // A group that could not be made active throws, so it is neither cached
+    // as verified nor handed to the suite as ready.
+    if (type === 'function_groups') {
+      await activateSharedFunctionGroup(client, name, transportRequest, logger);
+    }
+    _verifiedDependencies[cacheKey] = true;
     // `changed`: the source was written (and, without skip_activation,
     // activated) by this call — what a caller activating a group needs to know.
     return { existed: true, created: false, changed };
@@ -2957,547 +2297,531 @@ async function ensureSharedDependency(client, type, name, logger) {
 
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
   logger?.info?.(`Creating shared ${type} ${name}...`);
-  // Set by the function-group branch alone, and only to say the group was
-  // created but is still inactive — enough to keep the object and withhold the
-  // cache entry, so the next call looks at the group again instead of taking
-  // it on trust.
-  let activationRefused = false;
-  try {
-    if (type === 'domains') {
-      mustSucceed(
-        await client.getDomain().create(
-          {
-            domainName: name,
-            packageName,
-            description: depConfig.description || 'Shared test domain',
-            datatype: depConfig.datatype || 'CHAR',
-            length: depConfig.length || 10,
-            transportRequest,
-          },
-          { headers: integrationHeadersOf(client.getDomain(), 'create') },
-        ),
-        `shared domain create ${name}`,
-      );
-      // A domain carries no source: create only makes the shell, update fills
-      // in the type, and without that step it stays an empty object with no
-      // data type at all. Which is what happened, for as long as the fields
-      // were passed here as fields: the update writes `config.document` and
-      // merges nothing, so a config without one sent `undefined` and the shell
-      // stayed a shell. The document the create just answered is read back,
-      // patched, and written whole.
-      const createdDomain = await readDocumentForUpdate(
-        () => client.getDomain().readMetadata({ domainName: name }),
-        `read shared domain ${name} after create`,
-        logger,
-      );
+  // No recovery after a refused create: a 409 or "already exists" is a
+  // failure of this create, reported with what SAP said. An object that a
+  // read then finds was made by someone else, in a state nobody configured,
+  // and is not this dependency made ready.
+  if (type === 'domains') {
+    mustSucceed(
+      await client.getDomain().create(
+        {
+          domainName: name,
+          packageName,
+          description: depConfig.description || 'Shared test domain',
+          datatype: depConfig.datatype || 'CHAR',
+          length: depConfig.length || 10,
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getDomain(), 'create'),
+        },
+      ),
+      `shared domain create ${name}`,
+    );
+    // A domain carries no source: create only makes the shell, update fills
+    // in the type, and without that step it stays an empty object with no
+    // data type at all. Which is what happened, for as long as the fields
+    // were passed here as fields: the update writes `config.document` and
+    // merges nothing, so a config without one sent `undefined` and the shell
+    // stayed a shell. The document the create just answered is read back,
+    // patched, and written whole.
+    const createdDomain = await readDocumentForUpdate(
+      () =>
+        client
+          .getDomain()
+          .readMetadata({ domainName: name }, { analyse: analyseException }),
+      `read shared domain ${name} after create`,
+      logger,
+    );
+    mustSucceed(
+      await writeAndActivate(
+        client.getDomain(),
+        {
+          domainName: name,
+          // The update needs the package as much as the create did: measured on
+          // on premise (BASIS 816), the first-ever setup of a shared domain failed with `Package
+          // name is required for update` and the next run passed, because by
+          // then the object existed and the reconcile branch — which does pass
+          // it — took over. A defect only a fresh system ever sees.
+          packageName,
+          transportRequest,
+        },
+        { source: domainDocumentFor(createdDomain, depConfig) },
+      ),
+      `shared domain update ${name}`,
+    );
+  } else if (type === 'data_elements') {
+    mustSucceed(
+      await client.getDataElement().create(
+        {
+          dataElementName: name,
+          packageName,
+          description: depConfig.description || 'Shared test data element',
+          typeKind: depConfig.type_kind || 'domain',
+          typeName: depConfig.domain_name,
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getDataElement(), 'create'),
+        },
+      ),
+      `shared dataelement create ${name}`,
+    );
+    const createdElement = await readDocumentForUpdate(
+      () =>
+        client
+          .getDataElement()
+          .readMetadata(
+            { dataElementName: name },
+            { analyse: analyseException },
+          ),
+      `read shared data element ${name} after create`,
+      logger,
+    );
+    mustSucceed(
+      await writeAndActivate(
+        client.getDataElement(),
+        {
+          dataElementName: name,
+          // Same omission as the domain above, and the same fresh-system-only
+          // failure waiting behind it.
+          packageName,
+          transportRequest,
+        },
+        { source: dataElementDocumentFor(createdElement, depConfig) },
+      ),
+      `shared dataelement update ${name}`,
+    );
+  } else if (type === 'structures') {
+    mustSucceed(
+      await client.getStructure().create(
+        {
+          structureName: name,
+          packageName,
+          description: depConfig.description || 'Shared test structure',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getStructure(), 'create'),
+        },
+      ),
+      `shared structure create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared structure ${name}...`);
       mustSucceed(
         await writeAndActivate(
-          client.getDomain(),
-          {
-            domainName: name,
-            // The update needs the package as much as the create did: measured on
-            // on premise (BASIS 816), the first-ever setup of a shared domain failed with `Package
-            // name is required for update` and the next run passed, because by
-            // then the object existed and the reconcile branch — which does pass
-            // it — took over. A defect only a fresh system ever sees.
-            packageName,
-            transportRequest,
-          },
-          { source: domainDocumentFor(createdDomain, depConfig) },
-        ),
-        `shared domain update ${name}`,
-      );
-    } else if (type === 'data_elements') {
-      mustSucceed(
-        await client.getDataElement().create(
-          {
-            dataElementName: name,
-            packageName,
-            description: depConfig.description || 'Shared test data element',
-            typeKind: depConfig.type_kind || 'domain',
-            typeName: depConfig.domain_name,
-            transportRequest,
-          },
-          { headers: integrationHeadersOf(client.getDataElement(), 'create') },
-        ),
-        `shared dataelement create ${name}`,
-      );
-      const createdElement = await readDocumentForUpdate(
-        () => client.getDataElement().readMetadata({ dataElementName: name }),
-        `read shared data element ${name} after create`,
-        logger,
-      );
-      mustSucceed(
-        await writeAndActivate(
-          client.getDataElement(),
-          {
-            dataElementName: name,
-            // Same omission as the domain above, and the same fresh-system-only
-            // failure waiting behind it.
-            packageName,
-            transportRequest,
-          },
-          { source: dataElementDocumentFor(createdElement, depConfig) },
-        ),
-        `shared dataelement update ${name}`,
-      );
-    } else if (type === 'structures') {
-      mustSucceed(
-        await client.getStructure().create(
+          client.getStructure(),
           {
             structureName: name,
-            packageName,
-            description: depConfig.description || 'Shared test structure',
+            source: depConfig.source,
             transportRequest,
           },
-          { headers: integrationHeadersOf(client.getStructure(), 'create') },
+          { source: depConfig.source },
         ),
-        `shared structure create ${name}`,
+        `shared structure update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared structure ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getStructure(),
-            {
-              structureName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared structure update ${name}`,
-        );
-        logger?.info?.(`Shared structure ${name} activated`);
-      }
-    } else if (type === 'tables') {
+      logger?.info?.(`Shared structure ${name} activated`);
+    }
+  } else if (type === 'tables') {
+    mustSucceed(
+      await client.getTable().create(
+        {
+          tableName: name,
+          packageName,
+          description: depConfig.description || 'Shared test table',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getTable(), 'create'),
+        },
+      ),
+      `shared table create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared table ${name}...`);
       mustSucceed(
-        await client.getTable().create(
+        await writeAndActivate(
+          client.getTable(),
           {
             tableName: name,
-            packageName,
-            description: depConfig.description || 'Shared test table',
+            source: depConfig.source,
             transportRequest,
           },
-          { headers: integrationHeadersOf(client.getTable(), 'create') },
+          { source: depConfig.source },
         ),
-        `shared table create ${name}`,
+        `shared table update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared table ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getTable(),
-            {
-              tableName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared table update ${name}`,
-        );
-        logger?.info?.(`Shared table ${name} activated`);
-      }
-    } else if (type === 'views') {
-      mustSucceed(
-        await client.getDdl().create(
-          {
-            ddlName: name,
-            packageName,
-            description: depConfig.description || 'Shared test view',
-            transportRequest,
-          },
-          { headers: integrationHeadersOf(client.getDdl(), 'create') },
-        ),
-        `shared ddl create ${name}`,
+      logger?.info?.(`Shared table ${name} activated`);
+    }
+  } else if (type === 'views') {
+    mustSucceed(
+      await client.getDdl().create(
+        {
+          ddlName: name,
+          packageName,
+          description: depConfig.description || 'Shared test view',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getDdl(), 'create'),
+        },
+      ),
+      `shared ddl create ${name}`,
+    );
+    if (depConfig.source) {
+      await writeShared(
+        client.getDdl(),
+        { ddlName: name, source: depConfig.source, transportRequest },
+        depConfig,
+        logger,
       );
-      if (depConfig.source) {
-        await writeShared(
-          client.getDdl(),
-          { ddlName: name, source: depConfig.source, transportRequest },
-          depConfig,
-          logger,
-        );
-        logger?.info?.(`Shared view ${name} written`);
-      }
-    } else if (type === 'programs') {
+      logger?.info?.(`Shared view ${name} written`);
+    }
+  } else if (type === 'programs') {
+    mustSucceed(
+      await client.getProgram().create(
+        {
+          programName: name,
+          packageName,
+          description: depConfig.description || 'Shared test program',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getProgram(), 'create'),
+        },
+      ),
+      `shared program create ${name}`,
+    );
+    if (depConfig.source) {
       mustSucceed(
-        await client.getProgram().create(
+        await writeAndActivate(
+          client.getProgram(),
           {
             programName: name,
-            packageName,
-            description: depConfig.description || 'Shared test program',
+            source: depConfig.source,
             transportRequest,
           },
-          { headers: integrationHeadersOf(client.getProgram(), 'create') },
+          { source: depConfig.source },
         ),
-        `shared program create ${name}`,
+        `shared program update ${name}`,
       );
-      if (depConfig.source) {
-        mustSucceed(
-          await writeAndActivate(
-            client.getProgram(),
-            {
-              programName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
+    }
+  } else if (type === 'behavior_definitions') {
+    mustSucceed(
+      await client.getBehaviorDefinition().create(
+        {
+          name,
+          packageName,
+          rootEntity: depConfig.root_entity || name,
+          implementationType: depConfig.implementation_type || 'Managed',
+          description: depConfig.description || 'Shared test BDEF',
+          source: depConfig.source,
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(
+            client.getBehaviorDefinition(),
+            'create',
           ),
-          `shared program update ${name}`,
-        );
-      }
-    } else if (type === 'behavior_definitions') {
+        },
+      ),
+      `shared behaviordefinition create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared behavior definition ${name}...`);
       mustSucceed(
-        await client.getBehaviorDefinition().create(
+        await writeAndActivate(
+          client.getBehaviorDefinition(),
           {
             name,
-            packageName,
-            rootEntity: depConfig.root_entity || name,
-            implementationType: depConfig.implementation_type || 'Managed',
-            description: depConfig.description || 'Shared test BDEF',
             source: depConfig.source,
             transportRequest,
           },
-          {
-            headers: integrationHeadersOf(
-              client.getBehaviorDefinition(),
-              'create',
-            ),
-          },
+          { source: depConfig.source },
         ),
-        `shared behaviordefinition create ${name}`,
+        `shared behaviordefinition update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared behavior definition ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getBehaviorDefinition(),
-            {
-              name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared behaviordefinition update ${name}`,
-        );
-        logger?.info?.(`Shared behavior definition ${name} activated`);
-      }
-    } else if (type === 'classes') {
-      mustSucceed(
-        await client.getClass().create(
-          {
-            className: name,
-            packageName,
-            description: depConfig.description || 'Shared test class',
-            transportRequest,
-          },
-          { headers: integrationHeadersOf(client.getClass(), 'create') },
-        ),
-        `shared class create ${name}`,
+      logger?.info?.(`Shared behavior definition ${name} activated`);
+    }
+  } else if (type === 'classes') {
+    mustSucceed(
+      await client.getClass().create(
+        {
+          className: name,
+          packageName,
+          description: depConfig.description || 'Shared test class',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getClass(), 'create'),
+        },
+      ),
+      `shared class create ${name}`,
+    );
+    if (depConfig.source) {
+      await writeShared(
+        client.getClass(),
+        { className: name, source: depConfig.source, transportRequest },
+        depConfig,
+        logger,
       );
-      if (depConfig.source) {
-        await writeShared(
-          client.getClass(),
-          { className: name, source: depConfig.source, transportRequest },
-          depConfig,
-          logger,
-        );
-        logger?.info?.(`Shared class ${name} written`);
-      }
-    } else if (type === 'access_controls') {
+      logger?.info?.(`Shared class ${name} written`);
+    }
+  } else if (type === 'access_controls') {
+    mustSucceed(
+      await client.getAccessControl().create(
+        {
+          accessControlName: name,
+          packageName,
+          description: depConfig.description || 'Shared test access control',
+          source: depConfig.source,
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getAccessControl(), 'create'),
+        },
+      ),
+      `shared accesscontrol create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared access control ${name}...`);
       mustSucceed(
-        await client.getAccessControl().create(
+        await writeAndActivate(
+          client.getAccessControl(),
           {
             accessControlName: name,
-            packageName,
-            description: depConfig.description || 'Shared test access control',
             source: depConfig.source,
             transportRequest,
           },
-          {
-            headers: integrationHeadersOf(client.getAccessControl(), 'create'),
-          },
+          { source: depConfig.source },
         ),
-        `shared accesscontrol create ${name}`,
+        `shared accesscontrol update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared access control ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getAccessControl(),
-            {
-              accessControlName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared accesscontrol update ${name}`,
-        );
-        logger?.info?.(`Shared access control ${name} activated`);
-      }
-    } else if (type === 'interfaces') {
+      logger?.info?.(`Shared access control ${name} activated`);
+    }
+  } else if (type === 'interfaces') {
+    mustSucceed(
+      await client.getInterface().create(
+        {
+          interfaceName: name,
+          packageName,
+          description: depConfig.description || 'Shared test interface',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getInterface(), 'create'),
+        },
+      ),
+      `shared interface create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared interface ${name}...`);
       mustSucceed(
-        await client.getInterface().create(
+        await writeAndActivate(
+          client.getInterface(),
           {
             interfaceName: name,
-            packageName,
-            description: depConfig.description || 'Shared test interface',
+            source: depConfig.source,
             transportRequest,
           },
-          { headers: integrationHeadersOf(client.getInterface(), 'create') },
+          { source: depConfig.source },
         ),
-        `shared interface create ${name}`,
+        `shared interface update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared interface ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getInterface(),
-            {
-              interfaceName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared interface update ${name}`,
-        );
-        logger?.info?.(`Shared interface ${name} activated`);
-      }
-    } else if (type === 'function_groups') {
-      try {
-        mustSucceed(
-          await client.getFunctionGroup().create(
-            {
-              functionGroupName: name,
-              packageName,
-              description: depConfig.description || 'Shared test FUGR',
-              transportRequest,
-            },
-            {
-              headers: integrationHeadersOf(
-                client.getFunctionGroup(),
-                'create',
-              ),
-            },
-          ),
-          `shared functiongroup create ${name}`,
-        );
-      } catch (createErr) {
-        // On cloud, HTTP create may succeed but post-create read fails (404).
-        // Wait and verify the object actually exists before re-throwing.
-        //
-        // `!verify` was the check, and a read always answers an object now — so
-        // this swallowed every create failure it was meant to re-throw. The
-        // answer decides: a document means the group is there despite the error.
-        await new Promise((r) => setTimeout(r, 5000));
-        const verify = await client
-          .getFunctionGroup()
-          .readMetadata({ functionGroupName: name });
-        const arrived =
-          verify.ok && String(verify.getResult().value ?? '').trim() !== '';
-        if (!arrived) throw createErr;
-      }
-      activationRefused = !(await activateSharedFunctionGroup(
-        client,
-        name,
-        transportRequest,
-        logger,
-      ));
-    } else if (type === 'function_modules') {
+      logger?.info?.(`Shared interface ${name} activated`);
+    }
+  } else if (type === 'function_groups') {
+    // A refused create fails setup with what SAP said; a group found by a
+    // later read does not forgive it.
+    mustSucceed(
+      await client.getFunctionGroup().create(
+        {
+          functionGroupName: name,
+          packageName,
+          description: depConfig.description || 'Shared test FUGR',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getFunctionGroup(), 'create'),
+        },
+      ),
+      `shared functiongroup create ${name}`,
+    );
+    // Throws when the group cannot be made active.
+    await activateSharedFunctionGroup(client, name, transportRequest, logger);
+  } else if (type === 'function_modules') {
+    mustSucceed(
+      await client.getFunctionModule().create(
+        {
+          functionModuleName: name,
+          functionGroupName: depConfig.function_group,
+          packageName,
+          description: depConfig.description || 'Shared test FM',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getFunctionModule(), 'create'),
+        },
+      ),
+      `shared functionmodule create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared function module ${name}...`);
       mustSucceed(
-        await client.getFunctionModule().create(
+        await writeAndActivate(
+          client.getFunctionModule(),
           {
             functionModuleName: name,
             functionGroupName: depConfig.function_group,
-            packageName,
-            description: depConfig.description || 'Shared test FM',
+            source: depConfig.source,
             transportRequest,
           },
-          {
-            headers: integrationHeadersOf(client.getFunctionModule(), 'create'),
-          },
+          { source: depConfig.source },
         ),
-        `shared functionmodule create ${name}`,
+        `shared functionmodule update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared function module ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getFunctionModule(),
-            {
-              functionModuleName: name,
-              functionGroupName: depConfig.function_group,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared functionmodule update ${name}`,
-        );
-        logger?.info?.(`Shared function module ${name} activated`);
-      }
-    } else if (type === 'function_group_includes') {
-      // `create` takes no source since 18.0.0 — it makes the include, and the
-      // body is the write that follows. Same two steps as the function module
-      // above.
+      logger?.info?.(`Shared function module ${name} activated`);
+    }
+  } else if (type === 'function_group_includes') {
+    // `create` takes no source since 18.0.0 — it makes the include, and the
+    // body is the write that follows. Same two steps as the function module
+    // above.
+    mustSucceed(
+      await client.getFunctionInclude().create(
+        {
+          functionGroupName: depConfig.function_group,
+          includeName: name,
+          description:
+            depConfig.description || 'Shared test function group include',
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getFunctionInclude(), 'create'),
+        },
+      ),
+      `shared functioninclude create ${name}`,
+    );
+    if (depConfig.source) {
+      logger?.info?.(`Activating shared function include ${name}...`);
       mustSucceed(
-        await client.getFunctionInclude().create(
+        await writeAndActivate(
+          client.getFunctionInclude(),
           {
             functionGroupName: depConfig.function_group,
             includeName: name,
-            description:
-              depConfig.description || 'Shared test function group include',
+            source: depConfig.source,
             transportRequest,
           },
-          {
-            headers: integrationHeadersOf(
-              client.getFunctionInclude(),
-              'create',
-            ),
-          },
+          { source: depConfig.source },
         ),
-        `shared functioninclude create ${name}`,
+        `shared functioninclude update ${name}`,
       );
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared function include ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getFunctionInclude(),
-            {
-              functionGroupName: depConfig.function_group,
-              includeName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
+      logger?.info?.(`Shared function include ${name} activated`);
+    }
+  } else if (type === 'service_definitions') {
+    mustSucceed(
+      await client.getServiceDefinition().create(
+        {
+          serviceDefinitionName: name,
+          packageName,
+          description:
+            depConfig.description || 'Shared test service definition',
+          transportRequest,
+          source: depConfig.source,
+        },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(
+            client.getServiceDefinition(),
+            'create',
           ),
-          `shared functioninclude update ${name}`,
-        );
-        logger?.info?.(`Shared function include ${name} activated`);
-      }
-    } else if (type === 'service_definitions') {
+        },
+      ),
+      `shared servicedefinition create ${name}`,
+    );
+    if (depConfig.source && !depConfig.skip_activation) {
+      logger?.info?.(`Activating shared service definition ${name}...`);
       mustSucceed(
-        await client.getServiceDefinition().create(
+        await writeAndActivate(
+          client.getServiceDefinition(),
           {
             serviceDefinitionName: name,
-            packageName,
-            description:
-              depConfig.description || 'Shared test service definition',
-            transportRequest,
             source: depConfig.source,
-          },
-          {
-            headers: integrationHeadersOf(
-              client.getServiceDefinition(),
-              'create',
-            ),
-          },
-        ),
-        `shared servicedefinition create ${name}`,
-      );
-      if (depConfig.source && !depConfig.skip_activation) {
-        logger?.info?.(`Activating shared service definition ${name}...`);
-        mustSucceed(
-          await writeAndActivate(
-            client.getServiceDefinition(),
-            {
-              serviceDefinitionName: name,
-              source: depConfig.source,
-              transportRequest,
-            },
-            { source: depConfig.source },
-          ),
-          `shared servicedefinition update ${name}`,
-        );
-        logger?.info?.(`Shared service definition ${name} activated`);
-      } else if (depConfig.source && depConfig.skip_activation) {
-        mustSucceed(
-          await writeSource(
-            client.getServiceDefinition(),
-            { serviceDefinitionName: name, transportRequest },
-            { source: depConfig.source },
-            logger,
-          ),
-          `shared servicedefinition write ${name}`,
-        );
-        logger?.info?.(
-          `Shared service definition ${name} written (activation deferred for group activation)`,
-        );
-      }
-    } else if (type === 'service_bindings') {
-      mustSucceed(
-        await client.getServiceBinding().create(
-          {
-            bindingName: name,
-            packageName,
-            description: depConfig.description || 'Shared test service binding',
-            serviceDefinitionName: depConfig.service_definition,
-            serviceName: depConfig.service_name || name,
-            serviceVersion: depConfig.service_version || '0001',
-            // adt-clients takes a single bindingVariant (e.g. ODATA_V4_WEB_API),
-            // not separate type/version. Prefer an explicit binding_variant;
-            // otherwise derive it from binding_type/binding_version (defaulting
-            // the category to WEB_API).
-            bindingVariant:
-              depConfig.binding_variant ||
-              `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
             transportRequest,
           },
-          {
-            activateOnCreate: !depConfig.skip_activation,
-            headers: integrationHeadersOf(client.getServiceBinding(), 'create'),
-          },
+          { source: depConfig.source },
         ),
-        `shared servicebinding create ${name}`,
+        `shared servicedefinition update ${name}`,
       );
-      if (depConfig.skip_activation) {
-        logger?.info?.(
-          `Shared service binding ${name} created (activation deferred for group activation)`,
-        );
-      }
-    }
-    logger?.info?.(`Created shared ${type} ${name}`);
-    if (!activationRefused) _verifiedDependencies[cacheKey] = true;
-    return { existed: false, created: true, changed: true };
-  } catch (error) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
-      // A 409 is not "it exists". SAP answers 409 to refusals too — "No
-      // suitable software component is modifiable", a package on the wrong
-      // route — and reading every one as a concurrent create reported success
-      // over an object that was never made. It counts as existing only when a
-      // read after it finds the object; otherwise the refusal is reported with
-      // what SAP said.
-      let after;
-      try {
-        after = await readShared();
-      } catch (readError) {
-        logger?.warn?.(
-          `Shared ${type} ${name}: the read after a refused create failed: ${readError.message}`,
-        );
-      }
-      if (after?.ok) {
-        logger?.info?.(
-          `Shared ${type} ${name} already exists (concurrent creation)`,
-        );
-        _verifiedDependencies[cacheKey] = true;
-        // Someone else's create: what it wrote is unknown, so it counts as
-        // changed and a group that includes it is activated.
-        return { existed: true, created: false, changed: true };
-      }
-      throw new Error(
-        `Shared ${type} ${name} was not created, and a read after the refusal does not find it: ${error.message}`,
+      logger?.info?.(`Shared service definition ${name} activated`);
+    } else if (depConfig.source && depConfig.skip_activation) {
+      mustSucceed(
+        await writeSource(
+          client.getServiceDefinition(),
+          { serviceDefinitionName: name, transportRequest },
+          { source: depConfig.source },
+          logger,
+        ),
+        `shared servicedefinition write ${name}`,
+      );
+      logger?.info?.(
+        `Shared service definition ${name} written (activation deferred for group activation)`,
       );
     }
-    throw error;
+  } else if (type === 'service_bindings') {
+    mustSucceed(
+      await client.getServiceBinding().create(
+        {
+          bindingName: name,
+          packageName,
+          description: depConfig.description || 'Shared test service binding',
+          serviceDefinitionName: depConfig.service_definition,
+          serviceName: depConfig.service_name || name,
+          serviceVersion: depConfig.service_version || '0001',
+          // adt-clients takes a single bindingVariant (e.g. ODATA_V4_WEB_API),
+          // not separate type/version. Prefer an explicit binding_variant;
+          // otherwise derive it from binding_type/binding_version (defaulting
+          // the category to WEB_API).
+          bindingVariant:
+            depConfig.binding_variant ||
+            `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
+          transportRequest,
+        },
+        {
+          analyse: analyseException,
+          activateOnCreate: !depConfig.skip_activation,
+          headers: integrationHeadersOf(client.getServiceBinding(), 'create'),
+        },
+      ),
+      `shared servicebinding create ${name}`,
+    );
+    if (depConfig.skip_activation) {
+      logger?.info?.(
+        `Shared service binding ${name} created (activation deferred for group activation)`,
+      );
+    }
+  } else {
+    throw new Error(
+      `Shared dependency type ${type} has no create here — ${name} was not created`,
+    );
   }
+  logger?.info?.(`Created shared ${type} ${name}`);
+  _verifiedDependencies[cacheKey] = true;
+  return { existed: false, created: true, changed: true };
 }
 
 /**
@@ -3539,18 +2863,11 @@ module.exports = {
   getTestTimeout, // Add getTestTimeout from root helper
   resolveStandardObject, // Add resolveStandardObject helper
   getOperationDelay, // Get delay for SAP operations
-  parseValidationResponse, // Parse validation response from ADT
-  checkValidationResult, // Check validation result and throw if failed
-  retryCheckAfterActivate, // Retry check operation after activate
   checkPackageExists, // Check if package exists using searchObjects
   validateTestParameters, // Validate test parameters (package, transport)
   checkDefaultTestEnvironment, // Check default test environment before all tests
   logDefaultTestEnvironment, // Log default test environment in one line
-  createDependencyTable, // Create dependency table with full workflow (validate → create → lock → update → unlock → activate)
-  createDependencyCdsView, // Create dependency CDS view with full workflow (validate → create → lock → update → unlock → activate)
   createDependencyDomain, // Create dependency domain with full workflow (validate → create → lock → update → unlock → activate)
-  createDependencyFunctionGroup, // Create dependency function group with full workflow (validate → create → lock → unlock → activate)
-  createDependencyBehaviorDefinition, // Create dependency behavior definition with full workflow (validate → create → lock → update → unlock → activate)
   extractValidationErrorMessage, // Extract meaningful error message from validation response (parses XML)
   isHttpStatusAllowed, // Check if HTTP status is allowed/expected for test case
   getAcceptHint, // Extract Accept header hint from error response

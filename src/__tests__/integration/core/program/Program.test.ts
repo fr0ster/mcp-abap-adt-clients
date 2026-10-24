@@ -12,6 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -21,7 +25,14 @@ import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import {
+  gate,
+  gateAll,
+  gateOn,
+  gateStandardObject,
+} from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -37,7 +48,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -62,6 +72,22 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** A transport request is configured for the transport read tests. */
+function transportConfigured(isCloud: boolean): boolean {
+  const resolver = new TestConfigResolver({ isCloud }).tryMultipleHandlers([
+    { handlerName: 'read_transport', testCaseName: 'read_transport' },
+    { handlerName: 'create_program', testCaseName: 'adt_program' },
+  ]);
+  return !!(
+    resolver?.getTransportRequest() ||
+    new TestConfigResolver({
+      isCloud,
+      handlerName: 'create_program',
+      testCaseName: 'adt_program',
+    }).getTransportRequest()
+  );
+}
 
 describe('Program (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -128,18 +154,29 @@ describe('Program (using AdtClient)', () => {
                 libraryLogger,
                 systemContext,
               );
-              await cleanupClient.getProgram().delete(
+              const removed = await cleanupClient.getProgram().delete(
                 {
                   programName,
                   transportRequest,
                 },
                 {
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(
                     cleanupClient.getProgram(),
                     'delete',
                   ),
                 },
               );
+              if (!removed.ok) {
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: failureOf(
+                    removed,
+                    `delete existing program ${programName}`,
+                  ),
+                };
+              }
               await new Promise((resolve) => setTimeout(resolve, 3000));
             } catch (cleanupError: any) {
               return {
@@ -172,31 +209,10 @@ describe('Program (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_program', 'adt_program')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-
-        if (isCloudSystem) {
-          logTestSkip(
-            testsLogger,
-            'Program - full workflow',
-            'Programs are not supported in cloud systems (BTP ABAP Environment)',
-          );
-          return;
-        }
-
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode = testCase?.params?.source_code || config.source || '';
@@ -219,27 +235,12 @@ describe('Program (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateAll(
+      gate('create_program', 'adt_program'),
+      gateStandardObject('program'),
+    )(
       'should read standard SAP program',
       async () => {
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Program - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
-
-        if (isCloudSystem) {
-          logTestSkip(
-            testsLogger,
-            'Program - read standard object',
-            'Programs are not supported in cloud systems (BTP ABAP Environment)',
-          );
-          return;
-        }
-
         // Use TestConfigResolver for consistent parameter resolution
         const resolver = new TestConfigResolver({
           isCloud: isCloudSystem,
@@ -248,16 +249,9 @@ describe('Program (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('program');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Program - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Program - read standard object',
+          throw new Error(
             'Standard program not configured for on-premise environment',
           );
-          return;
         }
 
         const standardProgramName = standardObject.name;
@@ -288,27 +282,12 @@ describe('Program (using AdtClient)', () => {
   });
 
   describe('Read transport request', () => {
-    it(
+    gateAll(
+      gate('create_program', 'adt_program'),
+      gateOn(({ isCloud }) => transportConfigured(isCloud)),
+    )(
       'should read transport request for program',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Program - read transport request',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
-        if (isCloudSystem) {
-          logTestSkip(
-            testsLogger,
-            'Program - read transport request',
-            'Programs are not supported in cloud systems (BTP ABAP Environment)',
-          );
-          return;
-        }
-
         let transportRequest = '';
         const resolver = new TestConfigResolver({
           isCloud: isCloudSystem,
@@ -321,16 +300,9 @@ describe('Program (using AdtClient)', () => {
           resolver?.getTransportRequest() || tester.getTransportRequest() || '';
 
         if (!transportRequest) {
-          logTestStart(testsLogger, 'Program - read transport request', {
-            name: 'read_transport',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Program - read transport request',
+          throw new Error(
             'transport_request not configured in test-config.yaml (required for transport read test)',
           );
-          return;
         }
 
         logTestStart(testsLogger, 'Program - read transport request', {
@@ -345,7 +317,10 @@ describe('Program (using AdtClient)', () => {
           const result = expectResult(
             await client
               .getRequest()
-              .readMetadata({ transportNumber: transportRequest }),
+              .readMetadata(
+                { transportNumber: transportRequest },
+                { analyse: analyseException },
+              ),
             'read transport request',
           );
           expect(result).toContain(transportRequest);
@@ -353,7 +328,10 @@ describe('Program (using AdtClient)', () => {
           const metadata = expectResult(
             await client
               .getRequest()
-              .readMetadata({ transportNumber: transportRequest }),
+              .readMetadata(
+                { transportNumber: transportRequest },
+                { analyse: analyseException },
+              ),
             'read transport request metadata',
           );
           expect(metadata).toContain(transportRequest);

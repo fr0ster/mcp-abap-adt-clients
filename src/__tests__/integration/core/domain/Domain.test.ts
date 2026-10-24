@@ -21,6 +21,7 @@ import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -37,7 +38,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -152,21 +152,10 @@ describe('Domain (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_domain', 'adt_domain')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           updateTakesDocument: (current) =>
@@ -187,7 +176,7 @@ describe('Domain (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('domain')(
       'should read standard SAP domain',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -198,16 +187,9 @@ describe('Domain (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('domain');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Domain - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Domain - read standard object',
+          throw new Error(
             `Standard domain not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardDomainName = standardObject.name;
@@ -215,15 +197,6 @@ describe('Domain (using AdtClient)', () => {
           name: 'read_standard',
           params: { domain_name: standardDomainName },
         });
-
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Domain - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

@@ -15,6 +15,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -25,6 +26,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { wireItself } from '../../../utils/resultStrategy';
+import { gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -32,7 +34,7 @@ import {
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -47,21 +49,17 @@ const SE38 = '/sap/bc/adt/vit/wb/object_type/trant/object_name/SE38';
 describe('Shared - getObjectProperties', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
-      const { client: resolved, isLegacy: legacy } = await createTestAdtClient(
+      const { client: resolved } = await createTestAdtClient(
         connection,
         testsLogger,
       );
       client = resolved;
-      isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   }, 120000);
 
@@ -71,35 +69,27 @@ describe('Shared - getObjectProperties', () => {
     }
   });
 
-  it('reads the properties of transaction SE38', async () => {
-    const name = 'reads the properties of transaction SE38';
-    if (!hasConfig) {
-      logTestSkip(testsLogger, name, 'No SAP configuration');
-      return;
-    }
-    if (isLegacy) {
-      logTestSkip(
-        testsLogger,
-        name,
-        'Legacy system: no object-properties endpoint in its discovery',
-      );
-      return;
-    }
-    logTestStep(`object properties of ${SE38}`, testsLogger);
+  // A legacy system has no object-properties endpoint in its discovery.
+  gateOn(({ isLegacy }) => !isLegacy)(
+    'reads the properties of transaction SE38',
+    async () => {
+      logTestStep(`object properties of ${SE38}`, testsLogger);
 
-    // The exchange itself, so the status is there to assert.
-    const answer = await client
-      .getUtils({ ...utilDocuments, objectProperties: wireItself })
-      .getObjectProperties(SE38);
+      // The exchange itself, so the status is there to assert.
+      const answer = await client
+        .getUtils({ ...utilDocuments, objectProperties: wireItself })
+        .getObjectProperties(SE38, { analyse: analyseException });
 
-    expect(answer.ok).toBe(true);
-    if (!answer.ok) {
-      throw new Error(`expected a result: ${answer.getError().message}`);
-    }
-    const wire: IAdtWireResponse = answer.getResult().value;
-    expect(wire.status).toBe(200);
-    const body = String(wire.data);
-    expect(body).toContain('type="TRAN/T"');
-    expect(body).toContain('name="SE38"');
-  }, 60000);
+      expect(answer.ok).toBe(true);
+      if (!answer.ok) {
+        throw new Error(`expected a result: ${answer.getError().message}`);
+      }
+      const wire: IAdtWireResponse = answer.getResult().value;
+      expect(wire.status).toBe(200);
+      const body = String(wire.data);
+      expect(body).toContain('type="TRAN/T"');
+      expect(body).toContain('name="SE38"');
+    },
+    60000,
+  );
 });

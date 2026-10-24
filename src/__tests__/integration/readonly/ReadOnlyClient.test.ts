@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtMetadataReadable,
   IAdtReadable,
@@ -21,6 +22,12 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import {
+  gate,
+  gateAll,
+  gateOn,
+  gateStandardObject,
+} from '../../helpers/caseGate';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -35,13 +42,15 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../helpers/testProgressLogger';
 
-const { getTimeout } = require('../../helpers/test-helper');
+const {
+  getTimeout,
+  resolveStandardObject,
+} = require('../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../.env');
@@ -58,7 +67,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('AdtClient read operations', () => {
   let connection: IAbapConnection | null = null;
   let client: AdtClient | null = null;
-  let hasConfig = false;
   let isLegacy = false;
   let isCloud = false;
 
@@ -77,7 +85,6 @@ describe('AdtClient read operations', () => {
         await createTestAdtClient(connection, connectionLogger);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
       isCloud = await isCloudEnvironment(connection);
 
       testsLogger.info?.(
@@ -95,6 +102,13 @@ describe('AdtClient read operations', () => {
       testsLogger.info?.('✅ AdtClient read test environment cleanup complete');
     }
   });
+
+  function requireClient(): AdtClient {
+    if (!client) {
+      throw new Error('AdtClient was not created: see the setup errors above');
+    }
+    return client;
+  }
 
   function getDataLength(data: unknown): number {
     if (typeof data === 'string') {
@@ -129,15 +143,6 @@ describe('AdtClient read operations', () => {
     testCaseName?: string,
   ) {
     return async () => {
-      if (!hasConfig || !client) {
-        logTestSkip(
-          testsLogger,
-          `AdtClient - ${testName}`,
-          'No SAP configuration',
-        );
-        return;
-      }
-
       // Use TestConfigResolver for consistent parameter resolution
       const resolver = new TestConfigResolver({
         isCloud,
@@ -147,32 +152,12 @@ describe('AdtClient read operations', () => {
         testCaseName: testCaseName || `readonly_read_${objectType}`,
       });
 
-      if (!resolver.isEnabled()) {
-        logTestStart(testsLogger, `AdtClient - ${testName}`, {
-          name: `readonly_read_${objectType}`,
-          params: {},
-        });
-        logTestSkip(
-          testsLogger,
-          `AdtClient - ${testName}`,
-          `Test case disabled in test-config.yaml`,
-        );
-        return;
-      }
-
       const standardObject = resolver.getStandardObject(objectType);
 
       if (!standardObject) {
-        logTestStart(testsLogger, `AdtClient - ${testName}`, {
-          name: `readonly_read_${objectType}`,
-          params: {},
-        });
-        logTestSkip(
-          testsLogger,
-          `AdtClient - ${testName}`,
+        throw new Error(
           `Standard ${objectType} not configured for ${isCloud ? 'cloud' : 'on-premise'} environment`,
         );
-        return;
       }
 
       const objectName = standardObject.name;
@@ -192,9 +177,12 @@ describe('AdtClient read operations', () => {
         // rather than assuming — the same choice `BaseTester` makes.
         const readVersion = (version: 'active' | 'inactive') =>
           adtObject.read
-            ? adtObject.read(params, version)
+            ? adtObject.read(params, version, { analyse: analyseException })
             : // biome-ignore lint/style/noNonNullAssertion: one of the two is always there
-              adtObject.readMetadata!(params, { version });
+              adtObject.readMetadata!(params, {
+                version,
+                analyse: analyseException,
+              });
 
         const readMetadata = (version: 'active' | 'inactive') => {
           if (!adtObject.readMetadata) {
@@ -203,7 +191,10 @@ describe('AdtClient read operations', () => {
                 'object has a document of its own.',
             );
           }
-          return adtObject.readMetadata(params, { version });
+          return adtObject.readMetadata(params, {
+            analyse: analyseException,
+            version,
+          });
         };
 
         logTestStep('read active', testsLogger);
@@ -261,7 +252,10 @@ describe('AdtClient read operations', () => {
   }
 
   describe('readProgram', () => {
-    it(
+    gateAll(
+      gate('read_program', 'readonly_read_program'),
+      gateStandardObject('program'),
+    )(
       'should read existing program',
       createReadTest(
         'readProgram',
@@ -276,7 +270,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readClass', () => {
-    it(
+    gateAll(
+      gate('read_class', 'readonly_read_class'),
+      gateStandardObject('class'),
+    )(
       'should read existing class',
       createReadTest(
         'readClass',
@@ -291,7 +288,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readInterface', () => {
-    it(
+    gateAll(
+      gate('read_interface', 'readonly_read_interface'),
+      gateStandardObject('interface'),
+    )(
       'should read existing interface',
       createReadTest(
         'readInterface',
@@ -306,7 +306,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readDomain', () => {
-    it(
+    gateAll(
+      gate('read_domain', 'readonly_read_domain'),
+      gateStandardObject('domain'),
+    )(
       'should read existing domain',
       createReadTest(
         'readDomain',
@@ -321,7 +324,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readDataElement', () => {
-    it(
+    gateAll(
+      gate('read_data_element', 'readonly_read_data_element'),
+      gateStandardObject('dataElement'),
+    )(
       'should read existing data element',
       createReadTest(
         'readDataElement',
@@ -336,7 +342,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readStructure', () => {
-    it(
+    gateAll(
+      gate('read_structure', 'readonly_read_structure'),
+      gateStandardObject('structure'),
+    )(
       'should read existing structure',
       createReadTest(
         'readStructure',
@@ -351,18 +360,21 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readTable', () => {
-    it(
+    // Cloud reads a CDS view, on-premise a table: whichever the system has.
+    gateAll(
+      gate('read_table', 'readonly_read_table'),
+      gateOn(
+        ({ isCloud, isLegacy }) =>
+          !!resolveStandardObject(
+            isCloud ? 'view' : 'table',
+            isCloud,
+            null,
+            isLegacy,
+          ),
+      ),
+    )(
       'should read existing table',
       async () => {
-        if (!hasConfig || !client) {
-          logTestSkip(
-            testsLogger,
-            'AdtClient - readTable',
-            'No SAP configuration',
-          );
-          return;
-        }
-
         // Use TestConfigResolver to check if test is available for current environment
         const resolver = new TestConfigResolver({
           isCloud,
@@ -372,15 +384,6 @@ describe('AdtClient read operations', () => {
           testCaseName: 'readonly_read_table',
         });
 
-        if (!resolver.isAvailableForEnvironment()) {
-          logTestSkip(
-            testsLogger,
-            'AdtClient - readTable',
-            `Test not available for ${isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`,
-          );
-          return;
-        }
-
         // Cloud systems: 99% of tables are not readable via ADT, endpoint cannot read tables
         // On-premise: most tables are readable via ADT
         if (isCloud) {
@@ -388,17 +391,10 @@ describe('AdtClient read operations', () => {
           const standardView = resolver.getStandardObject('view');
 
           if (!standardView) {
-            logTestStart(testsLogger, 'AdtClient - readTable', {
-              name: 'readonly_read_table',
-              params: {},
-            });
-            logTestSkip(
-              testsLogger,
-              'AdtClient - readTable',
+            throw new Error(
               'Standard CDS view not configured for cloud environment. ' +
                 'Note: On cloud systems, 99% of tables are not readable via ADT, use CDS views instead.',
             );
-            return;
           }
 
           const ddlName = standardView.name;
@@ -411,10 +407,12 @@ describe('AdtClient read operations', () => {
           });
 
           try {
-            const viewClient = client.getDdl();
+            const viewClient = requireClient().getDdl();
             logTestStep('read active (cloud view)', testsLogger);
             const readActiveState = expectResult(
-              await viewClient.read({ ddlName }, 'active'),
+              await viewClient.read({ ddlName }, 'active', {
+                analyse: analyseException,
+              }),
               'readActiveState',
             );
             expect(readActiveState).toBeDefined();
@@ -425,7 +423,9 @@ describe('AdtClient read operations', () => {
 
             logTestStep('read inactive (cloud view)', testsLogger);
             const readInactiveState = expectResult(
-              await viewClient.read({ ddlName }, 'inactive'),
+              await viewClient.read({ ddlName }, 'inactive', {
+                analyse: analyseException,
+              }),
               'readInactiveState',
             );
             expect(readInactiveState).toBeDefined();
@@ -436,7 +436,10 @@ describe('AdtClient read operations', () => {
 
             logTestStep('read metadata (active, cloud view)', testsLogger);
             const metadataActiveState = expectResult(
-              await viewClient.readMetadata({ ddlName }, { version: 'active' }),
+              await viewClient.readMetadata(
+                { ddlName },
+                { analyse: analyseException, version: 'active' },
+              ),
               'metadataActiveState',
             );
             expect(metadataActiveState).toBeDefined();
@@ -449,7 +452,7 @@ describe('AdtClient read operations', () => {
             const metadataInactiveState = expectResult(
               await viewClient.readMetadata(
                 { ddlName },
-                { version: 'inactive' },
+                { analyse: analyseException, version: 'inactive' },
               ),
               'metadataInactiveState',
             );
@@ -477,16 +480,9 @@ describe('AdtClient read operations', () => {
           const standardTable = resolver.getStandardObject('table');
 
           if (!standardTable) {
-            logTestStart(testsLogger, 'AdtClient - readTable', {
-              name: 'readonly_read_table',
-              params: {},
-            });
-            logTestSkip(
-              testsLogger,
-              'AdtClient - readTable',
+            throw new Error(
               'Standard table not configured for on-premise environment',
             );
-            return;
           }
 
           const tableName = standardTable.name;
@@ -496,10 +492,12 @@ describe('AdtClient read operations', () => {
           });
 
           try {
-            const tableClient = client.getTable();
+            const tableClient = requireClient().getTable();
             logTestStep('read active', testsLogger);
             const readActiveState = expectResult(
-              await tableClient.read({ tableName }, 'active'),
+              await tableClient.read({ tableName }, 'active', {
+                analyse: analyseException,
+              }),
               'readActiveState',
             );
             expect(readActiveState).toBeDefined();
@@ -510,7 +508,9 @@ describe('AdtClient read operations', () => {
 
             logTestStep('read inactive', testsLogger);
             const readInactiveState = expectResult(
-              await tableClient.read({ tableName }, 'inactive'),
+              await tableClient.read({ tableName }, 'inactive', {
+                analyse: analyseException,
+              }),
               'readInactiveState',
             );
             expect(readInactiveState).toBeDefined();
@@ -523,7 +523,7 @@ describe('AdtClient read operations', () => {
             const metadataActiveState = expectResult(
               await tableClient.readMetadata(
                 { tableName },
-                { version: 'active' },
+                { analyse: analyseException, version: 'active' },
               ),
               'metadataActiveState',
             );
@@ -537,7 +537,7 @@ describe('AdtClient read operations', () => {
             const metadataInactiveState = expectResult(
               await tableClient.readMetadata(
                 { tableName },
-                { version: 'inactive' },
+                { analyse: analyseException, version: 'inactive' },
               ),
               'metadataInactiveState',
             );
@@ -564,7 +564,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readView', () => {
-    it(
+    gateAll(
+      gate('read_view', 'readonly_read_view'),
+      gateStandardObject('view'),
+    )(
       'should read existing view',
       createReadTest(
         'readView',
@@ -579,7 +582,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readFunctionGroup', () => {
-    it(
+    gateAll(
+      gate('read_function_group', 'readonly_read_function_group'),
+      gateStandardObject('function_group'),
+    )(
       'should read existing function group',
       createReadTest(
         'readFunctionGroup',
@@ -594,7 +600,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readFunctionModule', () => {
-    it(
+    gateAll(
+      gate('read_function_module', 'readonly_read_function_module'),
+      gateStandardObject('function_module'),
+    )(
       'should read existing function module',
       createReadTest(
         'readFunctionModule',
@@ -612,7 +621,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readPackage', () => {
-    it(
+    gateAll(
+      gate('read_package', 'readonly_read_package'),
+      gateStandardObject('package'),
+    )(
       'should read existing package',
       createReadTest(
         'readPackage',
@@ -627,7 +639,10 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readServiceDefinition', () => {
-    it(
+    gateAll(
+      gate('read_service_definition', 'readonly_read_service_definition'),
+      gateStandardObject('serviceDefinition'),
+    )(
       'should read existing service definition',
       createReadTest(
         'readServiceDefinition',
@@ -642,18 +657,12 @@ describe('AdtClient read operations', () => {
   });
 
   describe('readTransport', () => {
-    it(
+    gateOn(
+      ({ isCloud, isLegacy }) =>
+        !!new TestConfigResolver({ isCloud, isLegacy }).getTransportRequest(),
+    )(
       'should read existing transport request',
       async () => {
-        if (!hasConfig || !client) {
-          logTestSkip(
-            testsLogger,
-            'AdtClient - readTransport',
-            'No SAP configuration',
-          );
-          return;
-        }
-
         // Use TestConfigResolver for consistent parameter resolution
         const resolver = new TestConfigResolver({
           isCloud,
@@ -664,16 +673,9 @@ describe('AdtClient read operations', () => {
         const transportRequest = resolver.getTransportRequest();
 
         if (!transportRequest) {
-          logTestStart(testsLogger, 'AdtClient - readTransport', {
-            name: 'readonly_read_transport',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'AdtClient - readTransport',
+          throw new Error(
             'Transport request not configured in test-config.yaml (required for transport read test)',
           );
-          return;
         }
 
         logTestStart(testsLogger, 'AdtClient - readTransport', {
@@ -682,12 +684,15 @@ describe('AdtClient read operations', () => {
         });
 
         try {
-          const requestClient = client.getRequest();
+          const requestClient = requireClient().getRequest();
           logTestStep('read active', testsLogger);
           const readActiveState = expectResult(
-            await requestClient.readMetadata({
-              transportNumber: transportRequest,
-            }),
+            await requestClient.readMetadata(
+              {
+                transportNumber: transportRequest,
+              },
+              { analyse: analyseException },
+            ),
             'readActiveState',
           );
           expect(readActiveState).toBeDefined();
@@ -698,9 +703,12 @@ describe('AdtClient read operations', () => {
 
           logTestStep('read inactive', testsLogger);
           const readInactiveState = expectResult(
-            await requestClient.readMetadata({
-              transportNumber: transportRequest,
-            }),
+            await requestClient.readMetadata(
+              {
+                transportNumber: transportRequest,
+              },
+              { analyse: analyseException },
+            ),
             'readInactiveState',
           );
           expect(readInactiveState).toBeDefined();
@@ -711,9 +719,12 @@ describe('AdtClient read operations', () => {
 
           logTestStep('read metadata', testsLogger);
           const metadataState = expectResult(
-            await requestClient.readMetadata({
-              transportNumber: transportRequest,
-            }),
+            await requestClient.readMetadata(
+              {
+                transportNumber: transportRequest,
+              },
+              { analyse: analyseException },
+            ),
             'metadataState',
           );
           expect(metadataState).toBeDefined();

@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -24,6 +25,13 @@ import { readAuthorizationField } from '../../../../core/authorizationField/read
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import { failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -40,14 +48,11 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   resolveMasterSystem,
@@ -74,7 +79,6 @@ describe('AuthorizationField (using AdtClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -85,10 +89,12 @@ describe('AuthorizationField (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -134,7 +140,7 @@ describe('AuthorizationField (using AdtClient)', () => {
   }
 
   function getTestDefinition() {
-    return getTestCaseDefinition(
+    return configuredCase(
       'create_authorization_field',
       'adt_authorization_field',
     );
@@ -170,39 +176,26 @@ describe('AuthorizationField (using AdtClient)', () => {
   describe('Full workflow', () => {
     let testCase: any = null;
     let authorizationFieldName: string | null = null;
-    let skipReason: string | null = null;
+    let setupError: string | null = null;
 
     beforeEach(async () => {
-      skipReason = null;
+      setupError = null;
       testCase = null;
       authorizationFieldName = null;
 
       if (!hasConfig) {
-        skipReason = 'No SAP configuration';
+        setupError = 'No SAP configuration';
         return;
       }
 
-      const definition = getTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      if (
-        !TestConfigResolver.isTestAvailable(definition, isCloudSystem, isLegacy)
-      ) {
-        skipReason = `Test not available for ${
-          isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'
-        } environment`;
-        return;
-      }
-
-      const tc = getEnabledTestCase(
-        'create_authorization_field',
-        'adt_authorization_field',
-      );
+      // The gate registered this test, so the case is configured, enabled and
+      // available here; a case that is not there is a defect, not a skip.
+      const tc = getTestDefinition();
       if (!tc) {
-        skipReason = 'Test case disabled or not found';
+        setupError = missingCaseMessage(
+          'create_authorization_field',
+          'adt_authorization_field',
+        );
         return;
       }
 
@@ -211,7 +204,7 @@ describe('AuthorizationField (using AdtClient)', () => {
         'AuthorizationField - full workflow',
       );
       if (!packageCheck.success) {
-        skipReason = packageCheck.reason || 'Default package is not configured';
+        setupError = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -231,7 +224,7 @@ describe('AuthorizationField (using AdtClient)', () => {
             /already exists/i.test(cleanup.reason || '')
           ) {
             try {
-              await client.getAuthorizationField().delete(
+              const removed = await client.getAuthorizationField().delete(
                 {
                   authorizationFieldName,
                   transportRequest: resolveTransportRequest(
@@ -239,23 +232,32 @@ describe('AuthorizationField (using AdtClient)', () => {
                   ),
                 },
                 {
+                  analyse: judged(analyseDeletion),
                   headers: integrationHeadersOf(
                     client.getAuthorizationField(),
                     'delete',
                   ),
                 },
               );
+              if (!removed.ok) {
+                throw new Error(
+                  failureOf(
+                    removed,
+                    `delete pre-existing authorization field ${authorizationFieldName}`,
+                  ),
+                );
+              }
               testsLogger.info?.(
                 `Pre-existing authorization field ${authorizationFieldName} deleted before test`,
               );
             } catch (deleteErr: any) {
-              skipReason = `Pre-existing auth field cleanup failed: ${deleteErr.message}`;
+              setupError = `Pre-existing auth field cleanup failed: ${deleteErr.message}`;
               testCase = null;
               authorizationFieldName = null;
               return;
             }
           } else {
-            skipReason =
+            setupError =
               cleanup.reason ||
               'Failed to cleanup authorization field before test';
             testCase = null;
@@ -265,7 +267,7 @@ describe('AuthorizationField (using AdtClient)', () => {
       }
     });
 
-    it(
+    gate('create_authorization_field', 'adt_authorization_field')(
       'should execute full workflow and store all results',
       async () => {
         const definition = getTestDefinition();
@@ -275,22 +277,14 @@ describe('AuthorizationField (using AdtClient)', () => {
           definition,
         );
 
-        if (skipReason) {
-          logTestSkip(
-            testsLogger,
-            'AuthorizationField - full workflow',
-            skipReason,
+        if (setupError) {
+          throw new Error(
+            `Test could not be set up: ${setupError}. Nothing was verified.`,
           );
-          return;
         }
 
         if (!testCase || !authorizationFieldName) {
-          logTestSkip(
-            testsLogger,
-            'AuthorizationField - full workflow',
-            skipReason || 'Test case not available',
-          );
-          return;
+          throw new Error('authorization_field_name not configured');
         }
 
         const resolver = new TestConfigResolver({

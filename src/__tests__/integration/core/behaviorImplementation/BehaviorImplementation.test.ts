@@ -8,6 +8,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -17,7 +21,9 @@ import { mainSourceFor } from '../../../../core/behaviorImplementation/AdtBehavi
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import { gate } from '../../../helpers/caseGate';
+import { expectResult, failureOf, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -128,26 +134,40 @@ describe('BehaviorImplementation (using AdtClient)', () => {
         ensureObjectReady: async (className: string) => {
           if (!connection || !className) return { success: true };
           const existing = presenceOf(
-            await client.getBehaviorImplementation().read({ className }),
+            await client
+              .getBehaviorImplementation()
+              .read({ className }, undefined, { analyse: analyseException }),
             `behavior implementation ${className}`,
           );
-          if (existing.present !== true) return { success: true };
+          // "Could not find out" is not "absent": the create would meet it.
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === false) return { success: true };
           const removed = await client.getBehaviorImplementation().delete(
             {
               className,
               transportRequest: tester.getTransportRequest(),
             },
             {
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(
                 client.getBehaviorImplementation(),
                 'delete',
               ),
             },
           );
+          // A leftover that would not delete is what the create meets next:
+          // the test fails here, naming what SAP said.
           if (!removed.ok) {
-            testsLogger.warn?.(
-              `could not remove leftover ${className}: ${removed.getError().message}`,
-            );
+            return {
+              success: false,
+              objectExists: true,
+              reason: failureOf(
+                removed,
+                `delete leftover behavior implementation ${className}`,
+              ),
+            };
           }
           // The deletion service is asynchronous; the create that follows meets
           // a name still being freed otherwise.
@@ -206,21 +226,10 @@ describe('BehaviorImplementation (using AdtClient)', () => {
       await tester.afterEach()();
     });
 
-    it(
+    gate('create_behavior_implementation', 'adt_behavior_implementation')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode = testCase?.params?.source_code || config.source || '';
@@ -247,38 +256,40 @@ describe('BehaviorImplementation (using AdtClient)', () => {
             const bimpl = client.getClass();
             const target = { className: config.className };
             const locked = expectResult(
-              await bimpl.lock(target),
+              await bimpl.lock(target, { analyse: analyseException }),
               'lock for the generated shell',
             );
-            try {
-              expectResult(
-                await bimpl.update(
-                  {
-                    className: config.className,
-                    // **The request travels with the write.** Dropping it here
-                    // cost nothing while the test package was local, because
-                    // nothing was registered in CTS. Under a transportable
-                    // package the class is registered at create time, and a
-                    // source write carrying no `corrNr` is refused: `409
-                    // CTS_WBO_API 019`, "Object LIMU CLSD … is already locked
-                    // in request …" — naming the very request this suite works
-                    // in.
-                    transportRequest: config.transportRequest,
-                  },
-                  {
-                    headers: integrationHeadersOf(bimpl, 'update'),
-                    lockHandle: locked,
-                    source: mainSourceFor(
-                      config.className,
-                      config.behaviorDefinition,
-                    ),
-                  },
+            await releasing(
+              async () =>
+                expectResult(
+                  await bimpl.update(
+                    {
+                      className: config.className,
+                      // **The request travels with the write.** Dropping it here
+                      // cost nothing while the test package was local, because
+                      // nothing was registered in CTS. Under a transportable
+                      // package the class is registered at create time, and a
+                      // source write carrying no `corrNr` is refused: `409
+                      // CTS_WBO_API 019`, "Object LIMU CLSD … is already locked
+                      // in request …" — naming the very request this suite works
+                      // in.
+                      transportRequest: config.transportRequest,
+                    },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(bimpl, 'update'),
+                      lockHandle: locked,
+                      source: mainSourceFor(
+                        config.className,
+                        config.behaviorDefinition,
+                      ),
+                    },
+                  ),
+                  'write the generated shell',
                 ),
-                'write the generated shell',
-              );
-            } finally {
-              await bimpl.unlock(target, locked);
-            }
+              () => bimpl.unlock(target, locked, { analyse: analyseException }),
+              'unlock after the generated shell',
+            );
             await expectLockReleased(
               (c) => c.getClass(),
               target,

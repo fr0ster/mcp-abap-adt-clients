@@ -672,7 +672,7 @@ npm run discovery:markdown -- --env /path/to/.env
 **Environment Variables:**
 The script uses the same environment variables as the main package:
 - `SAP_URL` - SAP system URL (required)
-- `SAP_AUTH_TYPE` - Authentication type: `'basic'` or `'jwt'` (default: `'basic'`)
+- `SAP_AUTH_TYPE` - Authentication type: `'basic'`, `'jwt'` or `'xsuaa'` (required: a missing or other value is refused, naming the key)
 - `SAP_USERNAME` - Username for basic auth
 - `SAP_PASSWORD` - Password for basic auth
 - `SAP_JWT_TOKEN` - JWT token for JWT auth

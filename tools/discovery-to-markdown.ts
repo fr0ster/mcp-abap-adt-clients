@@ -12,7 +12,7 @@
  * 
  * Environment variables (can be set in .env file via --env option or environment):
  *   SAP_URL - SAP system URL (required)
- *   SAP_AUTH_TYPE - Authentication type: 'basic' or 'jwt' (default: 'basic')
+ *   SAP_AUTH_TYPE - Authentication type: 'basic', 'jwt' or 'xsuaa' (required, no default)
  *   SAP_USERNAME - Username for basic auth (required if authType is 'basic')
  *   SAP_PASSWORD - Password for basic auth (required if authType is 'basic')
  *   SAP_JWT_TOKEN - JWT token for JWT auth (required if authType is 'jwt')
@@ -58,11 +58,21 @@ function getConfig(): SapConfig {
   const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
   const rawClient = process.env.SAP_CLIENT;
   const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
+  const rawAuthType = process.env.SAP_AUTH_TYPE;
+  const authType = (rawAuthType ?? '').split('#')[0].trim().toLowerCase();
 
   if (!url || !/^https?:\/\//.test(url)) {
     throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  }
+  // Required and taken as stated: never defaulted, never read off the
+  // credentials.
+  if (!authType) {
+    throw new Error('SAP_AUTH_TYPE is not set — state basic, jwt or xsuaa');
+  }
+  if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
+    throw new Error(
+      `SAP_AUTH_TYPE is "${rawAuthType}", which is not one of basic, jwt, xsuaa`,
+    );
   }
 
   const config: SapConfig = {
@@ -513,7 +523,7 @@ Options:
 
 Environment variables (can be set in .env file or environment):
   SAP_URL            SAP system URL (required)
-  SAP_AUTH_TYPE      Authentication type: 'basic' or 'jwt' (default: 'basic')
+  SAP_AUTH_TYPE      Authentication type: 'basic', 'jwt' or 'xsuaa' (required, no default)
   SAP_USERNAME       Username for basic auth
   SAP_PASSWORD       Password for basic auth
   SAP_JWT_TOKEN      JWT token for JWT auth

@@ -24,7 +24,10 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDebuggeeEnd,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAdtRunnable,
@@ -43,12 +46,19 @@ import {
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -60,8 +70,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -71,7 +79,9 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase('runtime_debugger', 'adt_abap_debugger');
+const testCase = configuredCase('runtime_debugger', 'adt_abap_debugger');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_abap_debugger');
 const CLASS_NAME: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_PROBE'
 ).toUpperCase();
@@ -210,7 +220,6 @@ describe('ABAP debugger (AbapDebugger)', () => {
   let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
@@ -220,14 +229,6 @@ describe('ABAP debugger (AbapDebugger)', () => {
   /** Fails the step naming what it waited on, instead of running blind. */
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
-  }
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -240,6 +241,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     target: TTarget,
   ): Promise<{ debuggeeId: string; server?: string }> {
     const listener = listenerApi.listen(identity, {
+      analyse: analyseException,
       holdSeconds: HOLD_SECONDS,
     });
     const early = await Promise.race([
@@ -255,7 +257,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     }
     const trigger = triggerConnection;
     needs(trigger, 'the trigger connection');
-    run = runnable(trigger as Connection).run(target);
+    run = runnable(trigger as Connection).run(target, {
+      analyse: analyseException,
+    });
     const caught = await listener;
     const document = documentOf(caught);
     expect(caught.ok).toBe(true);
@@ -302,7 +306,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
   }
 
   async function topFrame(): Promise<IFrame> {
-    const stack = await debuggerApi.getStack();
+    const stack = await debuggerApi.getStack({ analyse: analyseException });
     const top = frames(documentOf(stack))[0];
     needs(stack.ok && top, 'a stack');
     return top;
@@ -310,8 +314,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_abap_debugger is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_abap_debugger'),
+      );
     }
     try {
       listenerConnection = await createTestConnection(connectionLogger, {
@@ -322,8 +327,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
@@ -353,31 +357,34 @@ describe('ABAP debugger (AbapDebugger)', () => {
     for (const id of armed) {
       await steps.run(
         `delete breakpoint ${id}`,
-        () => listenerApi.deleteBreakpoint(identity, id),
+        () =>
+          listenerApi.deleteBreakpoint(identity, id, {
+            analyse: analyseException,
+          }),
         { checkAnswer: true },
       );
     }
     if (attached) {
       await steps.run(
         'terminate the debuggee',
-        () => debuggerApi.terminateDebuggee(),
+        () => debuggerApi.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
         { checkAnswer: true },
       );
     }
     await steps.logOff('the debug session', sessionConnection);
     await steps.run(
       'stop the listener',
-      () => listenerApi.stopListener(identity),
+      () => listenerApi.stopListener(identity, { analyse: analyseException }),
       { checkAnswer: true },
     );
     if (run) {
+      // The run must come back, with its output or a termination's 500, and
+      // is let go only once it has: a timeout or another answer fails.
       const pending = run;
-      await steps.run('wait for the run', () =>
-        Promise.race([
-          pending,
-          new Promise((resolve) => setTimeout(resolve, 15_000)),
-        ]),
-      );
+      await steps.run('wait for the run', async () => {
+        await settleRun(pending, 15_000, 'the run', 'completed-or-terminated');
+        run = undefined;
+      });
     }
     await steps.logOff('the trigger session', triggerConnection);
     await steps.logOff('the listener session', listenerConnection);
@@ -386,10 +393,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- breakpoints -----------------------------------------------------------------
 
-  it(
+  debuggerCase(
     'validates all four kinds of breakpoint without arming them',
     async () => {
-      if (skipped()) return;
       const all: IDebuggerBreakpoint[] = [
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
         { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
@@ -397,6 +403,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
       ];
       const answer = await listenerApi.setBreakpoints(identity, all, {
+        analyse: analyseException,
         headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
         validationOnly: true,
       });
@@ -416,10 +423,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'arms a line and an exception breakpoint; the line comes back in its include',
     async () => {
-      if (skipped()) return;
       const answer = await listenerApi.setBreakpoints(
         identity,
         [
@@ -427,7 +433,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.catch}` },
           { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
         ],
-        { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+        },
       );
       expect(answer.ok).toBe(true);
       const ids = [
@@ -445,16 +454,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- run 1: from the first breakpoint to the end ---------------------------------
 
-  it(
+  debuggerCase(
     'catches the run on the first breakpoint and attaches',
     async () => {
-      if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
       const { debuggeeId, server } = await catchRun(asClass, {
         className: CLASS_NAME,
       });
       await openDebugSession();
       const answer = await debuggerApi.attach(identity, debuggeeId, {
+        analyse: analyseException,
         server,
       });
       const document = documentOf(answer);
@@ -471,10 +480,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'reads the stack: the probe on top, at the loop line',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const top = await topFrame();
       expect(top.program.startsWith(CLASS_NAME)).toBe(true);
@@ -484,12 +492,12 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'expands the variable scopes and reads the locals',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const root = await debuggerApi.getChildVariables(['@ROOT'], {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       expect(root.ok).toBe(true);
@@ -498,6 +506,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       ].map((m) => m[1]);
       expect(scopes).toContain('@LOCALS');
       const all = await debuggerApi.getChildVariables(scopes, {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       expect(all.ok).toBe(true);
@@ -508,12 +517,12 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'reads one variable by its id',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const answer = await debuggerApi.getVariables(['LV_TOTAL'], {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getVariables'),
       });
       expect(answer.ok).toBe(true);
@@ -522,18 +531,20 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'steps into the called method and sees its parameters',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      expect((await debuggerApi.step('stepInto')).ok).toBe(true);
+      expect(
+        (await debuggerApi.step('stepInto', { analyse: analyseException })).ok,
+      ).toBe(true);
       const top = await topFrame();
       expect(top.event).toBe('ADD');
       expect(top.line).toBe(LINE.add);
       const params = values(
         documentOf(
           await debuggerApi.getVariables(['IV_A', 'IV_B'], {
+            analyse: analyseException,
             headers: integrationHeadersOf(debuggerApi, 'getVariables'),
           }),
         ),
@@ -544,16 +555,18 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'moves the read cursor to the caller frame without moving the program',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      const stack = frames(documentOf(await debuggerApi.getStack()));
+      const stack = frames(
+        documentOf(await debuggerApi.getStack({ analyse: analyseException })),
+      );
       const caller = stack.find((f) => f.event === 'IF_OO_ADT_CLASSRUN~MAIN');
       needs(caller, 'the caller frame');
       const moved = await debuggerApi.setStackPosition(
         (caller as IFrame).position,
+        { analyse: analyseException },
       );
       expect(moved.ok).toBe(true);
       // The caller's local is readable from here…
@@ -561,6 +574,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -572,18 +586,21 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'returns from the method to the caller',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      expect((await debuggerApi.step('stepReturn')).ok).toBe(true);
+      expect(
+        (await debuggerApi.step('stepReturn', { analyse: analyseException }))
+          .ok,
+      ).toBe(true);
       const top = await topFrame();
       expect(top.event).toBe('IF_OO_ADT_CLASSRUN~MAIN');
       expect(
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -593,12 +610,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'creates and lists a watchpoint, and continues to the next breakpoint',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      const created = await debuggerApi.createWatchpoint('LV_TOTAL');
+      const created = await debuggerApi.createWatchpoint('LV_TOTAL', {
+        analyse: analyseException,
+      });
       expect(created.ok).toBe(true);
       watchpointId = attr(documentOf(created), 'id');
       needs(
@@ -606,12 +624,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
         `a watchpoint id: ${documentOf(created).slice(0, 300)}`,
       );
 
-      const listed = await debuggerApi.listWatchpoints();
+      const listed = await debuggerApi.listWatchpoints({
+        analyse: analyseException,
+      });
       expect(listed.ok).toBe(true);
       expect(documentOf(listed)).toContain(`id="${watchpointId}"`);
 
       // The loop breakpoint comes first: the assignment is on its line.
-      const step = await debuggerApi.step('stepContinue');
+      const step = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toContain('KIND=0.');
       expect((await topFrame()).line).toBe(LINE.loop);
@@ -619,18 +641,20 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops on the watchpoint when the watched variable changes, then removes it',
     async () => {
-      if (skipped()) return;
       needs(watchpointId, 'a watchpoint');
-      const step = await debuggerApi.step('stepContinue');
+      const step = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toMatch(/reachedWatchpoints/);
       expect(
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -639,6 +663,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
       const deleted = await debuggerApi.deleteWatchpoint(
         watchpointId as string,
+        { analyse: analyseException },
       );
       expect(deleted.ok).toBe(true);
       watchpointId = undefined;
@@ -646,17 +671,19 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'writes a variable at the stop and reads the new value back',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      const written = await debuggerApi.setVariableValue('LV_TOTAL', '100');
+      const written = await debuggerApi.setVariableValue('LV_TOTAL', '100', {
+        analyse: analyseException,
+      });
       expect(written.ok).toBe(true);
       expect(
         values(
           documentOf(
             await debuggerApi.getVariables(['LV_TOTAL'], {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             }),
           ),
@@ -666,15 +693,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'runs to a chosen line',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       // The loop breakpoint is in the way on the last iteration; out of it first.
       const ran = await debuggerApi.stepToLine(
         'stepRunToLine',
         `${SOURCE_URI}#start=${LINE.after}`,
+        { analyse: analyseException },
       );
       expect(ran.ok).toBe(true);
       const top = await topFrame();
@@ -685,6 +712,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
             await debuggerApi.stepToLine(
               'stepRunToLine',
               `${SOURCE_URI}#start=${LINE.after}`,
+              { analyse: analyseException },
             )
           ).ok,
         ).toBe(true);
@@ -694,24 +722,26 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'steps over a statement',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const before = (await topFrame()).line;
-      expect((await debuggerApi.step('stepOver')).ok).toBe(true);
+      expect(
+        (await debuggerApi.step('stepOver', { analyse: analyseException })).ok,
+      ).toBe(true);
       expect((await topFrame()).line).toBeGreaterThan(before);
     },
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops on the exception breakpoint, reported at the CATCH line',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
-      const step = await debuggerApi.step('stepContinue');
+      const step = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(step.ok).toBe(true);
       expect(documentOf(step)).toContain(
         'KIND=5.EXCEPTION_CLASS=CX_SY_ZERODIVIDE',
@@ -723,13 +753,14 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'continues to the end: the step answers debuggeeEnded and the run returns',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       // The CATCH line breakpoint, then the end.
-      const toCatch = await debuggerApi.step('stepContinue');
+      const toCatch = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(toCatch.ok).toBe(true);
       expect((await topFrame()).line).toBe(LINE.catch);
 
@@ -753,16 +784,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- run 2: terminated where it stands -------------------------------------------
 
-  it(
+  debuggerCase(
     'jumps a debuggee to a line, terminates it where it stands, and the run returns',
     async () => {
-      if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
       const { debuggeeId, server } = await catchRun(asClass, {
         className: CLASS_NAME,
       });
       await openDebugSession();
       const second = await debuggerApi.attach(identity, debuggeeId, {
+        analyse: analyseException,
         server,
       });
       if (!second.ok) {
@@ -778,6 +809,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const jumped = await debuggerApi.stepToLine(
         'stepJumpToLine',
         `${SOURCE_URI}#start=${LINE.after}`,
+        { analyse: analyseException },
       );
       expect(jumped.ok).toBe(true);
       expect((await topFrame()).line).toBe(LINE.after);
@@ -790,42 +822,51 @@ describe('ABAP debugger (AbapDebugger)', () => {
       expect(terminated.ok).toBe(true);
       attached = false;
 
-      const afterwards = await debuggerApi.getStack();
+      const afterwards = await debuggerApi.getStack({
+        analyse: analyseException,
+      });
       expect(afterwards.ok).toBe(false);
 
       needs(run, 'the run');
-      const settled = await Promise.race([
+      await settleRun(
         run as Promise<IAdtResponse<unknown>>,
-        new Promise<undefined>((resolve) =>
-          setTimeout(() => resolve(undefined), 30_000),
-        ),
-      ]);
-      expect(settled).toBeDefined();
+        30_000,
+        'the terminated run',
+        'completed-or-terminated',
+      );
       run = undefined;
     },
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'deletes the armed breakpoints and the listener',
     async () => {
-      if (skipped()) return;
       for (const id of armed.splice(0)) {
-        expect((await listenerApi.deleteBreakpoint(identity, id)).ok).toBe(
-          true,
-        );
+        expect(
+          (
+            await listenerApi.deleteBreakpoint(identity, id, {
+              analyse: analyseException,
+            })
+          ).ok,
+        ).toBe(true);
       }
-      expect((await listenerApi.stopListener(identity)).ok).toBe(true);
+      expect(
+        (
+          await listenerApi.stopListener(identity, {
+            analyse: analyseException,
+          })
+        ).ok,
+      ).toBe(true);
     },
     STEP_TIMEOUT,
   );
 
   // --- conflict: two listeners for one user -----------------------------------------
 
-  it(
+  debuggerCase(
     'a refusing listener is answered 409 while another one listens for the user',
     async () => {
-      if (skipped()) return;
       const holderConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -841,21 +882,30 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+          const holding = holder.listen(holderIdentity, {
+            analyse: analyseException,
+            holdSeconds: 10,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
           const refused = await listenerApi.listen(identity, {
+            analyse: analyseException,
             holdSeconds: 10,
           });
           expect(statusOf(refused)).toBe(409);
           expect(subtypeOf(refused)).toBe('conflictDetected');
 
-          await holding;
+          // The holder's own long poll ends when its hold runs out, with
+          // nothing caught: an answer, not a refusal.
+          expectResult(await holding, "the holder's listen");
         },
         async (steps) => {
           await steps.run(
             'stop the holder',
-            () => holder.stopListener(holderIdentity),
+            () =>
+              holder.stopListener(holderIdentity, {
+                analyse: analyseException,
+              }),
             { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
@@ -865,10 +915,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'a taking-over listener is accepted while another one listens for the user',
     async () => {
-      if (skipped()) return;
       const holderConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -889,10 +938,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = holder.listen(holderIdentity, { holdSeconds: 20 });
+          const holding = holder.listen(holderIdentity, {
+            analyse: analyseException,
+            holdSeconds: 20,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          const taking = taker.listen(identity, { holdSeconds: 5 });
+          const taking = taker.listen(identity, {
+            analyse: analyseException,
+            holdSeconds: 5,
+          });
           // Measured on premise (2026-10-09): the displaced long poll returns
           // at once, 409 with the subtype conflictNotification — the notice
           // Eclipse shows.
@@ -905,12 +960,15 @@ describe('ABAP debugger (AbapDebugger)', () => {
         async (steps) => {
           await steps.run(
             'stop the taker',
-            () => taker.stopListener(identity),
+            () => taker.stopListener(identity, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.run(
             'stop the holder',
-            () => holder.stopListener(holderIdentity),
+            () =>
+              holder.stopListener(holderIdentity, {
+                analyse: analyseException,
+              }),
             { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
@@ -920,10 +978,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'a refusing listener sees a conflict with one registered without the conflict parameters',
     async () => {
-      if (skipped()) return;
       const holderConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -937,26 +994,38 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+          const holding = holder.listen(holderIdentity, {
+            analyse: analyseException,
+            holdSeconds: 10,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
           // Measured on premise (2026-10-09): the conflict is seen whatever
           // parameters the other listener registered with.
-          const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
+          const beside = await listenerApi.listen(identity, {
+            analyse: analyseException,
+            holdSeconds: 3,
+          });
           expect(statusOf(beside)).toBe(409);
           expect(subtypeOf(beside)).toBe('conflictDetected');
 
-          await holding;
+          // The holder's own long poll ends when its hold runs out, with
+          // nothing caught: an answer, not a refusal.
+          expectResult(await holding, "the holder's listen");
         },
         async (steps) => {
           await steps.run(
             'stop the listener',
-            () => listenerApi.stopListener(identity),
+            () =>
+              listenerApi.stopListener(identity, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.run(
             'stop the holder',
-            () => holder.stopListener(holderIdentity),
+            () =>
+              holder.stopListener(holderIdentity, {
+                analyse: analyseException,
+              }),
             { checkAnswer: true },
           );
           await steps.logOff('the holder session', holderConnection);
@@ -966,10 +1035,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'two listeners of one IDE — the same IDE id — do not conflict',
     async () => {
-      if (skipped()) return;
       const otherConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -986,22 +1054,31 @@ describe('ABAP debugger (AbapDebugger)', () => {
       );
       await withCleanup(
         async () => {
-          const holding = other.listen(sameIde, { holdSeconds: 10 });
+          const holding = other.listen(sameIde, {
+            analyse: analyseException,
+            holdSeconds: 10,
+          });
           await new Promise((resolve) => setTimeout(resolve, 2000));
           // Measured on premise (2026-10-09): 200 after the hold, no 409.
-          const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
+          const beside = await listenerApi.listen(identity, {
+            analyse: analyseException,
+            holdSeconds: 3,
+          });
           expect(statusOf(beside)).toBe(200);
-          await holding;
+          // The holder's own long poll ends when its hold runs out, with
+          // nothing caught: an answer, not a refusal.
+          expectResult(await holding, "the holder's listen");
         },
         async (steps) => {
           await steps.run(
             'stop the listener',
-            () => listenerApi.stopListener(identity),
+            () =>
+              listenerApi.stopListener(identity, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.run(
             'stop the other listener',
-            () => other.stopListener(sameIde),
+            () => other.stopListener(sameIde, { analyse: analyseException }),
             { checkAnswer: true },
           );
           await steps.logOff('the other session', otherConnection);

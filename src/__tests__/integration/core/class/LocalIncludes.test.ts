@@ -17,6 +17,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -27,6 +32,9 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -47,7 +55,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -77,18 +84,6 @@ describe('Class local includes (using BaseTester)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
 
-  function logSkip(
-    testName: string,
-    definitionKey: string,
-    definitionName: string,
-    reason: string,
-  ): void {
-    const definition = getTestCaseDefinition(definitionKey, definitionName);
-    logTestStart(testsLogger, testName, definition);
-    logTestSkip(testsLogger, testName, reason);
-    logTestEnd(testsLogger, testName);
-  }
-
   async function ensureParentClassExists(
     config: ParentClassConfig,
   ): Promise<{ success: boolean; reason?: string; created?: boolean }> {
@@ -97,29 +92,48 @@ describe('Class local includes (using BaseTester)', () => {
       // either way, so this reported "the class is already there" for a class
       // that was not, and never created it.
       const existing = presenceOf(
-        await client.getClass().read({ className: config.className }),
+        await client
+          .getClass()
+          .read({ className: config.className }, undefined, {
+            analyse: analyseException,
+          }),
         `class ${config.className}`,
       );
+      if (existing.present === 'unknown') {
+        // "Could not find out" is never "absent": no create over a class
+        // that may be there.
+        return { success: false, reason: existing.reason };
+      }
       if (existing.present === true) {
         return { success: true, created: false };
       }
 
-      await client.getClass().create(
-        {
-          className: config.className,
-          packageName: config.packageName,
-          transportRequest: config.transportRequest,
-          description: config.description || `Test class ${config.className}`,
-        },
-        { headers: integrationHeadersOf(client.getClass(), 'create') },
+      expectResult(
+        await client.getClass().create(
+          {
+            className: config.className,
+            packageName: config.packageName,
+            transportRequest: config.transportRequest,
+            description: config.description || `Test class ${config.className}`,
+          },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(client.getClass(), 'create'),
+          },
+        ),
+        `create parent class ${config.className}`,
       );
 
-      await client
-        .getClass()
-        .activate(
+      expectResult(
+        await client.getClass().activate(
           { className: config.className },
-          { headers: integrationHeadersOf(client.getClass(), 'activate') },
-        );
+          {
+            analyse: judged(analyseActivation),
+            headers: integrationHeadersOf(client.getClass(), 'activate'),
+          },
+        ),
+        `activate parent class ${config.className}`,
+      );
       return { success: true, created: true };
     } catch (error: any) {
       return {
@@ -309,7 +323,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -317,13 +333,13 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -332,25 +348,10 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_definitions', 'local_definitions')(
       'should execute full workflow for definitions include',
       async () => {
-        const testName = 'Class - LocalDefinitions - full workflow';
-        if (!hasConfig || !definitionsTester) {
-          logSkip(
-            testName,
-            'update_class_local_definitions',
-            'local_definitions',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (definitionsTester.shouldSkip()) {
-          await definitionsTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = definitionsTester.getConfig();
+        const config = await definitionsTester.requireConfig();
         const tc = definitionsTester.getTestCase();
         const params = tc?.params || {};
         const updateCode =
@@ -389,7 +390,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -397,13 +400,13 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -412,25 +415,10 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_types', 'local_types')(
       'should execute full workflow for implementations include (local helper class)',
       async () => {
-        const testName = 'Class - LocalTypes - full workflow';
-        if (!hasConfig || !localTypesTester) {
-          logSkip(
-            testName,
-            'update_class_local_types',
-            'local_types',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (localTypesTester.shouldSkip()) {
-          await localTypesTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = localTypesTester.getConfig();
+        const config = await localTypesTester.requireConfig();
         const tc = localTypesTester.getTestCase();
         const params = tc?.params || {};
         const updateCode =
@@ -469,7 +457,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -477,13 +467,13 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -492,25 +482,10 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_testclass', 'local_testclass')(
       'should execute full workflow for testclasses include (local ABAP Unit tests)',
       async () => {
-        const testName = 'Class - LocalTestClass - full workflow';
-        if (!hasConfig || !localTestClassTester) {
-          logSkip(
-            testName,
-            'update_class_local_testclass',
-            'local_testclass',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (localTestClassTester.shouldSkip()) {
-          await localTestClassTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = localTestClassTester.getConfig();
+        const config = await localTestClassTester.requireConfig();
         const tc = localTestClassTester.getTestCase();
         const params = tc?.params || {};
         const updateCode =
@@ -549,7 +524,9 @@ describe('Class local includes (using BaseTester)', () => {
         const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
         if (shouldCleanup) {
-          try {
+          // A parent class this test created and could not remove fails the
+          // test: the next run's create meets it.
+          expectResult(
             await client.getClass().delete(
               {
                 className: parentInfo.className,
@@ -557,13 +534,13 @@ describe('Class local includes (using BaseTester)', () => {
                   tc?.params?.transport_request,
                 ),
               },
-              { headers: integrationHeadersOf(client.getClass(), 'delete') },
-            );
-          } catch (cleanupError: any) {
-            testsLogger.warn?.(
-              `⚠️ Failed to cleanup parent class ${parentInfo.className}: ${cleanupError.message}`,
-            );
-          }
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(client.getClass(), 'delete'),
+              },
+            ),
+            `cleanup parent class ${parentInfo.className}`,
+          );
         } else {
           testsLogger.info?.(
             `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - parent class left for analysis: ${parentInfo.className}`,
@@ -572,12 +549,12 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_macros', 'local_macros')(
       'should execute full workflow for macros include (on-premise only)',
       async () => {
         // No environment branch here. `available_in` decides and
         // `skip_reason` explains, both in test-config.yaml, and
-        // `localMacrosTester.shouldSkip()` below is what reads them. This case
+        // the registration gate is what reads them. This case
         // used to carry its own `if (isCloudSystem)` saying "Macros are not
         // supported in cloud systems" — a second source of truth, and a wrong
         // one: a cloud class has a writable macros include, ADT 3.60.3 against
@@ -586,47 +563,18 @@ describe('Class local includes (using BaseTester)', () => {
         // source contains, and that sentence now lives in the config.
 
         const testName = 'Class - LocalMacros - full workflow';
-        if (!hasConfig || !localMacrosTester) {
-          logSkip(
-            testName,
-            'update_class_local_macros',
-            'local_macros',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (localMacrosTester.shouldSkip()) {
-          await localMacrosTester.modifyFlowTestAuto();
-          return;
-        }
+        const config = await localMacrosTester.requireConfig();
 
-        const config = localMacrosTester.getConfig();
-        if (!config) {
-          await localMacrosTester.modifyFlowTestAuto();
-          return;
-        }
-
-        // Some on-premise systems may still not expose the macros include; skip if absent.
-        const existing = await client
-          .getLocalMacros()
-          .read({ className: config.className }, 'active');
-        // `read` answers `IAdtResponse`, an object on both halves, so
-        // `if (!existing)` was never true and this skip never fired. The
-        // question is whether the read succeeded.
-        if (!existing.ok) {
-          const definition = getTestCaseDefinition(
-            'update_class_local_macros',
-            'local_macros',
-          );
-          logTestStart(testsLogger, testName, definition);
-          logTestSkip(
-            testsLogger,
-            testName,
-            'Macros include is not available in this system',
-          );
-          logTestEnd(testsLogger, testName);
-          return;
-        }
+        // The case is on-premise only (its `available_in`), where the macros
+        // include is there; a refused read fails with the reason.
+        expectResult(
+          await client
+            .getLocalMacros()
+            .read({ className: config.className }, 'active', {
+              analyse: analyseException,
+            }),
+          'read the macros include',
+        );
 
         const tc = localMacrosTester.getTestCase();
         const params = tc?.params || {};

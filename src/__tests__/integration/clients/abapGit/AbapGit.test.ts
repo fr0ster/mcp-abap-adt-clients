@@ -18,6 +18,7 @@
 import {
   abapGitExternalRepo,
   abapGitRepos,
+  analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
@@ -26,12 +27,17 @@ import type {
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { abapGitDocuments } from '../../../../clients/abapGit/types';
-import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -41,11 +47,7 @@ import {
 
 dotenv.config();
 
-const {
-  getEnabledTestCase,
-  getTestCaseDefinition,
-  getTimeout,
-} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 describe('AbapGit (standalone AdtAbapGitClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
@@ -57,23 +59,19 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     externalRepo: abapGitExternalRepo,
   };
   let abapGit: AdtAbapGitClient<typeof results>;
-  let isCloudSystem = false;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(createConnectionLogger());
-      isCloudSystem = await isCloudEnvironment(connection);
       abapGit = new AdtAbapGitClient(
         connection,
         createLibraryLogger(),
         results,
       );
-      hasConfig = true;
     } catch (err) {
-      createTestsLogger().warn(
-        `beforeAll setup failed: ${(err as Error).message}`,
-      );
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      skipUnlessConfigured(err, createTestsLogger());
     }
   }, 120_000);
 
@@ -81,25 +79,19 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     await releaseTestConnection(connection);
   });
 
-  // Case definitions resolved at declaration time (test-config is static).
-  // Environment-dependent gating happens INSIDE each it() via runtime
-  // isCloudSystem, because beforeAll runs after these declarations.
-  const listCase = getTestCaseDefinition('abapgit', 'list_repos');
-  const checkCase = getTestCaseDefinition('abapgit', 'check_external_repo');
-  const flowCaseDef = getTestCaseDefinition('abapgit', 'link_pull_unlink_flow');
-
-  function isAvailable(
-    testCase: { available_in?: string[] } | null | undefined,
-  ): boolean {
-    if (!testCase?.available_in) return false;
-    return testCase.available_in.includes(isCloudSystem ? 'cloud' : 'onprem');
+  function configured(name: string) {
+    const testCase = configuredCase('abapgit', name);
+    if (!testCase) throw new Error(missingCaseMessage('abapgit', name));
+    return testCase;
   }
 
-  it(
+  gate('abapgit', 'list_repos')(
     'should list abapGit repositories',
     async () => {
-      if (!hasConfig || !listCase || !isAvailable(listCase)) return;
-      const repos = expectResult(await abapGit.listRepos(), 'list repos');
+      const repos = expectResult(
+        await abapGit.listRepos({ analyse: analyseException }),
+        'list repos',
+      );
       expect(Array.isArray(repos)).toBe(true);
       for (const r of repos) {
         expect(typeof r.package).toBe('string');
@@ -110,21 +102,17 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('abapgit', 'check_external_repo')(
     'should probe an external repo',
     async () => {
-      if (
-        !hasConfig ||
-        !checkCase ||
-        !checkCase.enabled ||
-        !isAvailable(checkCase)
-      ) {
-        return;
-      }
+      const checkCase = configured('check_external_repo');
       const info = expectResult(
         await abapGit.checkExternalRepo(
           { url: checkCase.params.url },
-          { headers: integrationHeadersOf(abapGit, 'checkExternalRepo') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(abapGit, 'checkExternalRepo'),
+          },
         ),
         'check external repo',
       );
@@ -133,31 +121,33 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('abapgit', 'link_pull_unlink_flow')(
     'should execute link → pull → unlink flow',
     async () => {
-      if (
-        !hasConfig ||
-        !flowCaseDef ||
-        !flowCaseDef.enabled ||
-        !isAvailable(flowCaseDef)
-      ) {
-        return;
-      }
+      const flowCaseDef = configured('link_pull_unlink_flow');
 
-      await abapGit.link(
-        {
-          package: flowCaseDef.params.package,
-          url: flowCaseDef.params.url,
-          branchName: flowCaseDef.params.branch,
-        },
-        { headers: integrationHeadersOf(abapGit, 'link') },
+      expectResult(
+        await abapGit.link(
+          {
+            package: flowCaseDef.params.package,
+            url: flowCaseDef.params.url,
+            branchName: flowCaseDef.params.branch,
+          },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(abapGit, 'link'),
+          },
+        ),
+        'link',
       );
 
       // Four steps since 19.0.0, because a pull was four requests: find the
       // link, post, wait, and read the log if the status says to. The waiting
       // is here because it belongs to whoever is waiting.
-      const repos = expectResult(await abapGit.listRepos(), 'repositories');
+      const repos = expectResult(
+        await abapGit.listRepos({ analyse: analyseException }),
+        'repositories',
+      );
       const repo = repos.find(
         (r) =>
           r.package.toUpperCase() === flowCaseDef.params.package.toUpperCase(),
@@ -175,7 +165,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
             pullLink: repo.pullLink,
             branchName: flowCaseDef.params.branch,
           },
-          { headers: integrationHeadersOf(abapGit, 'pull') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(abapGit, 'pull'),
+          },
         ),
         'pull',
       );
@@ -188,7 +181,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       // row is the caller's.
       const readStatus = async () => {
         const row = expectResult(
-          await abapGit.listRepos(),
+          await abapGit.listRepos({ analyse: analyseException }),
           'repository status',
         ).find((r) => r.repositoryId === repo.repositoryId);
         if (!row) throw new Error(`repository ${repo.repositoryId} vanished`);
@@ -209,7 +202,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         );
       }
       expectResult(
-        await abapGit.unlink({ repositoryId: repo.repositoryId }),
+        await abapGit.unlink(
+          { repositoryId: repo.repositoryId },
+          { analyse: analyseException },
+        ),
         'unlink',
       );
     },
