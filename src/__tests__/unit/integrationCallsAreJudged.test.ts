@@ -397,6 +397,17 @@ function changeOf(
 ): string | undefined {
   const declaration = symbol.valueDeclaration;
   if (!declaration) return 'options whose declaration cannot be found';
+  // Exported, it can be changed from a file this search does not read.
+  const statement = declaration.parent?.parent;
+  if (
+    statement &&
+    ts.isVariableStatement(statement) &&
+    statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    )
+  ) {
+    return `options ${symbol.name} is exported, so another file may change it`;
+  }
   const source = declaration.getSourceFile();
   let change: string | undefined;
   const visit = (node: ts.Node): void => {
@@ -1019,6 +1030,14 @@ export async function f(h: Domain) {
 `,
     ),
     fixture(
+      '__guardExported.ts',
+      `export const sharedOptions = { analyse: analyseException };
+export async function f(h: Domain) {
+  await h.readMetadata({}, sharedOptions);
+}
+`,
+    ),
+    fixture(
       '__guardCleanConst.ts',
       `export async function f(h: Domain) {
   const opts = { analyse: analyseException, headers: undefined };
@@ -1070,6 +1089,7 @@ export async function judgedCalls(h: Domain, runner: IRunner) {
     ['__guardDeleted.ts', 1, /has a property deleted/],
     ['__guardAssigned.ts', 1, /escapes to a call/],
     ['__guardEscaped.ts', 1, /escapes to a call/],
+    ['__guardExported.ts', 1, /is exported/],
   ])('refuses %s', (name, count, why) => {
     expect(of(name)).toHaveLength(count);
     for (const finding of of(name)) expect(finding).toMatch(why);
