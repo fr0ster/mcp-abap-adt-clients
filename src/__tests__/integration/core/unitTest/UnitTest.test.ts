@@ -30,6 +30,7 @@ import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestR
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -40,7 +41,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -49,14 +49,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getEnvironmentConfig,
   getTimeout,
   resolvePackageName,
@@ -81,7 +79,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
 
@@ -97,11 +94,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -112,45 +108,15 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
   });
 
   describe('Run unit test', () => {
-    it(
+    gate('run_unit_test', 'adt_unit_test')(
       'should run unit test and get status/result',
       async () => {
-        const testCase = getTestCaseDefinition(
-          'run_unit_test',
-          'adt_unit_test',
-        );
-
-        if (
-          !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-        ) {
-          logTestStart(testsLogger, 'UnitTest - run unit test', {
-            name: 'run_unit_test',
-            params: {},
-          });
-          const envName = isCloudSystem
-            ? 'cloud'
-            : isLegacy
-              ? 'legacy'
-              : 'onprem';
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
-            `Test not available for ${envName} environment`,
-          );
-          return;
-        }
+        const testCase = configuredCase('run_unit_test', 'adt_unit_test');
 
         if (!testCase?.params?.test_class?.run_unit_test) {
-          logTestStart(testsLogger, 'UnitTest - run unit test', {
-            name: 'run_unit_test',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
+          throw new Error(
             'Unit test configuration not found in test-config.yaml',
           );
-          return;
         }
 
         const containerClass = testCase.params.test_class.container_class;
@@ -180,23 +146,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           },
         });
 
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
-            'No SAP configuration',
-          );
-          return;
-        }
-
-        if (!packageName) {
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
-            'Package name not configured',
-          );
-          return;
-        }
+        if (!packageName) throw new Error('Package name not configured');
 
         try {
           // Step 0: Check if class already exists

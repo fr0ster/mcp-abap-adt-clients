@@ -20,6 +20,7 @@ import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -231,21 +232,10 @@ describe('FunctionModule (using AdtClient)', () => {
       tester?.afterEach()();
     });
 
-    it(
+    gate('create_function_module', 'adt_function_module')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode = testCase?.params?.source_code || config.source || '';
@@ -265,7 +255,7 @@ describe('FunctionModule (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('function_module')(
       'should read standard SAP function module',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -276,16 +266,9 @@ describe('FunctionModule (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('function_module');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'FunctionModule - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'FunctionModule - read standard object',
+          throw new Error(
             `Standard function module not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardFunctionGroupName = standardObject.group || 'SYST';
@@ -297,15 +280,6 @@ describe('FunctionModule (using AdtClient)', () => {
             function_module_name: standardFunctionModuleName,
           },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'FunctionModule - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

@@ -25,6 +25,11 @@ import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -33,7 +38,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -42,14 +46,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -70,9 +72,7 @@ const TITLE = "FunctionGroupUnitTest - run a function group's tests";
 describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -82,15 +82,16 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -100,10 +101,10 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
     }
   });
 
-  it(
+  gate('run_function_group_unit_test', 'adt_function_group_unit_test')(
     'runs the tests of a function group, and of one of its modules',
     async () => {
-      const testCase = getTestCaseDefinition(
+      const testCase = configuredCase(
         'run_function_group_unit_test',
         'adt_function_group_unit_test',
       );
@@ -111,30 +112,19 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         name: 'run_function_group_unit_test',
         params: {},
       });
-      if (!hasConfig) {
-        logTestSkip(testsLogger, TITLE, 'No SAP configuration');
-        return;
-      }
-      if (
-        !testCase ||
-        !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-      ) {
-        logTestSkip(
-          testsLogger,
-          TITLE,
-          'Test case not configured or not available for this environment',
+      if (!testCase)
+        throw new Error(
+          missingCaseMessage(
+            'run_function_group_unit_test',
+            'adt_function_group_unit_test',
+          ),
         );
-        return;
-      }
       const params = testCase.params;
       const packageName = resolvePackageName(params.package_name);
       const transportRequest = resolveTransportRequest(
         params.transport_request,
       );
-      if (!packageName) {
-        logTestSkip(testsLogger, TITLE, 'Package name not configured');
-        return;
-      }
+      if (!packageName) throw new Error('Package name not configured');
       const expected: string[] = params.expected_test_methods ?? [];
       const skipCleanup = params.skip_cleanup === true;
 

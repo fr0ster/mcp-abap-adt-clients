@@ -20,6 +20,7 @@ import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -34,7 +35,7 @@ import {
   createRunIntegrityLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
 
 const {
   resolvePackageName,
@@ -61,6 +62,13 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** The shared include the read-source case reads, set up by `shared:setup`. */
+function sharedIncludeConfigured(): boolean {
+  const shared = getSharedDependenciesConfig()?.function_group_includes;
+  const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
+  return !!sharedInclude?.name && !!sharedInclude?.function_group;
+}
 
 describe('FunctionInclude (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -277,21 +285,10 @@ describe('FunctionInclude (using AdtClient)', () => {
       tester?.afterEach()();
     });
 
-    it(
+    gate('create_function_include', 'adt_function_include')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const source = testCase?.params?.source_code || config.source || '';
@@ -310,17 +307,9 @@ describe('FunctionInclude (using AdtClient)', () => {
       getTimeout('test'),
     );
 
-    it(
+    gateOn(sharedIncludeConfigured)(
       'should read source via read()',
       async () => {
-        if (!tester || !hasConfig || !client) {
-          logTestSkip(
-            testsLogger,
-            'FunctionInclude - read source',
-            'No SAP configuration',
-          );
-          return;
-        }
         // **The shared include, not the flow's own.** This used to read
         // `params.include_name` — the same object the flow above creates and
         // deletes — so by the time it ran the include was gone, and the test
@@ -333,12 +322,9 @@ describe('FunctionInclude (using AdtClient)', () => {
         const shared = getSharedDependenciesConfig()?.function_group_includes;
         const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
         if (!sharedInclude?.name || !sharedInclude?.function_group) {
-          logTestSkip(
-            testsLogger,
-            'FunctionInclude - read source',
+          throw new Error(
             'shared_dependencies.function_group_includes is not configured',
           );
-          return;
         }
         const functionGroupName = String(sharedInclude.function_group);
         const includeName = String(sharedInclude.name);

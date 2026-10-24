@@ -23,6 +23,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { resolveDumpClassName } from '../../../helpers/dumpClassHelper';
 import {
@@ -45,7 +50,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -106,18 +110,16 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -127,11 +129,11 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('runtime_dumps', 'adt_runtime_dumps')(
     'should read dumps feed and optionally dump payload by ID',
     async () => {
       const testName = 'Runtime Dumps - read';
-      const testCase = getEnabledTestCase('runtime_dumps', 'adt_runtime_dumps');
+      const testCase = configuredCase('runtime_dumps', 'adt_runtime_dumps');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_runtime_dumps',
@@ -139,17 +141,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_dumps/adt_runtime_dumps not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('runtime_dumps', 'adt_runtime_dumps'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {

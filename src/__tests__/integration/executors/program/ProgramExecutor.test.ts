@@ -16,6 +16,13 @@ import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
 import {
@@ -33,7 +40,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -46,10 +52,7 @@ import {
   waitForNewTrace,
 } from '../../../helpers/traceHelpers';
 
-const {
-  getEnabledTestCase,
-  getTimeout,
-} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -122,7 +125,6 @@ describe('ProgramExecutor (integration)', () => {
   let runtime: AdtRuntimeClient;
   let profiler: ReadingProfiler;
   let programRunner: ReturnType<typeof readingProgramExecutor>;
-  let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
   /** Trace ids this file produced — an array for the reason above. */
@@ -157,11 +159,10 @@ describe('ProgramExecutor (integration)', () => {
       // cases assert entries, rows and the scheduled request id.
       profiler = readingProfiler(connection, libraryLogger);
       programRunner = readingProgramExecutor(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
       isCloudSystem = false;
     }
   });
@@ -208,46 +209,24 @@ describe('ProgramExecutor (integration)', () => {
     return resolveRunnableProgramName(testCase?.params ?? {});
   }
 
-  it(
+  gate('execute_program', 'adt_program_executor')(
     'should execute program via executor',
     async () => {
       const testName = 'ProgramExecutor - run';
-      const testCase = getEnabledTestCase(
+      const testCase = configuredCase(
         'execute_program',
         'adt_program_executor',
       );
+      if (!testCase) {
+        throw new Error(
+          missingCaseMessage('execute_program', 'adt_program_executor'),
+        );
+      }
 
       logTestStart(testsLogger, testName, {
         name: 'run',
         params: { program_name: testCase?.params?.program_name },
       });
-
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'No .env file or SAP configuration found',
-        );
-        return;
-      }
-
-      if (isCloudSystem) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'Programs are supported only on on-premise systems',
-        );
-        return;
-      }
-
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'execute_program/adt_program_executor not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
 
       try {
         const programName = sharedRunnableProgram(testCase);
@@ -273,52 +252,32 @@ describe('ProgramExecutor (integration)', () => {
     getTimeout('test'),
   );
 
-  it(
+  // Profiling is switched off in the case itself.
+  gateAll(
+    gate('execute_program', 'adt_program_executor'),
+    gateOn(
+      () =>
+        configuredCase('execute_program', 'adt_program_executor')?.params
+          ?.profiling?.enabled !== false,
+    ),
+  )(
     'should execute program with profiling and return trace id',
     async () => {
       const testName = 'ProgramExecutor - runWithProfiling';
-      const testCase = getEnabledTestCase(
+      const testCase = configuredCase(
         'execute_program',
         'adt_program_executor',
       );
+      if (!testCase) {
+        throw new Error(
+          missingCaseMessage('execute_program', 'adt_program_executor'),
+        );
+      }
 
       logTestStart(testsLogger, testName, {
         name: 'run_with_profiling',
         params: { program_name: testCase?.params?.program_name },
       });
-
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'No .env file or SAP configuration found',
-        );
-        return;
-      }
-
-      if (isCloudSystem) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'Programs are supported only on on-premise systems',
-        );
-        return;
-      }
-
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'execute_program/adt_program_executor not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      const profilingEnabled = testCase?.params?.profiling?.enabled !== false;
-      if (!profilingEnabled) {
-        logTestSkip(testsLogger, testName, 'profiling.enabled=false');
-        return;
-      }
 
       const profilerParameters = buildProfilerParameters(
         testCase?.params?.profiling?.parameters,

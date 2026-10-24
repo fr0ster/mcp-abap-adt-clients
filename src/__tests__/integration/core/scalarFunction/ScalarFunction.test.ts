@@ -22,6 +22,11 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -45,7 +50,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -67,7 +71,6 @@ const SKIP_STATUSES = new Set([404, 405, 501]);
 describe('ScalarFunction (DSFD/SCF) integration', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -84,25 +87,29 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
         systemContext,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
   describe('Full workflow', () => {
-    it(
+    gate('create_scalar_function', 'adt_scalar_function')(
       'create → read → update → activate → delete (skips only on 404/405/501)',
       async () => {
         const TEST_LABEL = 'ScalarFunction - full workflow';
 
         // Resolve test-case params from test-config.yaml (key: create_scalar_function)
-        const testCase = getEnabledTestCase(
+        const testCase = configuredCase(
           'create_scalar_function',
           'adt_scalar_function',
         );
+        if (!testCase) {
+          throw new Error(
+            missingCaseMessage('create_scalar_function', 'adt_scalar_function'),
+          );
+        }
 
         // Determine object name and package from config or defaults
         const resolver = new TestConfigResolver({
@@ -123,18 +130,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           params: { package_name: packageName },
         });
 
-        if (!hasConfig) {
-          logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
-          return;
-        }
-
         if (!packageName) {
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
+          throw new Error(
             'package_name not configured — set environment.default_package in test-config.yaml',
           );
-          return;
         }
 
         const transportRequest: string | undefined = resolveTransportRequest(

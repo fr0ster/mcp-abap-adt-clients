@@ -19,9 +19,10 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { gateOn } from '../../helpers/caseGate';
 import {
   createTestConnection,
-  getConfig,
+  getConnectionType,
   releaseTestConnection,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
@@ -29,7 +30,6 @@ import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
-import { logTestSkip } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -55,7 +55,6 @@ function describeToken(token?: string): string {
 
 describe('CSRF Token diagnostics', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
@@ -64,11 +63,10 @@ describe('CSRF Token diagnostics', () => {
       // ADT_NOT_CONNECTED and the diagnostic reported "NO CSRF token from any
       // endpoint" — a connection defect dressed up as a server one.
       connection = await createTestConnection(connectionLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -78,90 +76,86 @@ describe('CSRF Token diagnostics', () => {
     }
   });
 
-  it('should fetch CSRF token from available endpoints', async () => {
-    if (!hasConfig) {
-      logTestSkip(testsLogger, 'CSRF token', 'No SAP configuration');
-      return;
-    }
+  // CSRF tokens are an HTTP concept — not applicable over RFC transport
+  gateOn(() => getConnectionType() !== 'rfc')(
+    'should fetch CSRF token from available endpoints',
+    async () => {
+      const baseUrl = process.env.SAP_URL!;
+      console.log('\n=== CSRF Token Diagnostic ===');
+      console.log(`System: ${baseUrl}`);
 
-    // CSRF tokens are an HTTP concept — not applicable over RFC transport
-    const config = getConfig();
-    if ((config as any).connectionType === 'rfc') {
-      console.log('Skipping CSRF test: RFC connections do not use CSRF tokens');
-      return;
-    }
+      const endpoints = ['/sap/bc/adt/core/discovery', '/sap/bc/adt/discovery'];
 
-    const baseUrl = process.env.SAP_URL!;
-    console.log('\n=== CSRF Token Diagnostic ===');
-    console.log(`System: ${baseUrl}`);
+      const results: Record<string, string | undefined> = {};
 
-    const endpoints = ['/sap/bc/adt/core/discovery', '/sap/bc/adt/discovery'];
+      for (const endpoint of endpoints) {
+        console.log(`\n--- Trying: ${endpoint} ---`);
+        try {
+          const response = await connection.makeAdtRequest({
+            url: endpoint,
+            method: 'GET',
+            timeout: 30000,
+            headers: {
+              'x-csrf-token': 'fetch',
+              Accept: 'application/atomsvc+xml',
+            },
+          });
 
-    const results: Record<string, string | undefined> = {};
+          const status = response.status;
+          const contentType = response.headers?.['content-type'] ?? '';
+          const csrfToken = response.headers?.['x-csrf-token'] as
+            | string
+            | undefined;
 
-    for (const endpoint of endpoints) {
-      console.log(`\n--- Trying: ${endpoint} ---`);
-      try {
-        const response = await connection.makeAdtRequest({
-          url: endpoint,
-          method: 'GET',
-          timeout: 30000,
-          headers: {
-            'x-csrf-token': 'fetch',
-            Accept: 'application/atomsvc+xml',
-          },
-        });
+          console.log(`  Status: ${status}`);
+          console.log(`  Content-Type: ${contentType}`);
+          // The value never goes to the log. This diagnostic runs against a real
+          // system and its output gets pasted into issues and committed as
+          // evidence — which is how live tokens reached a public repository once
+          // already. What it needs to report is whether one came back.
+          console.log(`  x-csrf-token: ${describeToken(csrfToken)}`);
 
-        const status = response.status;
-        const contentType = response.headers?.['content-type'] ?? '';
-        const csrfToken = response.headers?.['x-csrf-token'] as
-          | string
-          | undefined;
+          results[endpoint] = csrfToken || undefined;
+        } catch (error: unknown) {
+          console.log(`\n--- ${endpoint} ERROR ---`);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.log(`  ${message}`);
+          const err = error as {
+            response?: { status?: number; headers?: Record<string, string> };
+          };
+          if (err.response) {
+            console.log(`  Status: ${err.response.status}`);
 
-        console.log(`  Status: ${status}`);
-        console.log(`  Content-Type: ${contentType}`);
-        // The value never goes to the log. This diagnostic runs against a real
-        // system and its output gets pasted into issues and committed as
-        // evidence — which is how live tokens reached a public repository once
-        // already. What it needs to report is whether one came back.
-        console.log(`  x-csrf-token: ${describeToken(csrfToken)}`);
-
-        results[endpoint] = csrfToken || undefined;
-      } catch (error: unknown) {
-        console.log(`\n--- ${endpoint} ERROR ---`);
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(`  ${message}`);
-        const err = error as {
-          response?: { status?: number; headers?: Record<string, string> };
-        };
-        if (err.response) {
-          console.log(`  Status: ${err.response.status}`);
-
-          // Even failed requests may carry a CSRF token
-          const csrfToken = err.response.headers?.['x-csrf-token'];
-          if (csrfToken) {
-            console.log(
-              `  x-csrf-token (from error): ${describeToken(csrfToken)}`,
-            );
-            results[endpoint] = csrfToken;
+            // Even failed requests may carry a CSRF token
+            const csrfToken = err.response.headers?.['x-csrf-token'];
+            if (csrfToken) {
+              console.log(
+                `  x-csrf-token (from error): ${describeToken(csrfToken)}`,
+              );
+              results[endpoint] = csrfToken;
+            }
           }
         }
       }
-    }
 
-    // Summary
-    console.log('\n=== Summary ===');
-    for (const [endpoint, token] of Object.entries(results)) {
-      console.log(`  ${endpoint}: ${token ? describeToken(token) : 'FAILED'}`);
-    }
+      // Summary
+      console.log('\n=== Summary ===');
+      for (const [endpoint, token] of Object.entries(results)) {
+        console.log(
+          `  ${endpoint}: ${token ? describeToken(token) : 'FAILED'}`,
+        );
+      }
 
-    // At least one endpoint should return CSRF
-    const anyToken = Object.values(results).find((t) => t);
-    console.log(
-      `\n  Result: ${anyToken ? 'CSRF token available' : 'NO CSRF token from any endpoint'}`,
-    );
-    console.log('=== End Diagnostic ===\n');
+      // At least one endpoint should return CSRF
+      const anyToken = Object.values(results).find((t) => t);
+      console.log(
+        `\n  Result: ${anyToken ? 'CSRF token available' : 'NO CSRF token from any endpoint'}`,
+      );
+      console.log('=== End Diagnostic ===\n');
 
-    expect(anyToken).toBeTruthy();
-  }, 60000);
+      expect(anyToken).toBeTruthy();
+    },
+    60000,
+  );
 });

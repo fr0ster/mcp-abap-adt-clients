@@ -19,6 +19,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IMetadataExtensionConfig } from '../../../../core/metadataExtension';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -164,21 +165,10 @@ extend view ${targetEntity} with "${extName}"
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_metadata_extension', 'adt_metadata_extension')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           source: config.source,

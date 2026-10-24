@@ -38,6 +38,11 @@ import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
 import {
   ensureDebugTarget,
@@ -55,8 +60,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -66,7 +69,9 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase('runtime_debugger', 'adt_amdp_debugger');
+const testCase = configuredCase('runtime_debugger', 'adt_amdp_debugger');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_amdp_debugger');
 const CLASS_NAME: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_AMDP'
 ).toUpperCase();
@@ -168,7 +173,6 @@ describe('AMDP debugger (AmdpDebugger)', () => {
   let trigger: Connection | undefined;
   let onSession: AmdpDebugger;
   let onCommands: AmdpDebugger;
-  let skipReason: string | undefined;
 
   let mainId = '';
   let hanaSession = '';
@@ -178,14 +182,6 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
-  }
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -230,8 +226,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_amdp_debugger is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_amdp_debugger'),
+      );
     }
     try {
       session = await createTestConnection(connectionLogger, {
@@ -245,8 +242,7 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     onSession = new AmdpDebugger(session, connectionLogger);
     onCommands = new AmdpDebugger(commands, connectionLogger);
@@ -313,10 +309,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     steps.finish();
   }, STEP_TIMEOUT);
 
-  it(
+  debuggerCase(
     'starts a debug session for the user and names it in Location',
     async () => {
-      if (skipped()) return;
       const user = (await abapUserOf(session as Connection)).toUpperCase();
       // A session left behind by an interrupted run locks the user's AMDP
       // debugging (500 DEBUGGEE_CONTEXT_LOCKED_BY_ME, SY 530); a test takes it over.
@@ -331,10 +326,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'syncs breakpoints: the request id at once, the outcome as an event',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
       const synced = await onCommands.syncBreakpoints(mainId, breakpoints());
       expect(synced.ok).toBe(true);
@@ -352,10 +346,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops the procedure on its loop line with its variables',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
       runClass();
       const events = await until('ON_BREAK');
@@ -371,10 +364,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'steps over a statement and sees the variable change',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee');
       const stepped = await onCommands.step(mainId, debuggeeId, 'over');
       expect(stepped.ok).toBe(true);
@@ -386,10 +378,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'continues to the next iteration, then to the end of the procedure',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee');
       await onCommands.step(mainId, debuggeeId, 'continue');
       await until('ON_BREAK');
@@ -407,10 +398,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops in the table function as a debuggee of its own',
     async () => {
-      if (skipped()) return;
       const procedureDebuggee = debuggeeId;
       if (lastBreak && lineOf(lastBreak) !== LINE.tf) await until('ON_BREAK');
       expect(lineOf(lastBreak as IEvent)).toBe(LINE.tf);
@@ -419,10 +409,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'reads a table variable: the whole of it, and through a SELECT of its own',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee in the table function');
       // One more iteration, so the table holds a row.
       await onCommands.step(mainId, debuggeeId, 'continue');
@@ -474,10 +463,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'lets the run finish: no breakpoints, continue, and the run returns its output',
     async () => {
-      if (skipped()) return;
       needs(debuggeeId, 'a debuggee');
       expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
       await onCommands.step(mainId, debuggeeId, 'continue');
@@ -495,10 +483,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'cancels a debuggee where it stands, and the run fails',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
       await onCommands.syncBreakpoints(mainId, breakpoints());
       await until('SYNC_BREAKPOINTS');
@@ -520,10 +507,9 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops the debug session',
     async () => {
-      if (skipped()) return;
       needs(mainId, 'a debug session');
       expect((await onCommands.syncBreakpoints(mainId, [])).ok).toBe(true);
       const stopped = await onCommands.stop(mainId);

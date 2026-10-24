@@ -29,6 +29,11 @@ import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -52,7 +57,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -79,7 +83,6 @@ function isSkippable(error: unknown): boolean {
 describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -96,24 +99,34 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
         systemContext,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
   describe('Full workflow', () => {
-    it(
+    gate(
+      'create_scalar_function_implementation',
+      'adt_scalar_function_implementation',
+    )(
       'DSFD + AMDP + DSFI fixture: create → impl update → group-activate → read → updateMetadata → delete',
       async () => {
         const TEST_LABEL = 'ScalarFunctionImplementation - full workflow';
 
-        const testCase = getEnabledTestCase(
+        const testCase = configuredCase(
           'create_scalar_function_implementation',
           'adt_scalar_function_implementation',
         );
+        if (!testCase) {
+          throw new Error(
+            missingCaseMessage(
+              'create_scalar_function_implementation',
+              'adt_scalar_function_implementation',
+            ),
+          );
+        }
         const resolver = new TestConfigResolver({
           testCase,
           isCloud: isCloudSystem,
@@ -138,17 +151,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           params: { function: funcName, amdp: amdpName, package: packageName },
         });
 
-        if (!hasConfig) {
-          logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
-          return;
-        }
         if (!packageName) {
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
+          throw new Error(
             'package_name not configured — set environment.default_package',
           );
-          return;
         }
 
         const sf = client.getScalarFunction();

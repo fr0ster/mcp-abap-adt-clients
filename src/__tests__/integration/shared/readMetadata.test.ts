@@ -17,6 +17,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtObjectType } from '../../../core/shared/types';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { gate, gateAll, gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -25,7 +26,7 @@ import {
 } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -36,10 +37,30 @@ if (fs.existsSync(envPath)) {
 const testsLogger = createTestsLogger();
 const { isHttpStatusAllowed } = require('../../helpers/test-helper');
 
+/** Applies where the case does and where it names the object it reads. */
+function objectCase(
+  handlerName: string,
+  testCaseName: string,
+  param: string,
+  type: string,
+): jest.It {
+  return gateAll(
+    gate(handlerName, testCaseName),
+    gateOn(
+      ({ isCloud, isLegacy }) =>
+        !!new TestConfigResolver({
+          isCloud,
+          isLegacy,
+          handlerName,
+          testCaseName,
+        }).getObjectName(param, type),
+    ),
+  );
+}
+
 describe('Shared - readMetadata', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
 
@@ -50,12 +71,11 @@ describe('Shared - readMetadata', () => {
         await createTestAdtClient(connection, testsLogger);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -65,234 +85,181 @@ describe('Shared - readMetadata', () => {
     }
   });
 
-  it('should read class metadata', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
+  objectCase(
+    'read_metadata',
+    'read_class_metadata',
+    'class_name',
+    'class',
+  )(
+    'should read class metadata',
+    async () => {
+      const resolver = new TestConfigResolver({
+        isCloud: isCloudSystem,
+        isLegacy,
+        logger: testsLogger,
+        handlerName: 'read_metadata',
+        testCaseName: 'read_class_metadata',
+      });
 
-    const resolver = new TestConfigResolver({
-      isCloud: isCloudSystem,
-      isLegacy,
-      logger: testsLogger,
-      handlerName: 'read_metadata',
-      testCaseName: 'read_class_metadata',
-    });
-    if (!resolver.isAvailableForEnvironment()) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'Test not available for current environment',
-      );
-      return;
-    }
-
-    const className = resolver.getObjectName('class_name', 'class');
-    if (!className) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'No class configured in standard_objects',
-      );
-      return;
-    }
-    try {
-      logTestStep('read class metadata', testsLogger);
-      testsLogger.info?.(`📋 Object: ${className} (class)`);
-      testsLogger.info?.('📖 Reading metadata...');
-
-      const activeResult = await orThrow(
-        client.getUtils().readObjectMetadata('class', className, undefined, {
-          version: 'active',
-        }),
-      );
-      const inactiveResult = await orThrow(
-        client.getUtils().readObjectMetadata('class', className, undefined, {
-          version: 'inactive',
-        }),
-      );
-
-      expect(activeResult).toBeDefined();
-      logTestStep(
-        `metadata active size: ${activeResult?.length || 0} bytes`,
-        testsLogger,
-      );
-
-      expect(inactiveResult).toBeDefined();
-      logTestStep(
-        `metadata inactive size: ${inactiveResult?.length || 0} bytes`,
-        testsLogger,
-      );
-
-      testsLogger.info?.('✅ Metadata retrieved');
-    } catch (error: any) {
-      if (error.response?.status === 406) {
-        if (isHttpStatusAllowed(406, { params: {} })) {
-          testsLogger.warn?.(
-            '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
-          );
-          return;
-        }
-        throw new Error(
-          `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
-        );
+      const className = resolver.getObjectName('class_name', 'class');
+      if (!className) {
+        throw new Error('No class configured in standard_objects');
       }
-      throw error;
-    }
-  }, 15000);
+      try {
+        logTestStep('read class metadata', testsLogger);
+        testsLogger.info?.(`📋 Object: ${className} (class)`);
+        testsLogger.info?.('📖 Reading metadata...');
 
-  it('should read domain metadata', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
-
-    const resolver = new TestConfigResolver({
-      isCloud: isCloudSystem,
-      isLegacy,
-      logger: testsLogger,
-      handlerName: 'read_metadata',
-      testCaseName: 'read_domain_metadata',
-    });
-    if (!resolver.isAvailableForEnvironment()) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'Test not available for current environment',
-      );
-      return;
-    }
-
-    const domainName = resolver.getObjectName('domain_name', 'domain');
-    if (!domainName) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'No domain configured in standard_objects',
-      );
-      return;
-    }
-    try {
-      logTestStep('read domain metadata', testsLogger);
-      testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
-      testsLogger.info?.('📖 Reading metadata...');
-
-      const result = await orThrow(
-        client.getUtils().readObjectMetadata('domain', domainName),
-      );
-
-      expect(result).toBeDefined();
-
-      testsLogger.info?.('✅ Metadata retrieved');
-      logTestStep(`metadata size: ${result?.length || 0} bytes`, testsLogger);
-    } catch (error: any) {
-      if (error.response?.status === 406) {
-        if (isHttpStatusAllowed(406, { params: {} })) {
-          testsLogger.warn?.(
-            '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
-          );
-          return;
-        }
-        throw new Error(
-          `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+        const activeResult = await orThrow(
+          client.getUtils().readObjectMetadata('class', className, undefined, {
+            version: 'active',
+          }),
         );
-      }
-      throw error;
-    }
-  }, 15000);
-
-  it('should read table metadata', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
-
-    const resolver = new TestConfigResolver({
-      isCloud: isCloudSystem,
-      isLegacy,
-      logger: testsLogger,
-      handlerName: 'read_metadata',
-      testCaseName: 'read_table_metadata',
-    });
-    if (!resolver.isAvailableForEnvironment()) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'Test not available for current environment',
-      );
-      return;
-    }
-
-    const tableName = resolver.getObjectName('table_name', 'table');
-    if (!tableName) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'No table configured in standard_objects',
-      );
-      return;
-    }
-    try {
-      logTestStep('read table metadata', testsLogger);
-      const result = await orThrow(
-        client.getUtils().readObjectMetadata('table', tableName),
-      );
-      expect(result).toBeDefined();
-    } catch (error: any) {
-      if (error.response?.status === 406) {
-        if (isHttpStatusAllowed(406, { params: {} })) {
-          testsLogger.warn?.(
-            '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
-          );
-          return;
-        }
-        throw new Error(
-          `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+        const inactiveResult = await orThrow(
+          client.getUtils().readObjectMetadata('class', className, undefined, {
+            version: 'inactive',
+          }),
         );
+
+        expect(activeResult).toBeDefined();
+        logTestStep(
+          `metadata active size: ${activeResult?.length || 0} bytes`,
+          testsLogger,
+        );
+
+        expect(inactiveResult).toBeDefined();
+        logTestStep(
+          `metadata inactive size: ${inactiveResult?.length || 0} bytes`,
+          testsLogger,
+        );
+
+        testsLogger.info?.('✅ Metadata retrieved');
+      } catch (error: any) {
+        if (error.response?.status === 406) {
+          if (isHttpStatusAllowed(406, { params: {} })) {
+            testsLogger.warn?.(
+              '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
+            );
+            return;
+          }
+          throw new Error(
+            `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+          );
+        }
+        throw error;
       }
-      throw error;
-    }
-  }, 15000);
+    },
+    15000,
+  );
 
-  it('should throw error for unsupported object type', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
+  objectCase(
+    'read_metadata',
+    'read_domain_metadata',
+    'domain_name',
+    'domain',
+  )(
+    'should read domain metadata',
+    async () => {
+      const resolver = new TestConfigResolver({
+        isCloud: isCloudSystem,
+        isLegacy,
+        logger: testsLogger,
+        handlerName: 'read_metadata',
+        testCaseName: 'read_domain_metadata',
+      });
 
-    const resolver = new TestConfigResolver({
-      isCloud: isCloudSystem,
-      isLegacy,
-      logger: testsLogger,
-      handlerName: 'read_metadata',
-      testCaseName: 'read_metadata_error_unsupported',
-    });
-    if (!resolver.isAvailableForEnvironment()) {
-      logTestSkip(
-        testsLogger,
-        'Shared - readMetadata',
-        'Test not available for current environment',
-      );
-      return;
-    }
+      const domainName = resolver.getObjectName('domain_name', 'domain');
+      if (!domainName) {
+        throw new Error('No domain configured in standard_objects');
+      }
+      try {
+        logTestStep('read domain metadata', testsLogger);
+        testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
+        testsLogger.info?.('📖 Reading metadata...');
 
-    logTestStep('validate error for unsupported object type', testsLogger);
-    await expect(
-      client
-        .getUtils()
-        // Force runtime validation for invalid inputs.
-        .readObjectMetadata(
-          'unsupported_type' as unknown as AdtObjectType,
-          'TEST',
-        ),
-    ).rejects.toThrow('Unsupported object type for metadata');
-  });
+        const result = await orThrow(
+          client.getUtils().readObjectMetadata('domain', domainName),
+        );
+
+        expect(result).toBeDefined();
+
+        testsLogger.info?.('✅ Metadata retrieved');
+        logTestStep(`metadata size: ${result?.length || 0} bytes`, testsLogger);
+      } catch (error: any) {
+        if (error.response?.status === 406) {
+          if (isHttpStatusAllowed(406, { params: {} })) {
+            testsLogger.warn?.(
+              '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
+            );
+            return;
+          }
+          throw new Error(
+            `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+          );
+        }
+        throw error;
+      }
+    },
+    15000,
+  );
+
+  objectCase(
+    'read_metadata',
+    'read_table_metadata',
+    'table_name',
+    'table',
+  )(
+    'should read table metadata',
+    async () => {
+      const resolver = new TestConfigResolver({
+        isCloud: isCloudSystem,
+        isLegacy,
+        logger: testsLogger,
+        handlerName: 'read_metadata',
+        testCaseName: 'read_table_metadata',
+      });
+
+      const tableName = resolver.getObjectName('table_name', 'table');
+      if (!tableName) {
+        throw new Error('No table configured in standard_objects');
+      }
+      try {
+        logTestStep('read table metadata', testsLogger);
+        const result = await orThrow(
+          client.getUtils().readObjectMetadata('table', tableName),
+        );
+        expect(result).toBeDefined();
+      } catch (error: any) {
+        if (error.response?.status === 406) {
+          if (isHttpStatusAllowed(406, { params: {} })) {
+            testsLogger.warn?.(
+              '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
+            );
+            return;
+          }
+          throw new Error(
+            `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+          );
+        }
+        throw error;
+      }
+    },
+    15000,
+  );
+
+  gate('read_metadata', 'read_metadata_error_unsupported')(
+    'should throw error for unsupported object type',
+    async () => {
+      logTestStep('validate error for unsupported object type', testsLogger);
+      await expect(
+        client
+          .getUtils()
+          // Force runtime validation for invalid inputs.
+          .readObjectMetadata(
+            'unsupported_type' as unknown as AdtObjectType,
+            'TEST',
+          ),
+      ).rejects.toThrow('Unsupported object type for metadata');
+    },
+  );
 });

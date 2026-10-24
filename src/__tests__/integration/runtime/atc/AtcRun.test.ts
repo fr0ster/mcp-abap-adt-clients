@@ -41,8 +41,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import { AdtAtc, atcDocuments } from '../../../../runtime/atc/AdtAtc';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -57,16 +61,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
-const {
-  getEnabledTestCase,
-  getTimeout,
-} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -134,7 +134,7 @@ const CASE = 'adt_atc_run';
  * hung run rather than as a bound nobody could have met.
  */
 const CASE_PARAMS: Record<string, unknown> =
-  getEnabledTestCase(SECTION, CASE)?.params ?? {};
+  configuredCase(SECTION, CASE)?.params ?? {};
 const POLL_TIMEOUT_MS = toPositiveInt(CASE_PARAMS.poll_timeout_ms, 300_000);
 const POLL_INTERVAL_MS = toPositiveInt(CASE_PARAMS.poll_interval_ms, 3_000);
 /** The deadline plus room for the run, the reads and the connection. */
@@ -171,18 +171,14 @@ function findingsFor(worklist: string, objectName: string): string[] {
 
 describe('ATC check runs (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let runtime: AdtRuntimeClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      runtime = new AdtRuntimeClient(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails naming the
       // reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -192,29 +188,18 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate(SECTION, CASE)(
     'waits for the run and reports a triple that is not all zeroes',
     async () => {
       const testName = 'AtcRun - wait for the run';
-      const testCase = getEnabledTestCase(SECTION, CASE);
+      const testCase = configuredCase(SECTION, CASE);
 
       logTestStart(testsLogger, testName, {
         name: CASE,
         params: testCase?.params || {},
       });
 
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          `${SECTION}/${CASE} not configured or disabled in test-config.yaml`,
-        );
-        return;
-      }
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
+      if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
 
       const className = String(testCase.params.class_name).toUpperCase();
 
@@ -270,29 +255,18 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
     JEST_TIMEOUT,
   );
 
-  it(
+  gate(SECTION, CASE)(
     'polls the run to completion and reads the finding out of the worklist',
     async () => {
       const testName = 'AtcRun - poll and read the worklist';
-      const testCase = getEnabledTestCase(SECTION, CASE);
+      const testCase = configuredCase(SECTION, CASE);
 
       logTestStart(testsLogger, testName, {
         name: CASE,
         params: testCase?.params || {},
       });
 
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          `${SECTION}/${CASE} not configured or disabled in test-config.yaml`,
-        );
-        return;
-      }
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
+      if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
 
       const className = String(testCase.params.class_name).toUpperCase();
       // Absent is a legitimate configuration — see the assertion below — but

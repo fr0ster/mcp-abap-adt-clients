@@ -37,6 +37,12 @@ import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -46,7 +52,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -54,14 +59,12 @@ import {
 } from '../../../helpers/testLogger';
 import {
   logTestEnd,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -179,9 +182,7 @@ function verdicts(reading: IRunReading) {
 describe('ABAP Unit on reports and function groups: run (async) and runSync (sync)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -197,10 +198,8 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         systemContext,
       );
       client = resolved.client;
-      isLegacy = resolved.isLegacy;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -210,37 +209,23 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
     }
   });
 
-  /** The test case, or the reason the test skips. */
-  function caseOrSkip(
-    section: string,
-    name: string,
-    title: string,
-    required: string,
-  ) {
-    const testCase = getTestCaseDefinition(section, name);
-    if (!hasConfig) {
-      logTestSkip(testsLogger, title, 'No SAP configuration');
-      return undefined;
-    }
+  /** The test case, configured with the parameter the test cannot run without. */
+  function configuredOrFail(section: string, name: string, required: string) {
+    const testCase = configuredCase(section, name);
     if (!testCase?.params?.[required]) {
-      logTestSkip(
-        testsLogger,
-        title,
-        `${name} not in test-config.yaml (npm run check:config)`,
-      );
-      return undefined;
-    }
-    if (
-      isLegacy ||
-      !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-    ) {
-      logTestSkip(testsLogger, title, 'Not available on this system');
-      return undefined;
+      throw new Error(`${name} not in test-config.yaml (npm run check:config)`);
     }
     return testCase;
   }
 
-  it(
+  // The legacy runner's `run` is the synchronous request already; there is no
+  // asynchronous one to compare it with.
+  const notLegacy = gateOn(({ isLegacy }) => !isLegacy);
+
+  gateAll(
+    gate('run_program_unit_test', 'adt_program_unit_test_sync'),
+    notLegacy,
+  )(
     'reports: both runners find the same tests, the same failure and the same alert',
     async () => {
       const TITLE = 'UnitTest - reports, async and sync compared';
@@ -249,13 +234,11 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         params: {},
       });
       try {
-        const testCase = caseOrSkip(
+        const testCase = configuredOrFail(
           'run_program_unit_test',
           'adt_program_unit_test_sync',
-          TITLE,
           'own_program_name',
         );
-        if (!testCase) return;
         const params = testCase.params;
         const packageName = resolvePackageName(params.package_name);
         const transportRequest = resolveTransportRequest(
@@ -456,7 +439,10 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
     getTimeout('test'),
   );
 
-  it(
+  gateAll(
+    gate('run_function_group_unit_test', 'adt_function_group_unit_test_sync'),
+    notLegacy,
+  )(
     'function group and modules: both runners compared, and what a module run covers',
     async () => {
       const TITLE = 'UnitTest - function group and modules, async and sync';
@@ -465,13 +451,11 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         params: {},
       });
       try {
-        const testCase = caseOrSkip(
+        const testCase = configuredOrFail(
           'run_function_group_unit_test',
           'adt_function_group_unit_test_sync',
-          TITLE,
           'function_group_name',
         );
-        if (!testCase) return;
         const params = testCase.params;
         const packageName = resolvePackageName(params.package_name);
         const transportRequest = resolveTransportRequest(

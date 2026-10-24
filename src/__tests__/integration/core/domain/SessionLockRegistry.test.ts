@@ -24,6 +24,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDataElementConfig } from '../../../../core/dataElement';
 import type { IDomainConfig } from '../../../../core/domain';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { gate, gateAll } from '../../../helpers/caseGate';
 import {
   deleteDataElement,
   deleteDomain,
@@ -47,7 +48,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -67,7 +67,6 @@ const TEST_NAME = 'Session lock registry - unlockAll across object types';
 describe('Session lock registry (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
   let domainConfig: IDomainConfig | undefined;
   let dataElementConfig: IDataElementConfig | undefined;
@@ -133,64 +132,70 @@ describe('Session lock registry (using AdtClient)', () => {
           description: ep.description,
         } as IDataElementConfig;
       }
-
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
-  it('aggregates locks from multiple handler types and unlockAll releases them all', async () => {
-    logTestStart(testsLogger, TEST_NAME, {
-      name: 'session_unlock_all',
-      params: {
-        domain_name: domainConfig?.domainName,
-        data_element_name: dataElementConfig?.dataElementName,
-      },
-    });
+  gateAll(
+    gate('create_domain', 'lock_registry_domain'),
+    gate('create_data_element', 'lock_registry_data_element'),
+  )(
+    'aggregates locks from multiple handler types and unlockAll releases them all',
+    async () => {
+      logTestStart(testsLogger, TEST_NAME, {
+        name: 'session_unlock_all',
+        params: {
+          domain_name: domainConfig?.domainName,
+          data_element_name: dataElementConfig?.dataElementName,
+        },
+      });
 
-    if (!hasConfig || !client || !domainConfig || !dataElementConfig) {
-      logTestSkip(testsLogger, TEST_NAME, 'No SAP configuration');
-      return;
-    }
+      if (!client || !domainConfig || !dataElementConfig) {
+        throw new Error(
+          'lock_registry_domain and lock_registry_data_element need their names and packages in test-config.yaml',
+        );
+      }
 
-    try {
-      // Typed and active, not the shells a create alone makes. The element
-      // is typed by the domain: a leftover element goes first (it references
-      // the domain, which cannot be deleted under it), then the domain is
-      // rebuilt, then the element.
-      await removeLeftoverDataElement(client, dataElementConfig);
-      await recreateActiveDomain(client, domainConfig, domainType);
-      await recreateActiveDataElement(
-        client,
-        dataElementConfig,
-        domainConfig.domainName,
-      );
+      try {
+        // Typed and active, not the shells a create alone makes. The element
+        // is typed by the domain: a leftover element goes first (it references
+        // the domain, which cannot be deleted under it), then the domain is
+        // rebuilt, then the element.
+        await removeLeftoverDataElement(client, dataElementConfig);
+        await recreateActiveDomain(client, domainConfig, domainType);
+        await recreateActiveDataElement(
+          client,
+          dataElementConfig,
+          domainConfig.domainName,
+        );
 
-      // Lock both through the SAME client session — deliberately no unlock.
-      await client.getDomain().lock(domainConfig);
-      await client.getDataElement().lock(dataElementConfig);
+        // Lock both through the SAME client session — deliberately no unlock.
+        await client.getDomain().lock(domainConfig);
+        await client.getDataElement().lock(dataElementConfig);
 
-      // The session-scoped registry aggregates both, regardless of type.
-      expect(client.pendingLocks.length).toBe(2);
+        // The session-scoped registry aggregates both, regardless of type.
+        expect(client.pendingLocks.length).toBe(2);
 
-      // One call releases every dangling lock; SAP must accept them all.
-      const failures = await client.unlockAll();
-      expect(failures).toEqual([]);
-      expect(client.pendingLocks).toEqual([]);
+        // One call releases every dangling lock; SAP must accept them all.
+        const failures = await client.unlockAll();
+        expect(failures).toEqual([]);
+        expect(client.pendingLocks).toEqual([]);
 
-      logTestSuccess(testsLogger, TEST_NAME);
-    } catch (error) {
-      // Best-effort cleanup so a mid-test failure never leaves locks behind.
-      await client.unlockAll().catch(() => {});
-      logTestError(testsLogger, TEST_NAME, error);
-      throw error;
-    } finally {
-      logTestEnd(testsLogger, TEST_NAME);
-    }
-  }, 900000);
+        logTestSuccess(testsLogger, TEST_NAME);
+      } catch (error) {
+        // Best-effort cleanup so a mid-test failure never leaves locks behind.
+        await client.unlockAll().catch(() => {});
+        logTestError(testsLogger, TEST_NAME, error);
+        throw error;
+      } finally {
+        logTestEnd(testsLogger, TEST_NAME);
+      }
+    },
+    900000,
+  );
 
   // A failed cleanup fails the suite: the leftovers are what this used to be.
   afterAll(async () => {

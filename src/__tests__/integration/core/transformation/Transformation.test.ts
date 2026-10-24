@@ -20,6 +20,11 @@ import type { ITransformationConfig } from '../../../../core/transformation';
 import { getTransformation } from '../../../../core/transformation/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -42,7 +47,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -151,21 +155,10 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_transformation', 'adt_simple_transformation')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const defaultSourceCode = `<?sap.transform simple?>
@@ -198,45 +191,20 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gate('read_transformation', 'read_standard_transformation')(
       'should read standard SAP transformation',
       async () => {
-        const {
-          getTestCaseDefinition,
-        } = require('../../../helpers/test-helper');
-        const testCase = getTestCaseDefinition(
-          'read_transformation',
-          'read_standard_transformation',
-        );
-
-        if (!testCase) {
-          logTestStart(testsLogger, 'Transformation - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Transformation - read standard object',
-            'Test case not defined in test-config.yaml',
-          );
-          return;
-        }
-
-        const enabledTestCase = getEnabledTestCase(
+        const enabledTestCase = configuredCase(
           'read_transformation',
           'read_standard_transformation',
         );
         if (!enabledTestCase) {
-          logTestStart(testsLogger, 'Transformation - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Transformation - read standard object',
-            'Test case disabled or not found',
+          throw new Error(
+            missingCaseMessage(
+              'read_transformation',
+              'read_standard_transformation',
+            ),
           );
-          return;
         }
 
         // Get transformation name from test case params
@@ -256,16 +224,9 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
           });
           const standardObject = resolver.getStandardObject('transformation');
           if (!standardObject) {
-            logTestStart(testsLogger, 'Transformation - read standard object', {
-              name: 'read_standard',
-              params: {},
-            });
-            logTestSkip(
-              testsLogger,
-              'Transformation - read standard object',
+            throw new Error(
               `Standard transformation not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
             );
-            return;
           }
           transformationName = standardObject.name;
         }
@@ -274,15 +235,6 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
           name: 'read_standard',
           params: { transformation_name: transformationName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Transformation - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

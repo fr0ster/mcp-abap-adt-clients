@@ -41,6 +41,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - `docs/development/RFC_TESTING.md` and `docs/usage/RFC_CONNECTION.md` no
   longer describe a binding compiled at install: on a platform without a
   prebuild, the binding is built from sap-rfc-lite's own repository.
+- **Every integration suite decides whether a case applies when the test is
+  registered** (fr0ster/mcp-abap-adt-clients#230). A case that is disabled,
+  unavailable on the system (`available_in` against `environment.system`) or
+  has nothing to read here registers as `it.skip` and is reported `○ skipped`;
+  before, 80 of 80 suites decided inside the running `it`, returned early, and
+  Jest counted the test as passed — four of the eight cases of one suite did
+  nothing in 0–1 ms and were reported as passing. `helpers/caseGate.ts` gains
+  `gateOn` (an arbitrary predicate on the configured system),
+  `gateStandardObject` (a standard object of that type is configured for the
+  system) and `gateAll` (every gate must register) beside `gate`.
+  `BaseTester` no longer has a skip: `shouldSkip()` and `getSkipReason()` are
+  gone, `beforeEach()` turns a missing, not-enabled or package-less case into
+  the setup error, which `flowTestAuto()`, `modifyFlowTestAuto()`,
+  `readTestAuto()` and the new `requireConfig()` raise, and it no longer
+  decides `available_in` a second time. The hand-rolled `skipReason` of the
+  other suites became the same kind of failure. What stays an in-body
+  `logTestSkip` is what only the system's answer decides: an object absent
+  from the system, an endpoint answering `403`/`404`/`406`/`501`, a lock
+  refused by an editing session, and a few lookups made mid-test from the
+  system's own data (`Transport.test.ts`).
 
 ## [37.2.0] - 2026-10-23
 

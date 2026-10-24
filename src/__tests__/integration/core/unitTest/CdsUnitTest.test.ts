@@ -29,6 +29,7 @@ import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -45,14 +46,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   getEnvironmentConfig,
@@ -79,7 +78,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
 
@@ -92,13 +90,12 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
 
       await ensureSharedPackage(client, testsLogger);
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -109,47 +106,21 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
   });
 
   describe('Create CDS unit test class', () => {
-    it(
+    gate('create_cds_unit_test', 'cds_unit_test')(
       'should create CDS unit test class with template and test class source',
       async () => {
-        const testCase = getTestCaseDefinition(
+        const testCase = configuredCase(
           'create_cds_unit_test',
           'cds_unit_test',
         );
         if (!testCase?.params?.cds_unit_test) {
-          logTestStart(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            {
-              name: 'create_cds_unit_test',
-              params: {},
-            },
-          );
-          logTestSkip(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
+          throw new Error(
             'CDS unit test configuration not found in test-config.yaml',
           );
-          return;
         }
 
         const packageName = resolvePackageName(testCase.params.package_name);
-        if (!packageName) {
-          logTestStart(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            {
-              name: 'create_cds_unit_test',
-              params: {},
-            },
-          );
-          logTestSkip(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            'Package name not configured',
-          );
-          return;
-        }
+        if (!packageName) throw new Error('Package name not configured');
 
         const cdsUnitTestConfig = testCase.params.cds_unit_test;
         const className = cdsUnitTestConfig.class_name;
@@ -178,20 +149,9 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           .map(([key]) => key);
 
         if (missingParams.length > 0) {
-          logTestStart(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            {
-              name: 'create_cds_unit_test',
-              params: {},
-            },
-          );
-          logTestSkip(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
+          throw new Error(
             `Missing in test-config.yaml under create_cds_unit_test: ${missingParams.join(', ')}`,
           );
-          return;
         }
 
         logTestStart(testsLogger, 'CdsUnitTest - create CDS unit test class', {
@@ -203,15 +163,6 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
             package_name: packageName,
           },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         const depTableName = testCase.params.dep_table_name;
 

@@ -21,6 +21,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { gateOn } from '../../helpers/caseGate';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -44,7 +45,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Shared - searchObjects', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
 
   beforeAll(async () => {
@@ -56,11 +56,10 @@ describe('Shared - searchObjects', () => {
         await createTestAdtClient(connection, testsLogger);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -75,85 +74,80 @@ describe('Shared - searchObjects', () => {
   const hitsUtils = () =>
     client.getUtils({ ...utilDocuments, search: utilSearchHits });
 
-  it('should search objects by name pattern', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
+  gateOn(() => true)(
+    'should search objects by name pattern',
+    async () => {
+      logTestStep('search objects by name pattern', testsLogger);
+      testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
 
-    logTestStep('search objects by name pattern', testsLogger);
-    testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
+      // The hits come from `utilSearchHits`, passed as the reading — the default
+      // answers the document. There is no document to parse here — the regex this used to run was /<objectReference/, which
+      // never matches, because SAP prefixes the element. It was only logged,
+      // never asserted, so it found nothing for as long as it existed.
+      const hits = expectResult(
+        await withAcceptHandling(
+          hitsUtils().search({ query: 'CL_ABAP*', maxResults: 10 }),
+        ),
+        'search CL_ABAP*',
+      ) as ISearchResult[];
 
-    // The hits come from `utilSearchHits`, passed as the reading — the default
-    // answers the document. There is no document to parse here — the regex this used to run was /<objectReference/, which
-    // never matches, because SAP prefixes the element. It was only logged,
-    // never asserted, so it found nothing for as long as it existed.
-    const hits = expectResult(
-      await withAcceptHandling(
-        hitsUtils().search({ query: 'CL_ABAP*', maxResults: 10 }),
-      ),
-      'search CL_ABAP*',
-    ) as ISearchResult[];
+      testsLogger.info?.('✅ Search completed');
+      testsLogger.info?.(`🎯 Found ${hits.length} objects`);
+      // Assert the count FIRST. Asserting only inside the loop is how the old
+      // regex failed: on an empty result no assertion runs and the test passes,
+      // so a wrong namespace or a broken parser reads as success.
+      expect(hits.length).toBeGreaterThan(0);
+      for (const hit of hits) {
+        expect(hit.name).toBeTruthy();
+        expect(hit.type).toBeTruthy();
+      }
+    },
+    15000,
+  );
 
-    testsLogger.info?.('✅ Search completed');
-    testsLogger.info?.(`🎯 Found ${hits.length} objects`);
-    // Assert the count FIRST. Asserting only inside the loop is how the old
-    // regex failed: on an empty result no assertion runs and the test passes,
-    // so a wrong namespace or a broken parser reads as success.
-    expect(hits.length).toBeGreaterThan(0);
-    for (const hit of hits) {
-      expect(hit.name).toBeTruthy();
-      expect(hit.type).toBeTruthy();
-    }
-  }, 15000);
+  gateOn(() => true)(
+    'should search objects with object type filter',
+    async () => {
+      logTestStep('search objects with object type filter', testsLogger);
+      testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
 
-  it('should search objects with object type filter', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
+      const hits = expectResult(
+        await withAcceptHandling(
+          hitsUtils().search({
+            query: 'T*',
+            objectType: 'TABL',
+            maxResults: 10,
+          }),
+        ),
+        'search tables',
+      ) as ISearchResult[];
 
-    logTestStep('search objects with object type filter', testsLogger);
-    testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
+      testsLogger.info?.('✅ Search completed');
+      testsLogger.info?.(`🎯 Found ${hits.length} tables`);
+      // Assert the count FIRST. Asserting only inside the loop is how the old
+      // regex failed: on an empty result no assertion runs and the test passes,
+      // so a wrong namespace or a broken parser reads as success.
+      expect(hits.length).toBeGreaterThan(0);
+      for (const hit of hits) {
+        expect(hit.name).toBeTruthy();
+        expect(hit.type).toBeTruthy();
+      }
+    },
+    15000,
+  );
 
-    const hits = expectResult(
-      await withAcceptHandling(
-        hitsUtils().search({ query: 'T*', objectType: 'TABL', maxResults: 10 }),
-      ),
-      'search tables',
-    ) as ISearchResult[];
+  gateOn(() => true)(
+    'should use default maxResults if not provided',
+    async () => {
+      logTestStep('search objects with default maxResults', testsLogger);
+      const hits = expectResult(
+        await withAcceptHandling(hitsUtils().search({ query: 'CL_ABAP*' })),
+        'search without maxResults',
+      ) as ISearchResult[];
 
-    testsLogger.info?.('✅ Search completed');
-    testsLogger.info?.(`🎯 Found ${hits.length} tables`);
-    // Assert the count FIRST. Asserting only inside the loop is how the old
-    // regex failed: on an empty result no assertion runs and the test passes,
-    // so a wrong namespace or a broken parser reads as success.
-    expect(hits.length).toBeGreaterThan(0);
-    for (const hit of hits) {
-      expect(hit.name).toBeTruthy();
-      expect(hit.type).toBeTruthy();
-    }
-  }, 15000);
-
-  it('should use default maxResults if not provided', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
-
-    logTestStep('search objects with default maxResults', testsLogger);
-    const hits = expectResult(
-      await withAcceptHandling(hitsUtils().search({ query: 'CL_ABAP*' })),
-      'search without maxResults',
-    ) as ISearchResult[];
-
-    // No `maxResults` is still a search, and the answer is still the hits.
-    expect(Array.isArray(hits)).toBe(true);
-  }, 15000);
+      // No `maxResults` is still a search, and the answer is still the hits.
+      expect(Array.isArray(hits)).toBe(true);
+    },
+    15000,
+  );
 });

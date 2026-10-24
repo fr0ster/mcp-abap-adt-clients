@@ -22,6 +22,7 @@ import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
+import { gate } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -206,27 +207,9 @@ describe('Shared - fetchNodeStructure', () => {
   beforeEach(() => tester?.beforeEach()());
   afterEach(() => tester?.afterEach()());
 
-  it(
+  gate('node_structure', 'fetch_node_structure')(
     'should fetch node structure',
     async () => {
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          'NodeStructure - fetch',
-          'No SAP configuration',
-        );
-        return;
-      }
-
-      if (!tester) {
-        logTestSkip(
-          testsLogger,
-          'NodeStructure - fetch',
-          'Tester not initialized',
-        );
-        return;
-      }
-
       const testName = 'NodeStructure - fetch';
       const testCase = tester.getTestCase() || {
         name: 'fetch_node_structure',
@@ -234,22 +217,7 @@ describe('Shared - fetchNodeStructure', () => {
       };
       logTestStart(testsLogger, testName, testCase);
 
-      if (tester.shouldSkip()) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          tester.getSkipReason() || 'Test case not available',
-        );
-        logTestEnd(testsLogger, testName);
-        return;
-      }
-
-      const config = tester.getConfig();
-      if (!config) {
-        logTestSkip(testsLogger, testName, 'Config not available');
-        logTestEnd(testsLogger, testName);
-        return;
-      }
+      const config = await tester.requireConfig();
 
       try {
         const result = (await tester.readTest(config, {

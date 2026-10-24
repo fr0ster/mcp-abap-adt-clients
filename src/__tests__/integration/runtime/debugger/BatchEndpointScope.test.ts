@@ -24,6 +24,7 @@ import {
   buildDebuggerBatchPayload,
   executeBatchRequest,
 } from '../../../../runtime/debugger/abap';
+import { gateOn } from '../../../helpers/caseGate';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -37,7 +38,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -56,16 +56,14 @@ const testsLogger: ILogger = createTestsLogger();
 
 describe('Debugger Batch Endpoint Scope', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -75,7 +73,7 @@ describe('Debugger Batch Endpoint Scope', () => {
     }
   });
 
-  it(
+  gateOn(() => true)(
     'should test if debugger batch accepts non-debugger requests (discovery)',
     async () => {
       const testName = 'Batch scope - discovery via debugger batch';
@@ -83,11 +81,6 @@ describe('Debugger Batch Endpoint Scope', () => {
         name: 'batch_scope_discovery',
         params: {},
       });
-
-      if (!hasConfig || !connection) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
 
       try {
         // Build batch with a non-debugger request: GET /sap/bc/adt/discovery
@@ -171,7 +164,7 @@ describe('Debugger Batch Endpoint Scope', () => {
     getTimeout('test'),
   );
 
-  it(
+  gateOn(() => true)(
     'should test if debugger batch accepts mixed debugger + non-debugger requests',
     async () => {
       const testName = 'Batch scope - mixed requests';
@@ -179,11 +172,6 @@ describe('Debugger Batch Endpoint Scope', () => {
         name: 'batch_scope_mixed',
         params: {},
       });
-
-      if (!hasConfig || !connection) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
 
       try {
         // Inner request 1: non-debugger (class metadata read)

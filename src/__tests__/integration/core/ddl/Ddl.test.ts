@@ -20,6 +20,11 @@ import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -41,7 +46,6 @@ const {
   getTimeout,
   ensureSharedPackage,
   ensureSharedDependency,
-  getEnabledTestCase,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -196,16 +200,15 @@ describe('View (using AdtClient)', () => {
 
   afterAll(() => tester?.afterAll()());
 
-  it(
+  gate('read_ddl_table_function', 'readonly_read_table_function')(
     'reads an AMDP table function (DDL source) when configured',
     async () => {
-      if (!hasConfig || !client) return; // no connection/config → skip
-      const tfCase = getEnabledTestCase(
+      const tfCase = configuredCase(
         'read_ddl_table_function',
         'readonly_read_table_function',
       );
       const ddlName = tfCase?.params?.ddl_name;
-      if (!ddlName) return; // not configured / disabled → skip
+      if (!ddlName) throw new Error('ddl_name not configured');
 
       // A table function that is not on this system answers an empty body, and
       // the assertions below say what it must contain — so absence fails on the
@@ -256,38 +259,14 @@ describe('View (using AdtClient)', () => {
       await tester.afterEach()();
     });
 
-    it(
+    gate('create_view', 'adt_view')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          testsLogger.warn?.(
-            'Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)',
-          );
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          testsLogger.warn?.(
-            'Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)',
-          );
-          return;
-        }
-
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          const skipReason = tester.getSkipReason() || 'Config is null';
-          testsLogger.warn?.(`Skipping test: ${skipReason}`);
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         if (!testCase) {
-          await tester.flowTestAuto();
-          testsLogger.warn?.(
-            'Skipping test: Test case not found in test-config.yaml',
-          );
-          return;
+          throw new Error(missingCaseMessage('create_view', 'adt_view'));
         }
 
         const ddlSource = testCase?.params?.ddl_source || config.source || '';

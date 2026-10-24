@@ -21,6 +21,7 @@ import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
+import { gate } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -35,7 +36,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../helpers/testProgressLogger';
@@ -223,27 +223,9 @@ describe('Shared - getVirtualFoldersContents', () => {
   beforeEach(() => tester?.beforeEach()());
   afterEach(() => tester?.afterEach()());
 
-  it(
+  gate('virtual_folders_contents', 'fetch_virtual_folders_contents')(
     'should fetch virtual folder contents for a package',
     async () => {
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          'VirtualFoldersContents - fetch contents',
-          'No SAP configuration',
-        );
-        return;
-      }
-
-      if (!tester) {
-        logTestSkip(
-          testsLogger,
-          'VirtualFoldersContents - fetch contents',
-          'Tester not initialized',
-        );
-        return;
-      }
-
       const testName = 'VirtualFoldersContents - fetch contents';
       const testCase = tester.getTestCase() || {
         name: 'fetch_virtual_folders_contents',
@@ -251,22 +233,7 @@ describe('Shared - getVirtualFoldersContents', () => {
       };
       logTestStart(testsLogger, testName, testCase);
 
-      if (tester.shouldSkip()) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          tester.getSkipReason() || 'Test case not available',
-        );
-        logTestEnd(testsLogger, testName);
-        return;
-      }
-
-      const config = tester.getConfig();
-      if (!config) {
-        logTestSkip(testsLogger, testName, 'Config not available');
-        logTestEnd(testsLogger, testName);
-        return;
-      }
+      const config = await tester.requireConfig();
 
       try {
         // The document itself. A status check never saw the refusals ADT

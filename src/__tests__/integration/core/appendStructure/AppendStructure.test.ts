@@ -22,6 +22,13 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -45,7 +52,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -67,7 +73,6 @@ const SKIP_STATUSES = new Set([404, 405, 501]);
 describe('AppendStructure (TABL/DS) integration', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -84,11 +89,10 @@ describe('AppendStructure (TABL/DS) integration', () => {
         systemContext,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -102,16 +106,33 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
   for (const { label, baseKey } of cases) {
     describe(`Full workflow — ${label}`, () => {
-      it(
+      gateAll(
+        gate('create_append_structure', 'adt_append_structure'),
+        // The base is configured per variant; a variant without one has
+        // nothing to extend.
+        gateOn(
+          () =>
+            !!configuredCase('create_append_structure', 'adt_append_structure')
+              ?.params?.[baseKey],
+        ),
+      )(
         'create → read → update → activate → delete (skips only on 404/405/501)',
         async () => {
           const TEST_LABEL = `AppendStructure - full workflow (${label})`;
 
           // Resolve test-case params from test-config.yaml (key: create_append_structure)
-          const testCase = getEnabledTestCase(
+          const testCase = configuredCase(
             'create_append_structure',
             'adt_append_structure',
           );
+          if (!testCase) {
+            throw new Error(
+              missingCaseMessage(
+                'create_append_structure',
+                'adt_append_structure',
+              ),
+            );
+          }
 
           const resolver = new TestConfigResolver({
             testCase,
@@ -140,27 +161,16 @@ describe('AppendStructure (TABL/DS) integration', () => {
             },
           });
 
-          if (!hasConfig) {
-            logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
-            return;
-          }
-
           if (!packageName) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
+            throw new Error(
               'package_name not configured — set environment.default_package in test-config.yaml',
             );
-            return;
           }
 
           if (!baseObject) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
+            throw new Error(
               `${baseKey} not configured in test-config.yaml (create_append_structure.params.${baseKey})`,
             );
-            return;
           }
 
           const transportRequest: string | undefined = resolveTransportRequest(

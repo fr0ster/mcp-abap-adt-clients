@@ -19,6 +19,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -36,7 +37,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -214,22 +214,10 @@ describe('Package (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_package', 'adt_package')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           // **The update in its own ABAP session** (issue #176): the create
@@ -268,7 +256,7 @@ describe('Package (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('package')(
       'should read standard SAP package',
       async () => {
         const standardObject = resolveStandardObject(
@@ -279,16 +267,9 @@ describe('Package (using AdtClient)', () => {
         );
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Package - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Package - read standard object',
+          throw new Error(
             `Standard package not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardPackageName = standardObject.name;
@@ -296,15 +277,6 @@ describe('Package (using AdtClient)', () => {
           name: 'read_standard',
           params: { package_name: standardPackageName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Package - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

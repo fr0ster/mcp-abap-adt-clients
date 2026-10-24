@@ -20,6 +20,7 @@ import type { IStructureConfig } from '../../../../core/structure';
 import { getStructureSource } from '../../../../core/structure/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -36,7 +37,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -148,21 +148,10 @@ describe('Structure (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_structure', 'adt_structure')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const updatedDdlCode =
@@ -183,7 +172,7 @@ describe('Structure (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('structure')(
       'should read standard SAP structure',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -194,16 +183,9 @@ describe('Structure (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('structure');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Structure - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Structure - read standard object',
+          throw new Error(
             `Standard structure not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardStructureName = standardObject.name;
@@ -211,15 +193,6 @@ describe('Structure (using AdtClient)', () => {
           name: 'read_standard',
           params: { structure_name: standardStructureName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Structure - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

@@ -30,6 +30,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
+import { gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -37,7 +38,7 @@ import {
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const testsLogger: ILogger = createTestsLogger();
 
@@ -47,7 +48,6 @@ const NEVER_EXISTS = 'ZZ_NO_SUCH_OBJECT_ZZ';
 describe('Shared - the deletion check, per type', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
@@ -57,9 +57,8 @@ describe('Shared - the deletion check, per type', () => {
         testsLogger,
       );
       client = resolved;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   }, 120000);
 
@@ -128,62 +127,57 @@ describe('Shared - the deletion check, per type', () => {
   ];
 
   for (const { label, ask } of unmeasured) {
-    it(`answers for a ${label}, one way or the other`, async () => {
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          `deletion check — ${label}`,
-          'No SAP configuration',
+    gateOn(() => true)(
+      `answers for a ${label}, one way or the other`,
+      async () => {
+        logTestStep(`deletion check for a ${label}`, testsLogger);
+
+        const { ok, text } = await ask();
+
+        // Recorded rather than judged. What must not happen is the third thing:
+        // an empty success, which is how a refusal used to reach a caller.
+        testsLogger.info?.(
+          `📄 ${label}: ${ok ? 'result' : 'failure'} — ${text.slice(0, 200)}`,
         );
-        return;
-      }
-      logTestStep(`deletion check for a ${label}`, testsLogger);
-
-      const { ok, text } = await ask();
-
-      // Recorded rather than judged. What must not happen is the third thing:
-      // an empty success, which is how a refusal used to reach a caller.
-      testsLogger.info?.(
-        `📄 ${label}: ${ok ? 'result' : 'failure'} — ${text.slice(0, 200)}`,
-      );
-      expect(text.length).toBeGreaterThan(0);
-    }, 60000);
+        expect(text.length).toBeGreaterThan(0);
+      },
+      60000,
+    );
   }
 
-  it('a class answers the deletion document, and it is the deletion one', async () => {
-    if (!hasConfig) {
-      logTestSkip(
+  gateOn(() => true)(
+    'a class answers the deletion document, and it is the deletion one',
+    async () => {
+      logTestStep(
+        `deletion check for a class that does not exist`,
         testsLogger,
-        'deletion check — class',
-        'No SAP configuration',
-      );
-      return;
-    }
-    logTestStep(`deletion check for a class that does not exist`, testsLogger);
-
-    const answer = await client
-      .getClass()
-      .checkDeletion(
-        { className: NEVER_EXISTS },
-        { headers: integrationHeadersOf(client.getClass(), 'checkDeletion') },
       );
 
-    // A class is one of the twenty-six the service is known to resolve, so this
-    // is the control: whatever the three above do, this one has to answer, and
-    // it has to answer `del:`-namespaced content rather than `chkl:messages`.
-    // The two documents shared a strategy slot for one commit, and only a live
-    // answer proves they no longer do.
-    const text = answer.ok
-      ? String(answer.getResult().value)
-      : answer.getError().message;
-    testsLogger.info?.(`📄 class: ${text.slice(0, 200)}`);
+      const answer = await client
+        .getClass()
+        .checkDeletion(
+          { className: NEVER_EXISTS },
+          { headers: integrationHeadersOf(client.getClass(), 'checkDeletion') },
+        );
 
-    if (answer.ok) {
-      expect(text).toContain('del:');
-      expect(text).not.toContain('chkl:messages');
-    } else {
-      expect(answer.getError().message.length).toBeGreaterThan(0);
-      expect(['connection', 'refusal']).toContain(answer.getError().origin);
-    }
-  }, 60000);
+      // A class is one of the twenty-six the service is known to resolve, so this
+      // is the control: whatever the three above do, this one has to answer, and
+      // it has to answer `del:`-namespaced content rather than `chkl:messages`.
+      // The two documents shared a strategy slot for one commit, and only a live
+      // answer proves they no longer do.
+      const text = answer.ok
+        ? String(answer.getResult().value)
+        : answer.getError().message;
+      testsLogger.info?.(`📄 class: ${text.slice(0, 200)}`);
+
+      if (answer.ok) {
+        expect(text).toContain('del:');
+        expect(text).not.toContain('chkl:messages');
+      } else {
+        expect(answer.getError().message.length).toBeGreaterThan(0);
+        expect(['connection', 'refusal']).toContain(answer.getError().origin);
+      }
+    },
+    60000,
+  );
 });

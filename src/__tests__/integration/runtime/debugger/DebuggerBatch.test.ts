@@ -180,7 +180,6 @@ describe('Debugger batch wire measurements', () => {
   let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
@@ -189,14 +188,6 @@ describe('Debugger batch wire measurements', () => {
   /** Fails the step naming what it waited on, instead of running blind. */
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
-  }
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -303,8 +294,7 @@ describe('Debugger batch wire measurements', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
@@ -569,7 +559,6 @@ describe('Debugger batch wire measurements', () => {
     gate('debugger_batch', name)(
       `${name}: stepOver variable history`,
       async () => {
-        if (skipped()) return;
         const steps = measurementSteps(name);
         await startAtBreakpoint();
         const frame = await topFrame();
@@ -844,7 +833,6 @@ describe('Debugger batch wire measurements', () => {
     gate('debugger_batch', method)(
       `${method} + getStack (Eclipse envelope)`,
       async () => {
-        if (skipped()) return;
         await startAtBreakpoint();
         // stepReturn is measured inside add, so it has a caller to return to.
         if (method === 'stepReturn') {
@@ -861,7 +849,6 @@ describe('Debugger batch wire measurements', () => {
   gate('debugger_batch', 'step_stack_variables')(
     'step + stack + body-carrying getVariables',
     async () => {
-      if (skipped()) return;
       await startAtBreakpoint();
       const children = await debuggerApi.getChildVariables(['@LOCALS'], {
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
@@ -890,7 +877,6 @@ describe('Debugger batch wire measurements', () => {
   gate('debugger_batch', 'stack_children')(
     'getStack + getChildVariables without stepping',
     async () => {
-      if (skipped()) return;
       await startAtBreakpoint();
       await measure('stack-children', [
         stackRequest(),
@@ -906,7 +892,6 @@ describe('Debugger batch wire measurements', () => {
   gate('batch', 'debugger_client')(
     'recording client: step + stack + variables',
     async () => {
-      if (skipped()) return;
       await startAtBreakpoint();
       const children = await debuggerApi.getChildVariables(['@LOCALS'], {
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),

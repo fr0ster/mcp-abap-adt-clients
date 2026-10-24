@@ -49,6 +49,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { integrationHeadersOf } from './adtHeaders';
+import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
 import {
   expectLockReleased,
@@ -68,7 +69,6 @@ import {
   getHttpStatusText,
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestStepError,
@@ -223,16 +223,15 @@ export class BaseTester<TConfig, TState = unknown> {
   /**
    * A failure to put the system into the state the test needs.
    *
-   * Kept apart from `skipReason` because the two mean opposite things and were
-   * being reported the same way. `skipReason` says the test does not apply here
-   * — no SAP configured, `available_in` excludes this system, the case is
-   * disabled. Nothing ran and nothing should have.
-   *
-   * This says the test does apply and the run could not get far enough to try:
-   * a leftover object that would not delete, most often. Routed through
-   * `skipReason` it printed SKIP and jest counted it green, so a suite that
-   * tested nothing was indistinguishable from one that passed — measured on
-   * on premise (BASIS 816), where a package left behind by a failed delete made the next run
+   * Whether a case applies to the system is decided before the test body runs:
+   * the suite registers it through `gate`, which registers `it.skip` for a case
+   * that is disabled, unavailable here or has no SAP behind it. A body that
+   * runs therefore applies, and whatever stops it from getting far enough to
+   * try is this error: a case missing from the configuration, no default
+   * package, a leftover object that would not delete. Routed through a skip it
+   * printed SKIP and jest counted it green, so a suite that tested nothing was
+   * indistinguishable from one that passed — measured on on premise (BASIS
+   * 816), where a package left behind by a failed delete made the next run
    * report success having executed neither create nor update.
    */
   private setupError: string | null = null;
@@ -246,7 +245,6 @@ export class BaseTester<TConfig, TState = unknown> {
   // Test state
   private testCase: any = null;
   private config: TConfig | null = null;
-  private skipReason: string | null = null;
   private configResolver: TestConfigResolver | null = null;
 
   /**
@@ -1617,16 +1615,15 @@ export class BaseTester<TConfig, TState = unknown> {
    * Get test case definition from YAML
    */
   getTestCaseDefinition(): any {
-    const { getTestCaseDefinition } = require('./test-helper');
-    return getTestCaseDefinition(this.testCaseKey, this.testCaseName);
+    return configuredCase(this.testCaseKey, this.testCaseName);
   }
 
   /**
    * Get enabled test case from YAML
    */
   getEnabledTestCase(): any {
-    const { getEnabledTestCase } = require('./test-helper');
-    return getEnabledTestCase(this.testCaseKey, this.testCaseName);
+    const testCase = configuredCase(this.testCaseKey, this.testCaseName);
+    return testCase?.enabled === true ? testCase : null;
   }
 
   /**
@@ -1749,36 +1746,32 @@ export class BaseTester<TConfig, TState = unknown> {
    */
   beforeEach(): () => Promise<void> {
     return async () => {
-      this.skipReason = null;
       this.setupError = null;
       this.testCase = null;
       this.config = null;
       this.configResolver = null;
 
+      // The gate registered this case, so each of these is a defect in the
+      // setup, never a case that does not apply.
       if (!this.hasConfig) {
-        this.skipReason = 'No SAP configuration';
-        this.log(LogLevel.WARN, 'beforeEach: Skipping - No SAP configuration');
+        this.setupError = 'No SAP configuration';
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
         return;
       }
 
-      const definition = this.getTestCaseDefinition();
-      if (!definition) {
-        this.skipReason = 'Test case not defined in test-config.yaml';
-        this.log(LogLevel.WARN, 'beforeEach: Skipping - Test case not defined');
-        return;
-      }
-
-      const {
-        getEnabledTestCase,
-        ensurePackageConfig,
-      } = require('./test-helper');
-      const tc = getEnabledTestCase(this.testCaseKey, this.testCaseName);
+      const { ensurePackageConfig } = require('./test-helper');
+      const tc = configuredCase(this.testCaseKey, this.testCaseName);
       if (!tc) {
-        this.skipReason = 'Test case disabled or not found';
-        this.log(
-          LogLevel.WARN,
-          'beforeEach: Skipping - Test case disabled or not found',
+        this.setupError = missingCaseMessage(
+          this.testCaseKey,
+          this.testCaseName,
         );
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
+        return;
+      }
+      if (tc.enabled !== true) {
+        this.setupError = `case ${this.testCaseKey}/${this.testCaseName} is not enabled; register the test through gate`;
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
         return;
       }
 
@@ -1787,9 +1780,9 @@ export class BaseTester<TConfig, TState = unknown> {
         `${this.loggerPrefix} - ${this.testDescription}`,
       );
       if (!packageCheck.success) {
-        this.skipReason =
+        this.setupError =
           packageCheck.reason || 'Default package is not configured';
-        this.log(LogLevel.WARN, `beforeEach: Skipping - ${this.skipReason}`);
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
         return;
       }
 
@@ -1803,34 +1796,13 @@ export class BaseTester<TConfig, TState = unknown> {
         logger: this.logger,
       });
 
-      // Check if test is available for current environment
-      if (!this.configResolver.isAvailableForEnvironment()) {
-        const envName = this.isCloudSystem
-          ? 'cloud'
-          : this.isLegacySystem
-            ? 'legacy'
-            : 'on-premise';
-        // `available_in` decides; `skip_reason` explains. A generic sentence
-        // sends the next reader to the flag and no further, which is how
-        // "not available on cloud" survived next to an endpoint that answers
-        // 200 — the flag was right and the reason was never written down.
-        this.skipReason =
-          typeof tc?.skip_reason === 'string' && tc.skip_reason.length > 0
-            ? tc.skip_reason
-            : `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
-        this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
-        this.testCase = null;
-        this.configResolver = null;
-        return;
-      }
-
       // Build config - pass resolver so buildConfig can use resolved parameters
       if (this.buildConfigFn) {
         try {
           this.config = this.buildConfigFn(tc, this.configResolver);
         } catch (error: any) {
-          this.skipReason = `Failed to build config: ${error.message}`;
-          this.log(LogLevel.ERROR, `beforeEach: ${this.skipReason}`);
+          this.setupError = `Failed to build config: ${error.message}`;
+          this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
           this.testCase = null;
           this.configResolver = null;
           return;
@@ -1926,23 +1898,9 @@ export class BaseTester<TConfig, TState = unknown> {
   }
 
   /**
-   * Get skip reason (if test should be skipped)
-   */
-  getSkipReason(): string | null {
-    return this.skipReason;
-  }
-
-  /**
-   * Check if test should be skipped
-   */
-  shouldSkip(): boolean {
-    return this.skipReason !== null || !this.testCase || !this.config;
-  }
-
-  /**
    * Flow test with automatic config loading
    * Uses config from beforeEach
-   * Returns undefined if test should be skipped
+   * Throws when the setup failed or beforeEach() was not called
    */
   /**
    * The flow for an object that is never created and never deleted.
@@ -2108,26 +2066,14 @@ export class BaseTester<TConfig, TState = unknown> {
 
     await this.raiseIfSetupFailed(testName, definition);
 
-    if (this.shouldSkip()) {
-      logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
-        this.skipReason || 'Test case not available',
-      );
-      logTestEnd(this.logger, testName);
-      return undefined;
-    }
-
     if (!this.config) {
       logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
+      const error = new Error(
         'Config not available - ensure beforeEach() was called',
       );
+      logTestError(this.logger, testName, error);
       logTestEnd(this.logger, testName);
-      return undefined;
+      throw error;
     }
 
     logTestStart(this.logger, testName, definition);
@@ -2169,8 +2115,9 @@ export class BaseTester<TConfig, TState = unknown> {
   /**
    * A setup that failed is a red test, not a skipped one.
    *
-   * Called before `shouldSkip()` in both auto entry points so it cannot be
-   * mistaken for "does not apply here".
+   * Called first in every auto entry point, so a setup that failed cannot be
+   * mistaken for "does not apply here": that is the gate's decision, made
+   * before the test starts.
    */
   // biome-ignore lint/suspicious/noExplicitAny: logTestStart's own parameter
   private async raiseIfSetupFailed(
@@ -2213,6 +2160,26 @@ export class BaseTester<TConfig, TState = unknown> {
     throw error;
   }
 
+  /**
+   * The config `beforeEach()` resolved, for a test that drives the tester's
+   * parts itself instead of `flowTestAuto`.
+   *
+   * The gate registered the test, so a setup that failed or a `beforeEach()`
+   * that was not called is a red test with its reason, never a quiet return.
+   */
+  async requireConfig(): Promise<TConfig> {
+    const testName = `${this.loggerPrefix} - ${this.testDescription}`;
+    const definition = this.getTestCaseDefinition() || {
+      name: this.testCaseKey,
+      params: {},
+    };
+    await this.raiseIfSetupFailed(testName, definition);
+    if (!this.config) {
+      throw new Error('Config not available - ensure beforeEach() was called');
+    }
+    return this.config;
+  }
+
   async flowTestAuto(options?: IFlowTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - ${this.testDescription}`;
     const definition = this.getTestCaseDefinition() || {
@@ -2222,30 +2189,14 @@ export class BaseTester<TConfig, TState = unknown> {
 
     await this.raiseIfSetupFailed(testName, definition);
 
-    if (this.shouldSkip()) {
-      logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
-        this.skipReason || 'Test case not available',
-      );
-      // Cleanup pre-existing object if ensureObjectReady flagged it
-      if (this.objectCreated && this.config) {
-        await this.cleanupExistingObject(this.config);
-      }
-      logTestEnd(this.logger, testName);
-      return undefined;
-    }
-
     if (!this.config) {
       logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
+      const error = new Error(
         'Config not available - ensure beforeEach() was called',
       );
+      logTestError(this.logger, testName, error);
       logTestEnd(this.logger, testName);
-      return undefined;
+      throw error;
     }
 
     logTestStart(this.logger, testName, definition);
@@ -2277,28 +2228,16 @@ export class BaseTester<TConfig, TState = unknown> {
       params: {},
     };
 
-    if (this.shouldSkip()) {
-      logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
-        this.skipReason || 'Test case not available',
-      );
-      logTestEnd(this.logger, testName);
-      throw new Error(
-        `Test skipped: ${this.skipReason || 'Test case not available'}`,
-      );
-    }
+    await this.raiseIfSetupFailed(testName, definition);
 
     if (!this.config) {
       logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
+      const error = new Error(
         'Config not available - ensure beforeEach() was called',
       );
+      logTestError(this.logger, testName, error);
       logTestEnd(this.logger, testName);
-      throw new Error('Config not available - ensure beforeEach() was called');
+      throw error;
     }
 
     logTestStart(this.logger, testName, definition);

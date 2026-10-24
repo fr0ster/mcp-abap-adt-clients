@@ -27,6 +27,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -76,18 +77,6 @@ describe('Class local includes (using BaseTester)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-
-  function logSkip(
-    testName: string,
-    definitionKey: string,
-    definitionName: string,
-    reason: string,
-  ): void {
-    const definition = getTestCaseDefinition(definitionKey, definitionName);
-    logTestStart(testsLogger, testName, definition);
-    logTestSkip(testsLogger, testName, reason);
-    logTestEnd(testsLogger, testName);
-  }
 
   async function ensureParentClassExists(
     config: ParentClassConfig,
@@ -332,25 +321,10 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_definitions', 'local_definitions')(
       'should execute full workflow for definitions include',
       async () => {
-        const testName = 'Class - LocalDefinitions - full workflow';
-        if (!hasConfig || !definitionsTester) {
-          logSkip(
-            testName,
-            'update_class_local_definitions',
-            'local_definitions',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (definitionsTester.shouldSkip()) {
-          await definitionsTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = definitionsTester.getConfig();
+        const config = await definitionsTester.requireConfig();
         const tc = definitionsTester.getTestCase();
         const params = tc?.params || {};
         const updateCode =
@@ -412,25 +386,10 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_types', 'local_types')(
       'should execute full workflow for implementations include (local helper class)',
       async () => {
-        const testName = 'Class - LocalTypes - full workflow';
-        if (!hasConfig || !localTypesTester) {
-          logSkip(
-            testName,
-            'update_class_local_types',
-            'local_types',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (localTypesTester.shouldSkip()) {
-          await localTypesTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = localTypesTester.getConfig();
+        const config = await localTypesTester.requireConfig();
         const tc = localTypesTester.getTestCase();
         const params = tc?.params || {};
         const updateCode =
@@ -492,25 +451,10 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_testclass', 'local_testclass')(
       'should execute full workflow for testclasses include (local ABAP Unit tests)',
       async () => {
-        const testName = 'Class - LocalTestClass - full workflow';
-        if (!hasConfig || !localTestClassTester) {
-          logSkip(
-            testName,
-            'update_class_local_testclass',
-            'local_testclass',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (localTestClassTester.shouldSkip()) {
-          await localTestClassTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = localTestClassTester.getConfig();
+        const config = await localTestClassTester.requireConfig();
         const tc = localTestClassTester.getTestCase();
         const params = tc?.params || {};
         const updateCode =
@@ -572,12 +516,12 @@ describe('Class local includes (using BaseTester)', () => {
       }
     });
 
-    it(
+    gate('update_class_local_macros', 'local_macros')(
       'should execute full workflow for macros include (on-premise only)',
       async () => {
         // No environment branch here. `available_in` decides and
         // `skip_reason` explains, both in test-config.yaml, and
-        // `localMacrosTester.shouldSkip()` below is what reads them. This case
+        // the registration gate is what reads them. This case
         // used to carry its own `if (isCloudSystem)` saying "Macros are not
         // supported in cloud systems" — a second source of truth, and a wrong
         // one: a cloud class has a writable macros include, ADT 3.60.3 against
@@ -586,25 +530,7 @@ describe('Class local includes (using BaseTester)', () => {
         // source contains, and that sentence now lives in the config.
 
         const testName = 'Class - LocalMacros - full workflow';
-        if (!hasConfig || !localMacrosTester) {
-          logSkip(
-            testName,
-            'update_class_local_macros',
-            'local_macros',
-            'No SAP configuration',
-          );
-          return;
-        }
-        if (localMacrosTester.shouldSkip()) {
-          await localMacrosTester.modifyFlowTestAuto();
-          return;
-        }
-
-        const config = localMacrosTester.getConfig();
-        if (!config) {
-          await localMacrosTester.modifyFlowTestAuto();
-          return;
-        }
+        const config = await localMacrosTester.requireConfig();
 
         // Some on-premise systems may still not expose the macros include; skip if absent.
         const existing = await client

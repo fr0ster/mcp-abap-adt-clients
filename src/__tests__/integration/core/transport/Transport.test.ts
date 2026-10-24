@@ -27,6 +27,12 @@ import {
 } from '../../../../utils/systemInfo';
 import { patchXmlElement } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -77,7 +83,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('AdtRequest', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
 
   beforeAll(async () => {
@@ -92,11 +97,10 @@ describe('AdtRequest', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -161,50 +165,23 @@ describe('AdtRequest', () => {
 
   describe('Full workflow', () => {
     let testCase: any = null;
-    let skipReason: string | null = null;
 
     beforeAll(async () => {
-      skipReason = null;
-      testCase = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      const definition = getTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_transport', 'builder_transport');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      testCase = tc;
+      // The gate registered the test, so the case is configured, enabled and
+      // available here; a case that is not there is a defect, not a skip.
+      testCase = configuredCase('create_transport', 'builder_transport');
     });
 
-    it(
+    gate('create_transport', 'builder_transport')(
       'should execute full workflow: create and read transport',
       async () => {
         const definition = getTestDefinition();
         logTestStart(testsLogger, 'AdtRequest - full workflow', definition);
 
-        if (skipReason) {
-          logTestSkip(testsLogger, 'AdtRequest - full workflow', skipReason);
-          return;
-        }
-
         if (!testCase) {
-          logTestSkip(
-            testsLogger,
-            'AdtRequest - full workflow',
-            skipReason || 'Test case not available',
+          throw new Error(
+            missingCaseMessage('create_transport', 'builder_transport'),
           );
-          return;
         }
 
         let transportNumber: string | null = null;
@@ -316,14 +293,6 @@ describe('AdtRequest', () => {
    * touches belongs to anyone else.
    */
   describe('Object list and tasks', () => {
-    let skipReason: string | null = null;
-
-    beforeAll(() => {
-      skipReason = hasConfig ? null : 'No SAP configuration';
-      if (!getEnabledTestCase('create_transport', 'builder_transport'))
-        skipReason = 'Test case disabled or not found';
-    });
-
     /**
      * The entries `readObjects` lists on one request or task.
      *
@@ -411,7 +380,7 @@ describe('AdtRequest', () => {
       return undefined;
     };
 
-    it(
+    gate('create_transport', 'builder_transport')(
       'creates a task, frees an object name, and proves the entry is gone',
       async () => {
         const label = 'AdtRequest - object list and tasks';
@@ -420,12 +389,7 @@ describe('AdtRequest', () => {
           params: {},
         });
 
-        if (skipReason) {
-          logTestSkip(testsLogger, label, skipReason);
-          return;
-        }
-
-        const testCase = getEnabledTestCase(
+        const testCase = configuredCase(
           'create_transport',
           'builder_transport',
         );
@@ -812,22 +776,13 @@ describe('AdtRequest', () => {
   });
 
   describe('List transports', () => {
-    it(
+    gateOn(() => true)(
       'should list transport requests through a saved search configuration',
       async () => {
         logTestStart(testsLogger, 'AdtRequest - list transports', {
           name: 'list_transports',
           params: {},
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'AdtRequest - list transports',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           // A body that merely "exists" is not a detector: the historical

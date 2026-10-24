@@ -20,6 +20,11 @@ import type { IServiceDefinitionConfig } from '../../../../core/serviceDefinitio
 import { getServiceDefinition } from '../../../../core/serviceDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -42,7 +47,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -153,21 +157,10 @@ describe('ServiceDefinition (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_service_definition', 'adt_service_definition')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
@@ -190,53 +183,20 @@ describe('ServiceDefinition (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gate('read_service_definition', 'read_standard_service_definition')(
       'should read standard SAP service definition',
       async () => {
-        const {
-          getTestCaseDefinition,
-        } = require('../../../helpers/test-helper');
-        const testCase = getTestCaseDefinition(
-          'read_service_definition',
-          'read_standard_service_definition',
-        );
-
-        if (!testCase) {
-          logTestStart(
-            testsLogger,
-            'ServiceDefinition - read standard object',
-            {
-              name: 'read_standard',
-              params: {},
-            },
-          );
-          logTestSkip(
-            testsLogger,
-            'ServiceDefinition - read standard object',
-            'Test case not defined in test-config.yaml',
-          );
-          return;
-        }
-
-        const enabledTestCase = getEnabledTestCase(
+        const enabledTestCase = configuredCase(
           'read_service_definition',
           'read_standard_service_definition',
         );
         if (!enabledTestCase) {
-          logTestStart(
-            testsLogger,
-            'ServiceDefinition - read standard object',
-            {
-              name: 'read_standard',
-              params: {},
-            },
+          throw new Error(
+            missingCaseMessage(
+              'read_service_definition',
+              'read_standard_service_definition',
+            ),
           );
-          logTestSkip(
-            testsLogger,
-            'ServiceDefinition - read standard object',
-            'Test case disabled or not found',
-          );
-          return;
         }
 
         // Get service definition name from test case params
@@ -257,20 +217,9 @@ describe('ServiceDefinition (using AdtClient)', () => {
           const standardObject =
             resolver.getStandardObject('serviceDefinition');
           if (!standardObject) {
-            logTestStart(
-              testsLogger,
-              'ServiceDefinition - read standard object',
-              {
-                name: 'read_standard',
-                params: {},
-              },
-            );
-            logTestSkip(
-              testsLogger,
-              'ServiceDefinition - read standard object',
+            throw new Error(
               `Standard service definition not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
             );
-            return;
           }
           serviceDefinitionName = standardObject.name;
         }
@@ -279,15 +228,6 @@ describe('ServiceDefinition (using AdtClient)', () => {
           name: 'read_standard',
           params: { service_definition_name: serviceDefinitionName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'ServiceDefinition - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

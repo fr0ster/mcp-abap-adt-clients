@@ -43,6 +43,11 @@ import {
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
 import {
   ensureDebugTarget,
@@ -60,8 +65,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -71,7 +74,9 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase('runtime_debugger', 'adt_abap_debugger');
+const testCase = configuredCase('runtime_debugger', 'adt_abap_debugger');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_abap_debugger');
 const CLASS_NAME: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_PROBE'
 ).toUpperCase();
@@ -210,7 +215,6 @@ describe('ABAP debugger (AbapDebugger)', () => {
   let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
@@ -220,14 +224,6 @@ describe('ABAP debugger (AbapDebugger)', () => {
   /** Fails the step naming what it waited on, instead of running blind. */
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
-  }
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -310,8 +306,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_abap_debugger is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_abap_debugger'),
+      );
     }
     try {
       listenerConnection = await createTestConnection(connectionLogger, {
@@ -322,8 +319,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
@@ -386,10 +382,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- breakpoints -----------------------------------------------------------------
 
-  it(
+  debuggerCase(
     'validates all four kinds of breakpoint without arming them',
     async () => {
-      if (skipped()) return;
       const all: IDebuggerBreakpoint[] = [
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
         { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
@@ -416,10 +411,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'arms a line and an exception breakpoint; the line comes back in its include',
     async () => {
-      if (skipped()) return;
       const answer = await listenerApi.setBreakpoints(
         identity,
         [
@@ -445,10 +439,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- run 1: from the first breakpoint to the end ---------------------------------
 
-  it(
+  debuggerCase(
     'catches the run on the first breakpoint and attaches',
     async () => {
-      if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
       const { debuggeeId, server } = await catchRun(asClass, {
         className: CLASS_NAME,
@@ -471,10 +464,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'reads the stack: the probe on top, at the loop line',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const top = await topFrame();
       expect(top.program.startsWith(CLASS_NAME)).toBe(true);
@@ -484,10 +476,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'expands the variable scopes and reads the locals',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const root = await debuggerApi.getChildVariables(['@ROOT'], {
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
@@ -508,10 +499,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'reads one variable by its id',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const answer = await debuggerApi.getVariables(['LV_TOTAL'], {
         headers: integrationHeadersOf(debuggerApi, 'getVariables'),
@@ -522,10 +512,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'steps into the called method and sees its parameters',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       expect((await debuggerApi.step('stepInto')).ok).toBe(true);
       const top = await topFrame();
@@ -544,10 +533,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'moves the read cursor to the caller frame without moving the program',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const stack = frames(documentOf(await debuggerApi.getStack()));
       const caller = stack.find((f) => f.event === 'IF_OO_ADT_CLASSRUN~MAIN');
@@ -572,10 +560,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'returns from the method to the caller',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       expect((await debuggerApi.step('stepReturn')).ok).toBe(true);
       const top = await topFrame();
@@ -593,10 +580,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'creates and lists a watchpoint, and continues to the next breakpoint',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const created = await debuggerApi.createWatchpoint('LV_TOTAL');
       expect(created.ok).toBe(true);
@@ -619,10 +605,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops on the watchpoint when the watched variable changes, then removes it',
     async () => {
-      if (skipped()) return;
       needs(watchpointId, 'a watchpoint');
       const step = await debuggerApi.step('stepContinue');
       expect(step.ok).toBe(true);
@@ -646,10 +631,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'writes a variable at the stop and reads the new value back',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const written = await debuggerApi.setVariableValue('LV_TOTAL', '100');
       expect(written.ok).toBe(true);
@@ -666,10 +650,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'runs to a chosen line',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       // The loop breakpoint is in the way on the last iteration; out of it first.
       const ran = await debuggerApi.stepToLine(
@@ -694,10 +677,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'steps over a statement',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const before = (await topFrame()).line;
       expect((await debuggerApi.step('stepOver')).ok).toBe(true);
@@ -706,10 +688,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'stops on the exception breakpoint, reported at the CATCH line',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       const step = await debuggerApi.step('stepContinue');
       expect(step.ok).toBe(true);
@@ -723,10 +704,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'continues to the end: the step answers debuggeeEnded and the run returns',
     async () => {
-      if (skipped()) return;
       needs(attached, 'an attached debuggee');
       // The CATCH line breakpoint, then the end.
       const toCatch = await debuggerApi.step('stepContinue');
@@ -753,10 +733,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- run 2: terminated where it stands -------------------------------------------
 
-  it(
+  debuggerCase(
     'jumps a debuggee to a line, terminates it where it stands, and the run returns',
     async () => {
-      if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
       const { debuggeeId, server } = await catchRun(asClass, {
         className: CLASS_NAME,
@@ -806,10 +785,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'deletes the armed breakpoints and the listener',
     async () => {
-      if (skipped()) return;
       for (const id of armed.splice(0)) {
         expect((await listenerApi.deleteBreakpoint(identity, id)).ok).toBe(
           true,
@@ -822,10 +800,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
   // --- conflict: two listeners for one user -----------------------------------------
 
-  it(
+  debuggerCase(
     'a refusing listener is answered 409 while another one listens for the user',
     async () => {
-      if (skipped()) return;
       const holderConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -865,10 +842,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'a taking-over listener is accepted while another one listens for the user',
     async () => {
-      if (skipped()) return;
       const holderConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -920,10 +896,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'a refusing listener sees a conflict with one registered without the conflict parameters',
     async () => {
-      if (skipped()) return;
       const holderConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
@@ -966,10 +941,9 @@ describe('ABAP debugger (AbapDebugger)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'two listeners of one IDE — the same IDE id — do not conflict',
     async () => {
-      if (skipped()) return;
       const otherConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });

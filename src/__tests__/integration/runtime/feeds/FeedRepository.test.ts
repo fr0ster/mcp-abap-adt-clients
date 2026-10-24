@@ -26,8 +26,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -49,7 +53,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -75,23 +78,19 @@ const testsLogger: ILogger = createTestsLogger();
 
 describe('FeedRepository (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let runtime: AdtRuntimeClient;
   // Built here rather than taken from `feeds`: the repository
   // answers each feed as its document by default, and these cases assert the
   // entries, so they construct it with the Atom readings.
   let feeds: FeedRepository<typeof feedReading>;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      runtime = new AdtRuntimeClient(connection, libraryLogger);
       feeds = new FeedRepository(connection, libraryLogger, feedReading);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -101,11 +100,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should list available feeds from feed catalog',
     async () => {
       const testName = 'FeedRepository - list';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -113,17 +112,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
@@ -152,11 +141,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should list feed variants',
     async () => {
       const testName = 'FeedRepository - variants';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -164,17 +153,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
@@ -214,11 +193,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should get dumps via feed',
     async () => {
       const testName = 'FeedRepository - dumps';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -226,17 +205,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {
@@ -265,11 +234,11 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_feeds', 'adt_feeds')(
     'should fetch arbitrary feed by URL',
     async () => {
       const testName = 'FeedRepository - byUrl';
-      const testCase = getEnabledTestCase('runtime_feeds', 'adt_feeds');
+      const testCase = configuredCase('runtime_feeds', 'adt_feeds');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_feeds',
@@ -277,17 +246,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_feeds/adt_feeds not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
+        throw new Error(missingCaseMessage('runtime_feeds', 'adt_feeds'));
       }
 
       try {

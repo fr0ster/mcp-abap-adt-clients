@@ -43,6 +43,12 @@ import {
 } from '../../../../runtime/debugger/AbapDebugger';
 import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
 import {
   ensureDebugTarget,
@@ -59,8 +65,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -70,8 +74,15 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase('runtime_debugger', 'adt_memory_debugger');
-const readCase = getEnabledTestCase('runtime_debugger', 'adt_memory_snapshots');
+const testCase = configuredCase('runtime_debugger', 'adt_memory_debugger');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_memory_debugger');
+const readCase = configuredCase('runtime_debugger', 'adt_memory_snapshots');
+// The read-back needs its own case as well.
+const snapshotsCase = gateAll(
+  debuggerCase,
+  gate('runtime_debugger', 'adt_memory_snapshots'),
+);
 const CLASS_NAME: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_MEM'
 ).toUpperCase();
@@ -145,7 +156,6 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
   let listenerApi: AbapDebugger;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
@@ -158,18 +168,11 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     if (!condition) throw new Error(`not reached: ${what}`);
   }
 
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
-  }
-
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_memory_debugger is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_memory_debugger'),
+      );
     }
     try {
       listenerConnection = await createTestConnection(connectionLogger, {
@@ -180,8 +183,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     const user = await abapUserOf(listenerConnection);
     const id = (part: string): string =>
@@ -256,10 +258,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     steps.finish();
   }, STEP_TIMEOUT);
 
-  it(
+  debuggerCase(
     'stops before the table is filled',
     async () => {
-      if (skipped()) return;
       const set = await listenerApi.setBreakpoints(
         identity,
         [
@@ -326,19 +327,17 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     logTestStep(`${stop}: snapshot ${file}`, testsLogger);
   }
 
-  it(
+  debuggerCase(
     'reads the memory sizes and writes a snapshot before',
     async () => {
-      if (skipped()) return;
       await atStop('before');
     },
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'after the table is filled, the sizes have grown and a second snapshot is written',
     async () => {
-      if (skipped()) return;
       needs(stops.before, 'the first stop');
       const moved = await debuggerApi.step('stepContinue');
       expect(moved.ok).toBe(true);
@@ -353,10 +352,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'the program runs to its end',
     async () => {
-      if (skipped()) return;
       needs(run, 'the run');
       // Continuing to the end is answered 500 debuggeeEnded; analyseDebuggeeEnd
       // reads it as the step having worked (ERRATA.md).
@@ -376,16 +374,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
 
   // --- read back ------------------------------------------------------------------
 
-  it(
+  snapshotsCase(
     'both snapshots reach the list',
     async () => {
-      if (skipped()) return;
-      if (!readCase) {
-        testsLogger.info?.(
-          'skipped: runtime_debugger.adt_memory_snapshots is not enabled here',
-        );
-        return;
-      }
       needs(stops.after, 'both snapshots written');
       const snapshots = new MemorySnapshots(
         triggerConnection as Connection,
@@ -411,10 +402,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     LIST_WAIT_SECONDS * 1000 + STEP_TIMEOUT,
   );
 
-  it(
+  snapshotsCase(
     'reads a snapshot, its overview, ranking list and references, and the delta',
     async () => {
-      if (skipped() || !readCase) return;
       needs(ids.before && ids.after, 'both snapshots listed');
       const snapshots = new MemorySnapshots(
         triggerConnection as Connection,

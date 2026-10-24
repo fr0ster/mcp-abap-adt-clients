@@ -21,6 +21,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -38,7 +39,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -214,21 +214,10 @@ describe('FunctionGroup (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_function_group', 'adt_function_group')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           updateTakesDocument: (current) =>
@@ -250,7 +239,7 @@ describe('FunctionGroup (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('function_group')(
       'should read standard SAP function group',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -261,16 +250,9 @@ describe('FunctionGroup (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('function_group');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'FunctionGroup - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            libraryLogger,
-            'FunctionGroup - read standard object',
+          throw new Error(
             `Standard function group not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardFunctionGroupName = standardObject.name;
@@ -278,15 +260,6 @@ describe('FunctionGroup (using AdtClient)', () => {
           name: 'read_standard',
           params: { function_group_name: standardFunctionGroupName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'FunctionGroup - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

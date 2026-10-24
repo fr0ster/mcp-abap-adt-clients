@@ -16,6 +16,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { configuredCase, gate, gateAll, gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -37,7 +38,6 @@ if (fs.existsSync(envPath)) {
 }
 
 const {
-  getEnabledTestCase,
   resolveStandardObject,
   withAcceptHandling,
   getAcceptHint,
@@ -112,16 +112,55 @@ async function runReadMetadataWithAcceptLogging<T>(
   }
 }
 
+/** What a test needs of the system and of the `read_accept` case. */
+type Need = (system: { isCloud: boolean }, testCase: any) => boolean;
+
+/** A standard object of this type for the system, by name. */
+const standard =
+  (objectType: string): Need =>
+  ({ isCloud }, testCase) =>
+    !!resolveStandardObject(objectType, isCloud, testCase)?.name;
+
+/** A parameter of the case, under the first of these keys that is set. */
+const param =
+  (...keys: string[]): Need =>
+  (_system, testCase) =>
+    keys.some((key) => !!testCase?.params?.[key]);
+
+const noCloud: Need = ({ isCloud }) => !isCloud;
+
+/** The module and its group, from the case or from the standard object. */
+const functionModuleConfigured: Need = ({ isCloud }, testCase) => {
+  const functionModule = resolveStandardObject(
+    'functionModule',
+    isCloud,
+    testCase,
+  );
+  return (
+    !!(testCase?.params?.function_module_name || functionModule?.name) &&
+    !!(testCase?.params?.function_group_name || functionModule?.group)
+  );
+};
+
+/** Applies where `read_accept` is on and every need is met. */
+function acceptCase(...needs: Need[]): jest.It {
+  return gateAll(
+    gate('read_accept', 'read_accept'),
+    gateOn((system) => {
+      const testCase = configuredCase('read_accept', 'read_accept');
+      return needs.every((need) => need(system, testCase));
+    }),
+  );
+}
+
 describe('Shared - read Accept headers', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
   let standardClassName: string | null = null;
   let standardInterfaceName: string | null = null;
   let testCase: any | null = null;
-  let hasTestCase = false;
 
   beforeAll(async () => {
     try {
@@ -135,10 +174,8 @@ describe('Shared - read Accept headers', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
 
-      testCase = getEnabledTestCase('read_accept', 'read_accept');
-      hasTestCase = !!testCase;
+      testCase = configuredCase('read_accept', 'read_accept');
 
       standardClassName =
         resolveStandardObject('class', isCloudSystem, testCase)?.name || null;
@@ -148,7 +185,7 @@ describe('Shared - read Accept headers', () => {
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -180,11 +217,9 @@ describe('Shared - read Accept headers', () => {
    * and costs more than it is worth, because TypeScript stops narrowing the
    * `string | null` names once the test lives behind a function call.
    */
-  const skipReason = (
+  const missingConfiguration = (
     requirements: Record<string, string | null | undefined>,
   ): string => {
-    if (!hasConfig) return 'no SAP configuration';
-    if (!hasTestCase) return 'read_accept not configured in test-config.yaml';
     const missing = Object.keys(requirements).filter(
       (name) => !requirements[name],
     );
@@ -193,12 +228,11 @@ describe('Shared - read Accept headers', () => {
       : 'unknown reason';
   };
 
-  it('should read class source', async () => {
-    if (!hasConfig || !hasTestCase || !standardClassName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
+  acceptCase(standard('class'))('should read class source', async () => {
+    if (!standardClassName) {
+      throw new Error(
+        missingConfiguration({ 'standard class': standardClassName }),
       );
-      return;
     }
 
     logTestStep('read class source', testsLogger);
@@ -215,42 +249,43 @@ describe('Shared - read Accept headers', () => {
     assertMetadataResult(metadataState, 'class metadata', standardClassName);
   });
 
-  it('should read local definitions include', async () => {
-    if (!hasConfig || !hasTestCase || !standardClassName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
+  acceptCase(standard('class'))(
+    'should read local definitions include',
+    async () => {
+      if (!standardClassName) {
+        throw new Error(
+          missingConfiguration({ 'standard class': standardClassName }),
+        );
+      }
+
+      logTestStep('read local definitions', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read local definitions',
+        client
+          .getLocalDefinitions()
+          .read({ className: standardClassName }, 'active'),
       );
-      return;
-    }
+      assertReadResult(state, 'local definitions', standardClassName);
 
-    logTestStep('read local definitions', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read local definitions',
-      client
-        .getLocalDefinitions()
-        .read({ className: standardClassName }, 'active'),
-    );
-    assertReadResult(state, 'local definitions', standardClassName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read local definitions metadata',
-      client
-        .getLocalDefinitions()
-        .readMetadata({ className: standardClassName }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'local definitions metadata',
-      standardClassName,
-    );
-  });
-
-  it('should read local types include', async () => {
-    if (!hasConfig || !hasTestCase || !standardClassName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read local definitions metadata',
+        client
+          .getLocalDefinitions()
+          .readMetadata({ className: standardClassName }),
       );
-      return;
+      assertMetadataResult(
+        metadataState,
+        'local definitions metadata',
+        standardClassName,
+      );
+    },
+  );
+
+  acceptCase(standard('class'))('should read local types include', async () => {
+    if (!standardClassName) {
+      throw new Error(
+        missingConfiguration({ 'standard class': standardClassName }),
+      );
     }
 
     logTestStep('read local types', testsLogger);
@@ -271,116 +306,113 @@ describe('Shared - read Accept headers', () => {
     );
   });
 
-  it('should read local test classes include', async () => {
-    if (!hasConfig || !hasTestCase || !standardClassName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
+  acceptCase(noCloud, standard('class'))(
+    'should read local test classes include',
+    async () => {
+      if (!standardClassName) {
+        throw new Error(
+          missingConfiguration({ 'standard class': standardClassName }),
+        );
+      }
+
+      logTestStep('read local test classes', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read local test classes',
+        client
+          .getLocalTestClass()
+          .read({ className: standardClassName }, 'active'),
       );
-      return;
-    }
-    if (isCloudSystem) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: Standard classes on the ABAP Cloud system have no local test classes',
+      assertReadResult(state, 'local test classes', standardClassName);
+
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read local test classes metadata',
+        client
+          .getLocalTestClass()
+          .readMetadata({ className: standardClassName }),
       );
-      return;
-    }
-
-    logTestStep('read local test classes', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read local test classes',
-      client
-        .getLocalTestClass()
-        .read({ className: standardClassName }, 'active'),
-    );
-    assertReadResult(state, 'local test classes', standardClassName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read local test classes metadata',
-      client.getLocalTestClass().readMetadata({ className: standardClassName }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'local test classes metadata',
-      standardClassName,
-    );
-  });
-
-  it('should read local macros include (on-prem only)', async () => {
-    if (!hasConfig || !hasTestCase || !standardClassName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
+      assertMetadataResult(
+        metadataState,
+        'local test classes metadata',
+        standardClassName,
       );
-      return;
-    }
-    if (isCloudSystem) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: Local macros not supported on cloud',
+    },
+  );
+
+  acceptCase(noCloud, standard('class'))(
+    'should read local macros include (on-prem only)',
+    async () => {
+      if (!standardClassName) {
+        throw new Error(
+          missingConfiguration({ 'standard class': standardClassName }),
+        );
+      }
+
+      logTestStep('read local macros', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read local macros',
+        client
+          .getLocalMacros()
+          .read({ className: standardClassName }, 'active'),
       );
-      return;
-    }
+      if (!state) {
+        testsLogger.warn?.(
+          '⚠️ Skipping test: Local macros include not available',
+        );
+        return;
+      }
+      assertReadResult(state, 'local macros', standardClassName);
 
-    logTestStep('read local macros', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read local macros',
-      client.getLocalMacros().read({ className: standardClassName }, 'active'),
-    );
-    if (!state) {
-      testsLogger.warn?.('⚠️ Skipping test: Local macros include not available');
-      return;
-    }
-    assertReadResult(state, 'local macros', standardClassName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read local macros metadata',
-      client.getLocalMacros().readMetadata({ className: standardClassName }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'local macros metadata',
-      standardClassName,
-    );
-  });
-
-  it('should read interface source', async () => {
-    if (!hasConfig || !hasTestCase || !standardInterfaceName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'standard interface': standardInterfaceName })}`,
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read local macros metadata',
+        client.getLocalMacros().readMetadata({ className: standardClassName }),
       );
-      return;
-    }
+      assertMetadataResult(
+        metadataState,
+        'local macros metadata',
+        standardClassName,
+      );
+    },
+  );
 
-    logTestStep('read interface source', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read interface source',
-      client
-        .getInterface()
-        .read({ interfaceName: standardInterfaceName }, 'active'),
-    );
-    assertReadResult(state, 'interface source', standardInterfaceName);
+  acceptCase(standard('interface'))(
+    'should read interface source',
+    async () => {
+      if (!standardInterfaceName) {
+        throw new Error(
+          missingConfiguration({ 'standard interface': standardInterfaceName }),
+        );
+      }
 
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read interface metadata',
-      client.getInterface().readMetadata({
-        interfaceName: standardInterfaceName,
-      }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'interface metadata',
-      standardInterfaceName,
-    );
-  });
+      logTestStep('read interface source', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read interface source',
+        client
+          .getInterface()
+          .read({ interfaceName: standardInterfaceName }, 'active'),
+      );
+      assertReadResult(state, 'interface source', standardInterfaceName);
 
-  it('should read program source', async () => {
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read interface metadata',
+        client.getInterface().readMetadata({
+          interfaceName: standardInterfaceName,
+        }),
+      );
+      assertMetadataResult(
+        metadataState,
+        'interface metadata',
+        standardInterfaceName,
+      );
+    },
+  );
+
+  acceptCase(standard('program'))('should read program source', async () => {
     const programName =
       resolveStandardObject('program', isCloudSystem, testCase)?.name ||
       testCase?.params?.program_name ||
       null;
-    if (!hasConfig || !hasTestCase || !programName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ program: programName })}`,
-      );
-      return;
+    if (!programName) {
+      throw new Error(missingConfiguration({ program: programName }));
     }
 
     logTestStep('read program source', testsLogger);
@@ -397,16 +429,13 @@ describe('Shared - read Accept headers', () => {
     assertMetadataResult(metadataState, 'program metadata', programName);
   });
 
-  it('should read domain', async () => {
+  acceptCase(standard('domain'))('should read domain', async () => {
     const domainName =
       resolveStandardObject('domain', isCloudSystem, testCase)?.name ||
       testCase?.params?.domain_name ||
       null;
-    if (!hasConfig || !hasTestCase || !domainName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ domain: domainName })}`,
-      );
-      return;
+    if (!domainName) {
+      throw new Error(missingConfiguration({ domain: domainName }));
     }
 
     logTestStep('read domain', testsLogger);
@@ -423,16 +452,15 @@ describe('Shared - read Accept headers', () => {
     assertMetadataResult(metadataState, 'domain metadata', domainName);
   });
 
-  it('should read data element', async () => {
+  acceptCase(standard('dataElement'))('should read data element', async () => {
     const dataElementName =
       resolveStandardObject('dataElement', isCloudSystem, testCase)?.name ||
       testCase?.params?.data_element_name ||
       null;
-    if (!hasConfig || !hasTestCase || !dataElementName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'data element': dataElementName })}`,
+    if (!dataElementName) {
+      throw new Error(
+        missingConfiguration({ 'data element': dataElementName }),
       );
-      return;
     }
 
     logTestStep('read data element', testsLogger);
@@ -453,42 +481,39 @@ describe('Shared - read Accept headers', () => {
     );
   });
 
-  it('should read structure source', async () => {
-    const structureName =
-      resolveStandardObject('structure', isCloudSystem, testCase)?.name ||
-      testCase?.params?.structure_name ||
-      null;
-    if (!hasConfig || !hasTestCase || !structureName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ structure: structureName })}`,
+  acceptCase(standard('structure'))(
+    'should read structure source',
+    async () => {
+      const structureName =
+        resolveStandardObject('structure', isCloudSystem, testCase)?.name ||
+        testCase?.params?.structure_name ||
+        null;
+      if (!structureName) {
+        throw new Error(missingConfiguration({ structure: structureName }));
+      }
+
+      logTestStep('read structure source', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read structure source',
+        client.getStructure().read({ structureName }, 'active'),
       );
-      return;
-    }
+      assertReadResult(state, 'structure source', structureName);
 
-    logTestStep('read structure source', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read structure source',
-      client.getStructure().read({ structureName }, 'active'),
-    );
-    assertReadResult(state, 'structure source', structureName);
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read structure metadata',
+        client.getStructure().readMetadata({ structureName }),
+      );
+      assertMetadataResult(metadataState, 'structure metadata', structureName);
+    },
+  );
 
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read structure metadata',
-      client.getStructure().readMetadata({ structureName }),
-    );
-    assertMetadataResult(metadataState, 'structure metadata', structureName);
-  });
-
-  it('should read table source', async () => {
+  acceptCase(standard('table'))('should read table source', async () => {
     const tableName =
       resolveStandardObject('table', isCloudSystem, testCase)?.name ||
       testCase?.params?.table_name ||
       null;
-    if (!hasConfig || !hasTestCase || !tableName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ table: tableName })}`,
-      );
-      return;
+    if (!tableName) {
+      throw new Error(missingConfiguration({ table: tableName }));
     }
 
     logTestStep('read table source', testsLogger);
@@ -505,40 +530,39 @@ describe('Shared - read Accept headers', () => {
     assertMetadataResult(metadataState, 'table metadata', tableName);
   });
 
-  it('should read table type metadata', async () => {
-    const tableTypeName =
-      resolveStandardObject('tabletype', isCloudSystem, testCase)?.name ||
-      testCase?.params?.tabletype_name ||
-      null;
-    if (!hasConfig || !hasTestCase || !tableTypeName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'table type': tableTypeName })}`,
+  acceptCase(standard('tabletype'))(
+    'should read table type metadata',
+    async () => {
+      const tableTypeName =
+        resolveStandardObject('tabletype', isCloudSystem, testCase)?.name ||
+        testCase?.params?.tabletype_name ||
+        null;
+      if (!tableTypeName) {
+        throw new Error(missingConfiguration({ 'table type': tableTypeName }));
+      }
+
+      logTestStep('read table type', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read table type',
+        client.getTableType().readMetadata({ tableTypeName }),
       );
-      return;
-    }
+      assertReadResult(state, 'table type', tableTypeName);
 
-    logTestStep('read table type', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read table type',
-      client.getTableType().readMetadata({ tableTypeName }),
-    );
-    assertReadResult(state, 'table type', tableTypeName);
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read table type metadata',
+        client.getTableType().readMetadata({ tableTypeName }),
+      );
+      assertMetadataResult(metadataState, 'table type metadata', tableTypeName);
+    },
+  );
 
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read table type metadata',
-      client.getTableType().readMetadata({ tableTypeName }),
-    );
-    assertMetadataResult(metadataState, 'table type metadata', tableTypeName);
-  });
-
-  it('should read view source', async () => {
+  acceptCase(standard('view'))('should read view source', async () => {
     const ddlName =
       resolveStandardObject('view', isCloudSystem, testCase)?.name ||
       testCase?.params?.ddl_name ||
       null;
-    if (!hasConfig || !hasTestCase || !ddlName) {
-      testsLogger.warn?.(`⚠️ Skipping test: ${skipReason({ view: ddlName })}`);
-      return;
+    if (!ddlName) {
+      throw new Error(missingConfiguration({ view: ddlName }));
     }
 
     logTestStep('read view source', testsLogger);
@@ -555,88 +579,88 @@ describe('Shared - read Accept headers', () => {
     assertMetadataResult(metadataState, 'view metadata', ddlName);
   });
 
-  it('should read function group', async () => {
-    const functionGroupName =
-      resolveStandardObject('functionGroup', isCloudSystem, testCase)?.name ||
-      testCase?.params?.function_group_name ||
-      null;
-    if (!hasConfig || !hasTestCase || !functionGroupName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'function group': functionGroupName })}`,
+  acceptCase(standard('functionGroup'))(
+    'should read function group',
+    async () => {
+      const functionGroupName =
+        resolveStandardObject('functionGroup', isCloudSystem, testCase)?.name ||
+        testCase?.params?.function_group_name ||
+        null;
+      if (!functionGroupName) {
+        throw new Error(
+          missingConfiguration({ 'function group': functionGroupName }),
+        );
+      }
+
+      logTestStep('read function group', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read function group',
+        client.getFunctionGroup().readMetadata({ functionGroupName }),
       );
-      return;
-    }
+      assertReadResult(state, 'function group', functionGroupName);
 
-    logTestStep('read function group', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read function group',
-      client.getFunctionGroup().readMetadata({ functionGroupName }),
-    );
-    assertReadResult(state, 'function group', functionGroupName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read function group metadata',
-      client.getFunctionGroup().readMetadata({ functionGroupName }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'function group metadata',
-      functionGroupName,
-    );
-  });
-
-  it('should read function module source', async () => {
-    const functionModule =
-      resolveStandardObject('functionModule', isCloudSystem, testCase) || null;
-    const functionModuleName =
-      testCase?.params?.function_module_name || functionModule?.name || null;
-    const functionGroupName =
-      testCase?.params?.function_group_name || functionModule?.group || null;
-    if (
-      !hasConfig ||
-      !hasTestCase ||
-      !functionModuleName ||
-      !functionGroupName
-    ) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ function_module_name: functionModuleName, function_group_name: functionGroupName })}`,
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read function group metadata',
+        client.getFunctionGroup().readMetadata({ functionGroupName }),
       );
-      return;
-    }
-
-    logTestStep('read function module', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read function module',
-      client
-        .getFunctionModule()
-        .read({ functionModuleName, functionGroupName }, 'active'),
-    );
-    assertReadResult(state, 'function module', functionModuleName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read function module metadata',
-      client.getFunctionModule().readMetadata({
-        functionModuleName,
+      assertMetadataResult(
+        metadataState,
+        'function group metadata',
         functionGroupName,
-      }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'function module metadata',
-      functionModuleName,
-    );
-  });
+      );
+    },
+  );
 
-  it('should read package', async () => {
+  acceptCase(functionModuleConfigured)(
+    'should read function module source',
+    async () => {
+      const functionModule =
+        resolveStandardObject('functionModule', isCloudSystem, testCase) ||
+        null;
+      const functionModuleName =
+        testCase?.params?.function_module_name || functionModule?.name || null;
+      const functionGroupName =
+        testCase?.params?.function_group_name || functionModule?.group || null;
+      if (!functionModuleName || !functionGroupName) {
+        throw new Error(
+          missingConfiguration({
+            function_module_name: functionModuleName,
+            function_group_name: functionGroupName,
+          }),
+        );
+      }
+
+      logTestStep('read function module', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read function module',
+        client
+          .getFunctionModule()
+          .read({ functionModuleName, functionGroupName }, 'active'),
+      );
+      assertReadResult(state, 'function module', functionModuleName);
+
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read function module metadata',
+        client.getFunctionModule().readMetadata({
+          functionModuleName,
+          functionGroupName,
+        }),
+      );
+      assertMetadataResult(
+        metadataState,
+        'function module metadata',
+        functionModuleName,
+      );
+    },
+  );
+
+  acceptCase(standard('package'))('should read package', async () => {
     const packageName =
       resolveStandardObject('package', isCloudSystem, testCase)?.name ||
       testCase?.params?.package_name ||
       null;
-    if (!hasConfig || !hasTestCase || !packageName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ package: packageName })}`,
-      );
-      return;
+    if (!packageName) {
+      throw new Error(missingConfiguration({ package: packageName }));
     }
 
     logTestStep('read package', testsLogger);
@@ -653,173 +677,190 @@ describe('Shared - read Accept headers', () => {
     assertMetadataResult(metadataState, 'package metadata', packageName);
   });
 
-  it('should read service definition source', async () => {
-    const serviceDefinitionName =
-      resolveStandardObject('serviceDefinition', isCloudSystem, testCase)
-        ?.name ||
-      testCase?.params?.service_definition_name ||
-      null;
-    if (!hasConfig || !hasTestCase || !serviceDefinitionName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'service definition': serviceDefinitionName })}`,
+  acceptCase(standard('serviceDefinition'))(
+    'should read service definition source',
+    async () => {
+      const serviceDefinitionName =
+        resolveStandardObject('serviceDefinition', isCloudSystem, testCase)
+          ?.name ||
+        testCase?.params?.service_definition_name ||
+        null;
+      if (!serviceDefinitionName) {
+        throw new Error(
+          missingConfiguration({ 'service definition': serviceDefinitionName }),
+        );
+      }
+
+      logTestStep('read service definition', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read service definition',
+        client.getServiceDefinition().read({ serviceDefinitionName }, 'active'),
       );
-      return;
-    }
+      assertReadResult(state, 'service definition', serviceDefinitionName);
 
-    logTestStep('read service definition', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read service definition',
-      client.getServiceDefinition().read({ serviceDefinitionName }, 'active'),
-    );
-    assertReadResult(state, 'service definition', serviceDefinitionName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read service definition metadata',
-      client.getServiceDefinition().readMetadata({ serviceDefinitionName }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'service definition metadata',
-      serviceDefinitionName,
-    );
-  });
-
-  it('should read behavior definition source', async () => {
-    const behaviorDefinitionName =
-      testCase?.params?.behavior_definition_name ||
-      testCase?.params?.behavior_definition ||
-      null;
-    if (!hasConfig || !hasTestCase || !behaviorDefinitionName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'behavior definition': behaviorDefinitionName })}`,
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read service definition metadata',
+        client.getServiceDefinition().readMetadata({ serviceDefinitionName }),
       );
-      return;
-    }
-
-    logTestStep('read behavior definition', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read behavior definition',
-      client
-        .getBehaviorDefinition()
-        .read({ name: behaviorDefinitionName }, 'active'),
-    );
-    assertReadResult(state, 'behavior definition', behaviorDefinitionName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read behavior definition metadata',
-      client
-        .getBehaviorDefinition()
-        .readMetadata({ name: behaviorDefinitionName }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'behavior definition metadata',
-      behaviorDefinitionName,
-    );
-  });
-
-  it('should read behavior implementation source', async () => {
-    const behaviorImplementationClassName =
-      testCase?.params?.behavior_implementation_class_name || null;
-    if (!hasConfig || !hasTestCase || !behaviorImplementationClassName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'behavior implementation': behaviorImplementationClassName })}`,
+      assertMetadataResult(
+        metadataState,
+        'service definition metadata',
+        serviceDefinitionName,
       );
-      return;
-    }
+    },
+  );
 
-    logTestStep('read behavior implementation', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read behavior implementation',
-      client
-        .getBehaviorImplementation()
-        .read({ className: behaviorImplementationClassName }, 'active'),
-    );
-    assertReadResult(
-      state,
-      'behavior implementation',
-      behaviorImplementationClassName,
-    );
+  acceptCase(param('behavior_definition_name', 'behavior_definition'))(
+    'should read behavior definition source',
+    async () => {
+      const behaviorDefinitionName =
+        testCase?.params?.behavior_definition_name ||
+        testCase?.params?.behavior_definition ||
+        null;
+      if (!behaviorDefinitionName) {
+        throw new Error(
+          missingConfiguration({
+            'behavior definition': behaviorDefinitionName,
+          }),
+        );
+      }
 
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read behavior implementation metadata',
-      client.getBehaviorImplementation().readMetadata({
-        className: behaviorImplementationClassName,
-      }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'behavior implementation metadata',
-      behaviorImplementationClassName,
-    );
-  });
-
-  it('should read metadata extension source', async () => {
-    const metadataExtensionName =
-      testCase?.params?.metadata_extension_name || null;
-    if (!hasConfig || !hasTestCase || !metadataExtensionName) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ 'metadata extension': metadataExtensionName })}`,
+      logTestStep('read behavior definition', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read behavior definition',
+        client
+          .getBehaviorDefinition()
+          .read({ name: behaviorDefinitionName }, 'active'),
       );
-      return;
-    }
+      assertReadResult(state, 'behavior definition', behaviorDefinitionName);
 
-    logTestStep('read metadata extension', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read metadata extension',
-      client
-        .getMetadataExtension()
-        .read({ name: metadataExtensionName }, 'active'),
-    );
-    assertReadResult(state, 'metadata extension', metadataExtensionName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read metadata extension metadata',
-      client.getMetadataExtension().readMetadata({
-        name: metadataExtensionName,
-      }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'metadata extension metadata',
-      metadataExtensionName,
-    );
-  });
-
-  it('should read enhancement', async () => {
-    const enhancementName = testCase?.params?.enhancement_name || null;
-    const enhancementType = testCase?.params?.enhancement_type || null;
-    if (!hasConfig || !hasTestCase || !enhancementName || !enhancementType) {
-      testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason({ enhancement_name: enhancementName, enhancement_type: enhancementType })}`,
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read behavior definition metadata',
+        client
+          .getBehaviorDefinition()
+          .readMetadata({ name: behaviorDefinitionName }),
       );
-      return;
-    }
+      assertMetadataResult(
+        metadataState,
+        'behavior definition metadata',
+        behaviorDefinitionName,
+      );
+    },
+  );
 
-    logTestStep('read enhancement', testsLogger);
-    const state = await runReadWithAcceptLogging(
-      'read enhancement',
-      client.getEnhancement().read(
-        {
+  acceptCase(param('behavior_implementation_class_name'))(
+    'should read behavior implementation source',
+    async () => {
+      const behaviorImplementationClassName =
+        testCase?.params?.behavior_implementation_class_name || null;
+      if (!behaviorImplementationClassName) {
+        throw new Error(
+          missingConfiguration({
+            'behavior implementation': behaviorImplementationClassName,
+          }),
+        );
+      }
+
+      logTestStep('read behavior implementation', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read behavior implementation',
+        client
+          .getBehaviorImplementation()
+          .read({ className: behaviorImplementationClassName }, 'active'),
+      );
+      assertReadResult(
+        state,
+        'behavior implementation',
+        behaviorImplementationClassName,
+      );
+
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read behavior implementation metadata',
+        client.getBehaviorImplementation().readMetadata({
+          className: behaviorImplementationClassName,
+        }),
+      );
+      assertMetadataResult(
+        metadataState,
+        'behavior implementation metadata',
+        behaviorImplementationClassName,
+      );
+    },
+  );
+
+  acceptCase(param('metadata_extension_name'))(
+    'should read metadata extension source',
+    async () => {
+      const metadataExtensionName =
+        testCase?.params?.metadata_extension_name || null;
+      if (!metadataExtensionName) {
+        throw new Error(
+          missingConfiguration({ 'metadata extension': metadataExtensionName }),
+        );
+      }
+
+      logTestStep('read metadata extension', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read metadata extension',
+        client
+          .getMetadataExtension()
+          .read({ name: metadataExtensionName }, 'active'),
+      );
+      assertReadResult(state, 'metadata extension', metadataExtensionName);
+
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read metadata extension metadata',
+        client.getMetadataExtension().readMetadata({
+          name: metadataExtensionName,
+        }),
+      );
+      assertMetadataResult(
+        metadataState,
+        'metadata extension metadata',
+        metadataExtensionName,
+      );
+    },
+  );
+
+  acceptCase(param('enhancement_name'), param('enhancement_type'))(
+    'should read enhancement',
+    async () => {
+      const enhancementName = testCase?.params?.enhancement_name || null;
+      const enhancementType = testCase?.params?.enhancement_type || null;
+      if (!enhancementName || !enhancementType) {
+        throw new Error(
+          missingConfiguration({
+            enhancement_name: enhancementName,
+            enhancement_type: enhancementType,
+          }),
+        );
+      }
+
+      logTestStep('read enhancement', testsLogger);
+      const state = await runReadWithAcceptLogging(
+        'read enhancement',
+        client.getEnhancement().read(
+          {
+            enhancementName,
+            enhancementType,
+          },
+          'active',
+        ),
+      );
+      assertReadResult(state, 'enhancement', enhancementName);
+
+      const metadataState = await runReadMetadataWithAcceptLogging(
+        'read enhancement metadata',
+        client.getEnhancement().readMetadata({
           enhancementName,
           enhancementType,
-        },
-        'active',
-      ),
-    );
-    assertReadResult(state, 'enhancement', enhancementName);
-
-    const metadataState = await runReadMetadataWithAcceptLogging(
-      'read enhancement metadata',
-      client.getEnhancement().readMetadata({
+        }),
+      );
+      assertMetadataResult(
+        metadataState,
+        'enhancement metadata',
         enhancementName,
-        enhancementType,
-      }),
-    );
-    assertMetadataResult(
-      metadataState,
-      'enhancement metadata',
-      enhancementName,
-    );
-  });
+      );
+    },
+  );
 });

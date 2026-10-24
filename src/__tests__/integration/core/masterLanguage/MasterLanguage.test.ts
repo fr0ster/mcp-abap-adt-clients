@@ -22,6 +22,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -55,7 +56,6 @@ function masterLangOf(xml: string): string | undefined {
 describe('Master language on create (#105)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let expectedLang = 'EN';
   let sentLang: string | undefined;
   const className = 'ZCL_AC_MASTERLANG_IT';
@@ -66,7 +66,6 @@ describe('Master language on create (#105)', () => {
     if (!process.env.SAP_URL) {
       return;
     }
-    hasConfig = true;
     connection = await createTestConnection(silentLogger);
 
     const isCloud = await isCloudEnvironment(connection);
@@ -97,14 +96,9 @@ describe('Master language on create (#105)', () => {
     ));
   }, getTimeout('connection') ?? 60000);
 
-  it(
+  gateOn(() => true)(
     'creates a class whose master language matches test-config default_master_language',
     async () => {
-      if (!hasConfig) {
-        console.warn('No SAP config — skipping master language test');
-        return;
-      }
-
       const cls = client.getClass();
 
       // **Every answer is read.** The delete, the create and the cleanup used

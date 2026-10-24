@@ -54,6 +54,12 @@ import { readListenerConflict } from '../../../../runtime/debugger/abap';
 import { rawDocument } from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
+  configuredCase,
+  gate,
+  gateAll,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
   CleanupSteps,
   releaseThenLogOff,
   withCleanup,
@@ -73,8 +79,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -84,10 +88,9 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase(
-  'runtime_debugger',
-  'adt_abap_debugger_modes',
-);
+const testCase = configuredCase('runtime_debugger', 'adt_abap_debugger_modes');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_abap_debugger_modes');
 const CLASS_A: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_MODES_A'
 ).toUpperCase();
@@ -420,15 +423,6 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   /** Arms breakpoints and listens; never attaches. */
   let listenerApi: Debugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
-  }
 
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
@@ -557,8 +551,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_abap_debugger_modes is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_abap_debugger_modes'),
+      );
     }
     try {
       listenerConnection = await createTestConnection(connectionLogger, {
@@ -569,8 +564,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(
@@ -617,10 +611,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 1. syncBreakpoints full -----------------------------------------------------
 
-  it(
+  debuggerCase(
     'full: replaces every breakpoint under the key, and an empty set clears it',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -687,10 +680,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 2. syncBreakpoints partial --------------------------------------------------
 
-  it(
+  debuggerCase(
     "partial: replaces A's line breakpoints and keeps B's and the exception breakpoint",
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -816,10 +808,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 12. what a plain setBreakpoints and a stopped listener leave ---------------
 
-  it(
+  debuggerCase(
     'setBreakpoints and stopListener: what each leaves of the breakpoints under the key',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         /** Arm B:END, do `then`, and answer whether a run of B is still caught. */
         const bAfter = async (
@@ -896,10 +887,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 3. skipCount ----------------------------------------------------------------
 
-  it(
+  debuggerCase(
     'skipCount: the server ignores it on an external line breakpoint, the first hit stops',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         // Sent by hand: the contract has no skipCount any more, because the server
         // ignores it on an external breakpoint - which this measures.
@@ -955,10 +945,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 4. detachDebugger without an id ---------------------------------------------
 
-  it(
+  debuggerCase(
     'detachDebugger without an id: the debugger leaves and the run goes on',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -1016,10 +1005,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 5. detachDebugger with a caught, unattached id ------------------------------
 
-  it(
+  debuggerCase(
     'detachDebugger with the id of a caught debuggee nobody attached',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -1063,10 +1051,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 6. detachDebugger with an id another session attached -----------------------
 
-  it(
+  debuggerCase(
     'detachDebugger with the id of a debuggee another session attached',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -1120,10 +1107,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 7. terminateDebugger --------------------------------------------------------
 
-  it(
+  debuggerCase(
     'terminateDebugger: the debugger is freed and the run finishes with its output',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -1164,10 +1150,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 8. setDebuggerSettings ------------------------------------------------------
 
-  it(
+  debuggerCase(
     'setDebuggerSettings: a mandatory field left out keeps its value; showDataAging does not',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
@@ -1263,10 +1248,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 9. checkListener ------------------------------------------------------------
 
-  it(
+  debuggerCase(
     'checkListener: 200 empty when free, 409 naming the holder when another listener holds the user',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const free = await listenerApi.checkListener(identity);
         record(9, `checkListener free answered ${summary(free)}`);
@@ -1306,10 +1290,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 10. terminal mode, without SAP GUI ------------------------------------------
 
-  it(
+  debuggerCase(
     'terminal mode: check, listen and stop, set and delete a breakpoint',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const terminal: IDebuggerIdentity = {
           debuggingMode: 'terminal',
@@ -1391,14 +1374,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     }
   }
 
-  it(
+  // Needs a second user's environment file named in the case.
+  gateAll(debuggerCase, SECOND_USER_ENV ? it : it.skip)(
     "another user: our debugger catches the second user's run of A",
     async () => {
-      if (skipped()) return;
-      if (!SECOND_USER_ENV) {
-        testsLogger.info?.('skipped: second_user_env is empty');
-        return;
-      }
       const file = SECOND_USER_ENV.startsWith('~/')
         ? path.join(os.homedir(), SECOND_USER_ENV.slice(2))
         : SECOND_USER_ENV;

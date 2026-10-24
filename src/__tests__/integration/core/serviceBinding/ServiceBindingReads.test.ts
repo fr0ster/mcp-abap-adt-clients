@@ -17,6 +17,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { IServiceBindingContract } from '../../../../clients/AdtClient';
 import type { serviceDocuments } from '../../../../core/service/types';
+import { gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -29,7 +30,7 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
 
 const { getSharedDependenciesConfig } = require('../../../helpers/test-helper');
 
@@ -49,33 +50,30 @@ interface ISharedBinding {
   service_name?: string;
 }
 
+/** The shared binding these cases read, set up by `shared:setup`. */
+function sharedBinding(): ISharedBinding | undefined {
+  return (getSharedDependenciesConfig()?.service_bindings ?? [])[0];
+}
+
+// Service bindings are absent on legacy systems; with no shared binding set up
+// there is nothing to read.
+const readsBinding = gateOn(({ isLegacy }) => !isLegacy && !!sharedBinding());
+
 describe('Service binding reads (getServiceBinding contract)', () => {
   let connection: IAbapConnection | undefined;
   let bindings: IServiceBindingContract<typeof serviceDocuments>;
   let shared: ISharedBinding | undefined;
-  let skipReason: string | undefined;
 
   beforeAll(async () => {
-    shared = (getSharedDependenciesConfig()?.service_bindings ?? [])[0];
-    if (!shared) {
-      skipReason = 'no shared service binding configured';
-      return;
-    }
+    shared = sharedBinding();
+    if (!shared) throw new Error('no shared service binding configured');
     try {
       connection = await createTestConnection(connectionLogger);
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
-    const { client, isLegacy } = await createTestAdtClient(
-      connection,
-      libraryLogger,
-    );
-    if (isLegacy) {
-      skipReason = 'service bindings are absent on legacy systems';
-      return;
-    }
+    const { client } = await createTestAdtClient(connection, libraryLogger);
     bindings = client.getServiceBinding();
   });
 
@@ -83,14 +81,7 @@ describe('Service binding reads (getServiceBinding contract)', () => {
     if (connection) await releaseTestConnection(connection);
   });
 
-  const skipped = (): boolean => {
-    if (skipReason)
-      logTestSkip(testsLogger, 'Service binding reads', skipReason);
-    return Boolean(skipReason);
-  };
-
-  it('lists the binding types the system offers', async () => {
-    if (skipped()) return;
+  readsBinding('lists the binding types the system offers', async () => {
     const document = String(
       expectResult(await bindings.getServiceBindingTypes(), 'binding types'),
     );
@@ -104,33 +95,36 @@ describe('Service binding reads (getServiceBinding contract)', () => {
     expect(names).toContain('ODATA');
   });
 
-  it('reads the service group the shared binding publishes', async () => {
-    if (skipped()) return;
-    const binding = shared as ISharedBinding;
-    const metadata = String(
-      expectResult(
-        await bindings.readMetadata({ bindingName: binding.name }),
-        'binding metadata',
-      ),
-    );
-    const version =
-      /srvb:binding[^>]*srvb:version="([^"]*)"/.exec(metadata)?.[1] ?? 'V4';
-    const serviceType = version.toUpperCase() === 'V2' ? 'odatav2' : 'odatav4';
-    const srvd = binding.service_definition ?? binding.name;
-    const group = String(
-      expectResult(
-        await bindings.getServiceGroup({
-          objectname: binding.name,
-          serviceType,
-          servicename: binding.service_name ?? srvd,
-          serviceversion: '0001',
-          srvdname: srvd,
-        }),
-        'service group',
-      ),
-    );
-    expect(group).toContain(`${serviceType}:serviceGroup`);
-    expect(group).toContain(`adtcore:name="${binding.name}"`);
-    expect(/:published="(true|false)"/.test(group)).toBe(true);
-  });
+  readsBinding(
+    'reads the service group the shared binding publishes',
+    async () => {
+      const binding = shared as ISharedBinding;
+      const metadata = String(
+        expectResult(
+          await bindings.readMetadata({ bindingName: binding.name }),
+          'binding metadata',
+        ),
+      );
+      const version =
+        /srvb:binding[^>]*srvb:version="([^"]*)"/.exec(metadata)?.[1] ?? 'V4';
+      const serviceType =
+        version.toUpperCase() === 'V2' ? 'odatav2' : 'odatav4';
+      const srvd = binding.service_definition ?? binding.name;
+      const group = String(
+        expectResult(
+          await bindings.getServiceGroup({
+            objectname: binding.name,
+            serviceType,
+            servicename: binding.service_name ?? srvd,
+            serviceversion: '0001',
+            srvdname: srvd,
+          }),
+          'service group',
+        ),
+      );
+      expect(group).toContain(`${serviceType}:serviceGroup`);
+      expect(group).toContain(`adtcore:name="${binding.name}"`);
+      expect(/:published="(true|false)"/.test(group)).toBe(true);
+    },
+  );
 });

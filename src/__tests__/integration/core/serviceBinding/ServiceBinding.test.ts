@@ -21,6 +21,7 @@ import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -388,21 +389,10 @@ describe('ServiceBinding (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_service_binding', 'adt_service_binding')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const params = testCase?.params || {};
@@ -447,30 +437,14 @@ describe('ServiceBinding (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('serviceBinding')(
       'should read standard SAP service binding',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'ServiceBinding - read standard object',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
         const standardObject = tester.getStandardObject('serviceBinding');
         if (!standardObject) {
-          logTestStart(testsLogger, 'ServiceBinding - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'ServiceBinding - read standard object',
+          throw new Error(
             `Standard service binding not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const bindingName = standardObject.name;

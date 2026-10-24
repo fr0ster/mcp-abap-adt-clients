@@ -20,6 +20,12 @@ import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  gate,
+  gateAll,
+  gateOn,
+  gateStandardObject,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -37,7 +43,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -62,6 +67,22 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** A transport request is configured for the transport read tests. */
+function transportConfigured(isCloud: boolean): boolean {
+  const resolver = new TestConfigResolver({ isCloud }).tryMultipleHandlers([
+    { handlerName: 'read_transport', testCaseName: 'read_transport' },
+    { handlerName: 'create_class', testCaseName: 'adt_class' },
+  ]);
+  return !!(
+    resolver?.getTransportRequest() ||
+    new TestConfigResolver({
+      isCloud,
+      handlerName: 'create_class',
+      testCaseName: 'adt_class',
+    }).getTransportRequest()
+  );
+}
 
 describe('Class (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -178,21 +199,10 @@ describe('Class (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_class', 'adt_class')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
@@ -215,32 +225,16 @@ describe('Class (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('class')(
       'should read standard SAP class',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Class - read standard object',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
         // Use BaseTester's method to get standard object (prioritizes standard_objects registry)
         const standardObject = tester.getStandardObject('class');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Class - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Class - read standard object',
+          throw new Error(
             `Standard class not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardClassName = standardObject.name;
@@ -248,15 +242,6 @@ describe('Class (using AdtClient)', () => {
           name: 'read_standard',
           params: { class_name: standardClassName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Class - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({
@@ -279,31 +264,18 @@ describe('Class (using AdtClient)', () => {
   });
 
   describe('Read transport request', () => {
-    it(
+    gateAll(
+      gateStandardObject('class'),
+      gateOn(({ isCloud }) => transportConfigured(isCloud)),
+    )(
       'should read transport request for class',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
         // Use BaseTester's method to get standard object (prioritizes standard_objects registry)
         const standardObject = tester.getStandardObject('class');
         if (!standardObject) {
-          logTestStart(testsLogger, 'Class - read transport request', {
-            name: 'read_transport',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
+          throw new Error(
             `Standard class not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardClassName = standardObject.name;
@@ -322,16 +294,9 @@ describe('Class (using AdtClient)', () => {
           resolver?.getTransportRequest() || tester.getTransportRequest() || '';
 
         if (!transportRequest) {
-          logTestStart(testsLogger, 'Class - read transport request', {
-            name: 'read_transport',
-            params: { class_name: standardClassName },
-          });
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
+          throw new Error(
             'transport_request not configured in test-config.yaml (required for transport read test)',
           );
-          return;
         }
 
         logTestStart(testsLogger, 'Class - read transport request', {
@@ -341,15 +306,6 @@ describe('Class (using AdtClient)', () => {
             transport_request: transportRequest,
           },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           // The shipped reading of a transport request is its document. The

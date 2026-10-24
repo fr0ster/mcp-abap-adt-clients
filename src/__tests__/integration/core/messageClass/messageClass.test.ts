@@ -30,6 +30,7 @@ import type { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMe
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -201,26 +202,12 @@ describe('MessageClass (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_message_class', 'adt_message_class')(
       'should execute full MessageClass lifecycle',
       async () => {
-        if (!tester) {
-          return;
-        }
-
-        // Delegate standard skip/cleanup to tester.
-        // flowTestAuto() returns early (without calling validate/create) when shouldSkip() is true,
-        // and cleans up any pre-existing object that was detected by ensureObjectReady.
-        if (tester.shouldSkip()) {
-          await tester.flowTestAuto();
-          return;
-        }
-
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        // A setup that failed is raised here, after the tester has cleaned up
+        // any pre-existing object that ensureObjectReady detected.
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCase();
         const params = testCase?.params || {};

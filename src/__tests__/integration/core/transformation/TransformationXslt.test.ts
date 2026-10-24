@@ -20,6 +20,7 @@ import type { ITransformationConfig } from '../../../../core/transformation';
 import { getTransformation } from '../../../../core/transformation/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -141,21 +142,10 @@ describe('Transformation - XSLTProgram (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_transformation', 'adt_xslt_program')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const defaultSourceCode = `<xsl:transform xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">

@@ -19,6 +19,11 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -40,7 +45,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -58,17 +62,15 @@ const testsLogger: ILogger = createTestsLogger();
 describe('SystemMessages (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let runtime: AdtRuntimeClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -78,11 +80,11 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('runtime_system_messages', 'adt_system_messages')(
     'should list system messages',
     async () => {
       const testName = 'SystemMessages - list';
-      const testCase = getEnabledTestCase(
+      const testCase = configuredCase(
         'runtime_system_messages',
         'adt_system_messages',
       );
@@ -93,17 +95,9 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_system_messages/adt_system_messages not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('runtime_system_messages', 'adt_system_messages'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {
@@ -135,11 +129,11 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('runtime_system_messages', 'adt_system_messages')(
     'should list system messages with maxResults filter',
     async () => {
       const testName = 'SystemMessages - list with maxResults';
-      const testCase = getEnabledTestCase(
+      const testCase = configuredCase(
         'runtime_system_messages',
         'adt_system_messages',
       );
@@ -150,17 +144,9 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_system_messages/adt_system_messages not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('runtime_system_messages', 'adt_system_messages'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {

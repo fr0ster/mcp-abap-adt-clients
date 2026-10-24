@@ -20,6 +20,7 @@ import type { IInterfaceConfig } from '../../../../core/interface';
 import { getInterfaceSource } from '../../../../core/interface/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -36,7 +37,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -148,21 +148,10 @@ describe('Interface (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_interface', 'adt_interface')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           source: config.source,
@@ -179,7 +168,7 @@ describe('Interface (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('interface')(
       'should read standard SAP interface',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -190,16 +179,9 @@ describe('Interface (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('interface');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Interface - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Interface - read standard object',
+          throw new Error(
             `Standard interface not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardInterfaceName = standardObject.name;
@@ -207,15 +189,6 @@ describe('Interface (using AdtClient)', () => {
           name: 'read_standard',
           params: { interface_name: standardInterfaceName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Interface - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

@@ -25,6 +25,7 @@ import { classDocuments } from '../../../../core/class/types';
 import { interfaceDocuments } from '../../../../core/interface/types';
 import { serviceDefinitionDocuments } from '../../../../core/serviceDefinition/types';
 import { tableDocuments } from '../../../../core/table/types';
+import { gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -33,7 +34,6 @@ import {
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
-import { logTestSkip } from '../../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -46,18 +46,16 @@ const logger = createTestsLogger();
 describe('Object version history', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(logger);
       const { client: c } = await createTestAdtClient(connection, logger);
       client = c;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, logger);
+      skipUnlessConfigured(error, logger);
     }
   }, 60000);
 
@@ -103,26 +101,26 @@ describe('Object version history', () => {
   ];
 
   for (const tc of cases) {
-    it(`lists versions and fetches a version's source for ${tc.label}`, async () => {
-      if (!hasConfig) {
-        logTestSkip(logger, `versions - ${tc.label}`, 'No SAP configuration');
-        return;
-      }
-      const versions = expectResult(await tc.list(), `${tc.label} versions`);
-      expect(Array.isArray(versions)).toBe(true);
-      expect(versions.length).toBeGreaterThan(0);
-      const v = versions[0];
-      expect(typeof v.versionId).toBe('string');
-      expect(typeof v.contentUri).toBe('string');
-      expect(v.contentUri.length).toBeGreaterThan(0);
+    gateOn(() => true)(
+      `lists versions and fetches a version's source for ${tc.label}`,
+      async () => {
+        const versions = expectResult(await tc.list(), `${tc.label} versions`);
+        expect(Array.isArray(versions)).toBe(true);
+        expect(versions.length).toBeGreaterThan(0);
+        const v = versions[0];
+        expect(typeof v.versionId).toBe('string');
+        expect(typeof v.contentUri).toBe('string');
+        expect(v.contentUri.length).toBeGreaterThan(0);
 
-      // getVersionSource is the same opaque-URI fetch on every handler.
-      const src = expectResult(
-        await client.getTable().getVersionSource(v.contentUri),
-        'src',
-      );
-      expect(typeof src).toBe('string');
-      expect(src.length).toBeGreaterThan(0);
-    }, 60000);
+        // getVersionSource is the same opaque-URI fetch on every handler.
+        const src = expectResult(
+          await client.getTable().getVersionSource(v.contentUri),
+          'src',
+        );
+        expect(typeof src).toBe('string');
+        expect(src.length).toBeGreaterThan(0);
+      },
+      60000,
+    );
   }
 });

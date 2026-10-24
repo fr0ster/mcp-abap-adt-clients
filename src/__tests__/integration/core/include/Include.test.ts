@@ -30,6 +30,7 @@ import { getIncludeSource } from '../../../../core/include';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateAll, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -45,7 +46,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -174,34 +174,14 @@ describe('Include (PROG/I, using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_include', 'adt_include')(
       'should create, read, update, activate and delete an include',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-
-        if (isCloudSystem) {
-          // Not a policy skip: discovery gives the includes collection no
-          // `app:accept` on cloud, so it is not a creation target, and the type
-          // answers 403 S_DEVELOP there.
-          logTestSkip(
-            testsLogger,
-            'Include - full workflow',
-            'PROG/I includes cannot be created on cloud: the collection declares no app:accept and the type answers 403 S_DEVELOP',
-          );
-          return;
-        }
-
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        // No cloud branch: PROG/I includes cannot be created on cloud —
+        // discovery gives the includes collection no `app:accept` there, and
+        // the type answers 403 S_DEVELOP — so `available_in` of the case is
+        // `onprem` and the gate registers it as skipped.
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const source = testCase?.params?.source_code || config.source || '';
@@ -222,22 +202,13 @@ describe('Include (PROG/I, using AdtClient)', () => {
   });
 
   describe('The document is an include, not a program', () => {
-    it(
+    gateAll(
+      gate('create_include', 'adt_include'),
+      gateStandardObject('include'),
+    )(
       'reads back include:abapInclude with adtcore:type="PROG/I"',
       async () => {
         const testName = 'Include - metadata shape';
-        if (!hasConfig || !tester) {
-          logTestSkip(testsLogger, testName, 'No SAP configuration');
-          return;
-        }
-        if (isCloudSystem) {
-          logTestSkip(
-            testsLogger,
-            testName,
-            'PROG/I includes are not creatable on cloud',
-          );
-          return;
-        }
 
         // A standard, SAP-delivered include, from the same registry every other
         // suite reads its read-only fixtures out of. Nothing is created: the
@@ -245,12 +216,9 @@ describe('Include (PROG/I, using AdtClient)', () => {
         // always existed answers it without leaving anything behind.
         const standard = tester.getStandardObject('include');
         if (!standard?.name) {
-          logTestSkip(
-            testsLogger,
-            testName,
+          throw new Error(
             'No standard include configured for this environment',
           );
-          return;
         }
 
         logTestStart(testsLogger, testName, {

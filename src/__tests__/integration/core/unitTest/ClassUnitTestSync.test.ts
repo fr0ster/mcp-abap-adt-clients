@@ -28,6 +28,12 @@ import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestR
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -37,7 +43,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -45,14 +50,12 @@ import {
 } from '../../../helpers/testLogger';
 import {
   logTestEnd,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -108,9 +111,7 @@ function rootOf(document: string): string {
 describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -126,10 +127,8 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
         systemContext,
       );
       client = resolved.client;
-      isLegacy = resolved.isLegacy;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -139,38 +138,24 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
     }
   });
 
-  it(
+  gateAll(
+    gate('run_unit_test', 'adt_unit_test_sync'),
+    // The legacy runner's `run` is the synchronous request already; there is
+    // no asynchronous one to compare it with.
+    gateOn(({ isLegacy }) => !isLegacy),
+  )(
     'both runners find the same tests, the same failure and the same alert',
     async () => {
-      const testCase = getTestCaseDefinition(
-        'run_unit_test',
-        'adt_unit_test_sync',
-      );
+      const testCase = configuredCase('run_unit_test', 'adt_unit_test_sync');
       logTestStart(testsLogger, TITLE, {
         name: 'adt_unit_test_sync',
         params: {},
       });
       try {
-        if (!hasConfig) {
-          logTestSkip(testsLogger, TITLE, 'No SAP configuration');
-          return;
-        }
         if (!testCase?.params?.container_class) {
-          logTestSkip(
-            testsLogger,
-            TITLE,
+          throw new Error(
             'adt_unit_test_sync not in test-config.yaml (npm run check:config)',
           );
-          return;
-        }
-        // The legacy runner's `run` is the synchronous request already; there
-        // is no asynchronous one to compare it with.
-        if (
-          isLegacy ||
-          !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-        ) {
-          logTestSkip(testsLogger, TITLE, 'No asynchronous runner on legacy');
-          return;
         }
 
         const className: string = testCase.params.container_class;
