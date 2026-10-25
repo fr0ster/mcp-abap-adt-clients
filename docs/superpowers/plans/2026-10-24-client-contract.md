@@ -39,6 +39,8 @@ published before adt-clients depends on it, and adt-clients before mcp-abap-adt 
 
 ### Task A1: the result-set contracts and the publication config
 
+Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
+
 - Each of the 35 `IXResults` is added to its object's `src/adt/IAdtX.ts`, copied from adt-clients'
   `core/<dir>/types.ts`.
   - The names and slots stay as they are, all `readonly …: IResultStrategy<unknown>`.
@@ -76,9 +78,11 @@ published before adt-clients depends on it, and adt-clients before mcp-abap-adt 
 - Each factory becomes one signature,
   `getX<R extends IXResults = typeof xDocuments>(results?: R): AdtX<R>`. The body and the default
   value stay as they are.
-- `AdtClientLegacy`'s overrides stay assignable, including the two-overload getters from #271,
-  which each become one signature answering its legacy class. `createAdtClient()` keeps answering
-  `Promise<AdtClient>`.
+- `AdtClientLegacy`'s overrides stay assignable. #271 declares seven getters with the base's two
+  overloads; each becomes one signature. Three answer their legacy class (`getFunctionInclude`,
+  `getInclude`, `getMessageClass`). Four answer the base class through `absentOnLegacy`
+  (`getTransformation`, `getScalarFunction`, `getScalarFunctionImplementation`,
+  `getAppendStructure`). `createAdtClient()` keeps answering `Promise<AdtClient>`.
 - Type-level assertions (review focus 1): for one object of each slot kind (string slots, a
   `void` slot, the generic message-class set), `getX()` without a result set answers the same slot
   types as before.
