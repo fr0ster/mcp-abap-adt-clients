@@ -31,7 +31,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDebuggeeEnd,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IDebuggerBreakpoint,
@@ -54,15 +57,23 @@ import { readListenerConflict } from '../../../../runtime/debugger/abap';
 import { rawDocument } from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
+  configuredCase,
+  gate,
+  gateAll,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
   CleanupSteps,
   releaseThenLogOff,
   withCleanup,
 } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   createTestConnection,
   skipUnlessConfigured,
@@ -73,8 +84,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -84,10 +93,9 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase(
-  'runtime_debugger',
-  'adt_abap_debugger_modes',
-);
+const testCase = configuredCase('runtime_debugger', 'adt_abap_debugger_modes');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_abap_debugger_modes');
 const CLASS_A: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_MODES_A'
 ).toUpperCase();
@@ -323,7 +331,7 @@ class Scope {
     [];
   readonly sessions: Connection[] = [];
   readonly attached: Debugger[] = [];
-  readonly runs: Array<Promise<unknown>> = [];
+  readonly runs: Array<Promise<IAdtResponse<unknown>>> = [];
 
   /** Remember the ids a breakpoints answer carries, and the key they live under. */
   arm(
@@ -362,50 +370,50 @@ class Scope {
   }
 
   /**
-   * Debugger state is released quietly — a refusal is logged — but every
-   * session this scope opened is logged off through `steps`, so a failed
-   * log-off is reported.
+   * Every piece of debugger state is released through `steps`, each answer
+   * read: a refused or throwing release is a failure of the test, reported
+   * with the others, and every session this scope opened is logged off
+   * whatever the release did.
    */
   async close(steps: CleanupSteps): Promise<void> {
-    // Every session is logged off, whatever the release did.
     await releaseThenLogOff(
       steps,
       async () => {
-        const quietly = async (what: string, work: () => Promise<unknown>) => {
-          try {
-            await work();
-          } catch (error) {
-            testsLogger.warn?.(
-              `cleanup: ${what}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-          }
-        };
+        const release = (what: string, work: () => Promise<unknown>) =>
+          steps.run(what, work, { checkAnswer: true });
         for (const api of this.attached.splice(0)) {
-          await quietly('terminate the debuggee', () =>
+          await release('terminate the debuggee', () =>
             api.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
           );
         }
         for (const { api, identity, id } of this.armed.splice(0)) {
-          await quietly(`delete breakpoint ${id}`, () =>
-            api.deleteBreakpoint(identity, id),
+          await release(`delete breakpoint ${id}`, () =>
+            api.deleteBreakpoint(identity, id, { analyse: analyseException }),
           );
         }
         // Anything armed under the key that no answer named: an empty full set
         // clears the key.
         for (const { api, identity } of this.keys.splice(0)) {
-          await quietly('clear the key', () =>
+          await release('clear the key', () =>
             api.syncBreakpoints(
               identity,
               { scope: 'full', breakpoints: [] },
-              { headers: integrationHeadersOf(api, 'syncBreakpoints') },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(api, 'syncBreakpoints'),
+              },
             ),
           );
         }
         for (const { api, identity } of this.listeners.splice(0)) {
-          await quietly('stop the listener', () => api.stopListener(identity));
+          await release('stop the listener', () =>
+            api.stopListener(identity, { analyse: analyseException }),
+          );
         }
         for (const run of this.runs.splice(0)) {
-          await within(run, 45_000);
+          await steps.run('settle a probe run', () =>
+            settleRun(run, 45_000, 'a probe run', 'completed-or-terminated'),
+          );
         }
       },
       this.sessions.splice(0),
@@ -420,15 +428,6 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   /** Arms breakpoints and listens; never attaches. */
   let listenerApi: Debugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
-  }
 
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
@@ -449,9 +448,12 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     trigger: Connection | undefined = triggerConnection,
   ): Promise<IAdtResponse<unknown>> {
     needs(trigger, 'the trigger connection');
-    const run = new ClassExecutor(trigger as Connection, connectionLogger).run({
-      className,
-    });
+    const run = new ClassExecutor(trigger as Connection, connectionLogger).run(
+      {
+        className,
+      },
+      { analyse: analyseException },
+    );
     scope.runs.push(run);
     return run;
   }
@@ -474,6 +476,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     const who = options.as ?? identity;
     scope.listening(api, who);
     const listener = api.listen(who, {
+      analyse: analyseException,
       holdSeconds: options.holdSeconds ?? HOLD_SECONDS,
     });
     const early = await within(listener, 2000);
@@ -502,6 +505,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   ): Promise<{ connection: Connection; api: Debugger }> {
     const session = await scope.openSession();
     const answer = await session.api.attach(as, caught.debuggeeId, {
+      analyse: analyseException,
       server: caught.server,
     });
     if (!answer.ok) {
@@ -513,7 +517,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
   }
 
   async function stopLine(api: Debugger): Promise<number | undefined> {
-    const stack = await api.getStack();
+    const stack = await api.getStack({ analyse: analyseException });
     needs(stack.ok, `a stack: ${summary(stack)}`);
     return topLine(documentOf(stack));
   }
@@ -549,7 +553,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     needs(runB.caught, 'B caught');
     const session = await attachOn(scope, runB.caught as ICaught);
     expect(await stopLine(session.api)).toBe(LINE_B.RAISE + 1);
-    const next = await session.api.step('stepContinue');
+    const next = await session.api.step('stepContinue', {
+      analyse: analyseException,
+    });
     expect(next.ok).toBe(true);
     expect(await stopLine(session.api)).toBe(LINE_B.END);
     expect(await continueToEnd(scope, session.api, runB.run)).toBe(OUTPUT_B);
@@ -557,8 +563,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_abap_debugger_modes is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_abap_debugger_modes'),
+      );
     }
     try {
       listenerConnection = await createTestConnection(connectionLogger, {
@@ -569,8 +576,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(
@@ -606,7 +612,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     if (listenerApi && identity) {
       await steps.run(
         'stop the listener',
-        () => listenerApi.stopListener(identity),
+        () => listenerApi.stopListener(identity, { analyse: analyseException }),
         { checkAnswer: true },
       );
     }
@@ -617,15 +623,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 1. syncBreakpoints full -----------------------------------------------------
 
-  it(
+  debuggerCase(
     'full: replaces every breakpoint under the key, and an empty set clears it',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('LOOP'), lineB()],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(2);
@@ -636,7 +644,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             scope: 'full',
             breakpoints: [lineA('END')],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         expect(replaced.ok).toBe(true);
         expect(
@@ -669,7 +680,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             scope: 'full',
             breakpoints: [],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         expect(cleared.ok).toBe(true);
         record(1, `full [] answered ${summary(cleared)}`);
@@ -687,15 +701,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 2. syncBreakpoints partial --------------------------------------------------
 
-  it(
+  debuggerCase(
     "partial: replaces A's line breakpoints and keeps B's and the exception breakpoint",
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('LOOP'), lineB(), zeroDivide],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(3);
@@ -707,7 +723,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             objects: [CLASS_URI_A],
             breakpoints: [lineA('END')],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         expect(synced.ok).toBe(true);
         expect(
@@ -738,7 +757,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             objects: [CLASS_URI_A],
             breakpoints: [lineB()],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         scope.arm(listenerApi, identity, outside);
         record(2, `partial [A] with [B:END] answered ${summary(outside)}`);
@@ -757,7 +779,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             objects: [CLASS_URI_A],
             breakpoints: [],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         expect(emptied.ok).toBe(true);
         expect(breakpointRows(documentOf(emptied))).toHaveLength(0);
@@ -778,7 +803,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             objects: [CLASS_URI_NONE],
             breakpoints: [lineA('LOOP')],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         scope.arm(listenerApi, identity, alone);
         record(
@@ -798,7 +826,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
             objects: [CLASS_URI_A, CLASS_URI_NONE],
             breakpoints: [lineA('LOOP')],
           },
-          { headers: integrationHeadersOf(listenerApi, 'syncBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'syncBreakpoints'),
+          },
         );
         scope.arm(listenerApi, identity, mixed);
         record(
@@ -816,10 +847,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 12. what a plain setBreakpoints and a stopped listener leave ---------------
 
-  it(
+  debuggerCase(
     'setBreakpoints and stopListener: what each leaves of the breakpoints under the key',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         /** Arm B:END, do `then`, and answer whether a run of B is still caught. */
         const bAfter = async (
@@ -827,6 +857,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           then: () => Promise<IAdtResponse<unknown>>,
         ): Promise<boolean> => {
           const armed = await listenerApi.setBreakpoints(identity, [lineB()], {
+            analyse: analyseException,
             headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
           });
           expect(armed.ok).toBe(true);
@@ -855,7 +886,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         // The control: nothing in between, and B is caught.
         expect(
           await bAfter('nothing (control)', () =>
-            listenerApi.checkListener(identity),
+            listenerApi.checkListener(identity, { analyse: analyseException }),
           ),
         ).toBe(true);
         // Measured: a request without a sync scope replaces everything the
@@ -863,6 +894,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         expect(
           await bAfter('setBreakpoints [A:END]', () =>
             listenerApi.setBreakpoints(identity, [lineA('END')], {
+              analyse: analyseException,
               headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
             }),
           ),
@@ -870,6 +902,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         expect(
           await bAfter('setBreakpoints [exception] validationOnly', () =>
             listenerApi.setBreakpoints(identity, [zeroDivide], {
+              analyse: analyseException,
               headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
               validationOnly: true,
             }),
@@ -879,14 +912,14 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         // when no listener is running.
         expect(
           await bAfter('stopListener with no listener running', () =>
-            listenerApi.stopListener(identity),
+            listenerApi.stopListener(identity, { analyse: analyseException }),
           ),
         ).toBe(false);
         // The closing control: armed again, B is caught - so a run that went
         // bad on the way cannot pass the "not caught" answers above.
         expect(
           await bAfter('nothing (closing control)', () =>
-            listenerApi.checkListener(identity),
+            listenerApi.checkListener(identity, { analyse: analyseException }),
           ),
         ).toBe(true);
       });
@@ -896,10 +929,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 3. skipCount ----------------------------------------------------------------
 
-  it(
+  debuggerCase(
     'skipCount: the server ignores it on an external line breakpoint, the first hit stops',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         // Sent by hand: the contract has no skipCount any more, because the server
         // ignores it on an external breakpoint - which this measures.
@@ -934,6 +966,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const session = await attachOn(scope, runA.caught as ICaught);
         expect(await stopLine(session.api)).toBe(LINE_A.LOOP);
         const read = await session.api.getVariables(['LV_I'], {
+          analyse: analyseException,
           headers: integrationHeadersOf(session.api, 'getVariables'),
         });
         expect(read.ok).toBe(true);
@@ -955,15 +988,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 4. detachDebugger without an id ---------------------------------------------
 
-  it(
+  debuggerCase(
     'detachDebugger without an id: the debugger leaves and the run goes on',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('LOOP'), lineA('END')],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(2);
@@ -977,16 +1012,20 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         // same run — at the next LOOP pass or at END — is seen.
         scope.listening(listenerApi, identity);
         const relisten = listenerApi.listen(identity, {
+          analyse: analyseException,
           holdSeconds: SHORT_HOLD_SECONDS,
         });
         await sleep(2000);
-        const detached = await session.api.detachDebugger();
+        const detached = await session.api.detachDebugger({
+          analyse: analyseException,
+        });
         record(4, `detachDebugger() answered ${summary(detached)}`);
         expect(detached.ok).toBe(true);
         expect(documentOf(detached)).toBe('');
         scope.released(session.api);
 
         const second = await relisten;
+        expect(second.ok).toBe(true);
         const secondId = tag(documentOf(second), 'DEBUGGEE_ID');
         // Measured: the external breakpoint catches the same run again, at
         // the next pass over the loop line.
@@ -1016,15 +1055,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 5. detachDebugger with a caught, unattached id ------------------------------
 
-  it(
+  debuggerCase(
     'detachDebugger with the id of a caught debuggee nobody attached',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('END')],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(1);
@@ -1034,6 +1075,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const fresh = await scope.openSession();
         const started = Date.now();
         const detached = await fresh.api.detachDebugger({
+          analyse: analyseException,
           debuggeeId: (runA.caught as ICaught).debuggeeId,
         });
         record(
@@ -1063,15 +1105,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 6. detachDebugger with an id another session attached -----------------------
 
-  it(
+  debuggerCase(
     'detachDebugger with the id of a debuggee another session attached',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('END')],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(1);
@@ -1083,6 +1127,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const s2 = await scope.openSession();
         const detached = await s2.api.detachDebugger({
+          analyse: analyseException,
           debuggeeId: (runA.caught as ICaught).debuggeeId,
         });
 
@@ -1107,11 +1152,14 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           expect(await continueToEnd(scope, s1.api, runA.run)).toBe(OUTPUT_A);
         } else {
           scope.released(s1.api);
-          const output = await within(runA.run, 60_000);
-          record(
-            6,
-            `the run ${output ? `returned "${documentOf(output).trim()}"` : 'had not returned after 60 s'}`,
+          // The debuggee ended: the run must come back with its output.
+          const output = await settleRun(
+            runA.run,
+            60_000,
+            'the run',
+            'completed',
           );
+          record(6, `the run returned "${documentOf(output).trim()}"`);
         }
       });
     },
@@ -1120,15 +1168,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 7. terminateDebugger --------------------------------------------------------
 
-  it(
+  debuggerCase(
     'terminateDebugger: the debugger is freed and the run finishes with its output',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('END')],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(1);
@@ -1138,7 +1188,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const session = await attachOn(scope, runA.caught as ICaught);
         expect(await stopLine(session.api)).toBe(LINE_A.END);
 
-        const terminated = await session.api.terminateDebugger();
+        const terminated = await session.api.terminateDebugger({
+          analyse: analyseException,
+        });
         record(7, `terminateDebugger() answered ${summary(terminated)}`);
         // Measured: the server frees the debugger's own ABAP session
         // (SYSTEM-CALL FREE MODE 0), so the request ends in a plain ICF 500 -
@@ -1154,7 +1206,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           OUTPUT_A,
         );
 
-        const after = await session.api.getStack();
+        const after = await session.api.getStack({ analyse: analyseException });
         record(7, `a stack read on that session afterwards: ${summary(after)}`);
         expect(statusOf(after)).toBe(400);
       });
@@ -1164,15 +1216,17 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 8. setDebuggerSettings ------------------------------------------------------
 
-  it(
+  debuggerCase(
     'setDebuggerSettings: a mandatory field left out keeps its value; showDataAging does not',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const armed = await listenerApi.setBreakpoints(
           identity,
           [lineA('END')],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         expect(armed.ok).toBe(true);
         expect(scope.arm(listenerApi, identity, armed)).toHaveLength(1);
@@ -1184,6 +1238,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const readBack = async (label: string) => {
           const read = await api.getVariables(['LV_I'], {
+            analyse: analyseException,
             headers: integrationHeadersOf(api, 'getVariables'),
           });
           record(
@@ -1197,7 +1252,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         // The first call after the attach, with systemDebugging=false.
         const first = await api.setDebuggerSettings(
           { systemDebugging: false },
-          { headers: integrationHeadersOf(api, 'setDebuggerSettings') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(api, 'setDebuggerSettings'),
+          },
         );
         record(
           8,
@@ -1211,7 +1269,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const on = await api.setDebuggerSettings(
           { systemDebugging: true },
-          { headers: integrationHeadersOf(api, 'setDebuggerSettings') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(api, 'setDebuggerSettings'),
+          },
         );
         record(8, `{ systemDebugging: true } answered ${summary(on)}`);
         expect(on.ok).toBe(true);
@@ -1220,7 +1281,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const kept = await api.setDebuggerSettings(
           {},
-          { headers: integrationHeadersOf(api, 'setDebuggerSettings') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(api, 'setDebuggerSettings'),
+          },
         );
         record(8, `{} answered ${summary(kept)}`);
         expect(kept.ok).toBe(true);
@@ -1229,7 +1293,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const off = await api.setDebuggerSettings(
           { systemDebugging: false },
-          { headers: integrationHeadersOf(api, 'setDebuggerSettings') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(api, 'setDebuggerSettings'),
+          },
         );
         record(8, `{ systemDebugging: false } answered ${summary(off)}`);
         expect(off.ok).toBe(true);
@@ -1238,7 +1305,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const aging = await api.setDebuggerSettings(
           { showDataAging: true },
-          { headers: integrationHeadersOf(api, 'setDebuggerSettings') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(api, 'setDebuggerSettings'),
+          },
         );
         record(8, `{ showDataAging: true } answered ${summary(aging)}`);
         expect(aging.ok).toBe(true);
@@ -1246,7 +1316,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         await readBack('showDataAging true');
         const agingOff = await api.setDebuggerSettings(
           {},
-          { headers: integrationHeadersOf(api, 'setDebuggerSettings') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(api, 'setDebuggerSettings'),
+          },
         );
         record(8, `{} after showDataAging answered ${summary(agingOff)}`);
         expect(agingOff.ok).toBe(true);
@@ -1263,12 +1336,13 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 9. checkListener ------------------------------------------------------------
 
-  it(
+  debuggerCase(
     'checkListener: 200 empty when free, 409 naming the holder when another listener holds the user',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
-        const free = await listenerApi.checkListener(identity);
+        const free = await listenerApi.checkListener(identity, {
+          analyse: analyseException,
+        });
         record(9, `checkListener free answered ${summary(free)}`);
         expect(statusOf(free)).toBe(200);
         expect(documentOf(free).trim()).toBe('');
@@ -1281,10 +1355,15 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const holderIdentity = otherIde(identity, 'check-holder');
         const holder = debuggerOn(holderConnection, 'takeOver');
         scope.listening(holder, holderIdentity);
-        const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
+        const holding = holder.listen(holderIdentity, {
+          analyse: analyseException,
+          holdSeconds: 10,
+        });
         await sleep(2000);
 
-        const busy = await listenerApi.checkListener(identity);
+        const busy = await listenerApi.checkListener(identity, {
+          analyse: analyseException,
+        });
         record(9, `checkListener while held answered ${summary(busy)}`);
         expect(statusOf(busy)).toBe(409);
         expect(busy.ok).toBe(false);
@@ -1298,7 +1377,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           identity.debuggingMode === 'user' ? identity.requestUser : undefined,
         );
 
-        await holding;
+        // The holder's own long poll ends when its hold runs out, with
+        // nothing caught: an answer, not a refusal.
+        expectResult(await holding, "the holder's listen");
       });
     },
     STEP_TIMEOUT,
@@ -1306,10 +1387,9 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
   // --- 10. terminal mode, without SAP GUI ------------------------------------------
 
-  it(
+  debuggerCase(
     'terminal mode: check, listen and stop, set and delete a breakpoint',
     async () => {
-      if (skipped()) return;
       await inScope(async (scope) => {
         const terminal: IDebuggerIdentity = {
           debuggingMode: 'terminal',
@@ -1317,31 +1397,43 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
           ideId: hex32(),
         };
 
-        const checked = await listenerApi.checkListener(terminal);
+        const checked = await listenerApi.checkListener(terminal, {
+          analyse: analyseException,
+        });
         record(10, `terminal checkListener answered ${summary(checked)}`);
         expect(statusOf(checked)).toBe(200);
 
         scope.listening(listenerApi, terminal);
-        const listened = await listenerApi.listen(terminal, { holdSeconds: 5 });
+        const listened = await listenerApi.listen(terminal, {
+          analyse: analyseException,
+          holdSeconds: 5,
+        });
         record(
           10,
           `terminal listener (hold 5 s) answered ${summary(listened)}`,
         );
         expect(listened.ok).toBe(true);
-        const stopped = await listenerApi.stopListener(terminal);
+        const stopped = await listenerApi.stopListener(terminal, {
+          analyse: analyseException,
+        });
         record(10, `terminal stopListener answered ${summary(stopped)}`);
         expect(stopped.ok).toBe(true);
 
         const armed = await listenerApi.setBreakpoints(
           terminal,
           [lineA('LOOP')],
-          { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+          },
         );
         record(10, `terminal breakpoint answered ${summary(armed)}`);
         expect(armed.ok).toBe(true);
         const ids = scope.arm(listenerApi, terminal, armed);
         expect(ids).toHaveLength(1);
-        const deleted = await listenerApi.deleteBreakpoint(terminal, ids[0]);
+        const deleted = await listenerApi.deleteBreakpoint(terminal, ids[0], {
+          analyse: analyseException,
+        });
         record(10, `terminal deleteBreakpoint answered ${summary(deleted)}`);
         expect(statusOf(deleted)).toBe(200);
         scope.armed.splice(0);
@@ -1391,14 +1483,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     }
   }
 
-  it(
+  // Needs a second user's environment file named in the case.
+  gateAll(debuggerCase, SECOND_USER_ENV ? it : it.skip)(
     "another user: our debugger catches the second user's run of A",
     async () => {
-      if (skipped()) return;
-      if (!SECOND_USER_ENV) {
-        testsLogger.info?.('skipped: second_user_env is empty');
-        return;
-      }
       const file = SECOND_USER_ENV.startsWith('~/')
         ? path.join(os.homedir(), SECOND_USER_ENV.slice(2))
         : SECOND_USER_ENV;
@@ -1433,6 +1521,7 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
         const takerSession = await scope.openSession();
         const taker = debuggerOn(takerSession.connection, 'takeOver');
         const armed = await taker.setBreakpoints(forOther, [lineA('LOOP')], {
+          analyse: analyseException,
           headers: integrationHeadersOf(taker, 'setBreakpoints'),
         });
         expect(armed.ok).toBe(true);

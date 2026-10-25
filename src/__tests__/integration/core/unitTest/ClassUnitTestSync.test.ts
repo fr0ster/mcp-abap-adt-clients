@@ -15,7 +15,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -26,9 +31,20 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { runToCompletion } from '../../../helpers/abapUnitRun';
+import {
+  isFailureAlert,
+  readMethodVerdicts,
+  runToCompletion,
+} from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+} from '../../../helpers/caseGate';
+import { expectResult, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -37,7 +53,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -45,14 +60,12 @@ import {
 } from '../../../helpers/testLogger';
 import {
   logTestEnd,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -75,26 +88,25 @@ interface IRunReading {
   methods: string[];
   /** `kind` of every alert. */
   alerts: string[];
+  /** Failure alerts at any scope, as `kind@scope`. */
+  failures: string[];
   /** Methods carrying at least one alert. */
   failed: string[];
 }
 
 function readRunResult(document: string): IRunReading {
-  const methods: string[] = [];
-  const failed: string[] = [];
-  const alerts: string[] = [];
-  // A method is either self-closing or closes after its alerts.
-  for (const m of document.matchAll(
-    /<testMethod [^>]*adtcore:name="([^"]+)"[^>]*?(\/>|>([\s\S]*?)<\/testMethod>)/g,
-  )) {
-    methods.push(m[1]);
-    const kinds = [...(m[3] ?? '').matchAll(/<alert kind="([^"]+)"/g)].map(
-      (a) => a[1],
-    );
-    if (kinds.length > 0) failed.push(m[1]);
-    alerts.push(...kinds);
-  }
-  return { methods: methods.sort(), alerts, failed: failed.sort() };
+  // Parsed, not matched: an alert is found whatever its attribute order.
+  const { methods, alerts } = readMethodVerdicts(document);
+  return {
+    methods: methods.map((m) => m.name).sort(),
+    // Every scope: a run- or class-level alert is not dropped.
+    alerts: alerts.map((a) => a.kind),
+    failures: alerts.filter(isFailureAlert).map((a) => `${a.kind}@${a.scope}`),
+    failed: methods
+      .filter((m) => m.alerts.length > 0)
+      .map((m) => m.name)
+      .sort(),
+  };
 }
 
 /** The result document's root element and its namespace, for the report. */
@@ -108,9 +120,7 @@ function rootOf(document: string): string {
 describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -126,10 +136,8 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
         systemContext,
       );
       client = resolved.client;
-      isLegacy = resolved.isLegacy;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -139,38 +147,24 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
     }
   });
 
-  it(
+  gateAll(
+    gate('run_unit_test', 'adt_unit_test_sync'),
+    // The legacy runner's `run` is the synchronous request already; there is
+    // no asynchronous one to compare it with.
+    gateOn(({ isLegacy }) => !isLegacy),
+  )(
     'both runners find the same tests, the same failure and the same alert',
     async () => {
-      const testCase = getTestCaseDefinition(
-        'run_unit_test',
-        'adt_unit_test_sync',
-      );
+      const testCase = configuredCase('run_unit_test', 'adt_unit_test_sync');
       logTestStart(testsLogger, TITLE, {
         name: 'adt_unit_test_sync',
         params: {},
       });
       try {
-        if (!hasConfig) {
-          logTestSkip(testsLogger, TITLE, 'No SAP configuration');
-          return;
-        }
         if (!testCase?.params?.container_class) {
-          logTestSkip(
-            testsLogger,
-            TITLE,
+          throw new Error(
             'adt_unit_test_sync not in test-config.yaml (npm run check:config)',
           );
-          return;
-        }
-        // The legacy runner's `run` is the synchronous request already; there
-        // is no asynchronous one to compare it with.
-        if (
-          isLegacy ||
-          !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-        ) {
-          logTestSkip(testsLogger, TITLE, 'No asynchronous runner on legacy');
-          return;
         }
 
         const className: string = testCase.params.container_class;
@@ -183,7 +177,9 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
 
         // Idempotent: a class left by an earlier, interrupted run goes first.
         const before = presenceOf(
-          await cls.read({ className }),
+          await cls.read({ className }, undefined, {
+            analyse: analyseException,
+          }),
           `class ${className}`,
         );
         if (before.present === 'unknown') throw new Error(before.reason);
@@ -191,6 +187,7 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           logTestStep('delete (leftover)', testsLogger);
           expectResult(
             await cls.delete(config, {
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(cls, 'delete'),
             }),
             'delete the leftover class',
@@ -206,50 +203,67 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
               transportRequest,
               description: 'ABAP Unit: async and sync runners',
             },
-            { headers: integrationHeadersOf(cls, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(cls, 'create'),
+            },
           ),
           'create the class',
         );
 
         try {
           logTestStep('update (source)', testsLogger);
-          const handle = String(expectResult(await cls.lock(config), 'lock'));
-          try {
+          const handle = String(
             expectResult(
-              await cls.update(config, {
-                headers: integrationHeadersOf(cls, 'update'),
-                source: testCase.params.source_code,
-                lockHandle: handle,
-              }),
-              'write the class source',
-            );
-          } finally {
-            await cls.unlock(config, handle);
-          }
+              await cls.lock(config, { analyse: analyseException }),
+              'lock',
+            ),
+          );
+          await releasing(
+            async () =>
+              expectResult(
+                await cls.update(config, {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(cls, 'update'),
+                  source: testCase.params.source_code,
+                  lockHandle: handle,
+                }),
+                'write the class source',
+              ),
+            () => cls.unlock(config, handle, { analyse: analyseException }),
+            'unlock after write the class source',
+          );
 
           logTestStep('update (testclasses)', testsLogger);
           const includeHandle = String(
-            expectResult(await cls.lock(config), 'lock for testclasses'),
-          );
-          try {
             expectResult(
-              await client.getLocalTestClass().update(config, {
-                headers: integrationHeadersOf(
-                  client.getLocalTestClass(),
-                  'update',
-                ),
-                source: testCase.params.test_class_source,
-                lockHandle: includeHandle,
-              }),
-              'write the testclasses include',
-            );
-          } finally {
-            await cls.unlock(config, includeHandle);
-          }
+              await cls.lock(config, { analyse: analyseException }),
+              'lock for testclasses',
+            ),
+          );
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getLocalTestClass().update(config, {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getLocalTestClass(),
+                    'update',
+                  ),
+                  source: testCase.params.test_class_source,
+                  lockHandle: includeHandle,
+                }),
+                'write the testclasses include',
+              ),
+            () =>
+              cls.unlock(config, includeHandle, { analyse: analyseException }),
+            'unlock after write the testclasses include',
+          );
 
           logTestStep('activate', testsLogger);
           expectResult(
             await cls.activate(config, {
+              analyse: judged(analyseActivation),
               headers: integrationHeadersOf(cls, 'activate'),
             }),
             'activate the class',
@@ -268,11 +282,16 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           const asyncRun = await runToCompletion(runner, className);
           const asyncMs = Date.now() - asyncStarted;
           const asyncReading = readRunResult(asyncRun.result);
+          // The reparse keeps what the run reported, at every scope.
+          expect(asyncReading.alerts).toEqual(asyncRun.alerts);
 
           logTestStep('runSync (synchronous)', testsLogger);
           const syncStarted = Date.now();
           const syncDocument = String(
-            expectResult(await runner.runSync(className), 'runSync'),
+            expectResult(
+              await runner.runSync(className, { analyse: analyseException }),
+              'runSync',
+            ),
           );
           const syncMs = Date.now() - syncStarted;
           const syncReading = readRunResult(syncDocument);
@@ -310,14 +329,19 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           // HARMLESS, so a run that excludes harmless runs none of them — on
           // both runners.
           logTestStep('both runners, harmless excluded', testsLogger);
-          const noHarmless = { riskLevel: { harmless: false } };
+          // A fresh object per call: one shared object handed to a helper
+          // could be changed before the member call reads it.
+          const noHarmless = () => ({ riskLevel: { harmless: false } });
           const asyncFiltered = readRunResult(
-            (await runToCompletion(runner, className, noHarmless)).result,
+            (await runToCompletion(runner, className, noHarmless())).result,
           );
           const syncFiltered = readRunResult(
             String(
               expectResult(
-                await runner.runSync(className, noHarmless),
+                await runner.runSync(className, {
+                  analyse: analyseException,
+                  ...noHarmless(),
+                }),
                 'runSync without harmless tests',
               ),
             ),
@@ -326,18 +350,26 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
             async: asyncFiltered,
             sync: syncFiltered,
           });
+          // None ran, and the run itself raised no failure: an empty method
+          // list beside a run- or class-level failure is a run that failed,
+          // not one that excluded everything.
           expect(asyncFiltered.methods).toEqual([]);
+          expect(asyncFiltered.failures).toEqual([]);
           expect(syncFiltered.methods).toEqual([]);
+          expect(syncFiltered.failures).toEqual([]);
         } finally {
           logTestStep('delete (cleanup)', testsLogger);
           expectResult(
             await cls.delete(config, {
+              analyse: judged(analyseDeletion),
               headers: integrationHeadersOf(cls, 'delete'),
             }),
             'delete the class',
           );
           const after = presenceOf(
-            await cls.read({ className }),
+            await cls.read({ className }, undefined, {
+              analyse: analyseException,
+            }),
             `class ${className}`,
           );
           expect(after).toEqual({ present: false });

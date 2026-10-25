@@ -85,11 +85,18 @@ export function configOf(target: ITarget): SapConfig {
   if (!url || !/^https?:\/\//.test(url)) {
     fail(`${target.file}: missing or invalid SAP_URL`);
   }
+  // SAP_AUTH_TYPE is required and taken as stated: absent, or a value
+  // outside basic / jwt / xsuaa, is refused — never read off the credentials.
   const authType = clean(env.SAP_AUTH_TYPE)?.toLowerCase();
-  const jwt =
-    authType === 'jwt' ||
-    authType === 'xsuaa' ||
-    (!authType && Boolean(clean(env.SAP_JWT_TOKEN)));
+  if (!authType) {
+    fail(`${target.file}: SAP_AUTH_TYPE is not set — state basic, jwt or xsuaa`);
+  }
+  if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
+    fail(
+      `${target.file}: SAP_AUTH_TYPE is "${authType}", which is not one of basic, jwt, xsuaa`,
+    );
+  }
+  const jwt = authType === 'jwt' || authType === 'xsuaa';
 
   const config: SapConfig = { url, authType: jwt ? 'jwt' : 'basic' };
   const client = clean(env.SAP_CLIENT);

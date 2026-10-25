@@ -20,7 +20,7 @@ const path = require('path');
 const TEST_DIR = path.resolve(__dirname, '../src/__tests__/integration');
 const YAML_CONFIG = path.resolve(
   __dirname,
-  '../src/__tests__/helpers/test-config.yaml',
+  '../src/__tests__/helpers/test-config.yaml.template',
 );
 
 // Special cases: Builders with only 1 test

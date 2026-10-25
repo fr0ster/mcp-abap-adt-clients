@@ -19,12 +19,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   deleteDomain,
@@ -46,7 +48,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -68,7 +69,6 @@ const TEST_NAME = 'Domain - lock registry final unlock';
 describe('Domain lock registry (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
   let config: IDomainConfig | undefined;
   let domainType: { datatype?: string; length?: number; decimals?: number } =
@@ -116,15 +116,14 @@ describe('Domain lock registry (using AdtClient)', () => {
           decimals: params.decimals,
         };
       }
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
-  it(
+  gate('create_domain', 'domain_lock_registry')(
     'unlockAll() releases a lock the caller never unlocked',
     async () => {
       logTestStart(testsLogger, TEST_NAME, {
@@ -132,9 +131,10 @@ describe('Domain lock registry (using AdtClient)', () => {
         params: { domain_name: config?.domainName },
       });
 
-      if (!hasConfig || !client || !config) {
-        logTestSkip(testsLogger, TEST_NAME, 'No SAP configuration');
-        return;
+      if (!client || !config) {
+        throw new Error(
+          'create_domain/domain_lock_registry needs domain_name and a package in test-config.yaml',
+        );
       }
 
       try {
@@ -145,7 +145,7 @@ describe('Domain lock registry (using AdtClient)', () => {
         // registry. Deliberately do NOT unlock here.
         const domain = client.getDomain();
         const lockHandle = expectResult(
-          await domain.lock(config),
+          await domain.lock(config, { analyse: analyseException }),
           'lockHandle',
         );
         expect(typeof lockHandle).toBe('string');

@@ -27,8 +27,10 @@
  */
 
 import {
+  analyseActivation,
   analyseDeletion,
-  analyseUnsupportedStatus,
+  analyseException,
+  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtActivatable,
@@ -44,17 +46,19 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
 } from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { integrationHeadersOf } from './adtHeaders';
+import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
+import { judged } from './judged';
 import {
   expectLockReleased,
   factoryOf,
   type ILockWindow,
   lockReleaseCheckEnabled,
+  noteLockReleaseCheckOff,
 } from './lockReleased';
 import {
   createTestAdtClient,
@@ -63,17 +67,17 @@ import {
   resolveSystemContext,
 } from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
-import { createLibraryLogger } from './testLogger';
+import { createLibraryLogger, createRunIntegrityLogger } from './testLogger';
 import {
   getHttpStatusText,
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestStepError,
   logTestSuccess,
 } from './testProgressLogger';
+import { validationErrors } from './validationVerdict';
 
 export interface ITestCaseParams {
   skip_cleanup?: boolean;
@@ -102,6 +106,12 @@ export interface IFlowTestOptions {
    * and returns the one to write, which is where a test changes a field.
    */
   updateTakesDocument?: boolean | ((current: string) => string);
+  /**
+   * The validate step is not sent, and the run logs this sentence, which names
+   * the configuration key that turned it off. Absent, the name is validated
+   * and any refusal fails.
+   */
+  skipValidation?: string;
   activateOnCreate?: boolean;
   activateOnUpdate?: boolean;
   timeout?: number;
@@ -223,16 +233,15 @@ export class BaseTester<TConfig, TState = unknown> {
   /**
    * A failure to put the system into the state the test needs.
    *
-   * Kept apart from `skipReason` because the two mean opposite things and were
-   * being reported the same way. `skipReason` says the test does not apply here
-   * — no SAP configured, `available_in` excludes this system, the case is
-   * disabled. Nothing ran and nothing should have.
-   *
-   * This says the test does apply and the run could not get far enough to try:
-   * a leftover object that would not delete, most often. Routed through
-   * `skipReason` it printed SKIP and jest counted it green, so a suite that
-   * tested nothing was indistinguishable from one that passed — measured on
-   * on premise (BASIS 816), where a package left behind by a failed delete made the next run
+   * Whether a case applies to the system is decided before the test body runs:
+   * the suite registers it through `gate`, which registers `it.skip` for a case
+   * that is disabled, unavailable here or has no SAP behind it. A body that
+   * runs therefore applies, and whatever stops it from getting far enough to
+   * try is this error: a case missing from the configuration, no default
+   * package, a leftover object that would not delete. Routed through a skip it
+   * printed SKIP and jest counted it green, so a suite that tested nothing was
+   * indistinguishable from one that passed — measured on on premise (BASIS
+   * 816), where a package left behind by a failed delete made the next run
    * report success having executed neither create nor update.
    */
   private setupError: string | null = null;
@@ -246,7 +255,6 @@ export class BaseTester<TConfig, TState = unknown> {
   // Test state
   private testCase: any = null;
   private config: TConfig | null = null;
-  private skipReason: string | null = null;
   private configResolver: TestConfigResolver | null = null;
 
   /**
@@ -349,26 +357,16 @@ export class BaseTester<TConfig, TState = unknown> {
       );
       return;
     }
-    try {
-      logTestStep('delete (pre-existing object cleanup)', this.logger);
-      if (this.cleanupObjectFn) {
-        await this.cleanupObjectFn(config);
-      } else {
-        await this.deleteOrRaise(config as Partial<TConfig>);
-      }
-      this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
-      this.objectCreated = false;
-    } catch (cleanupError) {
-      // Not raised: this runs on the skip path, where the test was never going
-      // to execute, and turning a legitimate skip red would say the wrong
-      // thing. Recorded at ERROR because the object is still there and the run
-      // after this one will meet it.
-      this.log(
-        LogLevel.ERROR,
-        'Pre-existing object cleanup failed — it is left on the system:',
-        cleanupError,
-      );
+    // A failed removal throws: the caller, which is already failing the
+    // test, reports it beside its own failure.
+    logTestStep('delete (pre-existing object cleanup)', this.logger);
+    if (this.cleanupObjectFn) {
+      await this.cleanupObjectFn(config);
+    } else {
+      await this.deleteOrRaise(config as Partial<TConfig>);
     }
+    this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
+    this.objectCreated = false;
   }
 
   /**
@@ -391,7 +389,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // into it; the test wants the real outcome, so it asks for the reading.
     const answer = await this.adtObject.delete(config, {
       headers: integrationHeadersOf(this.adtObject, 'delete'),
-      analyse: analyseDeletion,
+      analyse: judged(analyseDeletion),
     });
     if (!answer.ok) {
       const failure = answer.getError();
@@ -435,13 +433,26 @@ export class BaseTester<TConfig, TState = unknown> {
   private readWhatItHas(
     config: Partial<TConfig>,
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+    // No `analyse` among them: the strategy is this harness's own
+    // (analyseException), and an options object carrying one — possibly
+    // `undefined` — would override it.
+    options?: { withLongPolling?: boolean } & Omit<
+      IAdtOperationOptions,
+      'analyse'
+    >,
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.read) {
-      return this.adtObject.read(config, version, options);
+      return this.adtObject.read(config, version, {
+        analyse: analyseException,
+        ...options,
+      });
     }
     if (this.adtObject.readMetadata) {
-      return this.adtObject.readMetadata(config, { ...options, version });
+      return this.adtObject.readMetadata(config, {
+        analyse: analyseException,
+        ...options,
+        version,
+      });
     }
     throw new Error(
       `${this.loggerPrefix} offers neither read() nor readMetadata() — every ` +
@@ -449,18 +460,62 @@ export class BaseTester<TConfig, TState = unknown> {
     );
   }
 
+  /**
+   * The `readMetadata` step of a flow: its answer has to be a value.
+   *
+   * The one refusal accepted is the one the configuration accepts — HTTP 406
+   * with `allow_406` on the case or in `test_settings` — and it is read off the
+   * answer's own status. The step used to look for a thrown `response.status`
+   * and a `status` on the answer, neither of which a returned failure has, so
+   * a refused read passed as a read.
+   */
+  private async readMetadataStep(
+    config: Partial<TConfig>,
+    options?: { withLongPolling?: boolean },
+  ): Promise<void> {
+    const answer = await this.adtObject.readMetadata?.(config, {
+      analyse: analyseException,
+      ...options,
+    });
+    if (!answer) {
+      throw new Error(
+        `${this.loggerPrefix} offers no readMetadata() — the flow asked for ` +
+          'the object document and this type has none.',
+      );
+    }
+    if (!answer.ok && answer.getError().response?.status === 406) {
+      const { isHttpStatusAllowed, getAcceptHint } = require('./test-helper');
+      if (isHttpStatusAllowed(406, this.testCase)) {
+        const acceptHint = getAcceptHint({
+          response: answer.getError().response,
+        });
+        this.log(
+          LogLevel.WARN,
+          `readMetadata skipped: 406 Not Acceptable (allowed by config)${
+            acceptHint ? `; ${acceptHint}` : ''
+          }`,
+        );
+        return;
+      }
+    }
+    expectResult(answer, 'readMetadata');
+  }
+
   private writeWhatItHas(
     config: Partial<TConfig>,
-    options?: IAdtOperationOptions,
+    // No `analyse`: the strategy is the harness's own (analyseException).
+    options?: Omit<IAdtOperationOptions, 'analyse'>,
   ): Promise<IAdtResponse<unknown>> {
     if (this.adtObject.update) {
       return this.adtObject.update(config, {
+        analyse: analyseException,
         ...options,
         headers: integrationHeadersOf(this.adtObject, 'update'),
       });
     }
     if (this.adtObject.updateMetadata) {
       return this.adtObject.updateMetadata(config, {
+        analyse: analyseException,
         ...options,
         headers: integrationHeadersOf(this.adtObject, 'updateMetadata'),
       });
@@ -481,28 +536,45 @@ export class BaseTester<TConfig, TState = unknown> {
       return await this.writeWhatItHas(config, options);
     }
 
-    const handle = expectResult(await this.adtObject.lock(config), 'lock');
+    const handle = expectResult(
+      await this.adtObject.lock(config, { analyse: analyseException }),
+      'lock',
+    );
     this.objectLocked = true;
     this.lockHandle = handle;
     let unlocked = false;
     let written: unknown;
+    let writeThrew = false;
+    let unlockRefusal = '';
     try {
       written = await this.writeWhatItHas(config, {
         ...options,
         lockHandle: handle,
       });
+    } catch (error) {
+      writeThrew = true;
+      throw error;
     } finally {
-      const released = await this.adtObject.unlock(config, handle);
+      const released = await this.adtObject.unlock(config, handle, {
+        analyse: analyseException,
+      });
       this.objectLocked = false;
       this.lockHandle = undefined;
       unlocked = released.ok;
       if (!released.ok) {
-        this.log(
-          LogLevel.WARN,
-          `unlock after update failed, the handle may still be held: ${released.getError().message}`,
-        );
+        const refusal = `unlock after update failed, the handle may still be held: ${released.getError().message}`;
+        const writeFailed =
+          writeThrew ||
+          (written as IAdtResponse<unknown> | undefined)?.ok === false;
+        // A refused UNLOCK fails the test: the handle left held is what makes
+        // the next run's create answer 403 with nothing appearing to hold it.
+        // When the write itself failed, that failure is the one the caller
+        // raises, so this one is logged beside it instead of replacing it.
+        if (writeFailed) this.log(LogLevel.WARN, refusal);
+        else unlockRefusal = refusal;
       }
     }
+    if (unlockRefusal) throw new Error(unlockRefusal);
     // Only after an UNLOCK that answered ok: that is the answer that can be
     // wrong — a stateless UNLOCK answers 200 and releases nothing.
     if (unlocked) await this.expectLockReleased(config);
@@ -518,7 +590,10 @@ export class BaseTester<TConfig, TState = unknown> {
    * include's tester locks the class, and so does its check.
    */
   private async expectLockReleased(config: Partial<TConfig>): Promise<void> {
-    if (!lockReleaseCheckEnabled()) return;
+    if (!lockReleaseCheckEnabled()) {
+      noteLockReleaseCheckOff(`${this.loggerPrefix} ${describeObject(config)}`);
+      return;
+    }
     logTestStep('verify unlock released the lock', this.logger);
     // The factory is found on the verifier's own client: it is an AdtClient
     // like any other, and not every tester hands its client to setup().
@@ -534,7 +609,7 @@ export class BaseTester<TConfig, TState = unknown> {
             `${this.loggerPrefix}: no zero-argument factory on the client ` +
               `builds a ${handlerClass.constructor.name}, so the lock-release ` +
               'check cannot open this handler on its own session. Set ' +
-              'VERIFY_LOCK_RELEASED=false to run without it.',
+              'environment.verify_lock_released: false to run without it.',
           );
         }
         return (
@@ -757,7 +832,10 @@ export class BaseTester<TConfig, TState = unknown> {
       logTestStep(label, this.logger);
       const answer = await this.adtObject.readMetadata?.(
         config as Partial<TConfig>,
-        withLongPolling ? { withLongPolling: true } : undefined,
+        {
+          analyse: analyseException,
+          ...(withLongPolling ? { withLongPolling: true } : undefined),
+        },
       );
       if (!answer) {
         throw new Error(
@@ -788,31 +866,28 @@ export class BaseTester<TConfig, TState = unknown> {
       const encodedUri = encodeURIComponent(sourceUrl);
       const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
       logTestStep(label, this.logger);
-      try {
-        const response = await this.connection.makeAdtRequest({
-          url,
-          method: 'GET',
-          timeout: 0,
-          headers: {
-            Accept:
-              'application/vnd.sap.adt.repository.objproperties.result.v1+xml, application/vnd.sap.adt.objectproperties+xml, application/xml',
-          },
-        });
-        const payload = getPayloadText(response?.data);
-        logTestStep(
-          `${label} length: ${payload?.length || 0} characters`,
-          this.logger,
-        );
-      } catch (error: any) {
-        const errorText =
-          error?.message ||
-          error?.response?.data ||
-          'Unknown object properties error';
-        logTestStep(
-          `${label} failed: ${String(errorText).slice(0, 200)}`,
-          this.logger,
+      // A thrown request fails the step, and so does an answer that is not a
+      // 2xx or carries nothing: this read is part of the flow, not a probe.
+      const response = await this.connection.makeAdtRequest({
+        url,
+        method: 'GET',
+        timeout: 0,
+        headers: {
+          Accept:
+            'application/vnd.sap.adt.repository.objproperties.result.v1+xml, application/vnd.sap.adt.objectproperties+xml, application/xml',
+        },
+      });
+      const status = response?.status;
+      if (typeof status !== 'number' || status < 200 || status >= 300) {
+        throw new Error(
+          `${label} failed: object properties answered HTTP ${String(status)}`,
         );
       }
+      const payload = getPayloadText(response.data);
+      if (!payload) {
+        throw new Error(`${label} failed: object properties answered nothing`);
+      }
+      logTestStep(`${label} length: ${payload.length} characters`, this.logger);
     };
 
     const shouldSkipInitialSourceRead = (): boolean => {
@@ -921,145 +996,48 @@ export class BaseTester<TConfig, TState = unknown> {
       currentStep = 'validate';
       logTestStep(currentStep, this.logger);
       // No status check: a non-2xx is a returned failure since 31.0.0, and
-      // `expectResult` reports it with what SAP said.
-      //
-      // One failure is not the flow's: a system that has no validation resource
-      // at all answers `UNSUPPORTED_OPERATION`, and it has therefore not judged
-      // the name. There is nothing to read, and the rest of the flow is still
-      // worth running — so it is logged and stepped over. Every other failure
-      // still fails the test.
-      // A system without a validation resource answers 404, 405 or 501. The
-      // library reports that as it came; the test names it unsupported, so a
-      // missing resource skips the step instead of failing it.
-      const validationAnswer = await this.adtObject.validate(
-        config as Partial<TConfig>,
-        {
-          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
-        },
-      );
-      const validationUnavailable =
-        !validationAnswer.ok &&
-        validationAnswer.getError().code ===
-          AdtObjectErrorCodes.UNSUPPORTED_OPERATION;
-      if (validationUnavailable && !validationAnswer.ok) {
-        logTestStep(
-          `validate skipped: ${validationAnswer.getError().message}`,
-          this.logger,
+      // `expectResult` reports it with what SAP said. A system with no
+      // validation resource (404/405/501) fails too: whether a type is tested
+      // on a system is its case's `enabled` / `available_in`, never something
+      // read off a refusal.
+      let validationDocument = '';
+      if (options?.skipValidation) {
+        // Run-visible, like the lock-release check's: an off check is said in
+        // every run, not only under DEBUG_ADT_TESTS.
+        createRunIntegrityLogger().info?.(
+          `${this.loggerPrefix} ${describeObject(config)}: validate not sent — ${options.skipValidation}`,
+        );
+      } else {
+        validationDocument = String(
+          expectResult(
+            await this.adtObject.validate(config as Partial<TConfig>, {
+              analyse: judged(analyseValidation),
+            }),
+            'validate',
+          ) ?? '',
+        );
+
+        // The document still has to be read: validation reports a rejected
+        // name inside a 200. `analyseValidation` above judges the forms it
+        // knows; `validationErrors` reads every other table form by
+        // structure, nested messages and any namespace prefix included. An
+        // answer that is not XML fails: whether the name was rejected cannot
+        // be read from it.
+        const errorTexts = validationErrors(validationDocument);
+        if (errorTexts.length > 0) {
+          const error = new Error(
+            `Validation failed with errors: ${errorTexts.join('; ')}`,
+          );
+          logTestStepError(currentStep, error);
+          throw error;
+        }
+
+        // Delay after validate
+        await this.waitDelay(
+          this.getOperationDelay('validate', testCaseParams),
+          'validate',
         );
       }
-      const validationDocument = validationUnavailable
-        ? ''
-        : String(expectResult(validationAnswer, 'validate') ?? '');
-
-      // The document still has to be read: validation reports a rejected name
-      // inside a 200, in an error table.
-      if (validationDocument) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const parsed = parser.parse(validationDocument);
-
-          // Check for error table (adtcore:errorTable or similar)
-          const errorTable =
-            parsed['adtcore:errorTable'] ||
-            parsed.errorTable ||
-            parsed['adtcore:messageTable']?.['adtcore:message'] ||
-            parsed.messageTable?.message;
-
-          // Check if there are error messages (type="E" or severity="ERROR")
-          const messages = Array.isArray(errorTable)
-            ? errorTable
-            : errorTable
-              ? [errorTable]
-              : [];
-          const errorMessages = messages.filter((msg: any) => {
-            const type =
-              msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
-            const severity =
-              msg['@_adtcore:severity'] ||
-              msg['@_severity'] ||
-              msg.severity ||
-              '';
-            return type === 'E' || severity === 'ERROR' || type === 'ERROR';
-          });
-
-          if (errorMessages.length > 0) {
-            const errorTexts = errorMessages
-              .map((msg: any) => {
-                return (
-                  msg['@_adtcore:text'] ||
-                  msg['@_text'] ||
-                  msg.text ||
-                  msg['adtcore:text'] ||
-                  msg.text ||
-                  msg['#text'] ||
-                  JSON.stringify(msg)
-                );
-              })
-              .filter(Boolean)
-              .join('; ');
-
-            const error = new Error(
-              `Validation failed with errors: ${errorTexts}`,
-            );
-            this.log(
-              LogLevel.ERROR,
-              `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`,
-            );
-            logTestStepError(currentStep, error);
-            throw error;
-          }
-
-          // Log warnings if present (but don't fail)
-          const warningMessages = messages.filter((msg: any) => {
-            const type =
-              msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
-            const severity =
-              msg['@_adtcore:severity'] ||
-              msg['@_severity'] ||
-              msg.severity ||
-              '';
-            return type === 'W' || severity === 'WARNING' || type === 'WARNING';
-          });
-
-          if (warningMessages.length > 0) {
-            const warningTexts = warningMessages
-              .map((msg: any) => {
-                return (
-                  msg['@_adtcore:text'] ||
-                  msg['@_text'] ||
-                  msg.text ||
-                  msg['adtcore:text'] ||
-                  msg.text ||
-                  msg['#text'] ||
-                  JSON.stringify(msg)
-                );
-              })
-              .filter(Boolean)
-              .join('; ');
-            this.log(
-              LogLevel.WARN,
-              `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`,
-            );
-          }
-        } catch (parseError) {
-          // If parsing fails, continue - validation might be in different format
-          // But log the parse error for debugging
-          this.log(
-            LogLevel.DEBUG,
-            `Could not parse validation response for error tables: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          );
-        }
-      }
-
-      // Delay after validate
-      await this.waitDelay(
-        this.getOperationDelay('validate', testCaseParams),
-        'validate',
-      );
 
       // 2. Create
       currentStep = 'create';
@@ -1089,6 +1067,7 @@ export class BaseTester<TConfig, TState = unknown> {
         await this.adtObject.create(
           createConfig as Omit<TConfig, 'source'> & { source?: never },
           {
+            analyse: analyseException,
             ...createOptions,
             headers: integrationHeadersOf(this.adtObject, 'create'),
           },
@@ -1107,6 +1086,7 @@ export class BaseTester<TConfig, TState = unknown> {
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
+            analyse: judged(analyseActivation),
           }),
           'activate after create',
         );
@@ -1204,6 +1184,7 @@ export class BaseTester<TConfig, TState = unknown> {
           expectResult(
             await this.adtObject.activate(config as Partial<TConfig>, {
               headers: integrationHeadersOf(this.adtObject, 'activate'),
+              analyse: judged(analyseActivation),
             }),
             'activate after update',
           );
@@ -1232,11 +1213,12 @@ export class BaseTester<TConfig, TState = unknown> {
       ) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
-        // A refused activation is a failure in the answer — the handlers read
-        // `<msg type="E">` for it, which a status check never could.
+        // A refused activation is a failure in the answer: `analyseActivation`
+        // reads `activationExecuted="false"` and `<msg type="E">` inside the 200.
         expectResult(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
+            analyse: judged(analyseActivation),
           }),
           'activate',
         );
@@ -1336,45 +1318,10 @@ export class BaseTester<TConfig, TState = unknown> {
       if (options?.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
-        try {
-          const metadataResponse = await this.adtObject.readMetadata?.(
-            config as Partial<TConfig>,
-            options.readMetadataOptions,
-          );
-          const responseStatus = (metadataResponse as any)?.status;
-          if (
-            responseStatus &&
-            responseStatus !== 200 &&
-            responseStatus !== 204
-          ) {
-            const errorData =
-              typeof (metadataResponse as any)?.data === 'string'
-                ? (metadataResponse as any).data
-                : JSON.stringify((metadataResponse as any)?.data);
-            const error = new Error(
-              `Read metadata failed (HTTP ${responseStatus}): ${errorData}`,
-            );
-            logTestStepError(currentStep, error);
-            throw error;
-          }
-        } catch (error: any) {
-          if (error?.response?.status === 406) {
-            const { isHttpStatusAllowed } = require('./test-helper');
-            if (isHttpStatusAllowed(406, this.testCase)) {
-              const { getAcceptHint } = require('./test-helper');
-              const acceptHint = getAcceptHint(error);
-              this.log(
-                LogLevel.WARN,
-                `readMetadata skipped: 406 Not Acceptable (allowed by config)${
-                  acceptHint ? `; ${acceptHint}` : ''
-                }`,
-              );
-              return validationDocument as unknown as TState;
-            }
-          }
-          logTestStepError(currentStep, error);
-          throw error;
-        }
+        await this.readMetadataStep(
+          config as Partial<TConfig>,
+          options.readMetadataOptions,
+        );
       }
 
       // 5. Cleanup (if enabled)
@@ -1469,14 +1416,21 @@ export class BaseTester<TConfig, TState = unknown> {
             'delete',
           );
         } catch (cleanupError) {
-          // Not rethrown, deliberately: the test already has a failure, and it
-          // is the one worth reporting. This is recorded at ERROR so the object
-          // left behind is not invisible either.
+          // The test's own failure stays the one thrown, and the cleanup's
+          // failure is reported inside it, not only logged: the object is
+          // left on the system and the next run meets it.
           this.log(
             LogLevel.ERROR,
             'Cleanup after a failed test also failed — the object is left on the system:',
             cleanupError,
           );
+          if (error instanceof Error) {
+            error.message = `${error.message} — and the cleanup after it failed too, ${this.objectNameOf(config)} is left on the system: ${
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError)
+            }`;
+          }
         }
       } else if (this.objectCreated && !cleanupSettings.shouldCleanup) {
         this.log(
@@ -1572,30 +1526,15 @@ export class BaseTester<TConfig, TState = unknown> {
         return readState;
       }
 
-      logTestStep('readMetadata', this.logger);
-      try {
-        await this.adtObject.readMetadata?.(
+      // A type whose only read is `readMetadata` was read above.
+      if (this.adtObject.readMetadata) {
+        logTestStep('readMetadata', this.logger);
+        await this.readMetadataStep(
           config,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         );
-      } catch (error: any) {
-        if (error?.response?.status === 406) {
-          const { isHttpStatusAllowed } = require('./test-helper');
-          if (isHttpStatusAllowed(406, this.testCase)) {
-            const { getAcceptHint } = require('./test-helper');
-            const acceptHint = getAcceptHint(error);
-            this.log(
-              LogLevel.WARN,
-              `readMetadata skipped: 406 Not Acceptable (allowed by config)${
-                acceptHint ? `; ${acceptHint}` : ''
-              }`,
-            );
-            return readState;
-          }
-        }
-        throw error;
       }
 
       return readState;
@@ -1617,16 +1556,15 @@ export class BaseTester<TConfig, TState = unknown> {
    * Get test case definition from YAML
    */
   getTestCaseDefinition(): any {
-    const { getTestCaseDefinition } = require('./test-helper');
-    return getTestCaseDefinition(this.testCaseKey, this.testCaseName);
+    return configuredCase(this.testCaseKey, this.testCaseName);
   }
 
   /**
    * Get enabled test case from YAML
    */
   getEnabledTestCase(): any {
-    const { getEnabledTestCase } = require('./test-helper');
-    return getEnabledTestCase(this.testCaseKey, this.testCaseName);
+    const testCase = configuredCase(this.testCaseKey, this.testCaseName);
+    return testCase?.enabled === true ? testCase : null;
   }
 
   /**
@@ -1749,36 +1687,32 @@ export class BaseTester<TConfig, TState = unknown> {
    */
   beforeEach(): () => Promise<void> {
     return async () => {
-      this.skipReason = null;
       this.setupError = null;
       this.testCase = null;
       this.config = null;
       this.configResolver = null;
 
+      // The gate registered this case, so each of these is a defect in the
+      // setup, never a case that does not apply.
       if (!this.hasConfig) {
-        this.skipReason = 'No SAP configuration';
-        this.log(LogLevel.WARN, 'beforeEach: Skipping - No SAP configuration');
+        this.setupError = 'No SAP configuration';
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
         return;
       }
 
-      const definition = this.getTestCaseDefinition();
-      if (!definition) {
-        this.skipReason = 'Test case not defined in test-config.yaml';
-        this.log(LogLevel.WARN, 'beforeEach: Skipping - Test case not defined');
-        return;
-      }
-
-      const {
-        getEnabledTestCase,
-        ensurePackageConfig,
-      } = require('./test-helper');
-      const tc = getEnabledTestCase(this.testCaseKey, this.testCaseName);
+      const { ensurePackageConfig } = require('./test-helper');
+      const tc = configuredCase(this.testCaseKey, this.testCaseName);
       if (!tc) {
-        this.skipReason = 'Test case disabled or not found';
-        this.log(
-          LogLevel.WARN,
-          'beforeEach: Skipping - Test case disabled or not found',
+        this.setupError = missingCaseMessage(
+          this.testCaseKey,
+          this.testCaseName,
         );
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
+        return;
+      }
+      if (tc.enabled !== true) {
+        this.setupError = `case ${this.testCaseKey}/${this.testCaseName} is not enabled; register the test through gate`;
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
         return;
       }
 
@@ -1787,9 +1721,9 @@ export class BaseTester<TConfig, TState = unknown> {
         `${this.loggerPrefix} - ${this.testDescription}`,
       );
       if (!packageCheck.success) {
-        this.skipReason =
+        this.setupError =
           packageCheck.reason || 'Default package is not configured';
-        this.log(LogLevel.WARN, `beforeEach: Skipping - ${this.skipReason}`);
+        this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
         return;
       }
 
@@ -1803,34 +1737,13 @@ export class BaseTester<TConfig, TState = unknown> {
         logger: this.logger,
       });
 
-      // Check if test is available for current environment
-      if (!this.configResolver.isAvailableForEnvironment()) {
-        const envName = this.isCloudSystem
-          ? 'cloud'
-          : this.isLegacySystem
-            ? 'legacy'
-            : 'on-premise';
-        // `available_in` decides; `skip_reason` explains. A generic sentence
-        // sends the next reader to the flag and no further, which is how
-        // "not available on cloud" survived next to an endpoint that answers
-        // 200 — the flag was right and the reason was never written down.
-        this.skipReason =
-          typeof tc?.skip_reason === 'string' && tc.skip_reason.length > 0
-            ? tc.skip_reason
-            : `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
-        this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
-        this.testCase = null;
-        this.configResolver = null;
-        return;
-      }
-
       // Build config - pass resolver so buildConfig can use resolved parameters
       if (this.buildConfigFn) {
         try {
           this.config = this.buildConfigFn(tc, this.configResolver);
         } catch (error: any) {
-          this.skipReason = `Failed to build config: ${error.message}`;
-          this.log(LogLevel.ERROR, `beforeEach: ${this.skipReason}`);
+          this.setupError = `Failed to build config: ${error.message}`;
+          this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
           this.testCase = null;
           this.configResolver = null;
           return;
@@ -1926,23 +1839,9 @@ export class BaseTester<TConfig, TState = unknown> {
   }
 
   /**
-   * Get skip reason (if test should be skipped)
-   */
-  getSkipReason(): string | null {
-    return this.skipReason;
-  }
-
-  /**
-   * Check if test should be skipped
-   */
-  shouldSkip(): boolean {
-    return this.skipReason !== null || !this.testCase || !this.config;
-  }
-
-  /**
    * Flow test with automatic config loading
    * Uses config from beforeEach
-   * Returns undefined if test should be skipped
+   * Throws when the setup failed or beforeEach() was not called
    */
   /**
    * The flow for an object that is never created and never deleted.
@@ -1987,11 +1886,15 @@ export class BaseTester<TConfig, TState = unknown> {
     ): Promise<string | undefined> => {
       currentStep = label;
       logTestStep(label, this.logger);
-      const state = await this.readWhatItHas(
-        config as Partial<TConfig>,
-        version,
+      // The value, or the test fails with what SAP said. `readResult.data`
+      // was the state bag's field; the bags are gone, so it read `undefined`
+      // for every answer and a refused read passed as an empty one.
+      const payload = payloadOf(
+        expectResult(
+          await this.readWhatItHas(config as Partial<TConfig>, version),
+          label,
+        ),
       );
-      const payload = payloadOf((state as any)?.readResult?.data);
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -2015,6 +1918,7 @@ export class BaseTester<TConfig, TState = unknown> {
         { ...config, ...options?.updateConfig } as Partial<TConfig>,
         updateOptions,
       );
+      expectResult(updateState as IAdtResponse<unknown>, 'update');
       await this.waitDelay(
         this.getOperationDelay('update', testCaseParams),
         'update',
@@ -2025,27 +1929,15 @@ export class BaseTester<TConfig, TState = unknown> {
       if (!options?.activateOnUpdate && this.adtObject.activate) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
-        const activateState = await this.adtObject.activate(
-          config as Partial<TConfig>,
-          { headers: integrationHeadersOf(this.adtObject, 'activate') },
+        // A refused activation is a failure in the answer; the status this
+        // read off a state bag is not on a returned failure.
+        expectResult(
+          await this.adtObject.activate(config as Partial<TConfig>, {
+            headers: integrationHeadersOf(this.adtObject, 'activate'),
+            analyse: judged(analyseActivation),
+          }),
+          'activate',
         );
-        const activateResponse =
-          (activateState as any)?.activateResponse || activateState;
-        if (
-          activateResponse?.status &&
-          activateResponse.status !== 200 &&
-          activateResponse.status !== 204
-        ) {
-          const errorData =
-            typeof activateResponse?.data === 'string'
-              ? activateResponse.data
-              : JSON.stringify(activateResponse?.data);
-          const error = new Error(
-            `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
-          );
-          logTestStepError(currentStep, error);
-          throw error;
-        }
         await this.waitDelay(
           this.getOperationDelay('activate', testCaseParams),
           'activate',
@@ -2066,7 +1958,7 @@ export class BaseTester<TConfig, TState = unknown> {
       if (options?.readMetadata && this.adtObject.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
-        await this.adtObject.readMetadata?.(
+        await this.readMetadataStep(
           config as Partial<TConfig>,
           options.readMetadataOptions?.withLongPolling
             ? { withLongPolling: true }
@@ -2108,26 +2000,14 @@ export class BaseTester<TConfig, TState = unknown> {
 
     await this.raiseIfSetupFailed(testName, definition);
 
-    if (this.shouldSkip()) {
-      logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
-        this.skipReason || 'Test case not available',
-      );
-      logTestEnd(this.logger, testName);
-      return undefined;
-    }
-
     if (!this.config) {
       logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
+      const error = new Error(
         'Config not available - ensure beforeEach() was called',
       );
+      logTestError(this.logger, testName, error);
       logTestEnd(this.logger, testName);
-      return undefined;
+      throw error;
     }
 
     logTestStart(this.logger, testName, definition);
@@ -2169,8 +2049,9 @@ export class BaseTester<TConfig, TState = unknown> {
   /**
    * A setup that failed is a red test, not a skipped one.
    *
-   * Called before `shouldSkip()` in both auto entry points so it cannot be
-   * mistaken for "does not apply here".
+   * Called first in every auto entry point, so a setup that failed cannot be
+   * mistaken for "does not apply here": that is the gate's decision, made
+   * before the test starts.
    */
   // biome-ignore lint/suspicious/noExplicitAny: logTestStart's own parameter
   private async raiseIfSetupFailed(
@@ -2188,6 +2069,7 @@ export class BaseTester<TConfig, TState = unknown> {
     // every following run failed the same way. Measured on an ABAP Cloud system: a
     // function include stayed through three runs, each reporting that cleanup
     // would remove it.
+    let leftover = '';
     if (this.objectCreated && this.config) {
       const { shouldCleanup } = this.getCleanupSettings(
         this.testCase?.params as ITestCaseParams | undefined,
@@ -2196,21 +2078,45 @@ export class BaseTester<TConfig, TState = unknown> {
         try {
           await this.cleanupExistingObject(this.config);
         } catch (cleanupError) {
-          this.log(
-            LogLevel.WARN,
-            `Leftover object could not be removed: ${(cleanupError as Error).message}`,
-          );
+          // Reported in the failure below, not only logged: the object is
+          // still on the system and the next run meets it.
+          leftover = ` The leftover object could not be removed either: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }.`;
+          this.log(LogLevel.ERROR, leftover.trim());
         }
       }
     }
 
     const error = new Error(
       `Test could not be set up: ${this.setupError}. The system was not in a ` +
-        'state this test could run against, so nothing was verified.',
+        `state this test could run against, so nothing was verified.${leftover}`,
     );
     logTestError(this.logger, testName, error);
     logTestEnd(this.logger, testName);
     throw error;
+  }
+
+  /**
+   * The config `beforeEach()` resolved, for a test that drives the tester's
+   * parts itself instead of `flowTestAuto`.
+   *
+   * The gate registered the test, so a setup that failed or a `beforeEach()`
+   * that was not called is a red test with its reason, never a quiet return.
+   */
+  async requireConfig(): Promise<TConfig> {
+    const testName = `${this.loggerPrefix} - ${this.testDescription}`;
+    const definition = this.getTestCaseDefinition() || {
+      name: this.testCaseKey,
+      params: {},
+    };
+    await this.raiseIfSetupFailed(testName, definition);
+    if (!this.config) {
+      throw new Error('Config not available - ensure beforeEach() was called');
+    }
+    return this.config;
   }
 
   async flowTestAuto(options?: IFlowTestOptions): Promise<TState | undefined> {
@@ -2222,30 +2128,14 @@ export class BaseTester<TConfig, TState = unknown> {
 
     await this.raiseIfSetupFailed(testName, definition);
 
-    if (this.shouldSkip()) {
-      logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
-        this.skipReason || 'Test case not available',
-      );
-      // Cleanup pre-existing object if ensureObjectReady flagged it
-      if (this.objectCreated && this.config) {
-        await this.cleanupExistingObject(this.config);
-      }
-      logTestEnd(this.logger, testName);
-      return undefined;
-    }
-
     if (!this.config) {
       logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
+      const error = new Error(
         'Config not available - ensure beforeEach() was called',
       );
+      logTestError(this.logger, testName, error);
       logTestEnd(this.logger, testName);
-      return undefined;
+      throw error;
     }
 
     logTestStart(this.logger, testName, definition);
@@ -2277,28 +2167,16 @@ export class BaseTester<TConfig, TState = unknown> {
       params: {},
     };
 
-    if (this.shouldSkip()) {
-      logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
-        this.skipReason || 'Test case not available',
-      );
-      logTestEnd(this.logger, testName);
-      throw new Error(
-        `Test skipped: ${this.skipReason || 'Test case not available'}`,
-      );
-    }
+    await this.raiseIfSetupFailed(testName, definition);
 
     if (!this.config) {
       logTestStart(this.logger, testName, definition);
-      logTestSkip(
-        this.logger,
-        testName,
+      const error = new Error(
         'Config not available - ensure beforeEach() was called',
       );
+      logTestError(this.logger, testName, error);
       logTestEnd(this.logger, testName);
-      throw new Error('Config not available - ensure beforeEach() was called');
+      throw error;
     }
 
     logTestStart(this.logger, testName, definition);

@@ -53,19 +53,19 @@ Without a usable binding every RFC run stops in `globalSetup`:
 @mcp-abap-adt/sap-rfc-lite is not available … Cannot find module
 ```
 
-### test-config.yaml
+### test-config.overlay.yaml
 
-Set `connection_type: "rfc"` in the environment section:
+Set `environment.connection_type` in your overlay (an optional key; keys are
+written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 
 ```yaml
-environment:
-  system: "onprem"              # Which system. Stated, never inferred
-  connection_type: "rfc"        # Use RFC transport instead of HTTP
-  default_package: "$TMP"
-  default_master_system: "SID"
+"environment.system": "onprem"          # Which system. Stated, never inferred
+"environment.connection_type": "rfc"    # Use RFC transport instead of HTTP
+"environment.default_package": "$TMP"
+"environment.default_master_system": "SID"
 ```
 
-When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.
+`SAP_AUTH_TYPE` is required in every `.env` (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the test session config then overrides `authType` to `"rfc"`.
 
 **A legacy run needs `connection_type: "rfc"`.** The legacy client is supported,
 and measured on SAP_BASIS 7.40 SP04, over RFC only. With `is_legacy: true` and
@@ -109,7 +109,7 @@ cp <system>.env .env
 Or pass variables inline:
 ```bash
 SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" \
-  SAP_URL=http://saphost:8000 SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_CLIENT=100 \
+  SAP_URL=http://saphost:8000 SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_CLIENT=100 SAP_AUTH_TYPE=basic \
   npm test
 ```
 

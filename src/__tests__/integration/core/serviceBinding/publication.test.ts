@@ -49,6 +49,7 @@
  */
 
 import {
+  analyseException,
   analysePublication,
   analysePublicationLock,
 } from '@mcp-abap-adt/adt-strategies';
@@ -60,18 +61,24 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import {
   createTestAdtClient,
   createTestConnection,
   releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
 
 // `require`, like every other integration file here: the helper is JavaScript
 // and has no declaration file.
 // biome-ignore lint/correctness/noNodejsModules: the helper is CommonJS
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
 
 const testsLogger: ILogger = createTestsLogger();
 
@@ -86,9 +93,9 @@ interface IPublicationCase {
   pollSeconds: number;
 }
 
-function caseFrom(section: string): IPublicationCase | undefined {
-  const testCase = getEnabledTestCase(section);
-  if (!testCase) return undefined;
+function caseFrom(section: string, name: string): IPublicationCase {
+  const testCase = configuredCase(section, name);
+  if (!testCase) throw new Error(missingCaseMessage(section, name));
   const p = testCase.params ?? {};
   return {
     bindingName: p.binding_name,
@@ -106,11 +113,16 @@ async function stateOf(
   client: AdtClient,
   bindingName: string,
 ): Promise<{ published?: string; allowedAction?: string; bytes: number }> {
-  const answer = await client
-    .getServiceBinding()
-    .read({ bindingName }, 'active');
-  if (!answer.ok) return { bytes: 0 };
-  const doc = String(answer.getResult().value);
+  // A refused read fails with what SAP said: read as "no document" it was a
+  // state nobody asked for, and the wait below took it for "not yet".
+  const doc = String(
+    expectResult(
+      await client
+        .getServiceBinding()
+        .read({ bindingName }, 'active', { analyse: analyseException }),
+      `read binding ${bindingName}`,
+    ),
+  );
   return {
     published: /srvb:published="([^"]*)"/.exec(doc)?.[1],
     allowedAction: /srvb:allowedAction="([^"]*)"/.exec(doc)?.[1],
@@ -154,7 +166,6 @@ describe('Service binding publication (deliberate runs)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let baseUrl = '';
-  let hasConfig = false;
   /**
    * Every request this test's client makes, in order.
    *
@@ -181,9 +192,8 @@ describe('Service binding publication (deliberate runs)', () => {
         requests.push({ method: config.method ?? 'GET', url: config.url });
         return original(config as never);
       }) as typeof connection.makeAdtRequest;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   }, 120000);
 
@@ -263,7 +273,7 @@ describe('Service binding publication (deliberate runs)', () => {
       {
         headers: integrationHeadersOf(bindings, 'update'),
         timeout: c.timeoutMs,
-        analyse: analysePublication,
+        analyse: judged(analysePublication),
       },
     );
     const spent = Math.round((Date.now() - started) / 1000);
@@ -273,6 +283,7 @@ describe('Service binding publication (deliberate runs)', () => {
       const released = await bindings.unlock(
         { bindingName: c.bindingName },
         handle,
+        { analyse: analyseException },
       );
       if (!released.ok) {
         throw new Error(`unlock: ${released.getError().message}`);
@@ -327,33 +338,26 @@ describe('Service binding publication (deliberate runs)', () => {
     expect(state.published).toBe(target);
   }
 
-  it('publishes, and leaves it published for inspection', async () => {
-    const c = caseFrom('publish_service_binding');
-    if (!hasConfig || !c) {
-      logTestSkip(
-        testsLogger,
-        'ServiceBinding - publish',
-        !hasConfig
-          ? 'No SAP configuration'
-          : 'publish_service_binding is disabled — this is a deliberate run',
+  // Disabled by default: a deliberate run changes the state of the system.
+  gate('publish_service_binding', 'publish_binding')(
+    'publishes, and leaves it published for inspection',
+    async () => {
+      await change(
+        caseFrom('publish_service_binding', 'publish_binding'),
+        'published',
       );
-      return;
-    }
-    await change(c, 'published');
-  }, 1_500_000);
+    },
+    1_500_000,
+  );
 
-  it('unpublishes, once the published state has been checked', async () => {
-    const c = caseFrom('unpublish_service_binding');
-    if (!hasConfig || !c) {
-      logTestSkip(
-        testsLogger,
-        'ServiceBinding - unpublish',
-        !hasConfig
-          ? 'No SAP configuration'
-          : 'unpublish_service_binding is disabled — this is a deliberate run',
+  gate('unpublish_service_binding', 'unpublish_binding')(
+    'unpublishes, once the published state has been checked',
+    async () => {
+      await change(
+        caseFrom('unpublish_service_binding', 'unpublish_binding'),
+        'unpublished',
       );
-      return;
-    }
-    await change(c, 'unpublished');
-  }, 1_500_000);
+    },
+    1_500_000,
+  );
 });

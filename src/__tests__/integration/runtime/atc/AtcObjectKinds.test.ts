@@ -21,6 +21,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   atcSystemCheckVariant,
   atcWaitingRun,
   atcWorklistId,
@@ -34,6 +35,11 @@ import * as dotenv from 'dotenv';
 import { AdtAtc, atcDocuments } from '../../../../runtime/atc/AdtAtc';
 import { buildAtcObjectUri } from '../../../../runtime/atc/run';
 import { findingsOutside } from '../../../helpers/atcFindings';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -48,16 +54,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
-const {
-  getEnabledTestCase,
-  getTimeout,
-} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -115,14 +117,12 @@ function listedObjects(worklist: string): string[] {
 
 describe('ATC over programs and every kind of include', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -130,27 +130,16 @@ describe('ATC over programs and every kind of include', () => {
     if (connection) await releaseTestConnection(connection);
   });
 
-  it(
+  gate(SECTION, CASE)(
     'lists the owner of each configured reference in the finished worklist',
     async () => {
       const testName = 'AtcObjectKinds - owner listed';
-      const testCase = getEnabledTestCase(SECTION, CASE);
+      const testCase = configuredCase(SECTION, CASE);
       logTestStart(testsLogger, testName, {
         name: CASE,
         params: testCase?.params || {},
       });
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          `${SECTION}/${CASE} not configured or disabled in test-config.yaml`,
-        );
-        return;
-      }
-      if (!hasConfig) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
+      if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
 
       const cases = kindCases(testCase.params);
       if (cases.length === 0) {
@@ -162,7 +151,10 @@ describe('ATC over programs and every kind of include', () => {
         const pinned = String(testCase.params.check_variant ?? '').trim();
         const variant =
           pinned ||
-          expectResult(await atc.resolveCheckVariant(), 'check variant');
+          expectResult(
+            await atc.resolveCheckVariant({ analyse: analyseException }),
+            'check variant',
+          );
 
         for (const c of cases) {
           logTestStep(
@@ -170,20 +162,23 @@ describe('ATC over programs and every kind of include', () => {
             testsLogger,
           );
           const worklistId = expectResult(
-            await atc.createWorklist(variant),
+            await atc.createWorklist(variant, { analyse: analyseException }),
             'worklist',
           );
           const run = expectResult(
             await atc.startRun(
               worklistId,
               { objects: [c.ref] },
-              { wait: true },
+              { analyse: analyseException, wait: true },
             ),
             'ATC run',
           );
           expect(run.waited).toBe(true);
           const worklist = String(
-            expectResult(await atc.getFindings(worklistId), 'worklist read'),
+            expectResult(
+              await atc.getFindings(worklistId, { analyse: analyseException }),
+              'worklist read',
+            ),
           );
           expect(listedObjects(worklist)).toContain(
             `${c.ownerType} ${c.ownerName}`,

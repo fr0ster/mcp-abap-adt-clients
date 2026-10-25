@@ -49,8 +49,10 @@ an include it pulls in. A function group's through
 24.0.0; there was no way to run them before.
 
 **Integration test config.** Two new test cases, `run_program_unit_test` and
-`run_function_group_unit_test`, are in `test-config.yaml.template`. Copy them
-into your `test-config.yaml` to run the new suites.
+`run_function_group_unit_test`, are in `test-config.yaml.template`, the tracked base of the test configuration; they
+reach your checkout with the pull, and nothing needs copying (the local file is
+only a small overlay, see
+[Test Config Schema](../development/TEST_CONFIG_SCHEMA.md)).
 
 The result set shrank to what a runner answers: `run`, `status`, `result`.
 `IUnitTestResults` and `unitTestDocuments` are gone; `IClassTestRunnerResults`

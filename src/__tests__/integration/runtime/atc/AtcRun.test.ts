@@ -29,6 +29,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   atcRunStatus,
   atcStartedRun,
   atcSystemCheckVariant,
@@ -41,8 +42,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import { AdtAtc, atcDocuments } from '../../../../runtime/atc/AdtAtc';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -57,16 +62,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
-const {
-  getEnabledTestCase,
-  getTimeout,
-} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -120,7 +121,10 @@ async function checkVariantFor(
     );
   }
   if (pinned) return pinned;
-  return expectResult(await atc.resolveCheckVariant(), 'check variant');
+  return expectResult(
+    await atc.resolveCheckVariant({ analyse: analyseException }),
+    'check variant',
+  );
 }
 const CASE = 'adt_atc_run';
 
@@ -134,7 +138,7 @@ const CASE = 'adt_atc_run';
  * hung run rather than as a bound nobody could have met.
  */
 const CASE_PARAMS: Record<string, unknown> =
-  getEnabledTestCase(SECTION, CASE)?.params ?? {};
+  configuredCase(SECTION, CASE)?.params ?? {};
 const POLL_TIMEOUT_MS = toPositiveInt(CASE_PARAMS.poll_timeout_ms, 300_000);
 const POLL_INTERVAL_MS = toPositiveInt(CASE_PARAMS.poll_interval_ms, 3_000);
 /** The deadline plus room for the run, the reads and the connection. */
@@ -171,18 +175,14 @@ function findingsFor(worklist: string, objectName: string): string[] {
 
 describe('ATC check runs (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let runtime: AdtRuntimeClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      runtime = new AdtRuntimeClient(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails naming the
       // reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -192,29 +192,18 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate(SECTION, CASE)(
     'waits for the run and reports a triple that is not all zeroes',
     async () => {
       const testName = 'AtcRun - wait for the run';
-      const testCase = getEnabledTestCase(SECTION, CASE);
+      const testCase = configuredCase(SECTION, CASE);
 
       logTestStart(testsLogger, testName, {
         name: CASE,
         params: testCase?.params || {},
       });
 
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          `${SECTION}/${CASE} not configured or disabled in test-config.yaml`,
-        );
-        return;
-      }
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
+      if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
 
       const className = String(testCase.params.class_name).toUpperCase();
 
@@ -225,14 +214,14 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         const atc = new AdtAtc(connection, libraryLogger, atcReading);
         const variant = await checkVariantFor(atc, testCase);
         const worklistId = expectResult(
-          await atc.createWorklist(variant),
+          await atc.createWorklist(variant, { analyse: analyseException }),
           'worklist',
         );
         const result = expectResult(
           await atc.startRun(
             worklistId,
             { objects: [{ objectType: 'class', objectName: className }] },
-            { wait: true },
+            { analyse: analyseException, wait: true },
           ),
           'ATC run',
         );
@@ -270,29 +259,18 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
     JEST_TIMEOUT,
   );
 
-  it(
+  gate(SECTION, CASE)(
     'polls the run to completion and reads the finding out of the worklist',
     async () => {
       const testName = 'AtcRun - poll and read the worklist';
-      const testCase = getEnabledTestCase(SECTION, CASE);
+      const testCase = configuredCase(SECTION, CASE);
 
       logTestStart(testsLogger, testName, {
         name: CASE,
         params: testCase?.params || {},
       });
 
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          `${SECTION}/${CASE} not configured or disabled in test-config.yaml`,
-        );
-        return;
-      }
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
+      if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
 
       const className = String(testCase.params.class_name).toUpperCase();
       // Absent is a legitimate configuration — see the assertion below — but
@@ -326,13 +304,17 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestStep(`start ATC run over class ${className}`, testsLogger);
         const variant = await checkVariantFor(atc, testCase);
         const worklistId = expectResult(
-          await atc.createWorklist(variant),
+          await atc.createWorklist(variant, { analyse: analyseException }),
           'worklist',
         );
         const started = expectResult(
-          await atc.startRun(worklistId, {
-            objects: [{ objectType: 'class', objectName: className }],
-          }),
+          await atc.startRun(
+            worklistId,
+            {
+              objects: [{ objectType: 'class', objectName: className }],
+            },
+            { analyse: analyseException },
+          ),
           'ATC run',
         );
 
@@ -346,13 +328,15 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestStep(`poll run ${started.runId} until it finishes`, testsLogger);
         const giveUpAt = Date.now() + deadlineMs;
         let status = expectResult(
-          await atc.getRunStatus(started.runId),
+          await atc.getRunStatus(started.runId, { analyse: analyseException }),
           'ATC run status',
         );
         while (!status.isFinished && Date.now() < giveUpAt) {
           await new Promise((resolve) => setTimeout(resolve, intervalMs));
           status = expectResult(
-            await atc.getRunStatus(started.runId),
+            await atc.getRunStatus(started.runId, {
+              analyse: analyseException,
+            }),
             'ATC run status',
           );
         }
@@ -362,7 +346,7 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
 
         logTestStep(`read worklist ${worklistId}`, testsLogger);
         const worklist = expectResult(
-          await atc.getFindings(worklistId),
+          await atc.getFindings(worklistId, { analyse: analyseException }),
           'ATC findings',
         );
         expect(typeof worklist).toBe('string');

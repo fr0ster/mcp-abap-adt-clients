@@ -25,6 +25,9 @@ coverage/**
 mcp-abap-adt-adt-clients-*.tgz
 sk.json
 src/__tests__/helpers/test-config.yaml
+src/__tests__/helpers/test-config.overlay.yaml
+# one overlay per system, chosen by MCP_TEST_OVERLAY
+src/__tests__/helpers/test-config.overlay.*.yaml
 *.env
 
 # Claude Code local settings

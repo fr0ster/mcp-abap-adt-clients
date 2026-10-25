@@ -680,7 +680,7 @@ npm run discovery:markdown -- --env /path/to/.env
 **Environment Variables:**
 The script uses the same environment variables as the main package:
 - `SAP_URL` - SAP system URL (required)
-- `SAP_AUTH_TYPE` - Authentication type: `'basic'` or `'jwt'` (default: `'basic'`)
+- `SAP_AUTH_TYPE` - Authentication type: `'basic'`, `'jwt'` or `'xsuaa'` (required: a missing or other value is refused, naming the key)
 - `SAP_USERNAME` - Username for basic auth
 - `SAP_PASSWORD` - Password for basic auth
 - `SAP_JWT_TOKEN` - JWT token for JWT auth
@@ -1333,7 +1333,7 @@ See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
 
 ## Tests
 
-Integration tests use YAML configuration (`src/__tests__/helpers/test-config.yaml`) and the `BaseTester` pattern.  
+Integration tests use YAML configuration — the tracked base `src/__tests__/helpers/test-config.yaml.template` plus your local, gitignored overlay `test-config.overlay.yaml` (`npm run test:init -- onprem|cloud`; see [Test Config Schema](docs/development/TEST_CONFIG_SCHEMA.md)) — and the `BaseTester` pattern.  
 Some ADT endpoints are system-specific; 406 is treated as an Accept/header support issue and can be explicitly allowed via `test_settings.allow_406` or per-test `params.allow_406` (e.g., objectstructure/nodestructure).
 
 ## License

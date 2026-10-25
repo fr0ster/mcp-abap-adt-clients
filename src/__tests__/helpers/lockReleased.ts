@@ -16,8 +16,8 @@
  * released again here. The test's own session cannot answer the question: the
  * session holding a lock is granted it again.
  *
- * It costs one session logon per check, so `VERIFY_LOCK_RELEASED=false` turns
- * it off. A trial ABAP Cloud account grants two sessions — the run's and this one — so the
+ * It costs one session logon per check. Whether it is made is the system's
+ * configuration, `environment.verify_lock_released` (required). A trial ABAP Cloud account grants two sessions — the run's and this one — so the
  * session is always closed before this returns, and never two are open at once.
  */
 
@@ -34,7 +34,11 @@ import {
   createTestAdtClient,
   createTestConnection,
 } from './sessionConfig';
-import { createConnectionLogger, emptyLogger } from './testLogger';
+import {
+  createConnectionLogger,
+  createRunIntegrityLogger,
+  emptyLogger,
+} from './testLogger';
 
 /** The lock window of a handler: the two members this check calls. */
 export interface ILockWindow<TConfig> {
@@ -59,9 +63,39 @@ export type OpenVerifierSession = (
   logger?: ILogger,
 ) => Promise<IVerifierSession>;
 
-/** On unless `VERIFY_LOCK_RELEASED=false`. Read at the call, like the rest. */
-export function lockReleaseCheckEnabled(): boolean {
-  return process.env.VERIFY_LOCK_RELEASED?.trim().toLowerCase() !== 'false';
+/** The configuration key that says whether the check is made on this system. */
+export const LOCK_RELEASE_KEY = 'environment.verify_lock_released';
+
+/**
+ * Whether this system's configuration has the check made — its
+ * `environment.verify_lock_released`, required and boolean: there is no
+ * default and no environment variable. Read at the call, like the rest.
+ *
+ * On a cloud system a second session can land on another application server
+ * where a new object is not visible yet, and its LOCK answers 404 (measured):
+ * there the configuration says `false`. Where it says `true`, every refusal
+ * — that 404 included — fails the test, because the configuration may be
+ * wrong and that must surface.
+ */
+export function lockReleaseCheckEnabled(
+  environment: {
+    verify_lock_released?: unknown;
+  } = require('./test-helper').getEnvironmentConfig(),
+): boolean {
+  const value = environment?.verify_lock_released;
+  if (typeof value !== 'boolean') {
+    throw new Error(
+      `${LOCK_RELEASE_KEY} is not set (found ${JSON.stringify(value)}): state true or false for this system in test-config.overlay.yaml`,
+    );
+  }
+  return value;
+}
+
+/** The visible line a check that is off leaves in the run: nothing is sent. */
+export function noteLockReleaseCheckOff(what: string): void {
+  createRunIntegrityLogger().info?.(
+    `${what}: lock-release check not made — ${LOCK_RELEASE_KEY} is false; no second-session LOCK sent`,
+  );
 }
 
 /**
@@ -114,11 +148,6 @@ function statusOf(failure: IAdtError): string {
   return status === undefined ? `[${failure.origin}]` : `HTTP ${status}`;
 }
 
-const NOT_VISIBLE_RETRIES = 3;
-const NOT_VISIBLE_DELAY_MS = 2000;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** SAP says the object is not there: 404. Not a lock, whatever else it is. */
 function isNotVisible(failure: IAdtError): boolean {
   return failure.response?.status === 404;
@@ -149,33 +178,24 @@ export async function verifyLockReleased<TConfig>(
   let failure: unknown;
   try {
     const handler = openHandler(session.client);
-    // A new session may land on another application server, where an object
-    // created seconds ago is not visible yet: its LOCK answers 404 "does not
-    // exist". Measured on an ABAP Cloud system — the same test passed alone. That is
-    // not a lock at all, so it is retried, and if the object stays invisible
-    // the check reports it cannot judge rather than claiming a held lock.
-    let locked = await handler.lock(config, { analyse: analyseException });
-    for (
-      let attempt = 1;
-      !locked.ok &&
-      isNotVisible(locked.getError()) &&
-      attempt <= NOT_VISIBLE_RETRIES;
-      attempt++
-    ) {
-      await sleep(NOT_VISIBLE_DELAY_MS);
-      locked = await handler.lock(config, { analyse: analyseException });
-    }
+    // One LOCK, read as it answers. A new session may land on another
+    // application server where an object created seconds ago is not visible
+    // yet (404, measured on an ABAP Cloud system); that is a refusal too and
+    // fails the check as inconclusive — a later attempt that succeeded would
+    // not erase it, so none is made.
+    const locked = await handler.lock(config, { analyse: analyseException });
     if (!locked.ok) {
       const refusal = locked.getError();
       const detail =
         `(${statusOf(refusal)}): ${whatSapSaid(refusal)}` +
         (refusal.request?.url ? ` (${refusal.request.url})` : '');
       if (isNotVisible(refusal)) {
-        logger?.warn?.(
-          `${what}: lock-release check inconclusive — the object is not ` +
-            `visible from a second ABAP session ${detail}`,
+        throw new Error(
+          `${what}: the lock-release check is inconclusive — the object is ` +
+            `not visible from a second ABAP session ${detail}`,
         );
-      } else if (isLockHeld(refusal)) {
+      }
+      if (isLockHeld(refusal)) {
         throw new Error(
           `${what}: the previous UNLOCK did not release the lock — a second ` +
             `ABAP session was refused it ${detail}`,
@@ -239,7 +259,7 @@ export async function expectLockReleased<TConfig>(
   logger?: ILogger,
 ): Promise<void> {
   if (!lockReleaseCheckEnabled()) {
-    logger?.debug?.(`${what}: lock-release check off (VERIFY_LOCK_RELEASED)`);
+    noteLockReleaseCheckOff(what);
     return;
   }
   await verifyLockReleased(openOwnSession, openHandler, config, what, logger);

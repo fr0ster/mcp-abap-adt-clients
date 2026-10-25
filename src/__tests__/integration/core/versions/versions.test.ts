@@ -11,6 +11,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   type IObjectVersion,
   objectVersions,
 } from '@mcp-abap-adt/adt-strategies';
@@ -25,6 +26,7 @@ import { classDocuments } from '../../../../core/class/types';
 import { interfaceDocuments } from '../../../../core/interface/types';
 import { serviceDefinitionDocuments } from '../../../../core/serviceDefinition/types';
 import { tableDocuments } from '../../../../core/table/types';
+import { gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -33,7 +35,6 @@ import {
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
-import { logTestSkip } from '../../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -46,18 +47,16 @@ const logger = createTestsLogger();
 describe('Object version history', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(logger);
       const { client: c } = await createTestAdtClient(connection, logger);
       client = c;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, logger);
+      skipUnlessConfigured(error, logger);
     }
   }, 60000);
 
@@ -74,21 +73,30 @@ describe('Object version history', () => {
       list: () =>
         client
           .getTable({ ...tableDocuments, versions: objectVersions })
-          .getVersions({ tableName: 'ZAC_SHR_BTABL' }),
+          .getVersions(
+            { tableName: 'ZAC_SHR_BTABL' },
+            { analyse: analyseException },
+          ),
     },
     {
       label: 'class',
       list: () =>
         client
           .getClass({ ...classDocuments, versions: objectVersions })
-          .getVersions({ className: 'ZAC_SHR_DMP01' }),
+          .getVersions(
+            { className: 'ZAC_SHR_DMP01' },
+            { analyse: analyseException },
+          ),
     },
     {
       label: 'interface',
       list: () =>
         client
           .getInterface({ ...interfaceDocuments, versions: objectVersions })
-          .getVersions({ interfaceName: 'ZAC_SHR_IF01' }),
+          .getVersions(
+            { interfaceName: 'ZAC_SHR_IF01' },
+            { analyse: analyseException },
+          ),
     },
     {
       label: 'serviceDefinition',
@@ -98,31 +106,36 @@ describe('Object version history', () => {
             ...serviceDefinitionDocuments,
             versions: objectVersions,
           })
-          .getVersions({ serviceDefinitionName: 'ZAC_SHR_SRVD01' }),
+          .getVersions(
+            { serviceDefinitionName: 'ZAC_SHR_SRVD01' },
+            { analyse: analyseException },
+          ),
     },
   ];
 
   for (const tc of cases) {
-    it(`lists versions and fetches a version's source for ${tc.label}`, async () => {
-      if (!hasConfig) {
-        logTestSkip(logger, `versions - ${tc.label}`, 'No SAP configuration');
-        return;
-      }
-      const versions = expectResult(await tc.list(), `${tc.label} versions`);
-      expect(Array.isArray(versions)).toBe(true);
-      expect(versions.length).toBeGreaterThan(0);
-      const v = versions[0];
-      expect(typeof v.versionId).toBe('string');
-      expect(typeof v.contentUri).toBe('string');
-      expect(v.contentUri.length).toBeGreaterThan(0);
+    gateOn(() => true)(
+      `lists versions and fetches a version's source for ${tc.label}`,
+      async () => {
+        const versions = expectResult(await tc.list(), `${tc.label} versions`);
+        expect(Array.isArray(versions)).toBe(true);
+        expect(versions.length).toBeGreaterThan(0);
+        const v = versions[0];
+        expect(typeof v.versionId).toBe('string');
+        expect(typeof v.contentUri).toBe('string');
+        expect(v.contentUri.length).toBeGreaterThan(0);
 
-      // getVersionSource is the same opaque-URI fetch on every handler.
-      const src = expectResult(
-        await client.getTable().getVersionSource(v.contentUri),
-        'src',
-      );
-      expect(typeof src).toBe('string');
-      expect(src.length).toBeGreaterThan(0);
-    }, 60000);
+        // getVersionSource is the same opaque-URI fetch on every handler.
+        const src = expectResult(
+          await client
+            .getTable()
+            .getVersionSource(v.contentUri, { analyse: analyseException }),
+          'src',
+        );
+        expect(typeof src).toBe('string');
+        expect(src.length).toBeGreaterThan(0);
+      },
+      60000,
+    );
   }
 });

@@ -22,6 +22,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IIncludeConfig } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -45,7 +46,9 @@ import {
 } from '../helpers/testLogger';
 import { integrationHeadersOf } from './adtHeaders';
 import { BaseTester } from './BaseTester';
-import { logTestSkip } from './testProgressLogger';
+import { gateOn } from './caseGate';
+import { failureOf } from './contract';
+import { judged } from './judged';
 
 const {
   getEnabledTestCase,
@@ -181,18 +184,26 @@ describe('ObjectType (using AdtClient)', () => {
               libraryLogger,
               systemContext,
             );
-            await cleanupClient.getInclude().delete(
+            const removed = await cleanupClient.getInclude().delete(
               {
                 includeName: name,
                 transportRequest: tester.getTransportRequest(),
               },
               {
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   cleanupClient.getInclude(),
                   'delete',
                 ),
               },
             );
+            if (!removed.ok) {
+              return {
+                success: false,
+                objectExists: true,
+                reason: failureOf(removed, `delete existing include ${name}`),
+              };
+            }
             await new Promise((resolve) => setTimeout(resolve, 3000));
           } catch (error: any) {
             if (error.response?.status !== 404) {
@@ -216,41 +227,37 @@ describe('ObjectType (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should run the full workflow', async () => {
-      if (!tester) return;
-      if (!crudHasConfig) {
-        await tester.flowTestAuto();
-        return;
-      }
+    // Applicability is decided at registration, never in the body and never
+    // from a refusal: a capability the system lacks is the config's to state
+    // (the case's `enabled` / `available_in`) or a predicate on the configured
+    // system, here "not cloud" — the collection declares no app:accept there.
+    gateOn(({ isCloud }) => !isCloud)(
+      'should run the full workflow',
+      async () => {
+        if (!tester) return;
+        if (!crudHasConfig) {
+          await tester.flowTestAuto();
+          return;
+        }
 
-      // Gate on the CAPABILITY and name it. A skip that says "not supported"
-      // without saying why is how a gap stays invisible — say what the system
-      // lacks, so a reader can check whether it is still true.
-      if (isCloudSystem) {
-        logTestSkip(
-          testsLogger,
-          'ObjectType - full workflow',
-          'the collection declares no app:accept on this system, so it is not a creation target',
-        );
-        return;
-      }
+        const config = tester.getConfig();
+        if (!config) {
+          await tester.flowTestAuto();
+          return;
+        }
 
-      const config = tester.getConfig();
-      if (!config) {
-        await tester.flowTestAuto();
-        return;
-      }
+        const testCase = tester.getTestCaseDefinition();
+        const source = testCase?.params?.source_code || config.source || '';
 
-      const testCase = tester.getTestCaseDefinition();
-      const source = testCase?.params?.source_code || config.source || '';
-
-      await tester.flowTestAuto({
-        source,
-        updateConfig: {
-          ...config,
-          source: testCase?.params?.update_source_code || source,
-        },
-      });
-    }, 900000);
+        await tester.flowTestAuto({
+          source,
+          updateConfig: {
+            ...config,
+            source: testCase?.params?.update_source_code || source,
+          },
+        });
+      },
+      900000,
+    );
   });
 });

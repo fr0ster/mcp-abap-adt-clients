@@ -20,6 +20,11 @@ import type { IAccessControlConfig } from '../../../../core/accessControl';
 import { getAccessControl } from '../../../../core/accessControl/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -36,13 +41,11 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -149,21 +152,10 @@ describe('AccessControl (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_access_control', 'adt_access_control')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
@@ -186,45 +178,20 @@ describe('AccessControl (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gate('read_access_control', 'read_standard_access_control')(
       'should read standard SAP access control',
       async () => {
-        const {
-          getTestCaseDefinition,
-        } = require('../../../helpers/test-helper');
-        const testCase = getTestCaseDefinition(
-          'read_access_control',
-          'read_standard_access_control',
-        );
-
-        if (!testCase) {
-          logTestStart(testsLogger, 'AccessControl - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'AccessControl - read standard object',
-            'Test case not defined in test-config.yaml',
-          );
-          return;
-        }
-
-        const enabledTestCase = getEnabledTestCase(
+        const enabledTestCase = configuredCase(
           'read_access_control',
           'read_standard_access_control',
         );
         if (!enabledTestCase) {
-          logTestStart(testsLogger, 'AccessControl - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'AccessControl - read standard object',
-            'Test case disabled or not found',
+          throw new Error(
+            missingCaseMessage(
+              'read_access_control',
+              'read_standard_access_control',
+            ),
           );
-          return;
         }
 
         // Get access control name from test case params
@@ -244,16 +211,9 @@ describe('AccessControl (using AdtClient)', () => {
           });
           const standardObject = resolver.getStandardObject('accessControl');
           if (!standardObject) {
-            logTestStart(testsLogger, 'AccessControl - read standard object', {
-              name: 'read_standard',
-              params: {},
-            });
-            logTestSkip(
-              testsLogger,
-              'AccessControl - read standard object',
+            throw new Error(
               `Standard access control not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
             );
-            return;
           }
           accessControlName = standardObject.name;
         }
@@ -263,26 +223,14 @@ describe('AccessControl (using AdtClient)', () => {
           params: { access_control_name: accessControlName },
         });
 
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'AccessControl - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
-
         try {
           const resultState = await tester.readTest({
             accessControlName: accessControlName,
           });
           if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              'AccessControl - read standard object',
+            throw new Error(
               `Standard access control ${accessControlName} not found in system`,
             );
-            return;
           }
           expect(resultState).toBeDefined();
 

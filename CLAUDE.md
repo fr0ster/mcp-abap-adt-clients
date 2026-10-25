@@ -24,7 +24,7 @@ npm run lint:check      # Lint check + check:docs (no fixes)
 npm run check:docs      # Every name the docs import must exist
 npm run format          # Format code with Biome
 
-# Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.yaml)
+# Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.overlay.yaml)
 # IMPORTANT: Always save full log first, then analyze. Never pipe through grep/tail/head.
 #
 # RUNNING FROM AN LLM CLI: use `npm run test:detached`. A full run is ~27 minutes,
@@ -42,7 +42,7 @@ npm test -- e2e 2>&1 | tee test-run.log            # End-to-end tests (excluded 
 npm run shared:setup 2>&1 | tee shared-setup.log   # Create shared dependencies
 DEBUG_TESTS=true npm test -- integration/class 2>&1 | tee test-run.log   # With connection debug logs
 DEBUG_ADT_TESTS=true npm test -- integration/view 2>&1 | tee test-run.log # With ADT operation logs
-VERIFY_LOCK_RELEASED=false npm test 2>&1 | tee test-run.log   # Skip the second-session proof that each UNLOCK released its lock (on by default; one extra logon per check)
+# The second-session proof that each UNLOCK released its lock is the overlay's `environment.verify_lock_released` (required; true on premise, false on cloud, where a second session may land on another application server)
 
 # Ask SAP directly: one request to several systems, every answer printed whole
 # (status, headers, body). Targets are session files under ~/.config/mcp-abap-adt/sessions/;
@@ -135,9 +135,9 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 ## Testing Notes
 
 - All tests are integration tests against real SAP systems (no mocks); unit tests exist but are minimal (`src/__tests__/unit/`)
-- Tests require `.env` with SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) and `src/__tests__/helpers/test-config.yaml` with object names and parameters. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
+- Tests require `.env` with SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) and the base template plus `test-config.overlay.yaml` with object names and parameters. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
 - **Where credentials come from**: `~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows (`<system>.env`, `<other-system>.env`, …) is the one source; copy what a run needs into the repo's `.env` before it starts. There are no per-system `*.env` copies in the repo root any more — they went stale as passwords rotated and produced 401s. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`. `.env` must still end up with `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`
-- **Test config setup**: `npm run test:init` (or `cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml`). Template works out of the box — edit only lines marked `# ← CHANGE`: `system` (`"onprem"` or `"cloud"` — this is what picks the connector, and it is stated, never inferred from `SAP_URL` or the auth type), `default_package`, `default_transport`, `default_master_system`, `shared_dependencies.super_package`. On-prem package tests also need `transport_layer`.
+- **Test config setup**: the tracked `src/__tests__/helpers/test-config.yaml.template` is the base. The system-specific keys go into the gitignored `src/__tests__/helpers/test-config.overlay.yaml`. To create it, run `npm run test:init -- onprem|cloud`, which copies the empty form from `helpers/overlays/` and never overwrites a file that is there. Then fill in every value: `environment.system` (`onprem` or `cloud`, which picks the connector and is stated, never inferred from `SAP_URL` or the auth type), the packages, transports, master system, software component and transport layers. The config is refused, naming the key, when an overlay key is unknown or its value is missing or a placeholder, or when a full `test-config.yaml` is left over. `npm run test-config:migrate` converts an old full `test-config.yaml` into the overlay once. The key list and the rules are in `docs/development/TEST_CONFIG_SCHEMA.md`. One overlay per system: `MCP_TEST_OVERLAY` names the overlay a run reads (`src/__tests__/helpers/test-config.overlay.<system>.yaml`, gitignored); a named overlay that does not exist is refused, never replaced by the default.
 - **Root package prerequisite**: The package specified in `default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do not create this package — they only create objects inside it.
 - `TestConfigResolver` resolves params with priority: `testCase.params` > `environment.default_*` > `SAP_*` env vars
 - **Tests never build a connection themselves.** `createTestConnection(logger)` from `src/__tests__/helpers/sessionConfig.ts` reads the target system and the authentication from config, picks the connector accordingly, opens the session, and returns it ready to use; `await connection.disconnect()` in `afterAll` releases it. `createTestConnection(logger, { ownSession: true })` opens a session of its own instead of joining the run's — the caller closes it with `closeOwnTestConnection()`; `expectLockReleased` (`helpers/lockReleased.ts`) is its one user. `reset()` is gone as of `@mcp-abap-adt/connection` 5.0.0 — it dropped the cookie locally and left the session open on the server

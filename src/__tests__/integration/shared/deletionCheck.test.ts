@@ -12,8 +12,15 @@
  * `/sap/bc/adt/messageclass/z_msg_test_0001` came back naming
  * `adtcore:type="MSAG/N"` and the package it resolved to. If that holds for an
  * address whose object is deleted another way, the member is honest for those
- * three types; if the server refuses, the refusal is the answer and a caller
- * reads it — which is also honest, and worth knowing rather than assuming.
+ * two types. A transport request is the exception: the service has no URI
+ * mapping for it, so its `checkDeletion` reads the request's own document
+ * (`AdtRequest.checkDeletion`), and a number no system has answers 404
+ * (measured on premise). Its check asks about the run's own request,
+ * `environment.default_transport` — a read, which releases and deletes
+ * nothing — and must answer that request's document. A refused check fails
+ * the test with what SAP said: a test
+ * never passes over a refused operation, so a type the service does not
+ * resolve shows up red, for its case to be decided, rather than green.
  *
  * **Every assertion here is about the shape of the answer, never about a
  * verdict.** Whether a given object can be deleted right now depends on the
@@ -23,6 +30,7 @@
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/deletionCheck
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -30,6 +38,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
+import { gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -37,7 +46,9 @@ import {
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
+
+const { getDefaultTransport } = require('../../helpers/test-helper');
 
 const testsLogger: ILogger = createTestsLogger();
 
@@ -47,7 +58,6 @@ const NEVER_EXISTS = 'ZZ_NO_SUCH_OBJECT_ZZ';
 describe('Shared - the deletion check, per type', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
@@ -57,9 +67,8 @@ describe('Shared - the deletion check, per type', () => {
         testsLogger,
       );
       client = resolved;
-      hasConfig = true;
     } catch (error) {
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   }, 120000);
 
@@ -70,15 +79,16 @@ describe('Shared - the deletion check, per type', () => {
   });
 
   /**
-   * The three whose URI had never been put to the service.
+   * The three whose check had never been asked.
    *
-   * Each answers *something* — a document or a refusal — and this records which,
-   * with the server's own sentence, so the next reader does not have to guess
-   * either.
+   * Each must answer its document — the deletion one, or for a request the
+   * request's own; a refusal fails, naming the type and SAP's own sentence.
    */
   const unmeasured: {
     label: string;
     ask: () => Promise<{ ok: boolean; text: string }>;
+    /** What the answer must hold: the deletion document, or the request's. */
+    expected: () => string;
   }[] = [
     {
       label: 'PROG/I include',
@@ -86,6 +96,7 @@ describe('Shared - the deletion check, per type', () => {
         const answer = await client.getInclude().checkDeletion(
           { includeName: NEVER_EXISTS },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(client.getInclude(), 'checkDeletion'),
           },
         );
@@ -93,6 +104,7 @@ describe('Shared - the deletion check, per type', () => {
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
       },
+      expected: () => 'del:',
     },
     {
       label: 'DDLX metadata extension',
@@ -100,6 +112,7 @@ describe('Shared - the deletion check, per type', () => {
         const answer = await client.getMetadataExtension().checkDeletion(
           { name: NEVER_EXISTS },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(
               client.getMetadataExtension(),
               'checkDeletion',
@@ -110,13 +123,22 @@ describe('Shared - the deletion check, per type', () => {
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
       },
+      expected: () => 'del:',
     },
     {
       label: 'transport request',
       ask: async () => {
+        // The run's own request: a number no system has answers 404.
+        const transportNumber = getDefaultTransport();
+        if (!transportNumber) {
+          throw new Error(
+            'environment.default_transport is empty: there is no request to ask about',
+          );
+        }
         const answer = await client.getRequest().checkDeletion(
-          { transportNumber: NEVER_EXISTS },
+          { transportNumber },
           {
+            analyse: analyseException,
             headers: integrationHeadersOf(client.getRequest(), 'checkDeletion'),
           },
         );
@@ -124,66 +146,61 @@ describe('Shared - the deletion check, per type', () => {
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
       },
+      expected: () => `tm:number="${getDefaultTransport()}"`,
     },
   ];
 
-  for (const { label, ask } of unmeasured) {
-    it(`answers for a ${label}, one way or the other`, async () => {
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          `deletion check — ${label}`,
-          'No SAP configuration',
+  for (const { label, ask, expected } of unmeasured) {
+    gateOn(() => true)(
+      `answers the deletion check for a ${label}`,
+      async () => {
+        logTestStep(`deletion check for a ${label}`, testsLogger);
+
+        const { ok, text } = await ask();
+        testsLogger.info?.(
+          `📄 ${label}: ${ok ? 'result' : 'failure'} — ${text.slice(0, 200)}`,
         );
-        return;
-      }
-      logTestStep(`deletion check for a ${label}`, testsLogger);
-
-      const { ok, text } = await ask();
-
-      // Recorded rather than judged. What must not happen is the third thing:
-      // an empty success, which is how a refusal used to reach a caller.
-      testsLogger.info?.(
-        `📄 ${label}: ${ok ? 'result' : 'failure'} — ${text.slice(0, 200)}`,
-      );
-      expect(text.length).toBeGreaterThan(0);
-    }, 60000);
+        if (!ok) {
+          throw new Error(`deletion check for a ${label} refused: ${text}`);
+        }
+        expect(text).toContain(expected());
+      },
+      60000,
+    );
   }
 
-  it('a class answers the deletion document, and it is the deletion one', async () => {
-    if (!hasConfig) {
-      logTestSkip(
+  gateOn(() => true)(
+    'a class answers the deletion document, and it is the deletion one',
+    async () => {
+      logTestStep(
+        `deletion check for a class that does not exist`,
         testsLogger,
-        'deletion check — class',
-        'No SAP configuration',
       );
-      return;
-    }
-    logTestStep(`deletion check for a class that does not exist`, testsLogger);
 
-    const answer = await client
-      .getClass()
-      .checkDeletion(
+      const answer = await client.getClass().checkDeletion(
         { className: NEVER_EXISTS },
-        { headers: integrationHeadersOf(client.getClass(), 'checkDeletion') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(client.getClass(), 'checkDeletion'),
+        },
       );
 
-    // A class is one of the twenty-six the service is known to resolve, so this
-    // is the control: whatever the three above do, this one has to answer, and
-    // it has to answer `del:`-namespaced content rather than `chkl:messages`.
-    // The two documents shared a strategy slot for one commit, and only a live
-    // answer proves they no longer do.
-    const text = answer.ok
-      ? String(answer.getResult().value)
-      : answer.getError().message;
-    testsLogger.info?.(`📄 class: ${text.slice(0, 200)}`);
+      // A class is one of the twenty-six the service is known to resolve, so this
+      // is the control: whatever the three above do, this one has to answer, and
+      // it has to answer `del:`-namespaced content rather than `chkl:messages`.
+      // The two documents shared a strategy slot for one commit, and only a live
+      // answer proves they no longer do.
+      const text = answer.ok
+        ? String(answer.getResult().value)
+        : answer.getError().message;
+      testsLogger.info?.(`📄 class: ${text.slice(0, 200)}`);
 
-    if (answer.ok) {
+      if (!answer.ok) {
+        throw new Error(`deletion check for a class refused: ${text}`);
+      }
       expect(text).toContain('del:');
       expect(text).not.toContain('chkl:messages');
-    } else {
-      expect(answer.getError().message.length).toBeGreaterThan(0);
-      expect(['connection', 'refusal']).toContain(answer.getError().origin);
-    }
-  }, 60000);
+    },
+    60000,
+  );
 });

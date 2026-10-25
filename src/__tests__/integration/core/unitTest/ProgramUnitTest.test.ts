@@ -11,7 +11,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -24,7 +29,18 @@ import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
+  cleanupRefusal,
+  expectResult,
+  raiseAfterCleanup,
+  releasing,
+} from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -32,7 +48,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -41,14 +56,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -69,9 +82,7 @@ const TITLE = "ProgramUnitTest - run a report's tests";
 describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -81,15 +92,16 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -99,10 +111,10 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
     }
   });
 
-  it(
+  gate('run_program_unit_test', 'adt_program_unit_test')(
     'runs the tests of a report whose test class is in an include',
     async () => {
-      const testCase = getTestCaseDefinition(
+      const testCase = configuredCase(
         'run_program_unit_test',
         'adt_program_unit_test',
       );
@@ -110,30 +122,16 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
         name: 'run_program_unit_test',
         params: {},
       });
-      if (!hasConfig) {
-        logTestSkip(testsLogger, TITLE, 'No SAP configuration');
-        return;
-      }
-      if (
-        !testCase ||
-        !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-      ) {
-        logTestSkip(
-          testsLogger,
-          TITLE,
-          'Test case not configured or not available for this environment',
+      if (!testCase)
+        throw new Error(
+          missingCaseMessage('run_program_unit_test', 'adt_program_unit_test'),
         );
-        return;
-      }
       const params = testCase.params;
       const packageName = resolvePackageName(params.package_name);
       const transportRequest = resolveTransportRequest(
         params.transport_request,
       );
-      if (!packageName) {
-        logTestSkip(testsLogger, TITLE, 'Package name not configured');
-        return;
-      }
+      if (!packageName) throw new Error('Package name not configured');
       const expected: string[] = params.expected_test_methods ?? [];
       const skipCleanup = params.skip_cleanup === true;
 
@@ -142,6 +140,7 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
       const program = { programName };
       const include = { includeName };
 
+      let failed: { error: unknown } | undefined;
       try {
         // Step 1: the include holding the test class
         logTestStep('create include', testsLogger);
@@ -153,28 +152,41 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit test include',
             },
-            { headers: integrationHeadersOf(client.getInclude(), 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(client.getInclude(), 'create'),
+            },
           ),
           'create include',
         );
         const includeHandle = String(
-          expectResult(await client.getInclude().lock(include), 'lock include'),
-        );
-        try {
           expectResult(
-            await client.getInclude().update(
-              { ...include, transportRequest },
-              {
-                headers: integrationHeadersOf(client.getInclude(), 'update'),
-                lockHandle: includeHandle,
-                source: params.include_source,
-              },
+            await client
+              .getInclude()
+              .lock(include, { analyse: analyseException }),
+            'lock include',
+          ),
+        );
+        await releasing(
+          async () =>
+            expectResult(
+              await client.getInclude().update(
+                { ...include, transportRequest },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(client.getInclude(), 'update'),
+                  lockHandle: includeHandle,
+                  source: params.include_source,
+                },
+              ),
+              'write the test class',
             ),
-            'write the test class',
-          );
-        } finally {
-          await client.getInclude().unlock(include, includeHandle);
-        }
+          () =>
+            client
+              .getInclude()
+              .unlock(include, includeHandle, { analyse: analyseException }),
+          'unlock after write the test class',
+        );
 
         // Step 2: the report that pulls it in
         logTestStep('create program', testsLogger);
@@ -186,38 +198,53 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
               transportRequest,
               description: 'ABAP Unit test report',
             },
-            { headers: integrationHeadersOf(client.getProgram(), 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(client.getProgram(), 'create'),
+            },
           ),
           'create program',
         );
         const programHandle = String(
-          expectResult(await client.getProgram().lock(program), 'lock program'),
-        );
-        try {
           expectResult(
-            await client.getProgram().update(
-              { ...program, transportRequest },
-              {
-                headers: integrationHeadersOf(client.getProgram(), 'update'),
-                lockHandle: programHandle,
-                source: params.program_source,
-              },
+            await client
+              .getProgram()
+              .lock(program, { analyse: analyseException }),
+            'lock program',
+          ),
+        );
+        await releasing(
+          async () =>
+            expectResult(
+              await client.getProgram().update(
+                { ...program, transportRequest },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(client.getProgram(), 'update'),
+                  lockHandle: programHandle,
+                  source: params.program_source,
+                },
+              ),
+              'write the report',
             ),
-            'write the report',
-          );
-        } finally {
-          await client.getProgram().unlock(program, programHandle);
-        }
+          () =>
+            client
+              .getProgram()
+              .unlock(program, programHandle, { analyse: analyseException }),
+          'unlock after write the report',
+        );
 
         logTestStep('activate', testsLogger);
         expectResult(
           await client.getInclude().activate(include, {
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(client.getInclude(), 'activate'),
           }),
           'activate include',
         );
         expectResult(
           await client.getProgram().activate(program, {
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(client.getProgram(), 'activate'),
           }),
           'activate program',
@@ -241,28 +268,43 @@ describe('ABAP Unit on a report (AdtClient + AdtExecutor)', () => {
 
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
+        failed = { error };
         logTestError(testsLogger, TITLE, error);
-        throw error;
-      } finally {
-        if (!skipCleanup) {
-          logTestStep('delete (cleanup)', testsLogger);
-          await client
-            .getProgram()
-            .delete(
-              { ...program, transportRequest },
-              { headers: integrationHeadersOf(client.getProgram(), 'delete') },
-            )
-            .catch(() => undefined);
-          await client
-            .getInclude()
-            .delete(
-              { ...include, transportRequest },
-              { headers: integrationHeadersOf(client.getInclude(), 'delete') },
-            )
-            .catch(() => undefined);
-        }
-        logTestEnd(testsLogger, TITLE);
       }
+      // Cleanup runs whatever the body did. A refused delete fails the test;
+      // when the body already failed it is added to that failure instead,
+      // never replacing it. Absent — the body failed before creating it — is
+      // no refusal.
+      const refusals: string[] = [];
+      if (!skipCleanup) {
+        logTestStep('delete (cleanup)', testsLogger);
+        refusals.push(
+          await cleanupRefusal(
+            () =>
+              client.getProgram().delete(
+                { ...program, transportRequest },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(client.getProgram(), 'delete'),
+                },
+              ),
+            `delete program ${program.programName}`,
+          ),
+          await cleanupRefusal(
+            () =>
+              client.getInclude().delete(
+                { ...include, transportRequest },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(client.getInclude(), 'delete'),
+                },
+              ),
+            `delete include ${include.includeName}`,
+          ),
+        );
+      }
+      logTestEnd(testsLogger, TITLE);
+      raiseAfterCleanup(failed, refusals);
     },
     getTimeout('test'),
   );

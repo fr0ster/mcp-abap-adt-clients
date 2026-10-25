@@ -19,6 +19,7 @@ import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
+import { gate } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -179,27 +180,9 @@ describe('Shared - getPackageHierarchy', () => {
   beforeEach(() => tester?.beforeEach()());
   afterEach(() => tester?.afterEach()());
 
-  it(
+  gate('package_hierarchy', 'get_package_hierarchy')(
     'should fetch package hierarchy',
     async () => {
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          'PackageHierarchy - fetch',
-          'No SAP configuration',
-        );
-        return;
-      }
-
-      if (!tester) {
-        logTestSkip(
-          testsLogger,
-          'PackageHierarchy - fetch',
-          'Tester not initialized',
-        );
-        return;
-      }
-
       const testName = 'PackageHierarchy - fetch';
       const testCase = tester.getTestCase() || {
         name: 'get_package_hierarchy',
@@ -207,22 +190,7 @@ describe('Shared - getPackageHierarchy', () => {
       };
       logTestStart(testsLogger, testName, testCase);
 
-      if (tester.shouldSkip()) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          tester.getSkipReason() || 'Test case not available',
-        );
-        logTestEnd(testsLogger, testName);
-        return;
-      }
-
-      const config = tester.getConfig();
-      if (!config) {
-        logTestSkip(testsLogger, testName, 'Config not available');
-        logTestEnd(testsLogger, testName);
-        return;
-      }
+      const config = await tester.requireConfig();
 
       try {
         const result = (await tester.readTest(config, {
