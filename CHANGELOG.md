@@ -53,6 +53,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `MCP_TEST_CONFIG`. `test:init`, `test-config:migrate`, `check:config` and the
   loader read it; a named overlay that does not exist is refused, never replaced
   by the default one. Without the variable nothing changes.
+- **The standard transformation `ID` is read on cloud too.** Its
+  `standard_objects` entry named only on-premise and legacy, while
+  `read_standard_transformation` runs on cloud, so the test failed there with
+  "Standard transformation not configured". `ID` reads back on a BTP trial
+  (200), and the test passes there.
 - **`shared_dependencies.package` is marked `← CHANGE`** in the template, as the
   other system-specific keys were. Its being unmarked is what let a realignment
   replace it with a placeholder unnoticed and cost a full run on 2026-09-01.
