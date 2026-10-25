@@ -63,8 +63,22 @@ function check(directory = HELPERS_DIRECTORY, namedOverlay) {
   };
 }
 
+/** The overlay the environment names; a blank name is a failed check. */
+function checkNamed(directory, env = process.env) {
+  let namedOverlay;
+  try {
+    namedOverlay = overlayPathFromEnv(env);
+  } catch (error) {
+    if (error instanceof TestConfigError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+  return check(directory, namedOverlay);
+}
+
 function main(directory = HELPERS_DIRECTORY) {
-  const { ok, message } = check(directory, overlayPathFromEnv());
+  const { ok, message } = checkNamed(directory);
   (ok ? console.log : console.error)(message);
   process.exit(ok ? 0 : 1);
 }
@@ -73,4 +87,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { check, main };
+module.exports = { check, checkNamed, main };

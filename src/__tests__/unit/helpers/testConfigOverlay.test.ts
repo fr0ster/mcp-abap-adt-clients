@@ -5,7 +5,7 @@ import * as yaml from 'yaml';
 
 const overlayLib = require('../../../../scripts/lib/testConfigOverlay');
 const { init } = require('../../../../scripts/test-config');
-const { check } = require('../../../../scripts/check-config-drift');
+const { check, checkNamed } = require('../../../../scripts/check-config-drift');
 
 const {
   ALLOWED_OVERLAY_KEYS,
@@ -604,10 +604,18 @@ describe('the overlay MCP_TEST_OVERLAY names', () => {
     expect(OVERLAY_VARIABLE).toBe('MCP_TEST_OVERLAY');
   });
 
-  it('is none when the variable is not set or blank', () => {
+  it('is none when the variable is not set', () => {
     expect(overlayPathFromEnv({})).toBeUndefined();
-    expect(overlayPathFromEnv({ MCP_TEST_OVERLAY: '  ' })).toBeUndefined();
   });
+
+  it.each(['', '  '])(
+    'is refused when the variable is set but blank (%j)',
+    (blank) => {
+      expect(
+        refusal(() => overlayPathFromEnv({ MCP_TEST_OVERLAY: blank })),
+      ).toContain('MCP_TEST_OVERLAY is set but names no file');
+    },
+  );
 
   it('resolves a relative name against the repository root', () => {
     expect(
@@ -666,6 +674,15 @@ describe('the overlay MCP_TEST_OVERLAY names', () => {
     expect(init('cloud', directory, named)).toBe(named);
     expect(fs.existsSync(named)).toBe(true);
     expect(fs.existsSync(path.join(directory, OVERLAY_FILE))).toBe(false);
+  });
+
+  it('fails check:config when set but blank, without reading the default', () => {
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    const result = checkNamed(directory, { MCP_TEST_OVERLAY: ' ' });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'MCP_TEST_OVERLAY is set but names no file',
+    );
   });
 
   it('is what check:config checks, and must exist', () => {

@@ -47,11 +47,19 @@ const OVERLAY_VARIABLE = 'MCP_TEST_OVERLAY';
 
 /**
  * The overlay `MCP_TEST_OVERLAY` names, resolved against the repository root
- * when relative; `undefined` when the variable is not set.
+ * when relative; `undefined` only when the variable is not set. Set but blank
+ * — `MCP_TEST_OVERLAY="$OVERLAY"` with `$OVERLAY` empty — is refused: it names
+ * no file, and reading the default would run on another system's values.
  */
 function overlayPathFromEnv(env = process.env) {
-  const value = env[OVERLAY_VARIABLE]?.trim();
-  if (!value) return undefined;
+  const raw = env[OVERLAY_VARIABLE];
+  if (raw === undefined) return undefined;
+  const value = raw.trim();
+  if (value === '') {
+    throw new TestConfigError(
+      `${OVERLAY_VARIABLE} is set but names no file. Name the overlay of the system this run is for, or unset the variable to read ${OVERLAY_FILE}.`,
+    );
+  }
   return path.resolve(REPOSITORY_ROOT, value);
 }
 
