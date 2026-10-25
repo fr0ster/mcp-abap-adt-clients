@@ -46,6 +46,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   Overlay values are typed (no `null`, real booleans, non-empty strings except
   where `""` is a statement), and the merged result may keep no `<PLACEHOLDER>`
   in `environment`, `shared_dependencies` or an enabled case.
+- **One overlay per system, named by `MCP_TEST_OVERLAY`.** A checkout that runs
+  against several systems keeps an overlay for each
+  (`src/__tests__/helpers/test-config.overlay.<system>.yaml`, gitignored by
+  pattern) and names the one a run reads, as mcp-abap-adt names its config with
+  `MCP_TEST_CONFIG`. `test:init`, `test-config:migrate`, `check:config` and the
+  loader read it; a named overlay that does not exist is refused, never replaced
+  by the default one. Without the variable nothing changes.
 - **`shared_dependencies.package` is marked `← CHANGE`** in the template, as the
   other system-specific keys were. Its being unmarked is what let a realignment
   replace it with a placeholder unnoticed and cost a full run on 2026-09-01.

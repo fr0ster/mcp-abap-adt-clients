@@ -19,6 +19,7 @@ const {
 const { judged } = require('./judged');
 const {
   loadTestConfigFrom,
+  overlayPathFromEnv,
 } = require('../../../scripts/lib/testConfigOverlay');
 
 let cachedConfig = null;
@@ -215,13 +216,20 @@ function isTestAvailableForEnv(testCase) {
  * scripts/lib/testConfigOverlay.js. Without an overlay the base alone is
  * returned and `isTestConfigTemplate()` is true. A defective overlay, or the
  * old full `test-config.yaml`, throws a TestConfigError naming the fault.
+ *
+ * `MCP_TEST_OVERLAY` names the overlay of this checkout's own directory, one
+ * per system; a caller handing in another directory reads that directory's
+ * files alone.
  */
 function loadTestConfig(configDirectory = __dirname) {
   if (cachedConfig) {
     return cachedConfig;
   }
 
-  const { config, source } = loadTestConfigFrom(configDirectory);
+  const { config, source } = loadTestConfigFrom(
+    configDirectory,
+    configDirectory === __dirname ? overlayPathFromEnv() : undefined,
+  );
   if (source === 'base-only' && !displayedTemplateWarning) {
     console.warn(
       '⚠️ test-config.overlay.yaml not found. Using test-config.yaml.template alone; its values are placeholders (e.g. default_package <DEV_PACKAGE>).',

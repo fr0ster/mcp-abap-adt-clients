@@ -5,7 +5,7 @@ import * as yaml from 'yaml';
 
 const overlayLib = require('../../../../scripts/lib/testConfigOverlay');
 const { init } = require('../../../../scripts/test-config');
-const { check } = require('../../../../scripts/check-config-drift');
+const { check, checkNamed } = require('../../../../scripts/check-config-drift');
 
 const {
   ALLOWED_OVERLAY_KEYS,
@@ -413,6 +413,17 @@ describe('migrating the old full config', () => {
     );
   });
 
+  it('writes the overlay MCP_TEST_OVERLAY names, leaving the default absent', () => {
+    put(OLD_FULL_FILE, oldConfig());
+    const named = path.join(directory, 'test-config.overlay.sys.yaml');
+    migrateFullConfig(directory, named);
+    expect(fs.existsSync(path.join(directory, OVERLAY_FILE))).toBe(false);
+    fs.rmSync(path.join(directory, OLD_FULL_FILE));
+    expect(
+      loadTestConfigFrom(directory, named).config.environment.default_package,
+    ).toBe('ZMIGRATED');
+  });
+
   it('refuses to overwrite an existing overlay and leaves it untouched', () => {
     put(OLD_FULL_FILE, oldConfig());
     put(OVERLAY_FILE, 'mine: 1\n');
@@ -577,5 +588,117 @@ describe('npm run check:config', () => {
   it('fails on the old full config even without an overlay', () => {
     put(OLD_FULL_FILE, BASE);
     expect(check(directory).ok).toBe(false);
+  });
+});
+
+/**
+ * One checkout, one overlay per system: `MCP_TEST_OVERLAY` names the file a
+ * run reads. Editing the one overlay back and forth between systems is how a
+ * run ends up on the wrong one.
+ */
+describe('the overlay MCP_TEST_OVERLAY names', () => {
+  const { OVERLAY_VARIABLE, overlayPathFromEnv } = overlayLib;
+  const ROOT = path.resolve(__dirname, '..', '..', '..', '..');
+
+  it('is MCP_TEST_OVERLAY', () => {
+    expect(OVERLAY_VARIABLE).toBe('MCP_TEST_OVERLAY');
+  });
+
+  it('is none when the variable is not set', () => {
+    expect(overlayPathFromEnv({})).toBeUndefined();
+  });
+
+  it.each(['', '  '])(
+    'is refused when the variable is set but blank (%j)',
+    (blank) => {
+      expect(
+        refusal(() => overlayPathFromEnv({ MCP_TEST_OVERLAY: blank })),
+      ).toContain('MCP_TEST_OVERLAY is set but names no file');
+    },
+  );
+
+  it('resolves a relative name against the repository root', () => {
+    expect(
+      overlayPathFromEnv({
+        MCP_TEST_OVERLAY: 'src/__tests__/helpers/test-config.overlay.sys.yaml',
+      }),
+    ).toBe(
+      path.join(
+        ROOT,
+        'src',
+        '__tests__',
+        'helpers',
+        'test-config.overlay.sys.yaml',
+      ),
+    );
+  });
+
+  it('keeps an absolute path as it is', () => {
+    const absolute = path.join(os.tmpdir(), 'elsewhere.yaml');
+    expect(overlayPathFromEnv({ MCP_TEST_OVERLAY: absolute })).toBe(absolute);
+  });
+
+  it('is read in place of the default overlay', () => {
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    const named = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({ ...FULL_OVERLAY, 'environment.default_package': 'ZNAMED' }),
+    );
+    const { config, source } = loadTestConfigFrom(directory, named);
+    expect(source).toBe('base-and-overlay');
+    expect(config.environment.default_package).toBe('ZNAMED');
+  });
+
+  it('is refused when it does not exist, and the default is not read instead', () => {
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    const named = path.join(directory, 'test-config.overlay.absent.yaml');
+    const message = refusal(() => loadTestConfigFrom(directory, named));
+    expect(message).toContain('MCP_TEST_OVERLAY names');
+    expect(message).toContain(named);
+  });
+
+  it('is named in its own refusals', () => {
+    const named = put('test-config.overlay.sys.yaml', 'unknown.key: 1\n');
+    expect(refusal(() => loadTestConfigFrom(directory, named))).toContain(
+      'test-config.overlay.sys.yaml is not usable',
+    );
+  });
+
+  it('is where init writes the form, and the default stays absent', () => {
+    fs.mkdirSync(path.join(directory, 'overlays'));
+    fs.copyFileSync(
+      path.join(HELPERS, 'overlays', 'cloud.yaml'),
+      path.join(directory, 'overlays', 'cloud.yaml'),
+    );
+    const named = path.join(directory, 'test-config.overlay.sys.yaml');
+    expect(init('cloud', directory, named)).toBe(named);
+    expect(fs.existsSync(named)).toBe(true);
+    expect(fs.existsSync(path.join(directory, OVERLAY_FILE))).toBe(false);
+  });
+
+  it('fails check:config when set but blank, without reading the default', () => {
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    const result = checkNamed(directory, { MCP_TEST_OVERLAY: ' ' });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'MCP_TEST_OVERLAY is set but names no file',
+    );
+  });
+
+  it('is what check:config checks, and must exist', () => {
+    const absent = path.join(directory, 'test-config.overlay.absent.yaml');
+    const missing = check(directory, absent);
+    expect(missing.ok).toBe(false);
+    expect(missing.message).toContain('MCP_TEST_OVERLAY names');
+
+    const named = put(
+      'test-config.overlay.sys.yaml',
+      overlayText(FULL_OVERLAY),
+    );
+    expect(check(directory, named)).toEqual({
+      ok: true,
+      message:
+        'check:config — test-config.overlay.sys.yaml carries only allowed keys and every required one.',
+    });
   });
 });

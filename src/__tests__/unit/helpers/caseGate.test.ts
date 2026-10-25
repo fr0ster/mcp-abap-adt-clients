@@ -518,3 +518,34 @@ describe('a configuration defect wins over every applicability predicate', () =>
     expect(seen).toEqual(['the case']);
   });
 });
+
+describe('the overlay a run reads', () => {
+  const saved = process.env.MCP_TEST_OVERLAY;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.MCP_TEST_OVERLAY;
+    else process.env.MCP_TEST_OVERLAY = saved;
+  });
+
+  it('is not the one MCP_TEST_OVERLAY names when a caller hands in its own directory', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'case-gate-named-'));
+    try {
+      writeFileSync(
+        join(dir, 'test-config.yaml.template'),
+        'environment:\n  system: onprem\n',
+      );
+      process.env.MCP_TEST_OVERLAY = join(
+        dir,
+        'test-config.overlay.absent.yaml',
+      );
+      const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      jest.isolateModules(() => {
+        const helper = require('../../helpers/test-helper');
+        expect(() => helper.loadTestConfig(dir)).not.toThrow();
+        expect(helper.isTestConfigTemplate()).toBe(true);
+      });
+      warning.mockRestore();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

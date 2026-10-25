@@ -9,6 +9,12 @@
  *            a list is picked by its name
  *            (`create_package.test_cases[adt_package].params.package_name`).
  *
+ * One checkout serves several systems: `MCP_TEST_OVERLAY` names the overlay a
+ * run reads in place of `test-config.overlay.yaml` (relative to the repository
+ * root, or absolute) — `src/__tests__/helpers/test-config.overlay.<system>.yaml`,
+ * one per system, gitignored by pattern. A named overlay that does not
+ * exist is refused; the default one is never read in its place.
+ *
  * Nothing is guessed and nothing fails silently: an overlay key outside
  * ALLOWED_OVERLAY_KEYS, a required key the overlay omits, a value still written
  * as a `<PLACEHOLDER>`, and the old full `test-config.yaml` are each refused
@@ -34,14 +40,33 @@ const BASE_FILE = 'test-config.yaml.template';
 const OVERLAY_FILE = 'test-config.overlay.yaml';
 /** The pre-overlay local config. Refused when present. */
 const OLD_FULL_FILE = 'test-config.yaml';
-const HELPERS_DIRECTORY = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  'src',
-  '__tests__',
-  'helpers',
-);
+const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
+const HELPERS_DIRECTORY = path.join(REPOSITORY_ROOT, 'src', '__tests__', 'helpers');
+/** The variable that names the overlay a run reads. */
+const OVERLAY_VARIABLE = 'MCP_TEST_OVERLAY';
+
+/**
+ * The overlay `MCP_TEST_OVERLAY` names, resolved against the repository root
+ * when relative; `undefined` only when the variable is not set. Set but blank
+ * — `MCP_TEST_OVERLAY="$OVERLAY"` with `$OVERLAY` empty — is refused: it names
+ * no file, and reading the default would run on another system's values.
+ */
+function overlayPathFromEnv(env = process.env) {
+  const raw = env[OVERLAY_VARIABLE];
+  if (raw === undefined) return undefined;
+  const value = raw.trim();
+  if (value === '') {
+    throw new TestConfigError(
+      `${OVERLAY_VARIABLE} is set but names no file. Name the overlay of the system this run is for, or unset the variable to read ${OVERLAY_FILE}.`,
+    );
+  }
+  return path.resolve(REPOSITORY_ROOT, value);
+}
+
+/** The overlay of `directory`: the named one, else the default file there. */
+function overlayPathOf(directory, namedOverlay) {
+  return namedOverlay ?? path.join(directory, OVERLAY_FILE);
+}
 
 /**
  * Every key an overlay may carry.
@@ -258,19 +283,19 @@ function invalidValue(rule, value) {
  * The overlay's text → a map of flat keys to scalars. Throws TestConfigError on
  * a document that is not a flat map.
  */
-function parseOverlay(text, yaml) {
+function parseOverlay(text, yaml, label = OVERLAY_FILE) {
   let parsed;
   try {
     parsed = yaml.parse(text);
   } catch (error) {
     throw new TestConfigError(
-      `${OVERLAY_FILE} is not valid YAML (${error.name}). Fix it or recreate it with \`npm run test:init -- onprem|cloud\`.`,
+      `${label} is not valid YAML (${error.name}). Fix it or recreate it with \`npm run test:init -- onprem|cloud\`.`,
     );
   }
   if (parsed === null || parsed === undefined) return {};
   if (!isObject(parsed)) {
     throw new TestConfigError(
-      `${OVERLAY_FILE} must be a map of flat key paths to values, as in the forms under src/__tests__/helpers/overlays/.`,
+      `${label} must be a map of flat key paths to values, as in the forms under src/__tests__/helpers/overlays/.`,
     );
   }
   return parsed;
@@ -319,7 +344,7 @@ function leftoverPlaceholders(config) {
  * base + overlay → a new config. Every defect of the overlay is collected and
  * thrown together, so one run names them all.
  */
-function applyOverlay(base, overlay) {
+function applyOverlay(base, overlay, label = OVERLAY_FILE) {
   const allowed = new Map(ALLOWED_OVERLAY_KEYS.map((key) => [key.path, key]));
   const problems = [];
   const config = structuredClone(base);
@@ -355,7 +380,7 @@ function applyOverlay(base, overlay) {
   if (problems.length === 0) problems.push(...leftoverPlaceholders(config));
   if (problems.length > 0) {
     throw new TestConfigError(
-      `${OVERLAY_FILE} is not usable:\n  - ${problems.join('\n  - ')}`,
+      `${label} is not usable:\n  - ${problems.join('\n  - ')}`,
     );
   }
   return config;
@@ -373,10 +398,12 @@ function oldConfigMessage(directory) {
 
 /**
  * Load the configuration of `directory`.
+ * @param {string} [namedOverlay] the overlay `MCP_TEST_OVERLAY` names
+ *   ({@link overlayPathFromEnv}); refused when it does not exist
  * @returns {{ config: object, source: 'base-and-overlay' | 'base-only' }}
  *   `base-only` means no overlay: the base's placeholders are what is in use.
  */
-function loadTestConfigFrom(directory = HELPERS_DIRECTORY) {
+function loadTestConfigFrom(directory = HELPERS_DIRECTORY, namedOverlay) {
   const yaml = require('yaml');
   if (fs.existsSync(path.join(directory, OLD_FULL_FILE))) {
     throw new TestConfigError(oldConfigMessage(directory));
@@ -386,12 +413,18 @@ function loadTestConfigFrom(directory = HELPERS_DIRECTORY) {
     throw new TestConfigError(`${basePath} not found — the base is tracked in git.`);
   }
   const base = yaml.parse(fs.readFileSync(basePath, 'utf8')) || {};
-  const overlayPath = path.join(directory, OVERLAY_FILE);
+  const overlayPath = overlayPathOf(directory, namedOverlay);
   if (!fs.existsSync(overlayPath)) {
+    if (namedOverlay !== undefined) {
+      throw new TestConfigError(
+        `${OVERLAY_VARIABLE} names ${overlayPath}, which does not exist. Create it with \`${OVERLAY_VARIABLE}=… npm run test:init -- onprem|cloud\`; ${OVERLAY_FILE} is not read in its place.`,
+      );
+    }
     return { config: base, source: 'base-only' };
   }
-  const overlay = parseOverlay(fs.readFileSync(overlayPath, 'utf8'), yaml);
-  return { config: applyOverlay(base, overlay), source: 'base-and-overlay' };
+  const label = path.basename(overlayPath);
+  const overlay = parseOverlay(fs.readFileSync(overlayPath, 'utf8'), yaml, label);
+  return { config: applyOverlay(base, overlay, label), source: 'base-and-overlay' };
 }
 
 /** The value at `keyPath` in `config`, or `undefined` when the path is absent. */
@@ -416,12 +449,13 @@ function readAt(config, keyPath) {
  * Migrate: read the old full config of `directory` and write the overlay with
  * the allowed keys it holds. Returns the key paths written (never values).
  * Refuses to overwrite an overlay; refuses an old config that lacks a required
- * key, rather than writing an overlay that will not load.
+ * key, rather than writing an overlay that will not load. Writes the overlay
+ * `namedOverlay` names when given.
  */
-function migrateFullConfig(directory = HELPERS_DIRECTORY) {
+function migrateFullConfig(directory = HELPERS_DIRECTORY, namedOverlay) {
   const yaml = require('yaml');
   const oldPath = path.join(directory, OLD_FULL_FILE);
-  const overlayPath = path.join(directory, OVERLAY_FILE);
+  const overlayPath = overlayPathOf(directory, namedOverlay);
   if (!fs.existsSync(oldPath)) {
     throw new TestConfigError(
       `Nothing to migrate: ${oldPath} does not exist. Create the overlay with \`npm run test:init -- onprem|cloud\`.`,
@@ -462,8 +496,11 @@ module.exports = {
   BASE_FILE,
   OLD_FULL_FILE,
   OVERLAY_FILE,
+  OVERLAY_VARIABLE,
   HELPERS_DIRECTORY,
   TestConfigError,
+  overlayPathFromEnv,
+  overlayPathOf,
   applyOverlay,
   loadTestConfigFrom,
   migrateFullConfig,
