@@ -146,7 +146,7 @@ extend view ${targetEntity} with "${extName}"
             targetEntity,
             description,
             transportRequest,
-            sourceCode:
+            source:
               params.source_code ||
               generateDefaultSourceCode(extName, targetEntity),
           };

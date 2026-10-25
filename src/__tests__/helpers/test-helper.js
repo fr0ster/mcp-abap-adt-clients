@@ -1608,9 +1608,14 @@ function domainDocumentFor(current, depConfig) {
   );
 }
 
-/** The same, for a data element: its type kind and the domain it points at. */
+/**
+ * The same, for a data element: its type kind, and the domain it points at or
+ * the predefined type it carries (`data_type`, `length`, `decimals`, lengths
+ * as six digits like the domain's).
+ */
 function dataElementDocumentFor(current, depConfig) {
   const {
+    patchIf,
     patchXmlAttribute,
     patchXmlElement,
   } = require('../../utils/xmlPatch');
@@ -1626,6 +1631,19 @@ function dataElementDocumentFor(current, depConfig) {
       xml,
       'dtel:typeName',
       String(depConfig.domain_name).toUpperCase(),
+    );
+  }
+  if (typeKind !== 'domain' && depConfig.data_type) {
+    xml = patchXmlElement(
+      xml,
+      'dtel:dataType',
+      String(depConfig.data_type).toUpperCase(),
+    );
+    xml = patchIf(xml, depConfig.length, (x, val) =>
+      patchXmlElement(x, 'dtel:dataTypeLength', String(val).padStart(6, '0')),
+    );
+    xml = patchIf(xml, depConfig.decimals, (x, val) =>
+      patchXmlElement(x, 'dtel:dataTypeDecimals', String(val).padStart(6, '0')),
     );
   }
   return xml;

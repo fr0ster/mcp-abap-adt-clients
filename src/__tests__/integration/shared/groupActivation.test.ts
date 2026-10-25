@@ -70,6 +70,10 @@ const {
   getTimeout,
   getOperationDelay,
   getEnvironmentConfig,
+  dataElementDocumentFor,
+  domainDocumentFor,
+  readDocumentForUpdate,
+  writeSource,
 } = require('../../helpers/test-helper');
 
 const envPath =
@@ -455,6 +459,41 @@ describe('Group Activation (Shared)', () => {
               setTimeout(resolve, getOperationDelay('create', testCase)),
             );
 
+            // Step 1.1: Give the domain its type. The create is a shell whose
+            // `<doma:datatype/>` is empty; activation refuses it — measured:
+            // "Data type ' ' does not exist".
+            currentStep = 'write domain document';
+            logTestStep(currentStep, testsLogger);
+            const domainShell = await readDocumentForUpdate(
+              () =>
+                client
+                  .getDomain()
+                  .readMetadata(
+                    { domainName: domainName! },
+                    { analyse: analyseException },
+                  ),
+              `read ${domainName} after create`,
+            );
+            await writeSource(
+              client.getDomain(),
+              {
+                domainName: domainName,
+                packageName: packageName,
+                transportRequest: transportRequest,
+              },
+              {
+                source: domainDocumentFor(domainShell, {
+                  description:
+                    testCase.params.description ||
+                    `Test domain for group activation`,
+                  datatype: testCase.params.domain_datatype,
+                  length: testCase.params.domain_length,
+                  decimals: testCase.params.domain_decimals,
+                }),
+              },
+              testsLogger,
+            );
+
             // Step 1.5: Validate data element
             currentStep = 'validate data element';
             logTestStep(currentStep, testsLogger);
@@ -506,6 +545,41 @@ describe('Group Activation (Shared)', () => {
             dataElementCreated = true;
             await new Promise((resolve) =>
               setTimeout(resolve, getOperationDelay('create', testCase)),
+            );
+
+            // Step 2.1: Type the data element by the domain. The create is a
+            // shell whose `<dtel:typeKind/>` is empty, and the typeKind passed
+            // to it is not sent; without this write the group run refuses the
+            // element — measured: "No domain or data type was defined".
+            currentStep = 'write data element document';
+            logTestStep(currentStep, testsLogger);
+            const elementShell = await readDocumentForUpdate(
+              () =>
+                client
+                  .getDataElement()
+                  .readMetadata(
+                    { dataElementName: dataElementName! },
+                    { analyse: analyseException },
+                  ),
+              `read ${dataElementName} after create`,
+            );
+            await writeSource(
+              client.getDataElement(),
+              {
+                dataElementName: dataElementName,
+                packageName: packageName,
+                transportRequest: transportRequest,
+              },
+              {
+                source: dataElementDocumentFor(elementShell, {
+                  description:
+                    testCase.params.description ||
+                    `Test data element for group activation`,
+                  type_kind: testCase.params.data_element_type_kind || 'domain',
+                  domain_name: domainName,
+                }),
+              },
+              testsLogger,
             );
 
             // Step 2.5: Validate structure

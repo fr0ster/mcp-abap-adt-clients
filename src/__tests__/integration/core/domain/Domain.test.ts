@@ -19,7 +19,6 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
@@ -46,6 +45,7 @@ const {
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
+  domainDocumentFor,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -115,6 +115,7 @@ describe('Domain (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
+            datatype: params.datatype,
             length: params.length || 10,
             decimals: params.decimals,
           };
@@ -155,15 +156,24 @@ describe('Domain (using AdtClient)', () => {
     gate('create_domain', 'adt_domain')(
       'should execute full workflow and store all results',
       async () => {
-        const config = await tester.requireConfig();
+        // buildConfig above carries the type beside IDomainConfig's fields.
+        const config = (await tester.requireConfig()) as IDomainConfig & {
+          datatype?: string;
+          length?: number;
+          decimals?: number;
+        };
 
         await tester.flowTestAuto({
+          // The create is a shell — `<doma:datatype/>` empty — and the
+          // update is what gives it a type; without one activation refuses
+          // it: "Data type ' ' does not exist" (measured).
           updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config.description || ''} (updated)`.slice(0, 60),
-            ),
+            domainDocumentFor(current, {
+              description: `${config.description || ''} (updated)`,
+              datatype: config.datatype,
+              length: config.length,
+              decimals: config.decimals,
+            }),
           updateConfig: {
             domainName: config.domainName,
             packageName: config.packageName,

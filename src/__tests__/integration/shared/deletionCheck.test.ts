@@ -12,7 +12,13 @@
  * `/sap/bc/adt/messageclass/z_msg_test_0001` came back naming
  * `adtcore:type="MSAG/N"` and the package it resolved to. If that holds for an
  * address whose object is deleted another way, the member is honest for those
- * three types. A refused check fails the test with what SAP said: a test
+ * two types. A transport request is the exception: the service has no URI
+ * mapping for it, so its `checkDeletion` reads the request's own document
+ * (`AdtRequest.checkDeletion`), and a number no system has answers 404
+ * (measured on premise). Its check asks about the run's own request,
+ * `environment.default_transport` — a read, which releases and deletes
+ * nothing — and must answer that request's document. A refused check fails
+ * the test with what SAP said: a test
  * never passes over a refused operation, so a type the service does not
  * resolve shows up red, for its case to be decided, rather than green.
  *
@@ -41,6 +47,8 @@ import {
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
+
+const { getDefaultTransport } = require('../../helpers/test-helper');
 
 const testsLogger: ILogger = createTestsLogger();
 
@@ -71,14 +79,16 @@ describe('Shared - the deletion check, per type', () => {
   });
 
   /**
-   * The three whose URI had never been put to the service.
+   * The three whose check had never been asked.
    *
-   * Each must answer the deletion document; a refusal fails, naming the type
-   * and SAP's own sentence.
+   * Each must answer its document — the deletion one, or for a request the
+   * request's own; a refusal fails, naming the type and SAP's own sentence.
    */
   const unmeasured: {
     label: string;
     ask: () => Promise<{ ok: boolean; text: string }>;
+    /** What the answer must hold: the deletion document, or the request's. */
+    expected: () => string;
   }[] = [
     {
       label: 'PROG/I include',
@@ -94,6 +104,7 @@ describe('Shared - the deletion check, per type', () => {
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
       },
+      expected: () => 'del:',
     },
     {
       label: 'DDLX metadata extension',
@@ -112,12 +123,20 @@ describe('Shared - the deletion check, per type', () => {
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
       },
+      expected: () => 'del:',
     },
     {
       label: 'transport request',
       ask: async () => {
+        // The run's own request: a number no system has answers 404.
+        const transportNumber = getDefaultTransport();
+        if (!transportNumber) {
+          throw new Error(
+            'environment.default_transport is empty: there is no request to ask about',
+          );
+        }
         const answer = await client.getRequest().checkDeletion(
-          { transportNumber: NEVER_EXISTS },
+          { transportNumber },
           {
             analyse: analyseException,
             headers: integrationHeadersOf(client.getRequest(), 'checkDeletion'),
@@ -127,12 +146,13 @@ describe('Shared - the deletion check, per type', () => {
           ? { ok: true, text: String(answer.getResult().value) }
           : { ok: false, text: answer.getError().message };
       },
+      expected: () => `tm:number="${getDefaultTransport()}"`,
     },
   ];
 
-  for (const { label, ask } of unmeasured) {
+  for (const { label, ask, expected } of unmeasured) {
     gateOn(() => true)(
-      `answers the deletion document for a ${label}`,
+      `answers the deletion check for a ${label}`,
       async () => {
         logTestStep(`deletion check for a ${label}`, testsLogger);
 
@@ -143,7 +163,7 @@ describe('Shared - the deletion check, per type', () => {
         if (!ok) {
           throw new Error(`deletion check for a ${label} refused: ${text}`);
         }
-        expect(text).toContain('del:');
+        expect(text).toContain(expected());
       },
       60000,
     );

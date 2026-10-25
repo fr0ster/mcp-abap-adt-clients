@@ -23,7 +23,6 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -65,6 +64,7 @@ const {
   createDependencyDomain,
   extractValidationErrorMessage,
   getEnvironmentConfig,
+  dataElementDocumentFor,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -376,12 +376,18 @@ describe('DataElement (using AdtClient)', () => {
         try {
           // Use BaseTester.flowTest() for standardized CRUD flow
           await tester.flowTest(config, testCase.params, {
+            // The create is a shell — `<dtel:typeKind/>` empty — and the
+            // update is what gives it a type; without one activation refuses
+            // it: "No domain or data type was defined" (measured).
             updateTakesDocument: (current) =>
-              patchXmlAttribute(
-                current,
-                'adtcore:description',
-                `${config.description || ''} (updated)`.slice(0, 60),
-              ),
+              dataElementDocumentFor(current, {
+                description: `${config.description || ''} (updated)`,
+                type_kind: config.typeKind,
+                domain_name: domainName,
+                data_type: config.dataType,
+                length: config.length,
+                decimals: config.decimals,
+              }),
             updateConfig: {
               dataElementName: config.dataElementName,
               packageName: config.packageName!,

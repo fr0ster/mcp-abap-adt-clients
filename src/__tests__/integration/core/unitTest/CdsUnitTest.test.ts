@@ -37,7 +37,7 @@ import {
 } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectResult, releasing } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { removeLeftover } from '../../../helpers/objectPresence';
 import {
@@ -266,6 +266,40 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           );
           expect(createState).toBeDefined();
           testsLogger.info?.('CDS unit test class created successfully');
+
+          // Step 2.1: Write the configured test class. The template makes the
+          // generator's class, whose test method is the placeholder
+          // `cl_abap_unit_assert=>fail( msg = 'Place your assertions here' )`
+          // — run as it is, the test fails by design (measured on premise).
+          logTestStep('update (testclasses)', testsLogger);
+          const cls = client.getClass();
+          const includeConfig = { className, transportRequest };
+          const includeHandle = String(
+            expectResult(
+              await cls.lock(includeConfig, { analyse: analyseException }),
+              'lock for testclasses',
+            ),
+          );
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getLocalTestClass().update(includeConfig, {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getLocalTestClass(),
+                    'update',
+                  ),
+                  source: testClassSource,
+                  lockHandle: includeHandle,
+                }),
+                'write the testclasses include',
+              ),
+            () =>
+              cls.unlock(includeConfig, includeHandle, {
+                analyse: analyseException,
+              }),
+            'unlock after write the testclasses include',
+          );
 
           // Step 3: Activate class
           logTestStep('activate', testsLogger);

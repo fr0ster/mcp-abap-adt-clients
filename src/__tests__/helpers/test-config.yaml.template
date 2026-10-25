@@ -150,6 +150,10 @@ environment:
   read_message_class_after_create: true       # ← CHANGE: the message-class flow reads the class right after its
                                               #   create. On: any refusal (404 included) fails. Off: not read, and
                                               #   the run says so. false on cloud (same 404, measured).
+  validate_transformation_names: true         # ← CHANGE: the transformation flows validate the name first
+                                              #   (/sap/bc/adt/xslt/validation). On: any refusal (404 included)
+                                              #   fails. Off: not sent, and the run says so. false where the
+                                              #   system has no such resource (404, measured on premise).
   # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
   # is_legacy: true         # Uncomment for BASIS < 7.50 systems (for example a legacy system). Also set SAP_UNICODE=false in .env for non-unicode systems.
 
@@ -2425,7 +2429,8 @@ create_cds_unit_test:
               METHOD aunit_for_cds_method.
                 prepare_testdata( ).
                 SELECT * FROM zac_shr_cdsut_ddls INTO TABLE @act_results.
-                cl_abap_unit_assert=>fail( msg = 'Place your assertions here' ).
+                cl_abap_unit_assert=>assert_equals( exp = 1 act = lines( act_results ) ).
+                cl_abap_unit_assert=>assert_equals( exp = 'TEST01' act = act_results[ 1 ]-fld1 ).
               ENDMETHOD.
 
               METHOD prepare_testdata.

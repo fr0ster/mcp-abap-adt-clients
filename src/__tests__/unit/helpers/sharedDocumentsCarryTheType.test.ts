@@ -103,4 +103,35 @@ describe('the document a shared data element is updated with', () => {
     );
     expect(document).toContain('<dtel:typeName/>');
   });
+
+  it('carries a predefined type, its length and decimals as six digits', () => {
+    const shell = DTEL_SHELL.replace(
+      '</blue:wbobj>',
+      '<dtel:dataType/><dtel:dataTypeLength>000000</dtel:dataTypeLength>' +
+        '<dtel:dataTypeDecimals>000000</dtel:dataTypeDecimals></blue:wbobj>',
+    );
+    const document = dataElementDocumentFor(shell, {
+      type_kind: 'predefinedAbapType',
+      data_type: 'char',
+      length: 100,
+      decimals: 2,
+    });
+
+    expect(document).toContain('<dtel:dataType>CHAR</dtel:dataType>');
+    expect(document).toContain(
+      '<dtel:dataTypeLength>000100</dtel:dataTypeLength>',
+    );
+    expect(document).toContain(
+      '<dtel:dataTypeDecimals>000002</dtel:dataTypeDecimals>',
+    );
+  });
+
+  it('refuses a document with nowhere to put the predefined type', () => {
+    expect(() =>
+      dataElementDocumentFor(DTEL_SHELL, {
+        type_kind: 'predefinedAbapType',
+        data_type: 'CHAR',
+      }),
+    ).toThrow(/dtel:dataType/);
+  });
 });
