@@ -151,7 +151,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `true` on premise, `false` on cloud, where a second session can meet a 404
   for a new object). On, any refusal — the 404 included — fails; off, nothing
   is sent and the run logs a line naming the key. `VERIFY_LOCK_RELEASED` is
-  no longer read. **Migration:** add both keys to `test-config.overlay.yaml`.
+  no longer read. Whether the transformation flows validate the name first is
+  the third such key, `environment.validate_transformation_names` (the forms
+  state `true`; `false` where the system has no `/sap/bc/adt/xslt/validation`,
+  a 404 measured on premise). **Migration:** add the three keys to
+  `test-config.overlay.yaml`.
   Every call the integration suites and the test helpers make to an
   adt-clients member now passes an `analyse` strategy — `analyseException` by
   default, and a specific judge only composed with it

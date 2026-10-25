@@ -88,6 +88,10 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
       'environment.read_message_class_after_create',
       { required: true, type: 'boolean' },
     ],
+    [
+      'environment.validate_transformation_names',
+      { required: true, type: 'boolean' },
+    ],
     // The shared package (the template's "Lego library").
     ['shared_dependencies.package', { required: true }],
     ['shared_dependencies.super_package', { required: true }],

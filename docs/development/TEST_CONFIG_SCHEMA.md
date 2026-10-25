@@ -51,6 +51,7 @@ appear; anything else is refused by name. The list:
 |---|---|
 | `environment.system`, `.default_package`, `.default_transport`, `.default_master_system` | required |
 | `environment.verify_lock_released`, `environment.read_message_class_after_create` — booleans: whether the second-session lock-release check, and the message class's read right after its create, are made on this system. On, any refusal (a 404 included) fails; off, nothing is sent and the run logs a line naming the key. The forms state `true` on premise, `false` on cloud | required |
+| `environment.validate_transformation_names` — boolean: whether the transformation flows validate the name (`/sap/bc/adt/xslt/validation`) before the create. On, any refusal (a 404 included) fails; off, nothing is sent and the run logs a line naming the key. The forms state `true`; `false` where the system has no such resource (a 404, measured on an on-premise system) | required |
 | `shared_dependencies.package`, `.super_package`, `.software_component`, `.transport_layer`, `.record_changes` | required |
 | `create_package.test_cases[adt_package].params.package_name`, `.software_component`, `.transport_layer` | required |
 | `create_transport.test_cases[builder_transport].params.target_system` | required |

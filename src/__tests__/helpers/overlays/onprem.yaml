@@ -23,6 +23,8 @@
 "environment.verify_lock_released": true
 # Read the message class right after its create (on: any refusal fails; off: not read, said in the run).
 "environment.read_message_class_after_create": true
+# Validate a transformation's name before its create (on: any refusal fails; off: not sent, said in the run). false where the system has no /sap/bc/adt/xslt/validation (404).
+"environment.validate_transformation_names": true
 # Name of the shared package on THIS system (created by `npm run shared:setup` inside super_package).
 "shared_dependencies.package": "<SHARED_PACKAGE>"
 # Parent of the shared package; normally the same as environment.default_package.

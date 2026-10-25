@@ -29,6 +29,7 @@ import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
+  requiredEnvironmentFlag,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -174,6 +175,13 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
           testCase?.params?.source_code || config.source || defaultSourceCode;
 
         await tester.flowTestAuto({
+          // Whether this system offers name validation for transformations
+          // is its configuration, never read off a refusal.
+          skipValidation: requiredEnvironmentFlag(
+            'validate_transformation_names',
+          )
+            ? undefined
+            : 'environment.validate_transformation_names is false',
           source: sourceCode,
           updateConfig: {
             transformationName: config.transformationName,

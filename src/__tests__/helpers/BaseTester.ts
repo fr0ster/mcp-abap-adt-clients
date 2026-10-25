@@ -106,6 +106,12 @@ export interface IFlowTestOptions {
    * and returns the one to write, which is where a test changes a field.
    */
   updateTakesDocument?: boolean | ((current: string) => string);
+  /**
+   * The validate step is not sent, and the run logs this sentence, which names
+   * the configuration key that turned it off. Absent, the name is validated
+   * and any refusal fails.
+   */
+  skipValidation?: string;
   activateOnCreate?: boolean;
   activateOnUpdate?: boolean;
   timeout?: number;
@@ -994,34 +1000,40 @@ export class BaseTester<TConfig, TState = unknown> {
       // validation resource (404/405/501) fails too: whether a type is tested
       // on a system is its case's `enabled` / `available_in`, never something
       // read off a refusal.
-      const validationDocument = String(
-        expectResult(
-          await this.adtObject.validate(config as Partial<TConfig>, {
-            analyse: judged(analyseValidation),
-          }),
-          'validate',
-        ) ?? '',
-      );
-
-      // The document still has to be read: validation reports a rejected name
-      // inside a 200. `analyseValidation` above judges the forms it knows;
-      // `validationErrors` reads every other table form by structure, nested
-      // messages and any namespace prefix included. An answer that is not XML
-      // fails: whether the name was rejected cannot be read from it.
-      const errorTexts = validationErrors(validationDocument);
-      if (errorTexts.length > 0) {
-        const error = new Error(
-          `Validation failed with errors: ${errorTexts.join('; ')}`,
+      let validationDocument = '';
+      if (options?.skipValidation) {
+        this.log(LogLevel.INFO, `validate not sent: ${options.skipValidation}`);
+      } else {
+        validationDocument = String(
+          expectResult(
+            await this.adtObject.validate(config as Partial<TConfig>, {
+              analyse: judged(analyseValidation),
+            }),
+            'validate',
+          ) ?? '',
         );
-        logTestStepError(currentStep, error);
-        throw error;
-      }
 
-      // Delay after validate
-      await this.waitDelay(
-        this.getOperationDelay('validate', testCaseParams),
-        'validate',
-      );
+        // The document still has to be read: validation reports a rejected
+        // name inside a 200. `analyseValidation` above judges the forms it
+        // knows; `validationErrors` reads every other table form by
+        // structure, nested messages and any namespace prefix included. An
+        // answer that is not XML fails: whether the name was rejected cannot
+        // be read from it.
+        const errorTexts = validationErrors(validationDocument);
+        if (errorTexts.length > 0) {
+          const error = new Error(
+            `Validation failed with errors: ${errorTexts.join('; ')}`,
+          );
+          logTestStepError(currentStep, error);
+          throw error;
+        }
+
+        // Delay after validate
+        await this.waitDelay(
+          this.getOperationDelay('validate', testCaseParams),
+          'validate',
+        );
+      }
 
       // 2. Create
       currentStep = 'create';
