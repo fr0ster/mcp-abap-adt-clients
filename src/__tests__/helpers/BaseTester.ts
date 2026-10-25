@@ -67,7 +67,7 @@ import {
   resolveSystemContext,
 } from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
-import { createLibraryLogger } from './testLogger';
+import { createLibraryLogger, createRunIntegrityLogger } from './testLogger';
 import {
   getHttpStatusText,
   logTestEnd,
@@ -1002,7 +1002,11 @@ export class BaseTester<TConfig, TState = unknown> {
       // read off a refusal.
       let validationDocument = '';
       if (options?.skipValidation) {
-        this.log(LogLevel.INFO, `validate not sent: ${options.skipValidation}`);
+        // Run-visible, like the lock-release check's: an off check is said in
+        // every run, not only under DEBUG_ADT_TESTS.
+        createRunIntegrityLogger().info?.(
+          `${this.loggerPrefix} ${describeObject(config)}: validate not sent — ${options.skipValidation}`,
+        );
       } else {
         validationDocument = String(
           expectResult(
