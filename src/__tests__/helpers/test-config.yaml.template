@@ -845,7 +845,8 @@ standard_objects:
   transformations:
     - name: "ID"
       description: "Standard identity XSLT transformation"
-      available_in: ["onprem", "legacy"]
+      # Read back on premise (2026-09-27) and on a BTP trial (2026-10-25).
+      available_in: ["onprem", "legacy", "cloud"]
 
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
