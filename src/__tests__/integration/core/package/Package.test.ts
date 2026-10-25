@@ -8,7 +8,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -19,7 +22,9 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -36,7 +41,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -173,7 +177,7 @@ describe('Package (using AdtClient)', () => {
               },
               {
                 headers: integrationHeadersOf(client.getPackage(), 'delete'),
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
               },
             ),
             `delete package ${cfg.packageName}`,
@@ -185,7 +189,9 @@ describe('Package (using AdtClient)', () => {
           // apart from "it is not there": creating over a package that may be
           // there is the irreversible half of that guess.
           const presence = presenceOf(
-            await client.getPackage().readMetadata({ packageName }),
+            await client
+              .getPackage()
+              .readMetadata({ packageName }, { analyse: analyseException }),
             `package ${packageName}`,
           );
           if (presence.present === 'unknown') {
@@ -214,22 +220,10 @@ describe('Package (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_package', 'adt_package')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
           // **The update in its own ABAP session** (issue #176): the create
@@ -268,7 +262,7 @@ describe('Package (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('package')(
       'should read standard SAP package',
       async () => {
         const standardObject = resolveStandardObject(
@@ -279,16 +273,9 @@ describe('Package (using AdtClient)', () => {
         );
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Package - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Package - read standard object',
+          throw new Error(
             `Standard package not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardPackageName = standardObject.name;
@@ -296,15 +283,6 @@ describe('Package (using AdtClient)', () => {
           name: 'read_standard',
           params: { package_name: standardPackageName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Package - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

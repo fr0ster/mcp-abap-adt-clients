@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAdtResponse, IAdtResult } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -17,6 +18,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { gateOn } from '../../helpers/caseGate';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -40,7 +42,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Shared - discovery', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isLegacy = false;
 
   beforeAll(async () => {
@@ -52,11 +53,10 @@ describe('Shared - discovery', () => {
         await createTestAdtClient(connection, testsLogger);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -66,29 +66,26 @@ describe('Shared - discovery', () => {
     }
   });
 
-  it('should fetch ADT discovery document', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
+  gateOn(() => true)(
+    'should fetch ADT discovery document',
+    async () => {
+      logTestStep('fetch ADT discovery document', testsLogger);
 
-    logTestStep('fetch ADT discovery document', testsLogger);
+      // The verdict comes from the contract, not from the status: ADT answers a
+      // refusal inside a 200, so `status === 200` would pass over one.
+      // `withAcceptHandling` comes from a `require`d JS helper and returns `any`,
+      // so the contract has to be named here or the assertions below type as
+      // `unknown` and stop checking anything.
+      const answer = (await withAcceptHandling(
+        client.getUtils().discovery(undefined, { analyse: analyseException }),
+      )) as IAdtResponse<string>;
+      const xml = expectResult(answer, 'discovery');
+      expect(xml.length).toBeGreaterThan(0);
+      expect(xml).toMatch(/<app:service|<service/);
 
-    // The verdict comes from the contract, not from the status: ADT answers a
-    // refusal inside a 200, so `status === 200` would pass over one.
-    // `withAcceptHandling` comes from a `require`d JS helper and returns `any`,
-    // so the contract has to be named here or the assertions below type as
-    // `unknown` and stop checking anything.
-    const answer = (await withAcceptHandling(
-      client.getUtils().discovery(),
-    )) as IAdtResponse<string>;
-    const xml = expectResult(answer, 'discovery');
-    expect(xml.length).toBeGreaterThan(0);
-    expect(xml).toMatch(/<app:service|<service/);
-
-    testsLogger.info?.('✅ Discovery fetched');
-    testsLogger.info?.(`📊 Response size: ${xml.length} bytes`);
-  }, 15000);
+      testsLogger.info?.('✅ Discovery fetched');
+      testsLogger.info?.(`📊 Response size: ${xml.length} bytes`);
+    },
+    15000,
+  );
 });

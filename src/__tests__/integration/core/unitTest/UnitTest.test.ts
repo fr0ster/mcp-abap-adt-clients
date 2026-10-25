@@ -14,7 +14,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
   analyseUnitTestStart,
+  analyseValidation,
   unitTestRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -28,9 +32,11 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { runToCompletion } from '../../../helpers/abapUnitRun';
+import { readRunResult, runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import { configuredCase, gate } from '../../../helpers/caseGate';
+import { expectResult, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
@@ -40,7 +46,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -49,14 +54,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getEnvironmentConfig,
   getTimeout,
   resolvePackageName,
@@ -81,7 +84,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
 
@@ -97,11 +99,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -112,45 +113,15 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
   });
 
   describe('Run unit test', () => {
-    it(
+    gate('run_unit_test', 'adt_unit_test')(
       'should run unit test and get status/result',
       async () => {
-        const testCase = getTestCaseDefinition(
-          'run_unit_test',
-          'adt_unit_test',
-        );
-
-        if (
-          !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-        ) {
-          logTestStart(testsLogger, 'UnitTest - run unit test', {
-            name: 'run_unit_test',
-            params: {},
-          });
-          const envName = isCloudSystem
-            ? 'cloud'
-            : isLegacy
-              ? 'legacy'
-              : 'onprem';
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
-            `Test not available for ${envName} environment`,
-          );
-          return;
-        }
+        const testCase = configuredCase('run_unit_test', 'adt_unit_test');
 
         if (!testCase?.params?.test_class?.run_unit_test) {
-          logTestStart(testsLogger, 'UnitTest - run unit test', {
-            name: 'run_unit_test',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
+          throw new Error(
             'Unit test configuration not found in test-config.yaml',
           );
-          return;
         }
 
         const containerClass = testCase.params.test_class.container_class;
@@ -180,44 +151,27 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           },
         });
 
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
-            'No SAP configuration',
-          );
-          return;
-        }
-
-        if (!packageName) {
-          logTestSkip(
-            testsLogger,
-            'UnitTest - run unit test',
-            'Package name not configured',
-          );
-          return;
-        }
+        if (!packageName) throw new Error('Package name not configured');
 
         try {
-          // Step 0: Check if class already exists
-          let classExists = false;
-          try {
-            // `expectResult` failed the setup for a container class that is
-            // simply not there — which is the state this flow wants — and
-            // `if (existingClass)` was true either way. The answer decides.
-            const existingClass = presenceOf(
-              await client.getClass().read({ className: containerClass }),
-              `class ${containerClass}`,
-            );
-            if (existingClass.present === true) {
-              classExists = true;
-              testsLogger.info?.(
-                `Class ${containerClass} already exists, will reuse`,
-              );
-            }
-          } catch {
+          // Step 0: Check if class already exists. A read that could not
+          // find out fails the test: "unknown" is never "absent", and the
+          // create that would follow writes over an object that may be there.
+          const existingClass = presenceOf(
+            await client
+              .getClass()
+              .read({ className: containerClass }, undefined, {
+                analyse: analyseException,
+              }),
+            `class ${containerClass}`,
+          );
+          if (existingClass.present === 'unknown') {
+            throw new Error(existingClass.reason);
+          }
+          const classExists = existingClass.present;
+          if (classExists) {
             testsLogger.info?.(
-              `Class ${containerClass} does not exist, will create`,
+              `Class ${containerClass} already exists, will reuse`,
             );
           }
 
@@ -229,11 +183,14 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             // and fails with SAP's own sentence.
             logTestStep('validate', testsLogger);
             expectResult(
-              await client.getClass().validate({
-                className: containerClass,
-                packageName,
-                source,
-              }),
+              await client.getClass().validate(
+                {
+                  className: containerClass,
+                  packageName,
+                  source,
+                },
+                { analyse: judged(analyseValidation) },
+              ),
               'validate the container class name',
             );
             testsLogger.info?.('Container class validated');
@@ -247,7 +204,10 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
                   transportRequest,
                   description: `Test container class for ${testClassName}`,
                 },
-                { headers: integrationHeadersOf(client.getClass(), 'create') },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(client.getClass(), 'create'),
+                },
               ),
               'create the container class',
             );
@@ -272,19 +232,29 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             transportRequest,
           };
           const containerLock = expectResult(
-            await client.getClass().lock(containerConfig),
+            await client
+              .getClass()
+              .lock(containerConfig, { analyse: analyseException }),
             'lock container class',
           );
           const containerHandle = String(containerLock);
-          expectResult(
-            await client.getClass().update(containerConfig, {
-              headers: integrationHeadersOf(client.getClass(), 'update'),
-              source,
-              lockHandle: containerHandle,
-            }),
-            'write container class source',
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getClass().update(containerConfig, {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(client.getClass(), 'update'),
+                  source,
+                  lockHandle: containerHandle,
+                }),
+                'write container class source',
+              ),
+            () =>
+              client.getClass().unlock(containerConfig, containerHandle, {
+                analyse: analyseException,
+              }),
+            'unlock container class',
           );
-          await client.getClass().unlock(containerConfig, containerHandle);
           await expectLockReleased(
             (c) => c.getClass(),
             containerConfig,
@@ -304,28 +274,35 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           // found`, and the suite passed anyway because the answer went unread.
           logTestStep('update (test class)', testsLogger);
           const includeLock = expectResult(
-            await client.getClass().lock(containerConfig),
+            await client
+              .getClass()
+              .lock(containerConfig, { analyse: analyseException }),
             'lock container class for its testclasses include',
           );
           const includeHandle = String(includeLock);
-          try {
-            expectResult(
-              await client.getLocalTestClass().update(
-                { className: containerClass, transportRequest },
-                {
-                  headers: integrationHeadersOf(
-                    client.getLocalTestClass(),
-                    'update',
-                  ),
-                  source: testClassSource,
-                  lockHandle: includeHandle,
-                },
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getLocalTestClass().update(
+                  { className: containerClass, transportRequest },
+                  {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(
+                      client.getLocalTestClass(),
+                      'update',
+                    ),
+                    source: testClassSource,
+                    lockHandle: includeHandle,
+                  },
+                ),
+                'write the test class include',
               ),
-              'write the test class include',
-            );
-          } finally {
-            await client.getClass().unlock(containerConfig, includeHandle);
-          }
+            () =>
+              client.getClass().unlock(containerConfig, includeHandle, {
+                analyse: analyseException,
+              }),
+            'unlock after write the test class include',
+          );
           // The include was written under the CLASS lock, so the class lock is
           // the one to prove released.
           await expectLockReleased(
@@ -342,6 +319,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             await client.getClass().activate(
               { className: containerClass, transportRequest },
               {
+                analyse: judged(analyseActivation),
                 headers: integrationHeadersOf(client.getClass(), 'activate'),
               },
             ),
@@ -364,16 +342,21 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           const readState = expectResult(
             await client
               .getLocalTestClass()
-              .read({ className: containerClass }, 'active'),
+              .read({ className: containerClass }, 'active', {
+                analyse: analyseException,
+              }),
             'readState',
           );
           expect(readState).toBeDefined();
           testsLogger.info?.('Tests read back from the container class');
 
           const metadataState = expectResult(
-            await client.getLocalTestClass().readMetadata({
-              className: containerClass,
-            }),
+            await client.getLocalTestClass().readMetadata(
+              {
+                className: containerClass,
+              },
+              { analyse: analyseException },
+            ),
             'metadataState',
           );
           expect(metadataState).toBeDefined();
@@ -398,6 +381,7 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             await unitTest.getStatus(
               runId,
               unitTestStatus.with_long_polling ?? true,
+              { analyse: analyseException },
             ),
             'statusResponse',
           );
@@ -443,12 +427,21 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           logTestStep('getResult (run)', testsLogger);
           const resultResponse = expectResult(
             await unitTest.getResult(runId, {
+              analyse: analyseException,
               withNavigationUris: unitTestResult.with_navigation_uris || false,
               format: unitTestResult.format || 'abapunit',
             }),
             'resultResponse',
           );
           expect(resultResponse).toBeDefined();
+          // The explicit run's verdict, on every system (legacy included):
+          // its tests ran, and none raised an alert.
+          const explicitRun = readRunResult(
+            String(resultResponse),
+            unitTestResult.format || 'abapunit',
+          );
+          expect(explicitRun.methods.length).toBeGreaterThan(0);
+          expect(explicitRun.alerts).toEqual([]);
 
           // Step 9: The same tests run the way Eclipse runs a class — by its
           // name, every test class in it. Legacy runs whole classes either way.
@@ -497,20 +490,23 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
 
           // Step 10: Cleanup - delete class if configured
           if (!skipCleanup && containerClass) {
-            try {
-              logTestStep('delete (cleanup)', testsLogger);
-              testsLogger.info?.('Cleaning up test class:', containerClass);
+            logTestStep('delete (cleanup)', testsLogger);
+            testsLogger.info?.('Cleaning up test class:', containerClass);
+            // The class this test created and could not remove fails it.
+            expectResult(
               await client.getClass().delete(
                 {
                   className: containerClass,
                   transportRequest,
                 },
-                { headers: integrationHeadersOf(client.getClass(), 'delete') },
-              );
-              testsLogger.info?.('Test class deleted successfully');
-            } catch (cleanupError) {
-              testsLogger.warn?.('Failed to cleanup test class:', cleanupError);
-            }
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(client.getClass(), 'delete'),
+                },
+              ),
+              `delete test class ${containerClass}`,
+            );
+            testsLogger.info?.('Test class deleted successfully');
           } else if (skipCleanup) {
             testsLogger.info?.(
               'Cleanup skipped - test class left for analysis',

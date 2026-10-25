@@ -5,6 +5,10 @@ import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import {
+  analyseDebuggeeEnd,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IAdtRunnable,
@@ -39,11 +43,13 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { assertBatchStatuses } from '../../../helpers/batchStatuses';
 import { configuredCase, gate } from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   closeOwnTestConnection,
   createTestConnection,
@@ -180,7 +186,6 @@ describe('Debugger batch wire measurements', () => {
   let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
@@ -189,14 +194,6 @@ describe('Debugger batch wire measurements', () => {
   /** Fails the step naming what it waited on, instead of running blind. */
   function needs(condition: unknown, what: string): void {
     if (!condition) throw new Error(`not reached: ${what}`);
-  }
-
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -209,6 +206,7 @@ describe('Debugger batch wire measurements', () => {
     target: TTarget,
   ): Promise<{ debuggeeId: string; server?: string }> {
     const listener = listenerApi.listen(identity, {
+      analyse: analyseException,
       holdSeconds: HOLD_SECONDS,
     });
     const early = await Promise.race([
@@ -224,7 +222,9 @@ describe('Debugger batch wire measurements', () => {
     }
     const trigger = triggerConnection;
     needs(trigger, 'the trigger connection');
-    run = runnable(trigger as Connection).run(target);
+    run = runnable(trigger as Connection).run(target, {
+      analyse: analyseException,
+    });
     const caught = await listener;
     const document = documentOf(caught);
     expect(caught.ok).toBe(true);
@@ -268,7 +268,7 @@ describe('Debugger batch wire measurements', () => {
   }
 
   async function topFrame(): Promise<IFrame> {
-    const stack = await debuggerApi.getStack();
+    const stack = await debuggerApi.getStack({ analyse: analyseException });
     const top = frames(documentOf(stack))[0];
     needs(stack.ok && top, 'a stack');
     return top;
@@ -303,8 +303,7 @@ describe('Debugger batch wire measurements', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
@@ -330,7 +329,10 @@ describe('Debugger batch wire measurements', () => {
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.add}` },
       ],
-      { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+      },
     );
     if (!breakpoints.ok) throw new Error('Could not arm probe breakpoints');
     armed.push(
@@ -351,7 +353,10 @@ describe('Debugger batch wire measurements', () => {
       for (const id of armed) {
         await steps.run(
           `delete breakpoint ${id}`,
-          () => listenerApi.deleteBreakpoint(identity, id),
+          () =>
+            listenerApi.deleteBreakpoint(identity, id, {
+              analyse: analyseException,
+            }),
           { checkAnswer: true },
         );
       }
@@ -359,7 +364,7 @@ describe('Debugger batch wire measurements', () => {
     if (attached) {
       await steps.run(
         'terminate debuggee',
-        () => debuggerApi.terminateDebuggee(),
+        () => debuggerApi.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
         {
           checkAnswer: true,
         },
@@ -369,20 +374,20 @@ describe('Debugger batch wire measurements', () => {
     if (listenerApi && identity) {
       await steps.run(
         'stop listener',
-        () => listenerApi.stopListener(identity),
+        () => listenerApi.stopListener(identity, { analyse: analyseException }),
         {
           checkAnswer: true,
         },
       );
     }
     if (run) {
+      // The run must come back, with its output or a termination's 500, and
+      // is let go only once it has: a timeout or another answer fails.
       const pending = run;
-      await steps.run('wait for run', () =>
-        Promise.race([
-          pending,
-          new Promise((resolve) => setTimeout(resolve, 15_000)),
-        ]),
-      );
+      await steps.run('wait for run', async () => {
+        await settleRun(pending, 15_000, 'the run', 'completed-or-terminated');
+        run = undefined;
+      });
     }
     await steps.logOff('the trigger session', triggerConnection);
     await steps.logOff('the listener session', listenerConnection);
@@ -400,7 +405,10 @@ describe('Debugger batch wire measurements', () => {
       className: CLASS_NAME,
     });
     await openDebugSession();
-    const answer = await debuggerApi.attach(identity, debuggeeId, { server });
+    const answer = await debuggerApi.attach(identity, debuggeeId, {
+      analyse: analyseException,
+      server,
+    });
     if (!answer.ok) throw new Error(`attach: ${documentOf(answer)}`);
     attached = true;
     await topFrame();
@@ -408,14 +416,20 @@ describe('Debugger batch wire measurements', () => {
 
   afterEach(async () => {
     if (attached) {
-      await debuggerApi.terminateDebuggee();
       attached = false;
+      // On premise 500 subtype terminateDebuggee, on the cloud 200: either is
+      // the debuggee ended as asked, and analyseDebuggeeEnd reads both so.
+      // Anything else fails the test: a debuggee left attached holds the
+      // work process the next test needs.
+      expectResult(
+        await debuggerApi.terminateDebuggee({ analyse: analyseDebuggeeEnd }),
+        'terminate the debuggee',
+      );
     }
     if (run) {
-      await Promise.race([
-        run,
-        new Promise((resolve) => setTimeout(resolve, 15_000)),
-      ]);
+      // Kept until it has settled with an accepted answer, so afterAll tries
+      // again when this fails.
+      await settleRun(run, 15_000, 'the run', 'completed-or-terminated');
       run = undefined;
     }
   }, STEP_TIMEOUT);
@@ -569,12 +583,12 @@ describe('Debugger batch wire measurements', () => {
     gate('debugger_batch', name)(
       `${name}: stepOver variable history`,
       async () => {
-        if (skipped()) return;
         const steps = measurementSteps(name);
         await startAtBreakpoint();
         const frame = await topFrame();
         needs(frame.line === LINE.loop, 'the loop breakpoint in the probe');
         const children = await debuggerApi.getChildVariables(['@LOCALS'], {
+          analyse: analyseException,
           headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
         });
         const total = [
@@ -650,6 +664,7 @@ describe('Debugger batch wire measurements', () => {
           // The comparison starts with the same baseline, outside its N envelopes.
           if (name === 'loop_client_per_step') {
             const baseline = await debuggerApi.getVariables(ids, {
+              analyse: analyseException,
               headers: integrationHeadersOf(debuggerApi, 'getVariables'),
             });
             fs.appendFileSync(
@@ -664,13 +679,17 @@ describe('Debugger batch wire measurements', () => {
             if (name === 'multi_step_variables_direct') {
               answers.push(
                 await api.getVariables(ids, {
+                  analyse: analyseException,
                   headers: integrationHeadersOf(api, 'getVariables'),
                 }),
               );
               for (let i = 0; i < steps; i++) {
-                answers.push(await api.step('stepOver'));
+                answers.push(
+                  await api.step('stepOver', { analyse: analyseException }),
+                );
                 answers.push(
                   await api.getVariables(ids, {
+                    analyse: analyseException,
                     headers: integrationHeadersOf(api, 'getVariables'),
                   }),
                 );
@@ -705,13 +724,15 @@ describe('Debugger batch wire measurements', () => {
                 if (name === 'multi_step_variables_client')
                   pending.push(
                     api.getVariables(ids, {
+                      analyse: analyseException,
                       headers: integrationHeadersOf(api, 'getVariables'),
                     }),
                   );
                 for (let i = 0; i < (rounds === 1 ? steps : 1); i++) {
                   pending.push(
-                    api.step('stepOver'),
+                    api.step('stepOver', { analyse: analyseException }),
                     api.getVariables(ids, {
+                      analyse: analyseException,
                       headers: integrationHeadersOf(api, 'getVariables'),
                     }),
                   );
@@ -844,11 +865,12 @@ describe('Debugger batch wire measurements', () => {
     gate('debugger_batch', method)(
       `${method} + getStack (Eclipse envelope)`,
       async () => {
-        if (skipped()) return;
         await startAtBreakpoint();
         // stepReturn is measured inside add, so it has a caller to return to.
         if (method === 'stepReturn') {
-          const entered = await debuggerApi.step('stepInto');
+          const entered = await debuggerApi.step('stepInto', {
+            analyse: analyseException,
+          });
           if (!entered.ok) throw new Error(`enter add: ${documentOf(entered)}`);
           await topFrame();
         }
@@ -861,9 +883,9 @@ describe('Debugger batch wire measurements', () => {
   gate('debugger_batch', 'step_stack_variables')(
     'step + stack + body-carrying getVariables',
     async () => {
-      if (skipped()) return;
       await startAtBreakpoint();
       const children = await debuggerApi.getChildVariables(['@LOCALS'], {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       const rows = [
@@ -890,7 +912,6 @@ describe('Debugger batch wire measurements', () => {
   gate('debugger_batch', 'stack_children')(
     'getStack + getChildVariables without stepping',
     async () => {
-      if (skipped()) return;
       await startAtBreakpoint();
       await measure('stack-children', [
         stackRequest(),
@@ -906,9 +927,9 @@ describe('Debugger batch wire measurements', () => {
   gate('batch', 'debugger_client')(
     'recording client: step + stack + variables',
     async () => {
-      if (skipped()) return;
       await startAtBreakpoint();
       const children = await debuggerApi.getChildVariables(['@LOCALS'], {
+        analyse: analyseException,
         headers: integrationHeadersOf(debuggerApi, 'getChildVariables'),
       });
       const rows = [
@@ -930,9 +951,10 @@ describe('Debugger batch wire measurements', () => {
         abapDebuggerDocuments,
       );
       const pending = [
-        api.step('stepOver'),
-        api.getStack(),
+        api.step('stepOver', { analyse: analyseException }),
+        api.getStack({ analyse: analyseException }),
         api.getVariables([id as string], {
+          analyse: analyseException,
           headers: integrationHeadersOf(api, 'getVariables'),
         }),
       ];

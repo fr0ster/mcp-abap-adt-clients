@@ -12,6 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -21,7 +25,9 @@ import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -38,7 +44,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -145,13 +150,17 @@ describe('ServiceBinding (using AdtClient)', () => {
             // is not there — which is the state this flow wants. The answer
             // decides, on either version.
             const active = presenceOf(
-              await client.getServiceBinding().read({ bindingName }, 'active'),
+              await client
+                .getServiceBinding()
+                .read({ bindingName }, 'active', { analyse: analyseException }),
               `service binding ${bindingName} (active)`,
             );
             const inactive = presenceOf(
               await client
                 .getServiceBinding()
-                .read({ bindingName }, 'inactive'),
+                .read({ bindingName }, 'inactive', {
+                  analyse: analyseException,
+                }),
               `service binding ${bindingName} (inactive)`,
             );
             if (active.present === 'unknown') {
@@ -173,29 +182,35 @@ describe('ServiceBinding (using AdtClient)', () => {
               params.service_name || params.service_definition_name;
             const serviceVersion = params.service_version || '0001';
 
+            // The unpublish is a step towards the delete, and the delete's
+            // answer is what decides: a binding already unpublished refuses
+            // the unpublish and deletes fine. A refused unpublish is kept and
+            // named beside a refused delete.
+            let unpublishRefusal = '';
             if (active.present === true) {
-              try {
-                await client.getServiceBinding().update(
-                  {
-                    bindingName,
-                    desiredPublicationState: 'unpublished',
-                    serviceType,
-                    serviceName,
-                    serviceVersion,
-                  },
-                  {
-                    headers: integrationHeadersOf(
-                      client.getServiceBinding(),
-                      'update',
-                    ),
-                  },
-                );
-              } catch {
-                // best-effort: deletion may still work if state is already unpublished
-              }
+              const unpublished = await client.getServiceBinding().update(
+                {
+                  bindingName,
+                  desiredPublicationState: 'unpublished',
+                  serviceType,
+                  serviceName,
+                  serviceVersion,
+                },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getServiceBinding(),
+                    'update',
+                  ),
+                },
+              );
+              unpublishRefusal = failureOf(
+                unpublished,
+                `unpublish leftover binding ${bindingName}`,
+              );
             }
 
-            await client.getServiceBinding().delete(
+            const removed = await client.getServiceBinding().delete(
               {
                 bindingName,
                 transportRequest: resolveTransportRequest(
@@ -203,12 +218,25 @@ describe('ServiceBinding (using AdtClient)', () => {
                 ),
               },
               {
+                analyse: judged(analyseDeletion),
                 headers: integrationHeadersOf(
                   client.getServiceBinding(),
                   'delete',
                 ),
               },
             );
+            if (!removed.ok) {
+              return {
+                success: false,
+                objectExists: true,
+                reason: [
+                  unpublishRefusal,
+                  failureOf(removed, `delete leftover binding ${bindingName}`),
+                ]
+                  .filter(Boolean)
+                  .join('; '),
+              };
+            }
             await new Promise((resolve) => setTimeout(resolve, 2000));
           } catch (error: any) {
             if (error?.response?.status === 404) {
@@ -258,10 +286,18 @@ describe('ServiceBinding (using AdtClient)', () => {
         ? params.record_changes
         : undefined;
 
-    try {
+    // The parent's document fills in what the configuration leaves out. The
+    // read is issued, so it must succeed: a refused or throwing read fails
+    // the setup instead of falling back to the YAML values.
+    {
       const parentState = expectResult(
-        await client.getPackage().readMetadata({ packageName: parentPackage }),
-        'parentState',
+        await client
+          .getPackage()
+          .readMetadata(
+            { packageName: parentPackage },
+            { analyse: analyseException },
+          ),
+        `read parent package ${parentPackage}`,
       );
       const raw = parentState;
       if (typeof raw === 'string') {
@@ -306,8 +342,6 @@ describe('ServiceBinding (using AdtClient)', () => {
           pkg?.['@_adtcore:responsible'] ??
           pkg?.['@_responsible'];
       }
-    } catch {
-      // best-effort: if parent metadata is unavailable, fall back to YAML values
     }
 
     if (!parentSoftwareComponent) {
@@ -317,63 +351,70 @@ describe('ServiceBinding (using AdtClient)', () => {
     }
 
     const existing = presenceOf(
-      await client.getPackage().readMetadata({ packageName: testSubpackage }),
+      await client
+        .getPackage()
+        .readMetadata(
+          { packageName: testSubpackage },
+          { analyse: analyseException },
+        ),
       `package ${testSubpackage}`,
     );
+    if (existing.present === 'unknown') {
+      throw new Error(existing.reason);
+    }
     if (existing.present === true) {
       return testSubpackage;
     }
 
     const wait = async (ms: number): Promise<void> =>
       new Promise((resolve) => setTimeout(resolve, ms));
+    // Readable after its create decides; a read that refuses for any reason
+    // but absence fails the setup.
     const waitForPackage = async (): Promise<boolean> => {
       for (let i = 0; i < 4; i += 1) {
-        const state = await client.getPackage().readMetadata({
-          packageName: testSubpackage,
-          ...(i > 0 ? { withLongPolling: true } : {}),
-        } as { packageName: string });
-        // `state.ok`, not `state`: an answer is an object either way, so this
-        // returned true on the first pass and waited for nothing.
-        if (state.ok) {
-          return true;
-        }
+        const state = presenceOf(
+          await client.getPackage().readMetadata(
+            {
+              packageName: testSubpackage,
+              ...(i > 0 ? { withLongPolling: true } : {}),
+            } as { packageName: string },
+            { analyse: analyseException },
+          ),
+          `package ${testSubpackage}`,
+        );
+        if (state.present === 'unknown') throw new Error(state.reason);
+        if (state.present) return true;
         await wait(1000);
       }
       return false;
     };
 
-    try {
-      await client.getPackage().create(
-        {
-          packageName: testSubpackage,
-          superPackage: parentPackage,
-          description: `ServiceBinding test package ${testSubpackage}`,
-          softwareComponent: parentSoftwareComponent,
-          packageType: parentPackageType,
-          transportLayer: parentTransportLayer,
-          applicationComponent: parentApplicationComponent,
-          responsible: parentResponsible,
-          // **A package on a transport layer has to record changes.** Without
-          // this the create is refused with `TR 432`, "Change recording must be
-          // activated for package …", and the only symptom here was the package
-          // never becoming readable. It inherits the parent's setting where the
-          // parent states one, and a transport layer means yes either way.
-          recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
-          transportRequest: resolveTransportRequest(params.transport_request),
-        },
-        { headers: integrationHeadersOf(client.getPackage(), 'create') },
-      );
-    } catch (error: any) {
-      // Package create may return 404/409 when package was created but not readable yet.
-      const status = error?.response?.status;
-      if (status === 404 || status === 409) {
-        const created = await waitForPackage();
-        if (created) {
-          return testSubpackage;
-        }
-      }
-      throw error;
-    }
+    const packageCreated = await client.getPackage().create(
+      {
+        packageName: testSubpackage,
+        superPackage: parentPackage,
+        description: `ServiceBinding test package ${testSubpackage}`,
+        softwareComponent: parentSoftwareComponent,
+        packageType: parentPackageType,
+        transportLayer: parentTransportLayer,
+        applicationComponent: parentApplicationComponent,
+        responsible: parentResponsible,
+        // **A package on a transport layer has to record changes.** Without
+        // this the create is refused with `TR 432`, "Change recording must be
+        // activated for package …", and the only symptom here was the package
+        // never becoming readable. It inherits the parent's setting where the
+        // parent states one, and a transport layer means yes either way.
+        recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
+        transportRequest: resolveTransportRequest(params.transport_request),
+      },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(client.getPackage(), 'create'),
+      },
+    );
+    // A refused create fails, a 404 or 409 included: a package that a later
+    // read finds does not forgive it.
+    expectResult(packageCreated, `create test subpackage ${testSubpackage}`);
 
     const created = await waitForPackage();
     if (!created) {
@@ -388,21 +429,10 @@ describe('ServiceBinding (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_service_binding', 'adt_service_binding')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const params = testCase?.params || {};
@@ -447,30 +477,14 @@ describe('ServiceBinding (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('serviceBinding')(
       'should read standard SAP service binding',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'ServiceBinding - read standard object',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
         const standardObject = tester.getStandardObject('serviceBinding');
         if (!standardObject) {
-          logTestStart(testsLogger, 'ServiceBinding - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'ServiceBinding - read standard object',
+          throw new Error(
             `Standard service binding not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const bindingName = standardObject.name;
@@ -484,12 +498,9 @@ describe('ServiceBinding (using AdtClient)', () => {
             bindingName,
           });
           if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              'ServiceBinding - read standard object',
+            throw new Error(
               `Service binding ${bindingName} was not found in current system`,
             );
-            return;
           }
           expect(resultState).toBeDefined();
 

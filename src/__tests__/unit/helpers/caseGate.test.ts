@@ -2,9 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  configurationDefect,
+  gateAll,
+  gateOn,
   MISSING_TEST_CONFIG,
   missingCaseMessage,
   gate as registrationGate,
+  gateStandardObject as registrationGateStandardObject,
 } from '../../helpers/caseGate';
 
 const gate: typeof registrationGate = (handler, name, loader) =>
@@ -12,6 +16,18 @@ const gate: typeof registrationGate = (handler, name, loader) =>
     loadEnv: () => {},
     sapConfigured: () => true,
     templateInUse: () => false,
+  });
+
+const gateStandardObject = (
+  type: string,
+  parsed: unknown,
+  standardObject: (type: string, cloud: boolean, legacy: boolean) => unknown,
+) =>
+  registrationGateStandardObject(type, () => parsed, {
+    loadEnv: () => {},
+    sapConfigured: () => true,
+    templateInUse: () => false,
+    standardObject,
   });
 
 function config(system = 'onprem', enabled = true, availableIn = ['onprem']) {
@@ -58,7 +74,9 @@ describe('case registration gate', () => {
   it.each([undefined, {}, { environment: {} }, config('invalid')])(
     'registers normally when config or system is missing or invalid: %p',
     (parsed) => {
-      expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(it);
+      expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(
+        configurationDefect,
+      );
     },
   );
 
@@ -67,15 +85,19 @@ describe('case registration gate', () => {
       gate('enhancement', 'enhoxhh', () => {
         throw new Error('Unreadable config');
       }),
-    ).toBe(it);
+    ).toBe(configurationDefect);
   });
 
   it('registers a missing case in an otherwise configured system normally', () => {
-    expect(gate('enhancement', 'missing', () => config())).toBe(it);
+    expect(gate('enhancement', 'missing', () => config())).toBe(
+      configurationDefect,
+    );
   });
 
   it('registers normally when the handler section is absent', () => {
-    expect(gate('missing', 'enhoxhh', () => config())).toBe(it);
+    expect(gate('missing', 'enhoxhh', () => config())).toBe(
+      configurationDefect,
+    );
   });
 
   it('skips a case with enabled omitted', () => {
@@ -213,7 +235,7 @@ describe('SAP configuration at registration', () => {
           templateInUse: () => true,
         },
       ),
-    ).toBe(it);
+    ).toBe(configurationDefect);
   });
 });
 
@@ -284,10 +306,13 @@ describe('real environment loader and config provenance', () => {
     const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.isolateModules(() => {
       const helper = require('../../helpers/test-helper');
-      const { gate } = require('../../helpers/caseGate');
+      const {
+        gate,
+        configurationDefect: isolatedDefect,
+      } = require('../../helpers/caseGate');
       expect(
         gate('enhancement', 'enhoxhh', () => helper.loadTestConfig(directory)),
-      ).toBe(it);
+      ).toBe(isolatedDefect);
       expect(helper.isTestConfigTemplate()).toBe(true);
     });
     expect(warning.mock.calls).toEqual([
@@ -332,5 +357,164 @@ describe('enhancement configuration failure messages', () => {
     expect(missingCaseMessage('enhancement', 'enhoxhh')).toBe(
       'case enhancement/enhoxhh not in test-config.yaml',
     );
+  });
+});
+
+describe('standard object registration gate', () => {
+  it('registers when the system holds a standard object of the type', () => {
+    expect(
+      gateStandardObject('class', config(), () => ({ name: 'CL_ABAP_CHAR' })),
+    ).toBe(it);
+  });
+
+  it('skips when the system holds none of the type', () => {
+    expect(gateStandardObject('class', config(), () => null)).toBe(it.skip);
+  });
+
+  it('asks about the configured system, cloud and legacy included', () => {
+    const asked: unknown[][] = [];
+    const record = (...args: unknown[]) => {
+      asked.push(args);
+      return null;
+    };
+    gateStandardObject('table', config('cloud'), record);
+    const legacy = config();
+    gateStandardObject(
+      'table',
+      { ...legacy, environment: { ...legacy.environment, is_legacy: true } },
+      record,
+    );
+    expect(asked).toEqual([
+      ['table', true, false],
+      ['table', false, true],
+    ]);
+  });
+
+  it.each([undefined, {}, config('invalid')])(
+    'registers normally when config or system is missing or invalid: %p',
+    (parsed) => {
+      expect(gateStandardObject('class', parsed, () => null)).toBe(
+        configurationDefect,
+      );
+    },
+  );
+
+  it('skips without SAP before reading even broken configuration', () => {
+    expect(
+      registrationGateStandardObject(
+        'class',
+        () => {
+          throw new Error('Configuration must not be read without SAP');
+        },
+        { loadEnv: () => {}, sapConfigured: () => false },
+      ),
+    ).toBe(it.skip);
+  });
+});
+
+describe('gates combined', () => {
+  it('registers only when every gate registers', () => {
+    expect(gateAll(it, it)).toBe(it);
+    expect(gateAll(it, it.skip)).toBe(it.skip);
+    expect(gateAll(it.skip, it)).toBe(it.skip);
+    expect(gateAll(it.skip, it.skip)).toBe(it.skip);
+  });
+});
+
+describe('applicability gate', () => {
+  const on = (applies: Parameters<typeof gateOn>[0], parsed: unknown) =>
+    gateOn(applies, () => parsed, {
+      loadEnv: () => {},
+      sapConfigured: () => true,
+      templateInUse: () => false,
+    });
+
+  it('registers where the predicate holds and skips where it does not', () => {
+    expect(on(() => true, config())).toBe(it);
+    expect(on(() => false, config())).toBe(it.skip);
+  });
+
+  it('hands the predicate the configured system', () => {
+    const seen: unknown[] = [];
+    on((system) => !!seen.push(system), config('cloud'));
+    expect(seen).toEqual([{ isCloud: true, isLegacy: false }]);
+  });
+
+  it('registers normally when the predicate cannot decide', () => {
+    expect(
+      on(() => {
+        throw new Error('Unreadable configuration');
+      }, config()),
+    ).toBe(configurationDefect);
+  });
+
+  it('skips without SAP before asking the predicate', () => {
+    expect(
+      gateOn(
+        () => {
+          throw new Error('Must not be asked without SAP');
+        },
+        () => config(),
+        { loadEnv: () => {}, sapConfigured: () => false },
+      ),
+    ).toBe(it.skip);
+  });
+});
+
+describe('a configuration defect wins over every applicability predicate', () => {
+  const quiet = {
+    loadEnv: () => {},
+    sapConfigured: () => true,
+    templateInUse: () => false,
+  };
+
+  it('keeps a missing case a failing test when another gate says skip', () => {
+    const absent = gate('enhancement', 'missing', () => config());
+    expect(absent).toBe(configurationDefect);
+    const falsePredicate = gateOn(
+      () => false,
+      () => config(),
+      quiet,
+    );
+    expect(falsePredicate).toBe(it.skip);
+    expect(gateAll(absent, falsePredicate)).toBe(configurationDefect);
+    expect(gateAll(falsePredicate, absent)).toBe(configurationDefect);
+    expect(gateAll(absent, it.skip)).toBe(configurationDefect);
+  });
+
+  it('keeps a defect from a broken configuration over a skip', () => {
+    const broken = gate(
+      'enhancement',
+      'enhoxhh',
+      () => {
+        throw new Error('Unreadable config');
+      },
+      quiet,
+    );
+    expect(gateAll(broken, it.skip)).toBe(configurationDefect);
+  });
+
+  it('still skips an existing case that the predicate rules out', () => {
+    expect(
+      gateAll(
+        gate('enhancement', 'enhoxhh', () => config(), quiet),
+        it.skip,
+      ),
+    ).toBe(it.skip);
+  });
+
+  it('runs the defect as a real test, under the name it was given', () => {
+    const seen: string[] = [];
+    const real = global.it;
+    (global as { it: unknown }).it = Object.assign(
+      (name: string) => seen.push(name),
+      real,
+    );
+    try {
+      configurationDefect('the case');
+    } finally {
+      (global as { it: unknown }).it = real;
+    }
+    expect(seen).toEqual(['the case']);
   });
 });

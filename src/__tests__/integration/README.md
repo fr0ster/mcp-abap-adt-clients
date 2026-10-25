@@ -127,13 +127,13 @@ Tests require SAP connection configuration in `.env` file or environment variabl
 - `SAP_USERNAME` - SAP username
 - `SAP_PASSWORD` - SAP password
 - `SAP_CLIENT` - SAP client (optional)
-- `SAP_AUTH_TYPE=basic` - Authentication type (default: `basic`)
+- `SAP_AUTH_TYPE=basic` - Authentication type, required: a missing `SAP_AUTH_TYPE`, or a value other than `basic`, `jwt` or `xsuaa`, is refused naming the key — the mode is never read off the credentials.
 
 **For JWT Authentication:**
 - `SAP_URL` - SAP system URL
 - `SAP_JWT_TOKEN` - JWT access token
 - `SAP_CLIENT` - SAP client (optional)
-- `SAP_AUTH_TYPE=jwt` or `SAP_AUTH_TYPE=xsuaa` - Authentication type
+- `SAP_AUTH_TYPE=jwt` or `SAP_AUTH_TYPE=xsuaa` - Authentication type, required (see above)
 
 ### Optional Variables (for JWT Auto-Refresh)
 

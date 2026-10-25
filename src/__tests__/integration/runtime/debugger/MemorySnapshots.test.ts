@@ -25,7 +25,10 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDebuggeeEnd,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IDebuggerIdentity,
@@ -43,12 +46,19 @@ import {
 } from '../../../../runtime/debugger/AbapDebugger';
 import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
 import {
   ensureDebugTarget,
   markerLines,
   sharedSource,
 } from '../../../helpers/debuggerTargets';
+import { settleRun } from '../../../helpers/runSettlement';
 import {
   createTestConnection,
   skipUnlessConfigured,
@@ -59,8 +69,6 @@ import {
 } from '../../../helpers/testLogger';
 import { logTestStep } from '../../../helpers/testProgressLogger';
 
-const { getEnabledTestCase } = require('../../../helpers/test-helper');
-
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -70,8 +78,15 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const testCase = getEnabledTestCase('runtime_debugger', 'adt_memory_debugger');
-const readCase = getEnabledTestCase('runtime_debugger', 'adt_memory_snapshots');
+const testCase = configuredCase('runtime_debugger', 'adt_memory_debugger');
+// Disabled in test-config.yaml, or no SAP: registered as skipped.
+const debuggerCase = gate('runtime_debugger', 'adt_memory_debugger');
+const readCase = configuredCase('runtime_debugger', 'adt_memory_snapshots');
+// The read-back needs its own case as well.
+const snapshotsCase = gateAll(
+  debuggerCase,
+  gate('runtime_debugger', 'adt_memory_snapshots'),
+);
 const CLASS_NAME: string = (
   testCase?.params?.class_name ?? 'ZAC_SHR_DBG_MEM'
 ).toUpperCase();
@@ -145,7 +160,6 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
   let listenerApi: AbapDebugger;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
-  let skipReason: string | undefined;
 
   const armed: string[] = [];
   let run: Promise<IAdtResponse<unknown>> | undefined;
@@ -158,18 +172,11 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     if (!condition) throw new Error(`not reached: ${what}`);
   }
 
-  function skipped(): boolean {
-    if (skipReason) {
-      testsLogger.info?.(`skipped: ${skipReason}`);
-      return true;
-    }
-    return false;
-  }
-
   beforeAll(async () => {
     if (!testCase) {
-      skipReason = 'runtime_debugger.adt_memory_debugger is not enabled';
-      return;
+      throw new Error(
+        missingCaseMessage('runtime_debugger', 'adt_memory_debugger'),
+      );
     }
     try {
       listenerConnection = await createTestConnection(connectionLogger, {
@@ -180,8 +187,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       });
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
-      skipReason = 'no SAP configuration';
-      return;
+      throw error;
     }
     const user = await abapUserOf(listenerConnection);
     const id = (part: string): string =>
@@ -225,55 +231,63 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     for (const bp of armed) {
       await steps.run(
         `delete breakpoint ${bp}`,
-        () => listenerApi.deleteBreakpoint(identity, bp),
+        () =>
+          listenerApi.deleteBreakpoint(identity, bp, {
+            analyse: analyseException,
+          }),
         { checkAnswer: true },
       );
     }
     if (attached) {
       await steps.run(
         'continue the debuggee',
-        () => debuggerApi.step('stepContinue'),
+        () => debuggerApi.step('stepContinue', { analyse: analyseException }),
         { checkAnswer: true },
       );
     }
     await steps.logOff('the debug session', sessionConnection);
     await steps.run(
       'stop the listener',
-      () => listenerApi.stopListener(identity),
+      () => listenerApi.stopListener(identity, { analyse: analyseException }),
       { checkAnswer: true },
     );
     if (run) {
+      // The run must come back, with its output or a termination's 500, and
+      // is let go only once it has: a timeout or another answer fails.
       const pending = run;
-      await steps.run('wait for the run', () =>
-        Promise.race([
-          pending,
-          new Promise((resolve) => setTimeout(resolve, 15_000)),
-        ]),
-      );
+      await steps.run('wait for the run', async () => {
+        await settleRun(pending, 15_000, 'the run', 'completed-or-terminated');
+        run = undefined;
+      });
     }
     await steps.logOff('the trigger session', triggerConnection);
     await steps.logOff('the listener session', listenerConnection);
     steps.finish();
   }, STEP_TIMEOUT);
 
-  it(
+  debuggerCase(
     'stops before the table is filled',
     async () => {
-      if (skipped()) return;
       const set = await listenerApi.setBreakpoints(
         identity,
         [
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.before}` },
           { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.after}` },
         ],
-        { headers: integrationHeadersOf(listenerApi, 'setBreakpoints') },
+        {
+          analyse: analyseException,
+          headers: integrationHeadersOf(listenerApi, 'setBreakpoints'),
+        },
       );
       expect(set.ok).toBe(true);
       for (const m of documentOf(set).matchAll(/\bid="([^"]*)"/g))
         armed.push(m[1]);
       expect(armed).toHaveLength(2);
 
-      const listener = listenerApi.listen(identity, { holdSeconds: 60 });
+      const listener = listenerApi.listen(identity, {
+        analyse: analyseException,
+        holdSeconds: 60,
+      });
       const early = await Promise.race([
         listener,
         new Promise<undefined>((r) => setTimeout(() => r(undefined), 2000)),
@@ -287,7 +301,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       run = new ClassExecutor(
         triggerConnection as Connection,
         connectionLogger,
-      ).run({ className: CLASS_NAME });
+      ).run({ className: CLASS_NAME }, { analyse: analyseException });
       const caught = documentOf(await listener);
       const debuggeeId = tag(caught, 'DEBUGGEE_ID');
       needs(debuggeeId, `a debuggee: ${caught.slice(0, 300)}`);
@@ -302,11 +316,14 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         abapDebuggerDocuments,
       );
       const attach = await debuggerApi.attach(identity, debuggeeId as string, {
+        analyse: analyseException,
         server: tag(caught, 'INSTANCE_NAME'),
       });
       expect(attach.ok).toBe(true);
       attached = attach.ok;
-      const stack = documentOf(await debuggerApi.getStack());
+      const stack = documentOf(
+        await debuggerApi.getStack({ analyse: analyseException }),
+      );
       expect(Number(attr(stack, 'line'))).toBe(LINE.before);
     },
     STEP_TIMEOUT,
@@ -314,9 +331,13 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
 
   async function atStop(stop: 'before' | 'after'): Promise<void> {
     needs(attached, 'the debug session');
-    const sizes = await debuggerApi.getMemorySizes();
+    const sizes = await debuggerApi.getMemorySizes({
+      analyse: analyseException,
+    });
     expect(sizes.ok).toBe(true);
-    const snapshot = await debuggerApi.createMemorySnapshot();
+    const snapshot = await debuggerApi.createMemorySnapshot({
+      analyse: analyseException,
+    });
     const answer = documentOf(snapshot);
     expect(snapshot.ok).toBe(true);
     expect(attr(answer, 'isError')).toBe('false');
@@ -326,23 +347,25 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     logTestStep(`${stop}: snapshot ${file}`, testsLogger);
   }
 
-  it(
+  debuggerCase(
     'reads the memory sizes and writes a snapshot before',
     async () => {
-      if (skipped()) return;
       await atStop('before');
     },
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'after the table is filled, the sizes have grown and a second snapshot is written',
     async () => {
-      if (skipped()) return;
       needs(stops.before, 'the first stop');
-      const moved = await debuggerApi.step('stepContinue');
+      const moved = await debuggerApi.step('stepContinue', {
+        analyse: analyseException,
+      });
       expect(moved.ok).toBe(true);
-      const stack = documentOf(await debuggerApi.getStack());
+      const stack = documentOf(
+        await debuggerApi.getStack({ analyse: analyseException }),
+      );
       expect(Number(attr(stack, 'line'))).toBe(LINE.after);
       await atStop('after');
       // The table holds ROWS strings of over a hundred characters.
@@ -353,10 +376,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     STEP_TIMEOUT,
   );
 
-  it(
+  debuggerCase(
     'the program runs to its end',
     async () => {
-      if (skipped()) return;
       needs(run, 'the run');
       // Continuing to the end is answered 500 debuggeeEnded; analyseDebuggeeEnd
       // reads it as the step having worked (ERRATA.md).
@@ -366,26 +388,18 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       expect(toEnd.ok).toBe(true);
       expect(documentOf(toEnd)).toContain('debuggeeEnded');
       attached = false;
-      const ran = await run;
-      expect(documentOf(ran as IAdtResponse<unknown>)).toContain(
-        `rows ${ROWS}`,
-      );
+      const ran = (await run) as IAdtResponse<unknown>;
+      expect(ran.ok).toBe(true);
+      expect(documentOf(ran)).toContain(`rows ${ROWS}`);
     },
     STEP_TIMEOUT,
   );
 
   // --- read back ------------------------------------------------------------------
 
-  it(
+  snapshotsCase(
     'both snapshots reach the list',
     async () => {
-      if (skipped()) return;
-      if (!readCase) {
-        testsLogger.info?.(
-          'skipped: runtime_debugger.adt_memory_snapshots is not enabled here',
-        );
-        return;
-      }
       needs(stops.after, 'both snapshots written');
       const snapshots = new MemorySnapshots(
         triggerConnection as Connection,
@@ -393,7 +407,10 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       );
       const deadline = Date.now() + LIST_WAIT_SECONDS * 1000;
       for (;;) {
-        const list = await snapshots.list({ user: identity.requestUser });
+        const list = await snapshots.list({
+          analyse: analyseException,
+          user: identity.requestUser,
+        });
         expect(list.ok).toBe(true);
         for (const entry of documentOf(list).split('</mi:snapshot>')) {
           const file = tag(entry, 'fileName') ?? '';
@@ -411,10 +428,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     LIST_WAIT_SECONDS * 1000 + STEP_TIMEOUT,
   );
 
-  it(
+  snapshotsCase(
     'reads a snapshot, its overview, ranking list and references, and the delta',
     async () => {
-      if (skipped() || !readCase) return;
       needs(ids.before && ids.after, 'both snapshots listed');
       const snapshots = new MemorySnapshots(
         triggerConnection as Connection,
@@ -423,15 +439,20 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       const before = ids.before as string;
       const after = ids.after as string;
 
-      const header = await snapshots.getById(after);
+      const header = await snapshots.getById(after, {
+        analyse: analyseException,
+      });
       expect(header.ok).toBe(true);
       expect(tag(documentOf(header), 'fileName')).toContain(stops.after?.file);
 
-      const overview = await snapshots.getOverview(after);
+      const overview = await snapshots.getOverview(after, {
+        analyse: analyseException,
+      });
       expect(overview.ok).toBe(true);
       expect(documentOf(overview)).toContain('abapDynMemObjectsUsed');
 
       const ranking = await snapshots.getRankingList(after, {
+        analyse: analyseException,
         maxNumberOfObjects: 5,
       });
       expect(ranking.ok).toBe(true);
@@ -439,6 +460,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
 
       // The delta puts the filled table first, as an object added.
       const delta = await snapshots.getDeltaRankingList(before, after, {
+        analyse: analyseException,
         maxNumberOfObjects: 5,
       });
       expect(delta.ok).toBe(true);
@@ -447,11 +469,14 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       expect(tag(first, 'deltaSegment')).toBe('added');
       const key = tag(first, 'key') as string;
 
-      const deltaOverview = await snapshots.getDeltaOverview(before, after);
+      const deltaOverview = await snapshots.getDeltaOverview(before, after, {
+        analyse: analyseException,
+      });
       expect(deltaOverview.ok).toBe(true);
       expect(documentOf(deltaOverview)).toContain('<mi:delta>');
 
       const references = await snapshots.getReferences(after, key, {
+        analyse: analyseException,
         maxNumberOfReferences: 5,
       });
       expect(references.ok).toBe(true);
@@ -461,12 +486,13 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         before,
         after,
         key,
-        { maxNumberOfReferences: 5 },
+        { analyse: analyseException, maxNumberOfReferences: 5 },
       );
       expect(deltaReferences.ok).toBe(true);
 
       // A table of strings has no children of its own.
       const children = await snapshots.getChildren(after, key, {
+        analyse: analyseException,
         maxNumberOfObjects: 5,
       });
       expect(children.ok).toBe(true);
@@ -474,12 +500,13 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         before,
         after,
         key,
-        { maxNumberOfObjects: 5 },
+        { analyse: analyseException, maxNumberOfObjects: 5 },
       );
       expect(deltaChildren.ok).toBe(true);
 
       const missing = await snapshots.getById(
         '00000000000000000000000000000000',
+        { analyse: analyseException },
       );
       expect(missing.ok).toBe(false);
       if (!missing.ok) expect(missing.getError().response?.status).toBe(404);

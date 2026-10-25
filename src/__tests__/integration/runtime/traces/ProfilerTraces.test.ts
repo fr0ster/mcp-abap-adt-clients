@@ -21,7 +21,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { compareRecordedAt } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  compareRecordedAt,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -31,6 +34,13 @@ import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
@@ -60,7 +70,6 @@ import {
 } from '../../../helpers/traceHelpers';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -88,6 +97,19 @@ function extractTraceId(payload: unknown): string | undefined {
   return match?.[1];
 }
 
+/** The case is on and does not switch this test off with `flag`. */
+function notSwitchedOff(flag: string): jest.It {
+  return gateAll(
+    gate('profiler_traces', 'adt_profiler_traces'),
+    gateOn(
+      () =>
+        configuredCase('profiler_traces', 'adt_profiler_traces')?.params?.[
+          flag
+        ] !== true,
+    ),
+  );
+}
+
 describe('Profiler Traces (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
@@ -97,7 +119,6 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
   // assert entries, rows and the scheduled request id.
   let profiler: ReadingProfiler;
   let classRunner: ReturnType<typeof readingClassExecutor>;
-  let hasConfig = false;
 
   // Shared state between tests — traceId from profiled run or discovery
   let resolvedTraceId: string | undefined;
@@ -118,11 +139,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       runtime = new AdtRuntimeClient(connection, libraryLogger);
       profiler = readingProfiler(connection, libraryLogger);
       classRunner = readingClassExecutor(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -131,13 +151,14 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     // failed before removing the trace it made — otherwise a red run leaves the
     // very thing this suite exists to clean up.
     if (traceIdFromThisRun && runtime) {
-      try {
-        await profiler.delete(traceIdFromThisRun);
-      } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for trace ${traceIdFromThisRun}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
-      }
+      // A failed cleanup fails the suite: the leftover trace is what this
+      // exists to prevent.
+      expectResult(
+        await profiler.delete(traceIdFromThisRun, {
+          analyse: analyseException,
+        }),
+        `delete trace ${traceIdFromThisRun}`,
+      );
     }
 
     if (connection) {
@@ -145,14 +166,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('profiler_traces', 'adt_profiler_traces')(
     'should list trace files, requests, object types and process types',
     async () => {
       const testName = 'Profiler Traces - list endpoints';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -160,22 +178,17 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {
         logTestStep('list profiler traces', testsLogger);
-        const traces = expectResult(await profiler.list(), 'traces');
+        const traces = expectResult(
+          await profiler.list({ analyse: analyseException }),
+          'traces',
+        );
         expect(Array.isArray(traces)).toBe(true);
         // Every entry the contract promises: an id and when it was recorded.
         // A parsed listing that silently yields shapeless objects is the defect
@@ -191,7 +204,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
         logTestStep('list trace requests (the schedule)', testsLogger);
         const requests = expectResult(
-          await classExecutor.listRequests(),
+          await classExecutor.listRequests({ analyse: analyseException }),
           'trace requests',
         );
         // Empty means nothing is scheduled — the runs consume them — NOT that
@@ -200,7 +213,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
         logTestStep('list profiler object types', testsLogger);
         const objectTypes = expectResult(
-          await classExecutor.listObjectTypes(),
+          await classExecutor.listObjectTypes({ analyse: analyseException }),
           'objectTypes',
         );
         expect(objectTypes.length).toBeGreaterThan(0);
@@ -213,7 +226,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
         logTestStep('list profiler process types', testsLogger);
         const processTypes = expectResult(
-          await classExecutor.listProcessTypes(),
+          await classExecutor.listProcessTypes({ analyse: analyseException }),
           'processTypes',
         );
         expect(processTypes.length).toBeGreaterThan(0);
@@ -242,14 +255,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  notSwitchedOff('skip_create')(
     'should create trace parameters',
     async () => {
       const testName = 'Profiler Traces - create parameters';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -257,27 +267,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
-      }
-
-      const params = testCase?.params || {};
-      if (params.skip_create === true) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'skip_create=true in test-config.yaml',
-        );
-        return;
       }
 
       try {
@@ -292,6 +284,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // Location header.
         const requestId = expectResult(
           await classRunner.scheduleTrace({
+            analyse: analyseException,
             headers: integrationHeadersOf(classRunner, 'scheduleTrace'),
             description: 'adt-clients integration test',
           }),
@@ -324,14 +317,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  notSwitchedOff('skip_run_with_profiling')(
     'should run shared class with profiling',
     async () => {
       const testName = 'Profiler Traces - run with profiling';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -339,28 +329,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       const params = testCase?.params || {};
-      if (params.skip_run_with_profiling === true) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'skip_run_with_profiling=true in test-config.yaml',
-        );
-        return;
-      }
 
       try {
         const className = resolveRunnableClassName(params);
@@ -378,6 +352,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         const classExecutor = classRunner;
         const profilerId = expectResult(
           await classExecutor.scheduleTrace({
+            analyse: analyseException,
             headers: integrationHeadersOf(classExecutor, 'scheduleTrace'),
           }),
           'scheduled trace',
@@ -388,7 +363,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
         const result = {
           run: expectResult(
-            await classExecutor.runWithProfiler({ className }, { profilerId }),
+            await classExecutor.runWithProfiler(
+              { className },
+              { analyse: analyseException, profilerId },
+            ),
             'result',
           ),
           profilerId,
@@ -441,14 +419,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('profiler_traces', 'adt_profiler_traces')(
     'should discover traces from trace files feed',
     async () => {
       const testName = 'Profiler Traces - discover traces';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -456,17 +431,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {
@@ -484,7 +451,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           resolvedTraceId = configuredTraceId;
         } else if (!resolvedTraceId) {
           logTestStep('discover trace id from the trace feed', testsLogger);
-          const traces = expectResult(await profiler.list(), 'traces');
+          const traces = expectResult(
+            await profiler.list({ analyse: analyseException }),
+            'traces',
+          );
           expect(Array.isArray(traces)).toBe(true);
 
           // Newest by timestamp. Position in the feed is NOT age — measured,
@@ -533,14 +503,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('profiler_traces', 'adt_profiler_traces')(
     'should read trace details (hitlist, statements, db accesses)',
     async () => {
       const testName = 'Profiler Traces - read trace details';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -548,26 +515,15 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       if (!resolvedTraceId) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'no trace id available (previous tests did not resolve one)',
+        throw new Error(
+          'no trace id available: the earlier tests of this file did not resolve one',
         );
-        return;
       }
 
       try {
@@ -578,7 +534,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // body. A real trace has rows, and a row has the fields the contract
         // names — that is what proves the document was understood.
         const hitlist = expectResult(
-          await profiler.read(traceId, 'hitlist', { withSystemEvents: false }),
+          await profiler.read(traceId, 'hitlist', {
+            analyse: analyseException,
+            withSystemEvents: false,
+          }),
           'hitlist',
         );
         expect(hitlist.entries.length).toBeGreaterThan(0);
@@ -589,7 +548,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           testsLogger,
         );
         const hitlistWithEvents = expectResult(
-          await profiler.read(traceId, 'hitlist', { withSystemEvents: true }),
+          await profiler.read(traceId, 'hitlist', {
+            analyse: analyseException,
+            withSystemEvents: true,
+          }),
           'hitlistWithEvents',
         );
         expect(Array.isArray(hitlistWithEvents.entries)).toBe(true);
@@ -597,6 +559,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         logTestStep(`read trace statements for ${traceId}`, testsLogger);
         const statements = expectResult(
           await profiler.read(traceId, 'statements', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'statements',
@@ -607,6 +570,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         logTestStep(`read trace db accesses for ${traceId}`, testsLogger);
         const dbAccesses = expectResult(
           await profiler.read(traceId, 'dbAccesses', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'dbAccesses',
@@ -639,14 +603,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('profiler_traces', 'adt_profiler_traces')(
     'should get trace requests filtered by URI',
     async () => {
       const testName = 'Profiler Traces - requests by URI';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -654,17 +615,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       const params = testCase?.params || {};
@@ -683,7 +636,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       try {
         logTestStep(`get trace requests by URI: ${objectUri}`, testsLogger);
         const requests = expectResult(
-          await classRunner.getRequestsByUri(objectUri),
+          await classRunner.getRequestsByUri(objectUri, {
+            analyse: analyseException,
+          }),
           'trace requests by URI',
         );
         // A list, possibly empty: nothing scheduled for that URI is a normal
@@ -711,14 +666,11 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
     getTimeout('test'),
   );
 
-  it(
+  gate('profiler_traces', 'adt_profiler_traces')(
     'should delete the trace this run produced',
     async () => {
       const testName = 'Profiler Traces - delete trace';
-      const testCase = getEnabledTestCase(
-        'profiler_traces',
-        'adt_profiler_traces',
-      );
+      const testCase = configuredCase('profiler_traces', 'adt_profiler_traces');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_profiler_traces',
@@ -726,35 +678,25 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('profiler_traces', 'adt_profiler_traces'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       if (!traceIdFromThisRun) {
         // Deliberately NOT falling back to `resolvedTraceId`: that one can come
         // from the feed, and deleting a trace this file did not make is not
         // this test's business.
-        logTestSkip(
-          testsLogger,
-          testName,
-          'the profiled run produced no trace to delete',
-        );
-        return;
+        throw new Error('the profiled run produced no trace to delete');
       }
 
       try {
         const traceId = traceIdFromThisRun;
         logTestStep(`delete trace ${traceId}`, testsLogger);
-        await profiler.delete(traceId);
+        expectResult(
+          await profiler.delete(traceId, { analyse: analyseException }),
+          `delete trace ${traceId}`,
+        );
 
         // Deleted means gone from the feed. Polled rather than read once,
         // because how quickly the feed reflects a deletion is not measured —

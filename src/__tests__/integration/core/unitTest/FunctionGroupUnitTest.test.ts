@@ -12,7 +12,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -25,7 +30,18 @@ import { abapUnitRunnerDocuments } from '../../../../executors/abapUnitRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { runToCompletion } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
+  cleanupRefusal,
+  expectResult,
+  raiseAfterCleanup,
+  releasing,
+} from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -33,7 +49,6 @@ import {
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -42,14 +57,12 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getTestCaseDefinition,
   getTimeout,
   resolvePackageName,
   resolveTransportRequest,
@@ -70,9 +83,7 @@ const TITLE = "FunctionGroupUnitTest - run a function group's tests";
 describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -82,15 +93,16 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -100,10 +112,10 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
     }
   });
 
-  it(
+  gate('run_function_group_unit_test', 'adt_function_group_unit_test')(
     'runs the tests of a function group, and of one of its modules',
     async () => {
-      const testCase = getTestCaseDefinition(
+      const testCase = configuredCase(
         'run_function_group_unit_test',
         'adt_function_group_unit_test',
       );
@@ -111,30 +123,19 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         name: 'run_function_group_unit_test',
         params: {},
       });
-      if (!hasConfig) {
-        logTestSkip(testsLogger, TITLE, 'No SAP configuration');
-        return;
-      }
-      if (
-        !testCase ||
-        !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-      ) {
-        logTestSkip(
-          testsLogger,
-          TITLE,
-          'Test case not configured or not available for this environment',
+      if (!testCase)
+        throw new Error(
+          missingCaseMessage(
+            'run_function_group_unit_test',
+            'adt_function_group_unit_test',
+          ),
         );
-        return;
-      }
       const params = testCase.params;
       const packageName = resolvePackageName(params.package_name);
       const transportRequest = resolveTransportRequest(
         params.transport_request,
       );
-      if (!packageName) {
-        logTestSkip(testsLogger, TITLE, 'Package name not configured');
-        return;
-      }
+      if (!packageName) throw new Error('Package name not configured');
       const expected: string[] = params.expected_test_methods ?? [];
       const skipCleanup = params.skip_cleanup === true;
 
@@ -144,6 +145,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
       const module = { functionGroupName, functionModuleName };
       const include = { functionGroupName, includeName: params.include_name };
 
+      let failed: { error: unknown } | undefined;
       try {
         // Step 1: the group and the module under test
         logTestStep('create group', testsLogger);
@@ -156,6 +158,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
               description: 'ABAP Unit test group',
             },
             {
+              analyse: analyseException,
               headers: integrationHeadersOf(
                 client.getFunctionGroup(),
                 'create',
@@ -172,6 +175,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
               description: 'ABAP Unit test module',
             },
             {
+              analyse: analyseException,
               headers: integrationHeadersOf(
                 client.getFunctionModule(),
                 'create',
@@ -182,28 +186,35 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         );
         const moduleHandle = String(
           expectResult(
-            await client.getFunctionModule().lock(module),
+            await client
+              .getFunctionModule()
+              .lock(module, { analyse: analyseException }),
             'lock module',
           ),
         );
-        try {
-          expectResult(
-            await client.getFunctionModule().update(
-              { ...module, transportRequest },
-              {
-                headers: integrationHeadersOf(
-                  client.getFunctionModule(),
-                  'update',
-                ),
-                lockHandle: moduleHandle,
-                source: params.function_module_source,
-              },
+        await releasing(
+          async () =>
+            expectResult(
+              await client.getFunctionModule().update(
+                { ...module, transportRequest },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getFunctionModule(),
+                    'update',
+                  ),
+                  lockHandle: moduleHandle,
+                  source: params.function_module_source,
+                },
+              ),
+              'write the module',
             ),
-            'write the module',
-          );
-        } finally {
-          await client.getFunctionModule().unlock(module, moduleHandle);
-        }
+          () =>
+            client
+              .getFunctionModule()
+              .unlock(module, moduleHandle, { analyse: analyseException }),
+          'unlock after write the module',
+        );
 
         // Step 2: the include holding the test class
         logTestStep('create test include', testsLogger);
@@ -215,6 +226,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
               description: 'ABAP Unit tests',
             },
             {
+              analyse: analyseException,
               headers: integrationHeadersOf(
                 client.getFunctionInclude(),
                 'create',
@@ -225,32 +237,40 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         );
         const includeHandle = String(
           expectResult(
-            await client.getFunctionInclude().lock(include),
+            await client
+              .getFunctionInclude()
+              .lock(include, { analyse: analyseException }),
             'lock include',
           ),
         );
-        try {
-          expectResult(
-            await client.getFunctionInclude().update(
-              { ...include, transportRequest },
-              {
-                headers: integrationHeadersOf(
-                  client.getFunctionInclude(),
-                  'update',
-                ),
-                lockHandle: includeHandle,
-                source: params.include_source,
-              },
+        await releasing(
+          async () =>
+            expectResult(
+              await client.getFunctionInclude().update(
+                { ...include, transportRequest },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getFunctionInclude(),
+                    'update',
+                  ),
+                  lockHandle: includeHandle,
+                  source: params.include_source,
+                },
+              ),
+              'write the test class',
             ),
-            'write the test class',
-          );
-        } finally {
-          await client.getFunctionInclude().unlock(include, includeHandle);
-        }
+          () =>
+            client
+              .getFunctionInclude()
+              .unlock(include, includeHandle, { analyse: analyseException }),
+          'unlock after write the test class',
+        );
 
         logTestStep('activate', testsLogger);
         expectResult(
           await client.getFunctionModule().activate(module, {
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(
               client.getFunctionModule(),
               'activate',
@@ -260,6 +280,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         );
         expectResult(
           await client.getFunctionInclude().activate(include, {
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(
               client.getFunctionInclude(),
               'activate',
@@ -269,6 +290,7 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
         );
         expectResult(
           await client.getFunctionGroup().activate(group, {
+            analyse: judged(analyseActivation),
             headers: integrationHeadersOf(
               client.getFunctionGroup(),
               'activate',
@@ -306,26 +328,35 @@ describe('ABAP Unit on a function group (AdtClient + AdtExecutor)', () => {
 
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
+        failed = { error };
         logTestError(testsLogger, TITLE, error);
-        throw error;
-      } finally {
-        if (!skipCleanup) {
-          logTestStep('delete (cleanup)', testsLogger);
-          await client
-            .getFunctionGroup()
-            .delete(
-              { ...group, transportRequest },
-              {
-                headers: integrationHeadersOf(
-                  client.getFunctionGroup(),
-                  'delete',
-                ),
-              },
-            )
-            .catch(() => undefined);
-        }
-        logTestEnd(testsLogger, TITLE);
       }
+      // Cleanup runs whatever the body did. A refused delete fails the test;
+      // when the body already failed it is added to that failure instead,
+      // never replacing it. Absent — the body failed before creating it — is
+      // no refusal.
+      const refusals: string[] = [];
+      if (!skipCleanup) {
+        logTestStep('delete (cleanup)', testsLogger);
+        refusals.push(
+          await cleanupRefusal(
+            () =>
+              client.getFunctionGroup().delete(
+                { ...group, transportRequest },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(
+                    client.getFunctionGroup(),
+                    'delete',
+                  ),
+                },
+              ),
+            `delete function group ${group.functionGroupName}`,
+          ),
+        );
+      }
+      logTestEnd(testsLogger, TITLE);
+      raiseAfterCleanup(failed, refusals);
     },
     getTimeout('test'),
   );

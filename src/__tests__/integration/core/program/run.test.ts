@@ -17,13 +17,17 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { runProgram } from '../../../../core/program/run';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
   createTestAdtClient,
   createTestConnection,
   releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -31,7 +35,6 @@ import {
 } from '../../../helpers/testLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   ensureSharedDependency,
 } = require('../../../helpers/test-helper');
@@ -49,9 +52,7 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Program - Run', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -61,15 +62,16 @@ describe('Program - Run', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -79,34 +81,12 @@ describe('Program - Run', () => {
     }
   });
 
-  it(
+  gate('run_program', 'run_program')(
     'should run program and get output',
     async () => {
-      if (!hasConfig) {
-        testsLogger.warn(
-          'Skipping test: No .env file or SAP configuration found',
-        );
-        return;
-      }
-
-      const testCase = getEnabledTestCase('run_program');
+      const testCase = configuredCase('run_program', 'run_program');
       if (!testCase) {
-        testsLogger.warn('Skipping test: Test case is disabled');
-        return;
-      }
-
-      if (
-        !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
-      ) {
-        const envName = isCloudSystem
-          ? 'cloud'
-          : isLegacy
-            ? 'legacy'
-            : 'onprem';
-        testsLogger.warn(
-          `Skipping test: Not available for ${envName} environment`,
-        );
-        return;
+        throw new Error(missingCaseMessage('run_program', 'run_program'));
       }
 
       const programName = testCase.params.program_name;

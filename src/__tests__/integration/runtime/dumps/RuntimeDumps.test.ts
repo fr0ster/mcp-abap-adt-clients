@@ -15,6 +15,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -23,6 +24,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { resolveDumpClassName } from '../../../helpers/dumpClassHelper';
 import {
@@ -45,7 +51,6 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
 } = require('../../../helpers/test-helper');
@@ -106,18 +111,16 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -127,11 +130,11 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
     }
   });
 
-  it(
+  gate('runtime_dumps', 'adt_runtime_dumps')(
     'should read dumps feed and optionally dump payload by ID',
     async () => {
       const testName = 'Runtime Dumps - read';
-      const testCase = getEnabledTestCase('runtime_dumps', 'adt_runtime_dumps');
+      const testCase = configuredCase('runtime_dumps', 'adt_runtime_dumps');
 
       logTestStart(testsLogger, testName, {
         name: 'adt_runtime_dumps',
@@ -139,17 +142,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
       });
 
       if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'runtime_dumps/adt_runtime_dumps not configured or disabled in test-config.yaml',
+        throw new Error(
+          missingCaseMessage('runtime_dumps', 'adt_runtime_dumps'),
         );
-        return;
-      }
-
-      if (!hasConfig || !runtime) {
-        logTestSkip(testsLogger, testName, 'No SAP configuration');
-        return;
       }
 
       try {
@@ -170,10 +165,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
 
         logTestStep('list runtime dumps', testsLogger);
         const listResponse = expectResult(
-          await runtime.getDumps().list({
-            top,
-            inlinecount,
-          }),
+          await runtime
+            .getDumps()
+            .list({ analyse: analyseException, top, inlinecount }),
           'listResponse',
         );
         expect(listResponse).toBeDefined();
@@ -188,6 +182,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           .slice(0, 14);
         const filteredResponse = expectResult(
           await runtime.getDumps().list({
+            analyse: analyseException,
             from: fromDate,
             to: toDate,
             top,
@@ -199,10 +194,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
 
         logTestStep('list runtime dumps by user', testsLogger);
         const byUserResponse = expectResult(
-          await runtime.getDumps().listByUser(user, {
-            top,
-            inlinecount,
-          }),
+          await runtime
+            .getDumps()
+            .listByUser(user, { analyse: analyseException, top, inlinecount }),
           'byUserResponse',
         );
 
@@ -212,6 +206,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
         );
         const byUserFilteredResponse = expectResult(
           await runtime.getDumps().listByUser(user, {
+            analyse: analyseException,
             top,
             inlinecount,
             from: fromDate,
@@ -219,11 +214,21 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           }),
           'byUserFilteredResponse',
         );
-        for (const id of extractDumpIds(listResponse)) {
-          beforeDumpIds.add(id);
-        }
-        for (const id of extractDumpIds(byUserResponse)) {
-          beforeDumpIds.add(id);
+        // What is on the system before the run, asked the way discovery asks
+        // afterwards: a dump that merely falls into the wider window later is
+        // not this run's.
+        const discoveryQuery = { top: Math.max(top, 50), inlinecount } as const;
+        if (generateArtificialDump) {
+          const before = expectResult(
+            await runtime.getDumps().listByUser(user, {
+              analyse: analyseException,
+              ...discoveryQuery,
+            }),
+            'dumps before the run',
+          );
+          for (const id of extractDumpIds(before)) {
+            beforeDumpIds.add(id);
+          }
         }
 
         let generatedDumpId: string | undefined;
@@ -233,12 +238,26 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `run shared dump class ${className} (division by zero)`,
             testsLogger,
           );
-          // The answer is ignored on purpose: this run is *meant* to fail —
-          // a division by zero — and what the test is after is the dump SAP
-          // writes because of it, read below. A failure comes back in the
-          // answer now rather than being thrown, so there is nothing to catch.
-          await executor.getClassExecutor().run({ className });
+          // The run is *meant* to fail, with a division by zero, and SAP writes
+          // a dump because of it. Only that failure is accepted: a refusal
+          // (401/403), a missing class (404), a bad request or a failure that
+          // never reached the system produces no dump and fails the test here.
+          const run = await executor
+            .getClassExecutor()
+            .run({ className }, { analyse: analyseException });
+          if (!run.ok) {
+            const failure = run.getError();
+            const status = failure.response?.status;
+            if (status !== 500) {
+              throw new Error(
+                `running ${className} failed [${failure.origin}] with ${status ?? 'no HTTP status'}, not the runtime error that writes a dump: ${failure.message}`,
+              );
+            }
+          }
 
+          // A dump counts only if it is new since before the run and it is the
+          // dump of the class that was run.
+          const checked = new Set<string>();
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             logTestStep(
               `discover generated dump attempt ${attempt}/${maxAttempts}`,
@@ -246,13 +265,27 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             );
             const current = expectResult(
               await runtime.getDumps().listByUser(user, {
-                top: Math.max(top, 50),
-                inlinecount,
+                analyse: analyseException,
+                ...discoveryQuery,
               }),
               'current',
             );
-            const ids = extractDumpIds(current);
-            generatedDumpId = ids.find((id) => !beforeDumpIds.has(id));
+            for (const id of extractDumpIds(current)) {
+              if (beforeDumpIds.has(id) || checked.has(id)) continue;
+              checked.add(id);
+              const summary = expectResult(
+                await runtime
+                  .getDumps()
+                  .getById(id, { analyse: analyseException, view: 'summary' }),
+                `summary of new dump ${id}`,
+              );
+              const text =
+                typeof summary === 'string' ? summary : JSON.stringify(summary);
+              if (text.toUpperCase().includes(className.toUpperCase())) {
+                generatedDumpId = id;
+                break;
+              }
+            }
             if (generatedDumpId) {
               break;
             }
@@ -260,14 +293,12 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
               await delay(retryDelayMs);
             }
           }
-          if (generatedDumpId) {
-            logTestStep(
-              `generated dump found: ${generatedDumpId}`,
-              testsLogger,
+          if (!generatedDumpId) {
+            throw new Error(
+              `no new runtime dump of ${className} appeared after ${maxAttempts} attempts: the run wrote none`,
             );
-          } else {
-            logTestStep('generated dump not found after retries', testsLogger);
           }
+          logTestStep(`generated dump found: ${generatedDumpId}`, testsLogger);
         }
 
         const configuredDumpId =
@@ -275,8 +306,12 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             ? params.dump_id.trim()
             : undefined;
         const discoveredDumpId = extractDumpId(listResponse);
-        const dumpId = generatedDumpId || configuredDumpId || discoveredDumpId;
-        const dumpIdSource = generatedDumpId
+        // With generation on, only the dump this run wrote is read; an older
+        // one never stands in for it.
+        const dumpId = generateArtificialDump
+          ? generatedDumpId
+          : configuredDumpId || discoveredDumpId;
+        const dumpIdSource = generateArtificialDump
           ? 'forced_class_failure'
           : configuredDumpId
             ? 'config.dump_id'
@@ -296,7 +331,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           );
           logTestStep(`read runtime dump by id: ${dumpId}`, testsLogger);
           const dumpResponse = expectResult(
-            await runtime.getDumps().getById(dumpId),
+            await runtime
+              .getDumps()
+              .getById(dumpId, { analyse: analyseException }),
             'dumpResponse',
           );
           expect(dumpResponse).toBeDefined();
@@ -310,9 +347,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             testsLogger,
           );
           const summaryResponse = expectResult(
-            await runtime.getDumps().getById(dumpId, {
-              view: 'summary',
-            }),
+            await runtime
+              .getDumps()
+              .getById(dumpId, { analyse: analyseException, view: 'summary' }),
             'summaryResponse',
           );
           expect(summaryResponse).toBeDefined();
@@ -327,18 +364,15 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           );
           const formattedResponse = expectResult(
             await runtime.getDumps().getById(dumpId, {
+              analyse: analyseException,
               view: 'formatted',
             }),
             'formattedResponse',
           );
           expect(formattedResponse).toBeDefined();
         } else {
-          const reason = generateArtificialDump
-            ? 'forced dump was not discovered and no fallback dump_id/feed id'
-            : 'no dump id configured/discovered';
-          logTestStep(
-            `read runtime dump by id: skipped (${reason})`,
-            testsLogger,
+          throw new Error(
+            'generate_artificial_dump is off and there is no dump to read: set params.dump_id or let the run write one',
           );
         }
 

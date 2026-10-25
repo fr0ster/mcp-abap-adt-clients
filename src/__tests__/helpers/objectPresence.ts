@@ -21,6 +21,7 @@
  */
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { deletionRefusedIn, failureOf, saysAbsent } from './contract';
 
 export type ObjectPresence =
   | { present: true }
@@ -49,14 +50,60 @@ export function presenceOf(
   }
 
   const failure = answer.getError();
-  const status = failure.response?.status;
   // A refusal naming the object as non-existent is absence: that is the
   // sentence a cloud system answers in place of a 404.
-  if (status === 404 || /does not exist/i.test(failure.message ?? '')) {
+  if (saysAbsent(failure)) {
     return { present: false };
   }
   return {
     present: 'unknown',
     reason: `Cannot verify ${what} [${failure.origin}]: ${failure.message}`,
   };
+}
+
+/**
+ * A removal of something that may not be there, such as a leftover from an
+ * earlier run: removed, or refused because it is absent. Any other refusal —
+ * locked, not authorised, a dangling reference — fails, with what SAP said,
+ * instead of reappearing three steps later as a `409` on the create.
+ *
+ * Absence is read as {@link presenceOf} reads it: a 404, or a refusal naming
+ * the object as non-existent.
+ */
+export function expectRemovedOrAbsent(
+  answer: IAdtResponse<unknown>,
+  what: string,
+): 'removed' | 'absent' {
+  if (answer.ok) {
+    // A 200 is removed only when its deletion document says so.
+    const refused = deletionRefusedIn(answer, what);
+    if (refused) throw new Error(refused);
+    return 'removed';
+  }
+  if (presenceOf(answer, what).present === false) return 'absent';
+  throw new Error(failureOf(answer, what));
+}
+
+/**
+ * Remove a leftover of an earlier run: read first, delete only what is there.
+ *
+ * A delete alone cannot tell "gone" from "refused". Measured on premise
+ * (2026-10-25): a deleted object whose request is still open reads `404`, yet a
+ * second delete answers `isDeleted="false"` with "Release transport … to remove
+ * the object directory entry" — and a test may not release a request. The read
+ * is the question; the delete runs only when it says the object is there.
+ *
+ * @param what the delete's label, as {@link expectRemovedOrAbsent} takes it
+ * @param read the type's read, judged; absence as {@link presenceOf} reads it
+ * @param remove the type's delete, judged
+ */
+export async function removeLeftover(
+  what: string,
+  read: () => Promise<IAdtResponse<unknown>>,
+  remove: () => Promise<IAdtResponse<unknown>>,
+): Promise<'removed' | 'absent'> {
+  const presence = presenceOf(await read(), what);
+  if (presence.present === 'unknown') throw new Error(presence.reason);
+  if (presence.present === false) return 'absent';
+  return expectRemovedOrAbsent(await remove(), what);
 }

@@ -67,6 +67,8 @@ const SCALAR_IMPL =
   'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params';
 const APPEND = 'create_append_structure.test_cases[adt_append_structure].params';
 const ATC_RUN = 'atc_run.test_cases[adt_atc_run]';
+const FEATURE_TOGGLE = 'create_feature_toggle.test_cases[adt_feature_toggle]';
+const CHECK_RUN = 'check_run.test_cases[class_check]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
 
@@ -78,6 +80,18 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     ['environment.default_transport', { required: true, empty: true }],
     ['environment.default_master_system', { required: true, empty: true }],
     ['environment.connection_type', { values: ['rfc', 'http'] }],
+    // Checks whose outcome depends on how the system routes sessions: stated
+    // per system, required, never defaulted. On, any refusal fails; off, the
+    // check is not made and the run says so.
+    ['environment.verify_lock_released', { required: true, type: 'boolean' }],
+    [
+      'environment.read_message_class_after_create',
+      { required: true, type: 'boolean' },
+    ],
+    [
+      'environment.validate_transformation_names',
+      { required: true, type: 'boolean' },
+    ],
     // The shared package (the template's "Lego library").
     ['shared_dependencies.package', { required: true }],
     ['shared_dependencies.super_package', { required: true }],
@@ -93,6 +107,27 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${SCALAR}.scalar_function_name`, {}],
     [`${SCALAR_IMPL}.implementation_name`, {}],
     [`${APPEND}.append_structure_name`, {}],
+    // Whether a case runs on this system is the configuration's: a refusal
+    // fails the test, it never turns into a skip.
+    ['create_scalar_function.test_cases[adt_scalar_function].enabled', { type: 'boolean' }],
+    [
+      'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].enabled',
+      { type: 'boolean' },
+    ],
+    ['create_append_structure.test_cases[adt_append_structure].enabled', { type: 'boolean' }],
+    [`${FEATURE_TOGGLE}.enabled`, { type: 'boolean' }],
+    [`${CHECK_RUN}.enabled`, { type: 'boolean' }],
+    // Where the function module / include flows get their function group:
+    // the shared one, or one in the default package (no shared package on
+    // this system). Stated here, never a recovery from a failed shared setup.
+    [
+      'create_function_module.test_cases[adt_function_module].params.function_group_route',
+      { values: ['shared', 'default_package'] },
+    ],
+    [
+      'create_function_include.test_cases[adt_function_include].params.function_group_route',
+      { values: ['shared', 'default_package'] },
+    ],
     // ATC needs a check variant the system can run.
     [`${ATC_RUN}.enabled`, { type: 'boolean' }],
     [`${ATC_RUN}.params.check_variant`, { empty: true }],

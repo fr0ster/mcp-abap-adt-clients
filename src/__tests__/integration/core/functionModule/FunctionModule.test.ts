@@ -12,15 +12,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
+import { ensureFunctionGroupFor } from '../../../helpers/functionGroupRoute';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -37,7 +38,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -47,8 +47,6 @@ const {
   resolveTransportRequest,
   resolveMasterSystem,
   getTimeout,
-  ensureSharedPackage,
-  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -131,10 +129,13 @@ describe('FunctionModule (using AdtClient)', () => {
           // to "it exists" every time and this flow refused to run against a
           // system that was in exactly the state it wanted.
           const presence = presenceOf(
-            await client.getFunctionModule().readMetadata({
-              functionGroupName,
-              functionModuleName,
-            }),
+            await client.getFunctionModule().readMetadata(
+              {
+                functionGroupName,
+                functionModuleName,
+              },
+              { analyse: analyseException },
+            ),
             `FM ${functionGroupName}/${functionModuleName}`,
           );
           if (presence.present === 'unknown') {
@@ -163,65 +164,19 @@ describe('FunctionModule (using AdtClient)', () => {
 
   describe('Full workflow', () => {
     beforeEach(async () => {
-      // Ensure the shared function group exists (created once, never deleted)
+      // The function group the module goes into, by the route the case
+      // states (`params.function_group_route`); a failure of that route fails
+      // the test — the other route is never a recovery from it.
       if (hasConfig && client) {
-        const testCase = tester.getTestCaseDefinition();
-        const functionGroupName = testCase?.params?.function_group_name;
-        if (functionGroupName) {
-          try {
-            await ensureSharedPackage(client, testsLogger);
-            await ensureSharedDependency(
-              client,
-              'function_groups',
-              functionGroupName,
-              testsLogger,
-            );
-          } catch (_sharedError) {
-            // Shared package unavailable (e.g. BTP trial without transport layer) —
-            // fall back to creating the function group in the default package
-            const packageName = resolvePackageName(
-              testCase?.params?.package_name,
-            );
-            const transportRequest = resolveTransportRequest(
-              testCase?.params?.transport_request,
-            );
-            const readResult = await client
-              .getFunctionGroup()
-              .readMetadata({ functionGroupName });
-            if (readResult) {
-              testsLogger.info?.(
-                `Function group ${functionGroupName} already exists`,
-              );
-            } else {
-              try {
-                await client.getFunctionGroup().create(
-                  {
-                    functionGroupName,
-                    packageName,
-                    description: 'Shared FUGR for FM tests',
-                    transportRequest,
-                  },
-                  {
-                    headers: integrationHeadersOf(
-                      client.getFunctionGroup(),
-                      'create',
-                    ),
-                  },
-                );
-              } catch (_createErr) {
-                // On cloud, the HTTP create may succeed but the post-create read
-                // fails (404) due to eventual consistency. Wait and verify.
-                await new Promise((r) => setTimeout(r, 5000));
-                const verify = await client
-                  .getFunctionGroup()
-                  .readMetadata({ functionGroupName });
-                if (!verify) throw _createErr;
-              }
-              testsLogger.info?.(
-                `Created function group ${functionGroupName} in ${packageName}`,
-              );
-            }
-          }
+        const params = tester.getTestCaseDefinition()?.params;
+        if (params) {
+          await ensureFunctionGroupFor(
+            client,
+            params,
+            'create_function_module[adt_function_module]',
+            'Shared FUGR for FM tests',
+            testsLogger,
+          );
         }
       }
       await tester?.beforeEach()();
@@ -231,21 +186,10 @@ describe('FunctionModule (using AdtClient)', () => {
       tester?.afterEach()();
     });
 
-    it(
+    gate('create_function_module', 'adt_function_module')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode = testCase?.params?.source_code || config.source || '';
@@ -265,7 +209,7 @@ describe('FunctionModule (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('function_module')(
       'should read standard SAP function module',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -276,16 +220,9 @@ describe('FunctionModule (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('function_module');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'FunctionModule - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'FunctionModule - read standard object',
+          throw new Error(
             `Standard function module not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardFunctionGroupName = standardObject.group || 'SYST';
@@ -297,15 +234,6 @@ describe('FunctionModule (using AdtClient)', () => {
             function_module_name: standardFunctionModuleName,
           },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'FunctionModule - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({
@@ -319,15 +247,6 @@ describe('FunctionModule (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, 'FunctionModule - read standard object');
         } catch (error: any) {
-          const status = error.response?.status;
-          if (status === 404 || status === 500 || status === 403) {
-            logTestSkip(
-              testsLogger,
-              'FunctionModule - read standard object',
-              `Standard function module ${standardFunctionGroupName}/${standardFunctionModuleName} is not accessible (HTTP ${status}). This may be normal for some systems.`,
-            );
-            return;
-          }
           logTestError(
             testsLogger,
             'FunctionModule - read standard object',

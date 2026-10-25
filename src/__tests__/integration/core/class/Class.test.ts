@@ -12,6 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -20,7 +24,14 @@ import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { expectResult } from '../../../helpers/contract';
+import {
+  gate,
+  gateAll,
+  gateOn,
+  gateStandardObject,
+} from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -37,7 +48,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -62,6 +72,22 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** A transport request is configured for the transport read tests. */
+function transportConfigured(isCloud: boolean): boolean {
+  const resolver = new TestConfigResolver({ isCloud }).tryMultipleHandlers([
+    { handlerName: 'read_transport', testCaseName: 'read_transport' },
+    { handlerName: 'create_class', testCaseName: 'adt_class' },
+  ]);
+  return !!(
+    resolver?.getTransportRequest() ||
+    new TestConfigResolver({
+      isCloud,
+      handlerName: 'create_class',
+      testCaseName: 'adt_class',
+    }).getTransportRequest()
+  );
+}
 
 describe('Class (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -127,31 +153,49 @@ describe('Class (using AdtClient)', () => {
             // throwing: it is an answer object either way. The answer decides —
             // see `presenceOf`.
             const existing = presenceOf(
-              await cleanupClient.getClass().read({ className }),
+              await cleanupClient
+                .getClass()
+                .read({ className }, undefined, { analyse: analyseException }),
               `class ${className}`,
             );
+            // "Could not find out" is not "absent": the create would meet it.
+            if (existing.present === 'unknown') {
+              return { success: false, reason: existing.reason };
+            }
             if (existing.present === true) {
               try {
                 // Use BaseTester's config resolver to get transport request (allows overriding global params)
                 const transportRequest = tester.getTransportRequest();
-                await cleanupClient.getClass().delete(
+                const removed = await cleanupClient.getClass().delete(
                   {
                     className,
                     transportRequest,
                   },
                   {
+                    analyse: judged(analyseDeletion),
                     headers: integrationHeadersOf(
                       cleanupClient.getClass(),
                       'delete',
                     ),
                   },
                 );
+                if (!removed.ok) {
+                  return {
+                    success: false,
+                    objectExists: true,
+                    reason: failureOf(
+                      removed,
+                      `delete existing class ${className}`,
+                    ),
+                  };
+                }
                 await new Promise((resolve) => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
-                testsLogger.warn(
-                  `Could not delete existing class ${className}: ${cleanupError.message}. Will attempt update instead of create.`,
-                );
-                return { success: true, objectExists: true };
+                return {
+                  success: false,
+                  objectExists: true,
+                  reason: `Failed to delete existing class ${className}: ${cleanupError.message}`,
+                };
               }
             }
           } catch (error: any) {
@@ -178,21 +222,10 @@ describe('Class (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_class', 'adt_class')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        const config = await tester.requireConfig();
 
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
@@ -215,32 +248,16 @@ describe('Class (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('class')(
       'should read standard SAP class',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Class - read standard object',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
         // Use BaseTester's method to get standard object (prioritizes standard_objects registry)
         const standardObject = tester.getStandardObject('class');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Class - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Class - read standard object',
+          throw new Error(
             `Standard class not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardClassName = standardObject.name;
@@ -248,15 +265,6 @@ describe('Class (using AdtClient)', () => {
           name: 'read_standard',
           params: { class_name: standardClassName },
         });
-
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Class - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({
@@ -279,31 +287,18 @@ describe('Class (using AdtClient)', () => {
   });
 
   describe('Read transport request', () => {
-    it(
+    gateAll(
+      gateStandardObject('class'),
+      gateOn(({ isCloud }) => transportConfigured(isCloud)),
+    )(
       'should read transport request for class',
       async () => {
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
-            'No SAP configuration or tester not initialized',
-          );
-          return;
-        }
-
         // Use BaseTester's method to get standard object (prioritizes standard_objects registry)
         const standardObject = tester.getStandardObject('class');
         if (!standardObject) {
-          logTestStart(testsLogger, 'Class - read transport request', {
-            name: 'read_transport',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
+          throw new Error(
             `Standard class not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardClassName = standardObject.name;
@@ -322,16 +317,9 @@ describe('Class (using AdtClient)', () => {
           resolver?.getTransportRequest() || tester.getTransportRequest() || '';
 
         if (!transportRequest) {
-          logTestStart(testsLogger, 'Class - read transport request', {
-            name: 'read_transport',
-            params: { class_name: standardClassName },
-          });
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
+          throw new Error(
             'transport_request not configured in test-config.yaml (required for transport read test)',
           );
-          return;
         }
 
         logTestStart(testsLogger, 'Class - read transport request', {
@@ -342,15 +330,6 @@ describe('Class (using AdtClient)', () => {
           },
         });
 
-        if (!hasConfig) {
-          logTestSkip(
-            testsLogger,
-            'Class - read transport request',
-            'No SAP configuration',
-          );
-          return;
-        }
-
         try {
           // The shipped reading of a transport request is its document. The
           // number is what identifies the request, so a document that does not
@@ -358,7 +337,10 @@ describe('Class (using AdtClient)', () => {
           const result = expectResult(
             await client
               .getRequest()
-              .readMetadata({ transportNumber: transportRequest }),
+              .readMetadata(
+                { transportNumber: transportRequest },
+                { analyse: analyseException },
+              ),
             'read transport request',
           );
           expect(result).toContain(transportRequest);
@@ -366,7 +348,10 @@ describe('Class (using AdtClient)', () => {
           const metadata = expectResult(
             await client
               .getRequest()
-              .readMetadata({ transportNumber: transportRequest }),
+              .readMetadata(
+                { transportNumber: transportRequest },
+                { analyse: analyseException },
+              ),
             'read transport request metadata',
           );
           expect(metadata).toContain(transportRequest);

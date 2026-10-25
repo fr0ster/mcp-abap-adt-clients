@@ -2,9 +2,10 @@
  * Integration test for ScalarFunction (CDS DSFD/SCF)
  * Tests using AdtClient for unified CRUD operations.
  *
- * The test uses a discovery-then-create skip gate: if the DSFD endpoint is
- * absent on the target system (HTTP 404/405/501) the suite is skipped;
- * all other errors are rethrown and fail the test as real issues.
+ * Whether DSFD exists on a system is the configuration's to say — the case's
+ * `enabled` / `available_in`, read by the registration gate — never inferred
+ * from an answer: an enabled case whose create is refused, 404/405/501
+ * included, fails with what SAP said.
  *
  * Enable debug logs:
  *  DEBUG_ADT_TESTS=true   - Integration test execution logs
@@ -16,14 +17,31 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import {
+  expectResult,
+  failureOf,
+  noteCleanupRefusal,
+  releasing,
+} from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
+import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -39,13 +57,11 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
 const {
-  getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -61,13 +77,9 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-/** HTTP status codes that indicate the DSFD feature is absent on this system. */
-const SKIP_STATUSES = new Set([404, 405, 501]);
-
 describe('ScalarFunction (DSFD/SCF) integration', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -84,25 +96,29 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
         systemContext,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
   describe('Full workflow', () => {
-    it(
-      'create → read → update → activate → delete (skips only on 404/405/501)',
+    gate('create_scalar_function', 'adt_scalar_function')(
+      'create → read → update → activate → delete',
       async () => {
         const TEST_LABEL = 'ScalarFunction - full workflow';
 
         // Resolve test-case params from test-config.yaml (key: create_scalar_function)
-        const testCase = getEnabledTestCase(
+        const testCase = configuredCase(
           'create_scalar_function',
           'adt_scalar_function',
         );
+        if (!testCase) {
+          throw new Error(
+            missingCaseMessage('create_scalar_function', 'adt_scalar_function'),
+          );
+        }
 
         // Determine object name and package from config or defaults
         const resolver = new TestConfigResolver({
@@ -123,18 +139,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           params: { package_name: packageName },
         });
 
-        if (!hasConfig) {
-          logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
-          return;
-        }
-
         if (!packageName) {
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
+          throw new Error(
             'package_name not configured — set environment.default_package in test-config.yaml',
           );
-          return;
         }
 
         const transportRequest: string | undefined = resolveTransportRequest(
@@ -144,40 +152,41 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
         const sf = client.getScalarFunction();
 
         // ── 1) Idempotent cleanup of any leftover object from a previous run ──
-        try {
+        // Absent is the expected answer; any other refusal fails here.
+        expectRemovedOrAbsent(
           await sf.delete(
             {
               scalarFunctionName,
               transportRequest,
             },
-            { headers: integrationHeadersOf(sf, 'delete') },
-          );
-        } catch {
-          // Ignore — object may not exist yet
-        }
+            {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(sf, 'delete'),
+            },
+          ),
+          `delete leftover scalar function ${scalarFunctionName}`,
+        );
 
         // ── 2) Create (also confirms DSFD is supported on this system) ──
-        try {
-          await sf.create(
-            {
-              scalarFunctionName,
-              packageName,
-              transportRequest,
-              description: 'ADT integration test scalar function',
-            },
-            { headers: integrationHeadersOf(sf, 'create') },
+        // A refused create fails with what SAP said, 404/405/501 included:
+        // whether DSFD is there is the case's `enabled` / `available_in`, not
+        // an answer to read it from.
+        const created = await sf.create(
+          {
+            scalarFunctionName,
+            packageName,
+            transportRequest,
+            description: 'ADT integration test scalar function',
+          },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(sf, 'create'),
+          },
+        );
+        if (!created.ok) {
+          const createError = new Error(
+            failureOf(created, 'create scalar function'),
           );
-        } catch (createError) {
-          const status = (createError as { response?: { status?: number } })
-            .response?.status;
-          if (status && SKIP_STATUSES.has(status)) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
-              `DSFD unsupported on this system (HTTP ${status})`,
-            );
-            return;
-          }
           logTestError(testsLogger, TEST_LABEL, createError);
           throw createError;
         }
@@ -202,24 +211,32 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           if (configuredSource) {
             // ── 3a) Full flow: update source + activate ──
             const sfLock = expectResult(
-              await sf.lock({ scalarFunctionName }),
+              await sf.lock(
+                { scalarFunctionName },
+                { analyse: analyseException },
+              ),
               'lock scalar function',
             );
-            try {
-              expectResult(
-                await sf.update(
-                  { scalarFunctionName, transportRequest },
-                  {
-                    headers: integrationHeadersOf(sf, 'update'),
-                    source: configuredSource,
-                    lockHandle: sfLock,
-                  },
+            await releasing(
+              async () =>
+                expectResult(
+                  await sf.update(
+                    { scalarFunctionName, transportRequest },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(sf, 'update'),
+                      source: configuredSource,
+                      lockHandle: sfLock,
+                    },
+                  ),
+                  'update scalar function',
                 ),
-                'update scalar function',
-              );
-            } finally {
-              await sf.unlock({ scalarFunctionName }, sfLock);
-            }
+              () =>
+                sf.unlock({ scalarFunctionName }, sfLock, {
+                  analyse: analyseException,
+                }),
+              'unlock scalar function',
+            );
             await expectLockReleased(
               (c) => c.getScalarFunction(),
               { scalarFunctionName },
@@ -229,21 +246,28 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             expectResult(
               await sf.activate(
                 { scalarFunctionName },
-                { headers: integrationHeadersOf(sf, 'activate') },
+                {
+                  analyse: judged(analyseActivation),
+                  headers: integrationHeadersOf(sf, 'activate'),
+                },
               ),
               'activate scalar function',
             );
 
             // ── 4a) Read active ──
             const readState = expectResult(
-              await sf.read({ scalarFunctionName }, 'active'),
+              await sf.read({ scalarFunctionName }, 'active', {
+                analyse: analyseException,
+              }),
               'readState',
             );
             expect(typeof readState).toBe('string');
           } else {
             // ── 3b) Metadata-only validation: read the inactive object back ──
             const readState = expectResult(
-              await sf.read({ scalarFunctionName }, 'inactive'),
+              await sf.read({ scalarFunctionName }, 'inactive', {
+                analyse: analyseException,
+              }),
               'readState',
             );
             expect(typeof readState).toBe('string');
@@ -256,7 +280,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
                 scalarFunctionName,
                 transportRequest,
               },
-              { headers: integrationHeadersOf(sf, 'delete') },
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(sf, 'delete'),
+              },
             ),
             'deleteState',
           );
@@ -265,15 +292,20 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           logTestSuccess(testsLogger, TEST_LABEL);
         } catch (error) {
           logTestError(testsLogger, TEST_LABEL, error);
-          // Best-effort cleanup
-          try {
-            await sf.delete(
-              { scalarFunctionName, transportRequest },
-              { headers: integrationHeadersOf(sf, 'delete') },
-            );
-          } catch {
-            // Ignore cleanup errors
-          }
+          // The test already failed; a refused cleanup is added to that
+          // failure, not dropped.
+          await noteCleanupRefusal(
+            error,
+            () =>
+              sf.delete(
+                { scalarFunctionName, transportRequest },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(sf, 'delete'),
+                },
+              ),
+            `delete scalar function ${scalarFunctionName}`,
+          );
           throw error;
         } finally {
           logTestEnd(testsLogger, TEST_LABEL);

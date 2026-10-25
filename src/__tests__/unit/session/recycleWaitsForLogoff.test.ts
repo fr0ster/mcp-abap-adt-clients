@@ -23,6 +23,15 @@ import { recycleTestSession } from '../../helpers/sessionConfig';
 import type { ISessionSharing } from '../../helpers/sharedSession';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 
+// A live run's globalSetup publishes its session to the shared file. Read
+// through, this stub run would take that file for its own and publish the
+// stub's session over the live run's; it is cut off from the file instead.
+jest.mock('../../helpers/sharedSession', () => ({
+  ...jest.requireActual('../../helpers/sharedSession'),
+  readSessionMaterial: () => null,
+  publishSessionMaterial: jest.fn(),
+}));
+
 jest.setTimeout(20_000);
 
 const LOGOFF = '/sap/public/bc/icf/logoff';

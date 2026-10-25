@@ -15,14 +15,20 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import { expectResult } from '../../../helpers/contract';
+import { gateOn } from '../../../helpers/caseGate';
+import { expectResult, noteCleanupRefusal } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -55,7 +61,6 @@ function masterLangOf(xml: string): string | undefined {
 describe('Master language on create (#105)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
   let expectedLang = 'EN';
   let sentLang: string | undefined;
   const className = 'ZCL_AC_MASTERLANG_IT';
@@ -66,7 +71,6 @@ describe('Master language on create (#105)', () => {
     if (!process.env.SAP_URL) {
       return;
     }
-    hasConfig = true;
     connection = await createTestConnection(silentLogger);
 
     const isCloud = await isCloudEnvironment(connection);
@@ -97,14 +101,9 @@ describe('Master language on create (#105)', () => {
     ));
   }, getTimeout('connection') ?? 60000);
 
-  it(
+  gateOn(() => true)(
     'creates a class whose master language matches test-config default_master_language',
     async () => {
-      if (!hasConfig) {
-        console.warn('No SAP config — skipping master language test');
-        return;
-      }
-
       const cls = client.getClass();
 
       // **Every answer is read.** The delete, the create and the cleanup used
@@ -121,14 +120,17 @@ describe('Master language on create (#105)', () => {
             { className, transportRequest },
             {
               headers: integrationHeadersOf(cls, 'delete'),
-              analyse: analyseDeletion,
+              analyse: judged(analyseDeletion),
             },
           ),
           what,
         );
 
       // Idempotent: remove a leftover from a run that died before cleanup.
-      const existing = await cls.readMetadata({ className });
+      const existing = await cls.readMetadata(
+        { className },
+        { analyse: analyseException },
+      );
       if (existing.ok) {
         await deleteClass('delete leftover');
       } else if (existing.getError().response?.status !== 404) {
@@ -145,7 +147,10 @@ describe('Master language on create (#105)', () => {
               transportRequest,
               description: 'master language integration probe',
             },
-            { headers: integrationHeadersOf(cls, 'create') },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(cls, 'create'),
+            },
           ),
           'create',
         );
@@ -175,34 +180,42 @@ describe('Master language on create (#105)', () => {
         expectResult(
           await cls.activate(
             { className },
-            { headers: integrationHeadersOf(cls, 'activate') },
+            {
+              analyse: judged(analyseActivation),
+              headers: integrationHeadersOf(cls, 'activate'),
+            },
           ),
           'activate',
         );
 
         const meta = expectResult(
-          await cls.readMetadata({ className }),
+          await cls.readMetadata({ className }, { analyse: analyseException }),
           'meta',
         );
         const persisted = masterLangOf(String(meta ?? ''));
         expect(persisted).toBe(expectedLang);
         bodyPassed = true;
-      } finally {
-        // A cleanup that fails is a red test — the leftover is what broke this
-        // test before. When the body already failed, its error is the one to
-        // report, so the cleanup's must not replace it.
-        if (bodyPassed) {
-          await deleteClass('cleanup delete');
-        } else {
-          await cls
-            .delete(
+      } catch (error) {
+        // The body failed: its error is the one to report. A refused cleanup
+        // is added to it rather than dropped, and does not replace it.
+        await noteCleanupRefusal(
+          error,
+          () =>
+            cls.delete(
               { className, transportRequest },
               {
                 headers: integrationHeadersOf(cls, 'delete'),
-                analyse: analyseDeletion,
+                analyse: judged(analyseDeletion),
               },
-            )
-            .catch(() => undefined);
+            ),
+          'cleanup delete',
+        );
+        throw error;
+      } finally {
+        // A cleanup that fails is a red test — the leftover is what broke this
+        // test before.
+        if (bodyPassed) {
+          await deleteClass('cleanup delete');
         }
       }
     },

@@ -18,6 +18,7 @@ import * as dotenv from 'dotenv';
 import { functionGroupChildren } from '../../../../scripts/lib/functionGroupChildren';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
+import { gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -42,7 +43,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Shared - listFunctionModules', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
@@ -54,11 +54,10 @@ describe('Shared - listFunctionModules', () => {
         testsLogger,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -68,62 +67,56 @@ describe('Shared - listFunctionModules', () => {
     }
   });
 
-  it('lists the function modules of the shared function group', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
+  gateOn(() => true)(
+    'lists the function modules of the shared function group',
+    async () => {
+      logTestStep(`listFunctionModules(${SHARED_FUNCTION_GROUP})`, testsLogger);
+
+      // The two calls a consumer composes since 19.0.0, in place of the member
+      // that made them. See scripts/lib/functionGroupChildren.ts.
+      const result = await functionGroupChildren(
+        connection,
+        SHARED_FUNCTION_GROUP,
+        'FUGR/FF',
+        testsLogger,
       );
-      return;
-    }
 
-    logTestStep(`listFunctionModules(${SHARED_FUNCTION_GROUP})`, testsLogger);
+      testsLogger.info?.(`🎯 Function modules: ${JSON.stringify(result)}`);
 
-    // The two calls a consumer composes since 19.0.0, in place of the member
-    // that made them. See scripts/lib/functionGroupChildren.ts.
-    const result = await functionGroupChildren(
-      connection,
-      SHARED_FUNCTION_GROUP,
-      'FUGR/FF',
-      testsLogger,
-    );
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThan(0);
+      // Every entry must be a non-empty string.
+      for (const fm of result) {
+        expect(typeof fm).toBe('string');
+        expect(fm.length).toBeGreaterThan(0);
+      }
+      // The shared polygon module must be present (case-insensitive).
+      const upper = result.map((fm) => fm.toUpperCase());
+      expect(upper).toContain(SHARED_FUNCTION_MODULE.toUpperCase());
+      // No duplicates (deduped by uppercased key).
+      expect(new Set(upper).size).toBe(upper.length);
+    },
+    30000,
+  );
 
-    testsLogger.info?.(`🎯 Function modules: ${JSON.stringify(result)}`);
-
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0);
-    // Every entry must be a non-empty string.
-    for (const fm of result) {
-      expect(typeof fm).toBe('string');
-      expect(fm.length).toBeGreaterThan(0);
-    }
-    // The shared polygon module must be present (case-insensitive).
-    const upper = result.map((fm) => fm.toUpperCase());
-    expect(upper).toContain(SHARED_FUNCTION_MODULE.toUpperCase());
-    // No duplicates (deduped by uppercased key).
-    expect(new Set(upper).size).toBe(upper.length);
-  }, 30000);
-
-  it('is case-insensitive on the function group name', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
+  gateOn(() => true)(
+    'is case-insensitive on the function group name',
+    async () => {
+      logTestStep(
+        `listFunctionModules(${SHARED_FUNCTION_GROUP.toLowerCase()})`,
+        testsLogger,
       );
-      return;
-    }
 
-    logTestStep(
-      `listFunctionModules(${SHARED_FUNCTION_GROUP.toLowerCase()})`,
-      testsLogger,
-    );
+      const result = await functionGroupChildren(
+        connection,
+        SHARED_FUNCTION_GROUP.toLowerCase(),
+        'FUGR/FF',
+        testsLogger,
+      );
 
-    const result = await functionGroupChildren(
-      connection,
-      SHARED_FUNCTION_GROUP.toLowerCase(),
-      'FUGR/FF',
-      testsLogger,
-    );
-
-    const upper = result.map((fm) => fm.toUpperCase());
-    expect(upper).toContain(SHARED_FUNCTION_MODULE.toUpperCase());
-  }, 30000);
+      const upper = result.map((fm) => fm.toUpperCase());
+      expect(upper).toContain(SHARED_FUNCTION_MODULE.toUpperCase());
+    },
+    30000,
+  );
 });

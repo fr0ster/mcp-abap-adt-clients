@@ -18,6 +18,7 @@ import * as dotenv from 'dotenv';
 import { functionGroupChildren } from '../../../../scripts/lib/functionGroupChildren';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
+import { gateOn } from '../../helpers/caseGate';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -43,7 +44,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Shared - listFunctionGroupIncludes', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let hasConfig = false;
 
   beforeAll(async () => {
     try {
@@ -55,11 +55,10 @@ describe('Shared - listFunctionGroupIncludes', () => {
         testsLogger,
       );
       client = resolvedClient;
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -69,38 +68,35 @@ describe('Shared - listFunctionGroupIncludes', () => {
     }
   });
 
-  it('lists the includes of the shared function group', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
+  gateOn(() => true)(
+    'lists the includes of the shared function group',
+    async () => {
+      logTestStep(
+        `listFunctionGroupIncludes(${SHARED_FUNCTION_GROUP})`,
+        testsLogger,
       );
-      return;
-    }
 
-    logTestStep(
-      `listFunctionGroupIncludes(${SHARED_FUNCTION_GROUP})`,
-      testsLogger,
-    );
+      const result = await functionGroupChildren(
+        connection,
+        SHARED_FUNCTION_GROUP,
+        'FUGR/I',
+        testsLogger,
+      );
 
-    const result = await functionGroupChildren(
-      connection,
-      SHARED_FUNCTION_GROUP,
-      'FUGR/I',
-      testsLogger,
-    );
+      testsLogger.info?.(`🎯 Includes: ${JSON.stringify(result)}`);
 
-    testsLogger.info?.(`🎯 Includes: ${JSON.stringify(result)}`);
-
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0);
-    for (const inc of result) {
-      expect(typeof inc).toBe('string');
-      expect(inc.length).toBeGreaterThan(0);
-    }
-    // The generated TOP include must be present (case-insensitive).
-    const upper = result.map((inc) => inc.toUpperCase());
-    expect(upper).toContain(EXPECTED_TOP_INCLUDE.toUpperCase());
-    // No duplicates (deduped by uppercased key).
-    expect(new Set(upper).size).toBe(upper.length);
-  }, 30000);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThan(0);
+      for (const inc of result) {
+        expect(typeof inc).toBe('string');
+        expect(inc.length).toBeGreaterThan(0);
+      }
+      // The generated TOP include must be present (case-insensitive).
+      const upper = result.map((inc) => inc.toUpperCase());
+      expect(upper).toContain(EXPECTED_TOP_INCLUDE.toUpperCase());
+      // No duplicates (deduped by uppercased key).
+      expect(new Set(upper).size).toBe(upper.length);
+    },
+    30000,
+  );
 });

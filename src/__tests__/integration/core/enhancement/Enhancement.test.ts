@@ -27,6 +27,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectFailure, expectResult } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
   createTestAdtClient,
@@ -134,7 +135,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       expectResult(
         await client.getEnhancement().delete(object, {
           headers: integrationHeadersOf(client.getEnhancement(), 'delete'),
-          analyse: analyseDeletion,
+          analyse: judged(analyseDeletion),
         }),
         'delete leftover',
       );
@@ -147,7 +148,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     expectResult(
       await client.getEnhancement().delete(object, {
         headers: integrationHeadersOf(client.getEnhancement(), 'delete'),
-        analyse: analyseDeletion,
+        analyse: judged(analyseDeletion),
       }),
       'delete enhancement',
     );
@@ -238,7 +239,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
               expectResult(
                 await cls.delete(classConfig, {
                   headers: integrationHeadersOf(cls, 'delete'),
-                  analyse: analyseDeletion,
+                  analyse: judged(analyseDeletion),
                 }),
                 'delete BAdI class',
               );
@@ -252,7 +253,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
                 expectResult(
                   await intf.delete(intfConfig, {
                     headers: integrationHeadersOf(intf, 'delete'),
-                    analyse: analyseDeletion,
+                    analyse: judged(analyseDeletion),
                   }),
                   'delete BAdI interface',
                 );
@@ -292,7 +293,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await enhancement.activate(object, {
             headers: integrationHeadersOf(enhancement, 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate BAdI document',
         );
@@ -337,7 +338,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await intf.activate(intfConfig, {
             headers: integrationHeadersOf(intf, 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate BAdI interface',
         );
@@ -403,7 +404,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await cls.activate(classConfig, {
             headers: integrationHeadersOf(cls, 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate BAdI class',
         );
@@ -475,7 +476,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await client.getEnhancement().activate(object, {
             headers: integrationHeadersOf(client.getEnhancement(), 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate XSB',
         );
@@ -628,7 +629,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expectResult(
           await client.getEnhancement().activate(object, {
             headers: integrationHeadersOf(client.getEnhancement(), 'activate'),
-            analyse: analyseActivation,
+            analyse: judged(analyseActivation),
           }),
           'activate XHH',
         );

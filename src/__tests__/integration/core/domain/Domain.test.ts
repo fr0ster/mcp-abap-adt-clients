@@ -19,8 +19,8 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -37,7 +37,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
@@ -46,6 +45,7 @@ const {
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
+  domainDocumentFor,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -115,6 +115,7 @@ describe('Domain (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
+            datatype: params.datatype,
             length: params.length || 10,
             decimals: params.decimals,
           };
@@ -152,29 +153,27 @@ describe('Domain (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it(
+    gate('create_domain', 'adt_domain')(
       'should execute full workflow and store all results',
       async () => {
-        if (!tester) {
-          return;
-        }
-        if (!hasConfig) {
-          await tester.flowTestAuto();
-          return;
-        }
-        const config = tester.getConfig();
-        if (!config) {
-          await tester.flowTestAuto();
-          return;
-        }
+        // buildConfig above carries the type beside IDomainConfig's fields.
+        const config = (await tester.requireConfig()) as IDomainConfig & {
+          datatype?: string;
+          length?: number;
+          decimals?: number;
+        };
 
         await tester.flowTestAuto({
+          // The create is a shell — `<doma:datatype/>` empty — and the
+          // update is what gives it a type; without one activation refuses
+          // it: "Data type ' ' does not exist" (measured).
           updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config.description || ''} (updated)`.slice(0, 60),
-            ),
+            domainDocumentFor(current, {
+              description: `${config.description || ''} (updated)`,
+              datatype: config.datatype,
+              length: config.length,
+              decimals: config.decimals,
+            }),
           updateConfig: {
             domainName: config.domainName,
             packageName: config.packageName,
@@ -187,7 +186,7 @@ describe('Domain (using AdtClient)', () => {
   });
 
   describe('Read standard object', () => {
-    it(
+    gateStandardObject('domain')(
       'should read standard SAP domain',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
@@ -198,16 +197,9 @@ describe('Domain (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('domain');
 
         if (!standardObject) {
-          logTestStart(testsLogger, 'Domain - read standard object', {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            'Domain - read standard object',
+          throw new Error(
             `Standard domain not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
-          return;
         }
 
         const standardDomainName = standardObject.name;
@@ -215,15 +207,6 @@ describe('Domain (using AdtClient)', () => {
           name: 'read_standard',
           params: { domain_name: standardDomainName },
         });
-
-        if (!hasConfig || !tester) {
-          logTestSkip(
-            testsLogger,
-            'Domain - read standard object',
-            'No SAP configuration',
-          );
-          return;
-        }
 
         try {
           const resultState = await tester.readTest({

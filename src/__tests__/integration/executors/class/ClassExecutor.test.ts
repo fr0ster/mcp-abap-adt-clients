@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -16,6 +17,13 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import {
+  configuredCase,
+  gate,
+  gateAll,
+  gateOn,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
@@ -32,7 +40,6 @@ import {
 import {
   logTestEnd,
   logTestError,
-  logTestSkip,
   logTestStart,
   logTestStep,
   logTestSuccess,
@@ -45,10 +52,7 @@ import {
   waitForNewTrace,
 } from '../../../helpers/traceHelpers';
 
-const {
-  getEnabledTestCase,
-  getTimeout,
-} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -142,7 +146,6 @@ describe('ClassExecutor (integration)', () => {
   // assert entries, rows and the scheduled request id.
   let profilerReading: ReadingProfiler;
   let classRunner: ReturnType<typeof readingClassExecutor>;
-  let hasConfig = false;
   let isLegacy = false;
   /** Trace ids this file produced, deleted at teardown. */
   const tracesCreated: string[] = [];
@@ -162,11 +165,10 @@ describe('ClassExecutor (integration)', () => {
       runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
       profilerReading = readingProfiler(connection, libraryLogger);
       classRunner = readingClassExecutor(connection, libraryLogger);
-      hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
-      hasConfig = skipUnlessConfigured(error, testsLogger);
+      skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -184,17 +186,28 @@ describe('ClassExecutor (integration)', () => {
     // appeared in between belongs to somebody else. The retry path can leave a
     // trace from its first attempt untracked, and that is the trade taken
     // knowingly rather than risk deleting a stranger's.
+    // A trace that could not be removed fails the suite, after the connection
+    // is released: the leftover is what this cleanup exists to prevent.
+    const leftovers: string[] = [];
     for (const traceId of tracesCreated) {
       try {
-        await profilerReading.delete(traceId);
+        const answer = await profilerReading.delete(traceId, {
+          analyse: analyseException,
+        });
+        if (!answer.ok) {
+          leftovers.push(`${traceId}: ${answer.getError().message}`);
+        }
       } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        leftovers.push(
+          `${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
     if (connection) {
       await releaseTestConnection(connection);
+    }
+    if (leftovers.length > 0) {
+      throw new Error(`Cleanup failed for trace(s) ${leftovers.join('; ')}`);
     }
   });
 
@@ -233,7 +246,7 @@ describe('ClassExecutor (integration)', () => {
       // The run answers what the reading makes of the response, and the shipped
       // one is the document. A failed run is a failure, not a body to retry.
       lastOutput = expectResult(
-        await classRunner.run({ className }),
+        await classRunner.run({ className }, { analyse: analyseException }),
         'run class',
       );
       if (!isMissingClassRunMainMessage(lastOutput)) return lastOutput;
@@ -242,37 +255,21 @@ describe('ClassExecutor (integration)', () => {
     return lastOutput;
   }
 
-  it(
+  gate('execute_class', 'adt_class_executor')(
     'should execute class via executor',
     async () => {
       const testName = 'ClassExecutor - run';
-      const testCase = getEnabledTestCase(
-        'execute_class',
-        'adt_class_executor',
-      );
+      const testCase = configuredCase('execute_class', 'adt_class_executor');
+      if (!testCase) {
+        throw new Error(
+          missingCaseMessage('execute_class', 'adt_class_executor'),
+        );
+      }
 
       logTestStart(testsLogger, testName, {
         name: 'run',
         params: { class_name: testCase?.params?.class_name },
       });
-
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'No .env file or SAP configuration found',
-        );
-        return;
-      }
-
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'execute_class/adt_class_executor not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
 
       try {
         const className = sharedRunnableClass(testCase);
@@ -295,43 +292,29 @@ describe('ClassExecutor (integration)', () => {
     getTimeout('test'),
   );
 
-  it(
+  // Profiling is switched off in the case itself.
+  gateAll(
+    gate('execute_class', 'adt_class_executor'),
+    gateOn(
+      () =>
+        configuredCase('execute_class', 'adt_class_executor')?.params?.profiling
+          ?.enabled !== false,
+    ),
+  )(
     'should execute class with profiling and return trace id',
     async () => {
       const testName = 'ClassExecutor - scheduleTrace then runWithProfiler';
-      const testCase = getEnabledTestCase(
-        'execute_class',
-        'adt_class_executor',
-      );
+      const testCase = configuredCase('execute_class', 'adt_class_executor');
+      if (!testCase) {
+        throw new Error(
+          missingCaseMessage('execute_class', 'adt_class_executor'),
+        );
+      }
 
       logTestStart(testsLogger, testName, {
         name: 'run_with_profiling',
         params: { class_name: testCase?.params?.class_name },
       });
-
-      if (!hasConfig) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'No .env file or SAP configuration found',
-        );
-        return;
-      }
-
-      if (!testCase) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'execute_class/adt_class_executor not configured or disabled in test-config.yaml',
-        );
-        return;
-      }
-
-      const profilingEnabled = testCase?.params?.profiling?.enabled !== false;
-      if (!profilingEnabled) {
-        logTestSkip(testsLogger, testName, 'profiling.enabled=false');
-        return;
-      }
 
       const profilerParameters = buildProfilerParameters(
         testCase?.params?.profiling?.parameters,
@@ -357,6 +340,7 @@ describe('ClassExecutor (integration)', () => {
         const profiledRun = async () => {
           const profilerId = expectResult(
             await classExecutor.scheduleTrace({
+              analyse: analyseException,
               ...profilerParameters,
               headers: integrationHeadersOf(classExecutor, 'scheduleTrace'),
             }),
@@ -366,7 +350,7 @@ describe('ClassExecutor (integration)', () => {
             run: expectResult(
               await classExecutor.runWithProfiler(
                 { className },
-                { profilerId },
+                { analyse: analyseException, profilerId },
               ),
               'result',
             ),
@@ -376,9 +360,13 @@ describe('ClassExecutor (integration)', () => {
 
         let result = await profiledRun();
         if (isMissingClassRunMainMessage(result.run)) {
-          await client.getClass().read({ className }, 'active', {
-            withLongPolling: true,
-          });
+          expectResult(
+            await client.getClass().read({ className }, 'active', {
+              analyse: analyseException,
+              withLongPolling: true,
+            }),
+            'read the class until it is active',
+          );
           await wait(1000);
           await runClassWithReadinessRetry(className);
           result = await profiledRun();
@@ -407,18 +395,21 @@ describe('ClassExecutor (integration)', () => {
         logTestStep('read all three views', testsLogger);
         const hitlist = expectResult(
           await profiler.read(traceId, 'hitlist', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'hitlist',
         );
         const statements = expectResult(
           await profiler.read(traceId, 'statements', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'statements',
         );
         const dbAccesses = expectResult(
           await profiler.read(traceId, 'dbAccesses', {
+            analyse: analyseException,
             withSystemEvents: false,
           }),
           'dbAccesses',

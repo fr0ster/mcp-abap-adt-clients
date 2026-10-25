@@ -19,6 +19,12 @@
 "environment.default_transport": "<TRANSPORT_REQUEST>"
 # SAP system id (on-prem only; "" on cloud, which supplies it).
 "environment.default_master_system": ""
+# Prove each UNLOCK released its lock from a second ABAP session (on: any refusal fails; off: not made, said in the run). false on cloud: a second session can land on a server that cannot see a new object yet (404).
+"environment.verify_lock_released": false
+# Read the message class right after its create (on: any refusal fails; off: not read, said in the run). false on cloud: the same 404.
+"environment.read_message_class_after_create": false
+# Validate a transformation's name before its create (on: any refusal fails; off: not sent, said in the run). false where the system has no /sap/bc/adt/xslt/validation (404).
+"environment.validate_transformation_names": true
 # Name of the shared package on THIS system (created by `npm run shared:setup` inside super_package).
 "shared_dependencies.package": "<SHARED_PACKAGE>"
 # Parent of the shared package; normally the same as environment.default_package.
@@ -47,6 +53,20 @@
 # "create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params.implementation_name": "<NAME>"
 # Name of the append structure, if the base name collides.
 # "create_append_structure.test_cases[adt_append_structure].params.append_structure_name": "<NAME>"
+# false where the system has no scalar functions (DSFD): a refused create fails, it is not skipped.
+# "create_scalar_function.test_cases[adt_scalar_function].enabled": false
+# false where the system has no scalar function implementations (DSFI).
+# "create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].enabled": false
+# false where the system has no append structures.
+# "create_append_structure.test_cases[adt_append_structure].enabled": false
+# true only where the system allows creating feature toggles (#131); a refusal fails the test.
+# "create_feature_toggle.test_cases[adt_feature_toggle].enabled": true
+# false where the system refuses `check` (e.g. S_ABPLNGVS); a refusal fails the test.
+# "check_run.test_cases[class_check].enabled": false
+# "default_package" where the system has no shared package (e.g. a BTP trial without a transport layer); a failed shared setup fails the test.
+# "create_function_module.test_cases[adt_function_module].params.function_group_route": "default_package"
+# "default_package" where the system has no shared package; a failed shared setup fails the test.
+# "create_function_include.test_cases[adt_function_include].params.function_group_route": "default_package"
 # true once a check variant that runs on this system is set.
 # "atc_run.test_cases[adt_atc_run].enabled": true
 # ATC check variant, or "" for the system's own.
