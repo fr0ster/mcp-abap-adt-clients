@@ -24,6 +24,24 @@ npm run check:config             # does the overlay fit the base?
 
 `test:init` does not guess the system type and never overwrites an overlay.
 
+**One overlay per system.** A checkout that runs against several systems keeps
+one overlay for each, and `MCP_TEST_OVERLAY` names the one a run reads —
+relative to the repository root, or absolute. The pattern
+`src/__tests__/helpers/test-config.overlay.*.yaml` is gitignored:
+
+```bash
+MCP_TEST_OVERLAY=src/__tests__/helpers/test-config.overlay.<system>.yaml npm run test:init -- onprem
+MCP_TEST_OVERLAY=src/__tests__/helpers/test-config.overlay.<system>.yaml npm run check:config
+MCP_TEST_OVERLAY=src/__tests__/helpers/test-config.overlay.<system>.yaml \
+  MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/<system>.env npm test -- <path>
+```
+
+`test:init`, `test-config:migrate`, `check:config` and the loader all read the
+variable. A named overlay that does not exist is refused; the default
+`test-config.overlay.yaml` is never read in its place. The overlay says what the
+system holds; which system and which user a run reaches is `MCP_ENV_PATH`'s, so
+a run names both.
+
 **Migrating from the old full `test-config.yaml`.** A full local copy is no longer
 read: the loader refuses to start while it exists, because a copy goes stale when
 the base moves (a section realigned by hand once replaced three on-prem values with

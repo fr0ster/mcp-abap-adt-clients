@@ -8,7 +8,8 @@
  * `<PLACEHOLDER>`. Each of those turns into a config failure that reads like a
  * code regression, so this checks them before a run instead of after it:
  * every overlay key allowed, every required one present. The old full
- * `test-config.yaml` is refused. Nothing is printed of any value.
+ * `test-config.yaml` is refused. Nothing is printed of any value. With
+ * `MCP_TEST_OVERLAY` set, the overlay it names is checked, and must exist.
  *
  * No overlay at all is not an error here: unit tests need none. The integration
  * tests then register as configuration defects, which is their own gate.
@@ -21,13 +22,19 @@ const {
   OVERLAY_FILE,
   TestConfigError,
   loadTestConfigFrom,
+  overlayPathFromEnv,
+  overlayPathOf,
 } = require('./lib/testConfigOverlay');
 const fs = require('node:fs');
 const path = require('node:path');
 
 /** @returns {{ ok: boolean, message: string }} */
-function check(directory = HELPERS_DIRECTORY) {
-  if (!fs.existsSync(path.join(directory, OVERLAY_FILE))) {
+function check(directory = HELPERS_DIRECTORY, namedOverlay) {
+  const overlayName = path.basename(overlayPathOf(directory, namedOverlay));
+  if (
+    namedOverlay === undefined &&
+    !fs.existsSync(path.join(directory, OVERLAY_FILE))
+  ) {
     // Still refuses the old full file, which makes the loader throw.
     try {
       loadTestConfigFrom(directory);
@@ -43,7 +50,7 @@ function check(directory = HELPERS_DIRECTORY) {
     };
   }
   try {
-    loadTestConfigFrom(directory);
+    loadTestConfigFrom(directory, namedOverlay);
   } catch (error) {
     if (error instanceof TestConfigError) {
       return { ok: false, message: error.message };
@@ -52,12 +59,12 @@ function check(directory = HELPERS_DIRECTORY) {
   }
   return {
     ok: true,
-    message: `check:config — ${OVERLAY_FILE} carries only allowed keys and every required one.`,
+    message: `check:config — ${overlayName} carries only allowed keys and every required one.`,
   };
 }
 
 function main(directory = HELPERS_DIRECTORY) {
-  const { ok, message } = check(directory);
+  const { ok, message } = check(directory, overlayPathFromEnv());
   (ok ? console.log : console.error)(message);
   process.exit(ok ? 0 : 1);
 }

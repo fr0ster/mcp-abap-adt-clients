@@ -9,6 +9,9 @@
  *   npm run test-config:migrate         write test-config.overlay.yaml from an
  *                                       old full test-config.yaml; refuses to
  *                                       overwrite one
+ *
+ * Both write the overlay MCP_TEST_OVERLAY names when it is set — one per
+ * system: src/__tests__/helpers/test-config.overlay.<system>.yaml.
  */
 
 const fs = require('node:fs');
@@ -18,17 +21,19 @@ const {
   OVERLAY_FILE,
   TestConfigError,
   migrateFullConfig,
+  overlayPathFromEnv,
+  overlayPathOf,
 } = require('./lib/testConfigOverlay');
 
 const FORMS = ['onprem', 'cloud'];
 
-function init(type, directory = HELPERS_DIRECTORY) {
+function init(type, directory = HELPERS_DIRECTORY, namedOverlay) {
   if (!FORMS.includes(type)) {
     throw new TestConfigError(
       `Say which system type: \`npm run test:init -- ${FORMS.join('|')}\`. Nothing is guessed.`,
     );
   }
-  const target = path.join(directory, OVERLAY_FILE);
+  const target = overlayPathOf(directory, namedOverlay);
   if (fs.existsSync(target)) {
     throw new TestConfigError(
       `${target} already exists — not overwriting it.`,
@@ -46,12 +51,13 @@ function main(argv = process.argv.slice(2)) {
   const [command, argument] = argv;
   try {
     if (command === 'init') {
-      const target = init(argument);
+      const target = init(argument, HELPERS_DIRECTORY, overlayPathFromEnv());
       console.log(`Created ${target} — replace every <PLACEHOLDER> in it.`);
     } else if (command === 'migrate') {
-      const written = migrateFullConfig();
+      const namedOverlay = overlayPathFromEnv();
+      const written = migrateFullConfig(HELPERS_DIRECTORY, namedOverlay);
       console.log(
-        `Wrote ${OVERLAY_FILE} with ${written.length} key(s): ${written.join(', ')}.\n` +
+        `Wrote ${path.basename(overlayPathOf(HELPERS_DIRECTORY, namedOverlay))} with ${written.length} key(s): ${written.join(', ')}.\n` +
           'Check that it loads (`npm run check:config`), then delete the old test-config.yaml.',
       );
     } else {
