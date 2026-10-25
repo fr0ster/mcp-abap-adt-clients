@@ -12,7 +12,7 @@
  *   DEBUG_ADT_E2E_TESTS=true               - Enable E2E test logging
  */
 
-import type { ILogger, LogLevel } from '@mcp-abap-adt/interfaces-utils';
+import { type ILogger, LogLevel } from '@mcp-abap-adt/interfaces-utils';
 // Import only what we need to avoid side effects from pinoLogger initialization
 // When importing from '@mcp-abap-adt/logger', it executes: export const pinoLogger = new PinoLogger()
 // This causes an error if 'pino' is not installed, even though we don't use pinoLogger
@@ -154,11 +154,15 @@ export const emptyLogger: ILogger = {
  * being broken. Every other logger here answers `emptyLogger` by default, which
  * is right for tracing and wrong for this.
  *
+ * Its threshold is fixed at info, so `AUTH_LOG_LEVEL` quiets nothing it says: a
+ * check a run did not make is said at `warn` or `error` too. Debug lines stay
+ * off.
+ *
  * Use it sparingly. If a message is only interesting while debugging, it is not
  * this.
  */
 export function createRunIntegrityLogger(): ILogger {
-  return new DefaultLogger(getLogLevel());
+  return new DefaultLogger(LogLevel.INFO);
 }
 
 /**
