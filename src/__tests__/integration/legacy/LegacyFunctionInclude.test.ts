@@ -19,8 +19,13 @@
  * npm run test:detached -- integration/legacy/LegacyFunctionInclude
  */
 
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectResult } from '../../helpers/contract';
+import { judged } from '../../helpers/judged';
 import { requireOwnNames } from '../../helpers/legacyEnv';
 import {
   closeLegacySession,
@@ -83,7 +88,10 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
       expectResult(
         await handler.create(
           { ...group, packageName: LOCAL_PACKAGE, description: DESCRIPTION },
-          { headers: integrationHeadersOf(handler, 'create') },
+          {
+            headers: integrationHeadersOf(handler, 'create'),
+            analyse: analyseException,
+          },
         ),
         `create function group ${group.functionGroupName}`,
       );
@@ -107,7 +115,10 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
       expectResult(
         await finc.create(
           { ...include, description: DESCRIPTION },
-          { headers: integrationHeadersOf(finc, 'create') },
+          {
+            headers: integrationHeadersOf(finc, 'create'),
+            analyse: analyseException,
+          },
         ),
         'create the function include',
       );
@@ -134,6 +145,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
               headers: integrationHeadersOf(finc, 'update'),
               lockHandle,
               source: SOURCE,
+              analyse: analyseException,
             }),
             'write the function include',
           ),
@@ -144,7 +156,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
       expect(sent.map((r) => r.status)).toEqual([200, 200, 200]);
       expect(
         expectResult(
-          await finc.read(include, 'inactive'),
+          await finc.read(include, 'inactive', { analyse: analyseException }),
           'read the function include (inactive)',
         ),
       ).toEqual(expect.stringContaining(SOURCE));
@@ -158,6 +170,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include', () => {
       expectResult(
         await finc.activate(include, {
           headers: integrationHeadersOf(finc, 'activate'),
+          analyse: judged(analyseActivation),
         }),
         'activate the function include',
       );

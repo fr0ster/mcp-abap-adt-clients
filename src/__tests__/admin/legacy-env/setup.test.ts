@@ -4,8 +4,8 @@
  * versions, the marked request, package ZLG7_TEST), delete the DDL sources it
  * left for ADT, create or refresh the fixtures. Report: .legacy-env/setup.json
  *
- * Run (the 7.40 configuration and its .env, RFC):
- *   MCP_TEST_CONFIG_PATH=src/__tests__/helpers/test-config.legacy-740.yaml \
+ * Run (the 7.40 system's overlay and its .env, RFC):
+ *   MCP_TEST_OVERLAY=src/__tests__/helpers/test-config.overlay.<system>.yaml \
  *   MCP_ENV_PATH=<the 7.40 .env> SAPNWRFC_HOME=… npm run legacy:setup
  */
 

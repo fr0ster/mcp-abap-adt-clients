@@ -12,6 +12,7 @@
  * npm run test:detached -- integration/legacy/LegacyTransports
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { expectResult } from '../../helpers/contract';
 import {
@@ -43,8 +44,15 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transports', () => {
       string,
       (s: LegacySession) => Promise<IAdtResponse<unknown>>,
     ][] = [
-      ['list', (s) => s.client.getRequest().list({})],
-      ['readMetadata', (s) => s.client.getRequest().readMetadata({})],
+      [
+        'list',
+        (s) => s.client.getRequest().list({ analyse: analyseException }),
+      ],
+      [
+        'readMetadata',
+        (s) =>
+          s.client.getRequest().readMetadata({}, { analyse: analyseException }),
+      ],
     ];
 
     for (const [member, call] of members) {

@@ -65,7 +65,5 @@ refusal-visibility-evidence.json
 
 # Reports of npm run legacy:setup / legacy:status / legacy:teardown (they name the request)
 .legacy-env/
-# The 7.40 system's own test configuration (MCP_TEST_CONFIG_PATH)
-src/__tests__/helpers/test-config.legacy-740.yaml
 # The ABAP sources of the legacy 7.40 test environment and its fixtures
 !src/__tests__/integration/legacy/abap/*.abap

@@ -110,8 +110,9 @@ with the full account and the probe record and step behind every claim.
 
 - **An own 7.40 test environment and live checks.** The checks under
   `src/__tests__/integration/legacy/` run only on a configuration with
-  `is_legacy: true` and `connection_type: "rfc"` (`test-config.legacy-740.yaml.template`,
-  loaded through `MCP_TEST_CONFIG_PATH`) and skip with the reason elsewhere;
+  `is_legacy: true` and `connection_type: "rfc"` (the 7.40 system's overlay,
+  named by `MCP_TEST_OVERLAY`, turns them on; the base keeps them off) and
+  skip with the reason elsewhere;
   `npm run legacy:setup`, `legacy:status` and `legacy:teardown` manage the
   environment (prefix `ZLG7`, its classes run through ABAP Unit), described in
   `docs/development/RFC_TESTING.md`. **The live checks are written and have not

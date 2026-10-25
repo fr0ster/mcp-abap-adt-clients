@@ -31,6 +31,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtHeaders,
@@ -232,7 +233,7 @@ export function settingsOf(config: unknown): LegacyEnvSettings {
     ?.legacy_env;
   if (!section || typeof section !== 'object')
     throw new Error(
-      'legacy env: the configuration has no legacy_env section (see test-config.legacy-740.yaml.template)',
+      'legacy env: the configuration has no legacy_env section (see test-config.yaml.template)',
     );
   return {
     softwareComponent: abapNameValue(
@@ -792,6 +793,7 @@ export async function runEnvAction(
     scope: { ownTests: true, foreignTests: false },
     riskLevel: { harmless: true, dangerous: true, critical: true },
     duration: { short: true, medium: true, long: true },
+    analyse: analyseException,
   });
   const run = parseEnvRun(String(expectResult(answer, `run ${runner}`)));
   target.logger?.info(`legacy env ${action}:\n${describeRun(run)}`);

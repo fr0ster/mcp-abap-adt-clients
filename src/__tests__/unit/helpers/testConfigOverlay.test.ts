@@ -702,3 +702,73 @@ describe('the overlay MCP_TEST_OVERLAY names', () => {
     });
   });
 });
+
+describe('a legacy system in its overlay', () => {
+  const LEGACY_CASES = [
+    'legacy_deletes',
+    'legacy_refusals_send_nothing',
+    'legacy_unit_runners',
+    'legacy_function_include',
+    'legacy_transports',
+    'legacy_transportable',
+  ];
+
+  beforeEach(() => {
+    fs.copyFileSync(
+      path.join(HELPERS, BASE_FILE),
+      path.join(directory, BASE_FILE),
+    );
+  });
+
+  it('keeps every legacy case off in the base', () => {
+    const { config } = loadTestConfigFrom(directory);
+    for (const name of LEGACY_CASES) {
+      const testCase = config.legacy_740.test_cases.find(
+        (c: { name: string }) => c.name === name,
+      );
+      expect([name, testCase.enabled]).toEqual([name, false]);
+    }
+  });
+
+  it('turns the legacy client, its checks and its package on', () => {
+    const named = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({
+        ...FULL_OVERLAY,
+        'environment.system': 'onprem',
+        'environment.is_legacy': true,
+        'environment.connection_type': 'rfc',
+        'legacy_env.software_component': 'ZCUST',
+        'legacy_env.transport_layer': 'ZL7',
+        ...Object.fromEntries(
+          LEGACY_CASES.map((name) => [
+            `legacy_740.test_cases[${name}].enabled`,
+            true,
+          ]),
+        ),
+      }),
+    );
+    const { config } = loadTestConfigFrom(directory, named);
+    expect(config.environment.is_legacy).toBe(true);
+    expect(config.environment.connection_type).toBe('rfc');
+    expect(config.legacy_env).toEqual({
+      software_component: 'ZCUST',
+      transport_layer: 'ZL7',
+    });
+    expect(
+      config.legacy_740.test_cases
+        .filter((c: { name: string }) => LEGACY_CASES.includes(c.name))
+        .map((c: { enabled: boolean }) => c.enabled),
+    ).toEqual(LEGACY_CASES.map(() => true));
+  });
+
+  it('refuses is_legacy written as a string', () => {
+    const named = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({ ...FULL_OVERLAY, 'environment.is_legacy': 'true' }),
+    );
+    expect(refusal(() => loadTestConfigFrom(directory, named))).toContain(
+      '"environment.is_legacy" must be true or false',
+    );
+  });
+});

@@ -20,6 +20,7 @@
  * npm run test:detached -- integration/legacy/LegacyRefusals
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
   AdtObjectErrorCodes,
   type AdtObjectType,
@@ -140,10 +141,15 @@ describeLegacyRfc(
               ? await utils.readObjectMetadata(
                   objectType as AdtObjectType,
                   objectName,
+                  undefined,
+                  { analyse: analyseException },
                 )
               : await utils.readObjectSource(
                   objectType as AdtSourceObjectType,
                   objectName,
+                  undefined,
+                  undefined,
+                  { analyse: analyseException },
                 );
 
           expectResult(answer, `${member}(${objectType}, ${objectName})`);

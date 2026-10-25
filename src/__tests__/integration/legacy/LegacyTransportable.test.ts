@@ -22,6 +22,7 @@
  * npm run test:detached -- integration/legacy/LegacyTransportable
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../helpers/contract';
 import { ENV_PACKAGE, requireOwnNames, status } from '../../helpers/legacyEnv';
@@ -91,7 +92,10 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
             packageName: ENV_PACKAGE,
             description: DESCRIPTION,
           },
-          { headers: integrationHeadersOf(handler, 'create') },
+          {
+            headers: integrationHeadersOf(handler, 'create'),
+            analyse: analyseException,
+          },
         ),
         `create program ${programName} in ${ENV_PACKAGE}`,
       );
@@ -122,6 +126,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
               headers: integrationHeadersOf(handler, 'update'),
               lockHandle,
               source: SOURCE,
+              analyse: analyseException,
             }),
             'write the program',
           ),
@@ -140,9 +145,17 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
       const transports = client.getRequest();
       const mark = recorder.requests.length;
 
-      const list = String(expectResult(await transports.list({}), 'list'));
+      const list = String(
+        expectResult(
+          await transports.list({ analyse: analyseException }),
+          'list',
+        ),
+      );
       const metadata = String(
-        expectResult(await transports.readMetadata({}), 'readMetadata'),
+        expectResult(
+          await transports.readMetadata({}, { analyse: analyseException }),
+          'readMetadata',
+        ),
       );
 
       const sent = sentSince(recorder, mark);
@@ -178,7 +191,10 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
         sent[2] && queryOf(sent[2], 'lockHandle'),
       );
       const read = expectFailure(
-        await handler.readMetadata({ programName }),
+        await handler.readMetadata(
+          { programName },
+          { analyse: analyseException },
+        ),
         'read after the delete',
       );
       expect(read.response?.status).toBe(404);

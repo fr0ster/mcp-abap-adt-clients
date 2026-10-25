@@ -79,6 +79,7 @@ appear; anything else is refused by name. The list:
 | `create_function_module…[adt_function_module].params.function_group_route`, `create_function_include…[adt_function_include].params.function_group_route` — `"shared"` (the base: the shared function group in the shared package) or `"default_package"` (the group in the case's or the default package, for a system with no shared package); the route's failure fails the test, the other route is never a recovery | optional |
 | `atc_run…[adt_atc_run].enabled`, `.params.check_variant`, `.params.expected_message_id`, `.params.expected_priority`; `atc_object_kinds…[adt_atc_object_kinds].enabled`, `.params.check_variant` | optional |
 | `enhancement.test_cases[program_host].params.program_name`, `[function_group_host].params.function_group_name`, `[include_host].params.include_name`, `.main_program` | optional |
+| `environment.is_legacy` (boolean), `legacy_env.software_component`, `legacy_env.transport_layer`, `legacy_740.test_cases[<case>].enabled` for each of `legacy_deletes`, `legacy_refusals_send_nothing`, `legacy_unit_runners`, `legacy_function_include`, `legacy_transports`, `legacy_transportable` — a legacy system (SAP_BASIS < 7.50): its client, its live checks (off in the base) and the transportable package of its test environment; the base's `legacy_env` placeholders are refused when the environment is built | optional |
 
 **Required** keys are those whose base line carries `# ← CHANGE` and holds only a
 placeholder: the overlay must state them (an empty string is a statement), and the
@@ -145,15 +146,14 @@ environment:
   cleanup_after_test: true
 ```
 
-A legacy system (BASIS < 7.50) is `is_legacy: true`, and its live checks need
-`connection_type: "rfc"` beside it — the legacy client is supported over RFC
-only; over HTTP they skip and say so:
+A legacy system (BASIS < 7.50) says so in its overlay, and its live checks
+need `connection_type: "rfc"` beside it — the legacy client is supported over
+RFC only; over HTTP they skip and say so:
 
 ```yaml
-environment:
-  system: "onprem"
-  connection_type: "rfc"
-  is_legacy: true
+"environment.system": "onprem"
+"environment.connection_type": "rfc"
+"environment.is_legacy": true
 ```
 
 ## shared_dependencies
@@ -298,8 +298,9 @@ The test includes pre-cleanup (delete leftovers from failed previous runs) and g
 ## legacy_740
 
 The live checks of the legacy client (`src/__tests__/integration/legacy/`) on a
-SAP_BASIS 7.40 SP04 system. Disabled in `test-config.yaml.template`; all enabled
-in `test-config.legacy-740.yaml.template`. They run only when
+SAP_BASIS 7.40 SP04 system. Off in `test-config.yaml.template`; the 7.40
+system's overlay turns each on (`legacy_740.test_cases[<case>].enabled: true`,
+the form's legacy block in `overlays/onprem.yaml`). They run only when
 `environment.is_legacy` is `true` and `environment.connection_type` is `"rfc"`.
 Every name carries the prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`,
 `Z_LG7_*`), the prefix the test environment (`npm run legacy:setup` /
@@ -314,17 +315,15 @@ Every name carries the prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`,
 | `legacy_transports` | none |
 | `legacy_transportable` | `program_name`: created in package `ZLG7_TEST` on the environment's request |
 
-The 7.40 template also carries `legacy_env` — `software_component` and
-`transport_layer` of the transportable package `ZLG7_TEST` the environment
-creates.
+The 7.40 system's overlay also sets `legacy_env.software_component` and
+`legacy_env.transport_layer` — the transportable package `ZLG7_TEST` the
+environment creates. The base holds placeholders there, which the environment
+refuses.
 
 ```yaml
-legacy_740:
-  test_cases:
-    - name: "legacy_transports"
-      enabled: true
-      available_in: ["legacy"]
-      params: {}
+"legacy_env.software_component": "ZCUSTOMER"
+"legacy_env.transport_layer": "ZXYZ"
+"legacy_740.test_cases[legacy_transports].enabled": true
 ```
 
 ## Notes

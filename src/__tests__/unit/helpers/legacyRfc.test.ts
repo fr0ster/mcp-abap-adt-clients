@@ -9,7 +9,6 @@ describe('legacy RFC gate', () => {
       legacyRfcSkipReason({
         isLegacy: () => false,
         connectionType: () => 'rfc',
-        explicitConfigPath: () => undefined,
       }),
     ).toBe(NOT_LEGACY);
   });
@@ -19,7 +18,6 @@ describe('legacy RFC gate', () => {
       legacyRfcSkipReason({
         isLegacy: () => false,
         connectionType: () => 'http',
-        explicitConfigPath: () => undefined,
       }),
     ).toBe(NOT_LEGACY);
   });
@@ -29,7 +27,6 @@ describe('legacy RFC gate', () => {
       legacyRfcSkipReason({
         isLegacy: () => true,
         connectionType: () => 'http',
-        explicitConfigPath: () => undefined,
       }),
     ).toBe(RFC_ONLY);
   });
@@ -39,35 +36,20 @@ describe('legacy RFC gate', () => {
       legacyRfcSkipReason({
         isLegacy: () => true,
         connectionType: () => 'rfc',
-        explicitConfigPath: () => undefined,
       }),
     ).toBeUndefined();
   });
 
-  it('reads a configuration that cannot be loaded as not legacy, when none was named', () => {
-    expect(
-      legacyRfcSkipReason({
-        isLegacy: () => {
-          throw new Error('no config');
-        },
-        connectionType: () => 'rfc',
-        explicitConfigPath: () => undefined,
-      }),
-    ).toBe(NOT_LEGACY);
-  });
-
-  // A configuration named through MCP_TEST_CONFIG_PATH is the 7.40 run's own:
-  // when it cannot be read, skipping as "not a legacy configuration" would
-  // report a run that never happened as a deliberate skip.
-  it('fails, naming the path, when the named configuration cannot be read', () => {
+  // Read as "not legacy", a configuration that cannot be loaded would report
+  // a run that never happened as a deliberate skip.
+  it('fails with the fault when the configuration cannot be read', () => {
     expect(() =>
       legacyRfcSkipReason({
         isLegacy: () => {
-          throw new Error('does not exist');
+          throw new Error('test-config.overlay.sys.yaml is not usable');
         },
         connectionType: () => 'rfc',
-        explicitConfigPath: () => '/configs/legacy-740.yaml',
       }),
-    ).toThrow(/MCP_TEST_CONFIG_PATH.*\/configs\/legacy-740\.yaml/);
+    ).toThrow('test-config.overlay.sys.yaml is not usable');
   });
 });

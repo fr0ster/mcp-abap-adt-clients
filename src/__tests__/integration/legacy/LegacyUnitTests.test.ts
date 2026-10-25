@@ -18,6 +18,7 @@
  * npm run test:detached -- integration/legacy/LegacyUnitTests
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { expectResult } from '../../helpers/contract';
 import {
@@ -74,7 +75,7 @@ function methodsOf(document: string): string[] {
 
 interface RunCase {
   readonly title: string;
-  readonly run: (session: LegacySession) => Promise<IAdtResponse<unknown>>;
+  readonly call: (session: LegacySession) => Promise<IAdtResponse<unknown>>;
 }
 
 function runCases(params: CaseParams): RunCase[] {
@@ -85,35 +86,56 @@ function runCases(params: CaseParams): RunCase[] {
   return [
     {
       title: 'class run',
-      run: (s) => s.executor.getClassTestRunner().run(className()),
+      call: (s) =>
+        s.executor
+          .getClassTestRunner()
+          .run(className(), { analyse: analyseException }),
     },
     {
       title: 'class runSync',
-      run: (s) => s.executor.getClassTestRunner().runSync(className()),
+      call: (s) =>
+        s.executor
+          .getClassTestRunner()
+          .runSync(className(), { analyse: analyseException }),
     },
     {
       title: 'program run',
-      run: (s) => s.executor.getProgramTestRunner().run(programName()),
+      call: (s) =>
+        s.executor
+          .getProgramTestRunner()
+          .run(programName(), { analyse: analyseException }),
     },
     {
       title: 'program runSync',
-      run: (s) => s.executor.getProgramTestRunner().runSync(programName()),
+      call: (s) =>
+        s.executor
+          .getProgramTestRunner()
+          .runSync(programName(), { analyse: analyseException }),
     },
     {
       title: 'function group run',
-      run: (s) => s.executor.getFunctionGroupTestRunner().run(groupName()),
+      call: (s) =>
+        s.executor
+          .getFunctionGroupTestRunner()
+          .run(groupName(), { analyse: analyseException }),
     },
     {
       title: 'function group runSync',
-      run: (s) => s.executor.getFunctionGroupTestRunner().runSync(groupName()),
+      call: (s) =>
+        s.executor
+          .getFunctionGroupTestRunner()
+          .runSync(groupName(), { analyse: analyseException }),
     },
     {
       title: 'function module runSync',
-      run: (s) =>
-        s.executor.getFunctionModuleTestRunner().runSync({
-          functionGroupName: groupName(),
-          functionModuleName: moduleName(),
-        }),
+      call: (s) =>
+        s.executor.getFunctionModuleTestRunner().runSync(
+          {
+            functionGroupName: groupName(),
+            functionModuleName: moduleName(),
+          },
+          { analyse: analyseException },
+        ),
     },
   ];
 }
@@ -131,12 +153,12 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — ABAP Unit runners', () => {
       await closeLegacySession(session);
     });
 
-    for (const { title, run } of runCases(params)) {
+    for (const { title, call } of runCases(params)) {
       it(`${title} sends one testruns POST with <options> and answers the methods`, async () => {
         const { recorder } = current();
         const mark = recorder.requests.length;
 
-        const document = String(expectResult(await run(current()), title));
+        const document = String(expectResult(await call(current()), title));
 
         const sent = sentSince(recorder, mark);
         expect(sent.map(lineOf)).toEqual([TESTRUNS]);

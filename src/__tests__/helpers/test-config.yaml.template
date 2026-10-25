@@ -154,8 +154,8 @@ environment:
                                               #   (/sap/bc/adt/xslt/validation). On: any refusal (404 included)
                                               #   fails. Off: not sent, and the run says so. false where the
                                               #   system has no such resource (404, measured on premise).
-  # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
-  # is_legacy: true         # Uncomment for BASIS < 7.50 systems (for example a legacy system). Also set SAP_UNICODE=false in .env for non-unicode systems.
+  # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type. Set in the overlay.
+  # is_legacy: true         # BASIS < 7.50 systems: set in the overlay. Also set SAP_UNICODE=false in the session .env for non-unicode systems.
 
 # Shared dependencies — persistent Lego library for integration tests
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
@@ -3234,11 +3234,20 @@ batch:
       enabled: false
       available_in: ["onprem", "cloud"]
 
+# The transportable package ZLG7_TEST the legacy test environment creates
+# (npm run legacy:setup) and removes (legacy:teardown). Set in a legacy
+# system's overlay; the helper admits A-Z, 0-9, _ and / only, so a placeholder
+# left here is refused when the environment is built.
+legacy_env:
+  software_component: "<SOFTWARE_COMPONENT>"  # the system's customer component
+  transport_layer: "<TRANSPORT_LAYER>"        # the system's transport layer (up to 4 characters)
+
 # Live checks of the legacy client (AdtClientLegacy, AdtExecutorLegacy) on a
 # SAP_BASIS 7.40 SP04 system. They run only when environment.is_legacy is true
 # and environment.connection_type is "rfc"; elsewhere they skip and say why.
-# Disabled by default. The 7.40 system has a configuration of its own:
-# test-config.legacy-740.yaml.template, loaded through MCP_TEST_CONFIG_PATH.
+# Disabled by default. The 7.40 system's overlay turns them on, with
+# environment.is_legacy: true, environment.connection_type: "rfc" and the
+# legacy_env values (see overlays/onprem.yaml).
 #
 # Every name here carries the prefix ZLG7 (ZCL_LG7_*, ZIF_LG7_*, ZLG7_*,
 # Z_LG7_*): the test environment (npm run legacy:setup / legacy:teardown,

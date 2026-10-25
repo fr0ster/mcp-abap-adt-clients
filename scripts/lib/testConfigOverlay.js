@@ -41,7 +41,12 @@ const OVERLAY_FILE = 'test-config.overlay.yaml';
 /** The pre-overlay local config. Refused when present. */
 const OLD_FULL_FILE = 'test-config.yaml';
 const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
-const HELPERS_DIRECTORY = path.join(REPOSITORY_ROOT, 'src', '__tests__', 'helpers');
+const HELPERS_DIRECTORY = path.join(
+  REPOSITORY_ROOT,
+  'src',
+  '__tests__',
+  'helpers',
+);
 /** The variable that names the overlay a run reads. */
 const OVERLAY_VARIABLE = 'MCP_TEST_OVERLAY';
 
@@ -90,12 +95,22 @@ const TRANSPORT = 'create_transport.test_cases[builder_transport].params';
 const SCALAR = 'create_scalar_function.test_cases[adt_scalar_function].params';
 const SCALAR_IMPL =
   'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].params';
-const APPEND = 'create_append_structure.test_cases[adt_append_structure].params';
+const APPEND =
+  'create_append_structure.test_cases[adt_append_structure].params';
 const ATC_RUN = 'atc_run.test_cases[adt_atc_run]';
 const FEATURE_TOGGLE = 'create_feature_toggle.test_cases[adt_feature_toggle]';
 const CHECK_RUN = 'check_run.test_cases[class_check]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
+/** The live checks of the legacy client, off in the base. */
+const LEGACY_CASES = [
+  'legacy_deletes',
+  'legacy_refusals_send_nothing',
+  'legacy_unit_runners',
+  'legacy_function_include',
+  'legacy_transports',
+  'legacy_transportable',
+];
 
 const ALLOWED_OVERLAY_KEYS = Object.freeze(
   [
@@ -134,12 +149,18 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${APPEND}.append_structure_name`, {}],
     // Whether a case runs on this system is the configuration's: a refusal
     // fails the test, it never turns into a skip.
-    ['create_scalar_function.test_cases[adt_scalar_function].enabled', { type: 'boolean' }],
+    [
+      'create_scalar_function.test_cases[adt_scalar_function].enabled',
+      { type: 'boolean' },
+    ],
     [
       'create_scalar_function_implementation.test_cases[adt_scalar_function_implementation].enabled',
       { type: 'boolean' },
     ],
-    ['create_append_structure.test_cases[adt_append_structure].enabled', { type: 'boolean' }],
+    [
+      'create_append_structure.test_cases[adt_append_structure].enabled',
+      { type: 'boolean' },
+    ],
     [`${FEATURE_TOGGLE}.enabled`, { type: 'boolean' }],
     [`${CHECK_RUN}.enabled`, { type: 'boolean' }],
     // Where the function module / include flows get their function group:
@@ -165,6 +186,16 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${ENHANCEMENT}[function_group_host].params.function_group_name`, {}],
     [`${ENHANCEMENT}[include_host].params.include_name`, {}],
     [`${ENHANCEMENT}[include_host].params.main_program`, {}],
+    // A legacy system (SAP_BASIS < 7.50): the legacy client, its live checks
+    // (over RFC only) and the transportable package its test environment
+    // creates (`npm run legacy:setup`).
+    ['environment.is_legacy', { type: 'boolean' }],
+    ['legacy_env.software_component', {}],
+    ['legacy_env.transport_layer', {}],
+    ...LEGACY_CASES.map((name) => [
+      `legacy_740.test_cases[${name}].enabled`,
+      { type: 'boolean' },
+    ]),
   ].map(([keyPath, rule]) =>
     Object.freeze({
       path: keyPath,
@@ -266,7 +297,9 @@ function invalidValue(rule, value) {
     return 'has no value (an empty entry is not "unset" — write the value, or "" where that is allowed)';
   }
   if (rule.type === 'boolean') {
-    return typeof value === 'boolean' ? null : 'must be true or false, unquoted';
+    return typeof value === 'boolean'
+      ? null
+      : 'must be true or false, unquoted';
   }
   if (rule.type === 'integer') {
     return Number.isInteger(value) ? null : 'must be an integer';
@@ -317,8 +350,12 @@ function leftoverPlaceholders(config) {
       );
     } else if (Array.isArray(node)) {
       node.forEach((item, index) => {
-        const name = isObject(item) && typeof item.name === 'string' ? item.name : null;
-        scan(item, name === null ? `${prefix}[${index}]` : `${prefix}[${name}]`);
+        const name =
+          isObject(item) && typeof item.name === 'string' ? item.name : null;
+        scan(
+          item,
+          name === null ? `${prefix}[${index}]` : `${prefix}[${name}]`,
+        );
       });
     } else if (isObject(node)) {
       for (const [key, value] of Object.entries(node)) {
@@ -410,7 +447,9 @@ function loadTestConfigFrom(directory = HELPERS_DIRECTORY, namedOverlay) {
   }
   const basePath = path.join(directory, BASE_FILE);
   if (!fs.existsSync(basePath)) {
-    throw new TestConfigError(`${basePath} not found — the base is tracked in git.`);
+    throw new TestConfigError(
+      `${basePath} not found — the base is tracked in git.`,
+    );
   }
   const base = yaml.parse(fs.readFileSync(basePath, 'utf8')) || {};
   const overlayPath = overlayPathOf(directory, namedOverlay);
@@ -423,8 +462,15 @@ function loadTestConfigFrom(directory = HELPERS_DIRECTORY, namedOverlay) {
     return { config: base, source: 'base-only' };
   }
   const label = path.basename(overlayPath);
-  const overlay = parseOverlay(fs.readFileSync(overlayPath, 'utf8'), yaml, label);
-  return { config: applyOverlay(base, overlay, label), source: 'base-and-overlay' };
+  const overlay = parseOverlay(
+    fs.readFileSync(overlayPath, 'utf8'),
+    yaml,
+    label,
+  );
+  return {
+    config: applyOverlay(base, overlay, label),
+    source: 'base-and-overlay',
+  };
 }
 
 /** The value at `keyPath` in `config`, or `undefined` when the path is absent. */
@@ -471,7 +517,11 @@ function migrateFullConfig(directory = HELPERS_DIRECTORY, namedOverlay) {
   const missing = [];
   for (const rule of ALLOWED_OVERLAY_KEYS) {
     const value = readAt(old, rule.path);
-    if (value !== undefined && !isPlaceholder(value) && invalidValue(rule, value) === null) {
+    if (
+      value !== undefined &&
+      !isPlaceholder(value) &&
+      invalidValue(rule, value) === null
+    ) {
       overlay[rule.path] = value;
     } else if (rule.required) {
       missing.push(rule.path);

@@ -126,22 +126,21 @@ npm test -- integration/core/functionGroup
 DEBUG_ADT_TESTS=true npm test -- integration/core/class
 ```
 
-## The 7.40 system: a configuration and an environment of its own
+## The 7.40 system: an overlay and an environment of its own
 
 The live checks of the legacy client (`src/__tests__/integration/legacy/`) run
-against a SAP_BASIS 7.40 SP04 system over RFC, with a configuration of their own
-— not the main system's `test-config.yaml`:
+against a SAP_BASIS 7.40 SP04 system over RFC. Like any system, it has an
+overlay of its own over the tracked base, named for every run by
+`MCP_TEST_OVERLAY` (see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 
-- `src/__tests__/helpers/test-config.legacy-740.yaml.template`: copy it to
-  `test-config.legacy-740.yaml` (gitignored) and edit the lines marked
-  `# ← CHANGE` (the system ID, and the software component and transport layer of
-  the transportable package the environment creates). Only the `legacy_740`
-  cases are in it, all enabled; `is_legacy: true`, `connection_type: "rfc"`.
-- `MCP_TEST_CONFIG_PATH` names the configuration a run loads. Set, it is that
-  file or the run fails naming it — there is no fallback to `test-config.yaml`
-  or a template. `npm run check:config` then compares it with the template
-  beside it (`<file>.template`). `MCP_ENV_PATH` names the `.env` with that
-  system's credentials.
+- `MCP_TEST_OVERLAY=src/__tests__/helpers/test-config.overlay.<system>.yaml npm run test:init -- onprem`,
+  then fill in the required keys and, from the form's legacy block:
+  `environment.is_legacy: true`, `environment.connection_type: "rfc"`,
+  `legacy_env.software_component` and `legacy_env.transport_layer` (the
+  transportable package the environment creates), and `enabled: true` for each
+  `legacy_740` case. The base keeps every `legacy_740` case off.
+- `MCP_ENV_PATH` names the session `.env` with that system's credentials
+  (`SAP_UNICODE=false` for a non-unicode system).
 
 The objects the checks need are prepared and removed by ABAP classes in the
 system, one call each (the idea of mcp-test's environment classes): 7.40 SP04
@@ -171,8 +170,8 @@ A run of the live checks uses the fixtures and leaves them; only
 `legacy:teardown` removes them.
 
 ```bash
-export MCP_TEST_CONFIG_PATH=src/__tests__/helpers/test-config.legacy-740.yaml
-export MCP_ENV_PATH=$HOME/<the 7.40 system>.env
+export MCP_TEST_OVERLAY=src/__tests__/helpers/test-config.overlay.<system>.yaml
+export MCP_ENV_PATH=$HOME/.config/mcp-abap-adt/sessions/<system>.env
 export SAPNWRFC_HOME=$HOME/sap/nwrfcsdk PATH=$HOME/sap/nwrfcsdk/lib:$PATH \
   LD_LIBRARY_PATH=$HOME/.local/lib/sap-rfc-lite:$HOME/sap/nwrfcsdk/lib:$LD_LIBRARY_PATH
 npm run legacy:setup
@@ -186,7 +185,7 @@ Written, not yet run: no result of theirs is recorded in `docs/architecture/LEGA
 Each runs under `describeLegacyRfc` — only when the loaded configuration says
 `is_legacy: true` and `connection_type: "rfc"`, a skipped test naming the reason
 otherwise — and every case is a `legacy_740` test case of the configuration
-(`enabled: false` in `test-config.yaml.template`, enabled in the 7.40 template).
+(`enabled: false` in `test-config.yaml.template`, enabled in the 7.40 system's overlay).
 Refused members are asserted on a wire recorder (`helpers/requestRecorder.ts`),
 not on a log: nothing may leave.
 
@@ -200,8 +199,8 @@ not on a log: nothing may leave.
 | `LegacyTransportable.test.ts` | `legacy_transportable` | in package `ZLG7_TEST` on the environment's request: create, lock → update with `corrNr` → unlock; the list and `readMetadata` name the request; lock → `DELETE ?lockHandle=&corrNr=` → unlock — measures what is not yet measured (a delete with `corrNr`, a populated list) |
 
 Run them as shown above: `npm run legacy:setup`, then
-`npm run test:detached -- integration/legacy`, with `MCP_TEST_CONFIG_PATH` naming
-the 7.40 configuration and `MCP_ENV_PATH` its `.env`.
+`npm run test:detached -- integration/legacy`, with `MCP_TEST_OVERLAY` naming
+the 7.40 system's overlay and `MCP_ENV_PATH` its `.env`.
 
 ## RFC-Specific Considerations
 

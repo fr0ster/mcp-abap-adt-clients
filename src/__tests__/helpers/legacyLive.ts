@@ -9,9 +9,15 @@
  * them: lock, `DELETE ?lockHandle=`, unlock.
  */
 
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
+  IAdtDeletable,
   IAdtError,
-  IAdtHeaders,
+  IAdtLockable,
+  IAdtMetadataReadable,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -23,6 +29,7 @@ import { AdtExecutorLegacy } from '../../clients/AdtExecutorLegacy';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
+import { judged } from './judged';
 import { presenceOf } from './objectPresence';
 import {
   type RecordedRequest,
@@ -145,27 +152,17 @@ export function stepOf(request: RecordedRequest): string {
   return queryOf(request, '_action') ?? request.method;
 }
 
-/** A handler whose object is locked and unlocked. */
-export interface LegacyLockable<C> {
-  lock<E extends IAdtError = IAdtError>(
-    config: C,
-  ): Promise<IAdtResponse<string, E>>;
-  unlock<E extends IAdtError = IAdtError>(
-    config: C,
-    lockHandle: string,
-  ): Promise<IAdtResponse<void, E>>;
-}
+/**
+ * A handler whose object is locked and unlocked. Built from the contract, so
+ * every member keeps its `analyse` option.
+ */
+export type LegacyLockable<C> = IAdtLockable<C>;
 
 /** A handler deleted as 7.40 SP04 deletes: lock, delete with the handle, unlock. */
-export interface LegacyDeletable<C> extends LegacyLockable<C> {
-  readMetadata<E extends IAdtError = IAdtError>(
-    config: C,
-  ): Promise<IAdtResponse<unknown, E>>;
-  delete<E extends IAdtError = IAdtError>(
-    config: C,
-    options: { headers: IAdtHeaders; lockHandle?: string },
-  ): Promise<IAdtResponse<unknown, E>>;
-}
+export interface LegacyDeletable<C>
+  extends LegacyLockable<C>,
+    IAdtMetadataReadable<C, unknown>,
+    Pick<IAdtDeletable<C, unknown>, 'delete'> {}
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -179,7 +176,9 @@ async function unlockProblem<C>(
   label: string,
 ): Promise<string | undefined> {
   try {
-    const answer = await handler.unlock(config, lockHandle);
+    const answer = await handler.unlock(config, lockHandle, {
+      analyse: analyseException,
+    });
     if (answer.ok) return undefined;
     const failure = answer.getError();
     return `unlock ${label} failed [${failure.origin}]: ${failure.message}`;
@@ -202,7 +201,10 @@ export async function withLock<C, T>(
   body: (lockHandle: string) => Promise<T>,
 ): Promise<T> {
   const lockHandle = String(
-    expectResult(await handler.lock(config), `lock ${label}`),
+    expectResult(
+      await handler.lock(config, { analyse: analyseException }),
+      `lock ${label}`,
+    ),
   );
   let result: T;
   try {
@@ -240,6 +242,7 @@ export async function deleteLocked<C>(
     handler.delete(config, {
       headers: integrationHeadersOf(handler, 'delete'),
       lockHandle,
+      analyse: judged(analyseDeletion),
     }),
   );
 }
@@ -261,7 +264,12 @@ export async function requireAbsent(
   objects: readonly LegacyObject[],
 ): Promise<void> {
   for (const o of objects) {
-    const there = presenceOf(await o.handler().readMetadata(o.config), o.label);
+    const there = presenceOf(
+      await o.handler().readMetadata(o.config, {
+        analyse: analyseException,
+      }),
+      o.label,
+    );
     if (there.present === 'unknown') throw new Error(there.reason);
     if (there.present)
       throw new Error(
@@ -284,7 +292,9 @@ export async function removeCreated(
   for (const o of created) {
     try {
       const there = presenceOf(
-        await o.handler().readMetadata(o.config),
+        await o.handler().readMetadata(o.config, {
+          analyse: analyseException,
+        }),
         o.label,
       );
       if (there.present === 'unknown') throw new Error(there.reason);

@@ -18,6 +18,7 @@
  * enabled: npm run test:detached -- integration/legacy/LegacyDelete
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../helpers/contract';
@@ -77,7 +78,10 @@ function subjects(session: () => LegacySession, params: CaseParams) {
           .getClass()
           .create(
             { ...cls, ...local },
-            { headers: integrationHeadersOf(client().getClass(), 'create') },
+            {
+              headers: integrationHeadersOf(client().getClass(), 'create'),
+              analyse: analyseException,
+            },
           ),
       refusesWithoutHandle: true,
     },
@@ -91,7 +95,10 @@ function subjects(session: () => LegacySession, params: CaseParams) {
           .getProgram()
           .create(
             { ...prog, ...local },
-            { headers: integrationHeadersOf(client().getProgram(), 'create') },
+            {
+              headers: integrationHeadersOf(client().getProgram(), 'create'),
+              analyse: analyseException,
+            },
           ),
       refusesWithoutHandle: true,
     },
@@ -107,6 +114,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
             { ...intf, ...local },
             {
               headers: integrationHeadersOf(client().getInterface(), 'create'),
+              analyse: analyseException,
             },
           ),
       refusesWithoutHandle: true,
@@ -126,6 +134,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
                 client().getFunctionGroup(),
                 'create',
               ),
+              analyse: analyseException,
             },
           ),
       refusesWithoutHandle: true,
@@ -145,6 +154,7 @@ function subjects(session: () => LegacySession, params: CaseParams) {
                 client().getFunctionModule(),
                 'create',
               ),
+              analyse: analyseException,
             },
           ),
       refusesWithoutHandle: false,
@@ -159,7 +169,10 @@ function subjects(session: () => LegacySession, params: CaseParams) {
           .getDdl()
           .create(
             { ...ddl, ...local },
-            { headers: integrationHeadersOf(client().getDdl(), 'create') },
+            {
+              headers: integrationHeadersOf(client().getDdl(), 'create'),
+              analyse: analyseException,
+            },
           ),
       refusesWithoutHandle: false,
     },
@@ -223,6 +236,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — delete', () => {
         const failure = expectFailure(
           await s.handler().delete(s.config, {
             headers: integrationHeadersOf(s.handler(), 'delete'),
+            analyse: analyseException,
           }),
           `delete ${s.label} without a handle`,
         );
@@ -232,7 +246,9 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — delete', () => {
         expect(sent.map(lineOf)).toEqual([expect.stringMatching(/^DELETE /)]);
         expect(queryOf(sent[0], 'lockHandle')).toBeUndefined();
         expectResult(
-          await s.handler().readMetadata(s.config),
+          await s.handler().readMetadata(s.config, {
+            analyse: analyseException,
+          }),
           `read ${s.label} after the refused delete`,
         );
       }, 120000);
@@ -264,7 +280,9 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — delete', () => {
         expect(sent.map((r) => r.status)).toEqual([200, 200, 200]);
 
         const after = expectFailure(
-          await s.handler().readMetadata(s.config),
+          await s.handler().readMetadata(s.config, {
+            analyse: analyseException,
+          }),
           `read ${s.label} after the delete`,
         );
         expect(after.response?.status).toBe(404);
