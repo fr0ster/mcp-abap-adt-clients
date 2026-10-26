@@ -22,7 +22,7 @@ export PATH=$SAPNWRFC_HOME/lib:$PATH
 export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 ```
 
-> **Important:** `dotenv` does not expand `$PATH`/`%PATH%` or `~`, so these variables cannot be set via `.env` files. They must be set in the shell session before running tests.
+> **Important:** `dotenv` does not expand `$PATH`/`%PATH%` or `~`, so these variables cannot be set via session files. They must be set in the shell session before running tests.
 
 ### The binding: prebuilt, no install script
 
@@ -65,16 +65,16 @@ written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 "environment.default_master_system": "SID"
 ```
 
-`SAP_AUTH_TYPE` is required in every `.env` (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the test session config then overrides `authType` to `"rfc"`.
+`SAP_AUTH_TYPE` is required in every session file (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the test session config then overrides `authType` to `"rfc"`.
 
 `system` is separate from `connection_type` and both are required: the first says
 which system is on the other end, the second says how to reach it. RFC is an
 on-prem transport, but stating one does not state the other — the helper builds
 the connection from both.
 
-### .env Files
+### Session files
 
-System-specific `.env` files (e.g., `<system>.env`, `<other-system>.env`) contain SAP credentials:
+System-specific session files (`~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows) contain SAP credentials. The repository holds no `.env`; a run names its file with `MCP_ENV_PATH` (the helpers read the repository's `.env` only when it is unset). The file must carry `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`; keep it in the session directory, mode 600:
 
 ```env
 SAP_URL=http://saphost:8000
@@ -95,9 +95,9 @@ Controls the `chkrun:contentType` attribute in checkRun XML payloads for class i
 If this is set incorrectly, checkRun returns `notProcessed` with `"Dirty Source: Wrong content type"`.
 The value is read in `resolveSystemContext()` and passed to `AdtContentTypesBase(unicode)` which provides `sourceArtifactContentType()`.
 
-Copy the appropriate file to `.env` before running tests:
+Name the appropriate file before running tests:
 ```bash
-cp <system>.env .env
+MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/<system>.env npm test -- <path>
 ```
 
 Or pass variables inline:
