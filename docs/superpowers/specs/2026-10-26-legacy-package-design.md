@@ -2,8 +2,8 @@
 
 Answers `docs/superpowers/2026-10-26-legacy-package-goal.md`.
 
-The facts below were measured on SAP_BASIS 7.40 SP04 over RFC (E77). The
-probe records are outside the repository, in `~/prj/e77-probe/e77-results/`:
+The facts below were measured on SAP_BASIS 7.40 SP04 over RFC (the 7.40 test system). The
+probe records are outside the repository, in `the probe records directory outside the repository (`<probe records>/`)`:
 - B2-reads;
 - B3-cycle;
 - B3-deletes;

@@ -21,7 +21,7 @@ all.
 
 The legacy classes are finally tested as a whole. The create → lock →
 update → unlock → activate → read → check → delete cycles that worked on
-7.40 in the hand-run probes (records B2 and B3 in `~/prj/e77-probe/`) become
+7.40 in the hand-run probes (records B2 and B3 in the probe records outside the repository) become
 live tests in the repository, one cycle per object type.
 
 ## Why

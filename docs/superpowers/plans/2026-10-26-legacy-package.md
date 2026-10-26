@@ -13,7 +13,7 @@ prove every handler 7.40 serves with one live cycle per type.
 3. The package skeleton is created.
 4. The compiler drives the move: what the legacy classes need from the root
    is exported, and legacy leaves the root.
-5. The live cycles are written in the package and run on E77.
+5. The live cycles are written in the package and run on the 7.40 system.
 6. The docs and versions follow.
 
 **Tech Stack:**
@@ -26,7 +26,7 @@ prove every handler 7.40 serves with one live cycle per type.
 **Spec:** `docs/superpowers/specs/2026-10-26-legacy-package-design.md`.
 **Goal doc:** `docs/superpowers/2026-10-26-legacy-package-goal.md`.
 **Measurements:** the B2, B3, B4 and class-metadata-accept records in
-`~/prj/e77-probe/e77-results/`.
+`the probe records directory outside the repository (`<probe records>/`)`.
 
 ## Global Constraints
 
@@ -45,9 +45,9 @@ prove every handler 7.40 serves with one live cycle per type.
 - Commits end with the attribution lines. Work only in
   `.worktrees/legacy-package`, branch `feat/legacy-package`, PR #281.
 - **Live runs:**
-  - check the realm `[E77/182]` without logon before each;
+  - check the realm `of the 7.40 system` without logon before each;
   - `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e77-run.env`,
-    `MCP_TEST_OVERLAY` = the E77 overlay;
+    `MCP_TEST_OVERLAY` = the 7.40 overlay;
   - the test user only;
   - any credential refusal stops everything;
   - never release a transport;
@@ -399,15 +399,15 @@ prove every handler 7.40 serves with one live cycle per type.
   - add it to `scripts/lib/testConfigOverlay.js`' known keys and to
     `helpers/overlays/onprem.yaml` where the existing `legacy_740` cases
     are;
-  - enable it in the E77 overlay
-    (`src/__tests__/helpers/test-config.overlay.e77.yaml`, gitignored, and
+  - enable it in the 7.40 overlay
+    (`src/__tests__/helpers/test-config.overlay.<7.40 system>.yaml`, gitignored, and
     so edited locally by the controller).
 
   The overlay validation unit tests cover the new keys.
 - [ ] Step 4: Type check and lint. These tests run live only in Task 6.
 - [ ] Step 5: Commit: `test(legacy): one live cycle per type 7.40 serves, and the utils readers`.
 
-### Task 6: Run the cycles on E77
+### Task 6: Run the cycles on the 7.40 system
 
 **Files:**
 - Modify only what the run proves wrong:
