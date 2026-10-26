@@ -22,7 +22,7 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [37.3.0] - 2026-10-24
+## [37.3.0] - 2026-10-26
 
 The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) now matches what a
 SAP_BASIS 7.40 SP04 system serves through ADT, **measured on SAP_BASIS 7.40 SP04
@@ -113,10 +113,34 @@ with the full account and the probe record and step behind every claim.
   `is_legacy: true` and `connection_type: "rfc"` (the 7.40 system's overlay,
   named by `MCP_TEST_OVERLAY`, turns them on; the base keeps them off) and
   skip with the reason elsewhere;
-  `npm run legacy:setup`, `legacy:status` and `legacy:teardown` manage the
-  environment (prefix `ZLG7`, its classes run through ABAP Unit), described in
-  `docs/development/RFC_TESTING.md`. **The live checks are written and have not
-  yet been run on the system; no result of theirs is recorded.**
+  `npm run legacy:setup`, `legacy:status`, `legacy:teardown` and
+  `legacy:uninstall` manage the environment (prefix `ZLG7`), described in
+  `docs/development/RFC_TESTING.md`. **Run on SAP_BASIS 7.40 SP04 over RFC on
+  2026-10-26: all six suites, 366 of 366 checks, passed.**
+- **A manual runner for the environment.** Where ABAP Unit may not run the env
+  runner classes (a client's `SAUNIT_CLIENT_SETUP` limits the risk level below
+  `DANGEROUS`, as measured on the 7.40 system), `legacy_env.runner: manual`
+  installs `ZCL_LG7_ENV_RUN`, whose static `PREPARE` / `STATUS` / `TEARDOWN` /
+  `REMOVE` the test user runs in SE24; the npm scripts do the ADT steps around
+  them, and `LEGACY_ENV_REQUEST` hands the request to the transportable check.
+- **The environment touches only the test user's objects.** Every object in
+  scope, `$TMP` and `ZLG7_TEST` alike, must have the test user as its TADIR
+  author; the package `ZLG7_TEST` is adopted or deleted only when its owner is
+  the test user; an existing fixture is rewritten only when its own metadata
+  names the test user (on 7.40 a function module's names no one, so it is never
+  replaced); a source is skipped only when its active version matches, and an
+  activation is read back. A transportable object deleted under the request is
+  reported as recorded there, its TADIR row left to the request. `TEARDOWN`
+  deletes the function group `ZLG7_FX` whole.
+- **The request recorder of the live checks records each request once.** A
+  client's request trace wrote through the recorder's Proxy onto the real
+  connection, so every request was recorded twice and a deny recorder denied
+  another session's reads; the recorder now keeps what is written through it.
+- **The class metadata read on 7.40 takes the caller's Accept.** Measured:
+  `GET /sap/bc/adt/oo/classes/<name>` answers only
+  `application/vnd.sap.adt.oo.classes+xml`; every list naming a version answers
+  `400 ExceptionContentHandlerNotFound`. The library passes the caller's
+  `accept`; the live check sends that media type, as a legacy server will.
 
 ### Not measured on 7.40 SP04
 
