@@ -139,18 +139,19 @@ describeLegacyRfc(
           ]);
 
           mark = at();
-          group.markCreated();
           expectResult(
-            await group.handler.create(
-              {
-                functionGroupName: groupName,
-                packageName: LOCAL_PACKAGE,
-                description: DESCRIPTION,
-              },
-              {
-                headers: integrationHeadersOf(group.handler, 'create'),
-                analyse: analyseException,
-              },
+            await group.createOwned(() =>
+              group.handler.create(
+                {
+                  functionGroupName: groupName,
+                  packageName: LOCAL_PACKAGE,
+                  description: DESCRIPTION,
+                },
+                {
+                  headers: integrationHeadersOf(group.handler, 'create'),
+                  analyse: analyseException,
+                },
+              ),
             ),
             'create group',
           );
@@ -193,18 +194,19 @@ describeLegacyRfc(
           ]);
 
           mark = at();
-          module.markCreated();
           expectResult(
-            await module.handler.create(
-              {
-                functionGroupName: groupName,
-                functionModuleName: moduleName,
-                description: DESCRIPTION,
-              },
-              {
-                headers: integrationHeadersOf(module.handler, 'create'),
-                analyse: analyseException,
-              },
+            await module.createOwned(() =>
+              module.handler.create(
+                {
+                  functionGroupName: groupName,
+                  functionModuleName: moduleName,
+                  description: DESCRIPTION,
+                },
+                {
+                  headers: integrationHeadersOf(module.handler, 'create'),
+                  analyse: analyseException,
+                },
+              ),
             ),
             'create module',
           );

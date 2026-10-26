@@ -6,8 +6,9 @@
  * A cycle creates its own objects in `$TMP` (no transport) and deletes them
  * itself, as its last steps. The cleanup behind it ({@link runCycle}) is the
  * net for a cycle that stopped half-way: it touches only an object this run
- * created — a name it proved free (`validate`) and absent before the create —
- * releases a lock the run still holds with that very handle, deletes what is
+ * created — a name it proved free (`validate`) and absent before a create
+ * that answered ok; after a create that failed it deletes nothing and names
+ * the object if it is there — releases a lock the run still holds with that very handle, deletes what is
  * still there (lock, `DELETE ?lockHandle=`, unlock, as 7.40 SP04 deletes),
  * reads it back, and names every object left behind.
  */
@@ -75,8 +76,8 @@ function messageOf(error: unknown): string {
 
 /**
  * One object of a cycle. It may be removed only once this run created it:
- * {@link requireFree} proves the name free first, {@link markCreated} records
- * that the create went out. The lock the run holds on it is kept here, so a
+ * {@link requireFree} proves the name free first, {@link createOwned} records
+ * that the create answered ok. The lock the run holds on it is kept here, so a
  * cycle that stops between `lock` and `unlock` is cleaned with that handle.
  */
 export class CycleObject<
@@ -84,6 +85,8 @@ export class CycleObject<
   H extends LegacyCycleHandler<C> = LegacyCycleHandler<C>,
 > {
   private created = false;
+  /** The create went out and did not answer ok: never this run's to delete. */
+  private createFailed = false;
   private heldHandle: string | undefined;
 
   constructor(private readonly spec: CycleObjectSpec<C, H>) {}
@@ -145,12 +148,25 @@ export class CycleObject<
   }
 
   /**
-   * The create went out, after {@link requireFree}: whatever answers at this
-   * name from now on is this run's. Recorded before the answer is read, so a
-   * create that answered a failure yet made the object is cleaned too.
+   * Run the create, after {@link requireFree}. The object is this run's —
+   * so the cleanup may delete it — only when the create answered ok. A
+   * create that failed (another run took the name in between, say) makes
+   * nothing this run's: the cleanup deletes nothing and names the object
+   * when it is there, for removal by hand. Answers what the create answered.
    */
-  markCreated(): void {
-    this.created = true;
+  async createOwned<T>(
+    make: () => Promise<IAdtResponse<T>>,
+  ): Promise<IAdtResponse<T>> {
+    let answer: IAdtResponse<T>;
+    try {
+      answer = await make();
+    } catch (error) {
+      this.createFailed = true;
+      throw error;
+    }
+    if (answer.ok) this.created = true;
+    else this.createFailed = true;
+    return answer;
   }
 
   /** `lock`, the handle kept for the cleanup; the answer as it came. */
@@ -187,6 +203,7 @@ export class CycleObject<
    * behind, naming the object, or `undefined`.
    */
   async cleanup(): Promise<string | undefined> {
+    if (this.createFailed && !this.created) return this.failedCreateLeftover();
     if (!this.created) return undefined;
     const problems: string[] = [];
     try {
@@ -207,7 +224,16 @@ export class CycleObject<
         }),
         this.what,
       );
-      if (there.present === 'unknown') throw new Error(there.reason);
+      if (there.present === 'unknown') {
+        problems.push(there.reason);
+        // The lock this run holds is released whatever the read answered.
+        if (handle !== undefined) {
+          const unlocked = await this.unlock();
+          if (!unlocked.ok)
+            problems.push(`unlock failed: ${unlocked.getError().message}`);
+        }
+        return `${this.what}: ${problems.join('; ')}`;
+      }
       if (handle !== undefined) {
         if (there.present) {
           const deleted = await this.handler.delete(this.spec.config, {
@@ -244,6 +270,24 @@ export class CycleObject<
       ? `${this.what}: ${problems.join('; ')}`
       : undefined;
   }
+
+  /** After a failed create: the object, if it is there, named and left alone. */
+  private async failedCreateLeftover(): Promise<string | undefined> {
+    try {
+      const there = presenceOf(
+        await this.handler.readMetadata(this.spec.config, {
+          analyse: analyseException,
+        }),
+        this.what,
+      );
+      if (there.present === false) return undefined;
+      if (there.present === 'unknown')
+        return `${this.what}: the create failed, and whether the object is there is unknown (${there.reason}); check it and its owner by hand`;
+      return `${this.what}: the create failed and the object is there — it may be another run's; check its owner and remove it by hand`;
+    } catch (error) {
+      return `${this.what}: the create failed, and the read after it threw: ${messageOf(error)}`;
+    }
+  }
 }
 
 /** One object of a cycle (see {@link CycleObject}). */
@@ -268,7 +312,14 @@ export async function runCycle(
   try {
     await body();
   } catch (error) {
-    failed = { error };
+    // A value that is not an Error is wrapped, so the leftovers can be
+    // attached to it (raiseAfterCleanup adds them to an Error only).
+    failed = {
+      error:
+        error instanceof Error
+          ? error
+          : new Error(String(error), { cause: error }),
+    };
   }
   const left: string[] = [];
   for (const object of cleanupOrder) {

@@ -64,7 +64,9 @@ const DESCRIPTION = 'legacy live cycle: class';
 /**
  * The class metadata Accept 7.40 SP04 answers: only the unversioned type;
  * every list naming a version answers `400 ExceptionContentHandlerNotFound`
- * (class-metadata-accept-2026-10-26). Passed as a consumer passes it.
+ * (class-metadata-accept-2026-10-26). Passed as a consumer passes it; the
+ * class's `readMetadata` sends the caller's `accept` as given, its content
+ * types' class Accept only when the caller gives none.
  */
 const CLASS_METADATA = 'application/vnd.sap.adt.oo.classes+xml';
 
@@ -165,18 +167,19 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
         ]);
 
         mark = at();
-        cls.markCreated();
         expectResult(
-          await cls.handler.create(
-            {
-              className: name,
-              packageName: LOCAL_PACKAGE,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(cls.handler, 'create'),
-              analyse: analyseException,
-            },
+          await cls.createOwned(() =>
+            cls.handler.create(
+              {
+                className: name,
+                packageName: LOCAL_PACKAGE,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(cls.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create',
         );

@@ -134,18 +134,19 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
         ]);
 
         mark = at();
-        prog.markCreated();
         expectResult(
-          await prog.handler.create(
-            {
-              programName: name,
-              packageName: LOCAL_PACKAGE,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(prog.handler, 'create'),
-              analyse: analyseException,
-            },
+          await prog.createOwned(() =>
+            prog.handler.create(
+              {
+                programName: name,
+                packageName: LOCAL_PACKAGE,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(prog.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create',
         );

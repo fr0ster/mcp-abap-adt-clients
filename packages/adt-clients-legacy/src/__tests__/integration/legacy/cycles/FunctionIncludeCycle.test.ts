@@ -133,18 +133,19 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
         ]);
 
         mark = at();
-        group.markCreated();
         expectResult(
-          await group.handler.create(
-            {
-              functionGroupName: groupName,
-              packageName: LOCAL_PACKAGE,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(group.handler, 'create'),
-              analyse: analyseException,
-            },
+          await group.createOwned(() =>
+            group.handler.create(
+              {
+                functionGroupName: groupName,
+                packageName: LOCAL_PACKAGE,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(group.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create group',
         );
@@ -165,18 +166,19 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
         ]);
 
         mark = at();
-        include.markCreated();
         expectResult(
-          await include.handler.create(
-            {
-              functionGroupName: groupName,
-              includeName,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(include.handler, 'create'),
-              analyse: analyseException,
-            },
+          await include.createOwned(() =>
+            include.handler.create(
+              {
+                functionGroupName: groupName,
+                includeName,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(include.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create include',
         );

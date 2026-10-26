@@ -12,6 +12,11 @@
  * by it — by its last steps, or by the cleanup when a step failed; nothing
  * this run did not create is touched.
  *
+ * The SQL view the activation generates is checked through `search`: no
+ * object of its name before the create, the view after the activation, none
+ * after the delete. A search for a DDIC view is not measured on 7.40 SP04 —
+ * Task 6 (B2 s10-search: a program's name, `200`).
+ *
  * Runs on a legacy configuration over RFC with case
  * `legacy_740/legacy_cycle_ddl` enabled:
  * npm run test:live -- integration/legacy/cycles/DdlCycle
@@ -87,6 +92,26 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
         },
       });
       const at = () => recorder.requests.length;
+      /** Whether the repository search names an object `sqlViewName`. */
+      const viewFound = async (): Promise<boolean> => {
+        const before = at();
+        const found = String(
+          expectResult(
+            await client
+              .getUtils()
+              .search(
+                { query: sqlViewName, maxResults: 10 },
+                { analyse: analyseException },
+              ),
+            `search ${sqlViewName}`,
+          ),
+        ).toLowerCase();
+        expectSent(recorder, before, [
+          ['GET /sap/bc/adt/repository/informationsystem/search', 200],
+        ]);
+        const named = `adtcore:name="${sqlViewName.toLowerCase()}`;
+        return found.includes(`${named}"`) || found.includes(`${named} (`);
+      };
 
       await runCycle(CASE, [ddl], async () => {
         let mark = at();
@@ -96,20 +121,23 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
           ['POST /sap/bc/adt/ddic/ddl/validation', 200],
           [`GET ${uri}`, 404],
         ]);
+        // The SQL view's name is free too (Task 6).
+        expect(await viewFound()).toBe(false);
 
         mark = at();
-        ddl.markCreated();
         expectResult(
-          await ddl.handler.create(
-            {
-              ddlName: name,
-              packageName: LOCAL_PACKAGE,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(ddl.handler, 'create'),
-              analyse: analyseException,
-            },
+          await ddl.createOwned(() =>
+            ddl.handler.create(
+              {
+                ddlName: name,
+                packageName: LOCAL_PACKAGE,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(ddl.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create',
         );
@@ -154,6 +182,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
         );
         // B4 d3-activate.
         expectSent(recorder, mark, [['POST /sap/bc/adt/activation', 200]]);
+        // The activation generated the SQL view (Task 6).
+        expect(await viewFound()).toBe(true);
 
         mark = at();
         const read = expectResult(
@@ -237,6 +267,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
         // B4 d8-read404.
         expect(gone.response?.status).toBe(404);
         expectSent(recorder, mark, [[`GET ${uri}`, 404]]);
+        // The SQL view went with its source (Task 6).
+        expect(await viewFound()).toBe(false);
       });
     }, 900000);
   });

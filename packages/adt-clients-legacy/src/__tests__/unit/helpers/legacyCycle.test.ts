@@ -44,7 +44,14 @@ function answer(status: number, data = '') {
 }
 
 /** One program on a fake 7.40 SP04, and the recorder in front of it. */
-function fakeSystem(state: { exists: boolean; refuseDelete?: boolean }) {
+function fakeSystem(state: {
+  exists: boolean;
+  refuseDelete?: boolean;
+  /** The create's refusal (the object is left as it is). */
+  refuseCreate?: number;
+  /** The object's read answers this status instead. */
+  readFails?: number;
+}) {
   const connection = {
     setSessionType: () => {},
     getSessionId: () => 'session',
@@ -56,11 +63,18 @@ function fakeSystem(state: { exists: boolean; refuseDelete?: boolean }) {
         request.method === 'POST' &&
         path === '/sap/bc/adt/programs/programs'
       ) {
+        if (state.refuseCreate !== undefined)
+          return answer(
+            state.refuseCreate,
+            '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceAlreadyExists"/></exc:exception>',
+          );
         state.exists = true;
         return answer(200);
       }
       if (path === PROG && action === 'LOCK') return answer(200, LOCK_ANSWER);
       if (path === PROG && action === 'UNLOCK') return answer(200);
+      if (path === PROG && request.method === 'GET' && state.readFails)
+        return answer(state.readFails);
       if (path === PROG && request.method === 'GET')
         return state.exists
           ? answer(200, `<program:abapProgram adtcore:name="${NAME}"/>`)
@@ -87,14 +101,15 @@ function fakeSystem(state: { exists: boolean; refuseDelete?: boolean }) {
     validateConfig: { ...config, packageName: '$TMP', description: 'cycle' },
   });
   const create = async () => {
-    prog.markCreated();
     expectResult(
-      await prog.handler.create(
-        { programName: NAME, packageName: '$TMP', description: 'cycle' },
-        {
-          headers: integrationHeadersOf(prog.handler, 'create'),
-          analyse: analyseException,
-        },
+      await prog.createOwned(() =>
+        prog.handler.create(
+          { programName: NAME, packageName: '$TMP', description: 'cycle' },
+          {
+            headers: integrationHeadersOf(prog.handler, 'create'),
+            analyse: analyseException,
+          },
+        ),
       ),
       'create',
     );
@@ -229,7 +244,12 @@ describe('a live cycle that fails half-way is cleaned', () => {
       runCycle(CASE, [part], async () => {
         await owner.requireFree();
         await create();
-        part.markCreated();
+        await part.createOwned(async () =>
+          owner.handler.readMetadata(
+            { programName: NAME },
+            { analyse: analyseException },
+          ),
+        );
         expectResult(await part.lock(), 'lock');
         mark = recorder.requests.length;
         throw new Error('the write failed');
@@ -240,5 +260,68 @@ describe('a live cycle that fails half-way is cleaned', () => {
       `POST ${PROG} UNLOCK`,
     ]);
     expect(state.exists).toBe(true);
+  });
+
+  it("deletes nothing when the create was refused: the object there is not this run's", async () => {
+    const state = { exists: false, refuseCreate: 400 };
+    const { recorder, prog, create } = fakeSystem(state);
+    let mark = 0;
+
+    const thrown = await failureOf(
+      runCycle(CASE, [prog], async () => {
+        await prog.requireFree();
+        // Another run creates the object between the check and the create.
+        state.exists = true;
+        mark = recorder.requests.length;
+        await create();
+      }),
+    );
+
+    const lines = sentSince(recorder, mark).map(stepLine);
+    expect(lines).not.toContain(`POST ${PROG} LOCK`);
+    expect(lines).not.toContain(`DELETE ${PROG}`);
+    expect(state.exists).toBe(true);
+    expect(thrown.message).toContain(
+      `program ${NAME}: the create failed and the object is there`,
+    );
+  });
+
+  it('releases the held lock when the read before the delete answers no verdict', async () => {
+    const state: { exists: boolean; readFails?: number } = { exists: false };
+    const { recorder, prog, create } = fakeSystem(state);
+    let mark = 0;
+
+    const thrown = await failureOf(
+      runCycle(CASE, [prog], async () => {
+        await prog.requireFree();
+        await create();
+        expectResult(await prog.lock(), 'lock');
+        state.readFails = 500;
+        mark = recorder.requests.length;
+        throw new Error('the write under the lock failed');
+      }),
+    );
+
+    const sent = sentSince(recorder, mark);
+    expect(sent.map(stepLine)).toContain(`POST ${PROG} UNLOCK`);
+    expect(sent.map(stepLine)).not.toContain(`DELETE ${PROG}`);
+    expect(prog.held).toBeUndefined();
+    expect(thrown.message).toContain('the write under the lock failed; then ');
+  });
+
+  it('keeps the leftovers beside a body that threw something not an Error', async () => {
+    const state = { exists: false, refuseDelete: true };
+    const { prog, create } = fakeSystem(state);
+
+    const thrown = await failureOf(
+      runCycle(CASE, [prog], async () => {
+        await prog.requireFree();
+        await create();
+        throw 'a bare string';
+      }),
+    );
+
+    expect(thrown.message).toContain('a bare string; then ');
+    expect(thrown.message).toContain('remove them by hand');
   });
 });

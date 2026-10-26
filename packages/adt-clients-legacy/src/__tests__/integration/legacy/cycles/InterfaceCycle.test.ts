@@ -95,18 +95,19 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — interface cycle', () => {
         ]);
 
         mark = at();
-        intf.markCreated();
         expectResult(
-          await intf.handler.create(
-            {
-              interfaceName: name,
-              packageName: LOCAL_PACKAGE,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(intf.handler, 'create'),
-              analyse: analyseException,
-            },
+          await intf.createOwned(() =>
+            intf.handler.create(
+              {
+                interfaceName: name,
+                packageName: LOCAL_PACKAGE,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(intf.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create',
         );

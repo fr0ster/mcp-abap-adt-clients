@@ -99,18 +99,19 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — include cycle', () => {
         ]);
 
         mark = at();
-        incl.markCreated();
         expectResult(
-          await incl.handler.create(
-            {
-              includeName: name,
-              packageName: LOCAL_PACKAGE,
-              description: DESCRIPTION,
-            },
-            {
-              headers: integrationHeadersOf(incl.handler, 'create'),
-              analyse: analyseException,
-            },
+          await incl.createOwned(() =>
+            incl.handler.create(
+              {
+                includeName: name,
+                packageName: LOCAL_PACKAGE,
+                description: DESCRIPTION,
+              },
+              {
+                headers: integrationHeadersOf(incl.handler, 'create'),
+                analyse: analyseException,
+              },
+            ),
           ),
           'create',
         );

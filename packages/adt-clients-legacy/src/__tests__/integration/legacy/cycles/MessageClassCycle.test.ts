@@ -12,7 +12,9 @@
  *
  * A message is written through its class's document: each write is the
  * complete sequence read of the class, `LOCK_MSG`, a class `LOCK` with
- * `msgNo`, the `PUT`, the `UNLOCK` and `UNLOCK_ALL`. A message class that
+ * `msgNo`, the `PUT`, the `UNLOCK` and `UNLOCK_ALL`; the PUT and the UNLOCK
+ * carry the handle that class `LOCK` answered (read off a recorder that keeps
+ * the answers). A message class that
  * does not exist reads `200` with an empty body, not `404` (B4 r2-m0,
  * r2-m12-read404): the absence before the create and after the delete is
  * that empty `200`.
@@ -26,7 +28,6 @@
  * npm run test:live -- integration/legacy/cycles/MessageClassCycle
  */
 
-import type { AdtMessageClassMessage } from '@mcp-abap-adt/adt-clients';
 import {
   analyseDeletion,
   analyseException,
@@ -36,6 +37,7 @@ import type {
   IMessageClassConfig,
   IMessageClassMessageConfig,
 } from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { integrationHeadersOf } from '../../../../../../adt-clients/src/__tests__/helpers/adtHeaders';
 import {
   expectFailure,
@@ -54,6 +56,7 @@ import {
   closeLegacySession,
   type LegacySession,
   LOCAL_PACKAGE,
+  legacyClientsOn,
   openLegacySession,
   param,
   queryOf,
@@ -67,18 +70,31 @@ const MSGNO = '001';
 const FIRST_TEXT = 'Legacy live cycle message';
 const SECOND_TEXT = 'Legacy live cycle message, updated';
 
+/** The `LOCK_HANDLE` of a lock answer's body; `''` when it carries none. */
+function lockHandleIn(body: unknown): string {
+  const text = typeof body === 'string' ? body : '';
+  const open = text.indexOf('<LOCK_HANDLE>');
+  const close = text.indexOf('</LOCK_HANDLE>');
+  return open < 0 || close < open ? '' : text.slice(open + 13, close);
+}
+
 describeLegacyRfc(
   'Legacy 7.40 SP04 over RFC — message class and message cycle',
   () => {
     withLegacyCase(CASE, (params) => {
+      let opened: LegacySession | undefined;
+      /** The same connection, behind a recorder that keeps each answer's body. */
       let session: LegacySession | undefined;
 
       beforeAll(async () => {
-        session = await openLegacySession();
+        opened = await openLegacySession();
+        session = await legacyClientsOn(opened.connection, {
+          keepAnswers: true,
+        });
       }, 120000);
 
       afterAll(async () => {
-        await closeLegacySession(session);
+        await closeLegacySession(opened);
       });
 
       it('creates a message class, writes, reads and deletes message 001, and deletes the class', async () => {
@@ -96,10 +112,7 @@ describeLegacyRfc(
           handler: () => client.getMessageClass(),
           validateConfig: { ...config, description: DESCRIPTION },
         });
-        // The message's delete is the class's member: the contract
-        // `getMessageClassMessage()` answers names create, read and update.
-        const messages = () =>
-          client.getMessageClassMessage() as AdtMessageClassMessage;
+        const messages = () => client.getMessageClassMessage();
         const message = (msgtext?: string): IMessageClassMessageConfig =>
           msgtext === undefined
             ? { className: name, msgno: MSGNO }
@@ -114,6 +127,27 @@ describeLegacyRfc(
           [`POST ${messageUri} UNLOCK_ALL`, 200],
         ];
         const at = () => recorder.requests.length;
+        /**
+         * A message write, every request asserted: the six requests, the
+         * class `LOCK` for this message (`accessMode=MODIFY`, `msgNo=001`,
+         * `onSave=X`, B4 r2-m5/m7/m9), and the PUT and the UNLOCK carrying the
+         * handle that LOCK answered.
+         */
+        const expectMessageWrite = (mark: number) => {
+          const [, lockMessage, lockClass, put, unlock] = expectSent(
+            recorder,
+            mark,
+            messageWrite,
+          );
+          expect(queryOf(lockMessage, 'accessMode')).toBe('MODIFY');
+          expect(queryOf(lockClass, 'accessMode')).toBe('MODIFY');
+          expect(queryOf(lockClass, 'msgNo')).toBe(MSGNO);
+          expect(queryOf(lockClass, 'onSave')).toBe('X');
+          const handle = lockHandleIn(lockClass?.answer);
+          expect(handle).not.toBe('');
+          expect(queryOf(put, 'lockHandle')).toBe(handle);
+          expect(queryOf(unlock, 'lockHandle')).toBe(handle);
+        };
 
         await runCycle(CASE, [msag], async () => {
           let mark = at();
@@ -126,14 +160,15 @@ describeLegacyRfc(
           ]);
 
           mark = at();
-          msag.markCreated();
           expectResult(
-            await msag.handler.create(
-              { name, packageName: LOCAL_PACKAGE, description: DESCRIPTION },
-              {
-                headers: integrationHeadersOf(msag.handler, 'create'),
-                analyse: analyseException,
-              },
+            await msag.createOwned(() =>
+              msag.handler.create(
+                { name, packageName: LOCAL_PACKAGE, description: DESCRIPTION },
+                {
+                  headers: integrationHeadersOf(msag.handler, 'create'),
+                  analyse: analyseException,
+                },
+              ),
             ),
             'create message class',
           );
@@ -193,7 +228,7 @@ describeLegacyRfc(
             'create message 001',
           );
           // B4 r2-m5-msg-create.
-          expectSent(recorder, mark, messageWrite);
+          expectMessageWrite(mark);
 
           let read = await readMessage('read message 001');
           // B4 r2-m6-msg-read.
@@ -210,7 +245,7 @@ describeLegacyRfc(
             'update message 001',
           );
           // B4 r2-m7-msg-update.
-          expectSent(recorder, mark, messageWrite);
+          expectMessageWrite(mark);
 
           read = await readMessage('read message 001 after the update');
           // B4 r2-m8-msg-read.
@@ -227,12 +262,17 @@ describeLegacyRfc(
             'delete message 001',
           );
           // B4 r2-m9-msg-delete.
-          expectSent(recorder, mark, messageWrite);
+          expectMessageWrite(mark);
 
           read = await readMessage('read message 001 after the delete');
-          // B4 r2-m10-msg-read: 200, the class document without message 001
-          // (the strategy's reading of it as absent: Task 6).
-          expectFailure(read.answer, read.what);
+          // B4 r2-m10-msg-read: 200, the class document without message 001,
+          // which analyseMessageClassMessage answers as the message absent
+          // (the strategy's reading of the 7.40 document: Task 6).
+          const absent = expectFailure(read.answer, read.what);
+          expect(absent.code).toBe(AdtObjectErrorCodes.OBJECT_NOT_FOUND);
+          expect(absent.message).toContain(
+            `Message ${MSGNO} not found in class`,
+          );
 
           mark = at();
           expectResult(await msag.lock(), 'lock message class for delete');
