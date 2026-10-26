@@ -153,7 +153,7 @@ has no `IF_OO_ADT_CLASSRUN`, so they run through ABAP Unit
 |---|---|
 | `npm run legacy:setup` | installs `ZCL_LG7_ENV` and its runners (`$TMP`, written only when the source differs); runs prepare — releases the user's locks on ZLG7 names, deletes leftovers (not the fixtures) and their inactive versions, reuses or creates the request `ZLG7 LEGACY-TEST …`, creates package `ZLG7_TEST`; deletes leftover DDL sources over ADT; creates or refreshes the fixtures in `$TMP` |
 | `npm run legacy:status` | reads: the open request, the package, every ZLG7 object in scope |
-| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions; deletes the DDL sources over ADT; runs remove — package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT (`ZCL_LG7_ENV_RUN` too, where a manual setup left it). A credential refusal stops it at once |
+| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions; deletes the DDL sources over ADT; runs remove — every marked request of the user (none is ever released), the TADIR entries no request holds any more, package `ZLG7_TEST` on a fresh marked request, that request and the package's entry; then deletes the env classes over ADT (`ZCL_LG7_ENV_RUN` too, where a manual setup left it) — only when REMOVE reported no error, so it can run again. A credential refusal stops it at once |
 | `npm run legacy:uninstall` | deletes only the env classes over ADT — `ZCL_LG7_ENV`, its runners and `ZCL_LG7_ENV_RUN`, each that is there, in `$TMP` and of the session user; the manual runner's last step |
 
 Reports go to `.legacy-env/<action>.json` (gitignored). Each command first asks
@@ -180,7 +180,8 @@ source is activated on the next run and read back after the activation.
 A transportable object a live check deleted keeps its TADIR row in
 `ZLG7_TEST` until its request is released (none ever is): an object whose own
 table (TRDIR, SEOCLASS, TLIBG, DDDDLSRC, T100A) no longer has it is reported
-`deleted, recorded in the request` and its row is left to the request.
+`deleted, recorded in the request` and its row is left to the request until
+`REMOVE` has deleted that request; then it is purged.
 `TEARDOWN` deletes the function group `ZLG7_FX` whole, with every member in
 it: the group is the test user's, and a module someone else adds to it is
 theirs to agree with the group's owner.
@@ -240,7 +241,7 @@ user's request) and `TEARDOWN` / `REMOVE` would miss the test user's objects.
 | 3 | npm | `LEGACY_ENV_REQUEST=<that request> npm run test:detached -- integration/legacy`. Only `LegacyTransportable` reads it; without it that case skips, naming step 2. `STATUS` in SE24 reads the environment at any time (`npm run legacy:status` skips, naming it) |
 | 4 | SE24 | `TEARDOWN` — locks, every ZLG7 object in scope (fixtures included), inactive versions; DDL sources are left for ADT, the request is kept |
 | 5 | npm | `npm run legacy:teardown` — deletes the named DDL sources over ADT, nothing else |
-| 6 | SE24 | `REMOVE` — package `ZLG7_TEST`, every marked request of the user (none released) |
+| 6 | SE24 | `REMOVE` — every marked request of the user (none released), the TADIR entries no request holds, package `ZLG7_TEST` on a fresh marked request, that request and the package's entry; each failure stops the later steps. Run step 7 only when its `"ok"` is `true` |
 | 7 | npm | `npm run legacy:uninstall` — deletes the env classes over ADT, `ZCL_LG7_ENV_RUN` included |
 
 If step 1 fails on a lock or a leftover a crashed run holds, run `PREPARE`

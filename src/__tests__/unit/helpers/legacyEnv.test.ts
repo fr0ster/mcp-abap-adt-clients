@@ -34,6 +34,7 @@ import {
   setup,
   setupManual,
   stopOnCredentialRefusal,
+  teardown,
   teardownManual,
   uninstall,
 } from '../../helpers/legacyEnv';
@@ -1018,15 +1019,13 @@ describe('legacy env: the ABAP sources', () => {
     expect(requests).toContain(
       'IF lv_all_deleted = abap_true.\n        APPEND lv_request TO rt_deleted.',
     );
-    // REMOVE purges only when every marked request was deleted.
-    const remove = methodOf(env, 'remove');
-    expect(remove).toContain('lt_deleted = delete_requests( ).');
-    const kept = remove.indexOf(
-      '`a marked request was not deleted; deletion-flagged TADIR entries kept`',
+    // A survivor is reported by requests_removed as an error.
+    const removed = methodOf(env, 'requests_removed');
+    expect(removed).toContain('lt_deleted = delete_requests( ).');
+    expect(removed).toContain(
+      'iv_status = `ERROR`\n               iv_message = `a marked request was not deleted; TADIR entries and the package kept`',
     );
-    expect(kept).toBeGreaterThan(-1);
-    expect(remove.indexOf('purge_deleted_entries( ).')).toBeGreaterThan(kept);
-    expect(remove).toContain('IF lv_survives = abap_true.');
+    expect(removed).toContain('rv_ok = abap_false.');
   });
 
   it('purge a flagged TADIR entry only when no surviving request holds it', () => {
@@ -1044,6 +1043,38 @@ describe('legacy env: the ABAP sources', () => {
     );
   });
 
+  it('remove in stages: requests, guarded purge, package on a fresh marked request, that request, its entry', () => {
+    const remove = methodOf(code('zcl_lg7_env.clas.abap'), 'remove');
+    const steps = [
+      'IF requests_removed( ) = abap_false.',
+      'IF purge_deleted_entries( ) = abap_false.',
+      'IF package_exists( ) = abap_false.',
+      'ensure_request( ).',
+      'IF mv_request IS INITIAL.',
+      'IF delete_package( ) = abap_false.',
+      'IF requests_removed( ) = abap_false.',
+      'purge_deleted_entries( ).',
+    ];
+    let from = 0;
+    for (const step of steps) {
+      const at = remove.indexOf(step, from);
+      expect(`${step} at ${at}`).not.toBe(`${step} at -1`);
+      from = at + step.length;
+    }
+    // Every guard but the last ends REMOVE before the next destructive step.
+    const guards = remove.split('IF ').slice(1);
+    for (const guard of guards.slice(0, 6))
+      expect(guard.slice(0, guard.indexOf('ENDIF.'))).toContain('RETURN.');
+    // The package step finds its own request; delete_package creates none.
+    expect(
+      methodOf(code('zcl_lg7_env.clas.abap'), 'delete_package'),
+    ).not.toContain('ensure_request');
+    // An object gone, its deletion no longer held, is purged like a flagged one.
+    expect(
+      methodOf(code('zcl_lg7_env.clas.abap'), 'purge_deleted_entries'),
+    ).toContain('lt_gone = recorded_deletions( abap_false ).');
+  });
+
   it('attempt no package deletion while any TADIR entry is left in it', () => {
     const pkg = methodOf(code('zcl_lg7_env.clas.abap'), 'delete_package');
     expect(pkg).toContain(
@@ -1057,9 +1088,11 @@ describe('legacy env: the ABAP sources', () => {
     const env = read('zcl_lg7_env.clas.abap');
     const first = methodOf(env, 'teardown');
     const second = methodOf(env, 'remove');
-    expect(first).not.toMatch(/delete_package|delete_requests/);
-    expect(second).toContain('delete_package( ).');
-    expect(second).toContain('delete_requests( ).');
+    expect(first).not.toMatch(
+      /delete_package|delete_requests|requests_removed/,
+    );
+    expect(second).toContain('delete_package( )');
+    expect(second).toContain('requests_removed( )');
   });
 });
 
@@ -1225,6 +1258,8 @@ function recordingTarget(options: {
   metadata?: Record<string, string>;
   /** Sources per name (`<class>#tests` for a test include); see `sourceOf`. */
   sources?: Record<string, { active: string; inactive?: string }>;
+  /** The report lines a runner answers; an ok, empty report by default. */
+  answers?: Record<string, string[]>;
 }) {
   const calls: string[] = [];
   const runs: string[] = [];
@@ -1307,6 +1342,8 @@ function recordingTarget(options: {
     getClassTestRunner: () => ({
       runSync: async (runner: string) => {
         runs.push(runner);
+        const given = options.answers?.[runner];
+        if (given) return ok(answerWith(given));
         return ok(
           answerWith([
             '@@RESULT {"ok":true,"action":"prepare","request":"","package":"ZLG7_TEST","packageExists":true,"errors":0,"lines":0}',
@@ -1530,6 +1567,33 @@ describe("legacy env: an existing fixture member is replaced only when it is the
       'program ZLG7_FX_UNIT is in $TMP, but another user is responsible for it; not touched',
     );
     untouched(t.calls, 'ZLG7_FX_UNIT');
+  });
+});
+
+describe('legacy env: teardown keeps the env classes when REMOVE failed', () => {
+  const removeFailed = [
+    '@@LOG {"n":1,"step":"requests","object":"K900001","status":"ERROR","message":"a task of another user is in it; request not touched"}',
+    '@@RESULT {"ok":false,"action":"remove","request":"","package":"ZLG7_TEST","packageExists":true,"errors":1,"lines":1}',
+  ];
+  const envDeletes = (calls: string[]) =>
+    calls.filter((c) => c.startsWith('delete ZCL_LG7_ENV'));
+
+  it('deletes no env class and says why, so REMOVE can run again', async () => {
+    const t = recordingTarget({
+      ddl: MINE,
+      answers: { ZCL_LG7_ENV_REMOVE: removeFailed },
+    });
+    await expect(teardown(t.target)).rejects.toThrow(
+      'env classes kept: REMOVE reported an error; fix it and run npm run legacy:teardown again',
+    );
+    expect(t.runs).toEqual(['ZCL_LG7_ENV_TEARDOWN', 'ZCL_LG7_ENV_REMOVE']);
+    expect(envDeletes(t.calls)).toEqual([]);
+  });
+
+  it('deletes the env classes after a clean REMOVE', async () => {
+    const t = recordingTarget({ ddl: MINE });
+    await teardown(t.target);
+    expect(envDeletes(t.calls).length).toBeGreaterThan(0);
   });
 });
 

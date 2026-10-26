@@ -68,8 +68,12 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! theirs to agree with the group's owner.
     METHODS teardown.
 
-    "! Teardown, second phase (after ADT deleted the DDL sources): package
-    "! ZLG7_TEST deleted, every marked request of the user deleted.
+    "! Teardown, second phase (after ADT deleted the DDL sources), in stages,
+    "! each failure an ERROR step that stops the later ones: every marked
+    "! request of the user deleted (confirmed); the TADIR entries no request
+    "! holds any more purged; package ZLG7_TEST deleted when nothing is left
+    "! in it, on a fresh marked request; that request deleted; the package's
+    "! own entry purged. Nothing is ever released.
     METHODS remove.
 
     "! One '@@LOG {json}' line per step, then '@@RESULT {json}'.
@@ -129,8 +133,9 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS package_exists RETURNING VALUE(rv_yes) TYPE abap_bool.
     METHODS package_owner_problem RETURNING VALUE(rv_problem) TYPE string.
     METHODS ensure_package.
-    METHODS delete_package.
-    METHODS purge_deleted_entries.
+    METHODS requests_removed RETURNING VALUE(rv_ok) TYPE abap_bool.
+    METHODS delete_package RETURNING VALUE(rv_ok) TYPE abap_bool.
+    METHODS purge_deleted_entries RETURNING VALUE(rv_ok) TYPE abap_bool.
     METHODS commit.
     CLASS-METHODS lock_object_fits
       IMPORTING iv_kind       TYPE csequence
@@ -331,35 +336,55 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD remove.
-    DATA lt_requests TYPE tt_trkorr.
+    mv_action = `remove`.
+    " 1. The marked requests, each confirmed deleted.
+    IF requests_removed( ) = abap_false.
+      RETURN.
+    ENDIF.
+    " 2. The TADIR entries no surviving request holds.
+    IF purge_deleted_entries( ) = abap_false.
+      RETURN.
+    ENDIF.
+    " 3. The package, recorded on a fresh marked request.
+    IF package_exists( ) = abap_false.
+      add_log( iv_step = `package` iv_object = c_package iv_status = `OK` iv_message = `not present` ).
+      RETURN.
+    ENDIF.
+    ensure_request( ).
+    IF mv_request IS INITIAL.
+      add_log( iv_step = `package` iv_object = c_package iv_status = `ERROR`
+               iv_message = `no marked request to record the deletion; package kept` ).
+      RETURN.
+    ENDIF.
+    IF delete_package( ) = abap_false.
+      RETURN.
+    ENDIF.
+    " 4. That request, then the package's own entry it held.
+    IF requests_removed( ) = abap_false.
+      RETURN.
+    ENDIF.
+    purge_deleted_entries( ).
+  ENDMETHOD.
+
+
+  METHOD requests_removed.
+    " Every marked request deleted, confirmed by delete_requests; a survivor
+    " is an ERROR step and the TADIR entries and the package are kept.
     DATA lt_marked TYPE tt_trkorr.
     DATA lt_deleted TYPE tt_trkorr.
     DATA lv_request TYPE trkorr.
-    DATA lv_survives TYPE abap_bool.
-    mv_action = `remove`.
-    IF package_exists( ) = abap_true.
-      ensure_request( ).
-    ELSE.
-      lt_requests = marked_requests( ).
-      READ TABLE lt_requests INTO mv_request INDEX 1.
-    ENDIF.
-    delete_package( ).
     lt_marked = marked_requests( ).
     lt_deleted = delete_requests( ).
-    " A deletion-flagged TADIR entry is bookkeeping of the request that holds
-    " it: purged only when every marked request was confirmed deleted.
-    lv_survives = abap_false.
+    rv_ok = abap_true.
     LOOP AT lt_marked INTO lv_request.
       READ TABLE lt_deleted TRANSPORTING NO FIELDS WITH KEY table_line = lv_request.
       IF sy-subrc <> 0.
-        lv_survives = abap_true.
+        rv_ok = abap_false.
       ENDIF.
     ENDLOOP.
-    IF lv_survives = abap_true.
-      add_log( iv_step = `tadir` iv_status = `WARN`
-               iv_message = `a marked request was not deleted; deletion-flagged TADIR entries kept` ).
-    ELSE.
-      purge_deleted_entries( ).
+    IF rv_ok = abap_false.
+      add_log( iv_step = `tadir` iv_status = `ERROR`
+               iv_message = `a marked request was not deleted; TADIR entries and the package kept` ).
     ENDIF.
   ENDMETHOD.
 
@@ -1174,6 +1199,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
     IF package_exists( ) = abap_false.
       add_log( iv_step = `package` iv_object = c_package iv_status = `OK` iv_message = `not present` ).
+      rv_ok = abap_true.
       RETURN.
     ENDIF.
     lv_problem = package_owner_problem( ).
@@ -1243,6 +1269,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     ENDTRY.
     commit( ).
     add_log( iv_step = `package` iv_object = c_package iv_status = `DELETED` ).
+    rv_ok = abap_true.
   ENDMETHOD.
 
 
@@ -1254,12 +1281,18 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     " dropped here - only when no request or task still existing (E070)
     " holds an E071 row naming it; otherwise it is kept and logged.
     DATA lt_flagged TYPE tt_object.
+    DATA lt_gone TYPE tt_object.
     DATA ls_flagged TYPE ty_object.
     DATA lv_holder TYPE trkorr.
     DATA lx_call TYPE REF TO cx_sy_dyn_call_error.
     SELECT object obj_name devclass FROM tadir INTO TABLE lt_flagged
       WHERE pgmid = 'R3TR' AND delflag = 'X' AND author = sy-uname
         AND ( devclass = c_package OR ( object = 'DEVC' AND obj_name = c_package ) ).
+    " And the unflagged entries in ZLG7_TEST whose object is gone: deleted on
+    " a request, which keeps the entry until a release that never comes.
+    lt_gone = recorded_deletions( abap_false ).
+    APPEND LINES OF lt_gone TO lt_flagged.
+    rv_ok = abap_true.
     LOOP AT lt_flagged INTO ls_flagged.
       IF is_own_name( ls_flagged-obj_name ) = abap_false OR is_env_name( ls_flagged-obj_name ) = abap_true.
         CONTINUE.
@@ -1287,9 +1320,11 @@ CLASS zcl_lg7_env IMPLEMENTATION.
             add_log( iv_step = `tadir` iv_object = |{ ls_flagged-object } { ls_flagged-obj_name }| iv_status = `REMOVED` ).
           ELSE.
             add_log( iv_step = `tadir` iv_object = |{ ls_flagged-object } { ls_flagged-obj_name }| iv_status = `ERROR` iv_message = sy_message( ) ).
+            rv_ok = abap_false.
           ENDIF.
         CATCH cx_sy_dyn_call_error INTO lx_call.
           add_log( iv_step = `tadir` iv_object = |{ ls_flagged-object } { ls_flagged-obj_name }| iv_status = `ERROR` iv_message = lx_call->get_text( ) ).
+          rv_ok = abap_false.
       ENDTRY.
     ENDLOOP.
     commit( ).

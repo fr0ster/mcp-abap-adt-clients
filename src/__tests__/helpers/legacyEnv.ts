@@ -1397,7 +1397,14 @@ export async function teardown(target: LegacyEnvTarget): Promise<EnvRun> {
   const objects = await runEnvAction(target, 'teardown');
   const problems = await deleteLeftDdls(target, objects);
   const rest = await runEnvAction(target, 'remove');
-  problems.push(...(await deleteEnvClasses(target)).problems);
+  // The env classes are what runs REMOVE: kept while it reported an error,
+  // so it can run again once the cause is fixed.
+  if (rest.result.ok && !rest.log.some((l) => l.status === 'ERROR'))
+    problems.push(...(await deleteEnvClasses(target)).problems);
+  else
+    problems.push(
+      'env classes kept: REMOVE reported an error; fix it and run npm run legacy:teardown again',
+    );
   const run = combineRuns(objects, rest);
   requireClean(run, problems);
   return run;
