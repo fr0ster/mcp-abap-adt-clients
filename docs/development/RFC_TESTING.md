@@ -205,8 +205,9 @@ whose `"ok"` must be `true`. In SE24: class `ZCL_LG7_ENV_RUN` → **Test (F8)** 
 the method → **Execute (F8)** → double-click `RT_LINES`. The npm scripts do
 only the ADT part around those steps, and run no ABAP Unit runner.
 
-**Log on to SAP GUI as the `.env`'s `SAP_USERNAME`, in client `SAP_CLIENT`** —
-the user the npm steps run as. Everything `ZCL_LG7_ENV` does is tied to
+**Log on to SAP GUI as the `SAP_USERNAME`, in client `SAP_CLIENT`, of the
+session file `MCP_ENV_PATH` names** (`~/.config/mcp-abap-adt/sessions/<destination>.env`,
+never a file in the repository) — the user the npm steps run as. Everything `ZCL_LG7_ENV` does is tied to
 `sy-uname`: the `$TMP` objects it takes (TADIR author), the locks it releases,
 the request and task it creates and deletes. With ABAP Unit that was the ADT
 session's user; in SE24 it is whoever is logged on. Another user would create

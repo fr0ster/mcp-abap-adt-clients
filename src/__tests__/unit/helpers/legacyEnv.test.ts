@@ -871,13 +871,14 @@ describe('legacy env: the class the owner runs by hand', () => {
       transportLayer: 'ZABC',
     });
     expect(step).toContain(
-      "logged on as the .env's SAP_USERNAME in client SAP_CLIENT",
+      'logged on as the SAP_USERNAME (client SAP_CLIENT) of the session file MCP_ENV_PATH names (~/.config/mcp-abap-adt/sessions/<destination>.env)',
     );
     expect(step).toContain(`SE24: ${MANUAL_RUNNER} -> Test (F8) -> PREPARE`);
     expect(step).toContain(
       'IV_SOFTWARE_COMPONENT = HOME and IV_TRANSPORT_LAYER = ZABC',
     );
     expect(manualStep('remove')).toContain('-> REMOVE -> Execute (F8);');
+    expect(manualStep('remove')).not.toContain(".env's");
   });
 });
 

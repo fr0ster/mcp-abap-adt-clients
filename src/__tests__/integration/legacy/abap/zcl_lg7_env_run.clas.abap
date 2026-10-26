@@ -5,8 +5,10 @@
 "! '@@RESULT {json}' (ok, request, packageExists). Holds nothing else.
 "!
 "! Call it from SE24: ZCL_LG7_ENV_RUN -> Test (F8) -> the method -> Execute (F8)
-"! -> double-click RT_LINES. Log on to SAP GUI as the .env's SAP_USERNAME, in
-"! client SAP_CLIENT: every action works for sy-uname ($TMP objects by TADIR
+"! -> double-click RT_LINES. Log on to SAP GUI as the SAP_USERNAME, in client
+"! SAP_CLIENT, of the session file MCP_ENV_PATH names
+"! (~/.config/mcp-abap-adt/sessions/<destination>.env, never a file in the
+"! repository): every action works for sy-uname ($TMP objects by TADIR
 "! author, locks, the request and its task), and the npm steps run as that
 "! user. With legacy_env.runner: manual in the overlay, the order is:
 "! 1. npm run legacy:setup: installs ZCL_LG7_ENV and this class over ADT,
