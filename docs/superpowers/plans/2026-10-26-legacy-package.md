@@ -46,7 +46,7 @@ prove every handler 7.40 serves with one live cycle per type.
   `.worktrees/legacy-package`, branch `feat/legacy-package`, PR #281.
 - **Live runs:**
   - check the realm `of the 7.40 system` without logon before each;
-  - `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e77-run.env`,
+  - `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/<7.40 system>.env`,
     `MCP_TEST_OVERLAY` = the 7.40 overlay;
   - the test user only;
   - any credential refusal stops everything;
