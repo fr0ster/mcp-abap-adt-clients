@@ -124,6 +124,20 @@ prove every handler 7.40 serves with one live cycle per type.
   pause with the guards re-run, a `--dry-run` that never calls
   `npm publish`, refusal of unknown arguments, and its own test with a
   stubbed npm. Its test runs in this repository's check.
+
+  The root manifest meets the publisher's requirements:
+  - `publishOrder` lists all three package directories in dependency order
+    (`packages/adt-strategies`, `packages/adt-clients`,
+    `packages/adt-clients-legacy`, after checking which depends on which);
+  - a root `check` script is the release gate, a plain
+    `npm run a && npm run b` chain so the publisher runs it step by step;
+  - `semver` is a direct root devDependency;
+  - the root is CommonJS (no `"type": "module"`), or the publisher runs as
+    `.cjs`.
+
+  Add a repository integration check: run the publisher with a stubbed npm
+  against the **actual** root manifest and `release:publish -- --dry-run`.
+  It lists the three packages in order and calls `npm publish` never.
 - [ ] Step 2: Before moving anything, record each package's
   `npm pack --dry-run` file list and the unit-test counts.
 - [ ] Step 3: Move with `git mv` and fix the relative paths the compiler,
@@ -133,8 +147,19 @@ prove every handler 7.40 serves with one live cycle per type.
 - [ ] Step 4: Run root `npm install` once to generate the lockfile. Check it:
   `"link": true` only for the workspace siblings, and everything else from
   the registry.
+- [ ] Step 4b: Generate every prepack artifact before publishing. The
+  publisher runs `npm publish --ignore-scripts`, so `prepack` never runs at
+  release. That includes `adt-strategies`' `ERRATA.md` (made by
+  `scripts/copy-errata.js` today, with its source path moved) and any other
+  package's `prepack` or `prepare` output.
+  - Move each such generation into the package's build, or into a step of
+    the root `check`.
+  - Add a pack gate to the root `check`: from a clean checkout, after the
+    build, `npm pack --dry-run --ignore-scripts` per package lists every file
+    the package ships, `ERRATA.md` included.
 - [ ] Step 5: Run the root build, `test:check`, `lint:check` and unit tests,
-  then compare each package's `npm pack --dry-run` with Step 2. Expected:
+  then compare each package's `npm pack --dry-run --ignore-scripts` with
+  Step 2. Expected:
   green, the same unit counts, and identical pack contents apart from paths.
 - [ ] Step 6: Bring the CLAUDE.md texts for the new layout to the owner
   (CLAUDE.md moves or stays at the root as the model has it). Apply them only
