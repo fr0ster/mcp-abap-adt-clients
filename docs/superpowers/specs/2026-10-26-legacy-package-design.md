@@ -47,11 +47,26 @@ probe records are outside the repository, in `~/prj/e77-probe/e77-results/`:
     overlay keys.
   - **Docs:** `docs/architecture/LEGACY.md`.
 - **What stays in the root package:**
-  - the test harness both packages use (the overlay loader, the session
-    configuration, the recorder, the header pairs), which the legacy package
-    imports from its sibling for its tests only, never from its published
-    code;
-  - everything modern.
+  - everything modern;
+  - the shared test harness (the overlay loader, the session configuration,
+    the recorder, the header pairs). It has to become **free of legacy**
+    first, because today `adtHeaders.ts` imports the legacy client and its
+    handlers to recognise refusals, and `sessionConfig.ts` constructs
+    `AdtClientLegacy`. The harness instead exposes two seams the legacy
+    package fills:
+    - client construction: the session takes a client factory, and the
+      default is the modern one;
+    - registration of header pairs and refusals per handler class.
+  - The legacy registrations and the legacy factory move into the legacy
+    package's test helpers.
+- **The legacy package's test setup.**
+  - Its Jest and type-check configuration include the root's shared harness
+    by relative path (`../../src/__tests__/helpers/…`). That source is
+    test-only, in the same repository, and never part of either published
+    package.
+  - The root's harness never imports from the legacy package. The two AST
+    rules below hold for test sources too.
+
 - **The root package's surface.**
   - `AdtClientLegacy` and `AdtExecutorLegacy` go from `index.core` and
     `index.executors`, and `AdtRequestLegacy` goes from the transport
@@ -128,8 +143,15 @@ by the test in `$TMP` and deleted by it, also on failure. They are run as
 the test user over RFC, with the overlay `MCP_TEST_OVERLAY` names and the
 session file `MCP_ENV_PATH` names.
 
-Every step asserts three things: the one request it sends, read off the
-recorder; the status 7.40 answers; and the effect, read back. A step 7.40
+Every step asserts three things:
+- **the requests it sends, read off the recorder.** An operation that sends
+  one request is asserted as that one request. A composite operation is
+  asserted as its complete ordered sequence, every lock and unlock included.
+  For example, a message create, update or delete is a read of the class,
+  `LOCK_MSG`, a class `LOCK` with `msgNo`, the `PUT`, the `UNLOCK` and
+  `UNLOCK_ALL`;
+- **the status 7.40 answers;**
+- **the effect, read back.** A step 7.40
 refuses is asserted as the library's refusal with nothing sent. The
 headers are passed as the consumer passes them (§3).
 
@@ -145,6 +167,7 @@ headers are passed as the consumer passes them (§3).
 | Message class + message | class create → lock → unlock → readMetadata → `updateMetadata` refused; message 001 create → read → update → read → delete → read absent; class lock → delete (§2) → unlock → readMetadata empty `200` (as measured) |
 | Transportable program | as today (`LegacyTransportable`) |
 | Transports, unit-test runners, refusals | as today |
+| Utils readers | `search` (finds a cycle's object) → `getObjectStructure` of it → `fetchNodeStructure('DEVC/K', '$TMP')` lists it → `discovery` (the advertised collections) → write a cycle object without activating → `getInactiveObjects` lists it → `activateObjectsGroup` activates it → `getInactiveObjects` no longer lists it |
 
 `validate` of a name that does not exist yet is asserted before each
 create: it answers `200`, or the type's measured answer. That is the use a
@@ -178,7 +201,5 @@ package.
 - HTTP for legacy;
 - the trace members (`listRequests`, `getRequestsByUri`, `scheduleTrace`),
   which stay kept and unmeasured;
-- `fetchNodeStructure` through the library, the search / discovery /
-  inactive-objects readers;
 - the message-class metadata document for 7.40;
 - the 18 families 7.40 does not have, which stay refused.
