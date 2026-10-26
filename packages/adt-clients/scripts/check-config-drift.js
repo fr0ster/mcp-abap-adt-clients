@@ -14,6 +14,10 @@
  * No overlay at all is not an error here: unit tests need none. The integration
  * tests then register as configuration defects, which is their own gate.
  *
+ * Another package of this repository that adds its sections and keys to the
+ * configuration (`loadTestConfigFrom`'s extensions) checks its overlays with
+ * the same functions, naming its extensions: `check(dir, named, extensions)`.
+ *
  * Run: npm run check:config
  */
 
@@ -29,7 +33,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /** @returns {{ ok: boolean, message: string }} */
-function check(directory = HELPERS_DIRECTORY, namedOverlay) {
+function check(directory = HELPERS_DIRECTORY, namedOverlay, extensions = []) {
   const overlayName = path.basename(overlayPathOf(directory, namedOverlay));
   if (
     namedOverlay === undefined &&
@@ -37,7 +41,7 @@ function check(directory = HELPERS_DIRECTORY, namedOverlay) {
   ) {
     // Still refuses the old full file, which makes the loader throw.
     try {
-      loadTestConfigFrom(directory);
+      loadTestConfigFrom(directory, undefined, extensions);
     } catch (error) {
       if (error instanceof TestConfigError) {
         return { ok: false, message: error.message };
@@ -50,7 +54,7 @@ function check(directory = HELPERS_DIRECTORY, namedOverlay) {
     };
   }
   try {
-    loadTestConfigFrom(directory, namedOverlay);
+    loadTestConfigFrom(directory, namedOverlay, extensions);
   } catch (error) {
     if (error instanceof TestConfigError) {
       return { ok: false, message: error.message };
@@ -64,7 +68,7 @@ function check(directory = HELPERS_DIRECTORY, namedOverlay) {
 }
 
 /** The overlay the environment names; a blank name is a failed check. */
-function checkNamed(directory, env = process.env) {
+function checkNamed(directory, env = process.env, extensions = []) {
   let namedOverlay;
   try {
     namedOverlay = overlayPathFromEnv(env);
@@ -74,11 +78,11 @@ function checkNamed(directory, env = process.env) {
     }
     throw error;
   }
-  return check(directory, namedOverlay);
+  return check(directory, namedOverlay, extensions);
 }
 
-function main(directory = HELPERS_DIRECTORY) {
-  const { ok, message } = checkNamed(directory);
+function main(directory = HELPERS_DIRECTORY, extensions = []) {
+  const { ok, message } = checkNamed(directory, process.env, extensions);
   (ok ? console.log : console.error)(message);
   process.exit(ok ? 0 : 1);
 }

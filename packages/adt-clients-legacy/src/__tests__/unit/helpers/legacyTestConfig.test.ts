@@ -16,6 +16,9 @@ import {
  */
 const overlayLib = require('../../../../../adt-clients/scripts/lib/testConfigOverlay');
 const { BASE_FILE, TestConfigError, loadTestConfigFrom } = overlayLib;
+const {
+  check,
+} = require('../../../../../adt-clients/scripts/check-config-drift');
 
 const ROOT_HELPERS = path.resolve(
   __dirname,
@@ -156,5 +159,26 @@ describe('a legacy system in its overlay', () => {
     expect(
       refusal(() => loadTestConfigFrom(directory, named, EXTENSIONS)),
     ).toContain('"environment.is_legacy" must be true or false');
+  });
+
+  it("is checked before a run by this package's check:config, and refused by the root's", () => {
+    const named = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({
+        ...FULL_OVERLAY,
+        'environment.system': 'onprem',
+        'environment.is_legacy': true,
+        'legacy_env.runner': 'manual',
+        'legacy_740.test_cases[legacy_deletes].enabled': true,
+      }),
+    );
+    expect(check(directory, named, EXTENSIONS)).toEqual({
+      ok: true,
+      message:
+        'check:config — test-config.overlay.sys.yaml carries only allowed keys and every required one.',
+    });
+    const root = check(directory, named);
+    expect(root.ok).toBe(false);
+    expect(root.message).toContain('unknown key "environment.is_legacy"');
   });
 });
