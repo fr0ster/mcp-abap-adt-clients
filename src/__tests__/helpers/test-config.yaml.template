@@ -3241,6 +3241,11 @@ batch:
 legacy_env:
   software_component: "<SOFTWARE_COMPONENT>"  # the system's customer component
   transport_layer: "<TRANSPORT_LAYER>"        # the system's transport layer (up to 4 characters)
+  # How the env actions run: "abap_unit" (the runner classes through ABAP Unit,
+  # risk level DANGEROUS) or "manual" (the owner runs ZCL_LG7_ENV_RUN in SE24,
+  # where the client's ABAP Unit limit is lower; the npm scripts do the ADT
+  # part around it — docs/development/RFC_TESTING.md, "The manual runner").
+  runner: "abap_unit"
 
 # Live checks of the legacy client (AdtClientLegacy, AdtExecutorLegacy) on a
 # SAP_BASIS 7.40 SP04 system. They run only when environment.is_legacy is true

@@ -79,7 +79,7 @@ appear; anything else is refused by name. The list:
 | `create_function_module…[adt_function_module].params.function_group_route`, `create_function_include…[adt_function_include].params.function_group_route` — `"shared"` (the base: the shared function group in the shared package) or `"default_package"` (the group in the case's or the default package, for a system with no shared package); the route's failure fails the test, the other route is never a recovery | optional |
 | `atc_run…[adt_atc_run].enabled`, `.params.check_variant`, `.params.expected_message_id`, `.params.expected_priority`; `atc_object_kinds…[adt_atc_object_kinds].enabled`, `.params.check_variant` | optional |
 | `enhancement.test_cases[program_host].params.program_name`, `[function_group_host].params.function_group_name`, `[include_host].params.include_name`, `.main_program` | optional |
-| `environment.is_legacy` (boolean), `legacy_env.software_component`, `legacy_env.transport_layer`, `legacy_740.test_cases[<case>].enabled` for each of `legacy_deletes`, `legacy_refusals_send_nothing`, `legacy_unit_runners`, `legacy_function_include`, `legacy_transports`, `legacy_transportable` — a legacy system (SAP_BASIS < 7.50): its client, its live checks (off in the base) and the transportable package of its test environment; the base's `legacy_env` placeholders are refused when the environment is built | optional |
+| `environment.is_legacy` (boolean), `legacy_env.software_component`, `legacy_env.transport_layer`, `legacy_env.runner` (`abap_unit` in the base, or `manual`: the owner runs `ZCL_LG7_ENV_RUN` in SE24 — [RFC_TESTING.md](RFC_TESTING.md#the-manual-runner)), `legacy_740.test_cases[<case>].enabled` for each of `legacy_deletes`, `legacy_refusals_send_nothing`, `legacy_unit_runners`, `legacy_function_include`, `legacy_transports`, `legacy_transportable` — a legacy system (SAP_BASIS < 7.50): its client, its live checks (off in the base) and the transportable package of its test environment; the base's `legacy_env` placeholders are refused when the environment is built | optional |
 
 **Required** keys are those whose base line carries `# ← CHANGE` and holds only a
 placeholder: the overlay must state them (an empty string is a statement), and the
@@ -318,7 +318,10 @@ Every name carries the prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`,
 The 7.40 system's overlay also sets `legacy_env.software_component` and
 `legacy_env.transport_layer` — the transportable package `ZLG7_TEST` the
 environment creates. The base holds placeholders there, which the environment
-refuses.
+refuses. `legacy_env.runner` says how the env actions run: `abap_unit` (the
+base) or `manual`, where the client's ABAP Unit risk limit refuses the runner
+classes and the owner runs `ZCL_LG7_ENV_RUN` in SE24 (see
+[RFC_TESTING.md](RFC_TESTING.md#the-manual-runner)).
 
 ```yaml
 "legacy_env.software_component": "ZCUSTOMER"

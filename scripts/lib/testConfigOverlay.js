@@ -192,6 +192,8 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     ['environment.is_legacy', { type: 'boolean' }],
     ['legacy_env.software_component', {}],
     ['legacy_env.transport_layer', {}],
+    // How the env actions run; `manual` where ABAP Unit may not run them.
+    ['legacy_env.runner', { values: ['abap_unit', 'manual'] }],
     ...LEGACY_CASES.map((name) => [
       `legacy_740.test_cases[${name}].enabled`,
       { type: 'boolean' },

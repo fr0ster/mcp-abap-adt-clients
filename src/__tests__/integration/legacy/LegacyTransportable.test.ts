@@ -5,7 +5,10 @@
  *
  * The package and the request are the environment's: `npm run legacy:setup`
  * creates them (7.40's ADT cannot create a request), and `beforeAll` reads
- * them through the env's status run. Then, asserted on the recorder:
+ * them through the env's status run. With `legacy_env.runner: manual` the
+ * owner's `ZCL_LG7_ENV_RUN=>PREPARE` creates them, and the request comes from
+ * `LEGACY_ENV_REQUEST`; without it the case skips, naming that step. Then,
+ * asserted on the recorder:
  *
  * - create in `ZLG7_TEST` with the request;
  * - lock → `PUT ?lockHandle=&corrNr=<request>` → unlock;
@@ -25,7 +28,14 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../helpers/contract';
-import { ENV_PACKAGE, requireOwnNames, status } from '../../helpers/legacyEnv';
+import {
+  configuredRunner,
+  ENV_PACKAGE,
+  REQUEST_VARIABLE,
+  requestSource,
+  requireOwnNames,
+  status,
+} from '../../helpers/legacyEnv';
 import {
   closeLegacySession,
   deleteLocked,
@@ -57,6 +67,11 @@ const SOURCE = [
 
 describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
   withLegacyCase('legacy_transportable', (params) => {
+    const source = requestSource(configuredRunner());
+    if (source.from === 'none') {
+      it.skip(`skipped: ${source.skip}`, () => {});
+      return;
+    }
     let session: LegacySession | undefined;
     const current = () => session as LegacySession;
     let request = '';
@@ -77,12 +92,18 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
     beforeAll(async () => {
       requireOwnNames('legacy_transportable', [['program', programName]]);
       session = await openLegacySession();
-      const env = await status(current());
-      if (!env.result.request || !env.result.packageExists)
-        throw new Error(
-          `legacy_740/legacy_transportable: no open environment request or no package ${ENV_PACKAGE} — run npm run legacy:setup first`,
-        );
-      request = env.result.request;
+      if (source.from === 'owner') {
+        // The owner's PREPARE named it; that it is open and that the package
+        // exists is the create's to answer.
+        request = source.request;
+      } else {
+        const env = await status(current());
+        if (!env.result.request || !env.result.packageExists)
+          throw new Error(
+            `legacy_740/legacy_transportable: no open environment request or no package ${ENV_PACKAGE} — run npm run legacy:setup first`,
+          );
+        request = env.result.request;
+      }
       await requireAbsent('legacy_transportable', [program]);
       const handler = current().client.getProgram();
       expectResult(
@@ -97,7 +118,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
             analyse: analyseException,
           },
         ),
-        `create program ${programName} in ${ENV_PACKAGE}`,
+        `create program ${programName} in ${ENV_PACKAGE}${source.from === 'owner' ? ` (request from ${REQUEST_VARIABLE})` : ''}`,
       );
       created = true;
     }, 600000);

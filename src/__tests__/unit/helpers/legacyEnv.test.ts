@@ -8,21 +8,33 @@ import {
   assertOwnName,
   CredentialRefused,
   combineRuns,
+  ddlNamesOf,
   deleteLeftDdls,
+  ENV_CLASSES,
   ensureClass,
   envClasses,
   isCredentialRefusal,
   isOwnName,
   type LegacyEnvTarget,
+  MANUAL_RUNNER,
+  manualEnvClasses,
+  manualStep,
   markedLines,
   packageOf,
   parseEnvRun,
+  REQUEST_VARIABLE,
   renderPrepare,
+  requestSource,
   requireOwnNames,
   responsibleOf,
+  runnerOf,
   sameSource,
   settingsOf,
+  setup,
+  setupManual,
   stopOnCredentialRefusal,
+  teardownManual,
+  uninstall,
 } from '../../helpers/legacyEnv';
 
 // The stubs are no handler class `integrationHeadersOf` knows; the pair is not
@@ -740,5 +752,301 @@ describe('legacy env: the admin runs refuse a modern system', () => {
       return false;
     });
     expect(asked).toEqual([connection]);
+  });
+});
+
+describe('legacy env: the runner the configuration states', () => {
+  it('reads abap_unit or manual, and refuses a missing or other value', () => {
+    expect(runnerOf({ legacy_env: { runner: 'abap_unit' } })).toBe('abap_unit');
+    expect(runnerOf({ legacy_env: { runner: 'manual' } })).toBe('manual');
+    expect(() => runnerOf({ legacy_env: {} })).toThrow(
+      'legacy_env.runner is required',
+    );
+    expect(() => runnerOf({ legacy_env: { runner: 'sm37' } })).toThrow(
+      'legacy_env.runner must be abap_unit or manual, not "sm37"',
+    );
+    expect(() => runnerOf({})).toThrow('no legacy_env section');
+  });
+
+  it('the base states abap_unit', () => {
+    const template = readFileSync(
+      join(__dirname, '../../helpers/test-config.yaml.template'),
+      'utf8',
+    );
+    const section = template.slice(template.indexOf('\nlegacy_env:'));
+    expect(section.slice(0, section.indexOf('\nlegacy_740:'))).toContain(
+      '  runner: "abap_unit"',
+    );
+  });
+
+  it('names the DDL sources the live cases configure, once each', () => {
+    expect(
+      ddlNamesOf({
+        legacy_740: {
+          test_cases: [
+            { params: { ddl_name: 'zlg7_del_ddl' } },
+            { params: { class_name: 'ZCL_LG7_X' } },
+            { params: { ddl_name: 'ZLG7_DEL_DDL' } },
+            {},
+          ],
+        },
+      }),
+    ).toEqual(['ZLG7_DEL_DDL']);
+    expect(ddlNamesOf({})).toEqual([]);
+  });
+});
+
+describe('legacy env: the request of a live check', () => {
+  it('comes from the status run with abap_unit, which refuses the variable', () => {
+    expect(requestSource('abap_unit', {})).toEqual({ from: 'status' });
+    expect(() =>
+      requestSource('abap_unit', { [REQUEST_VARIABLE]: 'E77K900001' }),
+    ).toThrow(
+      `${REQUEST_VARIABLE} is read only with legacy_env.runner: manual`,
+    );
+  });
+
+  it('comes from the owner with manual, else the check skips naming the SE24 step', () => {
+    expect(
+      requestSource('manual', { [REQUEST_VARIABLE]: ' e77k900001 ' }),
+    ).toEqual({ from: 'owner', request: 'E77K900001' });
+    const none = requestSource('manual', {});
+    expect(none.from).toBe('none');
+    expect(none.from === 'none' && none.skip).toContain(
+      `run ${MANUAL_RUNNER}=>PREPARE (or STATUS) in SE24 and set ${REQUEST_VARIABLE}`,
+    );
+    expect(requestSource('manual', { [REQUEST_VARIABLE]: ' ' }).from).toBe(
+      'none',
+    );
+    expect(() =>
+      requestSource('manual', { [REQUEST_VARIABLE]: "E77K'1" }),
+    ).toThrow('must be a request number');
+  });
+});
+
+describe('legacy env: the class the owner runs by hand', () => {
+  const run = readFileSync(join(ABAP_DIR, 'zcl_lg7_env_run.clas.abap'), 'utf8');
+
+  it('is installed after the env class, a plain class with no test include', () => {
+    const classes = manualEnvClasses();
+    expect(classes.map((c) => c.name)).toEqual(['ZCL_LG7_ENV', MANUAL_RUNNER]);
+    expect(classes[1]?.testClasses).toBeUndefined();
+    expect(classes[1]?.main).toBe(run);
+  });
+
+  it('runs each action on a new ZCL_LG7_ENV and returns its report', () => {
+    expect(run).toContain(
+      'CLASS zcl_lg7_env_run DEFINITION PUBLIC FINAL CREATE PRIVATE.',
+    );
+    const code = run
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('"'))
+      .join('\n');
+    expect(code).not.toMatch(/FOR TESTING|RISK LEVEL|cl_abap_unit_assert/i);
+    for (const action of ['prepare', 'status', 'teardown', 'remove']) {
+      const start = run.indexOf(`  METHOD ${action}.`);
+      const body = run.slice(start, run.indexOf('ENDMETHOD.', start));
+      expect(`${action}: ${start > -1}`).toBe(`${action}: true`);
+      expect(body).toContain('CREATE OBJECT lo_env');
+      expect(body).toContain(`lo_env->${action}( ).`);
+      expect(body).toContain('rt_lines = lo_env->report_lines( ).');
+    }
+    expect(run).toContain('iv_software_component TYPE dlvunit');
+    expect(run).toContain('iv_transport_layer    TYPE devlayer');
+  });
+
+  it('is plain ASCII, so a non-unicode system stores it as written', () => {
+    expect([...run].filter((c) => c.charCodeAt(0) > 127)).toEqual([]);
+  });
+
+  it('is one of the env classes, which the env class never deletes', () => {
+    expect(ENV_CLASSES).toContain(MANUAL_RUNNER);
+    expect(ENV_CLASSES[ENV_CLASSES.length - 1]).toBe('ZCL_LG7_ENV');
+    expect(MANUAL_RUNNER.startsWith('ZCL_LG7_ENV')).toBe(true);
+  });
+
+  it('says what to run in SE24, with the prepare values', () => {
+    const step = manualStep('prepare', {
+      softwareComponent: 'HOME',
+      transportLayer: 'ZABC',
+    });
+    expect(step).toContain(`SE24: ${MANUAL_RUNNER} -> Test (F8) -> PREPARE`);
+    expect(step).toContain(
+      'IV_SOFTWARE_COMPONENT = HOME and IV_TRANSPORT_LAYER = ZABC',
+    );
+    expect(manualStep('remove')).toContain('-> REMOVE -> Execute (F8);');
+  });
+});
+
+/**
+ * A target whose every handler records `<call> <name>`, and whose ABAP Unit
+ * runner records the runner it was asked to run.
+ */
+function recordingTarget(options: { ddl: string }) {
+  const calls: string[] = [];
+  const runs: string[] = [];
+  const nameOf = (c: Record<string, string>) =>
+    c.ddlName ??
+    c.className ??
+    c.includeName ??
+    c.functionModuleName ??
+    c.programName ??
+    c.functionGroupName;
+  const handler = {
+    readMetadata: async (c: Record<string, string>) => {
+      calls.push(`readMetadata ${nameOf(c)}`);
+      return ok(c.ddlName ? options.ddl : IN('$TMP'));
+    },
+    read: async (c: Record<string, string>) => {
+      calls.push(`read ${nameOf(c)}`);
+      return ok('old source');
+    },
+    create: async (c: Record<string, string>) => {
+      calls.push(`create ${nameOf(c)}`);
+      return ok('');
+    },
+    lock: async (c: Record<string, string>) => {
+      calls.push(`lock ${nameOf(c)}`);
+      return ok('H');
+    },
+    unlock: async (c: Record<string, string>) => {
+      calls.push(`unlock ${nameOf(c)}`);
+      return ok(undefined);
+    },
+    update: async (c: Record<string, string>) => {
+      calls.push(`update ${nameOf(c)}`);
+      return ok('');
+    },
+    activate: async (c: Record<string, string>) => {
+      calls.push(`activate ${nameOf(c)}`);
+      return ok('');
+    },
+    delete: async (c: Record<string, string>) => {
+      calls.push(`delete ${nameOf(c)}`);
+      return ok('');
+    },
+  };
+  const client = {
+    getClass: () => handler,
+    getLocalTestClass: () => handler,
+    getDdl: () => handler,
+    getProgram: () => handler,
+    getFunctionGroup: () => handler,
+    getFunctionModule: () => handler,
+    getFunctionInclude: () => handler,
+  };
+  const executor = {
+    getClassTestRunner: () => ({
+      runSync: async (runner: string) => {
+        runs.push(runner);
+        return ok(
+          answerWith([
+            '@@RESULT {"ok":true,"action":"prepare","request":"","package":"ZLG7_TEST","packageExists":true,"errors":0,"lines":0}',
+          ]),
+        );
+      },
+    }),
+  };
+  const target = { client, executor } as unknown as LegacyEnvTarget;
+  /** Each object written, once, in the order of its first write. */
+  const written = () => [
+    ...new Set(
+      calls.filter((c) => c.startsWith('update ')).map((c) => c.slice(7)),
+    ),
+  ];
+  return { target, calls, runs, written };
+}
+
+const SETTINGS = { softwareComponent: 'HOME', transportLayer: 'ZABC' };
+
+describe('legacy env: the manual runner', () => {
+  it('setup installs the env class and ZCL_LG7_ENV_RUN, runs no runner, and says PREPARE is next', async () => {
+    const t = recordingTarget({ ddl: IN('$TMP') });
+    const handOff = await setupManual(t.target, SETTINGS, ['ZLG7_DEL_DDL']);
+    expect(t.runs).toEqual([]);
+    const written = t.written();
+    expect(written.slice(0, 2)).toEqual(['ZCL_LG7_ENV', MANUAL_RUNNER]);
+    expect(written.filter((n) => n.startsWith('ZCL_LG7_ENV_'))).toEqual([
+      MANUAL_RUNNER,
+    ]);
+    // The DDL leftover, then the fixtures.
+    expect(t.calls).toContain('delete ZLG7_DEL_DDL');
+    expect(written).toContain('ZCL_LG7_FX_UNIT');
+    expect(t.calls.indexOf('delete ZLG7_DEL_DDL')).toBeLessThan(
+      t.calls.indexOf('update ZCL_LG7_FX_UNIT'),
+    );
+    expect(handOff.handOff).toBe(true);
+    expect(handOff.next[0]).toBe(manualStep('prepare', SETTINGS));
+    expect(handOff.next[1]).toContain(REQUEST_VARIABLE);
+    expect(handOff.done).toContain('DDL sources deleted: ZLG7_DEL_DDL');
+  });
+
+  it('setup deletes no DDL source that is not there, and none outside $TMP', async () => {
+    const absent = recordingTarget({ ddl: '' });
+    const handOff = await setupManual(absent.target, SETTINGS, [
+      'ZLG7_DEL_DDL',
+    ]);
+    expect(absent.calls).not.toContain('delete ZLG7_DEL_DDL');
+    expect(handOff.done).toContain('DDL sources deleted: none');
+
+    const outside = recordingTarget({ ddl: IN('ZSOMEONE') });
+    await expect(
+      setupManual(outside.target, SETTINGS, ['ZLG7_DEL_DDL']),
+    ).rejects.toThrow(
+      'DDL source ZLG7_DEL_DDL: in package ZSOMEONE; not touched',
+    );
+    expect(outside.calls).not.toContain('delete ZLG7_DEL_DDL');
+    expect(outside.written()).not.toContain('ZCL_LG7_FX_UNIT');
+
+    const foreign = recordingTarget({ ddl: IN('$TMP') });
+    await expect(
+      setupManual(foreign.target, SETTINGS, ['ZOTHER_DDL']),
+    ).rejects.toThrow('DDL source ZOTHER_DDL: not a ZLG7 DDL source');
+    expect(foreign.calls).not.toContain('readMetadata ZOTHER_DDL');
+  });
+
+  it('teardown deletes the DDL sources only, and says REMOVE and uninstall are next', async () => {
+    const t = recordingTarget({ ddl: IN('$TMP') });
+    const handOff = await teardownManual(t.target, ['ZLG7_DEL_DDL']);
+    expect(t.runs).toEqual([]);
+    expect(t.calls).toEqual([
+      'readMetadata ZLG7_DEL_DDL',
+      'readMetadata ZLG7_DEL_DDL',
+      'lock ZLG7_DEL_DDL',
+      'delete ZLG7_DEL_DDL',
+      'unlock ZLG7_DEL_DDL',
+    ]);
+    expect(handOff.next).toEqual([
+      manualStep('remove'),
+      'then npm run legacy:uninstall',
+    ]);
+  });
+
+  it('uninstall deletes every env class, ZCL_LG7_ENV_RUN before ZCL_LG7_ENV', async () => {
+    const t = recordingTarget({ ddl: '' });
+    const handOff = await uninstall(t.target);
+    const deleted = t.calls
+      .filter((c) => c.startsWith('delete '))
+      .map((c) => c.slice(7));
+    expect(deleted).toEqual([...ENV_CLASSES]);
+    expect(t.runs).toEqual([]);
+    expect(handOff.next).toEqual([]);
+  });
+});
+
+describe('legacy env: the abap_unit runner is unchanged', () => {
+  it('setup installs the runners, runs PREPARE through ABAP Unit, and leaves ZCL_LG7_ENV_RUN alone', async () => {
+    const t = recordingTarget({ ddl: IN('$TMP') });
+    const run = await setup(t.target, SETTINGS);
+    expect(run.result.ok).toBe(true);
+    expect(t.runs).toEqual(['ZCL_LG7_ENV_PREPARE']);
+    expect(t.written().filter((n) => n.startsWith('ZCL_LG7_ENV'))).toEqual([
+      'ZCL_LG7_ENV',
+      'ZCL_LG7_ENV_PREPARE',
+      'ZCL_LG7_ENV_STATUS',
+      'ZCL_LG7_ENV_TEARDOWN',
+      'ZCL_LG7_ENV_REMOVE',
+    ]);
+    expect(t.calls.some((c) => c.endsWith(` ${MANUAL_RUNNER}`))).toBe(false);
   });
 });

@@ -4,14 +4,16 @@
 "! and what a crashed run leaves behind. Run through ABAP Unit by the runner
 "! classes ZCL_LG7_ENV_PREPARE / _STATUS / _TEARDOWN / _REMOVE (7.40 SP04 has no
 "! IF_OO_ADT_CLASSRUN); their test methods hand the report to the caller.
+"! Where ABAP Unit may not run them, ZCL_LG7_ENV_RUN runs each action by hand
+"! in SE24 and returns the same report.
 "!
 "! SCOPE — the only things this class ever touches:
 "! - repository objects whose name starts with ZLG7, ZCL_LG7_, ZIF_LG7_ or
 "!   Z_LG7_ AND whose TADIR package is ZLG7_TEST, or $TMP with the current
 "!   user as the TADIR author (name, package and author checked again right
 "!   before every delete) — a $TMP object of another user is never touched;
-"! - never ZCL_LG7_ENV* (this class and its runners): the TypeScript helper
-"!   installs and removes those over ADT;
+"! - never ZCL_LG7_ENV* (this class, its runners and ZCL_LG7_ENV_RUN): the
+"!   TypeScript helper installs and removes those over ADT;
 "! - the package ZLG7_TEST itself, and only when nothing is left in it;
 "! - transport requests of the current user whose text starts with
 "!   'ZLG7 LEGACY-TEST', and their tasks; a released request is never

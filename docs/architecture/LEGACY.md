@@ -337,7 +337,7 @@ Each row ships as decided until a run on 7.40 SP04 measures it. The live checks 
 
 ## Live checks on a 7.40 SP04 system
 
-The live checks under `src/__tests__/integration/legacy/` are written; how to run them, and the test environment they use (prefix `ZLG7`, the environment classes run through ABAP Unit, `npm run legacy:setup` / `legacy:status` / `legacy:teardown`, the 7.40 system's overlay named by `MCP_TEST_OVERLAY`), is in [RFC_TESTING.md](../development/RFC_TESTING.md#the-740-system-an-overlay-and-an-environment-of-its-own). They run only on a configuration with `is_legacy: true` and `connection_type: "rfc"`, and skip with the reason elsewhere — a legacy configuration over HTTP included ("the legacy client is supported over RFC only"). No result of theirs is recorded here yet.
+The live checks under `src/__tests__/integration/legacy/` are written; how to run them, and the test environment they use (prefix `ZLG7`, the environment classes run through ABAP Unit or, with `legacy_env.runner: manual`, by hand in SE24 (`ZCL_LG7_ENV_RUN`), `npm run legacy:setup` / `legacy:status` / `legacy:teardown` / `legacy:uninstall`, the 7.40 system's overlay named by `MCP_TEST_OVERLAY`), is in [RFC_TESTING.md](../development/RFC_TESTING.md#the-740-system-an-overlay-and-an-environment-of-its-own). They run only on a configuration with `is_legacy: true` and `connection_type: "rfc"`, and skip with the reason elsewhere — a legacy configuration over HTTP included ("the legacy client is supported over RFC only"). No result of theirs is recorded here yet.
 
 ## What changes on 7.40 for a consumer of 37.2
 

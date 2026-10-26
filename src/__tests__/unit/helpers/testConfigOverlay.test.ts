@@ -754,12 +754,33 @@ describe('a legacy system in its overlay', () => {
     expect(config.legacy_env).toEqual({
       software_component: 'ZCUST',
       transport_layer: 'ZL7',
+      runner: 'abap_unit',
     });
     expect(
       config.legacy_740.test_cases
         .filter((c: { name: string }) => LEGACY_CASES.includes(c.name))
         .map((c: { enabled: boolean }) => c.enabled),
     ).toEqual(LEGACY_CASES.map(() => true));
+  });
+
+  it('states the env runner: abap_unit in the base, manual from an overlay, nothing else', () => {
+    expect(loadTestConfigFrom(directory).config.legacy_env.runner).toBe(
+      'abap_unit',
+    );
+    const manual = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({ ...FULL_OVERLAY, 'legacy_env.runner': 'manual' }),
+    );
+    expect(loadTestConfigFrom(directory, manual).config.legacy_env.runner).toBe(
+      'manual',
+    );
+    const other = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({ ...FULL_OVERLAY, 'legacy_env.runner': 'sm37' }),
+    );
+    expect(refusal(() => loadTestConfigFrom(directory, other))).toContain(
+      '"legacy_env.runner" must be one of abap_unit, manual',
+    );
   });
 
   it('refuses is_legacy written as a string', () => {

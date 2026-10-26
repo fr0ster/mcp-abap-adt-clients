@@ -179,6 +179,49 @@ npm run test:detached -- integration/legacy
 npm run legacy:teardown        # when the environment is no longer needed
 ```
 
+`npm run legacy:uninstall` deletes only the env classes (`ZCL_LG7_ENV`, its
+runners, `ZCL_LG7_ENV_RUN`) over ADT — each that is there, in `$TMP` and of the
+session user. `legacy:teardown` does that itself with the ABAP Unit runner; the
+manual runner needs it as its last step.
+
+### The manual runner
+
+A client may limit ABAP Unit below risk level `DANGEROUS`
+(`SAUNIT_CLIENT_SETUP`): the runner classes are then refused with "No
+execution, risk level of test class exceeds upper limit" and no `@@RESULT`
+line comes back. There the overlay states
+
+```yaml
+"legacy_env.runner": "manual"
+```
+
+(the base states `"abap_unit"`; nothing else is accepted) and the owner runs
+each action in SAP GUI with `ZCL_LG7_ENV_RUN`
+(`src/__tests__/integration/legacy/abap/zcl_lg7_env_run.clas.abap`): one static
+method per action, each creating `ZCL_LG7_ENV`, calling the action and
+returning its report lines — `@@LOG {json}` per step, `@@RESULT {json}` last,
+whose `"ok"` must be `true`. In SE24: class `ZCL_LG7_ENV_RUN` → **Test (F8)** →
+the method → **Execute (F8)** → double-click `RT_LINES`. The npm scripts do
+only the ADT part around those steps, and run no ABAP Unit runner.
+
+| # | Who | Step |
+|---|---|---|
+| 1 | npm | `npm run legacy:setup` — installs `ZCL_LG7_ENV` and `ZCL_LG7_ENV_RUN` (no runner class), deletes the DDL sources the live cases name (`ddl_name`) when a crashed run left one in `$TMP`, creates or refreshes the fixtures. The test title and `.legacy-env/setup.json` (`next`) name step 2 with the values |
+| 2 | SE24 | `PREPARE` with `IV_SOFTWARE_COMPONENT` and `IV_TRANSPORT_LAYER` = the overlay's `legacy_env.software_component` and `transport_layer` — locks, leftovers, inactive versions, the request `ZLG7 LEGACY-TEST …`, package `ZLG7_TEST`. Its `@@RESULT` names the request |
+| 3 | npm | `LEGACY_ENV_REQUEST=<that request> npm run test:detached -- integration/legacy`. Only `LegacyTransportable` reads it; without it that case skips, naming step 2. `STATUS` in SE24 reads the environment at any time (`npm run legacy:status` skips, naming it) |
+| 4 | SE24 | `TEARDOWN` — locks, every ZLG7 object in scope (fixtures included), inactive versions; DDL sources are left for ADT, the request is kept |
+| 5 | npm | `npm run legacy:teardown` — deletes the named DDL sources over ADT, nothing else |
+| 6 | SE24 | `REMOVE` — package `ZLG7_TEST`, every marked request of the user (none released) |
+| 7 | npm | `npm run legacy:uninstall` — deletes the env classes over ADT, `ZCL_LG7_ENV_RUN` included |
+
+If step 1 fails on a lock or a leftover a crashed run holds, run `PREPARE`
+(step 2) and step 1 again: both are idempotent. With the manual runner the
+owner's report does not reach the npm side, so a DDL source the report marks
+`LEFT-FOR-ADT` under a name no live case configures is not deleted by steps 1
+and 5; `REMOVE` then reports package `ZLG7_TEST` as not empty if such a source
+is in it. `LEGACY_ENV_REQUEST` beside `legacy_env.runner: "abap_unit"` is
+refused, never ignored.
+
 ### The live checks
 
 Written, not yet run: no result of theirs is recorded in `docs/architecture/LEGACY.md`.

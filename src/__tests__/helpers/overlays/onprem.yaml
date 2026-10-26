@@ -94,6 +94,8 @@
 # "legacy_env.software_component": "<SOFTWARE_COMPONENT>"
 # Transport layer of that package (up to 4 characters).
 # "legacy_env.transport_layer": "<TRANSPORT_LAYER>"
+# How the env actions run: "abap_unit" (the base) or "manual" — the owner runs ZCL_LG7_ENV_RUN in SE24, where the client's ABAP Unit risk limit refuses the runners.
+# "legacy_env.runner": "manual"
 # The legacy live checks, each off in the base; true on the legacy system.
 # "legacy_740.test_cases[legacy_deletes].enabled": true
 # "legacy_740.test_cases[legacy_refusals_send_nothing].enabled": true

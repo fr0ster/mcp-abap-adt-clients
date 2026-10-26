@@ -25,8 +25,15 @@
  * delete): an object of another name, or one in another package, is never
  * touched.
  *
- * Run: npm run legacy:setup / legacy:status / legacy:teardown (see
- * src/__tests__/admin/legacy-env/).
+ * Where the client limits ABAP Unit below risk level DANGEROUS
+ * (`SAUNIT_CLIENT_SETUP`), the overlay states `legacy_env.runner: manual`:
+ * `ZCL_LG7_ENV_RUN` is installed instead of the runners, the owner runs each
+ * action in SE24 (`ZCL_LG7_ENV_RUN=>PREPARE` / `STATUS` / `TEARDOWN` /
+ * `REMOVE`), and the npm scripts do only the ADT part around those steps —
+ * the order is in that class's header.
+ *
+ * Run: npm run legacy:setup / legacy:status / legacy:teardown /
+ * legacy:uninstall (see src/__tests__/admin/legacy-env/).
  */
 
 import * as fs from 'node:fs';
@@ -255,6 +262,108 @@ export function configuredSettings(): LegacyEnvSettings {
   return settingsOf(loadTestConfig());
 }
 
+/**
+ * How the env actions run, stated by `legacy_env.runner`: `abap_unit` (the
+ * runner classes through ABAP Unit) or `manual` (the owner runs
+ * `ZCL_LG7_ENV_RUN` in SE24). The base states `abap_unit`; no value is guessed.
+ */
+export type EnvRunner = 'abap_unit' | 'manual';
+
+const RUNNER_VALUES: readonly string[] = ['abap_unit', 'manual'];
+
+/** The runner a configuration's `legacy_env` section states. */
+export function runnerOf(config: unknown): EnvRunner {
+  const section = (config as { legacy_env?: Record<string, unknown> } | null)
+    ?.legacy_env;
+  if (!section || typeof section !== 'object')
+    throw new Error(
+      'legacy env: the configuration has no legacy_env section (see test-config.yaml.template)',
+    );
+  const value = section.runner;
+  if (value === undefined || value === null)
+    throw new Error(
+      'legacy env: legacy_env.runner is required (abap_unit or manual)',
+    );
+  if (typeof value !== 'string' || !RUNNER_VALUES.includes(value))
+    throw new Error(
+      `legacy env: legacy_env.runner must be abap_unit or manual, not ${JSON.stringify(value)}`,
+    );
+  return value as EnvRunner;
+}
+
+/** The runner of the configuration this run loads. */
+export function configuredRunner(): EnvRunner {
+  const { loadTestConfig } = require('./test-helper');
+  return runnerOf(loadTestConfig());
+}
+
+/** The DDL source names the live cases configure: `ddl_name` of every `legacy_740` case. */
+export function ddlNamesOf(config: unknown): string[] {
+  const cases = (
+    config as {
+      legacy_740?: { test_cases?: Array<{ params?: Record<string, unknown> }> };
+    } | null
+  )?.legacy_740?.test_cases;
+  const names: string[] = [];
+  for (const testCase of Array.isArray(cases) ? cases : []) {
+    const name = testCase?.params?.ddl_name;
+    if (typeof name === 'string' && name.trim() !== '')
+      names.push(name.trim().toUpperCase());
+  }
+  return [...new Set(names)];
+}
+
+/** The DDL source names of the configuration this run loads. */
+export function configuredDdlNames(): string[] {
+  const { loadTestConfig } = require('./test-helper');
+  return ddlNamesOf(loadTestConfig());
+}
+
+/** The variable that carries the environment's request with the manual runner. */
+export const REQUEST_VARIABLE = 'LEGACY_ENV_REQUEST';
+
+/** Where a live check gets the environment's request from. */
+export type EnvRequestSource =
+  | { readonly from: 'status' }
+  | { readonly from: 'owner'; readonly request: string }
+  | { readonly from: 'none'; readonly skip: string };
+
+/**
+ * `abap_unit`: the status run. `manual`: the owner's `LEGACY_ENV_REQUEST` —
+ * the request the `@@RESULT` line of `ZCL_LG7_ENV_RUN=>PREPARE` (or `STATUS`)
+ * names; without it the check cannot run and says why. The variable is refused
+ * beside `abap_unit`, where it would be ignored.
+ */
+export function requestSource(
+  runner: EnvRunner,
+  env: NodeJS.ProcessEnv = process.env,
+): EnvRequestSource {
+  const raw = env[REQUEST_VARIABLE];
+  if (runner === 'abap_unit') {
+    if (raw !== undefined)
+      throw new Error(
+        `legacy env: ${REQUEST_VARIABLE} is read only with legacy_env.runner: manual; unset it`,
+      );
+    return { from: 'status' };
+  }
+  if (raw === undefined || raw.trim() === '')
+    return {
+      from: 'none',
+      skip: `legacy_env.runner is manual and ${REQUEST_VARIABLE} is not set — run ${MANUAL_RUNNER}=>PREPARE (or STATUS) in SE24 and set ${REQUEST_VARIABLE} to the request its @@RESULT line names`,
+    };
+  const request = raw.trim().toUpperCase();
+  if (
+    request.length > 20 ||
+    [...request].some(
+      (c) => !'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.includes(c),
+    )
+  )
+    throw new Error(
+      `legacy env: ${REQUEST_VARIABLE} must be a request number (1-20 characters of A-Z and 0-9)`,
+    );
+  return { from: 'owner', request };
+}
+
 // ---------------------------------------------------------------------------
 // The sources
 // ---------------------------------------------------------------------------
@@ -280,6 +389,35 @@ export const RUNNERS: Record<EnvAction, string> = {
   teardown: 'ZCL_LG7_ENV_TEARDOWN',
   remove: 'ZCL_LG7_ENV_REMOVE',
 };
+
+/** The class the owner runs by hand in SE24 with the manual runner. */
+export const MANUAL_RUNNER = 'ZCL_LG7_ENV_RUN';
+
+/** The env class, then the class the owner runs by hand (it depends on it). */
+export function manualEnvClasses(): ClassSource[] {
+  return [
+    ...envClasses([]),
+    {
+      name: MANUAL_RUNNER,
+      description: 'adt-clients legacy checks: env actions by hand',
+      main: abapFile('zcl_lg7_env_run.clas.abap'),
+    },
+  ];
+}
+
+/** What the owner does in SE24 to run `action` with the manual runner. */
+export function manualStep(
+  action: EnvAction,
+  settings?: LegacyEnvSettings,
+): string {
+  const values =
+    action !== 'prepare'
+      ? ''
+      : settings
+        ? ` with IV_SOFTWARE_COMPONENT = ${settings.softwareComponent} and IV_TRANSPORT_LAYER = ${settings.transportLayer}`
+        : " with the overlay's legacy_env.software_component and transport_layer";
+  return `SE24: ${MANUAL_RUNNER} -> Test (F8) -> ${action.toUpperCase()} -> Execute (F8)${values}; RT_LINES ends with an @@RESULT line whose "ok" must be true`;
+}
 
 /** The prepare runner's test include, the settings filled in. */
 export function renderPrepare(
@@ -801,9 +939,50 @@ export async function runEnvAction(
 }
 
 /**
- * Delete the DDL sources the env class left for ADT: lock, `DELETE
- * ?lockHandle=`, unlock — measured on 7.40 SP04. Guarded like everything here:
- * a ZLG7 name whose metadata names `$TMP`, or `ZLG7_TEST` with the env's
+ * Delete one ZLG7 DDL source over ADT: lock, `DELETE ?lockHandle=`, unlock —
+ * measured on 7.40 SP04. Only when its metadata names `$TMP` (and, where it
+ * names one, the session user as responsible) and `local` is set, or names
+ * `ZLG7_TEST` and `request` is given — the request goes as `corrNr`.
+ */
+async function deleteDdl(
+  target: LegacyEnvTarget,
+  name: string,
+  local: boolean,
+  request: string | undefined,
+): Promise<void> {
+  const handler = as(target.client.getDdl());
+  const label = `DDL source ${name}`;
+  const read = await handler.readMetadata({ ddlName: name });
+  stopOnCredentialRefusal(read, `read ${label}`);
+  const metadata = String(expectResult(read, `read ${label}`));
+  const pkg = packageOf(metadata)?.toUpperCase();
+  if (
+    !(local && pkg === LOCAL_PACKAGE) &&
+    !(request !== undefined && pkg === ENV_PACKAGE)
+  )
+    throw new Error(`in package ${pkg ?? '(none named)'}; not touched`);
+  const foreign =
+    pkg === LOCAL_PACKAGE ? notTheSessionUsers(metadata) : undefined;
+  if (foreign) throw new Error(`${foreign}; not touched`);
+  const config = {
+    ddlName: name,
+    ...(request !== undefined && { transportRequest: request }),
+  };
+  const deleted = await deleteLocked(lockable(handler), config, label);
+  stopOnCredentialRefusal(deleted, `delete ${label}`);
+  expectResult(deleted, `delete ${label}`);
+  target.logger?.info(`legacy env: deleted ${label}`);
+}
+
+/** A problem line for `label`, or the credential refusal rethrown. */
+function problemOf(label: string, error: unknown): string {
+  if (isCredentialRefusal(error)) throw error;
+  return `${label}: ${error instanceof Error ? error.message : String(error)}`;
+}
+
+/**
+ * Delete the DDL sources the env class left for ADT. Guarded like everything
+ * here: a ZLG7 name whose metadata names `$TMP`, or `ZLG7_TEST` with the env's
  * request as `corrNr`.
  */
 export async function deleteLeftDdls(
@@ -817,39 +996,59 @@ export async function deleteLeftDdls(
       problems.push(`${line.object}: not a ZLG7 DDL source; not touched`);
       continue;
     }
-    const handler = as(target.client.getDdl());
-    const label = `DDL source ${name}`;
-    const local = line.message.toUpperCase() === LOCAL_PACKAGE;
-    const inEnvPackage = line.message.toUpperCase() === ENV_PACKAGE;
+    const where = line.message.toUpperCase();
     try {
-      const read = await handler.readMetadata({ ddlName: name });
-      stopOnCredentialRefusal(read, `read ${label}`);
-      const metadata = String(expectResult(read, `read ${label}`));
-      const pkg = packageOf(metadata)?.toUpperCase();
-      if (
-        !(local && pkg === LOCAL_PACKAGE) &&
-        !(inEnvPackage && pkg === ENV_PACKAGE)
-      )
-        throw new Error(`in package ${pkg ?? '(none named)'}; not touched`);
-      const foreign =
-        pkg === LOCAL_PACKAGE ? notTheSessionUsers(metadata) : undefined;
-      if (foreign) throw new Error(`${foreign}; not touched`);
-      const config = {
-        ddlName: name,
-        ...(inEnvPackage && { transportRequest: run.result.request }),
-      };
-      const deleted = await deleteLocked(lockable(handler), config, label);
-      stopOnCredentialRefusal(deleted, `delete ${label}`);
-      expectResult(deleted, `delete ${label}`);
-      target.logger?.info(`legacy env: deleted ${label}`);
-    } catch (error) {
-      if (isCredentialRefusal(error)) throw error;
-      problems.push(
-        `${label}: ${error instanceof Error ? error.message : String(error)}`,
+      await deleteDdl(
+        target,
+        name,
+        where === LOCAL_PACKAGE,
+        where === ENV_PACKAGE ? run.result.request : undefined,
       );
+    } catch (error) {
+      problems.push(problemOf(`DDL source ${name}`, error));
     }
   }
   return problems;
+}
+
+/**
+ * With the manual runner the owner's report does not reach this side, so the
+ * DDL sources to delete are named instead (the live cases' `ddl_name`): each
+ * one there is deleted when it is a ZLG7 name in `$TMP` of the session user.
+ * A DDL source the report marks LEFT-FOR-ADT under another name is not seen.
+ */
+export async function deleteNamedDdls(
+  target: LegacyEnvTarget,
+  names: readonly string[],
+): Promise<{ deleted: string[]; problems: string[] }> {
+  const deleted: string[] = [];
+  const problems: string[] = [];
+  for (const name of names) {
+    const label = `DDL source ${name}`;
+    if (!isOwnName('DDL source', name)) {
+      problems.push(`${label}: not a ZLG7 DDL source; not touched`);
+      continue;
+    }
+    try {
+      if (
+        !(await isPresent(as(target.client.getDdl()), { ddlName: name }, label))
+      )
+        continue;
+      await deleteDdl(target, name, true, undefined);
+      deleted.push(name);
+    } catch (error) {
+      problems.push(problemOf(label, error));
+    }
+  }
+  return { deleted, problems };
+}
+
+/** Fail naming every problem of a step that has no ABAP report. */
+function requireNoProblems(what: string, problems: readonly string[]): void {
+  if (problems.length > 0)
+    throw new Error(
+      `legacy env ${what} reported ${problems.length} problem(s):\n  ${problems.join('\n  ')}`,
+    );
 }
 
 /** Fail naming every ERROR line (and every DDL source left behind). */
@@ -884,6 +1083,118 @@ export async function assertLegacySystem(
         'Nothing was installed or deleted.',
     );
   }
+}
+
+/**
+ * What an npm step did with the manual runner, and what the owner runs next:
+ * the ABAP actions are the owner's, so there is no report of them here.
+ */
+export interface EnvHandOff {
+  readonly handOff: true;
+  readonly done: readonly string[];
+  readonly next: readonly string[];
+}
+
+/**
+ * Before the live checks, manual runner: install `ZCL_LG7_ENV` and
+ * `ZCL_LG7_ENV_RUN` (no runner class, no ABAP Unit run), delete the named DDL
+ * sources a crashed run left, create or refresh the fixtures. Prepare is the
+ * owner's next step.
+ */
+export async function setupManual(
+  target: LegacyEnvTarget,
+  settings: LegacyEnvSettings,
+  ddlNames: readonly string[],
+): Promise<EnvHandOff> {
+  const classes = manualEnvClasses();
+  for (const cls of classes) await ensureClass(target, cls);
+  const ddls = await deleteNamedDdls(target, ddlNames);
+  requireNoProblems('setup', ddls.problems);
+  await ensureFixtures(target);
+  return {
+    handOff: true,
+    done: [
+      `installed ${classes.map((c) => c.name).join(', ')}`,
+      `DDL sources deleted: ${ddls.deleted.join(', ') || 'none'}`,
+      'fixtures created or refreshed',
+    ],
+    next: [
+      manualStep('prepare', settings),
+      `then the live checks, with ${REQUEST_VARIABLE} set to the request its @@RESULT line names`,
+    ],
+  };
+}
+
+/**
+ * After the owner's `ZCL_LG7_ENV_RUN=>TEARDOWN`, manual runner: delete the
+ * named DDL sources (teardown leaves DDL sources for ADT). Remove, then
+ * `npm run legacy:uninstall`, are the owner's next steps.
+ */
+export async function teardownManual(
+  target: LegacyEnvTarget,
+  ddlNames: readonly string[],
+): Promise<EnvHandOff> {
+  const ddls = await deleteNamedDdls(target, ddlNames);
+  requireNoProblems('teardown', ddls.problems);
+  return {
+    handOff: true,
+    done: [`DDL sources deleted: ${ddls.deleted.join(', ') || 'none'}`],
+    next: [manualStep('remove'), 'then npm run legacy:uninstall'],
+  };
+}
+
+/** Every env class, the ones depending on `ZCL_LG7_ENV` first. */
+export const ENV_CLASSES: readonly string[] = [
+  RUNNERS.prepare,
+  RUNNERS.status,
+  RUNNERS.teardown,
+  RUNNERS.remove,
+  MANUAL_RUNNER,
+  'ZCL_LG7_ENV',
+];
+
+/**
+ * Delete the env classes over ADT — each that is there, in `$TMP` and, where
+ * its metadata names one, of the session user. Answers the problems.
+ */
+export async function deleteEnvClasses(
+  target: LegacyEnvTarget,
+): Promise<{ deleted: string[]; problems: string[] }> {
+  const handler = as(target.client.getClass());
+  const deleted: string[] = [];
+  const problems: string[] = [];
+  for (const name of ENV_CLASSES) {
+    assertOwnName('class', name);
+    const config = { className: name };
+    const label = `class ${name}`;
+    try {
+      if (!(await isPresent(handler, config, label))) continue;
+      await assertLocal(handler, config, label);
+      const answer = await deleteLocked(lockable(handler), config, label);
+      stopOnCredentialRefusal(answer, `delete ${label}`);
+      expectResult(answer, `delete ${label}`);
+      target.logger?.info(`legacy env: deleted ${label}`);
+      deleted.push(name);
+    } catch (error) {
+      problems.push(problemOf(label, error));
+    }
+  }
+  return { deleted, problems };
+}
+
+/**
+ * The env classes deleted over ADT — after `ZCL_LG7_ENV_RUN=>REMOVE` with the
+ * manual runner (`legacy:teardown` does it itself with ABAP Unit). Nothing
+ * else is touched.
+ */
+export async function uninstall(target: LegacyEnvTarget): Promise<EnvHandOff> {
+  const classes = await deleteEnvClasses(target);
+  requireNoProblems('uninstall', classes.problems);
+  return {
+    handOff: true,
+    done: [`env classes deleted: ${classes.deleted.join(', ') || 'none'}`],
+    next: [],
+  };
 }
 
 /**
@@ -945,7 +1256,8 @@ export function combineRuns(first: EnvRun, second: EnvRun): EnvRun {
  * 2. the DDL sources over ADT, with the request as `corrNr` in `ZLG7_TEST`;
  * 3. remove (ABAP): package `ZLG7_TEST`, then every marked request — none
  *    is released;
- * 4. the env classes themselves over ADT, runners first.
+ * 4. the env classes themselves over ADT, runners first (`ZCL_LG7_ENV_RUN`
+ *    too, when a manual setup left it).
  * A credential refusal stops it at once.
  */
 export async function teardown(target: LegacyEnvTarget): Promise<EnvRun> {
@@ -953,32 +1265,7 @@ export async function teardown(target: LegacyEnvTarget): Promise<EnvRun> {
   const objects = await runEnvAction(target, 'teardown');
   const problems = await deleteLeftDdls(target, objects);
   const rest = await runEnvAction(target, 'remove');
-  const handler = as(target.client.getClass());
-  const classes = [
-    RUNNERS.prepare,
-    RUNNERS.status,
-    RUNNERS.teardown,
-    RUNNERS.remove,
-    'ZCL_LG7_ENV',
-  ];
-  for (const name of classes) {
-    assertOwnName('class', name);
-    const config = { className: name };
-    const label = `class ${name}`;
-    try {
-      if (!(await isPresent(handler, config, label))) continue;
-      await assertLocal(handler, config, label);
-      const deleted = await deleteLocked(lockable(handler), config, label);
-      stopOnCredentialRefusal(deleted, `delete ${label}`);
-      expectResult(deleted, `delete ${label}`);
-      target.logger?.info(`legacy env: deleted ${label}`);
-    } catch (error) {
-      if (isCredentialRefusal(error)) throw error;
-      problems.push(
-        `${label}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
+  problems.push(...(await deleteEnvClasses(target)).problems);
   const run = combineRuns(objects, rest);
   requireClean(run, problems);
   return run;
