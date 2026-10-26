@@ -94,16 +94,20 @@ function exportsOf(entry) {
   return names;
 }
 
+/** The repository root: this package is packages/adt-clients. */
+const REPOSITORY_ROOT = path.resolve(ROOT, '..', '..');
+
 /**
  * Where an installed dependency lives: the nearest `node_modules/<pkg>` from
- * this package up, the directories Node itself searches. In the repository's
- * workspace npm hoists most dependencies to the root's `node_modules`.
+ * this package up to the repository root, where npm hoists most of the
+ * workspace's dependencies. Never above it: a `node_modules` outside the
+ * repository is no install of this one.
  */
 function installedRoot(pkg) {
   for (let dir = ROOT; ; dir = path.dirname(dir)) {
     const candidate = path.join(dir, 'node_modules', pkg);
     if (fs.existsSync(candidate)) return candidate;
-    if (path.dirname(dir) === dir) return null;
+    if (dir === REPOSITORY_ROOT || path.dirname(dir) === dir) return null;
   }
 }
 
