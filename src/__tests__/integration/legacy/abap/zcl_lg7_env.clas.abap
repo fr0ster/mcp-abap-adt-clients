@@ -7,14 +7,18 @@
 "! Where ABAP Unit may not run them, ZCL_LG7_ENV_RUN runs each action by hand
 "! in SE24 and returns the same report.
 "!
-"! SCOPE — the only things this class ever touches:
+"! SCOPE - the only things this class ever touches:
 "! - repository objects whose name starts with ZLG7, ZCL_LG7_, ZIF_LG7_ or
-"!   Z_LG7_ AND whose TADIR package is ZLG7_TEST, or $TMP with the current
-"!   user as the TADIR author (name, package and author checked again right
-"!   before every delete) — a $TMP object of another user is never touched;
+"!   Z_LG7_ AND whose TADIR package is ZLG7_TEST or $TMP AND whose TADIR
+"!   author is the current user (name, package and author checked again right
+"!   before every delete) - an object of another user is never touched, in
+"!   either package;
 "! - never ZCL_LG7_ENV* (this class, its runners and ZCL_LG7_ENV_RUN): the
 "!   TypeScript helper installs and removes those over ADT;
-"! - the package ZLG7_TEST itself, and only when nothing is left in it;
+"! - the package ZLG7_TEST itself, only when the current user owns it
+"!   (TDEVC-AS4USER and the TADIR author of its DEVC entry), and deleted only
+"!   when nothing is left in it; a package of another user is neither adopted
+"!   nor deleted;
 "! - transport requests of the current user whose text starts with
 "!   'ZLG7 LEGACY-TEST', and their tasks; a released request is never
 "!   selected, and no request is ever released;
@@ -114,6 +118,7 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING VALUE(rv_status) TYPE string.
     METHODS clean_inactive IMPORTING iv_keep_fixtures TYPE abap_bool.
     METHODS package_exists RETURNING VALUE(rv_yes) TYPE abap_bool.
+    METHODS package_owner_problem RETURNING VALUE(rv_problem) TYPE string.
     METHODS ensure_package.
     METHODS delete_package.
     METHODS purge_deleted_entries.
@@ -183,10 +188,10 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD in_scope.
-    " ZLG7_TEST is the run's own package; in $TMP, which every user shares,
-    " only an object the current user is the TADIR author of.
-    IF iv_devclass = c_package
-        OR ( iv_devclass = c_local_package AND iv_author = sy-uname ).
+    " Only an object the current user is the TADIR author of, in ZLG7_TEST
+    " and in $TMP alike: both are shared with every other user.
+    IF iv_author = sy-uname
+        AND ( iv_devclass = c_package OR iv_devclass = c_local_package ).
       rv_yes = abap_true.
     ENDIF.
   ENDMETHOD.
@@ -330,11 +335,11 @@ CLASS zcl_lg7_env IMPLEMENTATION.
   METHOD release_locks.
     " Touches: enqueue entries of sy-uname in sy-mandt one of whose argument
     " words is EXACTLY a name of the scope list built from TADIR here (objects
-    " in scope, env classes excluded) or derived from one — a class's pool
+    " in scope, env classes excluded) or derived from one - a class's pool
     " includes (the name padded with '=' to 30, then its suffix), a function
-    " group's SAPL program, its L<group>xxx includes, its modules (TFDIR) — or
+    " group's SAPL program, its L<group>xxx includes, its modules (TFDIR) - or
     " a marked request. No substring match. And the lock's object (its table,
-    " GNAME) must be the one that kind of name is locked with — see
+    " GNAME) must be the one that kind of name is locked with - see
     " lock_object_fits; a lock of any other object naming our name is left in
     " place and logged. Nothing else goes to ENQUE_DELETE.
     TYPES:
@@ -496,10 +501,10 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
   METHOD lock_object_fits.
     " The lock object (seqg3-gname: the table its enqueue object locks) each
-    " kind of name is locked with — the ones known for 7.40, not measured
+    " kind of name is locked with - the ones known for 7.40, not measured
     " there: a class or interface by ESEOCLASS (SEOCLASS), a program or an
     " include by ESRDIRE (TRDIR), a function module by ESFUNCTION (TFDIR), a
-    " request by E_TRKORR (E070). Every other pairing is no — a DDL source, a
+    " request by E_TRKORR (E070). Every other pairing is no - a DDL source, a
     " function group by its own name and every unnamed lock object are left.
     CASE iv_kind.
       WHEN `CLAS` OR `INTF`.
@@ -673,15 +678,16 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD objects_in_scope.
-    " Touches nothing: TADIR entries (not flagged for deletion) in ZLG7_TEST,
-    " or in $TMP with the current user as author, whose name is ours, minus
+    " Touches nothing: TADIR entries (not flagged for deletion) in ZLG7_TEST
+    " or $TMP with the current user as author, whose name is ours, minus
     " the env classes (and the fixtures, when asked). The LIKE patterns only
     " narrow the read; is_own_name decides, and delete_one checks again.
     DATA lt_found TYPE tt_object.
     DATA ls_found TYPE ty_object.
     SELECT object obj_name devclass FROM tadir INTO TABLE lt_found
       WHERE pgmid = 'R3TR'
-        AND ( devclass = c_package OR ( devclass = c_local_package AND author = sy-uname ) )
+        AND ( devclass = c_package OR devclass = c_local_package )
+        AND author = sy-uname
         AND object <> 'DEVC'
         AND delflag = space
         AND ( obj_name LIKE 'ZLG7%' OR obj_name LIKE 'ZCL_LG7%'
@@ -752,7 +758,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     ENDDO.
 
     " DDL sources: no classic delete function module on 7.40 SP04; the
-    " TypeScript helper deletes these over ADT (lock, DELETE, unlock — measured).
+    " TypeScript helper deletes these over ADT (lock, DELETE, unlock - measured).
     lt_objects = objects_in_scope( iv_keep_fixtures ).
     LOOP AT lt_objects INTO ls_object.
       IF ls_object-object = 'DDLS'.
@@ -767,9 +773,9 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD delete_one.
-    " Touches: the one object given, only after the guard read again here —
-    " our name, not an env class, TADIR package ZLG7_TEST or $TMP with the
-    " current user as author.
+    " Touches: the one object given, only after the guard read again here -
+    " our name, not an env class, TADIR package ZLG7_TEST or $TMP, and the
+    " current user as the TADIR author.
     DATA lv_devclass TYPE devclass.
     DATA lv_author TYPE tadir-author.
     DATA lv_corrnr TYPE trkorr.
@@ -867,7 +873,8 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
   METHOD clean_inactive.
     " Touches: DWINACTIV entries of sy-uname whose owner (see owner_of) is in
-    " scope — our name, TADIR package $TMP or ZLG7_TEST — and not an env class
+    " scope - our name, TADIR package $TMP or ZLG7_TEST, the current user as
+    " author - and not an env class
     " (nor a fixture, when asked); removed with RS_DELETE_FROM_WORKING_AREA.
     TYPES:
       BEGIN OF ty_inactive,
@@ -929,15 +936,46 @@ CLASS zcl_lg7_env IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD package_owner_problem.
+    " Initial when the current user owns package ZLG7_TEST, else why not.
+    " Both owners the repository keeps for a package are read: TDEVC-AS4USER
+    " (the person responsible) and the TADIR author of its R3TR DEVC entry;
+    " both must be the current user.
+    DATA lv_responsible TYPE tdevc-as4user.
+    DATA lv_author TYPE tadir-author.
+    SELECT SINGLE as4user FROM tdevc INTO lv_responsible WHERE devclass = c_package.
+    IF sy-subrc <> 0.
+      rv_problem = `no TDEVC entry; not touched`.
+      RETURN.
+    ENDIF.
+    SELECT SINGLE author FROM tadir INTO lv_author
+      WHERE pgmid = 'R3TR' AND object = 'DEVC' AND obj_name = c_package.
+    IF sy-subrc <> 0.
+      rv_problem = `no TADIR entry; ownership not established; not touched`.
+      RETURN.
+    ENDIF.
+    IF lv_responsible <> sy-uname OR lv_author <> sy-uname.
+      rv_problem = |TDEVC-AS4USER { lv_responsible }, TADIR author { lv_author }: not the current user; not touched|.
+    ENDIF.
+  ENDMETHOD.
+
+
   METHOD ensure_package.
     " Touches: package ZLG7_TEST only, created when missing, on the marked
     " request, with the software component and transport layer it was given.
+    " An existing one is adopted only when the current user owns it.
     DATA ls_data TYPE scompkdtln.
     DATA lo_package TYPE REF TO if_package.
     DATA lx_call TYPE REF TO cx_root.
+    DATA lv_problem TYPE string.
     FIELD-SYMBOLS <lv_field> TYPE any.
 
     IF package_exists( ) = abap_true.
+      lv_problem = package_owner_problem( ).
+      IF lv_problem IS NOT INITIAL.
+        add_log( iv_step = `package` iv_object = c_package iv_status = `ERROR` iv_message = lv_problem ).
+        RETURN.
+      ENDIF.
       add_log( iv_step = `package` iv_object = c_package iv_status = `OK` iv_message = `exists` ).
       RETURN.
     ENDIF.
@@ -1004,14 +1042,20 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
 
   METHOD delete_package.
-    " Touches: package ZLG7_TEST only, and only when no object is left in it;
-    " the deletion is recorded on the marked request.
+    " Touches: package ZLG7_TEST only, only when the current user owns it and
+    " no object is left in it; the deletion is recorded on the marked request.
     DATA lo_package TYPE REF TO if_package.
     DATA lv_count TYPE i.
     DATA lx_call TYPE REF TO cx_root.
+    DATA lv_problem TYPE string.
 
     IF package_exists( ) = abap_false.
       add_log( iv_step = `package` iv_object = c_package iv_status = `OK` iv_message = `not present` ).
+      RETURN.
+    ENDIF.
+    lv_problem = package_owner_problem( ).
+    IF lv_problem IS NOT INITIAL.
+      add_log( iv_step = `package` iv_object = c_package iv_status = `ERROR` iv_message = lv_problem ).
       RETURN.
     ENDIF.
     SELECT COUNT(*) FROM tadir INTO lv_count
@@ -1078,14 +1122,15 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
   METHOD purge_deleted_entries.
     " Touches: TADIR entries flagged for deletion that belonged to ZLG7_TEST
-    " (and the package's own entry) with our names. A deleted object keeps such
+    " (and the package's own entry) with our names and the current user as
+    " author. A deleted object keeps such
     " an entry until its request is released; the marked requests are deleted
     " instead, so the entry is dropped here.
     DATA lt_flagged TYPE tt_object.
     DATA ls_flagged TYPE ty_object.
     DATA lx_call TYPE REF TO cx_sy_dyn_call_error.
     SELECT object obj_name devclass FROM tadir INTO TABLE lt_flagged
-      WHERE pgmid = 'R3TR' AND delflag = 'X'
+      WHERE pgmid = 'R3TR' AND delflag = 'X' AND author = sy-uname
         AND ( devclass = c_package OR ( object = 'DEVC' AND obj_name = c_package ) ).
     LOOP AT lt_flagged INTO ls_flagged.
       IF is_own_name( ls_flagged-obj_name ) = abap_false OR is_env_name( ls_flagged-obj_name ) = abap_true.

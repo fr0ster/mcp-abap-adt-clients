@@ -160,13 +160,19 @@ Reports go to `.legacy-env/<action>.json` (gitignored). Each command first asks
 `isModernAdtSystem()` and refuses a system that answers
 `/sap/bc/adt/core/discovery` — a modern one — before anything is installed.
 Nothing outside the prefix `ZLG7` (`ZCL_LG7_*`, `ZIF_LG7_*`, `ZLG7*`,
-`Z_LG7_*`) is touched, and of those only what is in package `ZLG7_TEST`, or in
-`$TMP` with the session user as its author: `objects_in_scope` selects a `$TMP`
-object only with TADIR `AUTHOR = sy-uname`, and every delete reads the name,
-the TADIR package and the author again right before it. A ZLG7-named object
-another user put in `$TMP` is never touched. Over ADT, the env classes and
-leftover DDL sources are deleted only when their metadata names `$TMP` and —
-where it names a person responsible (`adtcore:responsible`) — the session user.
+`Z_LG7_*`) is touched, and of those only what is in package `ZLG7_TEST` or in
+`$TMP` with the session user as its author: `objects_in_scope` selects an
+object, in either package, only with TADIR `AUTHOR = sy-uname`, and every
+delete reads the name, the TADIR package and the author again right before it.
+A ZLG7-named object another user put in `ZLG7_TEST` or `$TMP` is never
+touched. Package `ZLG7_TEST` is adopted or deleted only when `TDEVC-AS4USER`
+and the TADIR author of its `DEVC` entry are both the session user; otherwise
+the step reports an error and changes nothing. Over ADT, the env classes and
+leftover DDL sources are written or deleted only when their metadata names the
+session user as the person responsible (`adtcore:responsible`, which 7.40 SP04
+sends on class and DDL source metadata); metadata that names no one, or an
+unknown session user, refuses — delete such an object in SE80 as the test
+user.
 A run of the live checks uses the fixtures and leaves them; only
 `legacy:teardown` removes them.
 
@@ -209,7 +215,9 @@ only the ADT part around those steps, and run no ABAP Unit runner.
 session file `MCP_ENV_PATH` names** (`~/.config/mcp-abap-adt/sessions/<destination>.env`,
 never a file in the repository) — the user the npm steps run as. Everything `ZCL_LG7_ENV` does is tied to
 `sy-uname`: the `$TMP` objects it takes (TADIR author), the locks it releases,
-the request and task it creates and deletes. With ABAP Unit that was the ADT
+the request and task it creates and deletes. Every object it touches and the
+package `ZLG7_TEST` must belong to that user; anything else the environment
+refuses, with an error step, and leaves as it is. With ABAP Unit that was the ADT
 session's user; in SE24 it is whoever is logged on. Another user would create
 the request for themselves (the live checks would then write into another
 user's request) and `TEARDOWN` / `REMOVE` would miss the test user's objects.

@@ -175,19 +175,24 @@ function sessionUser(): string | undefined {
 }
 
 /**
- * `$TMP` is shared by every user, so a `$TMP` object is touched only when its
- * metadata names the session user as the person responsible. Why not, when it
- * may not be touched; `undefined` when it may. Metadata that names no one
- * leaves the package and name checks as the guard.
+ * An object is touched only when its metadata names the session user as the
+ * person responsible — in `$TMP`, which every user shares, and in `ZLG7_TEST`
+ * alike. Fails closed: metadata that names no one, or a session user that is
+ * not known, refuses. 7.40 SP04 names `adtcore:responsible` on the root of
+ * the class and the DDL source metadata (measured). Why not, when it may not
+ * be touched; `undefined` when it may.
  */
-function notTheSessionUsers(metadata: string): string | undefined {
-  const responsible = responsibleOf(metadata);
-  if (responsible === undefined) return undefined;
+function notTheSessionUsers(
+  metadata: string,
+  pkg: string | undefined,
+): string | undefined {
   const user = sessionUser();
-  if (user === undefined)
-    return 'names a person responsible, and the session user is not known';
+  if (user === undefined) return 'the session user is not known';
+  const responsible = responsibleOf(metadata);
+  if (responsible === undefined)
+    return "names no person responsible, so it is not known to be the session user's";
   if (responsible.toUpperCase() !== user)
-    return 'is in $TMP, but another user is responsible for it';
+    return `is in ${pkg ?? '(no package)'}, but another user is responsible for it`;
   return undefined;
 }
 
@@ -669,8 +674,8 @@ async function isPresent(handler: Writable, config: object, label: string) {
 }
 
 /**
- * Throw unless the object's metadata names `$TMP` and, where it names a person
- * responsible, the session user.
+ * Throw unless the object's metadata names `$TMP` and the session user as the
+ * person responsible.
  */
 async function assertLocal(handler: Writable, config: object, label: string) {
   const answer = await handler.readMetadata(config);
@@ -682,7 +687,7 @@ async function assertLocal(handler: Writable, config: object, label: string) {
     throw new Error(
       `legacy env: ${label} is in package ${pkg ?? '(none named)'}, not ${LOCAL_PACKAGE}; not touched`,
     );
-  const foreign = notTheSessionUsers(metadata);
+  const foreign = notTheSessionUsers(metadata, LOCAL_PACKAGE);
   if (foreign) throw new Error(`legacy env: ${label} ${foreign}; not touched`);
 }
 
@@ -940,9 +945,9 @@ export async function runEnvAction(
 
 /**
  * Delete one ZLG7 DDL source over ADT: lock, `DELETE ?lockHandle=`, unlock —
- * measured on 7.40 SP04. Only when its metadata names `$TMP` (and, where it
- * names one, the session user as responsible) and `local` is set, or names
- * `ZLG7_TEST` and `request` is given — the request goes as `corrNr`.
+ * measured on 7.40 SP04. Only when its metadata names the session user as
+ * responsible and `$TMP` with `local` set, or `ZLG7_TEST` with `request`
+ * given — the request goes as `corrNr`.
  */
 async function deleteDdl(
   target: LegacyEnvTarget,
@@ -961,8 +966,7 @@ async function deleteDdl(
     !(request !== undefined && pkg === ENV_PACKAGE)
   )
     throw new Error(`in package ${pkg ?? '(none named)'}; not touched`);
-  const foreign =
-    pkg === LOCAL_PACKAGE ? notTheSessionUsers(metadata) : undefined;
+  const foreign = notTheSessionUsers(metadata, pkg);
   if (foreign) throw new Error(`${foreign}; not touched`);
   const config = {
     ddlName: name,
@@ -1154,8 +1158,8 @@ export const ENV_CLASSES: readonly string[] = [
 ];
 
 /**
- * Delete the env classes over ADT — each that is there, in `$TMP` and, where
- * its metadata names one, of the session user. Answers the problems.
+ * Delete the env classes over ADT — each that is there, in `$TMP` and of the
+ * session user (its metadata names them responsible). Answers the problems.
  */
 export async function deleteEnvClasses(
   target: LegacyEnvTarget,

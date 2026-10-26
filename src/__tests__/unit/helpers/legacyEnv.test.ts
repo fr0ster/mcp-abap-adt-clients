@@ -62,6 +62,16 @@ function answerWith(lines: string[]): string {
   return `<?xml version="1.0"?><aunit:runResult><program><testClasses><testClass><testMethods><testMethod adtcore:name="RUN_PREPARE"><alerts>${alerts}</alerts></testMethod></testMethods></testClass></testClasses></program></aunit:runResult>`;
 }
 
+// Every case runs as TESTER unless it says otherwise (asUser).
+const SESSION_USER_BEFORE = process.env.SAP_USERNAME;
+beforeEach(() => {
+  process.env.SAP_USERNAME = 'TESTER';
+});
+afterAll(() => {
+  if (SESSION_USER_BEFORE === undefined) delete process.env.SAP_USERNAME;
+  else process.env.SAP_USERNAME = SESSION_USER_BEFORE;
+});
+
 const RESULT =
   '@@RESULT {"ok":true,"action":"prepare","request":"","package":"ZLG7_TEST","packageExists":true,"errors":0,"lines":2}';
 
@@ -401,6 +411,9 @@ const IN = (pkg: string) =>
 const OWNED = (owner: string) =>
   `<x adtcore:name="N" adtcore:responsible="${owner}"><adtcore:packageRef adtcore:name="$TMP"/></x>`;
 
+/** A `$TMP` object of the session user the suite runs as. */
+const MINE = OWNED('TESTER');
+
 /** Run `body` with `SAP_USERNAME` set to `user`, restored afterwards. */
 async function asUser<T>(user: string, body: () => Promise<T>): Promise<T> {
   const before = process.env.SAP_USERNAME;
@@ -412,6 +425,97 @@ async function asUser<T>(user: string, body: () => Promise<T>): Promise<T> {
     else process.env.SAP_USERNAME = before;
   }
 }
+
+describe("legacy env: an object not known to be the session user's is never touched", () => {
+  /** Metadata of `pkg` naming `owner` as responsible, or no one. */
+  const META = (pkg: string, owner?: string) =>
+    `<x adtcore:name="N"${owner === undefined ? '' : ` adtcore:responsible="${owner}"`}><adtcore:packageRef adtcore:name="${pkg}"/></x>`;
+  const left = (where: string, request: string) => ({
+    result: {
+      ok: true,
+      action: 'teardown',
+      request,
+      package: 'ZLG7_TEST',
+      packageExists: true,
+      errors: 0,
+      lines: 1,
+    },
+    log: [
+      {
+        n: 1,
+        step: 'objects',
+        object: 'DDLS ZLG7_DDL',
+        status: 'LEFT-FOR-ADT',
+        message: where,
+      },
+    ],
+  });
+
+  it('uninstall refuses a class whose metadata names no one responsible, and deletes nothing', async () => {
+    const t = stubTarget(META('$TMP'));
+    await asUser('TESTER', async () => {
+      await expect(uninstall(t.target)).rejects.toThrow(
+        "names no person responsible, so it is not known to be the session user's; not touched",
+      );
+    });
+    expect(t.calls).not.toContain('lock');
+    expect(t.calls).not.toContain('delete');
+  });
+
+  it('writes no class whose metadata names no one responsible', async () => {
+    const { target, calls } = stubTarget(META('$TMP'));
+    await asUser('TESTER', async () => {
+      await expect(
+        ensureClass(target, { name: 'ZCL_LG7_X', description: 'd', main: 'm' }),
+      ).rejects.toThrow('names no person responsible');
+    });
+    expect(calls).toEqual(['readMetadata', 'readMetadata']);
+  });
+
+  it('refuses when neither the session user nor the person responsible is known', async () => {
+    const { target, calls } = stubTarget(META('$TMP'));
+    const problems = await asUser('', () =>
+      deleteLeftDdls(target, left('$TMP', '')),
+    );
+    expect(problems).toEqual([
+      'DDL source ZLG7_DDL: the session user is not known; not touched',
+    ]);
+    expect(calls).toEqual(['readMetadata']);
+  });
+
+  it('deletes no DDL source whose metadata names no one responsible, $TMP or ZLG7_TEST', async () => {
+    for (const where of ['$TMP', 'ZLG7_TEST']) {
+      const { target, calls } = stubTarget(META(where));
+      const problems = await asUser('TESTER', () =>
+        deleteLeftDdls(target, left(where, 'K900001')),
+      );
+      expect(problems).toEqual([
+        "DDL source ZLG7_DDL: names no person responsible, so it is not known to be the session user's; not touched",
+      ]);
+      expect(calls).toEqual(['readMetadata']);
+    }
+  });
+
+  it('deletes no ZLG7_TEST DDL source of another user', async () => {
+    const { target, calls } = stubTarget(META('ZLG7_TEST', 'SOMEONE'));
+    const problems = await asUser('TESTER', () =>
+      deleteLeftDdls(target, left('ZLG7_TEST', 'K900001')),
+    );
+    expect(problems).toEqual([
+      'DDL source ZLG7_DDL: is in ZLG7_TEST, but another user is responsible for it; not touched',
+    ]);
+    expect(calls).toEqual(['readMetadata']);
+  });
+
+  it('deletes a ZLG7_TEST DDL source of the session user on the request', async () => {
+    const { target, calls } = stubTarget(META('ZLG7_TEST', 'TESTER'));
+    const problems = await asUser('TESTER', () =>
+      deleteLeftDdls(target, left('ZLG7_TEST', 'K900001')),
+    );
+    expect(problems).toEqual([]);
+    expect(calls).toEqual(['readMetadata', 'lock', 'delete', 'unlock']);
+  });
+});
 
 describe('legacy env: a $TMP object of another user is never touched', () => {
   it('reads the person responsible from the root element only', () => {
@@ -509,7 +613,7 @@ describe('legacy env: never writes what is not its own', () => {
   });
 
   it('writes a differing $TMP class under one lock and activates it', async () => {
-    const { target, calls } = stubTarget(IN('$TMP'));
+    const { target, calls } = stubTarget(MINE);
     expect(
       await ensureClass(target, {
         name: 'ZCL_LG7_X',
@@ -556,7 +660,7 @@ describe('legacy env: never writes what is not its own', () => {
     ).toEqual(['DDLS ZOTHER: not a ZLG7 DDL source; not touched']);
     expect(foreign.calls).toEqual([]);
 
-    const own = stubTarget(IN('$TMP'));
+    const own = stubTarget(MINE);
     expect(
       await deleteLeftDdls(own.target, run('DDLS ZLG7_DDL', '$TMP')),
     ).toEqual([]);
@@ -646,22 +750,63 @@ describe('legacy env: the ABAP sources', () => {
     expect(env).not.toMatch(/TR_RELEASE|RELEASE_REQUEST/i);
   });
 
-  it('take a $TMP object only when its author is the current user', () => {
+  it('take an object, in ZLG7_TEST and $TMP alike, only when its author is the current user', () => {
     const env = code('zcl_lg7_env.clas.abap');
     const scope = methodOf(env, 'objects_in_scope');
     expect(scope).toContain(
-      'AND ( devclass = c_package OR ( devclass = c_local_package AND author = sy-uname ) )',
+      'AND ( devclass = c_package OR devclass = c_local_package )\n        AND author = sy-uname',
     );
-    expect(methodOf(env, 'in_scope')).toContain(
-      'iv_devclass = c_local_package AND iv_author = sy-uname',
+    // The author binds both packages: no branch admits ZLG7_TEST alone.
+    expect(scope).not.toContain('devclass = c_package OR (');
+    const predicate = methodOf(env, 'in_scope');
+    expect(predicate).toContain(
+      'IF iv_author = sy-uname\n        AND ( iv_devclass = c_package OR iv_devclass = c_local_package ).',
     );
-    // The lock and inactive-version steps ask the same question.
+    expect(predicate).not.toContain('iv_devclass = c_package\n        OR');
+    // The lock, inactive-version and delete steps ask the same question.
     const owner = methodOf(env, 'scope_package_of');
     expect(owner).toContain('SELECT SINGLE devclass author FROM tadir');
     expect(owner).toContain(
       'in_scope( iv_devclass = lv_devclass iv_author = lv_author ) = abap_true',
     );
     expect(env).not.toContain('in_scope_package');
+    // A flagged TADIR entry is dropped only when it is the current user's.
+    expect(methodOf(env, 'purge_deleted_entries')).toContain(
+      "WHERE pgmid = 'R3TR' AND delflag = 'X' AND author = sy-uname",
+    );
+  });
+
+  it('adopt or delete package ZLG7_TEST only when the current user owns it', () => {
+    const env = code('zcl_lg7_env.clas.abap');
+    const owned = methodOf(env, 'package_owner_problem');
+    expect(owned).toContain(
+      'SELECT SINGLE as4user FROM tdevc INTO lv_responsible WHERE devclass = c_package.',
+    );
+    expect(owned).toContain(
+      "SELECT SINGLE author FROM tadir INTO lv_author\n      WHERE pgmid = 'R3TR' AND object = 'DEVC' AND obj_name = c_package.",
+    );
+    expect(owned).toContain(
+      'IF lv_responsible <> sy-uname OR lv_author <> sy-uname.',
+    );
+    for (const name of ['ensure_package', 'delete_package']) {
+      const body = methodOf(env, name);
+      const check = body.indexOf('lv_problem = package_owner_problem( ).');
+      expect(`${name}: ${check}`).not.toBe(`${name}: -1`);
+      // Refused with an error step before anything is changed.
+      const refuse = body.indexOf(
+        'iv_status = `ERROR` iv_message = lv_problem',
+        check,
+      );
+      expect(refuse).toBeGreaterThan(check);
+      expect(body.indexOf('RETURN.', refuse)).toBeLessThan(
+        body.indexOf('CALL METHOD'),
+      );
+    }
+    // Adopting an existing package is the owned branch only.
+    const ensure = methodOf(env, 'ensure_package');
+    expect(ensure.indexOf('package_owner_problem')).toBeLessThan(
+      ensure.indexOf('`exists`'),
+    );
   });
 
   it('match locks exactly against the scope list, never a substring', () => {
@@ -899,7 +1044,7 @@ function recordingTarget(options: { ddl: string }) {
   const handler = {
     readMetadata: async (c: Record<string, string>) => {
       calls.push(`readMetadata ${nameOf(c)}`);
-      return ok(c.ddlName ? options.ddl : IN('$TMP'));
+      return ok(c.ddlName ? options.ddl : MINE);
     },
     read: async (c: Record<string, string>) => {
       calls.push(`read ${nameOf(c)}`);
@@ -965,7 +1110,7 @@ const SETTINGS = { softwareComponent: 'HOME', transportLayer: 'ZABC' };
 
 describe('legacy env: the manual runner', () => {
   it('setup installs the env class and ZCL_LG7_ENV_RUN, runs no runner, and says PREPARE is next', async () => {
-    const t = recordingTarget({ ddl: IN('$TMP') });
+    const t = recordingTarget({ ddl: MINE });
     const handOff = await setupManual(t.target, SETTINGS, ['ZLG7_DEL_DDL']);
     expect(t.runs).toEqual([]);
     const written = t.written();
@@ -1002,7 +1147,7 @@ describe('legacy env: the manual runner', () => {
     expect(outside.calls).not.toContain('delete ZLG7_DEL_DDL');
     expect(outside.written()).not.toContain('ZCL_LG7_FX_UNIT');
 
-    const foreign = recordingTarget({ ddl: IN('$TMP') });
+    const foreign = recordingTarget({ ddl: MINE });
     await expect(
       setupManual(foreign.target, SETTINGS, ['ZOTHER_DDL']),
     ).rejects.toThrow('DDL source ZOTHER_DDL: not a ZLG7 DDL source');
@@ -1010,7 +1155,7 @@ describe('legacy env: the manual runner', () => {
   });
 
   it('teardown deletes the DDL sources only, and says REMOVE and uninstall are next', async () => {
-    const t = recordingTarget({ ddl: IN('$TMP') });
+    const t = recordingTarget({ ddl: MINE });
     const handOff = await teardownManual(t.target, ['ZLG7_DEL_DDL']);
     expect(t.runs).toEqual([]);
     expect(t.calls).toEqual([
@@ -1051,7 +1196,7 @@ describe('legacy env: the manual runner', () => {
 
 describe('legacy env: the abap_unit runner is unchanged', () => {
   it('setup installs the runners, runs PREPARE through ABAP Unit, and leaves ZCL_LG7_ENV_RUN alone', async () => {
-    const t = recordingTarget({ ddl: IN('$TMP') });
+    const t = recordingTarget({ ddl: MINE });
     const run = await setup(t.target, SETTINGS);
     expect(run.result.ok).toBe(true);
     expect(t.runs).toEqual(['ZCL_LG7_ENV_PREPARE']);
