@@ -1,4 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { withRequestTrace } from '../../../utils/requestTrace';
 import { recordRequests } from '../../helpers/requestRecorder';
 
 /** A stand-in connection with private state, so `this` must stay the target. */
@@ -128,5 +129,94 @@ describe('request recorder', () => {
       'https://example',
     );
     expect(recorder.requests).toEqual([]);
+  });
+
+  describe('one entry per wire request', () => {
+    const request = {
+      url: '/sap/bc/adt/guard',
+      method: 'GET',
+      timeout: 0,
+    } as const;
+
+    /** A stub that counts what reached its wire. */
+    function counting() {
+      let wire = 0;
+      const { target, connection } = stub(async () => {
+        wire += 1;
+        return { status: 200 };
+      });
+      return { target, connection, sent: () => wire };
+    }
+
+    // What every client does to the connection it is given (AdtClient,
+    // AdtExecutor, AdtUtils, AdtRuntimeClient): `withRequestTrace` replaces
+    // `makeAdtRequest` by assignment on that object — here, the recorder.
+    it('a client wrapping the recorder records each request once', async () => {
+      const { connection, sent } = counting();
+      const recorder = recordRequests(connection);
+      const client = withRequestTrace(recorder.connection);
+
+      await client.makeAdtRequest(request);
+      await client.makeAdtRequest(request);
+
+      expect(sent()).toBe(2);
+      expect(recorder.requests.map((r) => [r.method, r.url, r.status])).toEqual(
+        [
+          ['GET', '/sap/bc/adt/guard', 200],
+          ['GET', '/sap/bc/adt/guard', 200],
+        ],
+      );
+    });
+
+    it('a client wrapping the recorder leaves the connection itself alone', () => {
+      const { target, connection } = counting();
+      const recorder = recordRequests(connection);
+
+      withRequestTrace(recorder.connection);
+
+      expect(Object.hasOwn(target, 'makeAdtRequest')).toBe(false);
+    });
+
+    it('a deny recorder on the same connection does not deny the forwarding one', async () => {
+      const { connection, sent } = counting();
+      const forwarding = recordRequests(connection);
+      const forwardingClient = withRequestTrace(forwarding.connection);
+      const denying = recordRequests(connection, { deny: true });
+      const denyingClient = withRequestTrace(denying.connection);
+
+      const refused = await denyingClient
+        .makeAdtRequest(request)
+        .catch((e: unknown) => e);
+      const answer = await forwardingClient.makeAdtRequest(request);
+
+      expect(refused).toBeInstanceOf(Error);
+      expect(answer).toMatchObject({ status: 200 });
+      expect(sent()).toBe(1);
+      expect(forwarding.requests).toHaveLength(1);
+      expect(denying.requests).toHaveLength(1);
+    });
+
+    // A connection that re-enters `this.makeAdtRequest` (a retry or session
+    // layer): the inner call runs on the connection itself, not the recorder,
+    // so one call from the client is one entry.
+    it('a connection re-entering this.makeAdtRequest is recorded once', async () => {
+      let wire = 0;
+      const reentrant = {
+        async makeAdtRequest(
+          this: { makeAdtRequest(r: unknown): Promise<unknown> },
+          r: { inner?: boolean },
+        ): Promise<unknown> {
+          if (!r.inner) return this.makeAdtRequest({ ...r, inner: true });
+          wire += 1;
+          return { status: 200 };
+        },
+      } as unknown as IAbapConnection;
+      const recorder = recordRequests(reentrant);
+
+      await withRequestTrace(recorder.connection).makeAdtRequest(request);
+
+      expect(wire).toBe(1);
+      expect(recorder.requests).toHaveLength(1);
+    });
   });
 });

@@ -9,6 +9,16 @@
  * `setSessionType` calls are recorded too, then forwarded. Every other member
  * is the connection's own, called on the connection itself.
  *
+ * **A write through the recorder stays on the recorder.** Every client wraps
+ * the connection it is given by assigning `makeAdtRequest` on it
+ * (`withRequestTrace`). Without a `set` trap that assignment would land on the
+ * wrapped connection: the next read of `makeAdtRequest` would then wrap the
+ * client's wrapper, which calls the recorder captured before it — two entries
+ * for one request — and a second recorder on the same connection (a deny one)
+ * would install its own wrapper on the connection every other client shares.
+ * So a property set through the recorder is kept here, read back as set, and
+ * the connection is never written.
+ *
  * **Deny mode** (`{ deny: true }`) is for a check that nothing is sent: a
  * request is recorded and then refused with an error, never forwarded, so a
  * member that regressed into sending cannot reach the system.
@@ -52,8 +62,15 @@ export function recordRequests<T extends IAbapConnection>(
 ): RequestRecorder<T> {
   const requests: RecordedRequest[] = [];
   const sessionTypes: string[] = [];
+  /** What was written through the recorder, kept off the connection. */
+  const written = new Map<PropertyKey, unknown>();
   const recording = new Proxy(connection, {
+    set(_target, property, value) {
+      written.set(property, value);
+      return true;
+    },
     get(target, property) {
+      if (written.has(property)) return written.get(property);
       const value = Reflect.get(target, property, target);
       if (typeof value !== 'function') return value;
       if (property === 'makeAdtRequest') {
