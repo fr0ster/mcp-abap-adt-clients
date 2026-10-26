@@ -23,11 +23,11 @@ export async function readFunctionInclude(
   groupName: string,
   includeName: string,
   version: 'active' | 'inactive' = 'active',
-  _options?: IReadOptions,
+  options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();
   params.append('version', version);
-  if (_options?.withLongPolling) {
+  if (options?.withLongPolling) {
     params.append('withLongPolling', 'true');
   }
   const url = `${FUNCTION_INCLUDE.uri(groupName, includeName)}?${params.toString()}`;
@@ -37,7 +37,7 @@ export async function readFunctionInclude(
     method: 'GET',
     timeout: 0,
     headers: {
-      Accept: ACCEPT_FUNCTION_INCLUDE,
+      Accept: options?.accept ?? ACCEPT_FUNCTION_INCLUDE,
     },
   });
 }

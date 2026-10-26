@@ -181,9 +181,13 @@ export abstract class AdtClassMemberBase<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const readOptions = this.contentTypes
-      ? { ...options, accept: this.contentTypes.classRead().accept }
-      : options;
+    // The caller's Accept wins; the content types' class Accept is the
+    // default only when the caller gives none (7.40 SP04 answers the class
+    // metadata for the unversioned type alone, and the caller chooses it).
+    const readOptions =
+      this.contentTypes && options?.accept === undefined
+        ? { ...options, accept: this.contentTypes.classRead().accept }
+        : options;
 
     return answering(
       () =>

@@ -37,6 +37,8 @@ export interface RecordedRequest {
   readonly headers?: Record<string, string>;
   /** The answer's status; absent when none came back. */
   status?: number;
+  /** The answer's body, kept only with `RecordOptions.keepAnswers`. */
+  answer?: unknown;
 }
 
 export interface RequestRecorder<T extends IAbapConnection> {
@@ -54,6 +56,11 @@ function statusOf(value: unknown): number | undefined {
 export interface RecordOptions {
   /** Record each request, then throw instead of forwarding it. */
   readonly deny?: boolean;
+  /**
+   * Keep each answer's body on its entry (`answer`), for a check that ties a
+   * later request to what an earlier one answered — a lock's handle.
+   */
+  readonly keepAnswers?: boolean;
 }
 
 export function recordRequests<T extends IAbapConnection>(
@@ -90,6 +97,8 @@ export function recordRequests<T extends IAbapConnection>(
           try {
             const answer = await value.call(target, request);
             entry.status = statusOf(answer);
+            if (options.keepAnswers)
+              entry.answer = (answer as { data?: unknown } | undefined)?.data;
             return answer;
           } catch (error) {
             const status = statusOf(

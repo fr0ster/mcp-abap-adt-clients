@@ -53,6 +53,19 @@ describe('request recorder', () => {
     ]);
   });
 
+  it('keeps each answer body only when asked to', async () => {
+    const { connection } = stub(async () => ({ status: 200, data: '<lock/>' }));
+    const plain = recordRequests(connection);
+    const keeping = recordRequests(connection, { keepAnswers: true });
+    const request = { url: '/sap/bc/adt/x', method: 'POST', timeout: 0 };
+
+    await plain.connection.makeAdtRequest(request);
+    await keeping.connection.makeAdtRequest(request);
+
+    expect(plain.requests[0]).not.toHaveProperty('answer');
+    expect(keeping.requests[0]?.answer).toBe('<lock/>');
+  });
+
   it('records the status of a failed request and rethrows the same error', async () => {
     const error = Object.assign(new Error('not found'), {
       response: { status: 404 },

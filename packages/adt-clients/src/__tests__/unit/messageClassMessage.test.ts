@@ -2,6 +2,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { AdtClient } from '../../clients/AdtClient';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
 import { parseMessageClass } from '../../core/messageClass/xml';
 import { noopLogger } from '../../utils/noopLogger';
@@ -237,5 +238,20 @@ describe('AdtMessageClassMessage', () => {
     expect(body).toContain('mc:msgno="003"');
     expect(body).toContain('mc:selfexplainatory="false"');
     expect(body).toContain('adtcore:description="New message desc"');
+  });
+});
+
+describe('the message contract', () => {
+  it('declares delete: getMessageClassMessage() answers a handler a consumer deletes through, no cast', async () => {
+    const { conn, calls } = recorder();
+    const messages = new AdtClient(conn, noopLogger).getMessageClassMessage();
+    expectResult(
+      await messages.delete(
+        { className: 'ZT', msgno: '001' },
+        { headers: headersOf(messages, 'delete') },
+      ),
+      'delete message 001',
+    );
+    expect(calls.some((c) => c.method === 'PUT')).toBe(true);
   });
 });

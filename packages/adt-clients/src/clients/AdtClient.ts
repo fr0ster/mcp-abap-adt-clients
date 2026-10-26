@@ -600,7 +600,13 @@ export type IMessageClassMessageContract<
   R extends IMessageClassMessageResults,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
   IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
-  IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>;
+  IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>> &
+  // A message is deleted by writing its class without it; there is no
+  // deletion check of a message of its own.
+  Pick<
+    IAdtDeletable<IMessageClassMessageConfig, ReturnType<R['deleted']>>,
+    'delete'
+  >;
 export type IAccessControlContract<R extends IAccessControlResults> =
   IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
     IAdtReadable<IAccessControlConfig, ReturnType<R['source']>> &

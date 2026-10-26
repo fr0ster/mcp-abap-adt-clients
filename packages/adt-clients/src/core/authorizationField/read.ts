@@ -34,7 +34,7 @@ export async function readAuthorizationField(
     method: 'GET',
     timeout: 0,
     headers: {
-      Accept: ACCEPT_AUTHORIZATION_FIELD,
+      Accept: options?.accept ?? ACCEPT_AUTHORIZATION_FIELD,
     },
   });
 }
