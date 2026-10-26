@@ -46,7 +46,7 @@ createAdtClient(connection)
 | Content types | `AdtContentTypesModern` (v2+/v3+/v4+) | `AdtContentTypesBase` (v1 / versionless) |
 | Delete | `POST /sap/bc/adt/deletion/check` + `/delete` | Direct `DELETE {objectUrl}` — no lock is needed; a `lockHandle` is passed through only when the caller gives one |
 | Transport | `/sap/bc/adt/cts/transportrequests` | `/sap/bc/cts/transportrequests` |
-| Source content type | `text/plain; charset=utf-8` | `text/plain` (requires `SAP_UNICODE=false` in `.env`) |
+| Source content type | `text/plain; charset=utf-8` | `text/plain` (requires `SAP_UNICODE=false` in the session file `MCP_ENV_PATH` names) |
 
 ## Object Type Support Matrix
 
