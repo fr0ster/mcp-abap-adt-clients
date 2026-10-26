@@ -146,6 +146,7 @@ npm install @mcp-abap-adt/adt-clients
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
+   - `AdtClientLegacy` (from `createAdtClient` on BASIS < 7.50) is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only — HTTP to a legacy system is unsupported. Each member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed as not measured in LEGACY.md), or answers a refusal without a request; a legacy `delete` takes the lock handle from your `lock()`, and there is no `checkDeletion`. See [LEGACY.md](docs/architecture/LEGACY.md)
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
@@ -163,7 +164,7 @@ npm install @mcp-abap-adt/adt-clients
      - `getProgramExecutor()` for `programrun` (on-premise systems)
    - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
    - Each executor factory takes an optional result set, like the runtime client's
-   - `createAdtExecutor(connection)` picks `AdtExecutor` or `AdtExecutorLegacy` by system version, like `createAdtClient`; the legacy one differs only in the test runner
+   - `createAdtExecutor(connection)` picks `AdtExecutor` or `AdtExecutorLegacy` by system version, like `createAdtClient`. The legacy one (SAP_BASIS 7.40 SP04, over RFC) runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](docs/architecture/LEGACY.md#abap-unit-runners-and-executors)
 
 4. **AdtAbapGitClient**
    - Standalone: `new AdtAbapGitClient(connection, logger?, results?)` (the options argument, `contentTypeVersion`, was removed in 36.0.0)
@@ -437,8 +438,10 @@ const result = await runner.getResult(runId, { analyse: analyseUnitTest });
 ```
 
 `run` takes a class name (every test class in it) or a list of
-`{ containerClass, testClass }`. On a legacy system the runner's `run` answers
-the finished result, and `getStatus`/`getResult` refuse without a request.
+`{ containerClass, testClass }`. On a legacy system (measured on 7.40 SP04, over
+RFC) the runner's `run` sends the synchronous `/abapunit/testruns` request,
+`<options>` included, and answers the finished result; `getStatus`/`getResult`
+refuse without a request.
 
 **The synchronous runner, `runSync`.** `run` starts a run on
 `/sap/bc/adt/abapunit/runs`, which is then polled; that stays the default.
@@ -459,16 +462,21 @@ answer the same document — `aunit:runResult` in `http://www.sap.com/adt/aunit`
 — with the same methods and alerts. Two differences: the endpoint addresses
 whole classes, so `{ containerClass, testClass }` targets run each distinct
 container whole; and `title` and `context` are not sent. Scope, risk levels and
-durations are, with `run`'s defaults. On a legacy system `runSync` is the
-request `run` already sends there, read by `result`.
+durations are, with `run`'s defaults. On a legacy system `run` and `runSync`
+send this same request, `<options>` included — `run` read by the `run` strategy,
+`runSync` by `result`.
 
 A report's tests are local classes in its source or in an include it pulls in —
 written through `getProgram().update()` or `getInclude().update()` — and run
 through `executor.getProgramTestRunner().run(programName)`, with the same
 `getStatus`/`getResult`. A function group's are written in an include of the
 group (`getFunctionInclude()`) and run through `getFunctionGroupTestRunner()`
-for the whole group or `getFunctionModuleTestRunner()` for one module. Below
-7.50 these three runners refuse without a request, `runSync` included.
+for the whole group or `getFunctionModuleTestRunner()` for one module. On a
+legacy system (measured on 7.40 SP04, over RFC) the report and group runners'
+`run` and `runSync`, and the module runner's `runSync`, send the synchronous
+request below, with `<options>`; the module runner's `run` refuses without a
+request (it names no group, and the request needs the module's URI under its
+group — use `runSync`), and so does every legacy `getStatus`/`getResult`.
 
 All three have `runSync` as well — the same `/abapunit/testruns` request as a
 class's, naming the object by its URI, read by `result` and judged by
@@ -1066,7 +1074,10 @@ hold yourself:
 - `fetchDiscoveryEndpoints(connection)` / `isEndpointInDiscovery(...)` — the
   discovery document and a membership test over it.
 - `createAdtClient(connection, logger?, options?)` — `AdtClient` or
-  `AdtClientLegacy`, from `isModernAdtSystem`.
+  `AdtClientLegacy`, from `isModernAdtSystem`. The legacy client is an RFC
+  client: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only; HTTP to
+  a legacy system is unsupported. What it serves and what it refuses is in
+  [LEGACY.md](docs/architecture/LEGACY.md).
 
 **A probe answers only for an absent endpoint.** For `isModernAdtSystem` and
 `fetchDiscoveryEndpoints` a `404`, `405` or `501` is the answer `false` or an

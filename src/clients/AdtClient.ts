@@ -1103,9 +1103,10 @@ export class AdtClient {
    * having happened at all.
    *
    * Only asked of a connection that ANSWERS the question. `isConnected()` lives
-   * on `ISessionLifecycleAware`, not on `IAbapConnection`: an RFC connection has
-   * no HTTP session and no such method, and a transport that cannot answer must
-   * not be blocked on its silence. This is a real limit, not an oversight — a
+   * on `ISessionLifecycleAware`, not on `IAbapConnection`: a connection without
+   * the method cannot answer, and it must not be blocked on its silence. (The
+   * connectors of `@mcp-abap-adt/connection`, the RFC one included, do declare
+   * it, so for them the check bites.) This is a real limit, not an oversight — a
    * transport with no session has no "not connected" state to catch, so the
    * promise this guard makes is necessarily narrower than "every
    * `IAbapConnection`".
@@ -1117,8 +1118,11 @@ export class AdtClient {
    * method that is not there. This asks one question and calls one method, so
    * demanding the other two would only make it step aside for a connection that
    * could have answered — refusing evidence it was offered.
+   *
+   * Protected, not private, so that the legacy client's getters — which
+   * replace the base's and so skip its call — run the same check first.
    */
-  private assertConnected(): void {
+  protected assertConnected(): void {
     const candidate = this.connection as Partial<ISessionLifecycleAware>;
     if (typeof candidate.isConnected !== 'function') return;
 

@@ -16,13 +16,19 @@
  * atom — `readMetadata`, `unlock` and `getVersionSource` are where stubs hid.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  AdtObjectErrorCodes,
+  type IAdtError,
+  type IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import { LEGACY_REFUSED, LEGACY_SENDS } from '../../helpers/legacyMembers';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import type { RequestSpec } from './manifest';
 import {
@@ -31,6 +37,14 @@ import {
   HANDLERS,
   type HandlerEntry,
 } from './manifest';
+
+/** The getter a manifest entry calls, read back out of its closure. */
+function factoryOf(entry: HandlerEntry): string {
+  const match = entry.factory.toString().match(/\.(get\w+)\(/);
+  if (!match?.[1])
+    throw new Error(`Manifest entry does not name a factory: ${entry.factory}`);
+  return match[1];
+}
 
 type Recorded = {
   url: string;
@@ -113,7 +127,10 @@ function bodyFor(url: string, activationBody: string): string {
   return OBJECT_BODY;
 }
 
-function recordingClient(activationBody: string = ACTIVATION_OK) {
+function recordingClient(
+  activationBody: string = ACTIVATION_OK,
+  Client: typeof AdtClient = AdtClient,
+) {
   const calls: Recorded[] = [];
   const sessionTypes: string[] = [];
   const connection = {
@@ -144,7 +161,7 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
   // The factories assert the connection is connected, but only when it says it
   // can answer that — a connection without isConnected() is taken at its word,
   // which is what this stub is.
-  const client = new AdtClient(connection, createLibraryLogger());
+  const client = new Client(connection, createLibraryLogger());
   return { client, calls, sessionTypes };
 }
 
@@ -403,7 +420,7 @@ async function invoke(
   handler: Record<string, unknown>,
   method: string,
   config: Record<string, unknown>,
-): Promise<void> {
+): Promise<unknown> {
   const fn = handler[method] as (...args: unknown[]) => Promise<unknown>;
   // Since 36.0.0 the members that take `options.headers` require them.
   const headers = HEADER_MEMBERS.has(method)
@@ -411,14 +428,11 @@ async function invoke(
     : undefined;
   switch (method) {
     case 'unlock':
-      await fn.call(handler, config, 'GUARD-LOCK');
-      return;
+      return fn.call(handler, config, 'GUARD-LOCK');
     case 'getVersionSource':
-      await fn.call(handler, VERSION_CONTENT_URI);
-      return;
+      return fn.call(handler, VERSION_CONTENT_URI);
     case 'check':
-      await fn.call(handler, config, 'inactive', headers);
-      return;
+      return fn.call(handler, config, 'inactive', headers);
     case 'update':
     case 'updateMetadata':
       // The source travels in the options, which is the only channel now: the
@@ -427,14 +441,13 @@ async function invoke(
       // measuring. One field covers both kinds of body: this used to pass
       // `sourceCode` and `xmlContent` side by side, an ABAP line for the text
       // writes and an element for the document ones, and the handler chose.
-      await fn.call(handler, config, {
+      return fn.call(handler, config, {
         ...headers,
         source: String(config.source ?? '" guard'),
         lockHandle: 'GUARD-LOCK',
       });
-      return;
     default:
-      await fn.call(handler, config, headers);
+      return fn.call(handler, config, headers);
   }
 }
 
@@ -525,6 +538,111 @@ async function invokeWithOptions(
  * out with the strategy it was about.
  */
 
+/**
+ * The member issued the request its capability names, on the right resource,
+ * and nothing besides (unless {@link EXTRA_REQUESTS} says why).
+ */
+function assertIssuesItsRequest(
+  name: string,
+  entry: HandlerEntry,
+  method: string,
+  calls: Recorded[],
+  refusal: unknown,
+): void {
+  // A method that issued nothing returned success without doing
+  // anything, which is the shape of every stub this plan removed.
+  if (calls.length === 0) {
+    throw new Error(
+      refusal
+        ? `${name}.${method} refused without issuing a request: ${String(refusal)}`
+        : `${name}.${method} returned without issuing any request — an empty success`,
+    );
+  }
+
+  // And it has to be the right request. Anything else means the
+  // method did some of its chain and stopped short.
+  const key = `${name}.${method}`;
+  const fallback = ATOM_VERB[method];
+  const verb =
+    VERB_BY_HANDLER[key] ??
+    (typeof fallback === 'string' ? fallback : fallback.method);
+  const issued =
+    method === 'delete' && verb === 'DELETE'
+      ? calls.some(
+          (c) =>
+            c.method === 'DELETE' ||
+            (c.method === 'POST' && c.url.includes('/deletion/delete')),
+        )
+      : calls.some((c) => c.method === verb);
+  if (key in VERB_NOT_REACHED) {
+    // Listed as unreachable: it must still be unreachable, or the
+    // list is stale and says the check covers less than it does.
+    expect(issued).toBe(false);
+    return;
+  }
+  if (!issued) {
+    throw new Error(
+      `${name}.${method} issued ${calls
+        .map((c) => c.method)
+        .join(', ')} but never a ${verb}` +
+        (refusal ? ` — it refused: ${String(refusal)}` : ''),
+    );
+  }
+
+  // And on the right resource. A verb on the wrong URL is still the
+  // wrong request — the whole point of naming a capability.
+  const resource = expectedResource(entry, method, verb);
+  const made = calls
+    .filter(
+      (c) =>
+        !resource.action ||
+        new RegExp(`_action=${resource.action}(&|$)`, 'i').test(c.url),
+    )
+    .map((c) => ({
+      method: c.method,
+      path: c.url.toLowerCase().split('?')[0],
+    }));
+
+  // Every named request, method and path together: an operation whose
+  // chain mixes verbs — POST the class, then PUT the tests into it —
+  // is only half done if the second never happens, and a list under
+  // one implied verb could not say that.
+  const missing = resource.all.filter(
+    (want) =>
+      !made.some(
+        (c) =>
+          c.path === want.path &&
+          (c.method === want.method ||
+            (method === 'delete' &&
+              want.method === 'DELETE' &&
+              c.path.includes('/deletion/delete'))),
+      ),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `${name}.${method} never made ${resource.describe} — it made ${made.map((c) => `${c.method} ${c.path}`).join(', ') || 'nothing'}`,
+    );
+  }
+
+  // **And nothing besides.** Naming the right request proves it
+  // happened, not that it happened alone — a member that reads the
+  // object first and then writes it passes every assertion above.
+  // That is exactly what `AdtServiceBinding.update` did until this
+  // release, and what 61 other members did before the chains came
+  // out, so the count is the invariant this whole change is about.
+  if (!(key in EXTRA_REQUESTS)) {
+    expect({
+      member: key,
+      issued: calls.map((c) => `${c.method} ${c.url.split('?')[0]}`),
+    }).toEqual({
+      member: key,
+      issued: calls
+        .slice(0, resource.all.length)
+        .map((c) => `${c.method} ${c.url.split('?')[0]}`),
+    });
+  }
+}
+
 describe('capability guard — behaviour', () => {
   for (const [name, entry] of Object.entries(
     HANDLERS as Record<string, HandlerEntry>,
@@ -548,101 +666,121 @@ describe('capability guard — behaviour', () => {
               refusal = error;
             }
 
-            // A method that issued nothing returned success without doing
-            // anything, which is the shape of every stub this plan removed.
-            if (calls.length === 0) {
-              throw new Error(
-                refusal
-                  ? `${name}.${method} refused without issuing a request: ${String(refusal)}`
-                  : `${name}.${method} returned without issuing any request — an empty success`,
-              );
-            }
+            assertIssuesItsRequest(name, entry, method, calls, refusal);
+          });
+        }
+      }
+    });
+  }
+});
 
-            // And it has to be the right request. Anything else means the
-            // method did some of its chain and stopped short.
-            const key = `${name}.${method}`;
-            const fallback = ATOM_VERB[method];
-            const verb =
-              VERB_BY_HANDLER[key] ??
-              (typeof fallback === 'string' ? fallback : fallback.method);
-            const issued =
-              method === 'delete' && verb === 'DELETE'
-                ? calls.some(
-                    (c) =>
-                      c.method === 'DELETE' ||
-                      (c.method === 'POST' &&
-                        c.url.includes('/deletion/delete')),
-                  )
-                : calls.some((c) => c.method === verb);
-            if (key in VERB_NOT_REACHED) {
-              // Listed as unreachable: it must still be unreachable, or the
-              // list is stale and says the check covers less than it does.
-              expect(issued).toBe(false);
+/**
+ * The legacy client's handlers, held to the same claims (spec §11.1
+ * "Capabilities").
+ *
+ * A capability the manifest names is one `AdtClientLegacy` hands out too —
+ * the same getter, the same member — so each is either a request, checked
+ * exactly as above, or a refusal the inventory decided: a `LEGACY_REFUSED`
+ * row (`helpers/legacyMembers.ts`), answered without a request in the one
+ * refusal shape. A member that is neither is a stub on 7.40.
+ *
+ * Where 7.40 is asked another request than the manifest names, the request is
+ * the inventory's (`LEGACY_SENDS`), and the member is listed here with why —
+ * so the manifest's claim is not loosened for the modern client.
+ */
+const LEGACY_REQUESTS: Record<string, string> = {
+  // One DELETE on the object's URI with the caller's lock handle: 7.40 has no
+  // deletion service (spec §4.2).
+  'class.delete': 'DELETE on the object, spec §4.2',
+  'program.delete': 'as class',
+  'interface.delete': 'as class',
+  'functionGroup.delete': 'as class',
+  'functionModule.delete': 'as class',
+  'ddl.delete': 'as class',
+  // Below 7.50 the CTS endpoint sits outside /sap/bc/adt/ (spec §7.2).
+  'transport.readMetadata': 'GET /sap/bc/cts/transportrequests, spec §7.2',
+};
+
+/** The entry with the inventory's request for a {@link LEGACY_REQUESTS} member. */
+function legacyEntry(
+  name: string,
+  getter: string,
+  entry: HandlerEntry,
+  method: string,
+): HandlerEntry {
+  if (!(`${name}.${method}` in LEGACY_REQUESTS)) return entry;
+  const row = LEGACY_SENDS[getter]?.[method];
+  if (!row) throw new Error(`No LEGACY_SENDS row ${getter}.${method}`);
+  return {
+    ...entry,
+    requests: {
+      ...entry.requests,
+      [method]: row.sends.map((r) => ({ method: r.method, path: r.path })),
+    },
+  };
+}
+
+describe('capability guard — legacy behaviour', () => {
+  it('every listed request deviation is one the legacy pass reaches', () => {
+    const reached = Object.entries(HANDLERS as Record<string, HandlerEntry>)
+      .flatMap(([name, entry]) =>
+        entry.capabilities.flatMap((atom) =>
+          ATOM_METHODS[atom as Atom].map((method) => `${name}.${method}`),
+        ),
+      )
+      .filter((key) => key in LEGACY_REQUESTS);
+    expect(reached.sort()).toEqual(Object.keys(LEGACY_REQUESTS).sort());
+  });
+
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    const getter = factoryOf(entry);
+    describe(name, () => {
+      for (const atom of entry.capabilities) {
+        for (const method of ATOM_METHODS[atom as Atom]) {
+          const refused = LEGACY_REFUSED[getter]?.[method] !== undefined;
+          it(`${atom}: ${method} ${refused ? 'is refused without a request' : 'issues a request'}`, async () => {
+            const { client, calls, sessionTypes } = recordingClient(
+              ACTIVATION_OK,
+              AdtClientLegacy,
+            );
+            const handler = entry.factory(client) as unknown as Record<
+              string,
+              unknown
+            >;
+
+            expect(typeof handler[method]).toBe('function');
+
+            if (refused) {
+              const answer = (await invoke(handler, method, entry.config)) as {
+                ok: boolean;
+                getError: () => IAdtError;
+              };
+              expect(answer.ok).toBe(false);
+              expect(answer.getError().origin).toBe('refusal');
+              expect(answer.getError().code).toBe(
+                AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+              );
+              expect(calls).toEqual([]);
+              expect(sessionTypes).toEqual([]);
               return;
             }
-            if (!issued) {
-              throw new Error(
-                `${name}.${method} issued ${calls
-                  .map((c) => c.method)
-                  .join(', ')} but never a ${verb}` +
-                  (refusal ? ` — it refused: ${String(refusal)}` : ''),
-              );
+
+            let refusal: unknown;
+            try {
+              await invoke(handler, method, entry.config);
+            } catch (error) {
+              refusal = error;
             }
 
-            // And on the right resource. A verb on the wrong URL is still the
-            // wrong request — the whole point of naming a capability.
-            const resource = expectedResource(entry, method, verb);
-            const made = calls
-              .filter(
-                (c) =>
-                  !resource.action ||
-                  new RegExp(`_action=${resource.action}(&|$)`, 'i').test(
-                    c.url,
-                  ),
-              )
-              .map((c) => ({
-                method: c.method,
-                path: c.url.toLowerCase().split('?')[0],
-              }));
-
-            // Every named request, method and path together: an operation whose
-            // chain mixes verbs — POST the class, then PUT the tests into it —
-            // is only half done if the second never happens, and a list under
-            // one implied verb could not say that.
-            const missing = resource.all.filter(
-              (want) =>
-                !made.some(
-                  (c) =>
-                    c.path === want.path &&
-                    (c.method === want.method ||
-                      (method === 'delete' &&
-                        want.method === 'DELETE' &&
-                        c.path.includes('/deletion/delete'))),
-                ),
+            assertIssuesItsRequest(
+              name,
+              legacyEntry(name, getter, entry, method),
+              method,
+              calls,
+              refusal,
             );
-            if (missing.length > 0) {
-              throw new Error(
-                `${name}.${method} never made ${resource.describe} — it made ${made.map((c) => `${c.method} ${c.path}`).join(', ') || 'nothing'}`,
-              );
-            }
-
-            // **And nothing besides.** Naming the right request proves it
-            // happened, not that it happened alone — a member that reads the
-            // object first and then writes it passes every assertion above.
-            // That is exactly what `AdtServiceBinding.update` did until this
-            // release, and what 61 other members did before the chains came
-            // out, so the count is the invariant this whole change is about.
-            if (!(key in EXTRA_REQUESTS)) {
-              expect({
-                member: key,
-                issued: calls.map((c) => `${c.method} ${c.url.split('?')[0]}`),
-              }).toEqual({
-                member: key,
-                issued: calls
-                  .slice(0, resource.all.length)
-                  .map((c) => `${c.method} ${c.url.split('?')[0]}`),
-              });
-            }
           });
         }
       }

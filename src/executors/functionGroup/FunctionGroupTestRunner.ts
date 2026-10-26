@@ -30,7 +30,6 @@ import {
   AbapUnitRunner,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
-  refusedBelow750,
 } from '../abapUnitRunner';
 
 export type IFunctionGroupTestRunnerResults = IAbapUnitRunnerResults;
@@ -82,39 +81,5 @@ export class FunctionGroupTestRunner<
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
     return this.startSync([FUNCTION_GROUP.uri(functionGroupName)], options);
-  }
-}
-
-/**
- * Below 7.50: refused without a request, as a report's run is — the legacy
- * endpoint has not been measured to find a group's tests, with `<options>` or
- * without. `runSync` is refused the same way.
- */
-export class FunctionGroupTestRunnerLegacy<
-  R extends
-    IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
-> extends FunctionGroupTestRunner<R> {
-  override async run<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['run']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['run']>, E>("a function group's");
-  }
-
-  override async runSync<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['result']>, E>("a function group's");
-  }
-
-  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['status']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['status']>, E>("a function group's");
-  }
-
-  override async getResult<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['result']>, E>("a function group's");
   }
 }

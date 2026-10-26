@@ -1,6 +1,6 @@
 export {
   FunctionGroupTestRunner,
-  FunctionGroupTestRunnerLegacy,
   functionGroupTestRunnerDocuments,
   type IFunctionGroupTestRunnerResults,
 } from './FunctionGroupTestRunner';
+export { FunctionGroupTestRunnerLegacy } from './FunctionGroupTestRunnerLegacy';

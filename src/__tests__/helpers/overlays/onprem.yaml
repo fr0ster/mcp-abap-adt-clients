@@ -87,3 +87,19 @@
 # "enhancement.test_cases[include_host].params.include_name": "<INCLUDE>"
 # On-prem: the main program of that include.
 # "enhancement.test_cases[include_host].params.main_program": "<MAIN_PROGRAM>"
+# A legacy system (SAP_BASIS < 7.50): the legacy client and its live checks, over RFC only. Also SAP_UNICODE=false in the session .env for a non-unicode system.
+# "environment.is_legacy": true
+# "environment.connection_type": "rfc"
+# Software component of the transportable package ZLG7_TEST the legacy test environment creates (npm run legacy:setup).
+# "legacy_env.software_component": "<SOFTWARE_COMPONENT>"
+# Transport layer of that package (up to 4 characters).
+# "legacy_env.transport_layer": "<TRANSPORT_LAYER>"
+# How the env actions run: "abap_unit" (the base) or "manual" — the owner runs ZCL_LG7_ENV_RUN in SE24, where the client's ABAP Unit risk limit refuses the runners.
+# "legacy_env.runner": "manual"
+# The legacy live checks, each off in the base; true on the legacy system.
+# "legacy_740.test_cases[legacy_deletes].enabled": true
+# "legacy_740.test_cases[legacy_refusals_send_nothing].enabled": true
+# "legacy_740.test_cases[legacy_unit_runners].enabled": true
+# "legacy_740.test_cases[legacy_function_include].enabled": true
+# "legacy_740.test_cases[legacy_transports].enabled": true
+# "legacy_740.test_cases[legacy_transportable].enabled": true

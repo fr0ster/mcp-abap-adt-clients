@@ -87,3 +87,64 @@ describe("legacy delete carries the caller's timeout", () => {
     },
   );
 });
+
+describe('legacy delete sends the measured request', () => {
+  const lockHandle = 'LH/1+2=';
+  const encoded = encodeURIComponent(lockHandle);
+
+  async function run(
+    handler: (c: AdtClientLegacy) => Deletable,
+    config: unknown,
+    extra: { lockHandle?: string },
+  ) {
+    const { connection, sent } = recordingConnection();
+    const client = new AdtClientLegacy(connection);
+    const deletable = handler(client);
+    await deletable.delete(config, {
+      headers: headersOf(deletable, 'delete'),
+      ...extra,
+    } as { headers: IAdtHeaders });
+    return { connection, sent };
+  }
+
+  it.each(cases)(
+    '%s: one DELETE with the lock handle',
+    async (_name, handler, config) => {
+      const { connection, sent } = await run(handler, config, { lockHandle });
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.method).toBe('DELETE');
+      const url = sent[0]?.url as string;
+      expect(url.endsWith(`?lockHandle=${encoded}`)).toBe(true);
+      expect(url).not.toContain('_action=');
+      expect(connection.setSessionType).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(cases)(
+    '%s: the transport request travels as corrNr',
+    async (_name, handler, config) => {
+      const { sent } = await run(
+        handler,
+        { ...(config as object), transportRequest: 'TRK000001' },
+        { lockHandle },
+      );
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.method).toBe('DELETE');
+      expect(
+        sent[0]?.url?.endsWith(`?lockHandle=${encoded}&corrNr=TRK000001`),
+      ).toBe(true);
+    },
+  );
+
+  it.each(cases)(
+    '%s: without a handle one DELETE and no lockHandle parameter',
+    async (_name, handler, config) => {
+      const { connection, sent } = await run(handler, config, {});
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.method).toBe('DELETE');
+      expect(sent[0]?.url).not.toContain('lockHandle');
+      expect(sent[0]?.url).not.toContain('_action=');
+      expect(connection.setSessionType).not.toHaveBeenCalled();
+    },
+  );
+});

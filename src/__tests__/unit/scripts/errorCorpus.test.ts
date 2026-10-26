@@ -2877,8 +2877,6 @@ describe('stand-in arguments', () => {
       'getServiceBinding().unpublishByServiceType: serviceversion=undefined',
       'getClassExecutor().runWithProfiler: profilerId=undefined',
       'getProgramExecutor().runWithProfiler: profilerId=undefined',
-      'legacy getClassExecutor().runWithProfiler: profilerId=undefined',
-      'legacy getProgramExecutor().runWithProfiler: profilerId=undefined',
     ]);
   });
 });

@@ -142,8 +142,8 @@ const ACCEPT_TESTRUNS = 'application/xml';
  * objects are named by their ADT URIs: a class, a report, a function group, a
  * function module.
  *
- * The one implementation of this endpoint: every runner's `runSync`, and the
- * legacy class runner's `run`, send it.
+ * The one implementation of this endpoint: a runner's `runSync` sends it, and so
+ * does any runner whose `run` is this request.
  *
  * **Measured:** synchronous on a modern and a legacy on-prem system, over HTTP
  * and over RFC — `<aunit:runResult>` in the POST's answer, no `Location` — and
@@ -160,7 +160,7 @@ const ACCEPT_TESTRUNS = 'application/xml';
  * alerts as `/abapunit/runs`; the same body without `<options>` answered `200`
  * with an empty `<aunit:runResult/>` for all four. An include's own URI
  * answered empty even with `<options>` — its tests run through the report. So
- * every runner but the legacy class runner sends `<options>`.
+ * every runner sends `<options>`.
  *
  * **Reading the result: `kind` carries the distinction, `severity` does not.**
  * A failed assertion and an uncaught exception both come back
@@ -176,8 +176,7 @@ const ACCEPT_TESTRUNS = 'application/xml';
  *   container;
  * - `application/xml` for `Content-Type` and `Accept`.
  *
- * `options` absent sends no `<options>` element — the body the legacy class
- * runner has always sent, unchanged. Given (`{}` included), the scope, risk
+ * `options` absent sends no `<options>` element. Given (`{}` included), the scope, risk
  * levels and durations go in `<options>` with the same defaults `/runs` gets;
  * `title` and `context` have no place in this format and are not sent.
  */

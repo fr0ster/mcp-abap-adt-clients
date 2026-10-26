@@ -1,18 +1,26 @@
 /**
  * ProgramTestRunnerLegacy — a report's ABAP Unit tests on a legacy system
- * (BASIS < 7.50), which has no `/abapunit/runs`.
+ * (BASIS < 7.50), which has no `/sap/bc/adt/abapunit/runs`.
  *
- * Refused without a request. The legacy endpoint, `/abapunit/testruns`, was
- * given a report's URI on premise (2026-09-30) without `<options>` — the body a
- * legacy system is sent — and answered an empty result for a report whose
- * tests `/abapunit/runs` found, so sending it would answer "no tests" where
- * there are some. With `<options>` it runs them on SAP_BASIS 816 (2026-10-23),
- * but no legacy system has been measured with that body: `run` and `runSync`
- * stay refused until one is.
+ * `runSync` is the inherited one: `/sap/bc/adt/abapunit/testruns` given the
+ * report's URI, with `<options>`, answered the finished result on 7.40 SP04.
+ * `run` sends the same request, read by the `run` strategy — on 7.40 that POST
+ * is the run. There is no run id, so `getStatus` and `getResult` are refused.
  */
 
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { refusedBelow750 } from '../abapUnitRunner';
+import type {
+  IAdtAnalyseOptions,
+  IAdtError,
+  IAdtResponse,
+  IClassUnitTestRunOptions,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import { PROGRAM } from '../../endpoints/objects';
+import {
+  noResultToFetch,
+  noRunToPoll,
+  runSyncLegacy,
+} from '../abapUnitRunLegacy';
 import {
   type IProgramTestRunnerResults,
   ProgramTestRunner,
@@ -22,27 +30,28 @@ import {
 export class ProgramTestRunnerLegacy<
   R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
 > extends ProgramTestRunner<R> {
-  override async run<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['run']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['run']>, E>("a report's");
-  }
-
-  override async runSync<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
-    return refusedBelow750<ReturnType<R['result']>, E>("a report's");
+  /** Run every test class of the report: the `runSync` request, read by `run`. */
+  override async run<E extends IAdtError = IAdtError>(
+    programName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+    return runSyncLegacy(
+      this.connection,
+      [PROGRAM.uri(programName)],
+      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      options,
+    );
   }
 
   override async getStatus<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['status']>, E>
   > {
-    return refusedBelow750<ReturnType<R['status']>, E>("a report's");
+    return noRunToPoll<ReturnType<R['status']>, E>();
   }
 
   override async getResult<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['result']>, E>
   > {
-    return refusedBelow750<ReturnType<R['result']>, E>("a report's");
+    return noResultToFetch<ReturnType<R['result']>, E>();
   }
 }

@@ -1,15 +1,11 @@
 /**
  * AdtClassLegacy - Class handler for legacy SAP systems (BASIS < 7.50)
  *
- * On legacy systems, the x-sap-adt-sessiontype: stateful header causes locks
- * to be stored in ABAP session memory instead of the global enqueue server.
- * This means lock + update + unlock MUST happen within the same stateful
- * HTTP session — switching to stateless between lock and update invalidates
- * the lock handle (GitHub #11).
- *
  * Overrides:
- * - update() — keeps lock→check→update→unlock in one stateful session
- * - delete() — uses direct DELETE instead of /sap/bc/adt/deletion/ API
+ * - delete() — `DELETE <URI>?lockHandle=…` under the lock handle the caller
+ *   holds, instead of the /sap/bc/adt/deletion/ API 7.40 SP04 lacks.
+ *   `update` is the inherited stateless PUT; this class does not override it.
+ * - checkDeletion() — refused without a request: 7.40 has no deletion API.
  */
 
 import type {
@@ -23,6 +19,7 @@ import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
+import { noDeletionCheck } from '../shared/refusalLegacy';
 import { AdtClass } from './AdtClass';
 import type { classDocuments, IClassConfig, IClassResults } from './types';
 
@@ -30,25 +27,17 @@ export class AdtClassLegacy<
   R extends IClassResults = typeof classDocuments,
 > extends AdtClass<R> {
   /**
-   * Update class — legacy override.
-   *
-   * Keeps lock→check→update→unlock in a single stateful session so the
-   * lock handle remains valid (legacy stores locks in ABAP session memory).
-   */
-  override async update<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    // Low-level mode: caller owns the session
-
-    return super.update(config, options);
-  }
-
-  /**
    * Delete class — legacy override.
    *
-   * A direct DELETE on the object under its own lock: the `/sap/bc/adt/deletion/`
-   * resource the modern path uses does not exist on these systems.
+   * One stateless request: `DELETE <object URI>?lockHandle=<options.lockHandle>`,
+   * plus `&corrNr=<transportRequest>` when `transportRequest` is given. Pass the
+   * handle from your own `lock()` and release it with `unlock()` afterwards;
+   * this member does not lock. Measured on 7.40 SP04: lock, delete with the
+   * handle, unlock deleted a class. Without a handle SAP answered `400`
+   * "Parameter lockHandle could not be found." for a class; the request still goes
+   * and that answer reaches you.
+   * A delete with `corrNr` in a transportable package was not measured.
+   * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
@@ -69,5 +58,17 @@ export class AdtClassLegacy<
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
+  }
+
+  /**
+   * Refused without a request: 7.40 has no deletion API —
+   * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5). `delete` with
+   * the object's lock handle is the delete.
+   */
+  override async checkDeletion<E extends IAdtError = IAdtError>(
+    _config: Partial<IClassConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
   }
 }

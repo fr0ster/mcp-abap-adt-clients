@@ -1,15 +1,14 @@
 /**
  * ClassTestRunnerLegacy — running ABAP Unit on legacy SAP systems (BASIS < 7.50).
  *
- * One endpoint differs and one behaviour differs:
- * - `/sap/bc/adt/abapunit/testruns` instead of `/sap/bc/adt/abapunit/runs`,
- *   with `application/xml` rather than the versioned
- *   `application/vnd.sap.adt.api.abapunit.*` types;
- * - the POST answers with the finished result (`aunit:runResult`), so there is
- *   no run to poll.
+ * 7.40 has no `/sap/bc/adt/abapunit/runs`; `/sap/bc/adt/abapunit/testruns`
+ * runs the tests and answers the finished result (`aunit:runResult`), so there
+ * is no run to poll. `runSync` is the inherited one — measured on 7.40 SP04,
+ * `<options>` included — and `run` sends the same request, read by the `run`
+ * strategy.
  *
- * The legacy format addresses classes, never a test class inside one, so a run
- * given test definitions runs each distinct container whole.
+ * The format addresses classes, never a test class inside one, so a run given
+ * test definitions runs each distinct container whole.
  */
 
 import type {
@@ -19,9 +18,9 @@ import type {
   IClassUnitTestRunOptions,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { startClassUnitTestRunSync } from '../../core/class/run';
-import { answering, failed } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
+import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
 import {
   ClassTestRunner,
   type classTestRunnerDocuments,
@@ -34,37 +33,24 @@ export class ClassTestRunnerLegacy<
   R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
 > extends ClassTestRunner<R> {
   /**
-   * Run the tests. On a legacy system the POST answers the finished result.
-   *
-   * So the answer is read by this runner's `run` strategy as it came — the
-   * result document itself, not an id.
+   * Run the tests. On a legacy system the POST answers the finished result:
+   * the request `runSync` sends, with `<options>` — the caller's scope, risk
+   * levels and durations — read by this runner's `run` strategy as it came.
    */
   override async run<E extends IAdtError = IAdtError>(
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    // No options: the body a legacy system has always been sent — the
-    // `<options>` element `runSync` sends is unmeasured there.
+    const { analyse, ...runOptions } = options ?? {};
     return answering(
-      () => startClassUnitTestRunSync(this.connection, containersOf(target)),
+      () =>
+        startClassUnitTestRunSync(
+          this.connection,
+          containersOf(target),
+          runOptions,
+        ),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
-      options?.analyse,
-    );
-  }
-
-  /**
-   * The same request as `run` — on a legacy system `run` is already the
-   * synchronous one — answered through the `result` strategy, as the regular
-   * runner's `runSync` is.
-   */
-  override async runSync<E extends IAdtError = IAdtError>(
-    target: IClassTestRunTarget,
-    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
-    return answering(
-      () => startClassUnitTestRunSync(this.connection, containersOf(target)),
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
-      options?.analyse,
+      analyse,
     );
   }
 
@@ -75,23 +61,13 @@ export class ClassTestRunnerLegacy<
   override async getStatus<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['status']>, E>
   > {
-    return failed<ReturnType<R['status']>, E>({
-      origin: 'refusal',
-      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-      message:
-        'A legacy system has no run to poll: run() answers the finished result.',
-    } as E);
+    return noRunToPoll<ReturnType<R['status']>, E>();
   }
 
   /** Refused for the same reason: `run`'s answer is the result document. */
   override async getResult<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['result']>, E>
   > {
-    return failed<ReturnType<R['result']>, E>({
-      origin: 'refusal',
-      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-      message:
-        'A legacy system has no result to fetch: run() answers the finished result.',
-    } as E);
+    return noResultToFetch<ReturnType<R['result']>, E>();
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "37.2.0",
+  "version": "37.3.0",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -104,6 +104,10 @@
     "shared:setup": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/setup",
     "shared:teardown": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/teardown",
     "shared:check": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/check",
+    "legacy:setup": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/setup",
+    "legacy:status": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/status",
+    "legacy:teardown": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/teardown",
+    "legacy:uninstall": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/uninstall",
     "pretest": "npm run test:check:integration && npm run --silent check:config",
     "prepublishOnly": "npm run build",
     "prepare": "husky",

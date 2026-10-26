@@ -62,3 +62,8 @@ refusal-visibility-evidence.json
 
 # Header probe reports (npm run header:discovery): system answers, never committed
 .header-probe/
+
+# Reports of npm run legacy:setup / legacy:status / legacy:teardown (they name the request)
+.legacy-env/
+# The ABAP sources of the legacy 7.40 test environment and its fixtures
+!src/__tests__/integration/legacy/abap/*.abap
