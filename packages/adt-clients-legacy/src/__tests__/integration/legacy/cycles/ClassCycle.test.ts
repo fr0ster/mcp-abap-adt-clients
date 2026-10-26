@@ -226,7 +226,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
           ),
         ]);
         for (const write of writes)
-          expect(queryOf(write, 'lockHandle')).toBe(handle);
+          expect(queryOf(write, 'lockHandle') === handle).toBe(true);
 
         mark = at();
         expectResult(await cls.unlock(), 'unlock');
@@ -408,7 +408,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
           [`DELETE ${uri}`, 200],
           [`POST ${uri} UNLOCK`, 200],
         ]);
-        expect(queryOf(deleted, 'lockHandle')).toBe(deleteHandle);
+        expect(queryOf(deleted, 'lockHandle') === deleteHandle).toBe(true);
 
         mark = at();
         const gone = expectFailure(

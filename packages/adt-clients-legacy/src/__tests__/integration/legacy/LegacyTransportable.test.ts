@@ -211,9 +211,11 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
       expect(sent.map((r) => r.status)).toEqual([200, 200, 200]);
       const del = sent[1];
       expect(del && queryOf(del, 'corrNr')).toBe(request);
-      expect(del && queryOf(del, 'lockHandle')).toBe(
-        sent[2] && queryOf(sent[2], 'lockHandle'),
-      );
+      expect(
+        del !== undefined &&
+          queryOf(del, 'lockHandle') ===
+            (sent[2] && queryOf(sent[2], 'lockHandle')),
+      ).toBe(true);
       const read = expectFailure(
         await handler.readMetadata(
           { programName },

@@ -145,8 +145,8 @@ describeLegacyRfc(
           expect(queryOf(lockClass, 'onSave')).toBe('X');
           const handle = lockHandleIn(lockClass?.answer);
           expect(handle).not.toBe('');
-          expect(queryOf(put, 'lockHandle')).toBe(handle);
-          expect(queryOf(unlock, 'lockHandle')).toBe(handle);
+          expect(queryOf(put, 'lockHandle') === handle).toBe(true);
+          expect(queryOf(unlock, 'lockHandle') === handle).toBe(true);
         };
 
         await runCycle(CASE, [msag], async () => {
@@ -296,7 +296,7 @@ describeLegacyRfc(
             [`DELETE ${uri}`, 200],
             [`POST ${uri} UNLOCK`, 200],
           ]);
-          expect(queryOf(deleted, 'lockHandle')).toBe(handle);
+          expect(queryOf(deleted, 'lockHandle') === handle).toBe(true);
 
           mark = at();
           const after = expectResult(

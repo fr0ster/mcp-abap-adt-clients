@@ -208,8 +208,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
           [`PUT ${includeUri}/source/main`, 200],
           [`POST ${includeUri} UNLOCK`, 200],
         ]);
-        expect(queryOf(put, 'lockHandle')).toBe(handle);
-        expect(queryOf(unlocked, 'lockHandle')).toBe(handle);
+        expect(queryOf(put, 'lockHandle') === handle).toBe(true);
+        expect(queryOf(unlocked, 'lockHandle') === handle).toBe(true);
 
         mark = at();
         expectResult(
@@ -282,7 +282,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
           [`DELETE ${groupUri}`, 200],
           [`POST ${groupUri} UNLOCK`, 200],
         ]);
-        expect(queryOf(deleted, 'lockHandle')).toBe(groupHandle);
+        expect(queryOf(deleted, 'lockHandle') === groupHandle).toBe(true);
 
         mark = at();
         const groupGone = expectFailure(

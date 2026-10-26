@@ -232,7 +232,7 @@ describeLegacyRfc(
           const [put] = expectSent(recorder, mark, [
             [`PUT ${moduleUri}/source/main`, 200],
           ]);
-          expect(queryOf(put, 'lockHandle')).toBe(module.handle());
+          expect(queryOf(put, 'lockHandle') === module.handle()).toBe(true);
 
           mark = at();
           expectResult(await module.unlock(), 'unlock module');
@@ -348,7 +348,9 @@ describeLegacyRfc(
             [`DELETE ${moduleUri}`, 200],
             [`POST ${moduleUri} UNLOCK`, 200],
           ]);
-          expect(queryOf(moduleDeleted, 'lockHandle')).toBe(moduleHandle);
+          expect(queryOf(moduleDeleted, 'lockHandle') === moduleHandle).toBe(
+            true,
+          );
 
           mark = at();
           const moduleGone = expectFailure(
@@ -380,7 +382,9 @@ describeLegacyRfc(
             [`DELETE ${groupUri}`, 200],
             [`POST ${groupUri} UNLOCK`, 200],
           ]);
-          expect(queryOf(groupDeleted, 'lockHandle')).toBe(groupHandle);
+          expect(queryOf(groupDeleted, 'lockHandle') === groupHandle).toBe(
+            true,
+          );
 
           mark = at();
           const groupGone = expectFailure(

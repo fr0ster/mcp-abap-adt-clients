@@ -272,7 +272,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
           [`DELETE ${uri}`, 200],
           [`POST ${uri} UNLOCK`, 200],
         ]);
-        expect(queryOf(deleted, 'lockHandle')).toBe(handle);
+        expect(queryOf(deleted, 'lockHandle') === handle).toBe(true);
 
         mark = at();
         const gone = expectFailure(
