@@ -316,7 +316,7 @@ describe('legacy env: names and packages', () => {
     ).toBe(true);
   });
 
-  it('still tells a body difference; a case-only difference anywhere is the same (owner: ABAP is case-insensitive)', () => {
+  it('still tells a body difference; a case-only difference outside literals is the same', () => {
     const file = 'FUNCTION z_x.\n  lv_value = 1.\nENDFUNCTION.\n';
     expect(
       sameSource(file, 'FUNCTION Z_X.\n  lv_value = 2.\nENDFUNCTION.'),
@@ -324,12 +324,45 @@ describe('legacy env: names and packages', () => {
     expect(
       sameSource(file, 'FUNCTION Z_X.\n  lv_other = 1.\nENDFUNCTION.'),
     ).toBe(false);
+    // Keywords and identifiers, outside literals.
     expect(
       sameSource(
-        "FUNCTION z_x.\n  WRITE 'abc'. \" note\nENDFUNCTION.",
-        "function Z_X.\n  write 'ABC'. \" NOTE\nendfunction.",
+        'METHOD x.\n  DATA lv_a TYPE i.\nENDMETHOD.',
+        'method X.\n  data LV_A type I.\nendmethod.',
       ),
     ).toBe(true);
+  });
+
+  it('keeps the case of literal contents: text, string and template', () => {
+    expect(sameSource('rv_json = `true`.', 'rv_json = `TRUE`.')).toBe(false);
+    expect(sameSource("WRITE 'abc'.", "WRITE 'ABC'.")).toBe(false);
+    expect(
+      sameSource(
+        'lv = |"packageExists":{ lv_x }|.',
+        'lv = |"packageexists":{ lv_x }|.',
+      ),
+    ).toBe(false);
+    expect(
+      sameSource('lv = \'"packageExists":\'.', 'lv = \'"packageexists":\'.'),
+    ).toBe(false);
+    // An embedded expression is code; a doubled quote stays in the literal.
+    expect(sameSource('lv = |a{ lv_x }b|.', 'LV = |a{ LV_X }b|.')).toBe(true);
+    expect(sameSource("lv = 'it''s'.", "LV = 'it''s'.")).toBe(true);
+    expect(sameSource("lv = 'it''s'.", "LV = 'IT''s'.")).toBe(false);
+    expect(sameSource('lv = |a\\|b|.', 'LV = |a\\|b|.')).toBe(true);
+  });
+
+  it('folds comments freely; a quote in a comment opens no literal', () => {
+    expect(
+      sameSource(
+        "lv = 1. \" it's a `note`\nlv = 'x'.",
+        "LV = 1. \" IT'S A `NOTE`\nLV = 'x'.",
+      ),
+    ).toBe(true);
+    expect(
+      sameSource("* it's |a note|\nlv = 'x'.", "* IT'S |A NOTE|\nLV = 'x'."),
+    ).toBe(true);
+    expect(sameSource("* c\nlv = 'x'.", "* C\nLV = 'X'.")).toBe(false);
   });
 });
 

@@ -63,6 +63,9 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! Teardown, first phase: own locks released; every object in scope
     "! deleted, fixtures included (DDL sources are left for ADT); inactive
     "! versions dropped. The request is kept for the ADT deletions.
+    "! The function group ZLG7_FX is deleted whole, with every member in it:
+    "! the group is the test user's, and a module someone else adds to it is
+    "! theirs to agree with the group's owner.
     METHODS teardown.
 
     "! Teardown, second phase (after ADT deleted the DDL sources): package

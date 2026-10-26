@@ -177,6 +177,9 @@ metadata names no one) or test include (whose owner this side cannot read) is
 never replaced: setup refuses when its active source differs. An object is
 current only when its ACTIVE source is the one wanted; a written but inactive
 source is activated on the next run and read back after the activation.
+`TEARDOWN` deletes the function group `ZLG7_FX` whole, with every member in
+it: the group is the test user's, and a module someone else adds to it is
+theirs to agree with the group's owner.
 A run of the live checks uses the fixtures and leaves them; only
 `legacy:teardown` removes them.
 

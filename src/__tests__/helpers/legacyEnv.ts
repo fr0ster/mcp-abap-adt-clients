@@ -197,10 +197,65 @@ function notTheSessionUsers(
 }
 
 /**
- * Two sources the same, apart from what 7.40 changes on save: line ends,
- * trailing blanks, empty lines, the final line end and case — the owner's
- * rule: any ABAP is case-insensitive, so every line is compared case-folded.
- * Plain string code.
+ * One source line with its case folded everywhere but inside literal
+ * contents: `'…'` text literals, `` `…` `` string literals and the text parts
+ * of `|…|` string templates keep their case; an embedded `{ … }` expression
+ * is code. A `*` in the first column or a `"` outside a literal makes the
+ * rest a comment, folded freely. Literals do not span lines in ABAP. Plain
+ * scanning, no regex.
+ */
+function foldedLine(line: string): string {
+  if (line.startsWith('*')) return line.toUpperCase();
+  let out = '';
+  // The template / expression nesting: 'template' or 'expression' per level.
+  const nesting: Array<'template' | 'expression'> = [];
+  let at = 0;
+  while (at < line.length) {
+    const char = line.charAt(at);
+    const inTemplate = nesting[nesting.length - 1] === 'template';
+    if (inTemplate) {
+      if (char === '\\') {
+        out += line.slice(at, at + 2);
+        at += 2;
+        continue;
+      }
+      if (char === '|') nesting.pop();
+      else if (char === '{') nesting.push('expression');
+      out += char;
+      at += 1;
+      continue;
+    }
+    if (char === '"') return out + line.slice(at).toUpperCase();
+    if (char === "'" || char === '`') {
+      // To the closing quote; a doubled one stays inside the literal.
+      let end = at + 1;
+      while (end < line.length) {
+        if (line.charAt(end) === char) {
+          if (line.charAt(end + 1) === char) {
+            end += 2;
+            continue;
+          }
+          break;
+        }
+        end += 1;
+      }
+      out += line.slice(at, end + 1);
+      at = end + 1;
+      continue;
+    }
+    if (char === '|') nesting.push('template');
+    else if (char === '}' && nesting.length > 0) nesting.pop();
+    out += char.toUpperCase();
+    at += 1;
+  }
+  return out;
+}
+
+/**
+ * Two sources the same, apart from what 7.40 changes on save — line ends,
+ * trailing blanks, empty lines, the final line end — and case. The owner's
+ * rule: ABAP is case-insensitive except literal contents, whose case is
+ * compared as written (see `foldedLine`). Plain string code.
  */
 export function sameSource(a: string, b: string): boolean {
   const norm = (s: string) =>
@@ -210,8 +265,8 @@ export function sameSource(a: string, b: string): boolean {
       .split('\n')
       .map((l) => l.trimEnd())
       .filter((l) => l !== '')
-      .join('\n')
-      .toUpperCase();
+      .map(foldedLine)
+      .join('\n');
   return norm(a) === norm(b);
 }
 
