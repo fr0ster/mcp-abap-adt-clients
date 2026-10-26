@@ -107,13 +107,23 @@ prove every handler 7.40 serves with one live cycle per type.
 **Interfaces:**
 - Produces: `npm ci` at the root installs and links all workspaces. The
   root `build`, `test`, `lint:check` and `test:check` run for every package.
-  `release:publish -- --dry` lists `@mcp-abap-adt/adt-clients` and
-  `@mcp-abap-adt/adt-strategies` with their registry state. Nothing that
+  `release:publish -- --dry-run` lists `@mcp-abap-adt/adt-clients` and
+  `@mcp-abap-adt/adt-strategies` with their registry state and publishes
+  nothing. That is proved by the publisher's own stubbed-npm test before any
+  real run. Nothing that
   either package publishes changes, and their pack contents stay the same.
 
 - [ ] Step 1: Read `llm-agent`'s root `package.json`, its workspace scripts,
-  `scripts/publish-all.sh`, CI and release workflows end to end, and mirror
-  them. Copy the example whole.
+  CI and release workflows end to end, and mirror their layout and
+  workspace wiring. Do **not** copy `llm-agent`'s `scripts/publish-all.sh`:
+  it parses no arguments and publishes unconditionally.
+
+  `release:publish` is the owner's guarded publisher instead:
+  `tools/publish-changed.js` and `tools/test-publish-changed.js` from
+  `mcp-abap-adt-interfaces`, copied whole. It has a check to a log, one Enter
+  pause with the guards re-run, a `--dry-run` that never calls
+  `npm publish`, refusal of unknown arguments, and its own test with a
+  stubbed npm. Its test runs in this repository's check.
 - [ ] Step 2: Before moving anything, record each package's
   `npm pack --dry-run` file list and the unit-test counts.
 - [ ] Step 3: Move with `git mv` and fix the relative paths the compiler,
@@ -408,7 +418,8 @@ prove every handler 7.40 serves with one live cycle per type.
   - `README.md` (legacy is a separate package);
   - `CHANGELOG.md` `[37.4.0]` (removed legacy exports and the factory
     choice, with a migration note);
-  - `package.json` version `37.4.0` via `npm version --no-git-tag-version`;
+  - verify, do not bump: `packages/adt-clients/package.json` and its entry in
+    the root lockfile are `37.4.0` (set in Task 3);
   - the `RFC_TESTING.md` legacy section moves to the package docs or links
     there.
 - CLAUDE.md: draft the changes (legacy is a separate package; the rules)

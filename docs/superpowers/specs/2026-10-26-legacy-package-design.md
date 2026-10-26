@@ -23,9 +23,11 @@ probe records are outside the repository, in `~/prj/e77-probe/e77-results/`:
   - The packages are `packages/adt-clients` (today's root package, moved
     whole: `src`, its tests, scripts, docs, configs), `packages/adt-strategies`
     (unchanged, now a workspace) and `packages/adt-clients-legacy` (new).
-  - `release:publish` publishes the packages whose version is not on the
-    registry, in dependency order. Tags follow the model repository's
-    scheme.
+  - `release:publish` is the owner's guarded publisher, copied whole from
+    `mcp-abap-adt-interfaces` (`tools/publish-changed.js`, with its test). It
+    publishes the packages whose version is not on the registry, in
+    dependency order, and its `--dry-run` publishes nothing. Tags are
+    `<package directory>-v<version>`, as in interfaces and auth-providers.
 - **Name.** The new package is `@mcp-abap-adt/adt-clients-legacy`. Its first
   version is `0.1.0`.
 - **Dependency.** It depends on `@mcp-abap-adt/adt-clients` `^37.4.0`, a
@@ -72,7 +74,7 @@ probe records are outside the repository, in `~/prj/e77-probe/e77-results/`:
     package's test helpers.
 - **The legacy package's test setup.**
   - Its Jest and type-check configuration include the root's shared harness
-    by relative path (`../../src/__tests__/helpers/…`). That source is
+    by relative path from the legacy package directory (`../adt-clients/src/__tests__/helpers/…`). That source is
     test-only, in the same repository, and never part of either published
     package.
   - The root's harness never imports from the legacy package. The two AST
