@@ -1,0 +1,40 @@
+{
+  "name": "mcp-abap-adt-clients-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "license": "LGPL-3.0-only",
+  "workspaces": [
+    "packages/*"
+  ],
+  "publishOrder": [
+    "packages/adt-strategies",
+    "packages/adt-clients"
+  ],
+  "scripts": {
+    "clean": "npm run clean --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "biome check --write packages/adt-clients/src packages/adt-strategies tools",
+    "lint:check": "biome check packages/adt-clients/src packages/adt-strategies tools && npm run check:docs --workspaces --if-present",
+    "format": "biome format --write packages/adt-clients/src packages/adt-strategies tools",
+    "test:check": "npm run test:check --workspaces --if-present",
+    "test": "npm run test:unit --workspace @mcp-abap-adt/adt-clients && npm run test --workspace @mcp-abap-adt/adt-strategies",
+    "check": "npm run build && npm run test:check && npm run lint:check && npm run test && npm run check:packed && npm run check:publish && npm run check:publish:root",
+    "check:packed": "node tools/check-packed.js",
+    "check:publish": "node tools/test-publish-changed.js",
+    "check:publish:root": "node tools/test-publish-root.js",
+    "release:publish": "node tools/publish-changed.js",
+    "prepare": "husky"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "husky": "^9.1.7",
+    "semver": "^7.8.5"
+  },
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "unrs-resolver": false
+  }
+}
