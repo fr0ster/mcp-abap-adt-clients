@@ -1,24 +1,18 @@
 /**
- * Factory function that auto-detects SAP system version and returns the
- * appropriate executor client — the twin of `createAdtClient`.
+ * Factory function for the executor client — the twin of `createAdtClient`.
  *
- * - Modern systems (BASIS >= 7.50): AdtExecutor
- * - Legacy systems (BASIS < 7.50): AdtExecutorLegacy, supported over RFC only
- *   (HTTP to a legacy system is unsupported)
+ * It detects nothing: the system type is the consumer's to declare. This
+ * returns `AdtExecutor`; a 7.40 system is served by `AdtExecutorLegacy` from
+ * `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs itself.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { isModernAdtSystem } from '../utils/systemInfo';
 import { AdtExecutor } from './AdtExecutor';
-import { AdtExecutorLegacy } from './AdtExecutorLegacy';
 
 export async function createAdtExecutor(
   connection: IAbapConnection,
   logger?: ILogger,
 ): Promise<AdtExecutor> {
-  const isModern = await isModernAdtSystem(connection);
-  return isModern
-    ? new AdtExecutor(connection, logger)
-    : new AdtExecutorLegacy(connection, logger);
+  return new AdtExecutor(connection, logger);
 }

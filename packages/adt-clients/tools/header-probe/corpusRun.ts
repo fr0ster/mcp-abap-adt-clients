@@ -778,8 +778,6 @@ export function headersFor(
   };
 }
 
-const modern = (handler: string) => handler.replace(/^legacy /, '');
-
 async function runClients(ctx: IContext): Promise<void> {
   const recorded = await recordMembers();
   const only = ctx.only;
@@ -926,11 +924,8 @@ async function runClients(ctx: IContext): Promise<void> {
         row,
         call: (on, analyse) => {
           // Into the ledger before the write is sent, whatever follows.
-          // The legacy client's object is the modern client's: one entry,
-          // read and deleted through the modern handler (measured: the legacy
-          // package read answered nothing, so its entry could not be checked).
           if (write && readable) {
-            const owner = specs.get(modern(member.handler)) ?? spec;
+            const owner = specs.get(member.handler) ?? spec;
             const ownerOf = (clients: IClients) =>
               owner.of(clients) as IHandler;
             ctx.register(`clients ${owner.label}`, () => ({

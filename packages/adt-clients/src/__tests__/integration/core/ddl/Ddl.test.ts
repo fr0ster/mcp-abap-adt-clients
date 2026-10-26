@@ -73,7 +73,6 @@ describe('View (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let defaultPackage: string = '';
   let defaultTransport: string = '';
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
@@ -84,10 +83,12 @@ describe('View (using AdtClient)', () => {
       connection = await createTestConnection(connectionLogger);
       const isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       const envCheck = await checkDefaultTestEnvironment(connection);

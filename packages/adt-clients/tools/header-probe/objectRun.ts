@@ -49,8 +49,6 @@ export type Coverage =
   | { kind: 'not coverable'; reason: string }
   | { kind: 'no object' };
 
-const modern = (handler: string) => handler.replace(/^legacy /, '');
-
 /** The temporary object type of each handler whose members work on one object. */
 export const OBJECT_OF_HANDLER: Readonly<Record<string, string>> = {
   'getClass()': 'class',
@@ -184,7 +182,7 @@ export const NOT_COVERABLE: readonly {
 export function coverageOf(
   member: Pick<IMemberEndpoint, 'handler' | 'member' | 'requests'>,
 ): Coverage {
-  const handler = modern(member.handler);
+  const handler = member.handler;
   const refused = NOT_COVERABLE.find(
     (entry) =>
       entry.handler === handler &&

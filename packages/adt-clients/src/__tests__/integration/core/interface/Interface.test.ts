@@ -67,7 +67,6 @@ describe('Interface (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
   let tester: BaseTester<IInterfaceConfig>;
 
   beforeAll(async () => {
@@ -78,10 +77,12 @@ describe('Interface (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -180,7 +181,7 @@ describe('Interface (using AdtClient)', () => {
 
         if (!standardObject) {
           throw new Error(
-            `Standard interface not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
+            `Standard interface not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
           );
         }
 

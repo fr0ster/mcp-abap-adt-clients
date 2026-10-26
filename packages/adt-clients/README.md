@@ -146,7 +146,7 @@ npm install @mcp-abap-adt/adt-clients
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
-   - `AdtClientLegacy` (from `createAdtClient` on BASIS < 7.50) is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only — HTTP to a legacy system is unsupported. Each member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed as not measured in LEGACY.md), or answers a refusal without a request; a legacy `delete` takes the lock handle from your `lock()`, and there is no `checkDeletion`. See [LEGACY.md](docs/architecture/LEGACY.md)
+   - `AdtClientLegacy` (from `createAdtClient` on BASIS < 7.50) is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only — HTTP to a legacy system is unsupported. Each member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed as not measured in LEGACY.md), or answers a refusal without a request; a legacy `delete` takes the lock handle from your `lock()`, and there is no `checkDeletion`. See [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md)
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
@@ -164,7 +164,7 @@ npm install @mcp-abap-adt/adt-clients
      - `getProgramExecutor()` for `programrun` (on-premise systems)
    - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
    - Each executor factory takes an optional result set, like the runtime client's
-   - `createAdtExecutor(connection)` picks `AdtExecutor` or `AdtExecutorLegacy` by system version, like `createAdtClient`. The legacy one (SAP_BASIS 7.40 SP04, over RFC) runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](docs/architecture/LEGACY.md#abap-unit-runners-and-executors)
+   - `createAdtExecutor(connection)` picks `AdtExecutor` or `AdtExecutorLegacy` by system version, like `createAdtClient`. The legacy one (SAP_BASIS 7.40 SP04, over RFC) runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md#abap-unit-runners-and-executors)
 
 4. **AdtAbapGitClient**
    - Standalone: `new AdtAbapGitClient(connection, logger?, results?)` (the options argument, `contentTypeVersion`, was removed in 36.0.0)
@@ -1077,7 +1077,7 @@ hold yourself:
   `AdtClientLegacy`, from `isModernAdtSystem`. The legacy client is an RFC
   client: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only; HTTP to
   a legacy system is unsupported. What it serves and what it refuses is in
-  [LEGACY.md](docs/architecture/LEGACY.md).
+  [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md).
 
 **A probe answers only for an absent endpoint.** For `isModernAdtSystem` and
 `fetchDiscoveryEndpoints` a `404`, `405` or `501` is the answer `false` or an

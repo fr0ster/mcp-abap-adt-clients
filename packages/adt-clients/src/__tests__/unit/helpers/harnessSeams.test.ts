@@ -151,7 +151,7 @@ describe('refusals registered per handler class', () => {
   });
 });
 
-/** A connection whose discovery answers as a modern system does. */
+/** A connection that records what it is asked, answering a modern discovery. */
 function modernConnection() {
   const makeAdtRequest = jest.fn(async () => ({
     status: 200,
@@ -166,24 +166,17 @@ function modernConnection() {
 }
 
 describe('the client factory', () => {
-  it('builds the modern client by default, after the discovery read it always made', async () => {
+  it('builds the modern client by default, and asks the system nothing', async () => {
     const { connection, makeAdtRequest } = modernConnection();
-    const { client, isLegacy } = await createTestAdtClient(connection, logger);
+    const { client } = await createTestAdtClient(connection, logger);
     expect(Object.getPrototypeOf(client)).toBe(AdtClient.prototype);
-    expect(isLegacy).toBe(false);
-    expect(makeAdtRequest).toHaveBeenCalledTimes(1);
-    expect(makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/sap/bc/adt/core/discovery' }),
-    );
+    expect(makeAdtRequest).not.toHaveBeenCalled();
   });
 
   it('builds what an injected factory builds, with the same arguments, and sends nothing itself', async () => {
     const { connection, makeAdtRequest } = modernConnection();
     const options = { masterSystem: 'SEAM' };
-    const built = {
-      client: new AdtClient(connection, logger),
-      isLegacy: false,
-    };
+    const built = { client: new AdtClient(connection, logger) };
     const factory: TestClientFactory = jest.fn(async () => built);
     const result = await createTestAdtClient(
       connection,

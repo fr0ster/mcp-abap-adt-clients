@@ -4,7 +4,7 @@ RFC (Remote Function Call) transport allows ADT operations on legacy SAP systems
 
 ## When to Use RFC
 
-- **Legacy systems** (BASIS < 7.50) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. The library does not detect the wire and does not refuse HTTP; it just is not supported. See [LEGACY.md](../architecture/LEGACY.md#http-is-not-a-supported-legacy-wire).
+- **Legacy systems** (BASIS < 7.50) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. The library does not detect the wire and does not refuse HTTP; it just is not supported. See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#http-is-not-a-supported-legacy-wire).
 - **Systems without HTTP stateful support** — some custom configurations disable HTTP stateful sessions.
 
 Modern systems (BASIS >= 7.50, S/4 HANA, BTP) work fine with HTTP connections and don't need RFC.
@@ -114,7 +114,7 @@ SAP_BASIS 7.40 SP04 serves and refuses the rest without a request (`origin:
 'refusal'`, `UNSUPPORTED_OPERATION`). Two things differ for a caller: a
 `delete` takes the object's lock handle from your own `lock()`, and there is no
 `checkDeletion`. The member-by-member list is in
-[LEGACY.md](../architecture/LEGACY.md).
+[LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md).
 
 ### Legacy Content Types
 

@@ -56,10 +56,9 @@ function objectCase(
   return gateAll(
     gate(handlerName, testCaseName),
     gateOn(
-      ({ isCloud, isLegacy }) =>
+      ({ isCloud }) =>
         !!new TestConfigResolver({
           isCloud,
-          isLegacy,
           handlerName,
           testCaseName,
         }).getObjectName(param, type),
@@ -70,16 +69,16 @@ function objectCase(
 describe('Shared - getWhereUsed', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, testsLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        testsLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -104,7 +103,6 @@ describe('Shared - getWhereUsed', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'where_used',
         testCaseName: 'where_used_default_scope',
@@ -189,7 +187,6 @@ describe('Shared - getWhereUsed', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'where_used',
         testCaseName: 'where_used_all_types',
@@ -297,7 +294,6 @@ describe('Shared - getWhereUsed', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'where_used',
         testCaseName: 'where_used_table',
@@ -446,7 +442,6 @@ describe('Shared - getWhereUsed', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'where_used',
         testCaseName: 'where_used_list_parsed',
@@ -552,7 +547,6 @@ describe('Shared - getWhereUsed', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'where_used',
         testCaseName: 'where_used_list_raw_xml',
@@ -610,7 +604,6 @@ describe('Shared - getWhereUsed', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'where_used',
         testCaseName: 'where_used_list_filtered',

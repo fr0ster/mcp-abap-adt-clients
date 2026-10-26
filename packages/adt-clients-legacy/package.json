@@ -20,7 +20,7 @@
   "scripts": {
     "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\"",
     "build": "npm run --silent clean && tsc -p tsconfig.json",
-    "test": "jest -c jest.unit.config.js --passWithNoTests",
+    "test": "jest -c jest.unit.config.js",
     "test:live": "jest -c jest.live.config.js --runInBand",
     "test:check": "tsc --noEmit --project tsconfig.test.json",
     "legacy:setup": "jest -c jest.live.config.js --runInBand --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/setup",

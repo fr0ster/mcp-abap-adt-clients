@@ -17,9 +17,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAbapGitClient } from '../../src/clients/AdtAbapGitClient';
 import { AdtClient } from '../../src/clients/AdtClient';
-import { AdtClientLegacy } from '../../src/clients/AdtClientLegacy';
 import { AdtExecutor } from '../../src/clients/AdtExecutor';
-import { AdtExecutorLegacy } from '../../src/clients/AdtExecutorLegacy';
 import { AdtRuntimeClient } from '../../src/clients/AdtRuntimeClient';
 import { AbapDebugger } from '../../src/runtime/debugger/AbapDebugger';
 import { AmdpDebugger } from '../../src/runtime/debugger/AmdpDebugger';
@@ -32,16 +30,14 @@ import {
   traced,
 } from './capture';
 import { FIXED_TEXT, PROBE_HANDLE, PROBE_NAME, PROBE_PACKAGE } from './corpus';
-import { knownPair, legacyPair } from './pairs';
+import { knownPair } from './pairs';
 import { endpointOf, type ISentRequest } from './record';
 
-/** The clients a handler comes from, on one connection: the modern and the legacy ones. */
+/** The clients a handler comes from, on one connection. */
 export interface IClients {
   adt: AdtClient;
-  legacy: AdtClientLegacy;
   runtime: AdtRuntimeClient;
   executor: AdtExecutor;
-  legacyExecutor: AdtExecutorLegacy;
   abapGit: AdtAbapGitClient;
 }
 
@@ -53,10 +49,8 @@ export function clientsOn(
     throw new Error('clientsOn: the connection does not send through the gate');
   return {
     adt: new AdtClient(connection, undefined, options),
-    legacy: new AdtClientLegacy(connection, undefined, options),
     runtime: new AdtRuntimeClient(connection),
     executor: new AdtExecutor(connection),
-    legacyExecutor: new AdtExecutorLegacy(connection),
     abapGit: new AdtAbapGitClient(connection),
   };
 }
@@ -114,11 +108,10 @@ export const prototypeMembers = (prototype: object): string[] =>
 /**
  * Every handler the clients hand out — read from the clients themselves:
  * every `get…()` that answers an object — plus the abapGit client itself.
- * The legacy client's are labelled `legacy get…()`, as MIGRATION-36 does.
  */
 export function handlerSpecs(clients: IClients): IHandlerSpec[] {
   const specs: IHandlerSpec[] = [];
-  const factories = (key: keyof IClients, prefix = '') => {
+  const factories = (key: keyof IClients) => {
     const client = clients[key] as unknown as Record<string, unknown>;
     for (const name of memberNames(client)) {
       if (!/^get[A-Z]/.test(name)) continue;
@@ -130,7 +123,7 @@ export function handlerSpecs(clients: IClients): IHandlerSpec[] {
       }
       if (!made || typeof made !== 'object') continue;
       specs.push({
-        label: `${prefix}${name}()`,
+        label: `${name}()`,
         of: (on) =>
           (on[key] as unknown as Record<string, () => Handler>)[name].call(
             on[key],
@@ -139,10 +132,8 @@ export function handlerSpecs(clients: IClients): IHandlerSpec[] {
     }
   };
   factories('adt');
-  factories('legacy', 'legacy ');
   factories('runtime');
   factories('executor');
-  factories('legacyExecutor', 'legacy ');
   specs.push({
     label: 'AdtAbapGitClient',
     of: (on) => on.abapGit as unknown as Handler,
@@ -398,12 +389,11 @@ export interface IMemberEndpoint {
   hasBody?: boolean;
 }
 
-/** The corpus pair of a member, from pairs.ts; the legacy client's from its own rows. */
+/** The corpus pair of a member, from pairs.ts. */
 export function pairOf(
   handler: string,
   member: string,
 ): Partial<IAdtHeaders> | undefined {
-  if (handler.startsWith('legacy ')) return legacyPair(handler, member);
   return (
     knownPair(handler, member) ??
     (handler === 'getClass()' || handler.startsWith('getLocal')
@@ -512,8 +502,7 @@ export async function recordMembers(): Promise<{
       const standIn = standInParameters(capture.requests);
       if (standIn.length) entry.standIn = standIn;
       entry.hasBody = capture.requests.some((request) => request.hasBody);
-      // The legacy client's member is the modern one's: the same reason.
-      const notSent = NOT_SENT[key.replace(/^legacy /, '')];
+      const notSent = NOT_SENT[key];
       if (notSent) entry.skipped = `skipped: ${notSent}`;
       else if (!entry.requests.length)
         entry.skipped = capture.failure

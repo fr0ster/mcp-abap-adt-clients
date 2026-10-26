@@ -254,7 +254,7 @@ refused, never ignored.
 
 ### The live checks
 
-Written, not yet run: no result of theirs is recorded in `docs/architecture/LEGACY.md`.
+Written, not yet run: no result of theirs is recorded in `packages/adt-clients-legacy/docs/LEGACY.md`.
 Each runs under `describeLegacyRfc` — only when the loaded configuration says
 `is_legacy: true` and `connection_type: "rfc"`, a skipped test naming the reason
 otherwise — and every case is a `legacy_740` test case of the configuration

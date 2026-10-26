@@ -1167,6 +1167,6 @@ export function integrationHeadersOf(
     (handler as { constructor?: { name?: string } }).constructor?.name ??
     'unknown handler';
   throw new Error(
-    `No Accept/Content-Type pair recorded for ${name}.${member}: add it to SENT_BEFORE_36 in src/__tests__/helpers/adtHeaders.ts. An integration test does not send TEST_HEADERS to SAP.`,
+    `No Accept/Content-Type pair recorded for ${name}.${member}: add it to SENT_BEFORE_36 in src/__tests__/helpers/adtHeaders.ts, or — for a handler class of another package — register it with registerHeaderPairs. An integration test does not send TEST_HEADERS to SAP.`,
   );
 }

@@ -18,7 +18,6 @@ export type {
   DesiredPublicationState,
   GeneratedServiceType,
   ICreateAndGenerateServiceBindingParams,
-  ICreateAndGenerateServiceBindingParamsLegacy,
   ICreateServiceBindingParams,
   IServiceBindingConfig,
   ServiceBindingType,

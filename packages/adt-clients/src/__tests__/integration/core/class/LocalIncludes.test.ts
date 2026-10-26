@@ -82,7 +82,6 @@ describe('Class local includes (using BaseTester)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   async function ensureParentClassExists(
     config: ParentClassConfig,
@@ -160,10 +159,12 @@ describe('Class local includes (using BaseTester)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       definitionsTester = new BaseTester(

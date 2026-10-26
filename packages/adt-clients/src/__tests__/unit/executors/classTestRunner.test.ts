@@ -9,12 +9,10 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtExecutor } from '../../../clients/AdtExecutor';
-import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
 import {
   ClassTestRunner,
   classTestRunnerDocuments,
 } from '../../../executors/class/ClassTestRunner';
-import { ClassTestRunnerLegacy } from '../../../executors/class/ClassTestRunnerLegacy';
 import { expectFailure, expectResult } from '../../helpers/contract';
 import { createLibraryLogger } from '../../helpers/testLogger';
 
@@ -139,14 +137,11 @@ describe('ClassTestRunner — running', () => {
     }
   });
 
-  it('is what AdtExecutor hands out, and the legacy one from the legacy executor', () => {
+  it('is what AdtExecutor hands out', () => {
     const { conn } = makeConn();
 
     expect(new AdtExecutor(conn).getClassTestRunner()).toBeInstanceOf(
       ClassTestRunner,
-    );
-    expect(new AdtExecutorLegacy(conn).getClassTestRunner()).toBeInstanceOf(
-      ClassTestRunnerLegacy,
     );
   });
 });
@@ -285,109 +280,5 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
       '/sap/bc/adt/abapunit/runs',
       '/sap/bc/adt/abapunit/testruns',
     ]);
-  });
-});
-
-describe('ClassTestRunnerLegacy', () => {
-  /** Marks which strategy read the answer. */
-  const marked = {
-    ...classTestRunnerDocuments,
-    run: () => 'read by run',
-    result: () => 'read by result',
-  };
-
-  /** The body the modern `runSync` sends for the same target and options. */
-  async function modernBody(
-    target: Parameters<ClassTestRunner['runSync']>[0],
-    options?: Parameters<ClassTestRunner['runSync']>[1],
-  ): Promise<unknown> {
-    const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    await new ClassTestRunner(conn, createLibraryLogger()).runSync(
-      target,
-      options,
-    );
-    expect(calls).toHaveLength(1);
-    return calls[0].data;
-  }
-
-  it.each([
-    ['run', 'read by run'],
-    ['runSync', 'read by result'],
-  ] as const)(
-    '%s: one POST to /testruns, the modern runSync body byte for byte, read by %s',
-    async (member, readBy) => {
-      const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-      const runner = new ClassTestRunnerLegacy(
-        conn,
-        createLibraryLogger(),
-        marked,
-      );
-
-      expect(expectResult(await runner[member]('ZCL_TESTS'), member)).toBe(
-        readBy,
-      );
-      expect(calls).toHaveLength(1);
-      expect(calls[0].method).toBe('POST');
-      expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
-      expect(calls[0].headers).toEqual({
-        'Content-Type': 'application/xml',
-        Accept: 'application/xml',
-      });
-      expect(calls[0].data).toBe(SYNC_BODY);
-      expect(calls[0].data).toBe(await modernBody('ZCL_TESTS'));
-    },
-  );
-
-  it.each(['run', 'runSync'] as const)(
-    "%s: a caller's scope, risk levels and durations reach the body",
-    async (member) => {
-      const options = {
-        scope: { ownTests: false, foreignTests: true },
-        riskLevel: { dangerous: false },
-        duration: { long: false },
-        analyse: analyseUnitTest,
-      };
-      const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-      const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
-
-      await runner[member]('ZCL_TESTS', options);
-
-      const body = String(calls[0].data);
-      expect(body).toContain(
-        '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="true"/>',
-      );
-      expect(body).toContain(
-        '<testRiskLevels harmless="true" dangerous="false" critical="true"/>',
-      );
-      expect(body).toContain(
-        '<testDurations short="true" medium="true" long="false"/>',
-      );
-      expect(calls[0].data).toBe(await modernBody('ZCL_TESTS', options));
-    },
-  );
-
-  it('runs each distinct container whole, on /testruns', async () => {
-    const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
-
-    await runner.run([
-      { containerClass: 'ZCL_TESTS', testClass: 'LTCL_A' },
-      { containerClass: 'ZCL_TESTS', testClass: 'LTCL_B' },
-    ]);
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('/sap/bc/adt/abapunit/testruns');
-    const body = String(calls[0].data);
-    expect(body.match(/objectReference /g)).toHaveLength(1);
-    expect(body).toContain('/sap/bc/adt/oo/classes/zcl_tests');
-  });
-
-  it('refuses to poll or fetch without a request: the POST answered the result', async () => {
-    const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
-
-    expectFailure(await runner.getStatus(), 'no run to poll');
-    expectFailure(await runner.getResult(), 'no result to fetch');
-    expect(calls).toHaveLength(0);
   });
 });

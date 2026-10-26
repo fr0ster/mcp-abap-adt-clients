@@ -89,10 +89,7 @@ import {
   runOnTemporaryObjects,
   stepOf,
 } from '../../../../tools/header-probe/objectRun';
-import {
-  KNOWN_PAIRS,
-  LEGACY_PAIRS,
-} from '../../../../tools/header-probe/pairs';
+import { KNOWN_PAIRS } from '../../../../tools/header-probe/pairs';
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
 import {
   evidenceOfRows,
@@ -444,9 +441,6 @@ describe('the clients source', () => {
 
   it('lists every member it cannot record, with the reason, and drops none', () => {
     expect(find('getRequest()', 'create')?.skipped).toMatch(
-      /^skipped: the server assigns/,
-    );
-    expect(find('legacy getClassExecutor()', 'scheduleTrace')?.skipped).toMatch(
       /^skipped: the server assigns/,
     );
     expect(find('getClass()', 'getVersionSource')?.skipped).toMatch(
@@ -857,7 +851,7 @@ describe('a write that created something', () => {
 });
 
 describe('every member of a header-taking contract', () => {
-  it('has a row: probed, or skipped with its reason — the legacy client included', async () => {
+  it('has a row: probed, or skipped with its reason', async () => {
     const { members } = await recordMembers();
     const has = (handler: string, member: string) =>
       members.find(
@@ -872,8 +866,7 @@ describe('every member of a header-taking contract', () => {
         return ['getClassExecutor()', member];
       return [handler, member];
     };
-    const missing = [...KNOWN_PAIRS, ...LEGACY_PAIRS]
-      .map((pair) => label(pair.handler, pair.member))
+    const missing = KNOWN_PAIRS.map((pair) => label(pair.handler, pair.member))
       .filter(([handler, member]) => !has(handler, member))
       .map(([handler, member]) => `${handler}.${member}`);
     expect(missing).toEqual([]);
@@ -888,7 +881,6 @@ describe('every member of a header-taking contract', () => {
       'getScalarFunction()',
       'getScalarFunctionImplementation()',
       'getServiceBinding()',
-      'legacy getClass()',
     ])
       expect(members.some((m) => m.handler === handler)).toBe(true);
   });
@@ -1028,12 +1020,6 @@ describe('a clients run', () => {
       (r) => r.group === 'getClass()' && r.label === 'lock',
     );
     expect(lock?.skipped).toMatch(/takes no locks/);
-    // The legacy client's writes share the modern handler's ledger entry.
-    expect(
-      result.corpus?.removals.some((r) =>
-        r.label.startsWith('clients: legacy '),
-      ),
-    ).toBe(false);
     expect(result.corpus?.removals.every((r) => r.removed)).toBe(true);
   });
 });
@@ -2206,9 +2192,7 @@ function gateViolations(
           say(index, 'clientsOn on a connection that is not traced');
       }
       if (
-        /new\s+Adt(Client|ClientLegacy|RuntimeClient|Executor|ExecutorLegacy|AbapGitClient)\s*\(/.test(
-          line,
-        )
+        /new\s+Adt(Client|RuntimeClient|Executor|AbapGitClient)\s*\(/.test(line)
       ) {
         const inClientsOn =
           file === 'members.ts' && /^\s+\w+: new Adt/.test(line);
@@ -4534,12 +4518,6 @@ describe('where a member runs', () => {
 
   it('an object handler member on a temporary object, but create and validate', () => {
     expect(at('getClass()', 'read')).toEqual({ kind: 'object', type: 'class' });
-    expect(
-      at('legacy getClass()', 'delete', '/sap/bc/adt/deletion/delete'),
-    ).toEqual({
-      kind: 'object',
-      type: 'class',
-    });
     expect(at('getClass()', 'create')).toEqual({ kind: 'no object' });
     expect(at('getClass()', 'validate')).toEqual({ kind: 'no object' });
     expect(at('getUtils()', 'getTableColumns', '/x')).toEqual({
@@ -4554,7 +4532,6 @@ describe('where a member runs', () => {
   it('what cannot be made and removed cleanly is not coverable, with its reason', () => {
     for (const [handler, member] of [
       ['getRequest()', 'readMetadata'],
-      ['legacy getRequest()', 'list'],
       ['getAtcLog()', 'getExecutionLog'],
       ['AdtAbapGitClient', 'unlink'],
       ['getApplicationLog()', 'getObject'],

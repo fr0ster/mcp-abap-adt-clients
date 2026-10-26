@@ -39,7 +39,6 @@ function handlerFiles(root) {
     if (!statSync(d).isDirectory()) continue;
     for (const f of readdirSync(d)) {
       if (!f.startsWith('Adt') || !f.endsWith('.ts')) continue;
-      if (f.endsWith('Legacy.ts')) continue; // subclasses: overrides only
       out.push(join(d, f));
     }
   }

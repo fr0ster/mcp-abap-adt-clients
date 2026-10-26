@@ -1,27 +1,32 @@
 /**
- * No legacy branch outside the legacy classes (spec §2.2, §11.1).
+ * The root package carries no legacy (spec §1, "The AST rule becomes two
+ * rules").
  *
- * Every difference 7.40 needs lives in a legacy class — a `*Legacy` subclass
- * that overrides the members that differ, `absentOnLegacy` for a type 7.40
- * lacks, and the two legacy clients' getters that hand them out. A main
- * handler, a `src/core/shared/*` function the modern handlers call, the
- * connection and the header pairs stay as they are.
+ * The classes for SAP_BASIS below 7.50 — the `*Legacy` subclasses, their
+ * helpers, their tests and their test environment — live in
+ * `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), which
+ * builds on this package. Nothing here names them, loads them, or addresses
+ * the endpoint only they address, and nothing here chooses them: the system
+ * type is the consumer's to declare.
  *
- * So this reads `src` with the TypeScript parser (skipping `src/__tests__/`,
- * as `noHardcodedObjectAddresses.test.ts` does) and fails on three things
- * outside the places listed in {@link EXCEPTIONS}:
+ * So this reads every source file under `src` — the library and its tests,
+ * the harness's JavaScript included — with the TypeScript parser and fails,
+ * with no exception, on:
  *
- * - an identifier containing `legacy`, in any case — a main file that names a
- *   legacy class, imports one, or keeps a `legacy` flag is a branch;
- * - a module specifier containing `legacy`, in any case — of an import, an
+ * - an identifier containing the word, in any case — a file that names a
+ *   legacy class, imports one, or keeps a flag for one;
+ * - a module specifier containing it, in any case — of an import, an
  *   `export … from`, an `import x = require()`, an import type, a dynamic
- *   `import()` or a `require()`: a main file that loads a legacy
- *   module under a name of its own (`import * as v`, a side-effect import,
- *   `export *`) names no legacy identifier, and is a branch all the same;
- * - a string or template literal containing `/sap/bc/cts` — the legacy CTS
- *   endpoint, which only the legacy transport handler addresses.
+ *   `import()` or a `require()`: a file that loads such a module under a
+ *   name of its own names no such identifier, and loads it all the same;
+ * - a string or template literal containing it, in any case — a test name, a
+ *   configuration key, a class name compared at runtime;
+ * - a string or template literal containing the 7.40 CTS endpoint, which only
+ *   the legacy transport handler addresses.
  *
- * Comments are not code and are not read.
+ * Comments are not code and are not read: the removal notes stay. This file
+ * holds to its own rule, so the word it looks for is put together at run
+ * time.
  */
 
 import * as fs from 'node:fs';
@@ -30,8 +35,12 @@ import * as ts from 'typescript';
 
 const ROOT = path.resolve(__dirname, '../../..');
 
-/** The legacy CTS endpoint (below BASIS 7.50 it sits outside `/sap/bc/adt/`). */
-const LEGACY_CTS = '/sap/bc/cts';
+/** The word, in lower case. */
+const WORD = ['leg', 'acy'].join('');
+/** The word as a class name carries it. */
+const SUFFIX = `${WORD.slice(0, 1).toUpperCase()}${WORD.slice(1)}`;
+/** The 7.40 CTS endpoint (below BASIS 7.50 it sits outside `/sap/bc/adt/`). */
+const CTS = ['/sap/bc', 'cts'].join('/');
 
 /** What a node is, as far as this check is concerned. */
 type Hit = {
@@ -39,66 +48,6 @@ type Hit = {
   node: ts.Node;
   text: string;
 };
-
-interface Exception {
-  readonly reason: string;
-  readonly allows: (file: string, hit: Hit) => boolean;
-}
-
-const baseName = (file: string) => file.slice(file.lastIndexOf('/') + 1);
-
-/** Whether `node` sits inside a node `test` accepts. */
-function within(node: ts.Node, test: (n: ts.Node) => boolean): boolean {
-  for (let n: ts.Node | undefined = node; n; n = n.parent)
-    if (test(n)) return true;
-  return false;
-}
-
-/** The places a legacy name or the legacy endpoint belongs, each with why. */
-const EXCEPTIONS: readonly Exception[] = [
-  {
-    reason:
-      'A `*Legacy.ts` file is a legacy class or one of its helpers: every difference 7.40 needs lives there (`absentOnLegacy.ts` included).',
-    allows: (file) => baseName(file).endsWith('Legacy.ts'),
-  },
-  {
-    reason:
-      'The factories choose the legacy client or executor by `isModernAdtSystem`, as before this change: that choice is the one place a main module names them.',
-    allows: (file) =>
-      file === 'src/clients/createAdtClient.ts' ||
-      file === 'src/clients/createAdtExecutor.ts',
-  },
-  {
-    reason:
-      'A barrel re-exports the legacy classes so consumers reach them; a re-export (its names and the legacy module it names) is not a branch. An import, or any other use, in a barrel is.',
-    allows: (file, hit) =>
-      baseName(file).startsWith('index') &&
-      (hit.kind === 'identifier' || hit.kind === 'module') &&
-      within(hit.node, ts.isExportDeclaration),
-  },
-  {
-    reason:
-      '`src/endpoints/objects.ts` declares every address; the legacy CTS collection is the record `TRANSPORT_REQUEST_LEGACY`, kept apart from `TRANSPORT_REQUEST`, and `RECORDS` lists it.',
-    allows: (file, hit) =>
-      file === 'src/endpoints/objects.ts' &&
-      (hit.kind === 'identifier'
-        ? hit.text === 'TRANSPORT_REQUEST_LEGACY'
-        : within(
-            hit.node,
-            (n) =>
-              ts.isVariableDeclaration(n) &&
-              ts.isIdentifier(n.name) &&
-              n.name.text === 'TRANSPORT_REQUEST_LEGACY',
-          )),
-  },
-  {
-    reason:
-      '`ICreateAndGenerateServiceBindingParamsLegacy` is a contract type of `@mcp-abap-adt/interfaces-adt`, re-exported under its own name: a name of the contract, not a branch here.',
-    allows: (_file, hit) =>
-      hit.kind === 'identifier' &&
-      hit.text === 'ICreateAndGenerateServiceBindingParamsLegacy',
-  },
-];
 
 /** Text of a literal; a template's substitutions become `${}`. */
 function literalText(node: ts.Node): string | null {
@@ -147,21 +96,34 @@ function moduleSpecifierOf(node: ts.Node): ts.StringLiteralLike | null {
   return null;
 }
 
-/** Every legacy identifier, module and legacy-endpoint literal in a text. */
+/** Every hit in a text: the word, or the endpoint. */
 function hitsIn(file: string, text: string): Hit[] {
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+  );
   const hits: Hit[] = [];
+  /** A module specifier is a module hit, never also a literal one. */
+  const specifiers = new Set<ts.Node>();
   const visit = (node: ts.Node): void => {
     const specifier = moduleSpecifierOf(node);
-    if (specifier?.text.toLowerCase().includes('legacy')) {
-      hits.push({ kind: 'module', node: specifier, text: specifier.text });
+    if (specifier) {
+      specifiers.add(specifier);
+      if (specifier.text.toLowerCase().includes(WORD))
+        hits.push({ kind: 'module', node: specifier, text: specifier.text });
     }
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
-      if (node.text.toLowerCase().includes('legacy'))
+      if (node.text.toLowerCase().includes(WORD))
         hits.push({ kind: 'identifier', node, text: node.text });
-    } else {
+    } else if (!specifiers.has(node)) {
       const literal = literalText(node);
-      if (literal?.includes(LEGACY_CTS))
+      if (
+        literal !== null &&
+        (literal.toLowerCase().includes(WORD) || literal.includes(CTS))
+      )
         hits.push({ kind: 'literal', node, text: literal });
     }
     // A template's substitutions are expressions and may hold literals and
@@ -172,42 +134,17 @@ function hitsIn(file: string, text: string): Hit[] {
   return hits;
 }
 
-/** `file:line  kind text` for every hit no exception allows. */
+/** `file:line  kind text` for every hit. */
 function findings(file: string, text: string): string[] {
-  return hitsIn(file, text)
-    .filter((hit) => !EXCEPTIONS.some((e) => e.allows(file, hit)))
-    .map((hit) => {
-      const source = hit.node.getSourceFile();
-      const { line } = source.getLineAndCharacterOfPosition(
-        hit.node.getStart(),
-      );
-      return `${file}:${line + 1}  ${hit.kind} ${hit.text}`;
-    });
+  return hitsIn(file, text).map((hit) => {
+    const source = hit.node.getSourceFile();
+    const { line } = source.getLineAndCharacterOfPosition(hit.node.getStart());
+    return `${file}:${line + 1}  ${hit.kind} ${hit.text}`;
+  });
 }
 
-/** Every `.ts` under `src`, walked on disk, `src/__tests__/` left out. */
+/** Every source file under `src`, tests included, walked on disk. */
 function sourceFiles(): string[] {
-  const out: string[] = [];
-  const walk = (rel: string): void => {
-    for (const entry of fs.readdirSync(path.join(ROOT, rel), {
-      withFileTypes: true,
-    })) {
-      const next = `${rel}/${entry.name}`;
-      if (entry.isDirectory()) {
-        if (next !== 'src/__tests__') walk(next);
-      } else if (entry.name.endsWith('.ts')) out.push(next);
-    }
-  };
-  walk('src');
-  return out;
-}
-
-/**
- * The shared test harness: every file under `src/__tests__/helpers/` but the
- * legacy helpers (`legacy*`), which hold what the legacy classes bring to the
- * harness through its seams (`legacyRegistrations.ts`).
- */
-function harnessFiles(): string[] {
   const out: string[] = [];
   const walk = (rel: string): void => {
     for (const entry of fs.readdirSync(path.join(ROOT, rel), {
@@ -217,137 +154,107 @@ function harnessFiles(): string[] {
       if (entry.isDirectory()) walk(next);
       else if (
         /\.[cm]?[tj]s$/.test(entry.name) &&
-        !entry.name.toLowerCase().startsWith('legacy')
+        !entry.name.endsWith('.d.ts')
       )
         out.push(next);
     }
   };
-  walk('src/__tests__/helpers');
+  walk('src');
   return out;
 }
 
-/** `file:line  module …` for every legacy module a harness file loads. */
-function harnessFindings(file: string, text: string): string[] {
-  return findings(file, text).filter((finding) =>
-    finding.includes('  module '),
-  );
-}
-
-describe('legacy stays in legacy classes', () => {
-  it('no shared harness file loads a legacy module', () => {
-    const files = harnessFiles();
-    expect(files).toContain('src/__tests__/helpers/adtHeaders.ts');
-    expect(files).toContain('src/__tests__/helpers/sessionConfig.ts');
-    expect(files).not.toContain('src/__tests__/helpers/legacyRegistrations.ts');
-    const found = files.flatMap((file) =>
-      harnessFindings(file, fs.readFileSync(path.join(ROOT, file), 'utf8')),
-    );
-    expect(found).toEqual([]);
-  });
-
-  it('flags a harness file that loads a legacy module, however it loads it', () => {
-    const harness = 'src/__tests__/helpers/sessionConfig.ts';
-    const text = [
-      "import { AdtClientLegacy } from '../../clients/AdtClientLegacy';",
-      "const r = require('./legacyRegistrations');",
-      "import './legacyRegistrations';",
-      'const isLegacy = true;',
-    ].join('\n');
-    expect(harnessFindings(harness, text)).toEqual([
-      `${harness}:1  module ../../clients/AdtClientLegacy`,
-      `${harness}:2  module ./legacyRegistrations`,
-      `${harness}:3  module ./legacyRegistrations`,
-    ]);
-  });
-
-  it('no main file names a legacy class or addresses /sap/bc/cts', () => {
+describe('the root package carries no 7.40 classes', () => {
+  it('no source file names one, loads one, or addresses the 7.40 CTS endpoint', () => {
     const files = sourceFiles();
-    expect(files.length).toBeGreaterThan(100);
+    expect(files.length).toBeGreaterThan(300);
+    expect(files).toContain('src/__tests__/helpers/test-helper.js');
+    expect(files).toContain('src/__tests__/helpers/sessionConfig.ts');
     const found = files.flatMap((file) =>
       findings(file, fs.readFileSync(path.join(ROOT, file), 'utf8')),
     );
     expect(found).toEqual([]);
   });
 
-  it('every exception carries its reason', () => {
-    for (const exception of EXCEPTIONS)
-      expect(exception.reason.length).toBeGreaterThan(40);
-  });
-
   describe('the check itself', () => {
     const MAIN = 'src/core/class/AdtClass.ts';
+    const L = SUFFIX;
+    const UPPER = WORD.toUpperCase();
 
-    it('flags a legacy import, a legacy flag and a legacy call in a main file', () => {
+    it('flags an import, a flag and a call in a library file', () => {
       const text = [
-        "import { AdtClassLegacy } from './AdtClassLegacy';",
-        'const isLegacy = true;',
-        'const LEGACY_MODE = 1;',
-        'new AdtClassLegacy();',
+        `import { AdtClass${L} } from './AdtClass${L}';`,
+        `const is${L} = true;`,
+        `const ${UPPER}_MODE = 1;`,
+        `new AdtClass${L}();`,
       ].join('\n');
       expect(findings(MAIN, text)).toEqual([
-        `${MAIN}:1  module ./AdtClassLegacy`,
-        `${MAIN}:1  identifier AdtClassLegacy`,
-        `${MAIN}:2  identifier isLegacy`,
-        `${MAIN}:3  identifier LEGACY_MODE`,
-        `${MAIN}:4  identifier AdtClassLegacy`,
+        `${MAIN}:1  module ./AdtClass${L}`,
+        `${MAIN}:1  identifier AdtClass${L}`,
+        `${MAIN}:2  identifier is${L}`,
+        `${MAIN}:3  identifier ${UPPER}_MODE`,
+        `${MAIN}:4  identifier AdtClass${L}`,
       ]);
     });
 
-    it('flags a legacy module specifier however the import names nothing legacy', () => {
+    it('flags a module specifier however the import names nothing', () => {
       const text = [
-        "import './AdtClassLegacy';",
-        "import * as variant from './AdtClassLegacy';",
-        "import plain from '../shared/refusalLegacy';",
-        "export * from './AdtClassLegacy';",
-        "export { a as b } from '../shared/deleteLegacy';",
-        "const lazy = () => import('./AdtClassLegacy');",
+        `import './AdtClass${L}';`,
+        `import * as variant from './AdtClass${L}';`,
+        `import plain from '../shared/refusal${L}';`,
+        `export * from './AdtClass${L}';`,
+        `export { a as b } from '../shared/delete${L}';`,
+        `const lazy = () => import('./AdtClass${L}');`,
         "import { AdtClass } from './AdtClass';",
       ].join('\n');
       expect(findings(MAIN, text)).toEqual([
-        `${MAIN}:1  module ./AdtClassLegacy`,
-        `${MAIN}:2  module ./AdtClassLegacy`,
-        `${MAIN}:3  module ../shared/refusalLegacy`,
-        `${MAIN}:4  module ./AdtClassLegacy`,
-        `${MAIN}:5  module ../shared/deleteLegacy`,
-        `${MAIN}:6  module ./AdtClassLegacy`,
+        `${MAIN}:1  module ./AdtClass${L}`,
+        `${MAIN}:2  module ./AdtClass${L}`,
+        `${MAIN}:3  module ../shared/refusal${L}`,
+        `${MAIN}:4  module ./AdtClass${L}`,
+        `${MAIN}:5  module ../shared/delete${L}`,
+        `${MAIN}:6  module ./AdtClass${L}`,
       ]);
     });
 
-    it('flags a legacy module loaded by require, import = require or an import type', () => {
+    it('flags a module loaded by require, import = require or an import type', () => {
       const text = [
-        "import variant = require('./AdtClassLegacy');",
-        "const loaded = require('../shared/refusalLegacy');",
-        "type Variant = typeof import('./AdtClassLegacy');",
-        "let shape: import('../shared/deleteLegacy').Shape;",
+        `import variant = require('./AdtClass${L}');`,
+        `const loaded = require('../shared/refusal${L}');`,
+        `type Variant = typeof import('./AdtClass${L}');`,
+        `let shape: import('../shared/delete${L}').Shape;`,
         "const plain = require('./AdtClass');",
-        "other('./AdtClassLegacy');",
       ].join('\n');
       expect(findings(MAIN, text)).toEqual([
-        `${MAIN}:1  module ./AdtClassLegacy`,
-        `${MAIN}:2  module ../shared/refusalLegacy`,
-        `${MAIN}:3  module ./AdtClassLegacy`,
-        `${MAIN}:4  module ../shared/deleteLegacy`,
+        `${MAIN}:1  module ./AdtClass${L}`,
+        `${MAIN}:2  module ../shared/refusal${L}`,
+        `${MAIN}:3  module ./AdtClass${L}`,
+        `${MAIN}:4  module ../shared/delete${L}`,
       ]);
     });
 
-    it('lets a barrel re-export from a legacy module, but not import from one', () => {
-      const barrel = 'src/executors/index.ts';
+    it('flags the word in a string, a template and a test name, in a JavaScript file too', () => {
       const text = [
-        "export * from './abapUnitRunLegacy';",
-        "export { x } from './abapUnitRunLegacy';",
-        "import './abapUnitRunLegacy';",
+        `const a = 'is_${WORD}';`,
+        `it('a ${WORD} system', () => {});`,
+        `const b = \`\${base}.${L}\`;`,
+        "const c = 'modern';",
       ].join('\n');
-      expect(findings(barrel, text)).toEqual([
-        `${barrel}:3  module ./abapUnitRunLegacy`,
+      expect(findings(MAIN, text)).toEqual([
+        `${MAIN}:1  literal is_${WORD}`,
+        `${MAIN}:2  literal a ${WORD} system`,
+        `${MAIN}:3  literal \${}.${L}`,
+      ]);
+      const js = 'src/__tests__/helpers/test-helper.js';
+      expect(findings(js, `const k = config.environment.is_${WORD};`)).toEqual([
+        `${js}:1  identifier is_${WORD}`,
       ]);
     });
 
-    it('flags the legacy endpoint in a string, a template and a substitution', () => {
+    it('flags the 7.40 CTS endpoint in a string, a template and a substitution', () => {
       const text = [
-        "const a = '/sap/bc/cts/transportrequests';",
-        // Template literals, so the samples' placeholders stay text.
-        `const b = \`\${base}/sap/bc/cts/x\`;`,
-        `const c = \`\${'/sap/bc/cts'}/\${name}\`;`,
+        `const a = '${CTS}/transportrequests';`,
+        `const b = \`\${base}${CTS}/x\`;`,
+        `const c = \`\${'${CTS}'}/\${name}\`;`,
         "const d = '/sap/bc/adt/cts/transportrequests';",
       ].join('\n');
       expect(findings(MAIN, text).map((f) => f.split('  ')[0])).toEqual([
@@ -359,49 +266,25 @@ describe('legacy stays in legacy classes', () => {
 
     it('does not read comments', () => {
       const text = [
-        '// AdtClassLegacy uses /sap/bc/cts',
-        '/** a legacy system */',
+        `// AdtClass${L} uses ${CTS}`,
+        `/** a ${WORD} system */`,
         'const x = 1;',
       ].join('\n');
       expect(findings(MAIN, text)).toEqual([]);
     });
 
-    it('lets a barrel re-export a legacy class, and nothing else', () => {
-      const barrel = 'src/core/class/index.ts';
-      const text = [
-        "export { AdtClassLegacy } from './AdtClassLegacy';",
-        "import { AdtClassLegacy as L } from './AdtClassLegacy';",
-      ].join('\n');
-      expect(findings(barrel, text)).toEqual([
-        `${barrel}:2  module ./AdtClassLegacy`,
-        `${barrel}:2  identifier AdtClassLegacy`,
-      ]);
-    });
-
-    it('lets objects.ts declare the legacy record, and no other address on /sap/bc/cts', () => {
-      const objects = 'src/endpoints/objects.ts';
-      const text = [
-        "export const TRANSPORT_REQUEST_LEGACY = { collection: '/sap/bc/cts/transportrequests' };",
-        "export const OTHER = { collection: '/sap/bc/cts/other' };",
-        'export const RECORDS = { TRANSPORT_REQUEST_LEGACY };',
-        'export const OTHER_LEGACY = 1;',
-      ].join('\n');
-      expect(findings(objects, text)).toEqual([
-        `${objects}:2  literal /sap/bc/cts/other`,
-        `${objects}:4  identifier OTHER_LEGACY`,
-      ]);
-    });
-
-    it('lets a legacy file and the factories name the legacy classes', () => {
-      const text = "import { AdtClientLegacy } from './AdtClientLegacy';";
-      expect(findings('src/core/class/AdtClassLegacy.ts', text)).toEqual([]);
-      expect(findings('src/clients/absentOnLegacy.ts', text)).toEqual([]);
-      expect(findings('src/clients/createAdtClient.ts', text)).toEqual([]);
-      expect(findings('src/clients/createAdtExecutor.ts', text)).toEqual([]);
-      expect(findings('src/clients/AdtClient.ts', text)).toEqual([
-        'src/clients/AdtClient.ts:1  module ./AdtClientLegacy',
-        'src/clients/AdtClient.ts:1  identifier AdtClientLegacy',
-      ]);
+    it('allows nothing anywhere: a barrel, a factory, a test, the harness', () => {
+      const text = `export { AdtClient${L} } from './AdtClient${L}';`;
+      for (const file of [
+        'src/index.core.ts',
+        'src/clients/createAdtClient.ts',
+        'src/__tests__/unit/capabilities/behaviour.test.ts',
+        'src/__tests__/helpers/sessionConfig.ts',
+      ])
+        expect(findings(file, text)).toEqual([
+          `${file}:1  module ./AdtClient${L}`,
+          `${file}:1  identifier AdtClient${L}`,
+        ]);
     });
   });
 });

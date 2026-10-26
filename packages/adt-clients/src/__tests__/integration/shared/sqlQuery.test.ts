@@ -45,16 +45,16 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Shared - getSqlQuery', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, testsLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        testsLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
@@ -76,7 +76,6 @@ describe('Shared - getSqlQuery', () => {
       // Get test case from YAML configuration
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'sql_query',
         testCaseName: 'execute_sql_query',
@@ -124,7 +123,6 @@ describe('Shared - getSqlQuery', () => {
       // Get test case from YAML configuration
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'sql_query',
         testCaseName: 'execute_sql_query_default_row_number',

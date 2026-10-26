@@ -49,7 +49,7 @@ Legacy SAP systems (BASIS < 7.50) are supported through `AdtClientLegacy` and pe
 
 Key differences: versionless content types, direct DELETE (no `/deletion/` API), limited object type support (no DDIC dedicated endpoints).
 
-See [LEGACY.md](LEGACY.md) for the complete support matrix and RFC transport details.
+See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md) for the complete support matrix and RFC transport details.
 
 ## Source Layout
 

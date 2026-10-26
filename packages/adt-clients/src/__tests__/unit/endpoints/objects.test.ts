@@ -19,7 +19,6 @@ import {
   seg,
   sourceUri,
   TRANSPORT_REQUEST,
-  TRANSPORT_REQUEST_LEGACY,
   transportUri,
   versionsUri,
 } from '../../../endpoints/objects';
@@ -130,12 +129,9 @@ describe('records', () => {
       '/sap/bc/adt/cts/transportrequests/DEVK900001/moveobjects',
     );
   });
-  it('transport request has a legacy address of its own', () => {
+  it('transport request has its collection address', () => {
     expect(TRANSPORT_REQUEST.collection).toBe(
       '/sap/bc/adt/cts/transportrequests',
-    );
-    expect(TRANSPORT_REQUEST_LEGACY.collection).toBe(
-      '/sap/bc/cts/transportrequests',
     );
   });
   it('tails are functions of an address', () => {
@@ -180,7 +176,6 @@ describe('records', () => {
         'TABLE_TYPE',
         'TRANSFORMATION',
         'TRANSPORT_REQUEST',
-        'TRANSPORT_REQUEST_LEGACY',
       ].sort(),
     );
   });

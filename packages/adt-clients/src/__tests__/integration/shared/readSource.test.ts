@@ -56,10 +56,9 @@ function objectCase(
   return gateAll(
     gate(handlerName, testCaseName),
     gateOn(
-      ({ isCloud, isLegacy }) =>
+      ({ isCloud }) =>
         !!new TestConfigResolver({
           isCloud,
-          isLegacy,
           handlerName,
           testCaseName,
         }).getObjectName(param, type),
@@ -70,16 +69,16 @@ function objectCase(
 describe('Shared - readSource', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, connectionLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        connectionLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -117,7 +116,6 @@ describe('Shared - readSource', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_source',
         testCaseName: 'read_class_source',
@@ -161,7 +159,6 @@ describe('Shared - readSource', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_source',
         testCaseName: 'read_class_source_inactive',
@@ -196,7 +193,6 @@ describe('Shared - readSource', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_source',
         testCaseName: 'read_class_source_versions',
@@ -250,7 +246,6 @@ describe('Shared - readSource', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_source',
         testCaseName: 'read_source_error_unsupported',

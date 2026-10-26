@@ -74,7 +74,6 @@ describe('FunctionInclude (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<IFunctionIncludeConfig>;
 
@@ -83,10 +82,12 @@ describe('FunctionInclude (using AdtClient)', () => {
       connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester<IFunctionIncludeConfig>(
@@ -104,7 +105,6 @@ describe('FunctionInclude (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        isLegacySystem: isLegacy,
         buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
           const packageName =

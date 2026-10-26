@@ -41,7 +41,7 @@ describe('notes', () => {
     .filter((file) => file !== SELF)
     .filter(
       (file) =>
-        /^(docs\/|packages\/adt-clients\/(docs|scripts)\/|packages\/[^/]+\/src\/)/.test(
+        /^(docs\/|packages\/adt-clients\/scripts\/|packages\/[^/]+\/(docs|src)\/)/.test(
           file,
         ) ||
         /^(packages\/adt-clients\/)?(CHANGELOG|README)\.md$/.test(file) ||

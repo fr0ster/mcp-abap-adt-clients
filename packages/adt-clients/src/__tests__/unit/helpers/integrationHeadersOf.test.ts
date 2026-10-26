@@ -1,22 +1,9 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { join, sep } from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import * as ts from 'typescript';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
-import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
-import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
-import { AdtClass } from '../../../core/class/AdtClass';
-import { AdtFunctionIncludeLegacy } from '../../../core/functionInclude/AdtFunctionIncludeLegacy';
-import { AdtContentTypesBase } from '../../../core/shared/contentTypes';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
@@ -26,8 +13,7 @@ import {
   integrationHeadersOf,
   TEST_HEADERS,
 } from '../../helpers/adtHeaders';
-import { LEGACY_REFUSED } from '../../helpers/legacyMembers';
-import { REFUSED_WITHOUT_REQUEST } from '../../helpers/legacyRegistrations';
+import { resolverOffenders } from './resolverScan';
 
 /**
  * `integrationHeadersOf` is what every test that reaches SAP uses: a member
@@ -132,7 +118,6 @@ function headerMembers(
 
 function everyHeaderMember(conn: IAbapConnection): {
   modern: [string, Handler, string][];
-  legacy: [string, Handler, string][];
 } {
   const of = (client: AdtClient) =>
     handlersOf(client).flatMap(({ factory, handler }) =>
@@ -156,7 +141,6 @@ function everyHeaderMember(conn: IAbapConnection): {
         ),
       ),
     ],
-    legacy: of(new AdtClientLegacy(conn, logger)),
   };
 }
 
@@ -166,52 +150,21 @@ describe('integrationHeadersOf', () => {
     expect(() => integrationHeadersOf(cls, 'noSuchMember')).toThrow(
       'AdtClass.noSuchMember',
     );
+    // It says where a pair goes: the table here, or another package's seam.
+    expect(() => integrationHeadersOf(cls, 'noSuchMember')).toThrow(
+      /SENT_BEFORE_36 .*registerHeaderPairs/,
+    );
     // A member the class has, but which takes no headers, has no pair either.
     expect(() => integrationHeadersOf(cls, 'read')).toThrow('AdtClass.read');
     // The unit-test resolver keeps its fallback for the same call.
     expect(headersOf(cls, 'noSuchMember')).toBe(TEST_HEADERS);
   });
 
-  it('throws for a plain object that is not a legacy refusal', () => {
+  it('throws for a plain object no registered check recognises', () => {
     const handler = { create: async () => undefined };
     expect(() => integrationHeadersOf(handler, 'create')).toThrow(
       'Object.create',
     );
-  });
-
-  it('throws for a handler shaped like a legacy refusal that is not one', () => {
-    const sent: unknown[] = [];
-    const send = async (_config: unknown, options: { headers: unknown }) => {
-      sent.push(options.headers);
-    };
-    // An objectType the legacy client does not refuse.
-    expect(() =>
-      integrationHeadersOf({ objectType: 'Class', create: send }, 'create'),
-    ).toThrow('Object.create');
-    // A refused type's name and keys, but a member that sends.
-    const real = new AdtClientLegacy(connection(), logger).getDomain();
-    const forged: Record<string, unknown> = { ...real, create: send };
-    expect(() => integrationHeadersOf(forged, 'create')).toThrow(
-      'Object.create',
-    );
-    // A class that only borrows a legacy refusal's name.
-    class AdtPackageLegacy {
-      async create(_config: unknown, options: { headers: unknown }) {
-        sent.push(options.headers);
-      }
-    }
-    expect(() =>
-      integrationHeadersOf(new AdtPackageLegacy(), 'create'),
-    ).toThrow('AdtPackageLegacy.create');
-    // The real ones still pass.
-    expect(integrationHeadersOf(real, 'create')).toBe(TEST_HEADERS);
-    expect(
-      integrationHeadersOf(
-        new AdtClientLegacy(connection(), logger).getPackage(),
-        'create',
-      ),
-    ).toBe(TEST_HEADERS);
-    expect(sent).toEqual([]);
   });
 
   it('resolves a real pair for every header member of every modern handler', () => {
@@ -227,110 +180,6 @@ describe('integrationHeadersOf', () => {
       })
       .map(([label]) => label);
     expect(missing).toEqual([]);
-  });
-
-  it('resolves every header member of every legacy handler, or proves it sends nothing', async () => {
-    const conn = connection();
-    const { legacy } = everyHeaderMember(conn);
-    expect(legacy.length).toBeGreaterThan(150);
-    const sentWithTestHeaders: string[] = [];
-    let refusals = 0;
-    for (const [label, handler, member] of legacy) {
-      // Throws, and fails the test, for a member with no pair at all.
-      const pair = integrationHeadersOf(handler, member);
-      if (pair !== TEST_HEADERS) continue;
-      refusals++;
-      const before = conn.sent;
-      const answer = (await handler[member]?.call(handler, {}, undefined, {
-        headers: pair,
-      })) as { ok?: boolean };
-      if (answer?.ok !== false || conn.sent !== before)
-        sentWithTestHeaders.push(label);
-    }
-    // The absent types and the legacy package, request and data-preview
-    // refusals: each was called, and none sent a request.
-    expect(refusals).toBeGreaterThan(50);
-    expect(sentWithTestHeaders).toEqual([]);
-  });
-
-  /**
-   * `REFUSED_WITHOUT_REQUEST` and the inventory's refused rows are one list
-   * (spec §11.1 "Refusals"): every member a legacy class handler refuses is
-   * one `integrationHeadersOf` lets through without a pair, and no other. The
-   * inventory (`legacyMemberInventory.test.ts`) calls each of those rows and
-   * proves it sends nothing, so this agreement is what carries that proof
-   * here. Left out, each for its reason:
-   * - an `absentOnLegacy` object's rows — `isAbsentOnLegacy` recognises those
-   *   by their refusal, not by a list;
-   * - a row by case (`member[case]`) — that member sends for its other cases,
-   *   so a per-member entry would let a sending call go without a pair.
-   */
-  it('lets through exactly the members the inventory refuses on a legacy class handler', () => {
-    const conn = connection();
-    const owners: Record<string, object> = {};
-    for (const client of [
-      new AdtClientLegacy(conn, logger),
-      new AdtExecutorLegacy(conn, logger),
-    ]) {
-      for (const getter of Object.keys(LEGACY_REFUSED)) {
-        const make = (client as unknown as Record<string, unknown>)[getter];
-        if (typeof make === 'function') owners[getter] = make.call(client);
-      }
-    }
-    const fromInventory = new Set<string>();
-    for (const [getter, rows] of Object.entries(LEGACY_REFUSED)) {
-      const handler = owners[getter];
-      if (!handler) throw new Error(`No legacy getter ${getter}`);
-      if (Object.getPrototypeOf(handler) === Object.prototype) continue;
-      for (const member of Object.keys(rows)) {
-        if (member.endsWith(']')) continue;
-        let proto: object | null = handler;
-        while (proto && !Object.hasOwn(proto, member))
-          proto = Object.getPrototypeOf(proto);
-        const owner = (proto as { constructor?: { name?: string } } | null)
-          ?.constructor?.name;
-        fromInventory.add(`${owner}.${member}`);
-      }
-    }
-    const fromHelper = REFUSED_WITHOUT_REQUEST.flatMap(
-      ([implementation, members]) =>
-        members.map(
-          (member) => `${(implementation as { name?: string }).name}.${member}`,
-        ),
-    );
-    expect(fromHelper.length).toBeGreaterThan(30);
-    expect([...fromHelper].sort()).toEqual([...fromInventory].sort());
-  });
-
-  it('hands out the inherited stateless class update on a legacy client', () => {
-    const cls = new AdtClientLegacy(connection(), logger, {
-      contentTypes: new AdtContentTypesBase(false),
-    }).getClass();
-    expect(cls.update).toBe(AdtClass.prototype.update);
-    expect(integrationHeadersOf(cls, 'update')).toEqual({
-      accept: 'text/plain',
-      contentType: 'text/plain',
-    });
-  });
-
-  it('records the measured v1 pair for the function include create on a legacy client', () => {
-    const include = new AdtClientLegacy(
-      connection(),
-      logger,
-    ).getFunctionInclude();
-    expect(include).toBeInstanceOf(AdtFunctionIncludeLegacy);
-    const v1 = 'application/vnd.sap.adt.functions.fincludes+xml';
-    expect(integrationHeadersOf(include, 'create')).toEqual({
-      accept: v1,
-      contentType: v1,
-    });
-    // The modern client keeps v2.
-    expect(
-      integrationHeadersOf(
-        new AdtClient(connection(), logger).getFunctionInclude(),
-        'create',
-      ).contentType,
-    ).toBe('application/vnd.sap.adt.functions.fincludes.v2+xml');
   });
 
   it('is the only resolver in tests that reach SAP', () => {
@@ -409,179 +258,3 @@ describe('integrationHeadersOf', () => {
     }
   });
 });
-
-/** The files the scan reads: what Jest's `*.test.[tj]s` matches, and `.mjs` / `.cjs`. */
-const SCANNED = ['.ts', '.js', '.mjs', '.cjs'];
-
-/**
- * `const { integrationHeadersOf } = require('…')`: a CommonJS file (the
- * JavaScript `test-helper.js`) taking the strict resolver and nothing else.
- */
-function takesOnlyStrictResolver(call: ts.CallExpression): boolean {
-  const declaration = call.parent;
-  if (
-    !ts.isVariableDeclaration(declaration) ||
-    declaration.initializer !== call ||
-    !ts.isObjectBindingPattern(declaration.name)
-  )
-    return false;
-  const elements = declaration.name.elements;
-  return (
-    elements.length > 0 &&
-    elements.every(
-      (element) =>
-        !element.dotDotDotToken &&
-        (element.propertyName ?? element.name).getText() ===
-          'integrationHeadersOf',
-    )
-  );
-}
-
-/** Whether a CommonJS name starts `exports` or `module.exports`. */
-function isExportsName(node: ts.Node): boolean {
-  const text = node.getText();
-  return (
-    text === 'exports' ||
-    text.startsWith('exports.') ||
-    text === 'module.exports' ||
-    text.startsWith('module.exports.')
-  );
-}
-
-/**
- * Whether `node` is part of what a CommonJS module exports: the right side
- * of an assignment to `exports` / `module.exports` (or one of their
- * properties), or an argument of `Object.assign(exports | module.exports, …)`.
- */
-function assignedToExports(node: ts.Node): boolean {
-  for (let at: ts.Node = node; at.parent; at = at.parent) {
-    const parent = at.parent;
-    if (
-      ts.isBinaryExpression(parent) &&
-      parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      parent.right === at &&
-      isExportsName(parent.left)
-    )
-      return true;
-    if (
-      ts.isCallExpression(parent) &&
-      parent.expression.getText() === 'Object.assign' &&
-      parent.arguments[0] !== undefined &&
-      isExportsName(parent.arguments[0])
-    )
-      return true;
-  }
-  return false;
-}
-
-/**
- * Under `root` (`src/__tests__`), read with the TypeScript parser:
- * - no file but `helpers/adtHeaders.ts` itself re-exports anything from it,
- *   in any form (`export *`, `export * as`, named, type-only);
- * - a file in the directories whose tests reach SAP (integration, admin,
- *   helpers) imports from it only `integrationHeadersOf`, the registration
- *   seams ({@link STRICT_IMPORTS}) and types, and does not load it with
- *   `require` or `import()`.
- * Each offence is `<file>: <what>`.
- */
-/**
- * What a file that reaches SAP may import from `helpers/adtHeaders`: the strict
- * resolver, and the seams through which a handler class from elsewhere
- * registers its pairs and refusals — they add pairs, and resolve none.
- */
-const STRICT_IMPORTS = new Set([
-  'integrationHeadersOf',
-  'registerHeaderPairs',
-  'registerRefusedMembers',
-  'registerRefusingHandler',
-]);
-
-function resolverOffenders(root: string): string[] {
-  const walk = (dir: string): string[] =>
-    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-      entry.isDirectory()
-        ? walk(join(dir, entry.name))
-        : SCANNED.some((extension) => entry.name.endsWith(extension))
-          ? [join(dir, entry.name)]
-          : [],
-    );
-  const definition = join(root, 'helpers', 'adtHeaders');
-  const reachesSap = ['integration', 'admin', 'helpers'];
-  const offences: string[] = [];
-  for (const path of walk(root)) {
-    const file = relative(root, path);
-    if (file === join('helpers', 'adtHeaders.ts')) continue;
-    const strict = reachesSap.includes(file.split(sep)[0] ?? '');
-    const isDefinition = (specifier: ts.Node | undefined): boolean => {
-      if (!specifier || !ts.isStringLiteral(specifier)) return false;
-      const text = specifier.text;
-      if (!text.startsWith('.')) return false;
-      const target = resolve(dirname(path), text);
-      return (
-        target === definition ||
-        SCANNED.some((extension) => target === `${definition}${extension}`)
-      );
-    };
-    const source = ts.createSourceFile(
-      path,
-      readFileSync(path, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true,
-      path.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS,
-    );
-    const visit = (node: ts.Node): void => {
-      if (ts.isExportDeclaration(node) && isDefinition(node.moduleSpecifier))
-        offences.push(`${file}: re-exports helpers/adtHeaders`);
-      // `import h = require('…')`, and `export import h = require('…')`.
-      if (
-        ts.isImportEqualsDeclaration(node) &&
-        ts.isExternalModuleReference(node.moduleReference) &&
-        isDefinition(node.moduleReference.expression)
-      ) {
-        if (
-          node.modifiers?.some(
-            (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
-          )
-        )
-          offences.push(`${file}: re-exports helpers/adtHeaders`);
-        else if (strict && !node.isTypeOnly)
-          offences.push(`${file}: imports the whole module`);
-      }
-      if (
-        strict &&
-        ts.isImportDeclaration(node) &&
-        isDefinition(node.moduleSpecifier)
-      ) {
-        const clause = node.importClause;
-        if (clause && !clause.isTypeOnly) {
-          if (clause.name) offences.push(`${file}: imports a default`);
-          const bindings = clause.namedBindings;
-          if (bindings && ts.isNamespaceImport(bindings))
-            offences.push(`${file}: imports the whole module`);
-          if (bindings && ts.isNamedImports(bindings))
-            for (const element of bindings.elements) {
-              const name = (element.propertyName ?? element.name).text;
-              if (!element.isTypeOnly && !STRICT_IMPORTS.has(name))
-                offences.push(`${file}: imports ${name}`);
-            }
-        }
-        if (!clause) offences.push(`${file}: imports the module for effect`);
-      }
-      if (
-        ts.isCallExpression(node) &&
-        (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-          (ts.isIdentifier(node.expression) &&
-            node.expression.text === 'require')) &&
-        isDefinition(node.arguments[0])
-      ) {
-        if (assignedToExports(node))
-          offences.push(`${file}: re-exports helpers/adtHeaders`);
-        else if (strict && !takesOnlyStrictResolver(node))
-          offences.push(`${file}: loads the module at runtime`);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-  }
-  return offences;
-}

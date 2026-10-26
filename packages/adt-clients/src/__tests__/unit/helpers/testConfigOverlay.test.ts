@@ -703,93 +703,118 @@ describe('the overlay MCP_TEST_OVERLAY names', () => {
   });
 });
 
-describe('a legacy system in its overlay', () => {
-  const LEGACY_CASES = [
-    'legacy_deletes',
-    'legacy_refusals_send_nothing',
-    'legacy_unit_runners',
-    'legacy_function_include',
-    'legacy_transports',
-    'legacy_transportable',
-  ];
-
-  beforeEach(() => {
-    fs.copyFileSync(
-      path.join(HELPERS, BASE_FILE),
-      path.join(directory, BASE_FILE),
-    );
+describe("another package's sections and keys (an extension)", () => {
+  /** An extension's base: a section of its own, one case off. */
+  const SECTIONS = [
+    'extra_env:',
+    '  mode: "plain"',
+    'extra_cases:',
+    '  test_cases:',
+    '    - name: "extra_case"',
+    '      enabled: false',
+    '',
+  ].join('\n');
+  const extension = (keys: [string, object][] = []) => ({
+    name: 'extra',
+    baseFile: put('extra.yaml', SECTIONS),
+    keys: [
+      ['environment.is_extra', { type: 'boolean' }],
+      ['extra_env.mode', { values: ['plain', 'fancy'] }],
+      ['extra_cases.test_cases[extra_case].enabled', { type: 'boolean' }],
+      ...keys,
+    ],
   });
 
-  it('keeps every legacy case off in the base', () => {
-    const { config } = loadTestConfigFrom(directory);
-    for (const name of LEGACY_CASES) {
-      const testCase = config.legacy_740.test_cases.find(
-        (c: { name: string }) => c.name === name,
-      );
-      expect([name, testCase.enabled]).toEqual([name, false]);
-    }
-  });
-
-  it('turns the legacy client, its checks and its package on', () => {
+  it('adds its sections to the base, and its keys set them', () => {
     const named = put(
       'test-config.overlay.sys.yaml',
       overlayText({
         ...FULL_OVERLAY,
-        'environment.system': 'onprem',
-        'environment.is_legacy': true,
-        'environment.connection_type': 'rfc',
-        'legacy_env.software_component': 'ZCUST',
-        'legacy_env.transport_layer': 'ZL7',
-        ...Object.fromEntries(
-          LEGACY_CASES.map((name) => [
-            `legacy_740.test_cases[${name}].enabled`,
-            true,
-          ]),
-        ),
+        'environment.is_extra': true,
+        'extra_env.mode': 'fancy',
+        'extra_cases.test_cases[extra_case].enabled': true,
       }),
     );
-    const { config } = loadTestConfigFrom(directory, named);
-    expect(config.environment.is_legacy).toBe(true);
-    expect(config.environment.connection_type).toBe('rfc');
-    expect(config.legacy_env).toEqual({
-      software_component: 'ZCUST',
-      transport_layer: 'ZL7',
-      runner: 'abap_unit',
-    });
+    const { config } = loadTestConfigFrom(directory, named, [extension()]);
+    expect(config.environment.is_extra).toBe(true);
+    expect(config.extra_env).toEqual({ mode: 'fancy' });
+    expect(config.extra_cases.test_cases[0].enabled).toBe(true);
+    // Without an overlay, the sections are the extension's base.
     expect(
-      config.legacy_740.test_cases
-        .filter((c: { name: string }) => LEGACY_CASES.includes(c.name))
-        .map((c: { enabled: boolean }) => c.enabled),
-    ).toEqual(LEGACY_CASES.map(() => true));
+      loadTestConfigFrom(directory, undefined, [extension()]).config.extra_env,
+    ).toEqual({ mode: 'plain' });
   });
 
-  it('states the env runner: abap_unit in the base, manual from an overlay, nothing else', () => {
-    expect(loadTestConfigFrom(directory).config.legacy_env.runner).toBe(
-      'abap_unit',
-    );
-    const manual = put(
-      'test-config.overlay.sys.yaml',
-      overlayText({ ...FULL_OVERLAY, 'legacy_env.runner': 'manual' }),
-    );
-    expect(loadTestConfigFrom(directory, manual).config.legacy_env.runner).toBe(
-      'manual',
-    );
-    const other = put(
-      'test-config.overlay.sys.yaml',
-      overlayText({ ...FULL_OVERLAY, 'legacy_env.runner': 'sm37' }),
-    );
-    expect(refusal(() => loadTestConfigFrom(directory, other))).toContain(
-      '"legacy_env.runner" must be one of abap_unit, manual',
-    );
-  });
-
-  it('refuses is_legacy written as a string', () => {
+  it('checks its keys by their rules, as the base keys are checked', () => {
     const named = put(
       'test-config.overlay.sys.yaml',
-      overlayText({ ...FULL_OVERLAY, 'environment.is_legacy': 'true' }),
+      overlayText({ ...FULL_OVERLAY, 'extra_env.mode': 'other' }),
+    );
+    expect(
+      refusal(() => loadTestConfigFrom(directory, named, [extension()])),
+    ).toContain('"extra_env.mode" must be one of plain, fancy');
+  });
+
+  it('leaves its keys unknown to a load that does not name it', () => {
+    const named = put(
+      'test-config.overlay.sys.yaml',
+      overlayText({ ...FULL_OVERLAY, 'extra_env.mode': 'fancy' }),
     );
     expect(refusal(() => loadTestConfigFrom(directory, named))).toContain(
-      '"environment.is_legacy" must be true or false',
+      'unknown key "extra_env.mode"',
     );
+  });
+
+  it('refuses a section the base already has, and a key already known', () => {
+    const clash = {
+      name: 'clash',
+      baseFile: put('clash.yaml', 'environment:\n  system: "x"\n'),
+      keys: [],
+    };
+    expect(
+      refusal(() => loadTestConfigFrom(directory, undefined, [clash])),
+    ).toContain('names the section "environment", which the base already has');
+    expect(
+      refusal(() =>
+        loadTestConfigFrom(directory, undefined, [
+          extension([['environment.system', {}]]),
+        ]),
+      ),
+    ).toContain(
+      'names the overlay key "environment.system", which is already known',
+    );
+  });
+
+  it('refuses a base file that is not there', () => {
+    expect(
+      refusal(() =>
+        loadTestConfigFrom(directory, undefined, [
+          {
+            name: 'gone',
+            baseFile: path.join(directory, 'gone.yaml'),
+            keys: [],
+          },
+        ]),
+      ),
+    ).toContain('the base of the "gone" test configuration');
+  });
+
+  it('is read by every load the harness makes once registered, by name once', () => {
+    put(OVERLAY_FILE, overlayText(FULL_OVERLAY));
+    jest.isolateModules(() => {
+      const helper = require('../../helpers/test-helper');
+      expect(helper.loadTestConfig(directory).extra_env).toBeUndefined();
+      // Registering drops the cached configuration: the next load has it.
+      helper.registerTestConfigExtension(extension());
+      expect(helper.loadTestConfig(directory).extra_env).toEqual({
+        mode: 'plain',
+      });
+      // The same name again changes nothing: added twice, its section would
+      // be refused as one the base already has.
+      helper.registerTestConfigExtension(extension());
+      expect(helper.loadTestConfig(directory).extra_env).toEqual({
+        mode: 'plain',
+      });
+    });
   });
 });

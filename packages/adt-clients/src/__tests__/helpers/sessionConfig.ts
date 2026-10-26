@@ -633,12 +633,6 @@ function withWireLogOn(connection: CreatedConnection): CreatedConnection {
 /** What {@link createTestAdtClient} hands a test. */
 export interface ITestAdtClient {
   client: AdtClient;
-  /**
-   * What the factory reports of the system. The modern factory reports
-   * `false`; the root suites' branches that read it go with the move of the
-   * legacy classes.
-   */
-  isLegacy: boolean;
 }
 
 /** How a test's client is built. */
@@ -655,7 +649,6 @@ export const modernClientFactory: TestClientFactory = async (
   options,
 ) => ({
   client: await createAdtClient(connection, logger, options),
-  isLegacy: false,
 });
 
 /**

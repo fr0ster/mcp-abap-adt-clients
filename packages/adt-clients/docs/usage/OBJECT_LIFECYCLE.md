@@ -332,7 +332,7 @@ try {
 }
 ```
 
-See [LEGACY.md](../architecture/LEGACY.md#delete-lock-delete-with-the-handle-unlock).
+See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#delete-lock-delete-with-the-handle-unlock).
 
 ### A behavior implementation needs a second write, and it is the class's
 

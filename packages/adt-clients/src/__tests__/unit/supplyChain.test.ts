@@ -21,15 +21,32 @@ import { join, resolve } from 'node:path';
 
 /** The repository's root: this file is in packages/adt-clients/src/__tests__/unit. */
 const ROOT = resolve(__dirname, '../../../../..');
-/** Every manifest of the repository: the private root and each workspace package. */
+/**
+ * Every manifest of the repository: the private root and each workspace
+ * package, read from the tree (`packages/*` with a `package.json`, the root's
+ * `workspaces`), so a package added later is held to the same rules.
+ */
 const PACKAGES = [
   '.',
-  'packages/adt-clients',
-  'packages/adt-clients-legacy',
-  'packages/adt-strategies',
-] as const;
+  ...readdirSync(join(ROOT, 'packages'), { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        readdirSync(join(ROOT, 'packages', entry.name)).includes(
+          'package.json',
+        ),
+    )
+    .map((entry) => `packages/${entry.name}`)
+    .sort(),
+];
 /** The workspace siblings, the only entries of the lockfile npm links. */
 const WORKSPACES = PACKAGES.filter((dir) => dir !== '.');
+
+it('reads the root and the workspace packages', () => {
+  expect(PACKAGES[0]).toBe('.');
+  expect(WORKSPACES).toContain('packages/adt-clients');
+  expect(WORKSPACES.length).toBeGreaterThanOrEqual(3);
+});
 const WORKFLOWS = ['ci.yml', 'release.yml'] as const;
 
 const lines = (file: string): string[] =>

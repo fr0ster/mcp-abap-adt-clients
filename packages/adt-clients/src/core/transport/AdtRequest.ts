@@ -115,7 +115,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     IAdtTransportSortAndCompress<ReturnType<R['sortedAndCompressed']>>,
     IAdtTransportMoveObjects<ReturnType<R['movedObjects']>>
 {
-  private readonly connection: IAbapConnection;
+  protected readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Request';

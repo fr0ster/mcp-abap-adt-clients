@@ -28,7 +28,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
-import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
@@ -87,7 +86,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
 
   beforeAll(async () => {
@@ -95,10 +93,12 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
       connection = await createTestConnection(connectionLogger);
       const isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
 
       await ensureSharedPackage(client, testsLogger);
     } catch (error) {
@@ -343,10 +343,9 @@ describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
           logTestStep('run (unit test)', testsLogger);
           // The run's id is in a header of the start's answer; the reading that
           // finds it, and the check that a start carried one, are strategies.
-          const unitTest = (
-            isLegacy
-              ? new AdtExecutorLegacy(connection, libraryLogger)
-              : new AdtExecutor(connection, libraryLogger)
+          const unitTest = new AdtExecutor(
+            connection,
+            libraryLogger,
           ).getClassTestRunner({
             ...classTestRunnerDocuments,
             run: unitTestRunId,

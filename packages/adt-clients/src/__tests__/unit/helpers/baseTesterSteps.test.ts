@@ -257,7 +257,6 @@ describe('BaseTester flowTest reads what it is answered beside the steps', () =>
       } as never,
       hasConfig: true,
       isCloudSystem: false,
-      isLegacySystem: false,
       buildConfig: () => ({ programName: 'ZTHING' }) as never,
     });
     return { tester, handler };

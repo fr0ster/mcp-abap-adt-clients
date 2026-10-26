@@ -64,7 +64,6 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloud = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -78,7 +77,6 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         context,
       );
       client = resolved.client;
-      isLegacy = resolved.isLegacy;
       hasConfig = true;
     } catch (error) {
       hasConfig = skipUnlessConfigured(error, logger);
@@ -98,7 +96,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     if (!hasConfig) {
       throw new Error(`SAP setup failed for enhancement/${name}`);
     }
-    return new TestConfigResolver({ testCase, isCloud, isLegacy, logger });
+    return new TestConfigResolver({ testCase, isCloud, logger });
   }
 
   function required(resolver: TestConfigResolver, key: string): string {
@@ -554,7 +552,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       const dependency = resolveSharedDependency('programs', programName);
       if (
         !dependency ||
-        !TestConfigResolver.isTestAvailable(dependency, isCloud, isLegacy)
+        !TestConfigResolver.isTestAvailable(dependency, isCloud)
       ) {
         throw new Error(
           `Shared program ${programName} not configured for this system; run shared:setup`,

@@ -6,9 +6,7 @@
  * `422`). SE38 ships with every system, so nothing is configured and nothing
  * is created.
  *
- * Runs where SAP is configured and the system is not legacy (legacy discovery
- * lists no object-properties endpoint; `AdtUtilsLegacy` refuses the member);
- * skips with the reason elsewhere.
+ * Runs where SAP is configured; skips with the reason elsewhere.
  *
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/objectProperties
  */
@@ -69,8 +67,8 @@ describe('Shared - getObjectProperties', () => {
     }
   });
 
-  // A legacy system has no object-properties endpoint in its discovery.
-  gateOn(({ isLegacy }) => !isLegacy)(
+  // Applies wherever SAP is configured.
+  gateOn(() => true)(
     'reads the properties of transaction SE38',
     async () => {
       logTestStep(`object properties of ${SE38}`, testsLogger);

@@ -42,17 +42,17 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Shared - discovery', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
       // The connector refuses work on a connection nobody opened; these files
       // predate that contract and never noticed, because they were skipping.
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, testsLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        testsLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.

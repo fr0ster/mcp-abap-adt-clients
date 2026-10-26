@@ -26,6 +26,8 @@ let cachedConfig = null;
 let configLoadedFrom = null;
 let displayedTemplateWarning = false;
 let cachedEnvType = null;
+/** Other packages' sections and keys, read with every load (see below). */
+const configExtensions = [];
 
 /**
  * Write a shared object's source and leave it active.
@@ -177,21 +179,16 @@ function loadTestEnv() {
 
 /**
  * Determine current environment type from test config.
- * Returns 'cloud', 'legacy', or 'onprem'.
+ * Returns 'onprem' (refined by the callers that know isCloud).
  */
 function getEnvironmentType() {
   if (cachedEnvType) {
     return cachedEnvType;
   }
-  const config = loadTestConfig();
   // connection_type (rfc/http) is a transport mechanism, not a system type.
-  // Use explicit is_legacy: true in environment config to mark BASIS < 7.50 systems.
-  if (config?.environment?.is_legacy === true) {
-    cachedEnvType = 'legacy';
-  } else {
-    // Will be refined later when isCloud is known; default to 'onprem'
-    cachedEnvType = 'onprem';
-  }
+  loadTestConfig();
+  // Will be refined later when isCloud is known; default to 'onprem'
+  cachedEnvType = 'onprem';
   return cachedEnvType;
 }
 
@@ -229,6 +226,7 @@ function loadTestConfig(configDirectory = __dirname) {
   const { config, source } = loadTestConfigFrom(
     configDirectory,
     configDirectory === __dirname ? overlayPathFromEnv() : undefined,
+    configExtensions,
   );
   if (source === 'base-only' && !displayedTemplateWarning) {
     console.warn(
@@ -242,6 +240,22 @@ function loadTestConfig(configDirectory = __dirname) {
   cachedConfig = config;
   configLoadedFrom = source === 'base-only' ? 'template' : 'custom';
   return cachedConfig;
+}
+
+/**
+ * Add another package's sections and overlay keys to every load
+ * (`loadTestConfigFrom`'s extensions): a package of this repository whose
+ * suites run on this harness registers its own, here and in its globalSetup,
+ * so one overlay file serves both. Registering a name again changes nothing;
+ * a new one drops the cached configuration, so the next load reads it.
+ * @param {{ name: string, baseFile: string, keys: Array<[string, object]> }} extension
+ */
+function registerTestConfigExtension(extension) {
+  if (configExtensions.some((known) => known.name === extension.name)) return;
+  configExtensions.push(extension);
+  cachedConfig = null;
+  configLoadedFrom = null;
+  cachedEnvType = null;
 }
 
 /** Whether the cached configuration came from the placeholder template. */
@@ -572,12 +586,7 @@ function getTestCaseDefinition(handlerName, testCaseName) {
  * @param {object} [testCase] - Optional test case with params (e.g., { params: { standard_class_name_onprem: '...' } })
  * @returns {{name: string, group?: string} | null} - Object name and optional group (for function modules), or null if not found
  */
-function resolveStandardObject(
-  objectType,
-  isCloud,
-  testCase = null,
-  isLegacy = false,
-) {
+function resolveStandardObject(objectType, isCloud, testCase = null) {
   const config = loadTestConfig();
   const standardObjects = config.standard_objects || {};
 
@@ -675,7 +684,7 @@ function resolveStandardObject(
 
   // Priority 3: Global standard_objects registry filtered by environment
   const objectsList = standardObjects[typeInfo.yamlKey] || [];
-  const envFilter = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+  const envFilter = isCloud ? 'cloud' : 'onprem';
   const availableObjects = objectsList.filter((obj) =>
     obj.available_in?.includes(envFilter),
   );
@@ -2907,6 +2916,7 @@ module.exports = {
   ensureSharedPackage, // Create shared sub-package if it doesn't exist
   ensureSharedDependency, // Ensure shared dependency exists (create if missing, never delete)
   resetSharedDependencyCache, // Clear in-memory caches (for debugging)
-  getEnvironmentType, // Get current environment type: 'cloud', 'legacy', or 'onprem'
+  getEnvironmentType, // Get current environment type: 'onprem'
   isTestAvailableForEnv, // Check if test case available_in includes current environment
+  registerTestConfigExtension, // Another package's sections and overlay keys
 };

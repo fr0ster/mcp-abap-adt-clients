@@ -48,10 +48,9 @@ function objectCase(
   return gateAll(
     gate(handlerName, testCaseName),
     gateOn(
-      ({ isCloud, isLegacy }) =>
+      ({ isCloud }) =>
         !!new TestConfigResolver({
           isCloud,
-          isLegacy,
           handlerName,
           testCaseName,
         }).getObjectName(param, type),
@@ -62,16 +61,16 @@ function objectCase(
 describe('Shared - readMetadata', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, testsLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        testsLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -96,7 +95,6 @@ describe('Shared - readMetadata', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_metadata',
         testCaseName: 'read_class_metadata',
@@ -165,7 +163,6 @@ describe('Shared - readMetadata', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_metadata',
         testCaseName: 'read_domain_metadata',
@@ -220,7 +217,6 @@ describe('Shared - readMetadata', () => {
     async () => {
       const resolver = new TestConfigResolver({
         isCloud: isCloudSystem,
-        isLegacy,
         logger: testsLogger,
         handlerName: 'read_metadata',
         testCaseName: 'read_table_metadata',

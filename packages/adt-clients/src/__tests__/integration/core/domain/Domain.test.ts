@@ -67,7 +67,6 @@ describe('Domain (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let isCloudSystem = false;
   let tester: BaseTester<IDomainConfig>;
 
@@ -79,10 +78,12 @@ describe('Domain (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -198,7 +199,7 @@ describe('Domain (using AdtClient)', () => {
 
         if (!standardObject) {
           throw new Error(
-            `Standard domain not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
+            `Standard domain not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
           );
         }
 

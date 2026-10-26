@@ -257,7 +257,7 @@ request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). In short, per type:
 `FunctionGroupTestRunnerLegacy`, `FunctionModuleTestRunnerLegacy`,
 `ClassExecutorLegacy` and `ProgramExecutorLegacy`. Member by member, with the
 measurement behind each and what is not measured:
-[LEGACY.md](../architecture/LEGACY.md).
+[LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md).
 
 ### More factories
 

@@ -146,7 +146,6 @@ describe('ClassExecutor (integration)', () => {
   // assert entries, rows and the scheduled request id.
   let profilerReading: ReadingProfiler;
   let classRunner: ReturnType<typeof readingClassExecutor>;
-  let isLegacy = false;
   /** Trace ids this file produced, deleted at teardown. */
   const tracesCreated: string[] = [];
 
@@ -157,10 +156,11 @@ describe('ClassExecutor (integration)', () => {
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
       runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
       profilerReading = readingProfiler(connection, libraryLogger);

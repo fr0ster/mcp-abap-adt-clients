@@ -72,7 +72,6 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let isLegacy = false;
   let tester: BaseTester<ITransformationConfig>;
 
   beforeAll(async () => {
@@ -83,10 +82,12 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -232,7 +233,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
           const standardObject = resolver.getStandardObject('transformation');
           if (!standardObject) {
             throw new Error(
-              `Standard transformation not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
+              `Standard transformation not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
             );
           }
           transformationName = standardObject.name;

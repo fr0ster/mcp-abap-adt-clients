@@ -67,7 +67,6 @@ const testsLogger: ILogger = createTestsLogger();
 describe('AdtClient read operations', () => {
   let connection: IAbapConnection | null = null;
   let client: AdtClient | null = null;
-  let isLegacy = false;
   let isCloud = false;
 
   beforeAll(async () => {
@@ -81,10 +80,11 @@ describe('AdtClient read operations', () => {
       }
 
       connection = await createTestConnection(connectionLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, connectionLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        connectionLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       isCloud = await isCloudEnvironment(connection);
 
       testsLogger.info?.(
@@ -146,7 +146,6 @@ describe('AdtClient read operations', () => {
       // Use TestConfigResolver for consistent parameter resolution
       const resolver = new TestConfigResolver({
         isCloud,
-        isLegacy,
         logger: testsLogger,
         handlerName: handlerName || `read_${objectType}`,
         testCaseName: testCaseName || `readonly_read_${objectType}`,
@@ -364,13 +363,8 @@ describe('AdtClient read operations', () => {
     gateAll(
       gate('read_table', 'readonly_read_table'),
       gateOn(
-        ({ isCloud, isLegacy }) =>
-          !!resolveStandardObject(
-            isCloud ? 'view' : 'table',
-            isCloud,
-            null,
-            isLegacy,
-          ),
+        ({ isCloud }) =>
+          !!resolveStandardObject(isCloud ? 'view' : 'table', isCloud, null),
       ),
     )(
       'should read existing table',
@@ -378,7 +372,6 @@ describe('AdtClient read operations', () => {
         // Use TestConfigResolver to check if test is available for current environment
         const resolver = new TestConfigResolver({
           isCloud,
-          isLegacy,
           logger: testsLogger,
           handlerName: 'read_table',
           testCaseName: 'readonly_read_table',
@@ -658,15 +651,14 @@ describe('AdtClient read operations', () => {
 
   describe('readTransport', () => {
     gateOn(
-      ({ isCloud, isLegacy }) =>
-        !!new TestConfigResolver({ isCloud, isLegacy }).getTransportRequest(),
+      ({ isCloud }) =>
+        !!new TestConfigResolver({ isCloud }).getTransportRequest(),
     )(
       'should read existing transport request',
       async () => {
         // Use TestConfigResolver for consistent parameter resolution
         const resolver = new TestConfigResolver({
           isCloud,
-          isLegacy,
           logger: testsLogger,
         });
         // Try to get transport request from test case or global defaults

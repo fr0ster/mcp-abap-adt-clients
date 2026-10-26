@@ -280,15 +280,6 @@ export const TRANSPORT_REQUEST = {
     `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}/moveobjects`,
 } as const;
 
-/**
- * Below BASIS 7.50 the CTS endpoint sits outside `/sap/bc/adt/`. The one kind
- * whose address differs on legacy — so it is a record of its own, never a
- * substitution inside `TRANSPORT_REQUEST`.
- */
-export const TRANSPORT_REQUEST_LEGACY = {
-  collection: '/sap/bc/cts/transportrequests',
-} as const;
-
 /** Every record by name — what the enforcement test reads. */
 export const RECORDS = {
   PROGRAM,
@@ -320,7 +311,6 @@ export const RECORDS = {
   SCALAR_FUNCTION,
   SCALAR_FUNCTION_IMPLEMENTATION,
   TRANSPORT_REQUEST,
-  TRANSPORT_REQUEST_LEGACY,
 } as const;
 
 export const DEBUGGER = '/sap/bc/adt/debugger';

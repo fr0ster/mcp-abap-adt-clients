@@ -1,27 +1,15 @@
 /**
  * A function group's and a function module's ABAP Unit runs: the same
- * `/abapunit/runs` as a class's, naming the object as `FUGR` or `FUNC`. On a
- * legacy system there is no run to poll; what its runners send is in
- * `syncTestRunners.test.ts`.
+ * `/abapunit/runs` as a class's, naming the object as `FUGR` or `FUNC`.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtExecutor } from '../../../clients/AdtExecutor';
-import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
-import { ClassTestRunnerLegacy } from '../../../executors/class/ClassTestRunnerLegacy';
-import {
-  FunctionGroupTestRunner,
-  FunctionGroupTestRunnerLegacy,
-} from '../../../executors/functionGroup';
-import {
-  FunctionModuleTestRunner,
-  FunctionModuleTestRunnerLegacy,
-} from '../../../executors/functionModule';
-import { expectFailure } from '../../helpers/contract';
+import { FunctionGroupTestRunner } from '../../../executors/functionGroup';
+import { FunctionModuleTestRunner } from '../../../executors/functionModule';
 import { createLibraryLogger } from '../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -63,34 +51,8 @@ describe.each([
   });
 });
 
-describe.each([
-  ['FunctionGroupTestRunnerLegacy', FunctionGroupTestRunnerLegacy],
-  ['FunctionModuleTestRunnerLegacy', FunctionModuleTestRunnerLegacy],
-] as const)('%s', (_label, Runner) => {
-  it("refuses to poll or fetch without a request, with the class runner's reason", async () => {
-    const { conn, calls } = makeConn();
-    const runner = new Runner(conn, createLibraryLogger());
-    const classRunner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
-
-    const status = expectFailure(await runner.getStatus(), 'status');
-    const result = expectFailure(await runner.getResult(), 'result');
-
-    expect(status).toEqual(
-      expectFailure(await classRunner.getStatus(), 'class status'),
-    );
-    expect(result).toEqual(
-      expectFailure(await classRunner.getResult(), 'class result'),
-    );
-    expect(status.origin).toBe('refusal');
-    expect(status.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
-    expect(status.message).toContain('no run to poll');
-    expect(result.message).toContain('no result to fetch');
-    expect(calls).toHaveLength(0);
-  });
-});
-
 describe('the executors hand them out', () => {
-  it('modern and legacy', () => {
+  it('modern', () => {
     const { conn } = makeConn();
 
     expect(new AdtExecutor(conn).getFunctionGroupTestRunner()).toBeInstanceOf(
@@ -99,11 +61,5 @@ describe('the executors hand them out', () => {
     expect(new AdtExecutor(conn).getFunctionModuleTestRunner()).toBeInstanceOf(
       FunctionModuleTestRunner,
     );
-    expect(
-      new AdtExecutorLegacy(conn).getFunctionGroupTestRunner(),
-    ).toBeInstanceOf(FunctionGroupTestRunnerLegacy);
-    expect(
-      new AdtExecutorLegacy(conn).getFunctionModuleTestRunner(),
-    ).toBeInstanceOf(FunctionModuleTestRunnerLegacy);
   });
 });

@@ -45,12 +45,15 @@ describe('isModernAdtSystem', () => {
     ).resolves.toBe(true);
   });
 
-  it.each([404, 405, 501])('a %i is a legacy system', async (status) => {
-    await expect(isModernAdtSystem(failingWith(status))).resolves.toBe(false);
-  });
+  it.each([404, 405, 501])(
+    'a %i is a system without core discovery',
+    async (status) => {
+      await expect(isModernAdtSystem(failingWith(status))).resolves.toBe(false);
+    },
+  );
 
   it.each([401, 500, undefined])(
-    'a %s failure is raised, not read as legacy',
+    'a %s failure is raised, not read as a system without it',
     async (status) => {
       await expect(isModernAdtSystem(failingWith(status))).rejects.toThrow();
     },

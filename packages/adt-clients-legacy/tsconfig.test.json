@@ -2,7 +2,16 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": ".."
+    "rootDir": "..",
+    // The tests run against the root package's source, not its build, so
+    // the root's shared harness (imported by relative path) and the package
+    // under test see one AdtClient: two copies would be two classes, and a
+    // legacy class built on the one would not be the other's subclass.
+    // Test-only, inside this repository; the build (tsconfig.json) compiles
+    // against the published declarations through the workspace link.
+    "paths": {
+      "@mcp-abap-adt/adt-clients": ["../adt-clients/src/index.ts"]
+    }
   },
   "include": [
     // The root package's shared test harness, by relative path: test-only

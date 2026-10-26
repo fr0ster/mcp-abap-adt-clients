@@ -3,7 +3,6 @@
  */
 
 export { AdtRequest, hasDeferredResponses } from './AdtRequest';
-export { AdtRequestLegacy } from './AdtRequestLegacy';
 export {
   addObjectToTransport,
   changeTransportTaskType,

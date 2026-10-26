@@ -90,7 +90,6 @@ describe('DataElement (using AdtClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
@@ -101,10 +100,12 @@ describe('DataElement (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -422,7 +423,6 @@ describe('DataElement (using AdtClient)', () => {
         // Use TestConfigResolver for consistent parameter resolution
         const resolver = new TestConfigResolver({
           isCloud: isCloudSystem,
-          isLegacy,
           logger: testsLogger,
           handlerName: 'create_data_element',
           testCaseName: 'adt_data_element',
@@ -432,7 +432,7 @@ describe('DataElement (using AdtClient)', () => {
 
         if (!standardObject) {
           throw new Error(
-            `Standard data element not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
+            `Standard data element not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
           );
         }
 

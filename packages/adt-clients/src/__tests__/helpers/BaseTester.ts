@@ -147,7 +147,6 @@ export interface IBaseTesterSetupOptions {
   client: any; // AdtClient
   hasConfig: boolean;
   isCloudSystem: boolean;
-  isLegacySystem?: boolean;
   buildConfig: (testCase: any, resolver?: TestConfigResolver) => any;
   ensureObjectReady?: (
     objectName: string,
@@ -225,7 +224,6 @@ export class BaseTester<TConfig, TState = unknown> {
   private client?: any;
   private hasConfig: boolean = false;
   private isCloudSystem: boolean = false;
-  private isLegacySystem: boolean = false;
   private buildConfigFn?: (
     testCase: any,
     resolver?: TestConfigResolver,
@@ -853,10 +851,6 @@ export class BaseTester<TConfig, TState = unknown> {
 
     const readObjectProperties = async (label: string): Promise<void> => {
       if (!this.connection || !this.client) {
-        return;
-      }
-      // Skip on legacy — objectproperties endpoint does not exist on BASIS < 7.50
-      if (this.isLegacySystem) {
         return;
       }
       const sourceUrl = getSourceUrl(undefined);
@@ -1622,17 +1616,11 @@ export class BaseTester<TConfig, TState = unknown> {
         objectType,
         this.isCloudSystem,
         this.testCase,
-        this.isLegacySystem,
       );
     }
     // Use null testCase to prioritize standard_objects registry
     const { resolveStandardObject } = require('./test-helper');
-    return resolveStandardObject(
-      objectType,
-      this.isCloudSystem,
-      null,
-      this.isLegacySystem,
-    );
+    return resolveStandardObject(objectType, this.isCloudSystem, null);
   }
 
   /**
@@ -1658,10 +1646,6 @@ export class BaseTester<TConfig, TState = unknown> {
     this.client = options.client;
     this.hasConfig = options.hasConfig;
     this.isCloudSystem = options.isCloudSystem;
-    // Auto-detect legacy from client class name if not explicitly provided
-    this.isLegacySystem =
-      options.isLegacySystem ??
-      options.client?.constructor?.name === 'AdtClientLegacy';
     this.buildConfigFn = options.buildConfig;
     this.ensureObjectReadyFn = options.ensureObjectReady;
     this.cleanupObjectFn = options.cleanupObject;
@@ -1733,7 +1717,6 @@ export class BaseTester<TConfig, TState = unknown> {
       this.configResolver = new TestConfigResolver({
         testCase: tc,
         isCloud: this.isCloudSystem,
-        isLegacy: this.isLegacySystem,
         logger: this.logger,
       });
 

@@ -29,6 +29,12 @@
  * whose base value is a valid default (a case that is off, a standard object
  * that exists on most systems).
  *
+ * Another package of this repository that runs its suites on this harness
+ * brings its own sections and keys as an extension ({@link loadTestConfigFrom}):
+ * a base file of top-level sections this base does not have, and the overlay
+ * keys that set them. One overlay file then serves both; nothing of the
+ * extension lives here.
+ *
  * Plain node, no TypeScript: scripts/check-config-drift.js and the helper
  * test-helper.js both load it.
  */
@@ -102,15 +108,17 @@ const FEATURE_TOGGLE = 'create_feature_toggle.test_cases[adt_feature_toggle]';
 const CHECK_RUN = 'check_run.test_cases[class_check]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
-/** The live checks of the legacy client, off in the base. */
-const LEGACY_CASES = [
-  'legacy_deletes',
-  'legacy_refusals_send_nothing',
-  'legacy_unit_runners',
-  'legacy_function_include',
-  'legacy_transports',
-  'legacy_transportable',
-];
+
+/** `[path, rule]` → the frozen key rule the loader reads. */
+function overlayKey([keyPath, rule]) {
+  return Object.freeze({
+    path: keyPath,
+    required: rule.required === true,
+    type: rule.type ?? 'string',
+    empty: rule.empty === true,
+    values: rule.values,
+  });
+}
 
 const ALLOWED_OVERLAY_KEYS = Object.freeze(
   [
@@ -186,27 +194,7 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${ENHANCEMENT}[function_group_host].params.function_group_name`, {}],
     [`${ENHANCEMENT}[include_host].params.include_name`, {}],
     [`${ENHANCEMENT}[include_host].params.main_program`, {}],
-    // A legacy system (SAP_BASIS < 7.50): the legacy client, its live checks
-    // (over RFC only) and the transportable package its test environment
-    // creates (`npm run legacy:setup`).
-    ['environment.is_legacy', { type: 'boolean' }],
-    ['legacy_env.software_component', {}],
-    ['legacy_env.transport_layer', {}],
-    // How the env actions run; `manual` where ABAP Unit may not run them.
-    ['legacy_env.runner', { values: ['abap_unit', 'manual'] }],
-    ...LEGACY_CASES.map((name) => [
-      `legacy_740.test_cases[${name}].enabled`,
-      { type: 'boolean' },
-    ]),
-  ].map(([keyPath, rule]) =>
-    Object.freeze({
-      path: keyPath,
-      required: rule.required === true,
-      type: rule.type ?? 'string',
-      empty: rule.empty === true,
-      values: rule.values,
-    }),
-  ),
+  ].map(overlayKey),
 );
 
 class TestConfigError extends Error {
@@ -383,8 +371,13 @@ function leftoverPlaceholders(config) {
  * base + overlay → a new config. Every defect of the overlay is collected and
  * thrown together, so one run names them all.
  */
-function applyOverlay(base, overlay, label = OVERLAY_FILE) {
-  const allowed = new Map(ALLOWED_OVERLAY_KEYS.map((key) => [key.path, key]));
+function applyOverlay(
+  base,
+  overlay,
+  label = OVERLAY_FILE,
+  keys = ALLOWED_OVERLAY_KEYS,
+) {
+  const allowed = new Map(keys.map((key) => [key.path, key]));
   const problems = [];
   const config = structuredClone(base);
 
@@ -409,7 +402,7 @@ function applyOverlay(base, overlay, label = OVERLAY_FILE) {
       if (error !== null) problems.push(`"${keyPath}" ${error}`);
     }
   }
-  for (const { path: keyPath, required } of ALLOWED_OVERLAY_KEYS) {
+  for (const { path: keyPath, required } of keys) {
     if (required && !(keyPath in overlay)) {
       problems.push(
         `missing key "${keyPath}" — the base holds only a placeholder for it`,
@@ -436,13 +429,65 @@ function oldConfigMessage(directory) {
 }
 
 /**
+ * The base with every extension's sections added, and the keys an overlay may
+ * then carry. An extension adds top-level sections only: a section the base
+ * (or an earlier extension) already has is refused, so an extension never
+ * changes what the base says, and its keys are refused when they repeat one.
+ *
+ * An extension is `{ name, baseFile, keys }`: `baseFile` an absolute path to a
+ * YAML map of its sections, `keys` `[path, rule]` pairs as in
+ * {@link ALLOWED_OVERLAY_KEYS}.
+ */
+function extendBase(base, extensions, yaml) {
+  const config = { ...base };
+  const keys = [...ALLOWED_OVERLAY_KEYS];
+  for (const extension of extensions) {
+    if (!fs.existsSync(extension.baseFile)) {
+      throw new TestConfigError(
+        `${extension.baseFile} not found — the base of the "${extension.name}" test configuration is tracked in git.`,
+      );
+    }
+    const sections =
+      yaml.parse(fs.readFileSync(extension.baseFile, 'utf8')) || {};
+    if (!isObject(sections)) {
+      throw new TestConfigError(
+        `${extension.baseFile} must be a map of top-level sections.`,
+      );
+    }
+    for (const [section, body] of Object.entries(sections)) {
+      if (section in config) {
+        throw new TestConfigError(
+          `the "${extension.name}" test configuration names the section "${section}", which the base already has`,
+        );
+      }
+      config[section] = body;
+    }
+    for (const key of extension.keys.map(overlayKey)) {
+      if (keys.some((known) => known.path === key.path)) {
+        throw new TestConfigError(
+          `the "${extension.name}" test configuration names the overlay key "${key.path}", which is already known`,
+        );
+      }
+      keys.push(key);
+    }
+  }
+  return { config, keys };
+}
+
+/**
  * Load the configuration of `directory`.
  * @param {string} [namedOverlay] the overlay `MCP_TEST_OVERLAY` names
  *   ({@link overlayPathFromEnv}); refused when it does not exist
+ * @param {Array<{ name: string, baseFile: string, keys: Array<[string, object]> }>} [extensions]
+ *   another package's sections and keys ({@link extendBase})
  * @returns {{ config: object, source: 'base-and-overlay' | 'base-only' }}
  *   `base-only` means no overlay: the base's placeholders are what is in use.
  */
-function loadTestConfigFrom(directory = HELPERS_DIRECTORY, namedOverlay) {
+function loadTestConfigFrom(
+  directory = HELPERS_DIRECTORY,
+  namedOverlay,
+  extensions = [],
+) {
   const yaml = require('yaml');
   if (fs.existsSync(path.join(directory, OLD_FULL_FILE))) {
     throw new TestConfigError(oldConfigMessage(directory));
@@ -453,7 +498,11 @@ function loadTestConfigFrom(directory = HELPERS_DIRECTORY, namedOverlay) {
       `${basePath} not found — the base is tracked in git.`,
     );
   }
-  const base = yaml.parse(fs.readFileSync(basePath, 'utf8')) || {};
+  const { config: base, keys } = extendBase(
+    yaml.parse(fs.readFileSync(basePath, 'utf8')) || {},
+    extensions,
+    yaml,
+  );
   const overlayPath = overlayPathOf(directory, namedOverlay);
   if (!fs.existsSync(overlayPath)) {
     if (namedOverlay !== undefined) {
@@ -470,7 +519,7 @@ function loadTestConfigFrom(directory = HELPERS_DIRECTORY, namedOverlay) {
     label,
   );
   return {
-    config: applyOverlay(base, overlay, label),
+    config: applyOverlay(base, overlay, label, keys),
     source: 'base-and-overlay',
   };
 }

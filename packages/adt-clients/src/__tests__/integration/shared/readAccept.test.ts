@@ -157,7 +157,6 @@ function acceptCase(...needs: Need[]): jest.It {
 describe('Shared - read Accept headers', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let isCloudSystem = false;
   let standardClassName: string | null = null;
   let standardInterfaceName: string | null = null;
@@ -171,10 +170,12 @@ describe('Shared - read Accept headers', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
 
       testCase = configuredCase('read_accept', 'read_accept');
 

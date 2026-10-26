@@ -28,7 +28,6 @@ export interface ITestConfigResolverOptions {
   handlerName?: string;
   testCaseName?: string;
   isCloud?: boolean;
-  isLegacy?: boolean;
   logger?: ILogger;
 }
 
@@ -36,7 +35,6 @@ export class TestConfigResolver {
   private testCase: any;
   private envConfig: any;
   private isCloud: boolean;
-  private isLegacy: boolean;
   private logger?: ILogger;
 
   constructor(options: ITestConfigResolverOptions = {}) {
@@ -56,7 +54,6 @@ export class TestConfigResolver {
 
     this.envConfig = getEnvironmentConfig();
     this.isCloud = options.isCloud ?? false;
-    this.isLegacy = options.isLegacy ?? false;
     this.logger = options.logger;
   }
 
@@ -140,12 +137,7 @@ export class TestConfigResolver {
   getStandardObject(
     objectType: string,
   ): { name: string; group?: string } | null {
-    return resolveStandardObject(
-      objectType,
-      this.isCloud,
-      this.testCase,
-      this.isLegacy,
-    );
+    return resolveStandardObject(objectType, this.isCloud, this.testCase);
   }
 
   /**
@@ -199,12 +191,8 @@ export class TestConfigResolver {
       return true;
     }
 
-    // Determine current environment: cloud, onprem (modern), or legacy (on-premise BASIS < 7.50)
-    const currentEnv = this.isCloud
-      ? 'cloud'
-      : this.isLegacy
-        ? 'legacy'
-        : 'onprem';
+    // Determine current environment: cloud or onprem
+    const currentEnv = this.isCloud ? 'cloud' : 'onprem';
     return availableIn.includes(currentEnv);
   }
 
@@ -212,11 +200,7 @@ export class TestConfigResolver {
    * Check if test case is available for given environment
    * Convenience static method for tests that don't use BaseTester
    */
-  static isTestAvailable(
-    testCase: any,
-    isCloud: boolean,
-    isLegacy: boolean,
-  ): boolean {
+  static isTestAvailable(testCase: any, isCloud: boolean): boolean {
     const availableIn = testCase?.available_in;
     if (
       !availableIn ||
@@ -225,7 +209,7 @@ export class TestConfigResolver {
     ) {
       return true;
     }
-    const env = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+    const env = isCloud ? 'cloud' : 'onprem';
     return availableIn.includes(env);
   }
 

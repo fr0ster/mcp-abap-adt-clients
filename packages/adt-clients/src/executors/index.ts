@@ -5,9 +5,7 @@ export {
 } from './abapUnitRunner';
 export {
   ClassExecutor,
-  ClassExecutorLegacy,
   ClassTestRunner,
-  ClassTestRunnerLegacy,
   classExecutorDocuments,
   classTestRunnerDocuments,
   type IClassExecutorResults,
@@ -16,13 +14,11 @@ export {
 } from './class';
 export {
   FunctionGroupTestRunner,
-  FunctionGroupTestRunnerLegacy,
   functionGroupTestRunnerDocuments,
   type IFunctionGroupTestRunnerResults,
 } from './functionGroup';
 export {
   FunctionModuleTestRunner,
-  FunctionModuleTestRunnerLegacy,
   functionModuleTestRunnerDocuments,
   type IFunctionModuleTestRunnerResults,
   type IFunctionModuleTestRunSyncTarget,
@@ -31,9 +27,7 @@ export {
   type IProgramExecutorResults,
   type IProgramTestRunnerResults,
   ProgramExecutor,
-  ProgramExecutorLegacy,
   ProgramTestRunner,
-  ProgramTestRunnerLegacy,
   programExecutorDocuments,
   programTestRunnerDocuments,
 } from './program';

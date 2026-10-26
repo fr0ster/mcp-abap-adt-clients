@@ -1,15 +1,12 @@
 /**
  * `getObjectProperties` is one GET to the information system's
  * object-properties endpoint, with the object's uri encoded into the query and
- * the measured result type as `Accept`. The legacy class refuses it without a
- * request: legacy discovery does not list the endpoint.
+ * the measured result type as `Accept`.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
-import { AdtUtilsLegacy } from '../../../core/shared/AdtUtilsLegacy';
 
 const logger = {
   log: jest.fn(),
@@ -78,26 +75,5 @@ describe('AdtUtils.getObjectProperties', () => {
     expect(requests[0].url).toBe(
       '/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=%2Fsap%2Fbc%2Fadt%2Fx%3Fa%3D1%26b%3D%2Fc%20d',
     );
-  });
-});
-
-describe('AdtUtilsLegacy.getObjectProperties', () => {
-  it('answers an unsupported operation and asks nothing', async () => {
-    const { connection, requests } = recording();
-    const utils = new AdtUtilsLegacy(connection, logger);
-
-    const answer = await utils.getObjectProperties(SE38);
-
-    expect(answer.ok).toBe(false);
-    if (!answer.ok) {
-      expect(answer.getError().origin).toBe('refusal');
-      expect(answer.getError().code).toBe(
-        AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-      );
-      expect(answer.getError().message).toContain(
-        '/sap/bc/adt/repository/informationsystem/objectproperties/values',
-      );
-    }
-    expect(requests).toEqual([]);
   });
 });

@@ -85,11 +85,10 @@ CLASS zac_shr_broken IMPLEMENTATION.
 ENDCLASS.`;
 
 /** The configured class the checks run against, if there is one. */
-function configuredClassName(isLegacy: boolean): string | undefined {
+function configuredClassName(): string | undefined {
   return (
     new TestConfigResolver({
       isCloud: false,
-      isLegacy,
       logger: testsLogger,
       handlerName: 'read_source',
       testCaseName: 'read_class_source',
@@ -103,26 +102,24 @@ const checkCase = gate('check_run', 'class_check');
 // Applies where the case is on and a class is configured to check.
 const withClass = gateAll(
   checkCase,
-  gateOn(({ isLegacy }) => !!configuredClassName(isLegacy)),
+  gateOn(() => !!configuredClassName()),
 );
 
 describe('Shared - what check answers', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let isLegacy = false;
   let className: string | undefined;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
-      const { client: resolved, isLegacy: legacy } = await createTestAdtClient(
+      const { client: resolved } = await createTestAdtClient(
         connection,
         testsLogger,
       );
       client = resolved;
-      isLegacy = legacy;
 
-      className = configuredClassName(isLegacy);
+      className = configuredClassName();
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
     }

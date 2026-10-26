@@ -39,12 +39,6 @@ describe('AdtUtils readings', () => {
     const named = new Set(
       [...source.matchAll(/this\.results\.(\w+)/g)].map((m) => m[1]),
     );
-    // The legacy subclass overrides some of them; it reaches the same slots.
-    const legacy = readFileSync(
-      join(__dirname, '../../../core/shared/AdtUtilsLegacy.ts'),
-      'utf-8',
-    );
-    for (const m of legacy.matchAll(/this\.results\.(\w+)/g)) named.add(m[1]);
 
     expect([...named].sort()).toEqual(Object.keys(utilDocuments).sort());
     expect(named.size).toBe(21);
@@ -70,17 +64,11 @@ describe('AdtUtils readings', () => {
     // One `answering` per request-making member, and each passes the caller's
     // `analyse` through — a member that dropped it would judge the answer by
     // the library's verdict alone, with no way for the caller to say otherwise.
-    for (const file of ['AdtUtils.ts', 'AdtUtilsLegacy.ts']) {
-      const text = readFileSync(
-        join(__dirname, '../../../core/shared', file),
-        'utf-8',
-      );
-      const calls = text.split('return answering(').slice(1);
-      expect(calls.length).toBeGreaterThan(0);
-      for (const call of calls) {
-        const body = call.slice(0, call.indexOf('\n    );'));
-        expect(body).toContain('options?.analyse');
-      }
+    const calls = source.split('return answering(').slice(1);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      const body = call.slice(0, call.indexOf('\n    );'));
+      expect(body).toContain('options?.analyse');
     }
   });
 

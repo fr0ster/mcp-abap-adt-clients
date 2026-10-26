@@ -16,7 +16,6 @@ import {
   type IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 
 // These tests talk to a local stub and finish in well under a second. The suite
 // default is 15 minutes, meant for integration runs — long enough that anything
@@ -123,43 +122,5 @@ describe('AdtClient connect guard', () => {
       if (code !== ADT_SESSION_ERROR.NOT_CONNECTED) unguarded.push(name);
     }
     expect(unguarded).toEqual([]);
-  });
-
-  /**
-   * The legacy client's own getters, discovered the same way.
-   *
-   * Each override replaces the base factory, so the base's guard does not run
-   * for it: a legacy getter that forgets the check hands out a handler over an
-   * unconnected connection — or, for a type the legacy system lacks, a refusal
-   * that says nothing about the connection. An RFC connection does declare
-   * isConnected(), so the check is not academic there.
-   */
-  it('guards every factory the legacy client overrides', () => {
-    const client = new AdtClientLegacy(sessionAware(false), undefined);
-    const factories = Object.getOwnPropertyNames(
-      AdtClientLegacy.prototype,
-    ).filter((name) => /^get[A-Z]/.test(name));
-
-    // The legacy client overrides the getters of the types it serves
-    // differently and of every type it lacks.
-    expect(factories.length).toBeGreaterThanOrEqual(25);
-
-    const unguarded: string[] = [];
-    for (const name of factories) {
-      let code: string | undefined;
-      try {
-        (client as unknown as Record<string, () => unknown>)[name]();
-      } catch (error) {
-        code = (error as { code?: string }).code;
-      }
-      if (code !== ADT_SESSION_ERROR.NOT_CONNECTED) unguarded.push(name);
-    }
-    expect(unguarded).toEqual([]);
-  });
-
-  it('hands out a legacy handler once the connection reports connected', () => {
-    const client = new AdtClientLegacy(sessionAware(true), undefined);
-    expect(client.getInclude()).toBeDefined();
-    expect(client.getDomain()).toBeDefined();
   });
 });

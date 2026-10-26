@@ -27,12 +27,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../../clients/AdtClient';
 import type { AdtExecutor } from '../../clients/AdtExecutor';
-import type { AdtExecutorLegacy } from '../../clients/AdtExecutorLegacy';
 import type {
   ClassTestRunner,
   IClassTestRunTarget,
 } from '../../executors/class/ClassTestRunner';
-import type { ClassTestRunnerLegacy } from '../../executors/class/ClassTestRunnerLegacy';
 
 /** Compile error unless `T` is assignable to `Expected`. */
 type Satisfies<T extends Expected, Expected> = T;
@@ -45,12 +43,8 @@ type Satisfies<T extends Expected, Expected> = T;
 const _handsOutRunner: (executor: AdtExecutor) => ClassTestRunner = (
   executor,
 ) => executor.getClassTestRunner();
-const _handsOutLegacyRunner: (
-  executor: AdtExecutorLegacy,
-) => ClassTestRunnerLegacy = (executor) => executor.getClassTestRunner();
 const _handsOutDdl = (client: AdtClient) => client.getDdl();
 void _handsOutRunner;
-void _handsOutLegacyRunner;
 
 // --- Running, and asking about a run: two separate capabilities -------------
 type _RunnerIsRunnable = Satisfies<

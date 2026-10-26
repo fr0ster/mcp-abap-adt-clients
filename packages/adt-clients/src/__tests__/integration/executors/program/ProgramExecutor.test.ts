@@ -27,7 +27,6 @@ import {
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
 import {
-  createTestAdtClient,
   createTestConnection,
   releaseTestConnection,
   resolveSystemContext,
@@ -127,7 +126,6 @@ describe('ProgramExecutor (integration)', () => {
   let profiler: ReadingProfiler;
   let programRunner: ReturnType<typeof readingProgramExecutor>;
   let isCloudSystem = false;
-  let isLegacy = false;
   /** Trace ids this file produced — an array for the reason above. */
   const tracesCreated: string[] = [];
   let traceUser: string | undefined;
@@ -144,14 +142,6 @@ describe('ProgramExecutor (integration)', () => {
         connection,
         isCloudSystem,
       );
-      // Only for `isLegacy` now — this suite runs a shared program and owns
-      // no object, so it has nothing to ask an AdtClient for.
-      const { isLegacy: legacy } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
-      isLegacy = legacy;
       traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);

@@ -63,8 +63,7 @@ header corpus, everything batched and poisoned envelopes split:
    (below). It settles every endpoint whose `needs` it can.
 3. **Phase 2, for the clients endpoints still `unknown` only:**
    - **writes**: the write cycle (the former header probe, below), only for the
-     object types whose write members are still unknown (the modern client's;
-     the legacy client's writes stay as phase 1 left them). The bogus
+     object types whose write members are still unknown. The bogus
      Content-Type goes first, then the bogus Accept; the ledger holds every
      object before its create is sent, locks are released in a `finally`, the
      state is read after every write probe.
@@ -147,9 +146,7 @@ header corpus, everything batched and poisoned envelopes split:
      `POST` that switches a trace on or schedules one, and the reentrance
      ticket (its answer is a logon ticket, a secret).
    - `clients`: every member of every handler the clients hand out —
-     `AdtClient`, `AdtClientLegacy` (labelled `legacy get…()`),
-     `AdtRuntimeClient`, `AdtExecutor`, `AdtExecutorLegacy` and
-     `AdtAbapGitClient`, read from the clients themselves, not from a list.
+     `AdtClient`, `AdtRuntimeClient`, `AdtExecutor` and `AdtAbapGitClient`, read from the clients themselves, not from a list.
      Each member is first called against a connection that sends nothing and
      answers every request with an empty 200; the requests it builds are its
      endpoints (path with the probe name as `{name}`, method, `_action`).
@@ -168,8 +165,7 @@ header corpus, everything batched and poisoned envelopes split:
      body (one row per type); discovery names no Accept, so none is sent and
      the row says `accept: not in discovery` (measured 2026-10-18: a `POST`
      sent with the listed type as Accept as well was refused 406, naming a
-     different, result type). Members: `pairs.ts` (the legacy client's rows
-     from MIGRATION-36 as well).
+     different, result type). Members: `pairs.ts`.
    - `none`: no Accept and no Content-Type. In an envelope part the headers
      are left out and the part carries neither. On a request of its own the
      connection adds its default Accept unless the header is given as

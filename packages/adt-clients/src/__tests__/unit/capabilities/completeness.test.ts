@@ -6,14 +6,13 @@
  * 37 factories return a class the package root exports, and the other 19 return
  * a type only. The registry is the list of factories itself.
  *
- * `AdtClientLegacy` is walked too, and by its whole prototype chain:
- * `Object.getOwnPropertyNames(AdtClientLegacy.prototype)` lists only what the
- * subclass declares, so the inherited factories would vanish from a check whose
- * entire job is to notice what is missing.
+ * A client is walked by its whole prototype chain: a subclass's own
+ * prototype lists only what the subclass declares, so the inherited
+ * factories would vanish from a check whose entire job is to notice what is
+ * missing.
  */
 
 import { AdtClient } from '../../../clients/AdtClient';
-import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import type { HandlerEntry } from './manifest';
 import { HANDLERS, NOT_HANDLERS } from './manifest';
 
@@ -45,14 +44,6 @@ const claimedFactories = new Set(
 describe('capability guard — completeness', () => {
   it('every factory on AdtClient is in the manifest or in NOT_HANDLERS with a reason', () => {
     const unaccounted = factoryNames(AdtClient).filter(
-      (name) => !claimedFactories.has(name) && !(name in NOT_HANDLERS),
-    );
-
-    expect(unaccounted).toEqual([]);
-  });
-
-  it('every factory on AdtClientLegacy is accounted for too', () => {
-    const unaccounted = factoryNames(AdtClientLegacy).filter(
       (name) => !claimedFactories.has(name) && !(name in NOT_HANDLERS),
     );
 

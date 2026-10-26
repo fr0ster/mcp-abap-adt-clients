@@ -57,7 +57,6 @@ describe('MetadataExtension (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let tester: BaseTester<IMetadataExtensionConfig>;
 
   function generateDefaultSourceCode(
@@ -82,10 +81,12 @@ extend view ${targetEntity} with "${extName}"
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(

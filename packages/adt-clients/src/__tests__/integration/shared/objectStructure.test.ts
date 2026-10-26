@@ -124,17 +124,17 @@ describe('Shared - getObjectStructure', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
-  let isLegacy = false;
   let isCloudSystem = false;
   let tester: BaseTester<IObjectStructureParams>;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 

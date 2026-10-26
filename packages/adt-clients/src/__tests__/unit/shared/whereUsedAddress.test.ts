@@ -8,15 +8,12 @@
  * the caller's argument, thrown before any request.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
-import { AdtUtilsLegacy } from '../../../core/shared/AdtUtilsLegacy';
 import { whereUsedObjectUri } from '../../../core/shared/whereUsed';
 import { buildObjectUri } from '../../../utils/activationUtils';
 import { headersOf } from '../../helpers/adtHeaders';
-import '../../helpers/legacyRegistrations';
 
 const logger = {
   log: jest.fn(),
@@ -136,32 +133,6 @@ describe('AdtUtils where-used members', () => {
         { headers: headersOf(utils, 'getWhereUsedScope') },
       ),
     ).rejects.toThrow(/object type/);
-    expect(urls).toEqual([]);
-  });
-});
-
-describe('AdtUtilsLegacy refusals', () => {
-  it('answer an unsupported operation, not a connection failure, and ask nothing', async () => {
-    const { connection, urls } = recording();
-    const utils = new AdtUtilsLegacy(connection, logger);
-
-    for (const answer of [
-      await utils.getSqlQuery(
-        { sql_query: 'SELECT * FROM T000' },
-        { headers: headersOf(utils, 'getSqlQuery') },
-      ),
-      await utils.getTableColumns('T000'),
-      await utils.getTableContents({ table_name: 'T000' } as never, {
-        headers: headersOf(utils, 'getTableContents'),
-      }),
-    ]) {
-      expect(answer.ok).toBe(false);
-      if (answer.ok) continue;
-      expect(answer.getError().origin).toBe('refusal');
-      expect(answer.getError().code).toBe(
-        AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-      );
-    }
     expect(urls).toEqual([]);
   });
 });

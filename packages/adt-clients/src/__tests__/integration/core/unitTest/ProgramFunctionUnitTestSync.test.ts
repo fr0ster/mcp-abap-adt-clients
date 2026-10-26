@@ -46,12 +46,7 @@ import {
   runToCompletion,
 } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import {
-  configuredCase,
-  gate,
-  gateAll,
-  gateOn,
-} from '../../../helpers/caseGate';
+import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult, releasing } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -217,14 +212,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
     return testCase;
   }
 
-  // The legacy runner's `run` is the synchronous request already; there is no
-  // asynchronous one to compare it with.
-  const notLegacy = gateOn(({ isLegacy }) => !isLegacy);
-
-  gateAll(
-    gate('run_program_unit_test', 'adt_program_unit_test_sync'),
-    notLegacy,
-  )(
+  gate('run_program_unit_test', 'adt_program_unit_test_sync')(
     'reports: both runners find the same tests, the same failure and the same alert',
     async () => {
       const TITLE = 'UnitTest - reports, async and sync compared';
@@ -477,10 +465,7 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
     getTimeout('test'),
   );
 
-  gateAll(
-    gate('run_function_group_unit_test', 'adt_function_group_unit_test_sync'),
-    notLegacy,
-  )(
+  gate('run_function_group_unit_test', 'adt_function_group_unit_test_sync')(
     'function group and modules: both runners compared, and what a module run covers',
     async () => {
       const TITLE = 'UnitTest - function group and modules, async and sync';

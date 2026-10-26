@@ -17,7 +17,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 ## Architecture
 
 - [**ARCHITECTURE.md**](architecture/ARCHITECTURE.md) - System architecture, design patterns, and type system organization
-- [**LEGACY.md**](architecture/LEGACY.md) - Legacy system support (BASIS < 7.50): supported types, RFC transport, endpoint availability
+- [**LEGACY.md**](../../adt-clients-legacy/docs/LEGACY.md) - Legacy system support (BASIS < 7.50): supported types, RFC transport, endpoint availability
 - [**DECISIONS.md**](architecture/DECISIONS.md) - The choices that could have gone the other way, with the problem, the evidence and what would change them
 
 ## Usage Guides
@@ -52,7 +52,6 @@ docs/
 ├── architecture/
 │   ├── ARCHITECTURE.md               # System architecture and design
 │   ├── DECISIONS.md                  # Decisions, and why
-│   ├── LEGACY.md                     # Legacy system support (BASIS < 7.50)
 │   ├── discovery.md                  # ADT Discovery documentation
 │   └── discovery.xml                 # Pretty-printed ADT discovery XML
 ├── usage/

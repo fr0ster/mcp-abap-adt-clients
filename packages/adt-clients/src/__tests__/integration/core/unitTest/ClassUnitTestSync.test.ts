@@ -37,12 +37,7 @@ import {
   runToCompletion,
 } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
-import {
-  configuredCase,
-  gate,
-  gateAll,
-  gateOn,
-} from '../../../helpers/caseGate';
+import { configuredCase, gate } from '../../../helpers/caseGate';
 import { expectResult, releasing } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -147,12 +142,7 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
     }
   });
 
-  gateAll(
-    gate('run_unit_test', 'adt_unit_test_sync'),
-    // The legacy runner's `run` is the synchronous request already; there is
-    // no asynchronous one to compare it with.
-    gateOn(({ isLegacy }) => !isLegacy),
-  )(
+  gate('run_unit_test', 'adt_unit_test_sync')(
     'both runners find the same tests, the same failure and the same alert',
     async () => {
       const testCase = configuredCase('run_unit_test', 'adt_unit_test_sync');

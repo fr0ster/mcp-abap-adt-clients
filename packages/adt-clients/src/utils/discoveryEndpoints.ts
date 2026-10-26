@@ -13,10 +13,10 @@
  * settled it. So treat a hit here as "the system says it has this", and a miss
  * as the stronger signal of the two.
  *
- * The main library uses isModernAdtSystem() to auto-detect and
- * AdtClientLegacy answers a refusal for the types and members 7.40 SP04 lacks
- * (`absentOnLegacy` and the `*Legacy` handlers), not by reading this catalogue.
- * These utilities are for consumers who want manual checking.
+ * The library detects no system type: the consumer declares it (a 7.40
+ * system is served by `@mcp-abap-adt/adt-clients-legacy`, whose classes
+ * refuse what 7.40 SP04 lacks without reading this catalogue). These
+ * utilities are for consumers who want manual checking.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';

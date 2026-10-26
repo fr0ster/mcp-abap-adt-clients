@@ -21,7 +21,7 @@ const gate: typeof registrationGate = (handler, name, loader) =>
 const gateStandardObject = (
   type: string,
   parsed: unknown,
-  standardObject: (type: string, cloud: boolean, legacy: boolean) => unknown,
+  standardObject: (type: string, cloud: boolean) => unknown,
 ) =>
   registrationGateStandardObject(type, () => parsed, {
     loadEnv: () => {},
@@ -58,17 +58,6 @@ describe('case registration gate', () => {
     expect(
       gate('enhancement', 'enhoxhh', () => config('cloud', true, ['cloud'])),
     ).toBe(it);
-  });
-
-  it('uses the legacy flag for onprem systems', () => {
-    const parsed = config('onprem', true, ['legacy']);
-    expect(
-      gate('enhancement', 'enhoxhh', () => ({
-        ...parsed,
-        environment: { ...parsed.environment, is_legacy: true },
-      })),
-    ).toBe(it);
-    expect(gate('enhancement', 'enhoxhh', () => parsed)).toBe(it.skip);
   });
 
   it.each([undefined, {}, { environment: {} }, config('invalid')])(
@@ -121,16 +110,6 @@ describe('case registration gate', () => {
             { ...parsed.enhancement.test_cases[0], enabled: 'true' },
           ],
         },
-      })),
-    ).toBe(it.skip);
-  });
-
-  it('skips an onprem-only case on a legacy system', () => {
-    const parsed = config();
-    expect(
-      gate('enhancement', 'enhoxhh', () => ({
-        ...parsed,
-        environment: { ...parsed.environment, is_legacy: true },
       })),
     ).toBe(it.skip);
   });
@@ -371,22 +350,17 @@ describe('standard object registration gate', () => {
     expect(gateStandardObject('class', config(), () => null)).toBe(it.skip);
   });
 
-  it('asks about the configured system, cloud and legacy included', () => {
+  it('asks about the configured system, cloud included', () => {
     const asked: unknown[][] = [];
     const record = (...args: unknown[]) => {
       asked.push(args);
       return null;
     };
     gateStandardObject('table', config('cloud'), record);
-    const legacy = config();
-    gateStandardObject(
-      'table',
-      { ...legacy, environment: { ...legacy.environment, is_legacy: true } },
-      record,
-    );
+    gateStandardObject('table', config(), record);
     expect(asked).toEqual([
-      ['table', true, false],
-      ['table', false, true],
+      ['table', true],
+      ['table', false],
     ]);
   });
 
@@ -437,7 +411,7 @@ describe('applicability gate', () => {
   it('hands the predicate the configured system', () => {
     const seen: unknown[] = [];
     on((system) => !!seen.push(system), config('cloud'));
-    expect(seen).toEqual([{ isCloud: true, isLegacy: false }]);
+    expect(seen).toEqual([{ isCloud: true }]);
   });
 
   it('registers normally when the predicate cannot decide', () => {

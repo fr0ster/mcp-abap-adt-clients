@@ -185,7 +185,6 @@ export async function runWriteCycle(
   const members = new Set<string>();
   for (const key of input.unknown) {
     const who = key.slice(0, key.indexOf(' — '));
-    if (who.startsWith('legacy ')) continue;
     const handler = who.slice(0, who.lastIndexOf('.'));
     const member = who.slice(who.lastIndexOf('.') + 1);
     const type = typeOfHandler(handler);

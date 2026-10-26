@@ -85,13 +85,13 @@ describe('Admin: Teardown shared dependencies', () => {
       connection = await createTestConnection(connectionLogger);
       const isCloud = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(connection, isCloud);
-      const { client: resolvedClient, isLegacy } = await createTestAdtClient(
+      const { client: resolvedClient } = await createTestAdtClient(
         connection,
         libraryLogger,
         systemContext,
       );
       client = resolvedClient;
-      envType = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+      envType = isCloud ? 'cloud' : 'onprem';
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails naming the

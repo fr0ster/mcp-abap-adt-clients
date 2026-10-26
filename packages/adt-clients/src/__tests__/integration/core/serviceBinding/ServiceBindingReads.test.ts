@@ -56,9 +56,8 @@ function sharedBinding(): ISharedBinding | undefined {
   return (getSharedDependenciesConfig()?.service_bindings ?? [])[0];
 }
 
-// Service bindings are absent on legacy systems; with no shared binding set up
-// there is nothing to read.
-const readsBinding = gateOn(({ isLegacy }) => !isLegacy && !!sharedBinding());
+// With no shared binding set up there is nothing to read.
+const readsBinding = gateOn(() => !!sharedBinding());
 
 describe('Service binding reads (getServiceBinding contract)', () => {
   let connection: IAbapConnection | undefined;

@@ -92,8 +92,8 @@ function preflight(
  * | Enabled case unavailable per isTestAvailable | it.skip |
  * | Enabled, available case | it |
  *
- * Availability follows TestConfigResolver, including legacy systems and
- * unrestricted absent, non-array, or empty available_in values.
+ * Availability follows TestConfigResolver, including unrestricted absent,
+ * non-array, or empty available_in values.
  */
 export function gate(
   handlerName: string,
@@ -110,11 +110,7 @@ export function gate(
   const testCase = configuredCase(handlerName, testCaseName, () => config);
   if (!testCase) return configurationDefect;
   return testCase.enabled === true &&
-    TestConfigResolver.isTestAvailable(
-      testCase,
-      environment.system === 'cloud',
-      environment.is_legacy === true,
-    )
+    TestConfigResolver.isTestAvailable(testCase, environment.system === 'cloud')
     ? it
     : it.skip;
 }
@@ -131,7 +127,7 @@ export function gate(
  * | `applies` answers true, or throws | it |
  */
 export function gateOn(
-  applies: (system: { isCloud: boolean; isLegacy: boolean }) => boolean,
+  applies: (system: { isCloud: boolean }) => boolean,
   loadConfig: ConfigLoader = loadTestConfig,
   dependencies: GateDependencies = {},
 ): jest.It {
@@ -139,12 +135,7 @@ export function gateOn(
   if (decided.register) return decided.register;
   const { environment } = decided;
   try {
-    return applies({
-      isCloud: environment.system === 'cloud',
-      isLegacy: environment.is_legacy === true,
-    })
-      ? it
-      : it.skip;
+    return applies({ isCloud: environment.system === 'cloud' }) ? it : it.skip;
   } catch {
     // A configuration that cannot be read must fail the test, not skip it.
     return configurationDefect;
@@ -160,19 +151,15 @@ export function gateStandardObject(
   objectType: string,
   loadConfig: ConfigLoader = loadTestConfig,
   dependencies: GateDependencies & {
-    standardObject?: (
-      objectType: string,
-      isCloud: boolean,
-      isLegacy: boolean,
-    ) => unknown;
+    standardObject?: (objectType: string, isCloud: boolean) => unknown;
   } = {},
 ): jest.It {
   const standardObject =
     dependencies.standardObject ??
-    ((type, isCloud, isLegacy) =>
-      new TestConfigResolver({ isCloud, isLegacy }).getStandardObject(type));
+    ((type, isCloud) =>
+      new TestConfigResolver({ isCloud }).getStandardObject(type));
   return gateOn(
-    ({ isCloud, isLegacy }) => !!standardObject(objectType, isCloud, isLegacy),
+    ({ isCloud }) => !!standardObject(objectType, isCloud),
     loadConfig,
     dependencies,
   );

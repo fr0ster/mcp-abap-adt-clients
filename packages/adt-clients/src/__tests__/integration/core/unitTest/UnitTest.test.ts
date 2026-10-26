@@ -29,7 +29,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
-import { AdtExecutorLegacy } from '../../../../clients/AdtExecutorLegacy';
 import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { readRunResult, runToCompletion } from '../../../helpers/abapUnitRun';
@@ -85,7 +84,6 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let isCloudSystem = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -95,10 +93,12 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       client = resolvedClient;
-      isLegacy = legacy;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
@@ -331,10 +331,9 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           logTestStep('read (unit test)', testsLogger);
           // The run's id is in a header of the start's answer; the reading that
           // finds it, and the check that a start carried one, are strategies.
-          const unitTest = (
-            isLegacy
-              ? new AdtExecutorLegacy(connection, libraryLogger)
-              : new AdtExecutor(connection, libraryLogger)
+          const unitTest = new AdtExecutor(
+            connection,
+            libraryLogger,
           ).getClassTestRunner({
             ...classTestRunnerDocuments,
             run: unitTestRunId,
@@ -434,8 +433,8 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
             'resultResponse',
           );
           expect(resultResponse).toBeDefined();
-          // The explicit run's verdict, on every system (legacy included):
-          // its tests ran, and none raised an alert.
+          // The explicit run's verdict, on every system: its tests ran, and
+          // none raised an alert.
           const explicitRun = readRunResult(
             String(resultResponse),
             unitTestResult.format || 'abapunit',
@@ -444,13 +443,11 @@ describe('ABAP Unit on a class (AdtClient + AdtExecutor)', () => {
           expect(explicitRun.alerts).toEqual([]);
 
           // Step 9: The same tests run the way Eclipse runs a class — by its
-          // name, every test class in it. Legacy runs whole classes either way.
+          // name, every test class in it.
           logTestStep('run by class name', testsLogger);
-          if (!isLegacy) {
-            const byName = await runToCompletion(unitTest, containerClass);
-            expect(byName.methods.length).toBeGreaterThan(0);
-            expect(byName.alerts).toEqual([]);
-          }
+          const byName = await runToCompletion(unitTest, containerClass);
+          expect(byName.methods.length).toBeGreaterThan(0);
+          expect(byName.alerts).toEqual([]);
 
           // Log detailed result information
           if (resultResponse) {
