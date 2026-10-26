@@ -12,6 +12,7 @@ import { ClassExecutorLegacy } from '../../../executors/class/ClassExecutorLegac
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
 import { ProgramExecutorLegacy } from '../../../executors/program/ProgramExecutorLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 import { expectFailure } from '../../helpers/contract';
 
 type Request = Record<string, unknown>;

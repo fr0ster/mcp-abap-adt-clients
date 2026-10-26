@@ -16,6 +16,7 @@ import { AdtUtilsLegacy } from '../../../core/shared/AdtUtilsLegacy';
 import { whereUsedObjectUri } from '../../../core/shared/whereUsed';
 import { buildObjectUri } from '../../../utils/activationUtils';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 
 const logger = {
   log: jest.fn(),

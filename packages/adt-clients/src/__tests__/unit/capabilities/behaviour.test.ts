@@ -28,6 +28,7 @@ import type {
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 import { LEGACY_REFUSED, LEGACY_SENDS } from '../../helpers/legacyMembers';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import type { RequestSpec } from './manifest';

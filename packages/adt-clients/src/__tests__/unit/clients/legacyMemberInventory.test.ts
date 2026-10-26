@@ -21,6 +21,7 @@ import * as ts from 'typescript';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 import {
   ARGUMENT_DEPENDENT,
   LEGACY_REFUSED,

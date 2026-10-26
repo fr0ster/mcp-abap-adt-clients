@@ -15,6 +15,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 
 function recordingConnection() {
   const sent: IAbapRequestOptions[] = [];

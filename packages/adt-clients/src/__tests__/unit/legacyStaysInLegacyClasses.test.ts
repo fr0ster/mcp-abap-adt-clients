@@ -202,7 +202,64 @@ function sourceFiles(): string[] {
   return out;
 }
 
+/**
+ * The shared test harness: every file under `src/__tests__/helpers/` but the
+ * legacy helpers (`legacy*`), which hold what the legacy classes bring to the
+ * harness through its seams (`legacyRegistrations.ts`).
+ */
+function harnessFiles(): string[] {
+  const out: string[] = [];
+  const walk = (rel: string): void => {
+    for (const entry of fs.readdirSync(path.join(ROOT, rel), {
+      withFileTypes: true,
+    })) {
+      const next = `${rel}/${entry.name}`;
+      if (entry.isDirectory()) walk(next);
+      else if (
+        /\.[cm]?[tj]s$/.test(entry.name) &&
+        !entry.name.toLowerCase().startsWith('legacy')
+      )
+        out.push(next);
+    }
+  };
+  walk('src/__tests__/helpers');
+  return out;
+}
+
+/** `file:line  module …` for every legacy module a harness file loads. */
+function harnessFindings(file: string, text: string): string[] {
+  return findings(file, text).filter((finding) =>
+    finding.includes('  module '),
+  );
+}
+
 describe('legacy stays in legacy classes', () => {
+  it('no shared harness file loads a legacy module', () => {
+    const files = harnessFiles();
+    expect(files).toContain('src/__tests__/helpers/adtHeaders.ts');
+    expect(files).toContain('src/__tests__/helpers/sessionConfig.ts');
+    expect(files).not.toContain('src/__tests__/helpers/legacyRegistrations.ts');
+    const found = files.flatMap((file) =>
+      harnessFindings(file, fs.readFileSync(path.join(ROOT, file), 'utf8')),
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('flags a harness file that loads a legacy module, however it loads it', () => {
+    const harness = 'src/__tests__/helpers/sessionConfig.ts';
+    const text = [
+      "import { AdtClientLegacy } from '../../clients/AdtClientLegacy';",
+      "const r = require('./legacyRegistrations');",
+      "import './legacyRegistrations';",
+      'const isLegacy = true;',
+    ].join('\n');
+    expect(harnessFindings(harness, text)).toEqual([
+      `${harness}:1  module ../../clients/AdtClientLegacy`,
+      `${harness}:2  module ./legacyRegistrations`,
+      `${harness}:3  module ./legacyRegistrations`,
+    ]);
+  });
+
   it('no main file names a legacy class or addresses /sap/bc/cts', () => {
     const files = sourceFiles();
     expect(files.length).toBeGreaterThan(100);

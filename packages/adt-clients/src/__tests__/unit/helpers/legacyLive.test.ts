@@ -10,6 +10,7 @@ import {
 // The stubs below are no handler class `integrationHeadersOf` knows; the pair
 // is not this test's subject, so any pair does.
 jest.mock('../../helpers/adtHeaders', () => ({
+  ...jest.requireActual('../../helpers/adtHeaders'),
   integrationHeadersOf: () => ({ accept: 'x/test', contentType: 'x/test' }),
 }));
 

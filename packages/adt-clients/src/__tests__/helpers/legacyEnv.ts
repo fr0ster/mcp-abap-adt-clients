@@ -53,6 +53,7 @@ import { isUnansweredCredentialRefusal } from '../../utils/adtResponse';
 import { isModernAdtSystem } from '../../utils/systemInfo';
 import { integrationHeadersOf } from './adtHeaders';
 import { expectResult } from './contract';
+import './legacyRegistrations';
 import {
   deleteLocked,
   type LegacyDeletable,

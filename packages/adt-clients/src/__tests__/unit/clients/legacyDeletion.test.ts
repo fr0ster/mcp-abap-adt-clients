@@ -11,6 +11,7 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 import { LEGACY_REFUSED, LEGACY_SENDS } from '../../helpers/legacyMembers';
 
 const LOCK_BODY = `<?xml version="1.0" encoding="utf-8"?>

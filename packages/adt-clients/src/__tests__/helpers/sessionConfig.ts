@@ -12,6 +12,7 @@ import {
   type ConnectionSpec,
   type CreatedConnection,
   createConnection,
+  type OnPremHttpSpec,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -22,7 +23,6 @@ import type {
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';
-import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
 import {
@@ -267,16 +267,6 @@ export async function resolveSystemContext(
 }
 
 /**
- * Check if test-config.yaml marks the system as legacy (BASIS < 7.50).
- */
-export function isLegacyEnvironment(): boolean {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { loadTestConfig } = require('./test-helper');
-  const testConfig = loadTestConfig();
-  return testConfig?.environment?.is_legacy === true;
-}
-
-/**
  * Which system the tests are pointed at, from `environment.system`.
  *
  * Stated in the config, never worked out from the URL or the credential: the
@@ -320,6 +310,12 @@ export interface ITestConnectionOptions {
    * this is the second.
    */
   ownSession?: boolean;
+  /**
+   * The on-premise HTTP wire. Absent: plain `http`. The harness chooses no
+   * other: a caller whose system needs another wire names it here. Cloud and
+   * RFC have one wire each and ignore it.
+   */
+  onPremHttpTransport?: OnPremHttpSpec['transport'];
 }
 
 /**
@@ -360,7 +356,12 @@ export async function createTestConnection(
   // The system and the wire are stated, as `createConnection` requires.
   const connection = withSessionSharing(
     withWireLogOn(
-      createConnection(connectionSpec(config, system, credential, logger)),
+      createConnection(
+        connectionSpec(config, system, credential, logger, {
+          connectionType: getConnectionType(),
+          onPremHttpTransport: options.onPremHttpTransport,
+        }),
+      ),
     ),
   );
 
@@ -569,14 +570,21 @@ function credentialFor(config: SapConfig): IAuthProvider {
   );
 }
 
+/** The wire a session takes: from the configuration, and from the caller. */
+export interface ITestWire {
+  /** `environment.connection_type`. */
+  connectionType: 'http' | 'rfc';
+  /** The on-premise HTTP wire the caller named. Absent: plain `http`. */
+  onPremHttpTransport?: OnPremHttpSpec['transport'] | undefined;
+}
+
 /**
  * The system and the wire, from the configuration.
  *
- * Cloud has one wire. On-prem has three deployments, and the caller states
- * which: ordinary HTTP, the legacy one (BASIS < 7.50, where the session-type
- * header sends locks to ABAP session memory instead of the enqueue server —
- * this was the `skipSessionType` flag), and RFC, for a system where stateful
- * HTTP sessions are not usable at all.
+ * Cloud has one wire. On-prem has HTTP and RFC — RFC for a system where
+ * stateful HTTP sessions are not usable at all — and over HTTP the wire the
+ * caller names (`ITestConnectionOptions.onPremHttpTransport`), plain `http`
+ * unless it names another.
  *
  * Agent settings only: the credential's TLS material reaches the wire at
  * logon, through the provider's establish() (connection 10). `client` is not
@@ -584,24 +592,25 @@ function credentialFor(config: SapConfig): IAuthProvider {
  * than the client that was asked for, and later requests then route to a
  * client nobody named — `createConnection` takes it from `config.client`.
  */
-function connectionSpec(
+export function connectionSpec(
   config: SapConfig,
   system: 'onprem' | 'cloud',
   credential: IAuthProvider,
   logger: ILogger,
+  wire: ITestWire,
 ): ConnectionSpec {
   const base = { config, credential, logger, wireLogger: logger };
   const agentOptions = (): AgentOptions => ({});
   if (system === 'cloud') {
     return { ...base, system: 'cloud', transport: 'http', agentOptions };
   }
-  if (getConnectionType() === 'rfc') {
+  if (wire.connectionType === 'rfc') {
     return { ...base, system: 'onprem', transport: 'rfc' };
   }
   return {
     ...base,
     system: 'onprem',
-    transport: isLegacyEnvironment() ? 'legacy-http' : 'http',
+    transport: wire.onPremHttpTransport ?? 'http',
     agentOptions,
   };
 }
@@ -621,38 +630,45 @@ function withWireLogOn(connection: CreatedConnection): CreatedConnection {
   return connection;
 }
 
-/**
- * Get connection options for createAbapConnection.
- * Legacy systems need skipSessionType: true so the x-sap-adt-sessiontype
- * header is not sent — otherwise locks go to ABAP session memory instead
- * of the global enqueue server, causing HTTP 423 on subsequent requests.
- */
-export function getConnectionOptions():
-  | { skipSessionType?: boolean }
-  | undefined {
-  return isLegacyEnvironment() ? { skipSessionType: true } : undefined;
+/** What {@link createTestAdtClient} hands a test. */
+export interface ITestAdtClient {
+  client: AdtClient;
+  /**
+   * What the factory reports of the system. The modern factory reports
+   * `false`; the root suites' branches that read it go with the move of the
+   * legacy classes.
+   */
+  isLegacy: boolean;
 }
 
+/** How a test's client is built. */
+export type TestClientFactory = (
+  connection: IAbapConnection,
+  logger: ILogger,
+  options?: IAdtClientOptions,
+) => Promise<ITestAdtClient>;
+
+/** The modern factory: `createAdtClient`, as every test built its client before. */
+export const modernClientFactory: TestClientFactory = async (
+  connection,
+  logger,
+  options,
+) => ({
+  client: await createAdtClient(connection, logger, options),
+  isLegacy: false,
+});
+
 /**
- * Create the appropriate AdtClient based on system capabilities.
- * Modern systems (S/4 HANA, BTP) get AdtClient.
- * Legacy systems (BASIS < 7.50) get AdtClientLegacy.
- *
- * Respects is_legacy: true from test-config.yaml to force legacy client
- * (auto-detection via /sap/bc/adt/core/discovery is unreliable for HTTP
- * connections to legacy systems — discovery returns XML on any system).
+ * The client a test works with, built by `clientFactory` — the modern one
+ * unless the caller names another. The harness chooses no client of its own:
+ * a caller whose system needs another client passes the factory that builds
+ * it.
  */
 export async function createTestAdtClient(
   connection: IAbapConnection,
   logger: ILogger,
   options?: IAdtClientOptions,
-): Promise<{ client: AdtClient; isLegacy: boolean }> {
-  if (isLegacyEnvironment()) {
-    const client = new AdtClientLegacy(connection, logger, options);
-    return { client, isLegacy: true };
-  }
-
-  const client = await createAdtClient(connection, logger, options);
-  const isLegacy = client instanceof AdtClientLegacy;
-  return { client, isLegacy };
+  clientFactory: TestClientFactory = modernClientFactory,
+): Promise<ITestAdtClient> {
+  return clientFactory(connection, logger, options);
 }

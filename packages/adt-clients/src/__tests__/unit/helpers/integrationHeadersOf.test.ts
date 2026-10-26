@@ -24,10 +24,10 @@ import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
 import {
   headersOf,
   integrationHeadersOf,
-  REFUSED_WITHOUT_REQUEST,
   TEST_HEADERS,
 } from '../../helpers/adtHeaders';
 import { LEGACY_REFUSED } from '../../helpers/legacyMembers';
+import { REFUSED_WITHOUT_REQUEST } from '../../helpers/legacyRegistrations';
 
 /**
  * `integrationHeadersOf` is what every test that reaches SAP uses: a member
@@ -371,6 +371,8 @@ describe('integrationHeadersOf', () => {
       // Allowed: the strict resolver and types; a unit test's own import.
       'integration/ok.ts': `import { integrationHeadersOf } from ${from};\nimport type { X } from ${from};\nimport { type Y } from ${from};\n`,
       'unit/ok.ts': `import { headersOf, TEST_HEADERS } from ${from};\n`,
+      // Allowed: the registration seams, which resolve no pair.
+      'helpers/registers.ts': `import { registerHeaderPairs, registerRefusedMembers, registerRefusingHandler } from ${from};\n`,
     };
     try {
       for (const [file, text] of Object.entries(files)) {
@@ -477,10 +479,23 @@ function assignedToExports(node: ts.Node): boolean {
  * - no file but `helpers/adtHeaders.ts` itself re-exports anything from it,
  *   in any form (`export *`, `export * as`, named, type-only);
  * - a file in the directories whose tests reach SAP (integration, admin,
- *   helpers) imports from it only `integrationHeadersOf` and types, and does
- *   not load it with `require` or `import()`.
+ *   helpers) imports from it only `integrationHeadersOf`, the registration
+ *   seams ({@link STRICT_IMPORTS}) and types, and does not load it with
+ *   `require` or `import()`.
  * Each offence is `<file>: <what>`.
  */
+/**
+ * What a file that reaches SAP may import from `helpers/adtHeaders`: the strict
+ * resolver, and the seams through which a handler class from elsewhere
+ * registers its pairs and refusals — they add pairs, and resolve none.
+ */
+const STRICT_IMPORTS = new Set([
+  'integrationHeadersOf',
+  'registerHeaderPairs',
+  'registerRefusedMembers',
+  'registerRefusingHandler',
+]);
+
 function resolverOffenders(root: string): string[] {
   const walk = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -546,7 +561,7 @@ function resolverOffenders(root: string): string[] {
           if (bindings && ts.isNamedImports(bindings))
             for (const element of bindings.elements) {
               const name = (element.propertyName ?? element.name).text;
-              if (!element.isTypeOnly && name !== 'integrationHeadersOf')
+              if (!element.isTypeOnly && !STRICT_IMPORTS.has(name))
                 offences.push(`${file}: imports ${name}`);
             }
         }

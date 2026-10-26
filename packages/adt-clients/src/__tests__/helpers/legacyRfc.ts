@@ -12,14 +12,14 @@ export const NOT_LEGACY_REASON =
   'not a legacy configuration (`is_legacy: true`)';
 export const RFC_ONLY_REASON = 'the legacy client is supported over RFC only';
 
-/** What the gate reads; injected by the unit test, `sessionConfig` otherwise. */
+/** What the gate reads; injected by the unit test, `legacyRegistrations` and `sessionConfig` otherwise. */
 export interface LegacyRfcProbes {
   isLegacy: () => boolean;
   connectionType: () => 'http' | 'rfc';
 }
 
 const configured: LegacyRfcProbes = {
-  isLegacy: () => require('./sessionConfig').isLegacyEnvironment(),
+  isLegacy: () => require('./legacyRegistrations').isLegacyEnvironment(),
   connectionType: () => require('./sessionConfig').getConnectionType(),
 };
 

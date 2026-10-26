@@ -19,6 +19,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import type { AdtUtilsLegacy } from '../../../core/shared/AdtUtilsLegacy';
 import { headersOf } from '../../helpers/adtHeaders';
+import '../../helpers/legacyRegistrations';
 
 interface Sent {
   method: string;

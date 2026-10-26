@@ -30,6 +30,7 @@ import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
 import { judged } from './judged';
+import { legacyConnectionOptions } from './legacyRegistrations';
 import { presenceOf } from './objectPresence';
 import {
   type RecordedRequest,
@@ -91,7 +92,10 @@ export interface LegacySession {
 
 /** The legacy client and executor on a recorded test connection. */
 export async function openLegacySession(): Promise<LegacySession> {
-  const connection = await createTestConnection(createConnectionLogger());
+  const connection = await createTestConnection(
+    createConnectionLogger(),
+    legacyConnectionOptions(),
+  );
   return legacyClientsOn(connection, {});
 }
 

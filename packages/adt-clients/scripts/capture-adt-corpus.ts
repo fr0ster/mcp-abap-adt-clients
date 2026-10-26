@@ -83,7 +83,6 @@ import { headersOf } from '../src/__tests__/helpers/adtHeaders';
 import {
   createTestConnection,
   getTargetSystem,
-  isLegacyEnvironment,
   releaseTestConnection,
   resolveSystemContext,
 } from '../src/__tests__/helpers/sessionConfig';
@@ -852,7 +851,7 @@ async function main(): Promise<void> {
     getTargetSystem() === 'cloud',
   );
   console.log(
-    `system: legacy=${isLegacyEnvironment()} responsible=${ctx.responsible ?? '(unset)'} masterSystem=${ctx.masterSystem ?? '(unset)'}`,
+    `system: responsible=${ctx.responsible ?? '(unset)'} masterSystem=${ctx.masterSystem ?? '(unset)'}`,
   );
   // The SAP user id is only knowable now. SAP writes it into ordinary answer
   // text, so replace it everywhere from here on.

@@ -14,8 +14,14 @@
  * it (36.0.2).
  *
  * Before 36.0.0 a few members read the client's `contentTypes` provider
- * (the legacy client sets `AdtContentTypesBase`); `headersOf` does the same,
- * so a legacy run keeps its v1 types and its non-Unicode `text/plain`.
+ * (a client may set `AdtContentTypesBase`); `headersOf` does the same, so a
+ * run on such a client keeps its v1 types and its non-Unicode `text/plain`.
+ *
+ * The harness knows the pairs of the handler classes of this package. A
+ * handler class from elsewhere (a subclass for another system) brings its own
+ * through two seams: {@link registerHeaderPairs} for the pairs it sends, and
+ * {@link registerRefusedMembers} / {@link registerRefusingHandler} for the
+ * members that answer a refusal and send no request.
  */
 
 import type {
@@ -23,27 +29,7 @@ import type {
   IAdtContentTypes,
   IAdtHeaders,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { ENHANCEMENT_CONTENT_TYPES } from '../../constants/contentTypes';
-import { AdtClassLegacy } from '../../core/class/AdtClassLegacy';
-import { AdtDdlLegacy } from '../../core/ddl/AdtDdlLegacy';
-import { AdtFunctionGroupLegacy } from '../../core/functionGroup/AdtFunctionGroupLegacy';
-import { AdtFunctionIncludeLegacy } from '../../core/functionInclude/AdtFunctionIncludeLegacy';
-import { AdtFunctionModuleLegacy } from '../../core/functionModule/AdtFunctionModuleLegacy';
-import { AdtIncludeLegacy } from '../../core/include/AdtIncludeLegacy';
-import { AdtInterfaceLegacy } from '../../core/interface/AdtInterfaceLegacy';
-import { AdtMessageClassLegacy } from '../../core/messageClass/AdtMessageClassLegacy';
-import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
-import { AdtProgramLegacy } from '../../core/program/AdtProgramLegacy';
-import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
-import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
-import { ClassExecutorLegacy } from '../../executors/class/ClassExecutorLegacy';
-import { ClassTestRunnerLegacy } from '../../executors/class/ClassTestRunnerLegacy';
-import { FunctionGroupTestRunnerLegacy } from '../../executors/functionGroup/FunctionGroupTestRunnerLegacy';
-import { FunctionModuleTestRunnerLegacy } from '../../executors/functionModule/FunctionModuleTestRunnerLegacy';
-import { ProgramExecutorLegacy } from '../../executors/program/ProgramExecutorLegacy';
-import { ProgramTestRunnerLegacy } from '../../executors/program/ProgramTestRunnerLegacy';
 
 /** A pair for a unit test that only needs the call to compile and run. */
 export const TEST_HEADERS: IAdtHeaders = {
@@ -230,11 +216,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
   },
-  // completed for 36.0.0: accept was not sent, contentType was not sent
-  'AdtClassLegacy.delete': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
-  },
   'AdtClassMemberBase.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
@@ -313,11 +294,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtDdl.update': {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
-  },
-  // completed for 36.0.0: accept was not sent, contentType was not sent
-  'AdtDdlLegacy.delete': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
   },
   'AdtDomain.activate': {
     accept: 'application/xml',
@@ -434,16 +410,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     contentType:
       'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
   },
-  // completed for 36.0.0: accept was not sent, contentType was not sent
-  'AdtFunctionGroupLegacy.delete': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
-  },
-  // measured on 7.40 SP04 over RFC: v2 answers 400 "No content handler found"
-  'AdtFunctionIncludeLegacy.create': {
-    accept: 'application/vnd.sap.adt.functions.fincludes+xml',
-    contentType: 'application/vnd.sap.adt.functions.fincludes+xml',
-  },
   'AdtFunctionInclude.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
@@ -498,11 +464,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
   },
-  // completed for 36.0.0: accept was not sent, contentType was not sent
-  'AdtFunctionModuleLegacy.delete': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
-  },
   'AdtInclude.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
@@ -546,11 +507,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtInterface.update': {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
-  },
-  // completed for 36.0.0: accept was not sent, contentType was not sent
-  'AdtInterfaceLegacy.delete': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
   },
   'AdtLocalDefinitions.check': {
     accept: 'application/vnd.sap.adt.checkmessages+xml',
@@ -703,11 +659,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtProgram.update': {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
-  },
-  // completed for 36.0.0: accept was not sent, contentType was not sent
-  'AdtProgramLegacy.delete': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
   },
   'AdtRequest.addObject': {
     accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
@@ -967,10 +918,6 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     contentType:
       'application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml',
   },
-  'AdtUtilsLegacy.activateObjectsGroup': {
-    accept: 'application/xml',
-    contentType: 'application/xml',
-  },
   'AmdpDebugger.getDataPreview': {
     accept: 'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
     contentType: 'text/plain',
@@ -1047,9 +994,49 @@ function fromProvider(
   }
 }
 
-/** The pair for `<implementing class>.<member>`, as recorded. */
+/** A handler class as a registration names it: its name keys its pairs. */
+export interface IHandlerClass {
+  readonly name: string;
+  readonly prototype: object;
+}
+
+/**
+ * Pairs a handler class from elsewhere registered, keyed like
+ * {@link SENT_BEFORE_36} (`<class>.<member>`); never one of its keys.
+ */
+const REGISTERED_PAIRS: Record<string, IAdtHeaders> = {};
+
+/**
+ * Register the pairs `handlerClass` sends, member by member: the pair a test
+ * passes when the member is that class's own, or when the handler is an
+ * instance of that class and inherits the member — the library sends what
+ * the caller passes, so a subclass may need another pair for a member it does
+ * not override.
+ *
+ * A key already recorded with another pair is refused, naming it: a
+ * registration adds pairs and never changes one. The same pair again is the
+ * same registration.
+ */
+export function registerHeaderPairs(
+  handlerClass: IHandlerClass,
+  pairs: Record<string, IAdtHeaders>,
+): void {
+  for (const [member, pair] of Object.entries(pairs)) {
+    const key = `${handlerClass.name}.${member}`;
+    const recorded = SENT_BEFORE_36[key] ?? REGISTERED_PAIRS[key];
+    if (
+      recorded &&
+      (recorded.accept !== pair.accept ||
+        recorded.contentType !== pair.contentType)
+    )
+      throw new Error(`A different pair is already recorded for ${key}`);
+    REGISTERED_PAIRS[key] = pair;
+  }
+}
+
+/** The pair for `<implementing class>.<member>`, as recorded or registered. */
 export function headersFor(key: string): IAdtHeaders {
-  const pair = SENT_BEFORE_36[key];
+  const pair = SENT_BEFORE_36[key] ?? REGISTERED_PAIRS[key];
   if (!pair) throw new Error(`No recorded headers for ${key}`);
   return pair;
 }
@@ -1066,13 +1053,13 @@ function recordedPair(
 ): IAdtHeaders | undefined {
   const owner = ownerOf(handler, member);
   if (!owner) return undefined;
-  // A legacy class that inherits `member` may still send another pair: the
-  // library sends what the caller passes, and the measured one is recorded
-  // under the legacy class's own name.
+  // A registered class that inherits `member` may still send another pair:
+  // the library sends what the caller passes, and the measured one is
+  // registered under the class's own name.
   const leaf = (handler as { constructor?: { name?: string } }).constructor
     ?.name;
-  if (leaf && leaf !== owner && leaf.endsWith('Legacy')) {
-    const own = SENT_BEFORE_36[`${leaf}.${member}`];
+  if (leaf && leaf !== owner) {
+    const own = REGISTERED_PAIRS[`${leaf}.${member}`];
     if (own) return own;
   }
   const key = `${owner}.${member}`;
@@ -1091,7 +1078,11 @@ function recordedPair(
   }
   const provider = (handler as { contentTypes?: IAdtContentTypes })
     .contentTypes;
-  return (provider && fromProvider(key, provider)) ?? SENT_BEFORE_36[key];
+  return (
+    (provider && fromProvider(key, provider)) ??
+    REGISTERED_PAIRS[key] ??
+    SENT_BEFORE_36[key]
+  );
 }
 
 /**
@@ -1108,105 +1099,25 @@ export function headersOf(
   return recordedPair(handler, member, config) ?? TEST_HEADERS;
 }
 
-/**
- * Legacy members that answer a refusal and send no request (the class
- * overrides the member with one that returns `failed(...)` at once). A member
- * qualifies only when it **is** that class's own function, compared by
- * identity, so a test handler or another class of the same name does not.
- * The list is the class-handler rows of `LEGACY_REFUSED`
- * (`helpers/legacyMembers.ts`), member for member — `integrationHeadersOf.test.ts`
- * holds the two together, and `legacyMemberInventory.test.ts` calls each row
- * on a recording connection and proves that no request leaves.
- */
-export const REFUSED_WITHOUT_REQUEST: [{ prototype: object }, string[]][] = [
-  [
-    AdtPackageLegacy,
-    [
-      'create',
-      'updateMetadata',
-      'delete',
-      'checkDeletion',
-      'lock',
-      'unlock',
-      'readTransport',
-      'check',
-      // Refused before this change, and still: the item resource answered
-      // 404 to the read (spec §8).
-      'readMetadata',
-      'validate',
-      'read',
-    ],
-  ],
-  [
-    AdtRequestLegacy,
-    [
-      'create',
-      'updateMetadata',
-      'delete',
-      'searchConfigurations',
-      'checkDeletion',
-      'readObjects',
-      'readActionLog',
-      'addObject',
-      'removeObject',
-      'moveObjects',
-      'sortAndCompress',
-      'createTask',
-      'changeTaskType',
-    ],
-  ],
-  [
-    AdtUtilsLegacy,
-    [
-      'getSqlQuery',
-      'getTableContents',
-      'checkDeletionGroup',
-      'deleteObjectsGroup',
-      // Measured 404 on 7.40, or no run to ask about (spec §10.2).
-      'getWhereUsed',
-      'getWhereUsedScope',
-      'getVirtualFoldersContents',
-      'getAllTypes',
-      'getActivationRun',
-      'getActivationResults',
-      // Refused on legacy before this change, and still (spec §10.2).
-      'getTableColumns',
-      'getObjectProperties',
-    ],
-  ],
-  // No deletion API on 7.40 (spec §4.3, §5).
-  [AdtClassLegacy, ['checkDeletion']],
-  [AdtProgramLegacy, ['checkDeletion']],
-  [AdtInterfaceLegacy, ['checkDeletion']],
-  [AdtFunctionGroupLegacy, ['checkDeletion']],
-  [AdtFunctionModuleLegacy, ['checkDeletion']],
-  // `checkCdsTestDoubles` stays refused (spec §10.3).
-  [AdtDdlLegacy, ['checkDeletion', 'checkCdsTestDoubles']],
-  [AdtIncludeLegacy, ['checkDeletion', 'delete']],
-  [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
-  [AdtMessageClassLegacy, ['checkDeletion', 'delete']],
-  // A legacy run is answered finished, with no run id to ask about; the
-  // function module's `run` takes no function group, which its URI needs
-  // (spec §6.2).
-  [ClassTestRunnerLegacy, ['getStatus', 'getResult']],
-  [ProgramTestRunnerLegacy, ['getStatus', 'getResult']],
-  [FunctionGroupTestRunnerLegacy, ['getStatus', 'getResult']],
-  [FunctionModuleTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
-  // The runs, the profiled runs and the trace type lists: not advertised on
-  // 7.40, or no class run there at all (spec §6.3).
-  [
-    ClassExecutorLegacy,
-    ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'],
-  ],
-  [
-    ProgramExecutorLegacy,
-    ['run', 'runWithProfiler', 'listObjectTypes', 'listProcessTypes'],
-  ],
-];
+/** Members registered as answering a refusal with no request, per class. */
+const REFUSED_MEMBERS: [IHandlerClass, readonly string[]][] = [];
 
-function isLegacyRefusal(handler: object, member: string): boolean {
+/**
+ * Register members of `handlerClass` that answer a refusal and send no
+ * request (the class overrides the member with one that refuses at once). A
+ * member qualifies only when it **is** that class's own function, compared by
+ * identity, so a test handler or another class of the same name does not.
+ */
+export function registerRefusedMembers(
+  handlerClass: IHandlerClass,
+  members: readonly string[],
+): void {
+  REFUSED_MEMBERS.push([handlerClass, [...members]]);
+}
+
+function isRegisteredRefusal(handler: object, member: string): boolean {
   const own = (handler as Record<string, unknown>)[member];
-  return REFUSED_WITHOUT_REQUEST.some(
+  return REFUSED_MEMBERS.some(
     ([implementation, members]) =>
       members.includes(member) &&
       own === (implementation.prototype as Record<string, unknown>)[member],
@@ -1214,76 +1125,29 @@ function isLegacyRefusal(handler: object, member: string): boolean {
 }
 
 /**
- * The types `AdtClientLegacy` hands out through `absentOnLegacy`: a plain
- * object whose every member answers a refusal without a request. Each name is
- * the handler's `objectType` and its factory's suffix (`getDomain`, …).
+ * Whether a handler with no class of its own (a plain object) answers
+ * `member` with a refusal and sends no request.
  */
-const ABSENT_ON_LEGACY = [
-  'Domain',
-  'DataElement',
-  'Structure',
-  'Table',
-  'TableType',
-  'AccessControl',
-  'ServiceDefinition',
-  'ServiceBinding',
-  'BehaviorDefinition',
-  'BehaviorImplementation',
-  'MetadataExtension',
-  'Enhancement',
-  'AuthorizationField',
-  'FeatureToggle',
-  'Transformation',
-  'ScalarFunction',
-  'ScalarFunctionImplementation',
-  'AppendStructure',
-];
+export type RefusingHandlerCheck = (handler: object, member: string) => boolean;
 
-/** A connection that refuses every request: the reference handlers send none. */
-const NO_CONNECTION = {
-  makeAdtRequest: () => {
-    throw new Error('a legacy refusal handler sent a request');
-  },
-} as unknown as IAbapConnection;
+const REFUSING_HANDLERS: RefusingHandlerCheck[] = [];
 
 /**
- * Whether `handler` is a handler `absentOnLegacy` made: its `objectType` is
- * one of {@link ABSENT_ON_LEGACY}, and it matches the handler the legacy
- * client's own factory hands out for that type — the same keys, and the
- * member the same refusal (`absentOnLegacy` builds each member from one
- * source, so a member with any other body is not a refusal).
+ * Register a check that recognises plain-object handlers whose members answer
+ * a refusal without a request — handlers no class owns, so no
+ * {@link registerRefusedMembers} entry can name them.
  */
-function isAbsentOnLegacy(handler: object, member: string): boolean {
-  if (Object.getPrototypeOf(handler) !== Object.prototype) return false;
-  const objectType = (handler as { objectType?: unknown }).objectType;
-  if (typeof objectType !== 'string' || !ABSENT_ON_LEGACY.includes(objectType))
-    return false;
-  const client = new AdtClientLegacy(NO_CONNECTION) as unknown as Record<
-    string,
-    (() => Record<string, unknown>) | undefined
-  >;
-  const reference = client[`get${objectType}`]?.call(client);
-  if (!reference || Object.getPrototypeOf(reference) !== Object.prototype)
-    return false;
-  const own = (handler as Record<string, unknown>)[member];
-  const expected = reference[member];
-  return (
-    Object.hasOwn(handler, member) &&
-    typeof own === 'function' &&
-    typeof expected === 'function' &&
-    // Catches an accidental handler, not deliberate evasion: a function with a forged toString() copying the refusal's body still passes.
-    own.toString() === expected.toString() &&
-    Object.keys(handler).sort().join() === Object.keys(reference).sort().join()
-  );
+export function registerRefusingHandler(check: RefusingHandlerCheck): void {
+  REFUSING_HANDLERS.push(check);
 }
 
 /**
  * The pair for an **integration** test, where the request reaches a real
  * system. A member with no recorded pair throws, naming `handler.member`:
  * a fake `TEST_HEADERS` pair must never go to SAP. The one exception is a
- * member that answers a refusal and sends no request at all (a type or an
- * operation the legacy client refuses); it gets `TEST_HEADERS`, which nothing
- * receives.
+ * member that answers a refusal and sends no request at all (one registered
+ * through {@link registerRefusedMembers} or {@link registerRefusingHandler});
+ * it gets `TEST_HEADERS`, which nothing receives.
  */
 export function integrationHeadersOf(
   handler: object,
@@ -1294,8 +1158,8 @@ export function integrationHeadersOf(
   if (pair) return pair;
   const owner = ownerOf(handler, member);
   if (
-    (owner && isLegacyRefusal(handler, member)) ||
-    (!owner && isAbsentOnLegacy(handler, member))
+    (owner && isRegisteredRefusal(handler, member)) ||
+    (!owner && REFUSING_HANDLERS.some((check) => check(handler, member)))
   )
     return TEST_HEADERS;
   const name =
