@@ -4,7 +4,7 @@ RFC (Remote Function Call) transport allows ADT operations on legacy SAP systems
 
 ## When to Use RFC
 
-- **Legacy systems** (BASIS < 7.50) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. The library does not detect the wire and does not refuse HTTP; it just is not supported. See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#http-is-not-a-supported-legacy-wire).
+- **Legacy systems** (BASIS < 7.50) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`, from `@mcp-abap-adt/adt-clients-legacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. Neither package detects the wire or refuses HTTP; it just is not supported. See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#http-is-not-a-supported-legacy-wire).
 - **Systems without HTTP stateful support** — some custom configurations disable HTTP stateful sessions.
 
 Modern systems (BASIS >= 7.50, S/4 HANA, BTP) work fine with HTTP connections and don't need RFC.
@@ -103,27 +103,37 @@ ADT clients work transparently with RFC connections — no code changes needed. 
 ```typescript
 import { createAdtClient } from '@mcp-abap-adt/adt-clients';
 
-// AdtClient on a modern system, AdtClientLegacy on BASIS < 7.50
+// AdtClient — the factory detects nothing and returns the modern client
 const client = await createAdtClient(connection, logger);
 const program = client.getProgram();
 await program.read({ programName: 'ZTEST' });
 ```
 
-On a legacy system the client is `AdtClientLegacy`, and over RFC it sends what
-SAP_BASIS 7.40 SP04 serves and refuses the rest without a request (`origin:
-'refusal'`, `UNSUPPORTED_OPERATION`). Two things differ for a caller: a
-`delete` takes the object's lock handle from your own `lock()`, and there is no
-`checkDeletion`. The member-by-member list is in
+On a legacy system (BASIS < 7.50) the consumer declares the system type by
+constructing `AdtClientLegacy` from the separate package
+`@mcp-abap-adt/adt-clients-legacy`, over an RFC connection:
+
+```typescript
+import { AdtClientLegacy } from '@mcp-abap-adt/adt-clients-legacy';
+
+const client = new AdtClientLegacy(connection, logger);
+```
+
+Over RFC it sends what SAP_BASIS 7.40 SP04 serves and refuses the rest without a
+request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). Two things differ for a
+caller: a `delete` takes the object's lock handle from your own `lock()`, and
+there is no `checkDeletion`. The member-by-member list is in the
+[package README](../../../adt-clients-legacy/README.md) and
 [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md).
 
 ### Legacy Content Types
 
-On legacy systems, some ADT endpoints don't support versioned content types (v2+, v3+, v4+). The library automatically detects system capabilities via the `/sap/bc/adt/discovery` endpoint and uses appropriate content types:
+On legacy systems, some ADT endpoints don't support versioned content types (v2+, v3+, v4+). A request's `Accept` and `Content-Type` are the caller's (since 36.0.0), and nothing is chosen from the system:
 
 - Modern systems: `application/vnd.sap.adt.programs.programs.v2+xml`
 - Legacy systems: `application/vnd.sap.adt.programs.programs+xml` (no version)
 
-This is handled automatically by `createAdtClient()` which returns either `AdtClient` or `AdtClientLegacy` based on system capabilities.
+`AdtContentTypesBase` (versionless) and `AdtContentTypesModern` answer the pair for a create; the consumer who declared a legacy system passes the versionless one. Which pair 7.40 SP04 accepts per member is in the [package README](../../../adt-clients-legacy/README.md#headers-are-the-callers).
 
 ### Unicode / Non-Unicode Systems
 
@@ -157,7 +167,7 @@ If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setti
 |--------|------|-----|
 | Session | Toggle stateful/stateless | Stateful requests: one persistent conversation; the rest: reset or throwaway ones |
 | Lock handles | Lost on legacy systems (`423` on the write) | Preserved in the stateful conversation |
-| Legacy client | Unsupported | Supported (measured on 7.40 SP04) |
+| Legacy client (`@mcp-abap-adt/adt-clients-legacy`) | Unsupported | Supported (measured on 7.40 SP04) |
 | Content negotiation | Standard HTTP Accept | Some endpoints only accept `*/*` |
 | sap-client | Added to URL query | Not needed (set in RFC params) |
 | Authentication | Basic/JWT/XSUAA | Username/password only |

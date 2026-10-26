@@ -228,35 +228,28 @@ console.log(answer.getResult().value);   // the create's document, by default
 What that value *is* comes from the reading the implementation was built with —
 see [The reading is injected once](#the-reading-is-injected-once) below.
 
-### The legacy client (`AdtClientLegacy`)
+### The legacy client (separate package)
 
-`createAdtClient(connection)` returns `AdtClientLegacy` on a system without
-`/sap/bc/adt/core/discovery` (BASIS < 7.50). It is an **RFC client**: supported,
-and measured on SAP_BASIS 7.40 SP04, over RFC only; HTTP to a legacy system is
-unsupported. It hands out every getter of `AdtClient`; a getter it overrides
-declares the base's return type or a subclass of it (`AdtClassLegacy` for
-`AdtClass`, …), so code written against `AdtClient` compiles against it. Each
-member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured
-request under a collection 7.40 advertises, or answers a refusal without a
-request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). In short, per type:
+`createAdtClient(connection)` returns `AdtClient` and detects nothing. A legacy
+system (BASIS < 7.50) is served by `AdtClientLegacy` from
+`@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs over an RFC
+connection — the consumer declares the system type:
 
-| Type (getter) | Legacy handler | On 7.40 SP04 |
-|---|---|---|
-| class, program, interface, function group, function module, DDL source | `AdtClassLegacy`, `AdtProgramLegacy`, `AdtInterfaceLegacy`, `AdtFunctionGroupLegacy`, `AdtFunctionModuleLegacy`, `AdtDdlLegacy` | served; `delete` is one `DELETE ?lockHandle=` under your lock; `checkDeletion` refused |
-| local test class, types, definitions, macros | the modern handlers | served; their inherited `lock`, `unlock`, `activate`, `readMetadata` act on the container class |
-| function include | `AdtFunctionIncludeLegacy` | served — create with the v1 pair `application/vnd.sap.adt.functions.fincludes+xml`; `delete`, `checkDeletion` refused |
-| include (`PROG/I`) | `AdtIncludeLegacy` | read measured, the rest kept; `delete`, `checkDeletion` refused |
-| message class | `AdtMessageClassLegacy` | `readMetadata` measured, the rest kept; `delete`, `checkDeletion` refused |
-| message class message | the modern handler | `read` measured, the rest kept |
-| package | `AdtPackageLegacy` | every member refused (`/packages/{name}` answers `404`) |
-| transport request | `AdtRequestLegacy` | `list`, `readMetadata` (`/sap/bc/cts/transportrequests`); the rest refused |
-| utilities | `AdtUtilsLegacy` | search, node structure, object structure, discovery, inactive objects served; where-used, virtual folders, object types, activation runs, group deletion, data preview refused |
-| domain, data element, structure, table, table type, transformation, scalar function and its implementation, append structure, access control, service definition and binding, behavior definition and implementation, metadata extension, enhancement, authorization field, feature toggle | `absentOnLegacy` | every member refused |
+```typescript
+import { AdtClientLegacy, AdtExecutorLegacy } from '@mcp-abap-adt/adt-clients-legacy';
 
-`AdtExecutorLegacy` hands out `ClassTestRunnerLegacy`, `ProgramTestRunnerLegacy`,
-`FunctionGroupTestRunnerLegacy`, `FunctionModuleTestRunnerLegacy`,
-`ClassExecutorLegacy` and `ProgramExecutorLegacy`. Member by member, with the
-measurement behind each and what is not measured:
+const client = new AdtClientLegacy(connection, logger);      // connection: RFC
+const executor = new AdtExecutorLegacy(connection, logger);
+```
+
+It is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC
+only; HTTP to a legacy system is unsupported. It hands out every getter of
+`AdtClient`, so code written against `AdtClient` compiles against it. Each member
+sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request
+under a collection 7.40 advertises, or answers a refusal without a request
+(`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). Member by member, with the
+measurement behind each and what is not measured: the
+[package README](../../../adt-clients-legacy/README.md) and
 [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md).
 
 ### More factories
@@ -490,7 +483,7 @@ Contract notes:
 |-------------|-----------------|--------------------------|---------------------|-------------------------------------------|
 | Modern on-prem (BASIS ≥ 7.50) | ✅ with S_DEVELOP | ✅ with lock + transport | ✅ with transport | ✅ |
 | Cloud MDD | ⚠️ usually SAP-reserved; HTTP 403 for customer creation | ⚠️ typically limited to SAP-provided toggles | ⚠️ depends on toggle's `configurable` flag | ✅ against SAP-provided toggles |
-| Legacy (BASIS < 7.50) | ❌ refused without a request (`absentOnLegacy`) | ❌ | ❌ | ❌ |
+| Legacy (BASIS < 7.50), `@mcp-abap-adt/adt-clients-legacy` | ❌ refused without a request | ❌ | ❌ | ❌ |
 
 ### AbapGit (ADT-integrated)
 
@@ -963,13 +956,13 @@ different — that is **not** an error, and the answer succeeds with
 transport requests must be able to say so without being reported as broken; the
 distinction is the root element and the nesting, never a count.
 
-**Legacy systems answer the same member.** `AdtRequestLegacy.list()` reads
+**Legacy systems answer the same member** — `AdtRequestLegacy` in `@mcp-abap-adt/adt-clients-legacy`. Its `list()` reads
 `/sap/bc/cts/transportrequests` — measured on 7.40 SP04 over RFC: `200`, a
 `tm:root` document. The measured user had no requests, so a populated list is
 **not measured**, and `transportTree` may well not recognise one; it will say
 which element it expected and what it found. That is the cue to inject a reading
 for your system. That endpoint is not a saved search, so
-`AdtRequestLegacy.list()` keeps `configUri` optional and refuses one that is
+Its `list()` keeps `configUri` optional and refuses one that is
 given. `readMetadata` sends the same GET; every other member of the legacy
 transport handler, `create` included, refuses without a request.
 
@@ -1184,7 +1177,7 @@ if (source.ok) {
 }
 ```
 
-On a legacy system `readObjectMetadata` refuses (answered, not thrown) for
+On a legacy system (`AdtUtilsLegacy` of `@mcp-abap-adt/adt-clients-legacy`) `readObjectMetadata` refuses (answered, not thrown) for
 `domain`, `dataelement`, `structure`, `table`, `tabletype` and `package`, and
 `readObjectSource` for `structure`, `table` and `tabletype` — any alias, any
 case. For the domain, data element, structure, table and package families 7.40
@@ -1229,7 +1222,7 @@ address exists for, an ATC run over no objects), or a bug.
 There is no `cause`. What a library threw inside itself is not part of what a
 consumer reads; what the server said is, and that is `message` and `response`.
 
-On a legacy system `getSqlQuery` and `getTableContents` answer a refusal
+On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `getSqlQuery` and `getTableContents` answer a refusal
 without a request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`) — the endpoint
 is not there.
 
@@ -1625,7 +1618,7 @@ await utils.activateObjectsGroup([
 ], undefined, { headers });
 ```
 
-On a legacy system `activateObjectsGroup` is a synchronous
+On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `activateObjectsGroup` is a synchronous
 `POST /sap/bc/adt/activation?method=activate` (no run id; measured on an earlier
 BASIS 7.40 system, not measured on 7.40 SP04), and `checkDeletionGroup` and
 `deleteObjectsGroup` refuse without a request: 7.40 has no `/deletion/*`.
@@ -1653,7 +1646,7 @@ if (answer.ok) {
 }
 ```
 
-On a legacy system (`AdtClientLegacy`) the endpoint is absent and the member
+On a legacy system (`AdtClientLegacy` of `@mcp-abap-adt/adt-clients-legacy`) the endpoint is absent and the member
 answers a refusal (`UNSUPPORTED_OPERATION`) without a request.
 
 ### AdtUtils (Where-used)
@@ -1708,7 +1701,7 @@ it with `404`), left in 19.0.0: what to do on such a system is a decision about
 your system, not a fallback hidden in here. Without `utilWhereUsedReferences`,
 `getWhereUsed` answers the document.
 
-On a legacy system `getWhereUsed` and `getWhereUsedScope` refuse without a
+On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `getWhereUsed` and `getWhereUsedScope` refuse without a
 request: measured on 7.40 SP04 over RFC, `usageReferences` answers `404`. 7.40
 serves where-used only through RIS (`fullnamemapping` → `metadata` →
 `whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY`), another endpoint family this

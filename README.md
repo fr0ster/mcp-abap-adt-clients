@@ -1,11 +1,16 @@
 # mcp-abap-adt-clients
 
-The repository of two packages, each with its README and CHANGELOG in its directory:
+The repository of three packages, each with its README and CHANGELOG in its directory:
 
 - [`packages/adt-clients`](packages/adt-clients/README.md) — `@mcp-abap-adt/adt-clients`, the ADT
   clients for SAP ABAP systems;
 - [`packages/adt-strategies`](packages/adt-strategies/README.md) — `@mcp-abap-adt/adt-strategies`,
-  the default result and failure strategies, derived from recorded ADT answers.
+  the default result and failure strategies, derived from recorded ADT answers;
+- [`packages/adt-clients-legacy`](packages/adt-clients-legacy/README.md) —
+  `@mcp-abap-adt/adt-clients-legacy`, the clients for legacy systems (SAP_BASIS below 7.50,
+  measured on 7.40 SP04, over RFC only). It depends on `@mcp-abap-adt/adt-clients`
+  `^37.4.0`; `adt-clients` holds no legacy code, and the consumer declares the system type by
+  constructing `AdtClientLegacy` from it.
 
 This root is private and holds only the tools that build, check and publish the packages.
 
@@ -27,6 +32,6 @@ integration suites run in `packages/adt-clients` against a real system:
 [RUNNING_TESTS.md](packages/adt-clients/docs/development/RUNNING_TESTS.md).
 
 Releases are tagged `<package directory>-v<version>` (`adt-clients-v<version>`,
-`adt-strategies-v<version>`). `release:publish` publishes in `publishOrder` (the root
+`adt-strategies-v<version>`, `adt-clients-legacy-v<version>`). `release:publish` publishes in `publishOrder` (the root
 `package.json`), only from a clean tree whose tags name `HEAD`, and only after `npm run check`
 passed.

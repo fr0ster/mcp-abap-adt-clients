@@ -21,6 +21,97 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [37.4.0] - 2026-10-27
+
+The legacy classes leave this package. `AdtClientLegacy`, `AdtExecutorLegacy`
+and every `*Legacy` class are now the package
+[`@mcp-abap-adt/adt-clients-legacy`](../adt-clients-legacy/README.md), which
+`extends` this package's classes and only overrides; this package holds no
+legacy class, no legacy word and no `/sap/bc/cts` address. This is a minor: the
+legacy members never worked against a real 7.40 system (the owner's ruling), and
+nothing modern changes.
+
+### Removed
+
+- **The exports `AdtClientLegacy`, `AdtExecutorLegacy` and `AdtRequestLegacy`**
+  (and the six legacy runners and executors behind `AdtExecutorLegacy`).
+- **The legacy choice in `createAdtClient` and `createAdtExecutor`.** They
+  detect nothing and return `AdtClient` / `AdtExecutor`. `createAdtClient` no
+  longer asks `/sap/bc/adt/core/discovery`: it sends no request, so one request
+  fewer per call, and a credential refusal now shows at the first real request,
+  not at the factory. Both stay `async`, so a caller needs no change.
+- `ICreateAndGenerateServiceBindingParamsLegacy` is no longer re-exported by
+  `core/service/types` (it is a contract type: import it from
+  `@mcp-abap-adt/interfaces-adt`).
+
+### Changed
+
+- **A read member sends the caller's `accept` when it is given**, its own type
+  only as the default: the class and local-include `readMetadata`
+  (`AdtClassMemberBase`), the authorization field read, and the function include
+  metadata read. Before, the first sent the content types' class `Accept`
+  whatever the caller passed, and the other two a fixed one.
+- `IMessageClassMessageContract` declares `delete`, which the implementation
+  has: `getMessageClassMessage()` hands out a handler a consumer deletes a
+  message through without a cast.
+- `AdtInclude` and `AdtMessageClass` `connection` / `results`, and
+  `AdtRequest.connection`, are `protected`, so a subclass in another package
+  uses them.
+- `isModernAdtSystem` stays exported, unchanged: a probe the consumer may call
+  itself; nothing here calls it.
+
+### Added
+
+The exports the legacy package needs and nothing else (the compiler's list, not
+a new API to build on):
+
+- handler classes: `AdtAccessControl`, `AdtAuthorizationField`,
+  `AdtBehaviorDefinition`, `AdtBehaviorImplementation`, `AdtClass`,
+  `AdtDataElement`, `AdtDdicTableType`, `AdtDdl`, `AdtDomain`, `AdtEnhancement`,
+  `AdtFeatureToggle`, `AdtFunctionGroup`, `AdtFunctionInclude`,
+  `AdtFunctionModule`, `AdtInterface`, `AdtMetadataExtension`, `AdtPackage`,
+  `AdtProgram`, `AdtRequest`, `AdtServiceDefinition`, `AdtStructure`, `AdtTable`,
+  `AdtTransformation`, `AdtUtils`; `ClassExecutor`, `ClassTestRunner`,
+  `FunctionGroupTestRunner`, `FunctionModuleTestRunner`, `ProgramExecutor`,
+  `ProgramTestRunner`;
+- client contract types: `IAppendStructureContract`, `IFunctionIncludeContract`,
+  `IIncludeContract`, `IMessageClassContract`, `IScalarFunctionContract`,
+  `IScalarFunctionImplementationContract`, `ITransformationContract`;
+- address records: `ACCESS_CONTROL`, `AUTHORIZATION_FIELD`,
+  `BEHAVIOR_DEFINITION`, `CLASS`, `DATA_ELEMENT`, `DDL_SOURCE`, `DOMAIN`,
+  `ENHANCEMENT`, `FEATURE_TOGGLE`, `FUNCTION_GROUP`, `FUNCTION_MODULE`,
+  `INTERFACE`, `MESSAGE_CLASS`, `METADATA_EXTENSION`, `PACKAGE`, `PROGRAM`,
+  `PROGRAM_INCLUDE`, `SCALAR_FUNCTION`, `SCALAR_FUNCTION_IMPLEMENTATION`,
+  `SERVICE_BINDING`, `SERVICE_DEFINITION`, `STRUCTURE`, `TABLE`, `TABLE_TYPE`,
+  `TRANSFORMATION`, `TRANSPORT_REQUEST`, and `versionsUri`;
+- wire helpers: `answering`, `failed`, `withCallTimeout`, `writeQuery`,
+  `requestHeaders`, `buildObjectUri`, `startUnitTestRunSync`,
+  `startClassUnitTestRunSync`, `containersOf`.
+
+### Documentation
+
+`docs/architecture/LEGACY.md` moved with the code to
+`packages/adt-clients-legacy/docs/LEGACY.md`; the README, `ARCHITECTURE.md`,
+`DECISIONS.md` and the usage guides describe the separate package.
+`RFC_TESTING.md` links to the legacy package's docs for the 7.40 test system
+instead of carrying that section.
+
+### Migration from 37.3.x
+
+A consumer that used the legacy client through this package:
+
+1. Install `@mcp-abap-adt/adt-clients-legacy` (it depends on
+   `@mcp-abap-adt/adt-clients` `^37.4.0`).
+2. Construct the legacy classes from it, over an RFC connection:
+   `new AdtClientLegacy(connection, logger)` and
+   `new AdtExecutorLegacy(connection, logger)`. The system type is the
+   consumer's to declare: `createAdtClient()` / `createAdtExecutor()` no longer
+   return a legacy class on any system, so a consumer that relied on
+   `createAdtClient()` finding a 7.40 system must now choose the legacy class
+   itself.
+3. A consumer that does not use a legacy system changes nothing, and saves the
+   discovery request `createAdtClient()` used to send.
+
 ## [37.3.0] - 2026-10-26
 
 The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`) now matches what a

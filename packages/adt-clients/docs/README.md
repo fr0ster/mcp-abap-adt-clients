@@ -17,12 +17,12 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 ## Architecture
 
 - [**ARCHITECTURE.md**](architecture/ARCHITECTURE.md) - System architecture, design patterns, and type system organization
-- [**LEGACY.md**](../../adt-clients-legacy/docs/LEGACY.md) - Legacy system support (BASIS < 7.50): supported types, RFC transport, endpoint availability
+- [**LEGACY.md**](../../adt-clients-legacy/docs/LEGACY.md) - Legacy system support (BASIS < 7.50), in the separate package `@mcp-abap-adt/adt-clients-legacy` ([README](../../adt-clients-legacy/README.md)): what each member does on 7.40, RFC transport, endpoint availability
 - [**DECISIONS.md**](architecture/DECISIONS.md) - The choices that could have gone the other way, with the problem, the evidence and what would change them
 
 ## Usage Guides
 
-- [**MIGRATION-37.md**](usage/MIGRATION-37.md) — what a consumer on 36.x has to change: `getSystemInformation` answers an `IAdtResponse`, and `IUtilResults` has the required `objectProperties` slot
+- [**MIGRATION-37.md**](usage/MIGRATION-37.md) — what a consumer on 36.x has to change: `getSystemInformation` answers an `IAdtResponse`, and `IUtilResults` has the required `objectProperties` slot; and, in 37.4.0, the legacy classes live in `@mcp-abap-adt/adt-clients-legacy`
 - [**MIGRATION-36.md**](usage/MIGRATION-36.md) — what a consumer on 35.x has to change: a request's `Accept` and `Content-Type` are the caller's
 - [**MIGRATION-23.md**](usage/MIGRATION-23.md) — what a consumer on 22.x has to change: every reading and verdict the library applied is a strategy in `@mcp-abap-adt/adt-strategies`, with the replacing code for each
 - [**MIGRATION-19.md**](usage/MIGRATION-19.md) — what a consumer on 18.x has to change: one member, one endpoint call

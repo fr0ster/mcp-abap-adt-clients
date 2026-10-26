@@ -1125,8 +1125,9 @@ export class AdtClient {
    * demanding the other two would only make it step aside for a connection that
    * could have answered — refusing evidence it was offered.
    *
-   * Protected, not private, so that the legacy client's getters — which
-   * replace the base's and so skip its call — run the same check first.
+   * Protected, not private, so that a subclass's getters in another package
+   * (`AdtClientLegacy` of `@mcp-abap-adt/adt-clients-legacy`) — which replace
+   * the base's and so skip its call — run the same check first.
    */
   protected assertConnected(): void {
     const candidate = this.connection as Partial<ISessionLifecycleAware>;

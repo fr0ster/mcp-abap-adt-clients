@@ -101,8 +101,9 @@ export function noteLockReleaseCheckOff(what: string): void {
 /**
  * A second ABAP session: its own logon, its own client.
  *
- * Built the way a test builds its client, so a legacy system gets the legacy
- * client here too and the factory lookup in {@link factoryOf} matches.
+ * Built the way a test builds its client (the run's client factory, which the
+ * legacy package fills with its own), so the factory lookup in
+ * {@link factoryOf} matches.
  */
 export const openOwnSession: OpenVerifierSession = async (logger) => {
   const connection = await createTestConnection(createConnectionLogger(), {

@@ -187,3 +187,28 @@ holding the message shows the message exists.
 
 A caller who reads such an answer otherwise passes an `analyse` of its own
 instead of `analyseMessageClassMessage`.
+
+## 37.4.0: the legacy classes are a separate package
+
+`AdtClientLegacy`, `AdtExecutorLegacy` and `AdtRequestLegacy` are no longer
+exported from `@mcp-abap-adt/adt-clients`, and `createAdtClient()` /
+`createAdtExecutor()` no longer choose a legacy class: they detect nothing, send
+no request, and return `AdtClient` / `AdtExecutor`.
+
+A consumer of a SAP_BASIS 7.40 system:
+
+```typescript
+// before (37.3.x): the factory asked core/discovery and returned the legacy class
+const client = await createAdtClient(connection, logger);
+
+// now: install @mcp-abap-adt/adt-clients-legacy and declare the system
+import { AdtClientLegacy, AdtExecutorLegacy } from '@mcp-abap-adt/adt-clients-legacy';
+const client = new AdtClientLegacy(connection, logger);      // connection: RFC
+const executor = new AdtExecutorLegacy(connection, logger);
+```
+
+A consumer of a modern system changes nothing; `createAdtClient()` sends one
+request fewer, and a credential refusal now shows at the first real request
+rather than at the factory. A read member that takes `accept` sends the caller's
+when given (class and local-include `readMetadata`, the authorization field read,
+the function include metadata read).

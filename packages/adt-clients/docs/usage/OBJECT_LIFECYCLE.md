@@ -300,25 +300,26 @@ stays taken, and there is nothing for the delete to act on.
 
 ### On a legacy system: lock, delete with the handle, unlock
 
-`AdtClientLegacy` (SAP_BASIS 7.40 SP04, over RFC) has no deletion service:
+`AdtClientLegacy` of `@mcp-abap-adt/adt-clients-legacy` (SAP_BASIS 7.40 SP04, over RFC) has no deletion service:
 `/sap/bc/adt/deletion/check` answers `404`. So, there:
 
 - **`checkDeletion` is refused** without a request (`origin: 'refusal'`,
   `UNSUPPORTED_OPERATION`), on every handler, and so is
   `getUtils().checkDeletionGroup`.
 - **`delete` is one `DELETE <object URI>?lockHandle=…`** for a class, program,
-  interface, function group, function module and DDL source, and it needs the
-  object's lock handle — **yours**, from `lock()`. Measured on 7.40 SP04: without
-  one, a class, program, interface or function group answers `400` "Parameter
-  lockHandle could not be found."; with one, all six are deleted. The member
+  interface, function group, function module, DDL source, include and message
+  class, and it needs the object's lock handle — **yours**, from `lock()`.
+  Measured on 7.40 SP04: without one, a class, program, interface or function
+  group answers `400` "Parameter lockHandle could not be found."; with one, all
+  eight are deleted. The member
   does not lock or unlock; the request goes with or without a handle, and SAP's
   answer is the answer. `&corrNr=` is added when the config's
   `transportRequest` is given (not measured on 7.40 SP04).
-- The include, function include and message class `delete`, and
-  `deleteObjectsGroup`, went through `/deletion/*` and are refused.
+- The function include `delete` and `deleteObjectsGroup` went through
+  `/deletion/*` and are refused.
 
 ```typescript
-const cls = client.getClass();                    // AdtClientLegacy, over RFC
+const cls = client.getClass();                    // client: AdtClientLegacy, over RFC
 const config = { className: 'ZCL_TEST' };
 
 const locked = await cls.lock(config);

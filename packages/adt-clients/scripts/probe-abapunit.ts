@@ -4,7 +4,7 @@
  * Issue #115, steps 5 and 6. Two questions, one trip:
  *
  *  1. **Synchronous or not.** The closed PR behind #112 claims the endpoint
- *     answers with the finished result. `ClassTestRunnerLegacy` already owns the
+ *     answers with the finished result. `ClassTestRunnerLegacy` (of `@mcp-abap-adt/adt-clients-legacy`) already owns the
  *     same URL and treats it as async. Both cannot be right about one URL on
  *     one system. What decides it is the **root element of the response body**
  *     and whether a `Location` header is present — not the status code, which

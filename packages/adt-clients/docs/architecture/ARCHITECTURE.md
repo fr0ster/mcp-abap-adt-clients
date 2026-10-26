@@ -6,8 +6,7 @@
 
 Primary public entry points:
 - `AdtClient` - high-level CRUD-style object operations.
-- `AdtClientLegacy` - extends `AdtClient` for legacy systems (BASIS < 7.50): answers a refusal, without a request, from every member of a type the old system lacks, uses legacy deletion and versionless content types.
-- `createAdtClient()` - factory that auto-detects system version and returns `AdtClient` or `AdtClientLegacy`.
+- `createAdtClient()` - factory that returns `AdtClient`. It detects nothing and sends no request: the system type is the consumer's to declare (a legacy system, BASIS < 7.50, is served by `AdtClientLegacy` from the separate package `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs).
 - `AdtRuntimeClient` - stable runtime operations (traces, dumps, logs, feeds, ATC check runs, DDIC runtime helpers).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (class and program execution, run under the profiler, trace scheduling).
@@ -45,9 +44,9 @@ answered with a `401` comes back as a failure carrying that response, which
 
 ## Legacy System Support
 
-Legacy SAP systems (BASIS < 7.50) are supported through `AdtClientLegacy` and per-object `*Legacy` handler classes. The factory `createAdtClient()` auto-detects the system version and returns the appropriate client.
+This package carries no legacy code. Legacy SAP systems (BASIS < 7.50) are served by the separate package `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), whose `AdtClientLegacy` and `AdtExecutorLegacy` `extend` this package's classes and only override. The consumer declares the system type by constructing them over an RFC connection; `createAdtClient()` and `createAdtExecutor()` detect nothing and always return the modern class.
 
-Key differences: versionless content types, direct DELETE (no `/deletion/` API), limited object type support (no DDIC dedicated endpoints).
+What the legacy package needs from this one is exported from this package's root: the handler classes it extends, their base types, `AdtContentTypesBase`, `answering` and the other wire helpers, the address records and the result-set types. Nothing here names a legacy class, and a test (`legacyStaysInLegacyClasses.test.ts`) keeps it so.
 
 See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md) for the complete support matrix and RFC transport details.
 
@@ -59,7 +58,6 @@ src/
     objects.ts                # every ADT object address, one record per kind
   clients/
     AdtClient.ts
-    AdtClientLegacy.ts
     createAdtClient.ts
     AdtRuntimeClient.ts
     AdtClientsWS.ts
@@ -70,14 +68,12 @@ src/
   core/
     <object>/                 # class, program, package, table, ...
       Adt<Object>.ts          # implements the capability atoms the type supports
-      Adt<Object>Legacy.ts    # Legacy override (optional, for supported types)
       create.ts/read.ts/...   # low-level endpoint helpers
       types.ts                # I<Object>Results + <object>Documents
     shared/
       AdtUtils.ts             # cross-cutting non-CRUD utilities
       utilResultSet.ts        # IUtilResults + utilDocuments
       contentTypes.ts         # AdtContentTypesBase / AdtContentTypesModern
-      deleteLegacy.ts         # direct DELETE for legacy systems
       *.ts                    # discovery, search, where-used, etc.
 
   runtime/
@@ -316,7 +312,7 @@ Since **12.0.0** the claim is enforced rather than asserted. Every stub that thr
 A guard under `src/__tests__/unit/capabilities/` holds the line: a manifest authored from ADT rather than from the code, a compile-time comparison of all 37 factory return types against the 12 atoms **in both directions**, a completeness check over both clients' prototype chains, and a behavioural pass that calls every method of every claimed capability against a recording connection and asserts it issues the request its capability names — the verb included, since a chain that locks, reads and unlocks without ever writing issues three requests and none of them the one that matters.
 
 Package root (`src/index.ts`) exports:
-- client classes (`AdtClient`, `AdtClientLegacy`, `createAdtClient`, runtime/ws/executor/abapGit clients) and the handler classes exported directly,
+- client classes (`AdtClient`, `createAdtClient`, runtime/ws/executor/abapGit clients) and the handler classes exported directly,
 - the injection surface (`src/index.readings.ts` and the runtime/executor/abapGit barrels): one `IXxxResults` + `<type>Documents` pair per implementation, and the building blocks `rawDocument`, `nothing`, `wireItself`, `nothingIsARefusal`,
 - `AdtSAPError`, `AdtParseError`, the content-type sets and the system probes.
 

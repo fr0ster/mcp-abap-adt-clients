@@ -523,6 +523,15 @@ Until then these factories threw `Error` before any request, so a caller of
 `AdtClient` handed the legacy client crashed where the modern one returned a
 handler — the one place the substitution above did not hold.
 
+**Where it lives now (37.4.0, the owner's decision).** The exception stands, and
+its classes moved: the `*Legacy` classes and their clients are the package
+`@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), which
+`extends` this package's classes and only overrides. This package holds no legacy
+class and no legacy word (`legacyStaysInLegacyClasses.test.ts`); the legacy
+package's own rule (`legacyClassesOnlyOverride.test.ts`) holds the limits above.
+The system type is declared by the consumer — it constructs `AdtClientLegacy` —
+and `createAdtClient()` / `createAdtExecutor()` detect nothing.
+
 ---
 
 ### The boundary: contract surface, not every hierarchy

@@ -146,7 +146,7 @@ npm install @mcp-abap-adt/adt-clients
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
-   - `AdtClientLegacy` (from `createAdtClient` on BASIS < 7.50) is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only — HTTP to a legacy system is unsupported. Each member sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed as not measured in LEGACY.md), or answers a refusal without a request; a legacy `delete` takes the lock handle from your `lock()`, and there is no `checkDeletion`. See [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md)
+   - **Legacy systems (BASIS < 7.50) are a separate package**, [`@mcp-abap-adt/adt-clients-legacy`](../adt-clients-legacy/README.md): its `AdtClientLegacy` and `AdtExecutorLegacy` extend this package's classes. The consumer declares the system type by constructing them over an RFC connection (`new AdtClientLegacy(connection, logger)`); nothing here detects a system, and `createAdtClient()` returns `AdtClient` and sends no request. They are **RFC clients**, supported and measured on SAP_BASIS 7.40 SP04 over RFC only — HTTP to a legacy system is unsupported. What each member does on 7.40 is in that package's [README](../adt-clients-legacy/README.md) and [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md)
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
@@ -164,7 +164,7 @@ npm install @mcp-abap-adt/adt-clients
      - `getProgramExecutor()` for `programrun` (on-premise systems)
    - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
    - Each executor factory takes an optional result set, like the runtime client's
-   - `createAdtExecutor(connection)` picks `AdtExecutor` or `AdtExecutorLegacy` by system version, like `createAdtClient`. The legacy one (SAP_BASIS 7.40 SP04, over RFC) runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md#abap-unit-runners-and-executors)
+   - `createAdtExecutor(connection)` returns `AdtExecutor`, like `createAdtClient` detecting nothing. The legacy executor, `AdtExecutorLegacy` of `@mcp-abap-adt/adt-clients-legacy` (SAP_BASIS 7.40 SP04, over RFC), runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md#abap-unit-runners-and-executors)
 
 4. **AdtAbapGitClient**
    - Standalone: `new AdtAbapGitClient(connection, logger?, results?)` (the options argument, `contentTypeVersion`, was removed in 36.0.0)
@@ -438,8 +438,8 @@ const result = await runner.getResult(runId, { analyse: analyseUnitTest });
 ```
 
 `run` takes a class name (every test class in it) or a list of
-`{ containerClass, testClass }`. On a legacy system (measured on 7.40 SP04, over
-RFC) the runner's `run` sends the synchronous `/abapunit/testruns` request,
+`{ containerClass, testClass }`. On a legacy system (`@mcp-abap-adt/adt-clients-legacy`,
+measured on 7.40 SP04, over RFC) the runner's `run` sends the synchronous `/abapunit/testruns` request,
 `<options>` included, and answers the finished result; `getStatus`/`getResult`
 refuse without a request.
 
@@ -462,7 +462,7 @@ answer the same document — `aunit:runResult` in `http://www.sap.com/adt/aunit`
 — with the same methods and alerts. Two differences: the endpoint addresses
 whole classes, so `{ containerClass, testClass }` targets run each distinct
 container whole; and `title` and `context` are not sent. Scope, risk levels and
-durations are, with `run`'s defaults. On a legacy system `run` and `runSync`
+durations are, with `run`'s defaults. On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `run` and `runSync`
 send this same request, `<options>` included — `run` read by the `run` strategy,
 `runSync` by `result`.
 
@@ -472,7 +472,7 @@ through `executor.getProgramTestRunner().run(programName)`, with the same
 `getStatus`/`getResult`. A function group's are written in an include of the
 group (`getFunctionInclude()`) and run through `getFunctionGroupTestRunner()`
 for the whole group or `getFunctionModuleTestRunner()` for one module. On a
-legacy system (measured on 7.40 SP04, over RFC) the report and group runners'
+legacy system (`@mcp-abap-adt/adt-clients-legacy`, measured on 7.40 SP04, over RFC) the report and group runners'
 `run` and `runSync`, and the module runner's `runSync`, send the synchronous
 request below, with `<options>`; the module runner's `run` refuses without a
 request (it names no group, and the request needs the module's URI under its
@@ -943,7 +943,7 @@ still takes an optional `accept` (`IReadOptions`).
   metadata extension and a transport request — send the whole pair now. So do
   the requests that sent neither: a transport request's `checkDeletion`, and
   the direct `DELETE` of the legacy client's class, interface, program, DDL
-  source, function group and function module.
+  source, function group and function module (now in `@mcp-abap-adt/adt-clients-legacy`).
 - A message class message's `create`, `update` and `delete` are a chain (read,
   two locks, the `PUT`, two unlocks): the pair is the `PUT`'s; the chain's own
   requests keep their types.
@@ -1073,10 +1073,11 @@ hold yourself:
   headers) or `AdtContentTypesBase` (v1, universal) from that answer.
 - `fetchDiscoveryEndpoints(connection)` / `isEndpointInDiscovery(...)` — the
   discovery document and a membership test over it.
-- `createAdtClient(connection, logger?, options?)` — `AdtClient` or
-  `AdtClientLegacy`, from `isModernAdtSystem`. The legacy client is an RFC
-  client: supported, and measured on SAP_BASIS 7.40 SP04, over RFC only; HTTP to
-  a legacy system is unsupported. What it serves and what it refuses is in
+- `createAdtClient(connection, logger?, options?)` — `AdtClient`. It detects
+  nothing and sends no request (since 37.4.0): the consumer declares the system
+  type, and a legacy system is served by `AdtClientLegacy` of
+  `@mcp-abap-adt/adt-clients-legacy`, an RFC client constructed by the consumer.
+  What it serves and what it refuses is in
   [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md).
 
 **A probe answers only for an absent endpoint.** For `isModernAdtSystem` and
@@ -1084,7 +1085,7 @@ hold yourself:
 empty set stands for. Any other failure — no network, an expired session, a
 `401`, a `500` — is raised, since 23.0.0: it says nothing about the system, and
 swallowing it handed a legacy client to a modern system reached over a broken
-connection.
+connection (the factory no longer calls it).
 
 `getSystemInformation` answers rather than raises, and only a `404` is the
 endpoint absent. A malformed answer is not a system without the endpoint:
@@ -1166,11 +1167,11 @@ Since **9.0.0** no accessor returns the wide type, and since **12.0.0** none ret
 
 Since **24.0.0** there is no unit-test handler at all: every member `getUnitTest()` and `getCdsUnitTest()` had was another handler's request under a second name — the class's create, the local test class's read, update and delete. What was left, running, is `AdtExecutor.getClassTestRunner()` (`IAdtRunnable` plus `ITestRunInformation`), and the CDS test-doubles check is `getDdl().checkCdsTestDoubles()`. See [MIGRATION-24.md](docs/usage/MIGRATION-24.md).
 
-Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` is `^12.0.0`, group operations refuse a reference they cannot address before any request, and a legacy client answers a refusal for an object type the system lacks instead of throwing. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
+Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` is `^12.0.0`, group operations refuse a reference they cannot address before any request, and a legacy client (since 37.4.0 in `@mcp-abap-adt/adt-clients-legacy`) answers a refusal for an object type the system lacks instead of throwing. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
 
 The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` implements `IAtcRunStatusReadable & IAtcFindings`, plus `resolveCheckVariant`, `listCheckVariants`, `createWorklist` and `startRun` — a check run is three requests, started and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing. It is not `IAdtRunnable` since 19.0.0: that atom's `run` is one call.
 
-**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 37 factory return types against the 12 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling. The guard walks `AdtClient` and `AdtClientLegacy` only; the runtime accessors are pinned by `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts`.
+**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 37 factory return types against the 12 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling. The guard walks `AdtClient`; the legacy package runs the same guard over `AdtClientLegacy`; the runtime accessors are pinned by `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts`.
 
 One category deliberately remains local, because it is code, not contract:
 
