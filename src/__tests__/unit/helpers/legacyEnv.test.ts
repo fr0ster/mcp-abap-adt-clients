@@ -297,6 +297,40 @@ describe('legacy env: names and packages', () => {
     expect(sameSource('A.  \r\nB.\r\n\r\n', 'A.\nB.')).toBe(true);
     expect(sameSource('A.', 'B.')).toBe(false);
   });
+
+  it('reads a function module as 7.40 stores it as the same source (measured on 7.40 SP04)', () => {
+    const file = readFileSync(
+      join(ABAP_DIR, 'zlg7_fx.fugr.z_lg7_fx_unit.abap'),
+      'utf8',
+    );
+    // 7.40 upper-cases the FUNCTION statement, adds three empty lines after
+    // it and drops the final line end; the body is unchanged.
+    const lines = file.split('\n');
+    const stored = [lines[0]?.toUpperCase(), '', '', '', ...lines.slice(1)]
+      .join('\n')
+      .trimEnd();
+    expect(stored.startsWith('FUNCTION Z_LG7_FX_UNIT.\n\n\n\n*')).toBe(true);
+    expect(sameSource(stored, file)).toBe(true);
+    expect(
+      sameSource('function z_x.\nendfunction.', 'FUNCTION Z_X.\nENDFUNCTION.'),
+    ).toBe(true);
+  });
+
+  it('still tells a body difference; a case-only difference anywhere is the same (owner: ABAP is case-insensitive)', () => {
+    const file = 'FUNCTION z_x.\n  lv_value = 1.\nENDFUNCTION.\n';
+    expect(
+      sameSource(file, 'FUNCTION Z_X.\n  lv_value = 2.\nENDFUNCTION.'),
+    ).toBe(false);
+    expect(
+      sameSource(file, 'FUNCTION Z_X.\n  lv_other = 1.\nENDFUNCTION.'),
+    ).toBe(false);
+    expect(
+      sameSource(
+        "FUNCTION z_x.\n  WRITE 'abc'. \" note\nENDFUNCTION.",
+        "function Z_X.\n  write 'ABC'. \" NOTE\nendfunction.",
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('legacy env: settings into ABAP', () => {

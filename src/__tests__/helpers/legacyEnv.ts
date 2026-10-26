@@ -196,15 +196,22 @@ function notTheSessionUsers(
   return undefined;
 }
 
-/** Two sources the same, line ends and trailing blanks aside. */
+/**
+ * Two sources the same, apart from what 7.40 changes on save: line ends,
+ * trailing blanks, empty lines, the final line end and case — the owner's
+ * rule: any ABAP is case-insensitive, so every line is compared case-folded.
+ * Plain string code.
+ */
 export function sameSource(a: string, b: string): boolean {
   const norm = (s: string) =>
     s
-      .replace(/\r/g, '')
+      .split('\r')
+      .join('')
       .split('\n')
       .map((l) => l.trimEnd())
+      .filter((l) => l !== '')
       .join('\n')
-      .trim();
+      .toUpperCase();
   return norm(a) === norm(b);
 }
 
