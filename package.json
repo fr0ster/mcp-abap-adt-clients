@@ -13,11 +13,11 @@
   ],
   "scripts": {
     "clean": "npm run clean --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace @mcp-abap-adt/adt-strategies --workspace @mcp-abap-adt/adt-clients --workspace @mcp-abap-adt/adt-clients-legacy",
     "lint": "biome check --write packages/adt-clients/src packages/adt-clients-legacy/src packages/adt-strategies tools",
     "lint:check": "biome check packages/adt-clients/src packages/adt-clients-legacy/src packages/adt-strategies tools && npm run check:docs --workspaces --if-present",
     "format": "biome format --write packages/adt-clients/src packages/adt-clients-legacy/src packages/adt-strategies tools",
-    "test:check": "npm run test:check --workspaces --if-present",
+    "test:check": "npm run test:check --workspace @mcp-abap-adt/adt-clients --workspace @mcp-abap-adt/adt-clients-legacy",
     "test": "npm run test:unit --workspace @mcp-abap-adt/adt-clients && npm run test --workspace @mcp-abap-adt/adt-clients-legacy && npm run test --workspace @mcp-abap-adt/adt-strategies",
     "check": "npm run build && npm run test:check && npm run lint:check && npm run test && npm run check:packed && npm run check:publish && npm run check:publish:root",
     "check:packed": "node tools/check-packed.js",
