@@ -126,6 +126,15 @@ describeLegacyRfc(
         }, 60000);
       }
 
+      /**
+       * The class metadata Accept the legacy server sends on 7.40. Measured
+       * over RFC on 7.40 SP04 (2026-10-26): only the unversioned type answers
+       * `200`; every list naming a version answers `400`
+       * ExceptionContentHandlerNotFound. The library passes the caller's
+       * `accept` through; choosing it is the legacy server's.
+       */
+      const CLASS_METADATA_ON_740 = 'application/vnd.sap.adt.oo.classes+xml';
+
       for (const { member, name, objectType, kind } of servedCases) {
         it(`getUtils.${member}[${name}] reads the ${kind} and answers 200`, async () => {
           const { recorder, client } = current();
@@ -142,7 +151,12 @@ describeLegacyRfc(
                   objectType as AdtObjectType,
                   objectName,
                   undefined,
-                  { analyse: analyseException },
+                  kind === 'class'
+                    ? {
+                        accept: CLASS_METADATA_ON_740,
+                        analyse: analyseException,
+                      }
+                    : { analyse: analyseException },
                 )
               : await utils.readObjectSource(
                   objectType as AdtSourceObjectType,
@@ -156,6 +170,8 @@ describeLegacyRfc(
           const sent = sentSince(recorder, mark);
           expect(sent.map(lineOf)).toEqual([expect.stringMatching(/^GET /)]);
           expect(sent[0]?.status).toBe(200);
+          if (member === 'readObjectMetadata' && kind === 'class')
+            expect(sent[0]?.headers?.Accept).toBe(CLASS_METADATA_ON_740);
         }, 60000);
       }
     });

@@ -433,6 +433,33 @@ Legacy systems do not support versioned content types. The `AdtContentTypesBase`
 | Function include create | `application/vnd.sap.adt.functions.fincludes+xml` (measured on 7.40 SP04; pass it as `headers`) | `application/vnd.sap.adt.functions.fincludes.v2+xml` |
 | Source artifact | `text/plain` | `text/plain; charset=utf-8` |
 
+### The Accept of a metadata read is the caller's
+
+**Class metadata on 7.40 SP04: only the unversioned media type.** Measured over
+RFC on 2026-10-26, `GET /sap/bc/adt/oo/classes/<name>` answered `200`
+(`content-type: application/vnd.sap.adt.oo.classes+xml`) only for exactly
+`Accept: application/vnd.sap.adt.oo.classes+xml`. `…classes.v4+xml`,
+`…classes.v3+xml`, `…classes.v2+xml`, the lists `v4, unversioned` and
+`v2, unversioned`, and `application/xml` each answered `400`
+`ExceptionContentHandlerNotFound` — not the `406` a modern system answers for
+an unknown type. So no reading of a `406` sees it, and a list naming a version
+the system does not know is refused whole.
+
+`getUtils().readObjectMetadata('class' | 'CLAS/OC', …)` sends the shared
+default (`ACCEPT_CLASS`, v4 … v1) unless the caller gives `options.accept`;
+the library passes the caller's `accept` through unchanged and sets no legacy
+default of its own. Choosing the media type for 7.40 is the legacy server's:
+it sends `accept: 'application/vnd.sap.adt.oo.classes+xml'`, as
+`LegacyRefusals.test.ts` does for both spellings. `getClass().readMetadata()`
+on the legacy client already sends the unversioned type (`AdtContentTypesBase`
+above) and is measured `200`.
+
+**Not measured on 7.40:** the other versioned defaults of the same read —
+interface (`ACCEPT_INTERFACE`, v5 … unversioned), function group (v2, v1),
+function module and the rest of `getMetadataAcceptHeader`. The program list
+(v2, v1) answers `200`. The others are candidates for a 7.40 header-probe
+corpus (`tools/header-probe`, none captured on 7.40 yet).
+
 ## Discovery Reference
 
 Measured catalogue sizes — collections advertised by `/sap/bc/adt/discovery`:
