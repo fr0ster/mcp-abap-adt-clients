@@ -32,11 +32,13 @@ The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`.
 - **Include and message class `delete` send** one
   `DELETE <object URI>?lockHandle=` under the caller's lock (they were refused),
   with the caller's headers and timeout, and `&corrNr=` when `transportRequest`
-  is given. Measured: the include answered `200` and then `404` on read; the
+  is given (a delete with `corrNr` in a transportable package is measured by the
+  2026-10-26 live run). Measured: the include answered `200` and then `404` on read; the
   message class answered `200`.
 - **`readTransport` is refused**, with no request, for a class, program,
-  interface, function group, function module and DDL source: `GET <object>/transport`
-  answered `404`.
+  interface, function group, function module and DDL source. `GET <object>/transport`
+  answered `404` for the first five; the DDL source's refusal is inferred from
+  them and measured in the next live run.
 - **A DDL source's `getVersions` and `getVersionSource` are refused**:
   `GET /ddic/ddl/sources/<name>/versions` answered `404`.
 - **A message class's `updateMetadata` is refused** until its document is

@@ -1,7 +1,7 @@
 # @mcp-abap-adt/adt-clients-legacy
 
 Clients for legacy SAP ABAP systems (SAP_BASIS below 7.50), built on
-[`@mcp-abap-adt/adt-clients`](../adt-clients/README.md). `AdtClientLegacy` and
+[`@mcp-abap-adt/adt-clients`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/master/packages/adt-clients/README.md). `AdtClientLegacy` and
 `AdtExecutorLegacy` `extend` that package's `AdtClient` and `AdtExecutor` and only
 override: each member sends the request **measured accepted on SAP_BASIS 7.40
 SP04**, or keeps an unmeasured request under a collection 7.40 advertises, or
@@ -117,8 +117,9 @@ The measured pairs are passed by the tests as a consumer would pass them
   }
   ```
 
-  A delete with `corrNr` (a transportable object) and a populated transport list
-  are **not yet measured**.
+  A delete with `corrNr` in a transportable package is measured (the 2026-10-26
+  live run, `LegacyTransportable`): lock, `DELETE ?lockHandle=&corrNr=`, unlock,
+  then `404` on read.
 - **What ADT does not serve on 7.40 is the user's, one level up.** Where-used
   outside RIS, DDIC sources, transport changes, and the like are not ADT there: a
   consumer that needs them goes through the legacy MCP server, whose LLM writes
@@ -241,7 +242,7 @@ A function group has no version members.
 | `validate` | sends: a free name `200` |
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `getVersions`, `getVersionSource` | **refused** — `GET …/ddic/ddl/sources/<name>/versions` answered `404` |
-| `readTransport` | **refused**; LEGACY.md says what its basis is |
+| `readTransport` | **refused** — inferred from the five measured types (class, program, interface, function group, function module answered `404`); measured in the next live run |
 | `checkDeletion`, `checkCdsTestDoubles` | **refused** |
 
 ### Message class — `getMessageClass()`, and a message — `getMessageClassMessage()`
@@ -271,8 +272,9 @@ Package contents come through `getUtils().fetchNodeStructure('DEVC/K', name)`.
 | `create` | **refused** (`400`) |
 | every other member | **refused** — `/sap/bc/adt/cts/*` is not advertised, and changes to a request are refused |
 
-A populated list is not yet measured: the measured user had no requests, so
-whether `transportTree` of `@mcp-abap-adt/adt-strategies` reads one is open.
+A populated list is measured (the 2026-10-26 live run, `LegacyTransportable`):
+after a write under the lock with `corrNr`, the list and `readMetadata` name the
+request.
 
 ### Utilities — `getUtils()`
 

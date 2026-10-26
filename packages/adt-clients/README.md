@@ -146,7 +146,7 @@ npm install @mcp-abap-adt/adt-clients
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
-   - **Legacy systems (BASIS < 7.50) are a separate package**, [`@mcp-abap-adt/adt-clients-legacy`](../adt-clients-legacy/README.md): its `AdtClientLegacy` and `AdtExecutorLegacy` extend this package's classes. The consumer declares the system type by constructing them over an RFC connection (`new AdtClientLegacy(connection, logger)`); nothing here detects a system, and `createAdtClient()` returns `AdtClient` and sends no request. They are **RFC clients**, supported and measured on SAP_BASIS 7.40 SP04 over RFC only — HTTP to a legacy system is unsupported. What each member does on 7.40 is in that package's [README](../adt-clients-legacy/README.md) and [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md)
+   - **Legacy systems (BASIS < 7.50) are a separate package**, [`@mcp-abap-adt/adt-clients-legacy`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/master/packages/adt-clients-legacy/README.md): its `AdtClientLegacy` and `AdtExecutorLegacy` extend this package's classes. The consumer declares the system type by constructing them over an RFC connection (`new AdtClientLegacy(connection, logger)`); nothing here detects a system, and `createAdtClient()` returns `AdtClient` and sends no request. They are **RFC clients**, supported and measured on SAP_BASIS 7.40 SP04 over RFC only — HTTP to a legacy system is unsupported. What each member does on 7.40 is in that package's [README](https://github.com/fr0ster/mcp-abap-adt-clients/blob/master/packages/adt-clients-legacy/README.md) and [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/master/packages/adt-clients-legacy/docs/LEGACY.md)
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
@@ -164,7 +164,7 @@ npm install @mcp-abap-adt/adt-clients
      - `getProgramExecutor()` for `programrun` (on-premise systems)
    - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
    - Each executor factory takes an optional result set, like the runtime client's
-   - `createAdtExecutor(connection)` returns `AdtExecutor`, like `createAdtClient` detecting nothing. The legacy executor, `AdtExecutorLegacy` of `@mcp-abap-adt/adt-clients-legacy` (SAP_BASIS 7.40 SP04, over RFC), runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md#abap-unit-runners-and-executors)
+   - `createAdtExecutor(connection)` returns `AdtExecutor`, like `createAdtClient` detecting nothing. The legacy executor, `AdtExecutorLegacy` of `@mcp-abap-adt/adt-clients-legacy` (SAP_BASIS 7.40 SP04, over RFC), runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/master/packages/adt-clients-legacy/docs/LEGACY.md#abap-unit-runners-and-executors)
 
 4. **AdtAbapGitClient**
    - Standalone: `new AdtAbapGitClient(connection, logger?, results?)` (the options argument, `contentTypeVersion`, was removed in 36.0.0)
@@ -1078,7 +1078,7 @@ hold yourself:
   type, and a legacy system is served by `AdtClientLegacy` of
   `@mcp-abap-adt/adt-clients-legacy`, an RFC client constructed by the consumer.
   What it serves and what it refuses is in
-  [LEGACY.md](../adt-clients-legacy/docs/LEGACY.md).
+  [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/master/packages/adt-clients-legacy/docs/LEGACY.md).
 
 **A probe answers only for an absent endpoint.** For `isModernAdtSystem` and
 `fetchDiscoveryEndpoints` a `404`, `405` or `501` is the answer `false` or an

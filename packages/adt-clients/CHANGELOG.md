@@ -31,6 +31,12 @@ legacy class, no legacy word and no `/sap/bc/cts` address. This is a minor: the
 legacy members never worked against a real 7.40 system (the owner's ruling), and
 nothing modern changes.
 
+### Repository layout
+
+The package's source moved to `packages/adt-clients` in a workspace repository
+(tags are `adt-clients-v<version>`). Nothing changes for a consumer of the npm
+package.
+
 ### Removed
 
 - **The exports `AdtClientLegacy`, `AdtExecutorLegacy` and `AdtRequestLegacy`**

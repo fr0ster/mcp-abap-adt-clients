@@ -59,8 +59,10 @@ The result set shrank to what a runner answers: `run`, `status`, `result`.
 and `classTestRunnerDocuments` replace them. A caller who put a strategy into
 `unitTestDocuments.run` puts it into `classTestRunnerDocuments.run`.
 
-**Legacy systems.** `createAdtExecutor` answers `AdtExecutorLegacy` below 7.50,
-the way `createAdtClient` answers `AdtClientLegacy`. Its runner posts to
+**Legacy systems.** (Until 37.3.x; since 37.4.0 the legacy classes are the
+separate package `@mcp-abap-adt/adt-clients-legacy` and the factories choose
+none.) `createAdtExecutor` answered `AdtExecutorLegacy` below 7.50,
+the way `createAdtClient` answered `AdtClientLegacy`. Its runner posts to
 `/abapunit/testruns`, whose POST answers the finished result, and refuses
 `getStatus`/`getResult` without a request — the behaviour `AdtClientLegacy
 .getUnitTest()` had. The legacy format addresses classes only, so a list of test

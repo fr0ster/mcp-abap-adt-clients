@@ -172,7 +172,7 @@ const results = {
 };
 ```
 
-On a legacy system (`AdtClientLegacy`) the member answers a refusal
+On a legacy system (`AdtClientLegacy` of `@mcp-abap-adt/adt-clients-legacy`) the member answers a refusal
 (`UNSUPPORTED_OPERATION`) without a request; the slot is required there too.
 
 ## `analyseMessageClassMessage` refuses an answer that is no class document

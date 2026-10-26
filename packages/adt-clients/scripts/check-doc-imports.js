@@ -33,7 +33,15 @@ const path = require('node:path');
 const ts = require('typescript');
 const { importsIn } = require('./doc-imports');
 
-const ROOT = path.resolve(__dirname, '..');
+// The package whose docs are checked: this one, or the directory given as the
+// first argument (`node ../adt-clients/scripts/check-doc-imports.js .` from a
+// sibling package of this repository).
+const ROOT = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.resolve(__dirname, '..');
+const OWN_NAME = JSON.parse(
+  fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'),
+).name;
 
 /** Docs a reader is expected to follow. Working notes are not included. */
 const DOC_ROOTS = [
@@ -46,9 +54,12 @@ const DOC_ROOTS = [
 
 /** Packages whose exports we can check. Anything else is somebody else's. */
 const OURS = [
-  '@mcp-abap-adt/adt-clients',
-  '@mcp-abap-adt/interfaces',
-  '@mcp-abap-adt/connection',
+  OWN_NAME,
+  ...[
+    '@mcp-abap-adt/adt-clients',
+    '@mcp-abap-adt/interfaces',
+    '@mcp-abap-adt/connection',
+  ].filter((pkg) => pkg !== OWN_NAME),
 ];
 
 function walk(dir, out = []) {

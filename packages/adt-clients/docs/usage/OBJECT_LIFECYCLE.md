@@ -314,7 +314,8 @@ stays taken, and there is nothing for the delete to act on.
   eight are deleted. The member
   does not lock or unlock; the request goes with or without a handle, and SAP's
   answer is the answer. `&corrNr=` is added when the config's
-  `transportRequest` is given (not measured on 7.40 SP04).
+  `transportRequest` is given (measured on 7.40 SP04 in a transportable
+  package: the 2026-10-26 live run, `LegacyTransportable`).
 - The function include `delete` and `deleteObjectsGroup` went through
   `/deletion/*` and are refused.
 

@@ -958,11 +958,10 @@ distinction is the root element and the nesting, never a count.
 
 **Legacy systems answer the same member** — `AdtRequestLegacy` in `@mcp-abap-adt/adt-clients-legacy`. Its `list()` reads
 `/sap/bc/cts/transportrequests` — measured on 7.40 SP04 over RFC: `200`, a
-`tm:root` document. The measured user had no requests, so a populated list is
-**not measured**, and `transportTree` may well not recognise one; it will say
-which element it expected and what it found. That is the cue to inject a reading
-for your system. That endpoint is not a saved search, so
-Its `list()` keeps `configUri` optional and refuses one that is
+`tm:root` document. A populated list is measured too (the 2026-10-26 live run of
+the legacy package, `LegacyTransportable`): after a write with `corrNr`, the list
+and `readMetadata` name the request. That endpoint is not a saved search, so its
+`list()` keeps `configUri` optional and refuses one that is
 given. `readMetadata` sends the same GET; every other member of the legacy
 transport handler, `create` included, refuses without a request.
 

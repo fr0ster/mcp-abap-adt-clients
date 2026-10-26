@@ -144,7 +144,7 @@ RFC returns base64 lock handles with characters like spaces, `+`, `=`. All `lock
 
 ### Content Type Versioning
 
-Legacy systems (BASIS < 7.50) don't support versioned content types. The `contentTypes` system (`AdtContentTypesBase` / `AdtContentTypesModern`) handles this automatically. Key differences:
+Legacy systems (BASIS < 7.50) don't support versioned content types. Headers are the caller's: the library sends the caller's `accept` / `contentType` and its own pair only as the default, and nothing is chosen from the system (since 36.0.0). `AdtContentTypesBase` / `AdtContentTypesModern` answer the pair; the consumer who declared a legacy system passes the versionless one, and the measured pairs are listed in the [legacy package README](../../../adt-clients-legacy/README.md#headers-are-the-callers). Key differences:
 
 | Operation | Legacy (Base) | Modern |
 |-----------|--------------|--------|

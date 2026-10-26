@@ -126,7 +126,7 @@ try {
 }
 ```
 
-**Not yet measured:** a delete with `corrNr` — every probe so far ran in a local package (`$TMP`, B4 included). Kept: SAP's class resource controller reads `corrNr` from the URL. `LegacyTransportable.test.ts` measures it when it is run.
+**Measured on 7.40 SP04:** a delete with `corrNr` in a transportable package — lock, `DELETE ?lockHandle=&corrNr=` naming the request, unlock, then `404` on read (`LegacyTransportable.test.ts`, the 2026-10-26 live run of `integration/legacy` (366 of 366 passed), `LegacyTransportable` cases "writes under the lock with corrNr naming the request", "the transport list and readMetadata name the request", "deletes with the lock handle and corrNr; the read answers 404"). The B4 cycles themselves ran in `$TMP` with no transport.
 
 ### The other deletes
 
@@ -231,7 +231,7 @@ The getter still hands out a handler, so code written against `AdtClient` keeps 
 | `searchConfigurations`, `checkDeletion`, `readObjects`, `readActionLog` | refused: `/sap/bc/adt/cts/*` is not advertised |
 | `addObject`, `removeObject`, `moveObjects`, `sortAndCompress`, `createTask`, `changeTaskType` | refused, for the same reason, and because they change a request |
 
-So a legacy client lists and reads its user's requests and does nothing else with transports. The list is answered as it arrived. **Not measured:** a populated list — the measured user had no requests — and so whether `transportTree` from adt-strategies reads it; inject a reading for your system if it does not.
+So a legacy client lists and reads its user's requests and does nothing else with transports. The list is answered as it arrived. **Measured:** a populated list — after a write under the lock with `corrNr`, the list and `readMetadata` name the request (`LegacyTransportable.test.ts`, the 2026-10-26 live run above). The earlier probe (`B3-unmeasured-20261023-1631`) found the user's list empty.
 
 ## ABAP Unit runners and executors
 
@@ -318,16 +318,14 @@ Each row ships as decided until a run on 7.40 SP04 measures it. The live checks 
 
 | member(s) | shipped decision | argued from |
 |---|---|---|
-| delete with `corrNr` (`transportRequest` given) | kept | SAP's class controller reads it; a transportable delete likely works. Not measured: every probe ran in `$TMP` |
 | `delete` of a function include (a direct `DELETE ?lockHandle=`) | refused until measured | `/deletion/*` is measured absent; a direct DELETE would be an inference |
 | package `lock`, `unlock`, `readTransport`, `check` | refused | the item resource answered `404` to a read |
 | `programrun`; trace `objecttypes`, `processtypes` | refused until measured | not advertised |
 | `getScalarFunctionImplementation()` (`/sap/bc/adt/ddic/dsfi`) | refused until measured | not advertised; its sibling's collection answered `404` |
 | `readObjectMetadata`/`readObjectSource` for table types | refused | not advertised; the other DDIC families answered `404` |
-| a populated transport list, and `readMetadata` over it | kept | the measured user had no requests |
 | enhancement readers; versions of a function include; `validate`, `check`, `readMetadata` of a function include; the `check`s and `activate`s not listed as measured | kept | under advertised collections; at worst a `404`, read strictly |
 | the local includes' `readTransport`; message class message `readMetadata`; `activateTestClasses`; function group `updateMetadata` | kept | `/oo/classes` and the other collections are advertised; the inherited members address the container class |
-| `readTransport` of a DDL source | refused | the class, program, interface, function group and function module answered `404` for it (B4); the DDL's own request is not in B4 |
+| `readTransport` of a DDL source | refused — inferred from the five measured types (class, program, interface, function group, function module answered `404`); measured in the next live run | the DDL's own request is not in B4 |
 | the read of a created object (rather than a system one) for the cycle steps `read`, `readMetadata` of a program, function module, function include; the version content containing the source written; the free-name `validate` of a function group and module | the shipped decision above | the cycle suites assert them; **not yet measured** |
 | trace `listRequests`, `getRequestsByUri`, `scheduleTrace` | kept | advertised |
 | `activateObjectsGroup` | kept | measured earlier on BASIS 7.40, not in a 7.40 SP04 record (the utils cycle asserts it) |
@@ -349,7 +347,7 @@ The legacy classes of `@mcp-abap-adt/adt-clients` 37.3.x are this package's, wit
 
 - **Where they live.** Install `@mcp-abap-adt/adt-clients-legacy` and construct `AdtClientLegacy` / `AdtExecutorLegacy` from it over RFC; `createAdtClient()` / `createAdtExecutor()` no longer return them.
 - **Include and message class `delete` send** one `DELETE ?lockHandle=` under your lock (37.3 refused both).
-- **`readTransport` is refused** for a class, program, interface, function group, function module and DDL source (37.3 sent it; `404`).
+- **`readTransport` is refused** for a class, program, interface, function group, function module and DDL source (37.3 sent it). `GET <object>/transport` answered `404` for the first five (B4); the DDL source is refused on that basis, inferred from them and measured in the next live run.
 - **A DDL source's `getVersions` and `getVersionSource` are refused** (`404` on `/ddic/ddl/sources/<n>/versions`).
 - **A message class's `updateMetadata` is refused** until its document is measured.
 - **`AdtPackageLegacy.read` is not carried over**: a member `AdtPackage` does not have.
