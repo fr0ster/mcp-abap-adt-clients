@@ -24,11 +24,21 @@
  * - a string or template literal containing the 7.40 CTS endpoint, which only
  *   the legacy transport handler addresses.
  *
- * Comments are not code and are not read: the removal notes stay. This file
+ * Comments are not code and are not read: the removal notes stay.
+ *
+ * The other tracked files under `src` — the configuration base and forms
+ * (`.yaml`, `.template`), the XML fixtures, anything that is neither code nor
+ * a Markdown note — are read as plain text, every line, for the word and the
+ * endpoint: a configuration key or a fixture has no comment to hide in that
+ * matters. Only tracked files are read, so a developer's gitignored overlay is
+ * never opened.
+ *
+ * This file
  * holds to its own rule, so the word it looks for is put together at run
  * time.
  */
 
+import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
@@ -163,7 +173,58 @@ function sourceFiles(): string[] {
   return out;
 }
 
+/** `file:line  text` for every line of a plain-text file holding either. */
+function textFindings(file: string, text: string): string[] {
+  return text
+    .split('\n')
+    .flatMap((line, index) =>
+      line.toLowerCase().includes(WORD) || line.includes(CTS)
+        ? [`${file}:${index + 1}  text ${line.trim()}`]
+        : [],
+    );
+}
+
+/** The tracked files under `src` that are neither code nor a Markdown note. */
+function textFiles(): string[] {
+  return execSync('git ls-files src', { cwd: ROOT, encoding: 'utf8' })
+    .split('\n')
+    .filter(
+      (file) =>
+        file !== '' &&
+        !/\.[cm]?[tj]s$/.test(file) &&
+        !file.endsWith('.md') &&
+        fs.existsSync(path.join(ROOT, file)),
+    );
+}
+
 describe('the root package carries no 7.40 classes', () => {
+  it('no configuration or fixture file under src carries the word or the 7.40 CTS endpoint', () => {
+    const files = textFiles();
+    expect(files).toContain('src/__tests__/helpers/test-config.yaml.template');
+    expect(files).toContain('src/__tests__/helpers/overlays/onprem.yaml');
+    expect(files.some((file) => file.endsWith('.xml'))).toBe(true);
+    const found = files.flatMap((file) =>
+      textFindings(file, fs.readFileSync(path.join(ROOT, file), 'utf8')),
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('reads such a file as text, comments included', () => {
+    const file = 'src/__tests__/helpers/overlays/onprem.yaml';
+    expect(
+      textFindings(
+        file,
+        [
+          `# "environment.is_${WORD}": true`,
+          `${WORD}_env:`,
+          `  available_in: ["onprem", "${WORD}"]`,
+          `<a href="${CTS}/x"/>`,
+          '  available_in: ["onprem"]',
+        ].join('\n'),
+      ).map((line) => line.split('  ')[0]),
+    ).toEqual([`${file}:1`, `${file}:2`, `${file}:3`, `${file}:4`]);
+  });
+
   it('no source file names one, loads one, or addresses the 7.40 CTS endpoint', () => {
     const files = sourceFiles();
     expect(files.length).toBeGreaterThan(300);
