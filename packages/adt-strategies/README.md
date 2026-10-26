@@ -25,7 +25,7 @@ it — with an opinion, stated as one, and built from evidence rather than taste
 Since `adt-clients` 23.0.0 it holds **every** reading and verdict that library
 used to apply on its own: the transport tree, the search hits, the version feed,
 the unit-test run id, the abapGit repositories, the ATC and profiler shapes,
-the package-deletion and publication verdicts. [MIGRATION-23.md](../../docs/usage/MIGRATION-23.md)
+the package-deletion and publication verdicts. [MIGRATION-23.md](../adt-clients/docs/usage/MIGRATION-23.md)
 maps each old behaviour to the strategy that replaces it.
 
 **Two axes, two moments.** A *result* strategy is given once, when you build an
@@ -67,7 +67,7 @@ if (!answer.ok) {
 ## Why it cannot be one rule
 
 ADT does not have a single way of saying no. From the recordings in
-[`corpus/adt/`](../../corpus) at the root of this repository:
+[`corpus/adt/`](../adt-clients/corpus) in adt-clients' directory of this repository:
 
 | the "no" | arrives as | shape |
 |---|---|---|

@@ -3,13 +3,16 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v1.1.0, v1.2.3, etc.
+      # <package directory>-v<version>, as tools/publish-changed.js requires
+      - 'adt-clients-v*.*.*'
+      - 'adt-strategies-v*.*.*'
 
 permissions:
   contents: write  # Required for creating releases
 
 jobs:
-  build-and-release:
+  release-adt-clients:
+    if: startsWith(github.ref_name, 'adt-clients-v')
     # A hung step is capped here instead of by GitHub's 6-hour default; a
     # release takes about a minute.
     timeout-minutes: 10
@@ -25,6 +28,16 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/adt-clients-v}"
+          VERSION="$(node -p "require('./packages/adt-clients/package.json').version")"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag adt-clients-v$TAG does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+
+      # One install at the root, which covers every workspace package.
       # --ignore-scripts: the runner's npm may predate 11.19.0, which reads
       # package.json `allowScripts` in full, and no dependency's install
       # script is needed to build or pack.
@@ -32,30 +45,25 @@ jobs:
         run: npm ci --ignore-scripts
 
       # A tag with a known advisory of moderate severity or above is not
-      # released, dev dependencies included. Both trees; npm audit reads the
-      # strategies package's lockfile without installing it.
+      # released, dev dependencies included.
       - name: Security audit (moderate+)
         run: npm audit --audit-level=moderate
 
-      - name: Security audit, strategies package (moderate+)
-        run: npm audit --audit-level=moderate --prefix packages/adt-strategies
+      - name: Build the package
+        run: npm run build --workspace packages/adt-clients
 
-      - name: Build project
-        run: npm run build
-
+      # --ignore-scripts, as tools/publish-changed.js publishes: the tarball
+      # holds what the build made, nothing a pack-time script adds.
       - name: Create package
-        run: npm pack
+        working-directory: packages/adt-clients
+        run: npm pack --ignore-scripts
 
       - name: Get package filename
         id: package
         run: |
-          PACKAGE_FILE=$(ls mcp-abap-adt-adt-clients-*.tgz)
+          PACKAGE_FILE=$(cd packages/adt-clients && ls mcp-abap-adt-adt-clients-*.tgz)
           echo "filename=$PACKAGE_FILE" >> $GITHUB_OUTPUT
           echo "Package created: $PACKAGE_FILE"
-
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       # A release for this tag may already exist, written by hand before the tag
       # was pushed. Its notes are the ones worth keeping — the workflow's are a
@@ -75,7 +83,7 @@ jobs:
       # asset rather than failing on a second run, so a rerun changes nothing.
       - name: Attach the package to the existing release
         if: steps.existing.outputs.exists == 'true'
-        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.package.outputs.filename }}" --clobber
+        run: gh release upload "$GITHUB_REF_NAME" "packages/adt-clients/${{ steps.package.outputs.filename }}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -85,7 +93,104 @@ jobs:
         if: steps.existing.outputs.exists == 'false'
         uses: softprops/action-gh-release@v3
         with:
-          files: ${{ steps.package.outputs.filename }}
+          files: packages/adt-clients/${{ steps.package.outputs.filename }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          body: |
+            ## Installation
+
+            Download the `.tgz` package and install:
+
+            ```bash
+            npm install -g ./${{ steps.package.outputs.filename }}
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-adt-strategies:
+    if: startsWith(github.ref_name, 'adt-strategies-v')
+    # A hung step is capped here instead of by GitHub's 6-hour default; a
+    # release takes about a minute.
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/adt-strategies-v}"
+          VERSION="$(node -p "require('./packages/adt-strategies/package.json').version")"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag adt-strategies-v$TAG does not match package.json version $VERSION" >&2
+            exit 1
+          fi
+
+      # One install at the root, which covers every workspace package.
+      # --ignore-scripts: the runner's npm may predate 11.19.0, which reads
+      # package.json `allowScripts` in full, and no dependency's install
+      # script is needed to build or pack.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # A tag with a known advisory of moderate severity or above is not
+      # released, dev dependencies included.
+      - name: Security audit (moderate+)
+        run: npm audit --audit-level=moderate
+
+      - name: Build the package
+        run: npm run build --workspace packages/adt-strategies
+
+      # --ignore-scripts, as tools/publish-changed.js publishes: the tarball
+      # holds what the build made, nothing a pack-time script adds.
+      - name: Create package
+        working-directory: packages/adt-strategies
+        run: npm pack --ignore-scripts
+
+      - name: Get package filename
+        id: package
+        run: |
+          PACKAGE_FILE=$(cd packages/adt-strategies && ls mcp-abap-adt-adt-strategies-*.tgz)
+          echo "filename=$PACKAGE_FILE" >> $GITHUB_OUTPUT
+          echo "Package created: $PACKAGE_FILE"
+
+      # A release for this tag may already exist, written by hand before the tag
+      # was pushed. Its notes are the ones worth keeping — the workflow's are a
+      # fallback, not an improvement on them.
+      - name: Is there already a release for this tag?
+        id: existing
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Attach the package and touch nothing else. `--clobber` replaces the
+      # asset rather than failing on a second run, so a rerun changes nothing.
+      - name: Attach the package to the existing release
+        if: steps.existing.outputs.exists == 'true'
+        run: gh release upload "$GITHUB_REF_NAME" "packages/adt-strategies/${{ steps.package.outputs.filename }}" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only when nobody wrote one: then there are no notes to protect, and the
+      # generated changelog is better than an empty release.
+      - name: Create the release
+        if: steps.existing.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: packages/adt-strategies/${{ steps.package.outputs.filename }}
           generate_release_notes: true
           draft: false
           prerelease: false

@@ -8,7 +8,7 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
  * A strategy is a function of an answer, so testing one against a fixture is
  * the whole test: no SAP, no mock, no invented document.
  */
-const CORPUS = join(__dirname, '../../../../corpus/adt');
+const CORPUS = join(__dirname, '../../../adt-clients/corpus/adt');
 
 interface ISidecar {
   case: string;

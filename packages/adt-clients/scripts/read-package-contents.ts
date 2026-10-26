@@ -1,0 +1,241 @@
+/**
+ * Script: Read package contents using AdtClient
+ *
+ * Usage:
+ *   ../../node_modules/.bin/ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]
+ *   ../../node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG
+ *   ../../node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG --tree
+ *   ../../node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG --subpackages
+ *   ../../node_modules/.bin/ts-node scripts/read-package-contents.ts ZTEST_PKG --json
+ *
+ * Options:
+ *   --tree         Output as tree structure (using getPackageHierarchy)
+ *   --subpackages  Include subpackage contents recursively
+ *   --json         Output as JSON
+ *   --depth=N      Max depth for subpackages (default: 5)
+ *
+ * Environment variables:
+ *   MCP_ENV_PATH - Path to .env file (default: .env in project root)
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as dotenv from 'dotenv';
+import {
+  createTestConnection,
+  getConfig,
+  releaseTestConnection,
+} from '../src/__tests__/helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+} from '../src/__tests__/helpers/testLogger';
+import { AdtClient } from '../src/clients/AdtClient';
+import type {} from '../src/core/shared/types';
+import type { IWalkedNode } from './lib/packageWalk';
+import { walkPackage } from './lib/packageWalk';
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
+
+const connectionLogger = createConnectionLogger();
+const libraryLogger = createLibraryLogger();
+
+interface Options {
+  packageName: string;
+  treeMode: boolean;
+  includeSubpackages: boolean;
+  jsonOutput: boolean;
+  maxDepth: number;
+}
+
+function parseArgs(argv: string[]): Options {
+  let packageName = '';
+  let treeMode = false;
+  let includeSubpackages = false;
+  let jsonOutput = false;
+  let maxDepth = 5;
+
+  for (const arg of argv) {
+    if (arg === '--tree') {
+      treeMode = true;
+    } else if (arg === '--subpackages') {
+      includeSubpackages = true;
+    } else if (arg === '--json') {
+      jsonOutput = true;
+    } else if (arg.startsWith('--depth=')) {
+      const value = Number.parseInt(arg.slice('--depth='.length), 10);
+      if (!Number.isNaN(value) && value > 0) {
+        maxDepth = value;
+      }
+    } else if (!arg.startsWith('--') && !packageName) {
+      packageName = arg.trim().toUpperCase();
+    }
+  }
+
+  return { packageName, treeMode, includeSubpackages, jsonOutput, maxDepth };
+}
+
+/** What the table prints, now that the package ships no content-item shape. */
+interface IFlatItem {
+  readonly name: string;
+  readonly type: string;
+  readonly packageName: string;
+}
+
+/** The walk, as a list — one line per object, packages included. */
+function flatten(node: IWalkedNode, parent = ''): IFlatItem[] {
+  const here: IFlatItem[] =
+    node.isPackage && !parent
+      ? []
+      : [{ name: node.name, type: node.type, packageName: parent }];
+  for (const child of node.children) {
+    here.push(...flatten(child, node.isPackage ? node.name : parent));
+  }
+  return here;
+}
+
+function printTable(items: IFlatItem[]): void {
+  if (items.length === 0) {
+    console.log('No objects found.');
+    return;
+  }
+
+  // Calculate column widths
+  const nameWidth = Math.max(4, ...items.map((o) => o.name.length));
+  const typeWidth = Math.max(4, ...items.map((o) => o.type.length));
+  const pkgWidth = Math.max(7, ...items.map((o) => o.packageName.length));
+
+  // Print header
+  console.log(
+    `${'NAME'.padEnd(nameWidth)}  ${'TYPE'.padEnd(typeWidth)}  ${'PACKAGE'.padEnd(pkgWidth)}`,
+  );
+  console.log(
+    `${'-'.repeat(nameWidth)}  ${'-'.repeat(typeWidth)}  ${'-'.repeat(pkgWidth)}`,
+  );
+
+  // Print rows
+  for (const item of items) {
+    console.log(
+      `${item.name.padEnd(nameWidth)}  ${item.type.padEnd(typeWidth)}  ${item.packageName.padEnd(pkgWidth)}`,
+    );
+  }
+
+  console.log('');
+  console.log(`Total: ${items.length} object(s)`);
+}
+
+function printTree(node: IWalkedNode, prefix = '', isLast = true): void {
+  const connector = isLast ? '└── ' : '├── ';
+  const typeLabel = node.type || '';
+
+  console.log(`${prefix}${connector}${node.name} (${typeLabel})`);
+
+  const children = node.children || [];
+  const newPrefix = prefix + (isLast ? '    ' : '│   ');
+
+  for (let i = 0; i < children.length; i++) {
+    printTree(children[i], newPrefix, i === children.length - 1);
+  }
+}
+
+function countObjects(node: IWalkedNode): {
+  packages: number;
+  objects: number;
+} {
+  let packages = node.isPackage ? 1 : 0;
+  let objects = node.isPackage ? 0 : 1;
+
+  for (const child of node.children || []) {
+    const childCounts = countObjects(child);
+    packages += childCounts.packages;
+    objects += childCounts.objects;
+  }
+
+  return { packages, objects };
+}
+
+async function run(): Promise<void> {
+  const options = parseArgs(process.argv.slice(2));
+
+  if (!options.packageName) {
+    console.error(
+      'Usage: ../../node_modules/.bin/ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
+    );
+    console.error('');
+    console.error('Options:');
+    console.error('  --tree         Output as tree structure');
+    console.error('  --subpackages  Include subpackage contents recursively');
+    console.error('  --json         Output as JSON');
+    console.error('  --depth=N      Max depth for subpackages (default: 5)');
+    process.exit(1);
+  }
+
+  const config = getConfig();
+  const connection = await createTestConnection(connectionLogger);
+  // Already open: `createTestConnection` connects before returning.
+
+  const client = new AdtClient(connection, libraryLogger);
+  const utils = client.getUtils();
+
+  console.log(`Reading package contents for: ${options.packageName}`);
+  if (options.treeMode) {
+    console.log('Mode: tree (getPackageHierarchy)');
+  } else {
+    console.log('Mode: list (getPackageContentsList)');
+  }
+  if (options.includeSubpackages) {
+    console.log(`Include subpackages: yes (depth: ${options.maxDepth})`);
+  }
+  console.log('');
+
+  try {
+    if (options.treeMode) {
+      // Tree mode - use getPackageHierarchy
+      const tree = await walkPackage(
+        connection,
+        options.packageName,
+        options.includeSubpackages ? options.maxDepth : 1,
+      );
+
+      if (options.jsonOutput) {
+        console.log(JSON.stringify(tree, null, 2));
+      } else {
+        printTree(tree, '', true);
+        const counts = countObjects(tree);
+        console.log('');
+        console.log(
+          `Total: ${counts.packages} package(s), ${counts.objects} object(s)`,
+        );
+      }
+    } else {
+      // List mode - use getPackageContentsList
+      const items = flatten(
+        await walkPackage(
+          connection,
+          options.packageName,
+          options.includeSubpackages ? options.maxDepth : 1,
+        ),
+      );
+
+      if (options.jsonOutput) {
+        console.log(JSON.stringify(items, null, 2));
+      } else {
+        printTable(items);
+      }
+    }
+  } catch (error: any) {
+    console.error('Failed to read package contents:', error?.message || error);
+    process.exitCode = 1;
+    return;
+  } finally {
+    await releaseTestConnection(connection);
+  }
+}
+
+run().catch((error) => {
+  console.error('Script failed:', error?.message || error);
+  process.exit(1);
+});

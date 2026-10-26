@@ -1,0 +1,158 @@
+/**
+ * Read feed catalog and feed entries from SAP system.
+ *
+ * Usage:
+ *   ../../node_modules/.bin/ts-node scripts/read-feeds.ts                    # feed catalog
+ *   ../../node_modules/.bin/ts-node scripts/read-feeds.ts dumps              # dumps feed
+ *   ../../node_modules/.bin/ts-node scripts/read-feeds.ts systemMessages     # system messages feed
+ *   ../../node_modules/.bin/ts-node scripts/read-feeds.ts gatewayErrors      # gateway error log feed
+ *
+ * Options (env vars):
+ *   FEED_USER=DEVELOPER     — filter by user
+ *   FEED_MAX=10                — max results
+ *   MCP_ENV_PATH=trial.env     — switch SAP system
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as dotenv from 'dotenv';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../src/__tests__/helpers/sessionConfig';
+import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
+import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { feedDocuments } from '../src/runtime/feeds/FeedRepository';
+import { resultOf } from './resultOf';
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+const sessionConfigPath = path.resolve(
+  __dirname,
+  '../src/__tests__/helpers/sessionConfig',
+);
+const { getConfig } = require(sessionConfigPath);
+
+async function main() {
+  const config = getConfig();
+  const topic = process.argv[2];
+
+  const options = {
+    user: process.env.FEED_USER || undefined,
+    maxResults: process.env.FEED_MAX
+      ? Number.parseInt(process.env.FEED_MAX, 10)
+      : 20,
+  };
+
+  console.log(`Connecting to ${config.url}...`);
+  const connection = await createTestConnection(createConnectionLogger());
+  // Already open: `createTestConnection` connects before returning.
+  try {
+    const runtime = new AdtRuntimeClient(connection);
+    // The feeds answer Atom documents as they arrived; this script reads them.
+    const feeds = runtime.getFeeds({
+      ...feedDocuments,
+      feeds: feedDescriptors,
+      variants: feedVariants,
+      entries: feedEntries,
+      systemMessages: feedSystemMessages,
+      gatewayErrors: feedGatewayErrors,
+      gatewayErrorDetail: feedGatewayErrorDetail,
+    });
+
+    if (!topic) {
+      console.log('\n=== Feed Catalog ===\n');
+      const catalog = resultOf(await feeds.list());
+      for (const entry of catalog) {
+        console.log(`  ${entry.title}`);
+        console.log(`    url: ${entry.url}`);
+        if (entry.category) console.log(`    category: ${entry.category}`);
+        console.log();
+      }
+      return;
+    }
+
+    if (topic === 'dumps') {
+      console.log(
+        `\n=== Dumps Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const entries = resultOf(await feeds.dumps(options));
+      console.log(`Found ${entries.length} entries:\n`);
+      for (const entry of entries) {
+        console.log(`  [${entry.updated}] ${entry.title}`);
+        if (entry.link) console.log(`    link: ${entry.link}`);
+        if (entry.author) console.log(`    author: ${entry.author}`);
+        if (entry.content) {
+          const preview = String(entry.content).slice(0, 120);
+          console.log(
+            `    content: ${preview}${entry.content.length > 120 ? '...' : ''}`,
+          );
+        }
+        console.log();
+      }
+      return;
+    }
+
+    if (topic === 'systemMessages') {
+      console.log(
+        `\n=== System Messages Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const entries = resultOf(await feeds.systemMessages(options));
+      console.log(`Found ${entries.length} entries:\n`);
+      for (const entry of entries) {
+        console.log(`  [${entry.id}] ${entry.title}`);
+        console.log(`    severity: ${entry.severity}`);
+        console.log(`    text: ${entry.text}`);
+        console.log(`    created by: ${entry.createdBy}`);
+        console.log(`    valid: ${entry.validFrom} — ${entry.validTo}`);
+        console.log();
+      }
+      return;
+    }
+
+    if (topic === 'gatewayErrors') {
+      console.log(
+        `\n=== Gateway Errors Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const entries = resultOf(await feeds.gatewayErrors(options));
+      console.log(`Found ${entries.length} entries:\n`);
+      for (const entry of entries) {
+        console.log(`  [${entry.type}] ${entry.shortText}`);
+        console.log(`    dateTime: ${entry.dateTime}`);
+        console.log(`    username: ${entry.username}`);
+        console.log(`    requestKind: ${entry.requestKind}`);
+        console.log(`    transactionId: ${entry.transactionId}`);
+        console.log();
+      }
+      return;
+    }
+
+    console.error(`Unknown topic: ${topic}`);
+    console.error('Available: dumps, systemMessages, gatewayErrors');
+    process.exitCode = 1;
+    return;
+  } finally {
+    // In `finally`, and the session given back rather than left to time out.
+    // A small pool is easy to exhaust — two concurrent sessions is the measured
+    // ceiling on the ABAP Cloud system — and a script that leaks one on every run locks the
+    // next person out for no visible reason.
+    await releaseTestConnection(connection);
+  }
+}
+
+main().catch((err) => {
+  console.error('Error:', err.message || err);
+  process.exit(1);
+});

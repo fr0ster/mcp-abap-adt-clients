@@ -6,28 +6,28 @@ coverage/
 .env.*
 .DS_Store
 *.log
-tests/test-config.yaml
+packages/adt-clients/tests/test-config.yaml
 
 # Compiled JS files in src (should be in dist)
-src/**/*.js
-src/**/*.js.map
+packages/adt-clients/src/**/*.js
+packages/adt-clients/src/**/*.js.map
 # Exception: test-helper.js is an intentional JS file (not compiled from TS)
-!src/__tests__/helpers/test-helper.js
+!packages/adt-clients/src/__tests__/helpers/test-helper.js
 
 coverage/**
 
 # Session and lock files - keep directories but ignore contents
-.sessions/*
-!.sessions/.keep
+packages/adt-clients/.sessions/*
+!packages/adt-clients/.sessions/.keep
 
-.locks/*
-!.locks/.keep
+packages/adt-clients/.locks/*
+!packages/adt-clients/.locks/.keep
 mcp-abap-adt-adt-clients-*.tgz
 sk.json
-src/__tests__/helpers/test-config.yaml
-src/__tests__/helpers/test-config.overlay.yaml
+packages/adt-clients/src/__tests__/helpers/test-config.yaml
+packages/adt-clients/src/__tests__/helpers/test-config.overlay.yaml
 # one overlay per system, chosen by MCP_TEST_OVERLAY
-src/__tests__/helpers/test-config.overlay.*.yaml
+packages/adt-clients/src/__tests__/helpers/test-config.overlay.*.yaml
 *.env
 
 # Claude Code local settings
@@ -66,4 +66,4 @@ refusal-visibility-evidence.json
 # Reports of npm run legacy:setup / legacy:status / legacy:teardown (they name the request)
 .legacy-env/
 # The ABAP sources of the legacy 7.40 test environment and its fixtures
-!src/__tests__/integration/legacy/abap/*.abap
+!packages/adt-clients/src/__tests__/integration/legacy/abap/*.abap

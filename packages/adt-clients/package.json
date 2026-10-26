@@ -1,0 +1,151 @@
+{
+  "name": "@mcp-abap-adt/adt-clients",
+  "version": "37.3.0",
+  "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/index.core.d.ts",
+      "default": "./dist/index.core.js"
+    },
+    "./runtime": {
+      "types": "./dist/index.runtime.d.ts",
+      "default": "./dist/index.runtime.js"
+    },
+    "./ws": {
+      "types": "./dist/index.ws.d.ts",
+      "default": "./dist/index.ws.js"
+    },
+    "./abapgit": {
+      "types": "./dist/index.abapgit.d.ts",
+      "default": "./dist/index.abapgit.js"
+    },
+    "./executors": {
+      "types": "./dist/index.executors.d.ts",
+      "default": "./dist/index.executors.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "core": [
+        "dist/index.core.d.ts"
+      ],
+      "runtime": [
+        "dist/index.runtime.d.ts"
+      ],
+      "ws": [
+        "dist/index.ws.d.ts"
+      ],
+      "abapgit": [
+        "dist/index.abapgit.d.ts"
+      ],
+      "executors": [
+        "dist/index.executors.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "docs/usage",
+    "README.md",
+    "LICENSE",
+    "COPYING"
+  ],
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "clients",
+    "runtime",
+    "mcp"
+  ],
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "license": "LGPL-3.0-only",
+  "homepage": "https://github.com/fr0ster/mcp-abap-adt-clients#readme",
+  "bugs": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt-clients/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git",
+    "directory": "packages/adt-clients"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "chrono": "./tools/version-stats.sh",
+    "clean": "node -e \"const fs=require('fs');['dist','tsconfig.tsbuildinfo'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true})}catch{}})\"",
+    "lint": "biome check --write src",
+    "lint:check": "biome check src && npm run --silent check:docs",
+    "check:docs": "node scripts/check-doc-imports.js",
+    "format": "biome format --write src",
+    "build": "npm run --silent clean && biome check src --diagnostic-level=error && tsc -p tsconfig.json",
+    "build:fast": "tsc -p tsconfig.json",
+    "test:init": "node scripts/test-config.js init",
+    "test-config:migrate": "node scripts/test-config.js migrate",
+    "test": "jest --runInBand",
+    "test:unit": "jest src/__tests__/unit",
+    "test:detached": "bash scripts/run-detached.sh",
+    "test:check": "tsc --noEmit --project tsconfig.test.json",
+    "test:type-check": "npm run test:check",
+    "test:check:integration": "tsc --noEmit --project tsconfig.test.integration.json",
+    "test:sequential": "node scripts/run-tests-sequential.js",
+    "test:module": "node scripts/test-module.js",
+    "test:long-polling-read": "ts-node scripts/test-long-polling-read.ts",
+    "package:contents": "ts-node scripts/show-package-contents.ts",
+    "discovery:markdown": "ts-node tools/discovery-to-markdown.ts",
+    "header:discovery": "ts-node tools/header-probe/errorCorpus.ts",
+    "adt:entities": "node tools/adt-object-entities.js",
+    "shared:setup": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/setup",
+    "shared:teardown": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/teardown",
+    "shared:check": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/check",
+    "legacy:setup": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/setup",
+    "legacy:status": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/status",
+    "legacy:teardown": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/teardown",
+    "legacy:uninstall": "jest --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/uninstall",
+    "pretest": "npm run test:check:integration && npm run --silent check:config",
+    "prepublishOnly": "npm run build",
+    "check:config": "node scripts/check-config-drift.js",
+    "corpus:capture": "ts-node scripts/capture-adt-corpus.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/interfaces-adt": "^20.1.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
+    "@mcp-abap-adt/interfaces-network": "^2.0.1",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.1",
+    "@mcp-abap-adt/logger": "^0.4.1",
+    "axios": "^1.18.1",
+    "fast-xml-parser": "^5.9.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@mcp-abap-adt/adt-strategies": "^0.10.0",
+    "@mcp-abap-adt/auth-providers": "^6.0.2",
+    "@mcp-abap-adt/connection": "^19.0.0",
+    "@mcp-abap-adt/interfaces-auth": "^7.5.0",
+    "@mcp-abap-adt/interfaces-auth-sap": "^3.3.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.3.3",
+    "dotenv": "^17.3.1",
+    "jest": "^30.0.5",
+    "jest-util": "^30.2.0",
+    "markdown-it": "^14.3.3",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "yaml": "^2.8.1"
+  },
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "unrs-resolver": false
+  }
+}
