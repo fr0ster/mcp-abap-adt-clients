@@ -54,12 +54,42 @@ const { execFileSync } = require('node:child_process');
 const semver = require('semver');
 
 const ROOT = path.resolve(__dirname, '..');
-const DRY_RUN = process.argv.includes('--dry-run');
+
+// Every argument is one this script reads, or the run stops before anything
+// else. An unread one is not harmless: `--dryrun` or `--dry_run` would be
+// skipped and the run would publish for real, and a second `--tag=` would be
+// dropped in favour of the first.
+const ARGS = process.argv.slice(2);
+for (const arg of ARGS) {
+  if (arg !== '--dry-run' && !arg.startsWith('--tag=')) {
+    console.error(
+      `\npublish: unknown argument ${JSON.stringify(arg)}; ` +
+        'the arguments are --dry-run and --tag=<dist-tag>. Nothing was published.',
+    );
+    process.exit(1);
+  }
+}
+for (const name of ['--dry-run', '--tag=']) {
+  if (
+    ARGS.filter((a) => a === name || (name.endsWith('=') && a.startsWith(name)))
+      .length > 1
+  ) {
+    console.error(
+      `\npublish: ${name.replace('=', '')} is given more than once. Nothing was published.`,
+    );
+    process.exit(1);
+  }
+}
+if (ARGS.includes('--tag=')) {
+  console.error('\npublish: --tag= names no dist-tag. Nothing was published.');
+  process.exit(1);
+}
+
+const DRY_RUN = ARGS.includes('--dry-run');
 // The npm dist-tag to publish under. Without it npm publishes to `latest`,
 // which is why a prerelease requires it explicitly.
 const NPM_TAG =
-  process.argv.find((a) => a.startsWith('--tag='))?.slice('--tag='.length) ??
-  null;
+  ARGS.find((a) => a.startsWith('--tag='))?.slice('--tag='.length) ?? null;
 // `latest` is the tag a plain `npm publish` moves, so naming it explicitly must
 // not buy anything. Both dist-tag guards key on this rather than on whether a
 // --tag was passed: `--tag=latest` bypassed both when they asked the latter.

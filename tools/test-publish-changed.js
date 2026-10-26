@@ -735,6 +735,34 @@ check('passes --tag through to npm publish', () => {
   ]);
 });
 
+for (const [name, args, words] of [
+  ['a misspelt --dry-run', ['--dryrun'], /unknown argument "--dryrun"/],
+  ['an argument without dashes', ['dry-run'], /unknown argument "dry-run"/],
+  [
+    'a second --tag',
+    ['--tag=next', '--tag=beta'],
+    /--tag is given more than once/,
+  ],
+  [
+    'a second --dry-run',
+    ['--dry-run', '--dry-run'],
+    /--dry-run is given more than once/,
+  ],
+  ['an empty --tag', ['--tag='], /--tag= names no dist-tag/],
+]) {
+  check(`${name} publishes nothing and runs nothing`, () => {
+    const dir = fixture([{ dir: 'alpha', version: '1.1.0' }]);
+    const { bin, logPath } = installFakeNpm(dir, alphaManifests(dir));
+    const result = run(dir, bin, args);
+    assert.strictEqual(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, words);
+    assert.match(result.stderr, /Nothing was published/);
+    // Refused before the check, the registry reads or a publish: npm is never
+    // called at all.
+    assert.deepStrictEqual(readLog(logPath), []);
+  });
+}
+
 check('a failed publish stops the run before the next package', () => {
   const dir = fixture([
     { dir: 'alpha', version: '1.1.0' },
