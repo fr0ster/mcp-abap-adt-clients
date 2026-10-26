@@ -14,23 +14,33 @@ probe records are outside the repository, in `~/prj/e77-probe/e77-results/`:
 
 ## 1. The package
 
-- **Name and place.**
-  - The package is `@mcp-abap-adt/adt-clients-legacy`, in
-    `packages/adt-clients-legacy/`. It lives next to
-    `packages/adt-strategies` and uses the same layout: its own
-    `package.json`, `tsconfig`, build, lint and Jest configuration, a nested
-    package with no npm workspaces.
-  - The root scripts reach it the way they reach adt-strategies
-    (`--prefix`).
-  - It publishes on its own: the root `release:publish` covers it.
-  - Its first version is `0.1.0`.
-- **Dependency.** It depends on `@mcp-abap-adt/adt-clients` with a `^37.4.0`
-  range, which is the minor that this change releases. Inside the
-  repository it may link to the root package while developing. At release,
-  adt-clients is published first and the range resolves on the registry.
-  Its other dependencies are the contract packages the legacy classes
-  import today (interfaces-adt, interfaces-adt-connection,
-  interfaces-utils, adt-strategies) at the root package's ranges.
+- **The repository layout.**
+  - The layout is the owner's multi-package one, mirrored from `llm-agent`,
+    whose root `package.json`, build, test, lint and release scripts are read
+    end to end and copied.
+  - The root is private (`"private": true`, `"workspaces": ["packages/*"]`)
+    and holds no published code.
+  - The packages are `packages/adt-clients` (today's root package, moved
+    whole: `src`, its tests, scripts, docs, configs), `packages/adt-strategies`
+    (unchanged, now a workspace) and `packages/adt-clients-legacy` (new).
+  - `release:publish` publishes the packages whose version is not on the
+    registry, in dependency order. Tags follow the model repository's
+    scheme.
+- **Name.** The new package is `@mcp-abap-adt/adt-clients-legacy`. Its first
+  version is `0.1.0`.
+- **Dependency.** It depends on `@mcp-abap-adt/adt-clients` `^37.4.0`, a
+  semver range with no `file:`, `link:` or `workspace:` specifier.
+  - **Inside the repository** npm links the workspace sibling. This is the
+    owner's exception for packages of one repository. The repository's
+    lockfile has `"link": true` for the siblings only.
+  - **At release** adt-clients is published first, and the range resolves on
+    the registry.
+  - **Other dependencies** are the contract packages the legacy classes
+    import today, at adt-clients' ranges.
+- **Builds.** Each package builds into its own `dist`, with `rootDir` = its
+  own `src`. The legacy package compiles against adt-clients' built
+  declarations through the workspace link, so the build order follows the
+  dependencies.
 - **What moves in.** Everything else ends up in the new package, and
   nothing of legacy stays in the root package:
   - **The legacy classes:**
@@ -40,13 +50,14 @@ probe records are outside the repository, in `~/prj/e77-probe/e77-results/`:
     - the helpers `deleteLegacy`, `refusalLegacy`, `readLegacy`,
       `abapUnitRunLegacy`.
   - **Tests:** their unit tests, the live suites
-    (`src/__tests__/integration/legacy/`), and the legacy helpers and admin
+    (`packages/adt-clients/src/__tests__/integration/legacy/` after the
+    move), and the legacy helpers and admin
     scripts of the tests (`legacyEnv`, `legacyLive`, `legacyRfc`,
     `legacyMembers`, `admin/legacy-env`).
   - **The ABAP environment:** `abap/`, the `legacy:*` scripts and the
     overlay keys.
   - **Docs:** `docs/architecture/LEGACY.md`.
-- **What stays in the root package:**
+- **What stays in `packages/adt-clients`:**
   - everything modern;
   - the shared test harness (the overlay loader, the session configuration,
     the recorder, the header pairs). It has to become **free of legacy**

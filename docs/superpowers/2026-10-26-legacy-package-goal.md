@@ -47,6 +47,15 @@ outside the repository, and nothing keeps them working.
 
 ## What changes
 
+- **The repository takes the owner's multi-package layout**, as in
+  `llm-agent`:
+  - a private root with `workspaces: ["packages/*"]`;
+  - every package under `packages/`: `adt-clients` (moved from the root),
+    `adt-strategies`, and the new legacy package;
+  - siblings depend on each other by semver ranges, and npm links them inside
+    the repository;
+  - `release:publish` publishes the packages whose version is not on the
+    registry.
 - **A new package in this repository** (`packages/<legacy package>`), with
   its own `package.json`, build, unit tests, live tests, docs and release
   tag. It depends on `@mcp-abap-adt/adt-clients` by a semver range. Inside
