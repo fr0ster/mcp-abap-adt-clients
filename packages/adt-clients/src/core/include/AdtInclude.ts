@@ -76,7 +76,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     IAdtLockable<IIncludeConfig>
 {
   constructor(
-    private readonly connection: IAbapConnection,
+    protected readonly connection: IAbapConnection,
     // Part of the constructor shape every client in this library shares. It is
     // unread here now that the members are single requests with nothing to
     // narrate; removing it would make this one class take different arguments.
@@ -86,7 +86,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
     private readonly contentTypes?: IAdtContentTypes,
     // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = includeDocuments as unknown as R,
+    protected readonly results: R = includeDocuments as unknown as R,
     // Last, so the constructor every consumer already calls keeps its shape.
     private readonly systemContext: IAdtSystemContext = {},
   ) {}

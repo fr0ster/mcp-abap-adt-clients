@@ -69,7 +69,7 @@ export class AdtMessageClass<
     IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
     IAdtLockable<IMessageClassConfig>
 {
-  private readonly connection: IAbapConnection;
+  protected readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
@@ -81,7 +81,7 @@ export class AdtMessageClass<
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
     // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = messageClassDocuments as unknown as R,
+    protected readonly results: R = messageClassDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;

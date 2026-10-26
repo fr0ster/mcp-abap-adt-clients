@@ -81,6 +81,9 @@ export const LEGACY_HEADER_PAIRS: [
   [AdtInterfaceLegacy, { delete: XML }],
   // completed for 36.0.0: accept was not sent, contentType was not sent
   [AdtProgramLegacy, { delete: XML }],
+  // measured on 7.40 SP04 (B4-cycles-20261026-2019): the delete under the lock
+  [AdtIncludeLegacy, { delete: XML }],
+  [AdtMessageClassLegacy, { delete: XML }],
   [AdtUtilsLegacy, { activateObjectsGroup: XML }],
 ];
 
@@ -151,16 +154,25 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
     ],
   ],
   // No deletion API on 7.40 (spec §4.3, §5).
-  [AdtClassLegacy, ['checkDeletion']],
-  [AdtProgramLegacy, ['checkDeletion']],
-  [AdtInterfaceLegacy, ['checkDeletion']],
-  [AdtFunctionGroupLegacy, ['checkDeletion']],
-  [AdtFunctionModuleLegacy, ['checkDeletion']],
+  [AdtClassLegacy, ['checkDeletion', 'readTransport']],
+  [AdtProgramLegacy, ['checkDeletion', 'readTransport']],
+  [AdtInterfaceLegacy, ['checkDeletion', 'readTransport']],
+  [AdtFunctionGroupLegacy, ['checkDeletion', 'readTransport']],
+  [AdtFunctionModuleLegacy, ['checkDeletion', 'readTransport']],
   // `checkCdsTestDoubles` stays refused (spec §10.3).
-  [AdtDdlLegacy, ['checkDeletion', 'checkCdsTestDoubles']],
-  [AdtIncludeLegacy, ['checkDeletion', 'delete']],
+  [
+    AdtDdlLegacy,
+    [
+      'checkDeletion',
+      'checkCdsTestDoubles',
+      'readTransport',
+      'getVersions',
+      'getVersionSource',
+    ],
+  ],
+  [AdtIncludeLegacy, ['checkDeletion']],
   [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
-  [AdtMessageClassLegacy, ['checkDeletion', 'delete']],
+  [AdtMessageClassLegacy, ['checkDeletion', 'updateMetadata']],
   // A legacy run is answered finished, with no run id to ask about; the
   // function module's `run` takes no function group, which its URI needs
   // (spec §6.2).

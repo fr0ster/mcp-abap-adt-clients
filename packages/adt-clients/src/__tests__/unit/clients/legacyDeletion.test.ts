@@ -68,9 +68,7 @@ const REFUSED: [getter: string, member: string, endpoint: string][] = [
   ['getFunctionInclude', 'checkDeletion', CHECK],
   ['getMessageClass', 'checkDeletion', CHECK],
   ['getUtils', 'checkDeletionGroup', CHECK],
-  ['getInclude', 'delete', DELETE],
   ['getFunctionInclude', 'delete', DELETE],
-  ['getMessageClass', 'delete', DELETE],
   ['getUtils', 'deleteObjectsGroup', DELETE],
 ];
 
@@ -124,6 +122,8 @@ describe('no deletion API on legacy', () => {
     'getFunctionGroup',
     'getFunctionModule',
     'getDdl',
+    'getInclude',
+    'getMessageClass',
   ];
 
   it.each([
@@ -148,12 +148,7 @@ describe('no deletion API on legacy', () => {
     },
   );
 
-  it.each([
-    'getPackage',
-    'getInclude',
-    'getFunctionInclude',
-    'getMessageClass',
-  ])(
+  it.each(['getPackage', 'getFunctionInclude'])(
     '%s().checkDeletion says there is no deletion check, and names no delete that refuses',
     async (getter) => {
       const row = LEGACY_REFUSED[getter]?.checkDeletion;

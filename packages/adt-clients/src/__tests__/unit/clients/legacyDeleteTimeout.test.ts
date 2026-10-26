@@ -55,6 +55,12 @@ const cases: Array<[string, (c: AdtClientLegacy) => Deletable, unknown]> = [
     { interfaceName: 'ZIF_X' },
   ],
   ['program', (c) => c.getProgram() as Deletable, { programName: 'ZPROG_X' }],
+  ['include', (c) => c.getInclude() as Deletable, { includeName: 'ZINC_X' }],
+  [
+    'message class',
+    (c) => c.getMessageClass() as Deletable,
+    { name: 'ZMSG_X' },
+  ],
 ];
 
 describe("legacy delete carries the caller's timeout", () => {
@@ -114,6 +120,7 @@ describe('legacy delete sends the measured request', () => {
       const { connection, sent } = await run(handler, config, { lockHandle });
       expect(sent).toHaveLength(1);
       expect(sent[0]?.method).toBe('DELETE');
+      expect(sent[0]?.headers).toMatchObject({ Accept: 'application/xml' });
       const url = sent[0]?.url as string;
       expect(url.endsWith(`?lockHandle=${encoded}`)).toBe(true);
       expect(url).not.toContain('_action=');

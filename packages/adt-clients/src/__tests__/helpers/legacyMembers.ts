@@ -647,13 +647,31 @@ function getters(names: readonly string[]): Rows<SendsRow> {
 }
 
 export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
-  getClass: Object.fromEntries([cls.refused('checkDeletion', '§5')]),
-  getProgram: Object.fromEntries([prog.refused('checkDeletion', '§5')]),
-  getInterface: Object.fromEntries([intf.refused('checkDeletion', '§5')]),
-  getFunctionGroup: Object.fromEntries([fugr.refused('checkDeletion', '§5')]),
-  getFunctionModule: Object.fromEntries([func.refused('checkDeletion', '§5')]),
+  getClass: Object.fromEntries([
+    cls.refused('checkDeletion', '§5'),
+    cls.refused('readTransport', '§2 measured in B4'),
+  ]),
+  getProgram: Object.fromEntries([
+    prog.refused('checkDeletion', '§5'),
+    prog.refused('readTransport', '§2 measured in B4'),
+  ]),
+  getInterface: Object.fromEntries([
+    intf.refused('checkDeletion', '§5'),
+    intf.refused('readTransport', '§2 measured in B4'),
+  ]),
+  getFunctionGroup: Object.fromEntries([
+    fugr.refused('checkDeletion', '§5'),
+    fugr.refused('readTransport', '§2 measured in B4'),
+  ]),
+  getFunctionModule: Object.fromEntries([
+    func.refused('checkDeletion', '§5'),
+    func.refused('readTransport', '§2 measured in B4'),
+  ]),
   getDdl: Object.fromEntries([
     ddl.refused('checkDeletion', '§5'),
+    ddl.refused('readTransport', '§2 measured in B4'),
+    ddl.refused('getVersions', '§2 measured in B4'),
+    ddl.refused('getVersionSource', '§2 measured in B4'),
     ddl.refused(
       'checkCdsTestDoubles',
       '§10.3 stays refused',
@@ -664,13 +682,10 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
     finc.refused('checkDeletion', '§5'),
     finc.refused('delete', '§4.3'),
   ]),
-  getInclude: Object.fromEntries([
-    incl.refused('checkDeletion', '§5'),
-    incl.refused('delete', '§4.3'),
-  ]),
+  getInclude: Object.fromEntries([incl.refused('checkDeletion', '§5')]),
   getMessageClass: Object.fromEntries([
     msag.refused('checkDeletion', '§5'),
-    msag.refused('delete', '§4.3'),
+    msag.refused('updateMetadata', '§2 measured in B4'),
   ]),
   getPackage: Object.fromEntries([
     pkg.refused('create', '§8 measured'),
@@ -943,7 +958,6 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     ]),
     cls.sends('validate', '§10.3 kept', [post(CLASS.validation)]),
     cls.sends('getVersionSource', '§10.3 kept', [get(VERSION_URI)]),
-    cls.sends('readTransport', '§10.3 kept', [get(transportUri(CLASS_URI))]),
     cls.sends('activateTestClasses', '§10.3 kept', [activation()]),
     cls.sends('readEnhancementElements', '§10.3 kept', [
       get(CLASS.enhancementElements('ZCL_GUARD')),
@@ -971,7 +985,6 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     prog.sends('validate', '§10.3 kept', [post(PROGRAM.validation)]),
     prog.sends('check', '§10.3 kept', [checkRun()]),
     prog.sends('getVersionSource', '§10.3 kept', [get(VERSION_URI)]),
-    prog.sends('readTransport', '§10.3 kept', [get(transportUri(PROGRAM_URI))]),
     prog.sends('readEnhancementElements', '§10.3 kept', [
       get(PROGRAM.enhancementElements('ZGUARD')),
     ]),
@@ -994,9 +1007,6 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     intf.sends('check', '§10.3 kept', [checkRun()]),
     intf.sends('validate', '§10.3 kept', [post(INTERFACE.validation)]),
     intf.sends('getVersionSource', '§10.3 kept', [get(VERSION_URI)]),
-    intf.sends('readTransport', '§10.3 kept', [
-      get(transportUri(INTERFACE_URI)),
-    ]),
   ]),
   getFunctionGroup: Object.fromEntries([
     fugr.sends('create', '§10.3 measured', [post(FUNCTION_GROUP.collection)]),
@@ -1008,7 +1018,6 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     fugr.sends('updateMetadata', '§10.3 kept', [writeWith(GROUP_URI)]),
     fugr.sends('check', '§10.3 kept', [checkRun()]),
     fugr.sends('validate', '§10.3 kept', [post(FUNCTION_GROUP.validation)]),
-    fugr.sends('readTransport', '§10.3 kept', [get(transportUri(GROUP_URI))]),
     fugr.sends('readEnhancementElements', '§10.3 kept', [
       get(FUNCTION_GROUP.enhancementElements('ZGUARD_FG')),
     ]),
@@ -1033,7 +1042,6 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
       get(versionsUri(sourceUri(MODULE_URI))),
     ]),
     func.sends('getVersionSource', '§10.3 kept', [get(VERSION_URI)]),
-    func.sends('readTransport', '§10.3 kept', [get(transportUri(MODULE_URI))]),
   ]),
   getDdl: Object.fromEntries([
     ddl.sends('create', '§10.3 measured', [post(DDL_SOURCE.collection)]),
@@ -1046,9 +1054,6 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     ddl.sends('activate', '§10.3 kept', [activation()]),
     ddl.sends('check', '§10.3 kept', [checkRun()]),
     ddl.sends('validate', '§10.3 kept', [post(DDL_SOURCE.validation)]),
-    ddl.sends('getVersions', '§10.3 kept', [get(versionsUri(DDL_URI))]),
-    ddl.sends('getVersionSource', '§10.3 kept', [get(VERSION_URI)]),
-    ddl.sends('readTransport', '§10.3 kept', [get(transportUri(DDL_URI))]),
   ]),
   getFunctionInclude: Object.fromEntries([
     finc.sends('create', '§10.3 measured, §10.4', [
@@ -1072,6 +1077,7 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     incl.sends('read', '§10.3 measured', [get(sourceUri(INCLUDE_URI))]),
     incl.sends('create', '§10.3 kept', [post(PROGRAM_INCLUDE.collection)]),
     incl.sends('update', '§10.3 kept', [writeWith(sourceUri(INCLUDE_URI))]),
+    incl.sends('delete', '§2 measured in B4', [deleteWith(INCLUDE_URI)]),
     incl.sends('lock', '§10.3 kept', [lockOf(INCLUDE_URI)]),
     incl.sends('unlock', '§10.3 kept', [unlockOf(INCLUDE_URI)]),
     incl.sends('activate', '§10.3 kept', [activation()]),
@@ -1087,7 +1093,7 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
   getMessageClass: Object.fromEntries([
     msag.sends('readMetadata', '§10.3 measured', [get(MSAG_URI)]),
     msag.sends('create', '§10.3 kept', [post(MESSAGE_CLASS.collection)]),
-    msag.sends('updateMetadata', '§10.3 kept', [writeWith(MSAG_URI)]),
+    msag.sends('delete', '§2 measured in B4', [deleteWith(MSAG_URI)]),
     msag.sends('lock', '§10.3 kept', [lockOf(MSAG_URI)]),
     msag.sends('unlock', '§10.3 kept', [unlockOf(MSAG_URI)]),
     msag.sends('validate', '§10.3 kept', [post(MESSAGE_CLASS.validation)]),

@@ -28,6 +28,37 @@ export function legacyRefusal<T, E extends IAdtError = IAdtError>(
 }
 
 /**
+ * `operation` refused because a run measured that 7.40 SP04 does not serve
+ * it: `measured` states what the run answered. Same shape as
+ * {@link legacyRefusal}; no request is sent.
+ */
+export function legacyMeasuredRefusal<T, E extends IAdtError = IAdtError>(
+  operation: string,
+  measured: string,
+): IAdtResponse<T, E> {
+  // The library's own verdict, as in legacyRefusal.
+  return failed<T, E>({
+    origin: 'refusal',
+    code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+    message: `${operation}: refused, measured on 7.40 SP04: ${measured}`,
+  } as E);
+}
+
+/**
+ * `readTransport` of a legacy handler: measured on 7.40 SP04, the object's
+ * `/transport` resource answers `404` for every type (record
+ * B4-cycles-20261026-2019).
+ */
+export function noTransportResource<T, E extends IAdtError = IAdtError>(
+  resource: string,
+): IAdtResponse<T, E> {
+  return legacyMeasuredRefusal<T, E>(
+    'readTransport',
+    `GET ${resource}/transport answers 404.`,
+  );
+}
+
+/**
  * `operation` refused until measured: 7.40 SP04's discovery does not advertise
  * `endpoint`, and no run on it has measured the endpoint. The same shape as
  * {@link legacyRefusal}; the words claim only what discovery shows.

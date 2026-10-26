@@ -19,7 +19,7 @@ import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck } from '../shared/refusalLegacy';
+import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 import { AdtClass } from './AdtClass';
 import type { classDocuments, IClassConfig, IClassResults } from './types';
 
@@ -70,5 +70,18 @@ export class AdtClassLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
+   * answers `404` for every type (record B4-cycles-20261026-2019).
+   */
+  override async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    return noTransportResource<ReturnType<R['transport']>, E>(
+      CLASS.uri(config.className as string),
+    );
   }
 }

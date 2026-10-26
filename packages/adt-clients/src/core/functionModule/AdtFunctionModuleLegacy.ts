@@ -18,7 +18,7 @@ import { FUNCTION_MODULE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck } from '../shared/refusalLegacy';
+import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 import { AdtFunctionModule } from './AdtFunctionModule';
 import type {
   functionModuleDocuments,
@@ -73,5 +73,21 @@ export class AdtFunctionModuleLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
+   * answers `404` for every type (record B4-cycles-20261026-2019).
+   */
+  override async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IFunctionModuleConfig>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    return noTransportResource<ReturnType<R['transport']>, E>(
+      FUNCTION_MODULE.uri(
+        config.functionGroupName as string,
+        config.functionModuleName as string,
+      ),
+    );
   }
 }

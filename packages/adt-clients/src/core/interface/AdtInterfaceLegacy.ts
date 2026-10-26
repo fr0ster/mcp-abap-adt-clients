@@ -17,7 +17,7 @@ import { INTERFACE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck } from '../shared/refusalLegacy';
+import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 import { AdtInterface } from './AdtInterface';
 import type {
   IInterfaceConfig,
@@ -72,5 +72,18 @@ export class AdtInterfaceLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
+   * answers `404` for every type (record B4-cycles-20261026-2019).
+   */
+  override async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IInterfaceConfig>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    return noTransportResource<ReturnType<R['transport']>, E>(
+      INTERFACE.uri(config.interfaceName as string),
+    );
   }
 }

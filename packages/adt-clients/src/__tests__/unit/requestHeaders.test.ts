@@ -113,11 +113,12 @@ const SENDS_NO_REQUEST = new Set([
   'AdtFunctionModuleLegacy.checkDeletion',
   'AdtDdlLegacy.checkDeletion',
   'AdtIncludeLegacy.checkDeletion',
-  'AdtIncludeLegacy.delete',
   'AdtFunctionIncludeLegacy.checkDeletion',
   'AdtFunctionIncludeLegacy.delete',
   'AdtMessageClassLegacy.checkDeletion',
-  'AdtMessageClassLegacy.delete',
+  // Measured on 7.40 SP04 (B4-cycles-20261026-2019): refused, no request
+  // (readTransport and the DDL version reads take no headers: not in this table).
+  'AdtMessageClassLegacy.updateMetadata',
   // Measured 404 on 7.40 (spec §10.2).
   'AdtUtilsLegacy.getWhereUsed',
   'AdtUtilsLegacy.getWhereUsedScope',

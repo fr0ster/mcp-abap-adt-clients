@@ -698,6 +698,9 @@ const LEGACY_REQUESTS: Record<string, string> = {
   'functionGroup.delete': 'as class',
   'functionModule.delete': 'as class',
   'ddl.delete': 'as class',
+  // Measured on 7.40 SP04 (B4-cycles-20261026-2019).
+  'include.delete': 'as class',
+  'messageClass.delete': 'as class',
   // Below 7.50 the CTS endpoint sits outside /sap/bc/adt/ (spec §7.2).
   'transport.readMetadata': 'GET /sap/bc/cts/transportrequests, spec §7.2',
 };

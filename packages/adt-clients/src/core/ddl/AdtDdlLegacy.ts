@@ -6,6 +6,8 @@
  * and refuses checkCdsTestDoubles(): the CDS test-doubles framework endpoint is
  * not present below 7.50 (issue #207).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
+ * readTransport(), getVersions() and getVersionSource() are refused without a
+ * request: measured on 7.40 SP04, their resources answer `404`.
  */
 
 import type {
@@ -17,11 +19,15 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
-import { DDL_SOURCE } from '../../endpoints/objects';
+import { DDL_SOURCE, versionsUri } from '../../endpoints/objects';
 import { answering, failed } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck } from '../shared/refusalLegacy';
+import {
+  legacyMeasuredRefusal,
+  noDeletionCheck,
+  noTransportResource,
+} from '../shared/refusalLegacy';
 import { AdtDdl } from './AdtDdl';
 import type { ddlDocuments, IDdlConfig, IDdlResults } from './types';
 
@@ -84,5 +90,46 @@ export class AdtDdlLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
+   * answers `404` for every type (record B4-cycles-20261026-2019).
+   */
+  override async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IDdlConfig>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    return noTransportResource<ReturnType<R['transport']>, E>(
+      DDL_SOURCE.uri(config.ddlName as string),
+    );
+  }
+
+  /**
+   * Refused without a request: measured on 7.40 SP04, `GET <DDL URI>/versions`
+   * answers `404` (record B4-cycles-20261026-2019).
+   */
+  override async getVersions<E extends IAdtError = IAdtError>(
+    config: Partial<IDdlConfig>,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+    return legacyMeasuredRefusal<ReturnType<R['versions']>, E>(
+      'getVersions',
+      `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName as string))} answers 404.`,
+    );
+  }
+
+  /**
+   * Refused without a request: the version list it takes its `contentUri`
+   * from answers `404` on 7.40 SP04 (record B4-cycles-20261026-2019).
+   */
+  override async getVersionSource<E extends IAdtError = IAdtError>(
+    _contentUri: string,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+    return legacyMeasuredRefusal<ReturnType<R['versionSource']>, E>(
+      'getVersionSource',
+      'the DDL version list (GET <DDL URI>/versions) answers 404, so there is no version to read.',
+    );
   }
 }
