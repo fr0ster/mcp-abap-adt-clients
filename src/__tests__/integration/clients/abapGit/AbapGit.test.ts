@@ -24,7 +24,6 @@ import type {
   IAbapConnection,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { abapGitDocuments } from '../../../../clients/abapGit/types';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
@@ -44,8 +43,6 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-
-dotenv.config();
 
 const { getTimeout } = require('../../../helpers/test-helper');
 

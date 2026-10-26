@@ -146,10 +146,11 @@ environment:
                                               #   to prove the lock was released. On: any refusal (404 included)
                                               #   fails. Off: not made, and the run says so. false on cloud, where
                                               #   the second session can land on a server that cannot see a new
-                                              #   object yet (404, measured).
+                                              #   object yet (404, measured; some runs only, a BTP trial
+                                              #   passed with true on 2026-10-25).
   read_message_class_after_create: true       # ← CHANGE: the message-class flow reads the class right after its
                                               #   create. On: any refusal (404 included) fails. Off: not read, and
-                                              #   the run says so. false on cloud (same 404, measured).
+                                              #   the run says so. false on cloud (same 404, some runs only).
   validate_transformation_names: true         # ← CHANGE: the transformation flows validate the name first
                                               #   (/sap/bc/adt/xslt/validation). On: any refusal (404 included)
                                               #   fails. Off: not sent, and the run says so. false where the

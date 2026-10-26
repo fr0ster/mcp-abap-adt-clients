@@ -96,7 +96,7 @@ A measurement overrides the discovery catalogue both ways: `/deletion/*` is not 
 | Delete | `POST /sap/bc/adt/deletion/check` + `/delete` | One `DELETE {objectUrl}?lockHandle=…` under the caller's lock — see [Delete](#delete-lock-delete-with-the-handle-unlock) |
 | Deletion check | `POST /sap/bc/adt/deletion/check` | refused: 7.40 has no deletion API |
 | Transport | `/sap/bc/adt/cts/transportrequests` | `/sap/bc/cts/transportrequests` — list and read only |
-| Source content type | `text/plain; charset=utf-8` | `text/plain` (requires `SAP_UNICODE=false` in `.env`) |
+| Source content type | `text/plain; charset=utf-8` | `text/plain` (requires `SAP_UNICODE=false` in the session file `MCP_ENV_PATH` names) |
 
 ## Delete: lock, delete with the handle, unlock
 

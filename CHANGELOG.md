@@ -191,6 +191,15 @@ families, which have no legacy variant and were not measured.
   `read_standard_transformation` runs on cloud, so the test failed there with
   "Standard transformation not configured". `ID` reads back on a BTP trial
   (200), and the test passes there.
+- **The cloud form says why its two checks are off, with both measurements.**
+  `verify_lock_released` and `read_message_class_after_create` stay `false` in
+  `overlays/cloud.yaml`: a cloud system answered 404 for a new object on one run
+  and a BTP trial passed with both `true` on another, so the 404 comes some runs
+  only, and an off check is said in the run.
+- **The AbapGit suite reads the environment the others read.** It called
+  `dotenv.config()` with no path, which reads a `.env` in the working directory
+  beside the file `MCP_ENV_PATH` names; it now relies on the test helper's load
+  alone, like every other suite.
 - **`shared_dependencies.package` is marked `← CHANGE`** in the template, as the
   other system-specific keys were. Its being unmarked is what let a realignment
   replace it with a placeholder unnoticed and cost a full run on 2026-09-01.

@@ -24,7 +24,7 @@ npm run lint:check      # Lint check + check:docs (no fixes)
 npm run check:docs      # Every name the docs import must exist
 npm run format          # Format code with Biome
 
-# Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.overlay.yaml)
+# Test (MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/<system>.env + the overlay MCP_TEST_OVERLAY names; no .env in the repository)
 # IMPORTANT: Always save full log first, then analyze. Never pipe through grep/tail/head.
 #
 # RUNNING FROM AN LLM CLI: use `npm run test:detached`. A full run is ~27 minutes,
@@ -67,7 +67,7 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
 - **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Six members, one request each — `link`, `pull({ package, pullLink })` (starts the pull and does not wait; polling `listRepos` is the caller's), `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo`. The key, pull link and log link come from `listRepos`; there is no `getRepo`. Result set as the fourth constructor argument (`abapGitDocuments` by default). Not a factory on AdtClient — consumers `new` it directly. Available on cloud + modern on-prem (ABAP Platform 2022+).
 
-All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. Optional: `options.enableAcceptCorrection` — `Accept` negotiation on HTTP 406 (and `Content-Type` on 415) is off unless switched on: the option, `setAcceptCorrectionEnabled`, or `ADT_ACCEPT_CORRECTION=true`; its state lives on the connection.
+All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. No request is corrected, sent again or remembered: a `406`/`415` is the call's answer (Accept negotiation was removed in 36.0.0). A caller that knows a system's media types passes them per call: `options.headers` (`{ accept, contentType }`) on the object members, `options.accept` on the `getUtils` reads.
 
 ### Core Modules (`src/core/`)
 
@@ -115,7 +115,7 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 
 ### Supporting Layers
 
-- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): off by default. When switched on, on HTTP 406 extracts supported content types from the response, caches the correct `Accept` per URL and retries once. `extractSupportedAccept`, `cachedAccept` and `rememberAccept` are exported for a consumer that corrects requests itself; the caches and the switch are per connection.
+- **Supported media types** (`src/utils/supportedMediaTypes.ts`): `extractSupportedAccept` (a 406 body's accepted content types) and `extractSupportedContentType` (a 415): pure parsers for a consumer that chooses the next request's headers itself; the library retries nothing.
 - **Runtime** (`src/runtime/`): profiler and cross/ST05 traces, application logs, ATC, DDIC activation graph, runtime dumps, feeds, system messages, gateway error log — each in its own subfolder, each with its result set.
 - **Executors** (`src/executors/`): Class/program execution and trace scheduling.
 - **System probes** (`src/utils/systemInfo.ts`, `src/utils/discoveryEndpoints.ts`): `getSystemInformation()`, `isModernAdtSystem()`, `fetchDiscoveryEndpoints()` answer 404/405/501 as an absent endpoint and raise any other failure.
@@ -135,8 +135,8 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 ## Testing Notes
 
 - All tests are integration tests against real SAP systems (no mocks); unit tests exist but are minimal (`src/__tests__/unit/`)
-- Tests require `.env` with SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) and the base template plus `test-config.overlay.yaml` with object names and parameters. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
-- **Where credentials come from**: `~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows (`<system>.env`, `<other-system>.env`, …) is the one source; copy what a run needs into the repo's `.env` before it starts. There are no per-system `*.env` copies in the repo root any more — they went stale as passwords rotated and produced 401s. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`. `.env` must still end up with `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`
+- Tests read SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) from the session file `MCP_ENV_PATH` names, and object names and parameters from the base template plus the overlay `MCP_TEST_OVERLAY` names. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
+- **Where credentials come from**: `~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows (`<system>.env`, `<other-system>.env`, …) is the one source; a run names its file with `MCP_ENV_PATH`. The repository holds no `.env` and no per-system copy (they went stale as passwords rotated and produced 401s); the helpers read the repository's `.env` only when `MCP_ENV_PATH` is unset. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`; the file a run names must carry `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT` — keep such a copy in the session directory, mode 600.
 - **Test config setup**: the tracked `src/__tests__/helpers/test-config.yaml.template` is the base. The system-specific keys go into the gitignored `src/__tests__/helpers/test-config.overlay.yaml`. To create it, run `npm run test:init -- onprem|cloud`, which copies the empty form from `helpers/overlays/` and never overwrites a file that is there. Then fill in every value: `environment.system` (`onprem` or `cloud`, which picks the connector and is stated, never inferred from `SAP_URL` or the auth type), the packages, transports, master system, software component and transport layers. The config is refused, naming the key, when an overlay key is unknown or its value is missing or a placeholder, or when a full `test-config.yaml` is left over. `npm run test-config:migrate` converts an old full `test-config.yaml` into the overlay once. The key list and the rules are in `docs/development/TEST_CONFIG_SCHEMA.md`. One overlay per system: `MCP_TEST_OVERLAY` names the overlay a run reads (`src/__tests__/helpers/test-config.overlay.<system>.yaml`, gitignored); a named overlay that does not exist is refused, never replaced by the default.
 - **Root package prerequisite**: The package specified in `default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do not create this package — they only create objects inside it.
 - `TestConfigResolver` resolves params with priority: `testCase.params` > `environment.default_*` > `SAP_*` env vars
@@ -176,9 +176,9 @@ environment:
 
 **Run tests — pass `SAPNWRFC_HOME` and `PATH`/`LD_LIBRARY_PATH` inline:**
 
-These vars CANNOT be in `.env` — `dotenv` doesn't expand `PATH`. Pass them at launch.
+These vars CANNOT be in the session file — `dotenv` doesn't expand `PATH`. Pass them at launch.
 
-Put the target system's credentials into `.env` first — from the session directory (`~/.config/mcp-abap-adt/sessions/` or, on Windows, `~/Documents/mcp-abap-adt/sessions/`) — `<other-system>.env` (see "Where credentials come from" above).
+Name the target system's session file with `MCP_ENV_PATH` — `~/.config/mcp-abap-adt/sessions/<system>.env` or, on Windows, `~/Documents/mcp-abap-adt/sessions/<system>.env` (see "Where credentials come from" above).
 
 Windows (Git Bash):
 ```bash
