@@ -1001,6 +1001,58 @@ describe('legacy env: the ABAP sources', () => {
     }
   });
 
+  it('report a request as deleted only when it was: a foreign task or a failed delete leaves it out', () => {
+    const env = code('zcl_lg7_env.clas.abap');
+    expect(env).toContain(
+      'METHODS delete_requests RETURNING VALUE(rt_deleted) TYPE tt_trkorr.',
+    );
+    const requests = methodOf(env, 'delete_requests');
+    // The foreign-task skip leaves the loop before anything is recorded.
+    const skip = requests.indexOf('a task of another user is in it');
+    expect(requests.indexOf('CONTINUE.', skip)).toBeLessThan(
+      requests.indexOf('APPEND lv_request TO rt_deleted.'),
+    );
+    // Recorded only when every TR_DELETE_COMM of the request succeeded.
+    expect(requests).toContain('lv_all_deleted = abap_false.');
+    expect(requests.split('lv_all_deleted = abap_false.').length - 1).toBe(2); // the failed call and the dynamic-call error
+    expect(requests).toContain(
+      'IF lv_all_deleted = abap_true.\n        APPEND lv_request TO rt_deleted.',
+    );
+    // REMOVE purges only when every marked request was deleted.
+    const remove = methodOf(env, 'remove');
+    expect(remove).toContain('lt_deleted = delete_requests( ).');
+    const kept = remove.indexOf(
+      '`a marked request was not deleted; deletion-flagged TADIR entries kept`',
+    );
+    expect(kept).toBeGreaterThan(-1);
+    expect(remove.indexOf('purge_deleted_entries( ).')).toBeGreaterThan(kept);
+    expect(remove).toContain('IF lv_survives = abap_true.');
+  });
+
+  it('purge a flagged TADIR entry only when no surviving request holds it', () => {
+    const env = code('zcl_lg7_env.clas.abap');
+    const purge = methodOf(env, 'purge_deleted_entries');
+    const held = purge.indexOf(
+      'FROM e071 INNER JOIN e070 ON e070~trkorr = e071~trkorr',
+    );
+    expect(held).toBeGreaterThan(-1);
+    expect(purge).toContain('WHERE e071~obj_name = ls_flagged-obj_name.');
+    const keep = purge.indexOf('iv_status = `KEPT`');
+    expect(keep).toBeGreaterThan(held);
+    expect(purge.indexOf('CONTINUE.', keep)).toBeLessThan(
+      purge.indexOf("CALL FUNCTION 'TR_TADIR_INTERFACE'"),
+    );
+  });
+
+  it('attempt no package deletion while any TADIR entry is left in it', () => {
+    const pkg = methodOf(code('zcl_lg7_env.clas.abap'), 'delete_package');
+    expect(pkg).toContain(
+      "SELECT COUNT(*) FROM tadir INTO lv_count\n      WHERE devclass = c_package AND object <> 'DEVC'.",
+    );
+    expect(pkg).not.toContain('delflag');
+    expect(pkg.indexOf('TADIR entr')).toBeLessThan(pkg.indexOf('CALL METHOD'));
+  });
+
   it('remove the package and the requests only in the second teardown phase', () => {
     const env = read('zcl_lg7_env.clas.abap');
     const first = methodOf(env, 'teardown');

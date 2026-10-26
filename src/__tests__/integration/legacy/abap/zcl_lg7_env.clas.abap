@@ -111,7 +111,7 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS marked_requests RETURNING VALUE(rt_requests) TYPE tt_trkorr.
     METHODS ensure_request.
     METHODS create_request RETURNING VALUE(rv_trkorr) TYPE trkorr.
-    METHODS delete_requests.
+    METHODS delete_requests RETURNING VALUE(rt_deleted) TYPE tt_trkorr.
     METHODS tadir_in_scope
       IMPORTING iv_keep_fixtures  TYPE abap_bool
       RETURNING VALUE(rt_objects) TYPE tt_object.
@@ -332,6 +332,10 @@ CLASS zcl_lg7_env IMPLEMENTATION.
 
   METHOD remove.
     DATA lt_requests TYPE tt_trkorr.
+    DATA lt_marked TYPE tt_trkorr.
+    DATA lt_deleted TYPE tt_trkorr.
+    DATA lv_request TYPE trkorr.
+    DATA lv_survives TYPE abap_bool.
     mv_action = `remove`.
     IF package_exists( ) = abap_true.
       ensure_request( ).
@@ -340,8 +344,23 @@ CLASS zcl_lg7_env IMPLEMENTATION.
       READ TABLE lt_requests INTO mv_request INDEX 1.
     ENDIF.
     delete_package( ).
-    delete_requests( ).
-    purge_deleted_entries( ).
+    lt_marked = marked_requests( ).
+    lt_deleted = delete_requests( ).
+    " A deletion-flagged TADIR entry is bookkeeping of the request that holds
+    " it: purged only when every marked request was confirmed deleted.
+    lv_survives = abap_false.
+    LOOP AT lt_marked INTO lv_request.
+      READ TABLE lt_deleted TRANSPORTING NO FIELDS WITH KEY table_line = lv_request.
+      IF sy-subrc <> 0.
+        lv_survives = abap_true.
+      ENDIF.
+    ENDLOOP.
+    IF lv_survives = abap_true.
+      add_log( iv_step = `tadir` iv_status = `WARN`
+               iv_message = `a marked request was not deleted; deletion-flagged TADIR entries kept` ).
+    ELSE.
+      purge_deleted_entries( ).
+    ENDIF.
   ENDMETHOD.
 
 
@@ -620,6 +639,8 @@ CLASS zcl_lg7_env IMPLEMENTATION.
   METHOD delete_requests.
     " Touches: the marked requests of sy-uname (never a released one) and
     " their tasks: object locks of each removed, then each deleted, tasks first.
+    " Answers the requests confirmed deleted: every TR_DELETE_COMM of the
+    " request and its tasks succeeded. A skipped or failed one is not in it.
     DATA lt_requests TYPE tt_trkorr.
     DATA lv_request TYPE trkorr.
     DATA lt_order TYPE tt_trkorr.
@@ -629,6 +650,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     DATA lt_tasks TYPE STANDARD TABLE OF e070.
     DATA ls_task TYPE e070.
     DATA lv_foreign TYPE abap_bool.
+    DATA lv_all_deleted TYPE abap_bool.
 
     lt_requests = marked_requests( ).
     IF lt_requests IS INITIAL.
@@ -653,6 +675,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       APPEND lv_request TO lt_order.
+      lv_all_deleted = abap_true.
       LOOP AT lt_order INTO lv_trkorr.
         CLEAR ls_unlock.
         ls_unlock-h-trkorr = lv_trkorr.
@@ -678,12 +701,17 @@ CLASS zcl_lg7_env IMPLEMENTATION.
             IF sy-subrc = 0.
               add_log( iv_step = `requests` iv_object = lv_trkorr iv_status = `DELETED` ).
             ELSE.
+              lv_all_deleted = abap_false.
               add_log( iv_step = `requests` iv_object = lv_trkorr iv_status = `ERROR` iv_message = sy_message( ) ).
             ENDIF.
           CATCH cx_sy_dyn_call_error INTO lx_call.
+            lv_all_deleted = abap_false.
             add_log( iv_step = `requests` iv_object = lv_trkorr iv_status = `ERROR` iv_message = lx_call->get_text( ) ).
         ENDTRY.
       ENDLOOP.
+      IF lv_all_deleted = abap_true.
+        APPEND lv_request TO rt_deleted.
+      ENDIF.
     ENDLOOP.
     commit( ).
     CLEAR mv_request.
@@ -1153,10 +1181,13 @@ CLASS zcl_lg7_env IMPLEMENTATION.
       add_log( iv_step = `package` iv_object = c_package iv_status = `ERROR` iv_message = lv_problem ).
       RETURN.
     ENDIF.
+    " Every TADIR entry counts, flagged or not: an object, or the deletion of
+    " one a request still holds - the package is not deleted under either.
     SELECT COUNT(*) FROM tadir INTO lv_count
-      WHERE devclass = c_package AND object <> 'DEVC' AND delflag = space.
+      WHERE devclass = c_package AND object <> 'DEVC'.
     IF lv_count > 0.
-      add_log( iv_step = `package` iv_object = c_package iv_status = `ERROR` iv_message = |{ lv_count } object(s) still in it; not deleted| ).
+      add_log( iv_step = `package` iv_object = c_package iv_status = `ERROR`
+               iv_message = |{ lv_count } TADIR entr(y/ies) still in it (objects, or deletions a request holds); not deleted| ).
       RETURN.
     ENDIF.
     IF mv_request IS INITIAL.
@@ -1218,17 +1249,28 @@ CLASS zcl_lg7_env IMPLEMENTATION.
   METHOD purge_deleted_entries.
     " Touches: TADIR entries flagged for deletion that belonged to ZLG7_TEST
     " (and the package's own entry) with our names and the current user as
-    " author. A deleted object keeps such
-    " an entry until its request is released; the marked requests are deleted
-    " instead, so the entry is dropped here.
+    " author. A deleted object keeps such an entry until its request is
+    " released; the marked requests are deleted instead, so the entry is
+    " dropped here - only when no request or task still existing (E070)
+    " holds an E071 row naming it; otherwise it is kept and logged.
     DATA lt_flagged TYPE tt_object.
     DATA ls_flagged TYPE ty_object.
+    DATA lv_holder TYPE trkorr.
     DATA lx_call TYPE REF TO cx_sy_dyn_call_error.
     SELECT object obj_name devclass FROM tadir INTO TABLE lt_flagged
       WHERE pgmid = 'R3TR' AND delflag = 'X' AND author = sy-uname
         AND ( devclass = c_package OR ( object = 'DEVC' AND obj_name = c_package ) ).
     LOOP AT lt_flagged INTO ls_flagged.
       IF is_own_name( ls_flagged-obj_name ) = abap_false OR is_env_name( ls_flagged-obj_name ) = abap_true.
+        CONTINUE.
+      ENDIF.
+      CLEAR lv_holder.
+      SELECT SINGLE e070~trkorr INTO lv_holder
+        FROM e071 INNER JOIN e070 ON e070~trkorr = e071~trkorr
+        WHERE e071~obj_name = ls_flagged-obj_name.
+      IF sy-subrc = 0.
+        add_log( iv_step = `tadir` iv_object = |{ ls_flagged-object } { ls_flagged-obj_name }| iv_status = `KEPT`
+                 iv_message = |request { lv_holder } still holds it| ).
         CONTINUE.
       ENDIF.
       TRY.
