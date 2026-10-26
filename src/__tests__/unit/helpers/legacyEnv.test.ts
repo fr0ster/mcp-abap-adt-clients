@@ -12,6 +12,7 @@ import {
   deleteLeftDdls,
   ENV_CLASSES,
   ensureClass,
+  ensureFixtures,
   envClasses,
   isCredentialRefusal,
   isOwnName,
@@ -358,17 +359,34 @@ describe('legacy env: settings into ABAP', () => {
   });
 });
 
-/** A client whose class handler answers `metadata` and records every call. */
-function stubTarget(metadata: string) {
+/**
+ * A client whose class handler answers `metadata` and records every call. The
+ * class source and its test include each keep an active and an inactive
+ * version: a write changes the inactive one, an activation copies it, unless
+ * `activates` is false (an activation that does not take).
+ */
+function stubTarget(
+  metadata: string,
+  options: {
+    active?: string;
+    inactive?: string;
+    activates?: boolean;
+  } = {},
+) {
   const calls: string[] = [];
-  const handler = {
+  const slot = () => ({
+    active: options.active ?? 'old source',
+    inactive: options.inactive ?? options.active ?? 'old source',
+  });
+  const slots = { main: slot(), tests: slot() };
+  const handlerOf = (which: 'main' | 'tests') => ({
     readMetadata: async () => {
       calls.push('readMetadata');
       return ok(metadata);
     },
-    read: async () => {
-      calls.push('read');
-      return ok('old source');
+    read: async (_c: object, version?: 'active' | 'inactive') => {
+      calls.push(version === 'active' ? 'read active' : 'read');
+      return ok(slots[which][version === 'active' ? 'active' : 'inactive']);
     },
     create: async () => {
       calls.push('create');
@@ -382,22 +400,29 @@ function stubTarget(metadata: string) {
       calls.push('unlock');
       return ok(undefined);
     },
-    update: async () => {
+    update: async (_c: object, o: { source?: string }) => {
       calls.push('update');
+      slots[which].inactive = o.source ?? '';
       return ok('');
     },
     activate: async () => {
       calls.push('activate');
+      if (options.activates !== false) {
+        slots.main.active = slots.main.inactive;
+        slots.tests.active = slots.tests.inactive;
+      }
       return ok('');
     },
     delete: async () => {
       calls.push('delete');
       return ok('');
     },
-  };
+  });
+  const handler = handlerOf('main');
+  const tests = handlerOf('tests');
   const client = {
     getClass: () => handler,
-    getLocalTestClass: () => handler,
+    getLocalTestClass: () => tests,
     getDdl: () => handler,
   };
   const target = { client, executor: {} } as unknown as LegacyEnvTarget;
@@ -562,7 +587,7 @@ describe('legacy env: a $TMP object of another user is never touched', () => {
         main: 'old source',
       });
     });
-    expect(calls).toEqual(['readMetadata', 'readMetadata', 'read']);
+    expect(calls).toEqual(['readMetadata', 'readMetadata', 'read active']);
   });
 
   it('leaves a $TMP DDL source of another user', async () => {
@@ -625,6 +650,7 @@ describe('legacy env: never writes what is not its own', () => {
     expect(calls).toEqual([
       'readMetadata',
       'readMetadata',
+      'read active',
       'read',
       'read',
       'lock',
@@ -632,6 +658,8 @@ describe('legacy env: never writes what is not its own', () => {
       'update',
       'unlock',
       'activate',
+      'read active',
+      'read active',
     ]);
   });
 
@@ -1031,7 +1059,13 @@ describe('legacy env: the class the owner runs by hand', () => {
  * A target whose every handler records `<call> <name>`, and whose ABAP Unit
  * runner records the runner it was asked to run.
  */
-function recordingTarget(options: { ddl: string }) {
+function recordingTarget(options: {
+  ddl: string;
+  /** Metadata per object name; the session user's `$TMP` object by default. */
+  metadata?: Record<string, string>;
+  /** Sources per name (`<class>#tests` for a test include); see `sourceOf`. */
+  sources?: Record<string, { active: string; inactive?: string }>;
+}) {
   const calls: string[] = [];
   const runs: string[] = [];
   const nameOf = (c: Record<string, string>) =>
@@ -1041,14 +1075,32 @@ function recordingTarget(options: { ddl: string }) {
     c.functionModuleName ??
     c.programName ??
     c.functionGroupName;
-  const handler = {
+  // A function include starts absent (an empty source); everything else
+  // present with an old source, active and inactive alike.
+  const sources = new Map<string, { active: string; inactive: string }>();
+  const sourceOf = (key: string) => {
+    let found = sources.get(key);
+    if (!found) {
+      const given = options.sources?.[key];
+      const start = key.startsWith('LZLG7') ? '' : 'old source';
+      found = {
+        active: given?.active ?? start,
+        inactive: given?.inactive ?? given?.active ?? start,
+      };
+      sources.set(key, found);
+    }
+    return found;
+  };
+  const handlerOf = (suffix: string) => ({
     readMetadata: async (c: Record<string, string>) => {
       calls.push(`readMetadata ${nameOf(c)}`);
-      return ok(c.ddlName ? options.ddl : MINE);
+      const name = nameOf(c) ?? '';
+      return ok(options.metadata?.[name] ?? (c.ddlName ? options.ddl : MINE));
     },
-    read: async (c: Record<string, string>) => {
+    read: async (c: Record<string, string>, version?: string) => {
       calls.push(`read ${nameOf(c)}`);
-      return ok('old source');
+      const found = sourceOf(`${nameOf(c)}${suffix}`);
+      return ok(version === 'active' ? found.active : found.inactive);
     },
     create: async (c: Record<string, string>) => {
       calls.push(`create ${nameOf(c)}`);
@@ -1062,22 +1114,29 @@ function recordingTarget(options: { ddl: string }) {
       calls.push(`unlock ${nameOf(c)}`);
       return ok(undefined);
     },
-    update: async (c: Record<string, string>) => {
+    update: async (c: Record<string, string>, o: { source?: string }) => {
       calls.push(`update ${nameOf(c)}`);
+      sourceOf(`${nameOf(c)}${suffix}`).inactive = o.source ?? '';
       return ok('');
     },
     activate: async (c: Record<string, string>) => {
       calls.push(`activate ${nameOf(c)}`);
+      for (const key of [`${nameOf(c)}`, `${nameOf(c)}#tests`]) {
+        const found = sourceOf(key);
+        found.active = found.inactive;
+      }
       return ok('');
     },
     delete: async (c: Record<string, string>) => {
       calls.push(`delete ${nameOf(c)}`);
       return ok('');
     },
-  };
+  });
+  const handler = handlerOf('');
+  const tests = handlerOf('#tests');
   const client = {
     getClass: () => handler,
-    getLocalTestClass: () => handler,
+    getLocalTestClass: () => tests,
     getDdl: () => handler,
     getProgram: () => handler,
     getFunctionGroup: () => handler,
@@ -1191,6 +1250,126 @@ describe('legacy env: the manual runner', () => {
     });
     expect(t.calls).not.toContain('lock');
     expect(t.calls).not.toContain('delete');
+  });
+});
+
+describe('legacy env: an interrupted write is activated on the next run', () => {
+  it('skips a class only when its active source is the one wanted', async () => {
+    // A previous run wrote the source and failed before the activation.
+    const { target, calls } = stubTarget(MINE, {
+      active: 'old',
+      inactive: 'new',
+    });
+    expect(
+      await ensureClass(target, {
+        name: 'ZCL_LG7_X',
+        description: 'd',
+        main: 'new',
+      }),
+    ).toBe(true);
+    expect(calls).toEqual([
+      'readMetadata',
+      'readMetadata',
+      'read active',
+      'read',
+      'activate',
+      'read active',
+    ]);
+  });
+
+  it('fails when the activation did not take', async () => {
+    const { target, calls } = stubTarget(MINE, { activates: false });
+    await expect(
+      ensureClass(target, { name: 'ZCL_LG7_X', description: 'd', main: 'new' }),
+    ).rejects.toThrow(
+      'class ZCL_LG7_X: the active source is not the one written; the activation did not take',
+    );
+    expect(calls).toContain('activate');
+  });
+
+  it('activates a written but inactive fixture source without writing it again', async () => {
+    const program = readFileSync(
+      join(ABAP_DIR, 'zlg7_fx_unit.prog.abap'),
+      'utf8',
+    );
+    const t = recordingTarget({
+      ddl: '',
+      sources: { ZLG7_FX_UNIT: { active: 'old', inactive: program } },
+    });
+    await ensureFixtures(t.target);
+    expect(t.calls).not.toContain('update ZLG7_FX_UNIT');
+    expect(t.calls).toContain('activate ZLG7_FX_UNIT');
+  });
+});
+
+describe("legacy env: an existing fixture member is replaced only when it is the session user's", () => {
+  const NO_ONE = '<fmodule:abapFunctionModule adtcore:name="Z_LG7_FX_UNIT"/>';
+  const module = readFileSync(
+    join(ABAP_DIR, 'zlg7_fx.fugr.z_lg7_fx_unit.abap'),
+    'utf8',
+  );
+  const untouched = (calls: string[], name: string) => {
+    for (const call of ['lock', 'update', 'activate'])
+      expect(calls).not.toContain(`${call} ${name}`);
+  };
+
+  it('refuses to replace a function module whose metadata names no one (as 7.40 sends it)', async () => {
+    const t = recordingTarget({ ddl: '', metadata: { Z_LG7_FX_UNIT: NO_ONE } });
+    await expect(ensureFixtures(t.target)).rejects.toThrow(
+      "function module Z_LG7_FX_UNIT names no person responsible, so it is not known to be the session user's; its source differs and is not replaced",
+    );
+    untouched(t.calls, 'Z_LG7_FX_UNIT');
+  });
+
+  it('refuses a function module another user is responsible for, reading no source', async () => {
+    const t = recordingTarget({
+      ddl: '',
+      metadata: { Z_LG7_FX_UNIT: OWNED('SOMEONE') },
+    });
+    await expect(ensureFixtures(t.target)).rejects.toThrow(
+      'function module Z_LG7_FX_UNIT is in $TMP, but another user is responsible for it; not touched',
+    );
+    untouched(t.calls, 'Z_LG7_FX_UNIT');
+    expect(t.calls).not.toContain('read Z_LG7_FX_UNIT');
+  });
+
+  it('leaves an unverifiable function module alone when its active source is the fixture', async () => {
+    const t = recordingTarget({
+      ddl: '',
+      metadata: { Z_LG7_FX_UNIT: NO_ONE },
+      sources: { Z_LG7_FX_UNIT: { active: module } },
+    });
+    await ensureFixtures(t.target);
+    untouched(t.calls, 'Z_LG7_FX_UNIT');
+  });
+
+  it('writes a function module the session user is responsible for', async () => {
+    const t = recordingTarget({ ddl: '' });
+    await ensureFixtures(t.target);
+    expect(t.calls).toContain('update Z_LG7_FX_UNIT');
+  });
+
+  it('refuses to replace an existing test include, whose owner cannot be read', async () => {
+    const t = recordingTarget({
+      ddl: '',
+      sources: { LZLG7_FXT99: { active: "someone else's tests" } },
+    });
+    await expect(ensureFixtures(t.target)).rejects.toThrow(
+      'function include LZLG7_FXT99 exists and its owner cannot be read from its metadata on this release; its source differs and is not replaced',
+    );
+    untouched(t.calls, 'LZLG7_FXT99');
+    expect(t.calls).not.toContain('create LZLG7_FXT99');
+  });
+
+  it('refuses a program another user is responsible for', async () => {
+    const t = recordingTarget({
+      ddl: '',
+      metadata: { ZLG7_FX_UNIT: OWNED('SOMEONE') },
+    });
+    await expect(ensureFixtures(t.target)).rejects.toThrow(
+      'program ZLG7_FX_UNIT is in $TMP, but another user is responsible for it; not touched',
+    );
+    untouched(t.calls, 'ZLG7_FX_UNIT');
   });
 });
 

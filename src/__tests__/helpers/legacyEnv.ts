@@ -692,11 +692,17 @@ async function assertLocal(handler: Writable, config: object, label: string) {
 }
 
 /**
- * The current (inactive, else active) source; `''` for an include never
- * written, which ADT answers with an empty body or a `404`.
+ * The source in `version` — `inactive` reads the inactive version, else the
+ * active one; `''` for an include never written, which ADT answers with an
+ * empty body or a `404`.
  */
-async function source(handler: Writable, config: object, label: string) {
-  const answer = await handler.read(config, 'inactive');
+async function source(
+  handler: Writable,
+  config: object,
+  label: string,
+  version: 'active' | 'inactive' = 'inactive',
+) {
+  const answer = await handler.read(config, version);
   stopOnCredentialRefusal(answer, `read ${label}`);
   if (!answer.ok && answer.getError().response?.status === 404) return '';
   return String(expectResult(answer, `read ${label}`) ?? '');
@@ -728,75 +734,125 @@ export async function ensureClass(
   }
   await assertLocal(handler, config, label);
 
-  const mainDiffers = !sameSource(
-    await source(handler, config, label),
-    cls.main,
-  );
-  const testsDiffer =
-    cls.testClasses !== undefined &&
-    !sameSource(
-      await source(tests, config, `${label} test classes`),
-      cls.testClasses,
-    );
-  if (!mainDiffers && !testsDiffer) return false;
+  // Done only when the ACTIVE source is the one wanted: a run that wrote and
+  // then failed in the unlock or the activation left it inactive.
+  const parts: Array<[Writable, string, string]> = [[handler, label, cls.main]];
+  if (cls.testClasses !== undefined)
+    parts.push([tests, `${label} test classes`, cls.testClasses]);
+  let current = true;
+  for (const [part, partLabel, text] of parts)
+    if (!sameSource(await source(part, config, partLabel, 'active'), text)) {
+      current = false;
+      break;
+    }
+  if (current) return false;
 
-  await withLock(lockable(handler), config, label, async (lockHandle) => {
-    if (mainDiffers)
-      expectResult(
-        await handler.update(config, {
-          headers: integrationHeadersOf(handler, 'update'),
-          lockHandle,
-          source: cls.main,
-        }),
-        `write ${label}`,
-      );
-    if (testsDiffer)
-      expectResult(
-        await tests.update(config, {
-          headers: integrationHeadersOf(tests, 'update'),
-          lockHandle,
-          source: cls.testClasses,
-        }),
-        `write ${label} test classes`,
-      );
-  });
+  const toWrite: Array<[Writable, string, string]> = [];
+  for (const part of parts)
+    if (!sameSource(await source(part[0], config, part[1]), part[2]))
+      toWrite.push(part);
+  if (toWrite.length > 0)
+    await withLock(lockable(handler), config, label, async (lockHandle) => {
+      for (const [part, partLabel, text] of toWrite)
+        expectResult(
+          await part.update(config, {
+            headers: integrationHeadersOf(part, 'update'),
+            lockHandle,
+            source: text,
+          }),
+          `write ${partLabel}`,
+        );
+    });
+  await activateAndVerify(handler, config, label, parts);
+  target.logger?.info(
+    `legacy env: ${toWrite.length > 0 ? 'wrote and ' : ''}activated ${label}`,
+  );
+  return true;
+}
+
+/**
+ * Activate, then read every part's active source back: an activation that
+ * answered without taking leaves the old implementation running.
+ */
+async function activateAndVerify(
+  handler: Writable,
+  config: object,
+  label: string,
+  parts: ReadonlyArray<readonly [Writable, string, string]>,
+): Promise<void> {
   expectResult(
     await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate'),
     }),
     `activate ${label}`,
   );
-  target.logger?.info(`legacy env: wrote and activated ${label}`);
-  return true;
+  for (const [part, partLabel, text] of parts)
+    if (!sameSource(await source(part, config, partLabel, 'active'), text))
+      throw new Error(
+        `legacy env: ${partLabel}: the active source is not the one written; the activation did not take`,
+      );
 }
 
-/** Keep one source object (program, module, include) current; `true` when written. */
+/**
+ * Keep one source object (program, module, include) current; `true` when it
+ * wrote or activated. Done only when the active source is the one wanted.
+ * `unverified` says why the object's owner is not established (an existing
+ * object whose metadata cannot name the session user); then any change —
+ * a write or the activation of an inactive version — is refused.
+ */
 async function ensureSource(
   target: LegacyEnvTarget,
   handler: Writable,
   config: object,
   label: string,
   text: string,
+  unverified?: string,
 ): Promise<boolean> {
-  if (sameSource(await source(handler, config, label), text)) return false;
-  await withLock(lockable(handler), config, label, async (lockHandle) =>
-    expectResult(
-      await handler.update(config, {
-        headers: integrationHeadersOf(handler, 'update'),
-        lockHandle,
-        source: text,
-      }),
-      `write ${label}`,
-    ),
+  if (sameSource(await source(handler, config, label, 'active'), text))
+    return false;
+  if (unverified !== undefined)
+    throw new Error(
+      `legacy env: ${label} ${unverified}; its source differs and is not replaced — delete it as the test user (npm run legacy:teardown, or SE80) and run setup again`,
+    );
+  const written = sameSource(await source(handler, config, label), text);
+  if (!written)
+    await withLock(lockable(handler), config, label, async (lockHandle) =>
+      expectResult(
+        await handler.update(config, {
+          headers: integrationHeadersOf(handler, 'update'),
+          lockHandle,
+          source: text,
+        }),
+        `write ${label}`,
+      ),
+    );
+  await activateAndVerify(handler, config, label, [[handler, label, text]]);
+  target.logger?.info(
+    `legacy env: ${written ? '' : 'wrote and '}activated ${label}`,
   );
-  expectResult(
-    await handler.activate(config, {
-      headers: integrationHeadersOf(handler, 'activate'),
-    }),
-    `activate ${label}`,
-  );
-  target.logger?.info(`legacy env: wrote and activated ${label}`);
   return true;
+}
+
+/**
+ * Why an existing member's owner is not established, or `undefined` when its
+ * metadata names the session user as responsible. Metadata naming another
+ * user, or a session user not known, refuses at once; metadata naming no one
+ * (a function module on 7.40 SP04, measured) answers why, so the caller
+ * refuses any change but leaves a current source alone.
+ */
+async function memberOwnership(
+  handler: Writable,
+  config: object,
+  label: string,
+): Promise<string | undefined> {
+  const answer = await handler.readMetadata(config);
+  stopOnCredentialRefusal(answer, `read ${label}`);
+  const metadata = String(expectResult(answer, `read ${label}`));
+  const why = notTheSessionUsers(metadata, packageOf(metadata));
+  if (why === undefined) return undefined;
+  if (sessionUser() !== undefined && responsibleOf(metadata) === undefined)
+    return why;
+  throw new Error(`legacy env: ${label} ${why}; not touched`);
 }
 
 /** Create `config` in `$TMP` when missing; then require it to be in `$TMP`. */
@@ -868,6 +924,9 @@ export async function ensureFixtures(target: LegacyEnvTarget): Promise<void> {
   const moduleHandler = as(c.getFunctionModule());
   const module = { ...group, functionModuleName: FIXTURES.functionModuleName };
   const moduleLabel = `function module ${module.functionModuleName}`;
+  // The group's owner is not its members': an existing module is written
+  // only when its own metadata names the session user.
+  let moduleOwner: string | undefined;
   if (!(await isPresent(moduleHandler, module, moduleLabel))) {
     expectResult(
       await moduleHandler.create(
@@ -876,13 +935,15 @@ export async function ensureFixtures(target: LegacyEnvTarget): Promise<void> {
       ),
       `create ${moduleLabel}`,
     );
-  }
+  } else
+    moduleOwner = await memberOwnership(moduleHandler, module, moduleLabel);
   await ensureSource(
     target,
     moduleHandler,
     module,
     moduleLabel,
     abapFile('zlg7_fx.fugr.z_lg7_fx_unit.abap'),
+    moduleOwner,
   );
 
   assertOwnName('function include', FIXTURES.testIncludeName);
@@ -890,8 +951,12 @@ export async function ensureFixtures(target: LegacyEnvTarget): Promise<void> {
   const include = { ...group, includeName: FIXTURES.testIncludeName };
   const includeLabel = `function include ${include.includeName}`;
   // The include's own metadata read is not measured on 7.40: its presence is
-  // read from its source, empty or `404` for an include never created.
+  // read from its source, empty or `404` for an include never created. An
+  // existing one has no owner this side can read, so it is never replaced.
+  let includeOwner: string | undefined =
+    'exists and its owner cannot be read from its metadata on this release';
   if ((await source(includeHandler, include, includeLabel)).trim() === '') {
+    includeOwner = undefined;
     expectResult(
       await includeHandler.create(
         { ...include, description: 'adt-clients legacy checks: tests' },
@@ -906,6 +971,7 @@ export async function ensureFixtures(target: LegacyEnvTarget): Promise<void> {
     include,
     includeLabel,
     abapFile('zlg7_fx.fugr.lzlg7_fxt99.abap'),
+    includeOwner,
   );
   expectResult(
     await groupHandler.activate(group, {

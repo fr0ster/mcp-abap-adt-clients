@@ -172,7 +172,11 @@ leftover DDL sources are written or deleted only when their metadata names the
 session user as the person responsible (`adtcore:responsible`, which 7.40 SP04
 sends on class and DDL source metadata); metadata that names no one, or an
 unknown session user, refuses — delete such an object in SE80 as the test
-user.
+user. An existing fixture function module (whose 7.40
+metadata names no one) or test include (whose owner this side cannot read) is
+never replaced: setup refuses when its active source differs. An object is
+current only when its ACTIVE source is the one wanted; a written but inactive
+source is activated on the next run and read back after the activation.
 A run of the live checks uses the fixtures and leaves them; only
 `legacy:teardown` removes them.
 
