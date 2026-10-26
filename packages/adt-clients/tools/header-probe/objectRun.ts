@@ -28,6 +28,7 @@ import {
 } from './corpus';
 import type { Interrupt, Ledger } from './ledger';
 import {
+  baseHandler,
   clientsOn,
   type IClients,
   type IHandlerSpec,
@@ -182,7 +183,7 @@ export const NOT_COVERABLE: readonly {
 export function coverageOf(
   member: Pick<IMemberEndpoint, 'handler' | 'member' | 'requests'>,
 ): Coverage {
-  const handler = member.handler;
+  const handler = baseHandler(member.handler);
   const refused = NOT_COVERABLE.find(
     (entry) =>
       entry.handler === handler &&

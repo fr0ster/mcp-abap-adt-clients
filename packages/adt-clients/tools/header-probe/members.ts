@@ -39,7 +39,57 @@ export interface IClients {
   runtime: AdtRuntimeClient;
   executor: AdtExecutor;
   abapGit: AdtAbapGitClient;
+  /** The clients of the registered client sets ({@link registerClientSet}), by key. */
+  more: Readonly<Record<string, object>>;
 }
+
+/**
+ * Clients of another package of this repository, probed beside these: each
+ * set's clients hand out handlers labelled `<prefix>get…()`, their pairs come
+ * from the set's own table, and a member the base client's same-named member
+ * does not send is not sent either. Registered by that package's entry point
+ * before the run; nothing here knows the classes.
+ */
+export interface IClientSet {
+  /** Prefix of every handler label, `'<word> '`. */
+  readonly prefix: string;
+  /** The set's clients on one connection, by key. */
+  build(
+    connection: IAbapConnection,
+    options?: ConstructorParameters<typeof AdtClient>[2],
+  ): Readonly<Record<string, object>>;
+  /** The corpus pair of `handler.member` (its label prefixed), or `undefined`. */
+  pairOf(handler: string, member: string): Partial<IAdtHeaders> | undefined;
+}
+
+const CLIENT_SETS: IClientSet[] = [];
+
+/** Probe another package's clients as well, from now on. */
+export function registerClientSet(set: IClientSet): void {
+  if (!/^\S+ $/.test(set.prefix))
+    throw new Error(
+      `a client set's prefix is a word and a space: "${set.prefix}"`,
+    );
+  if (CLIENT_SETS.some((known) => known.prefix === set.prefix)) return;
+  CLIENT_SETS.push(set);
+}
+
+/** The registered client set a handler label belongs to, if any. */
+const setOf = (handler: string): IClientSet | undefined =>
+  CLIENT_SETS.find((set) => handler.startsWith(set.prefix));
+
+/**
+ * The base client's label of a handler: a registered set's handler is the
+ * base handler of the same name (`'<prefix>getClass()'` → `'getClass()'`).
+ */
+export function baseHandler(handler: string): string {
+  const set = setOf(handler);
+  return set ? handler.slice(set.prefix.length) : handler;
+}
+
+/** Whether a handler label is a registered client set's. */
+export const isSetHandler = (handler: string): boolean =>
+  setOf(handler) !== undefined;
 
 export function clientsOn(
   connection: IAbapConnection,
@@ -52,6 +102,14 @@ export function clientsOn(
     runtime: new AdtRuntimeClient(connection),
     executor: new AdtExecutor(connection),
     abapGit: new AdtAbapGitClient(connection),
+    more: Object.fromEntries(
+      CLIENT_SETS.flatMap((set) =>
+        Object.entries(set.build(connection, options)).map(([key, client]) => [
+          `${set.prefix}${key}`,
+          client,
+        ]),
+      ),
+    ),
   };
 }
 
@@ -111,8 +169,11 @@ export const prototypeMembers = (prototype: object): string[] =>
  */
 export function handlerSpecs(clients: IClients): IHandlerSpec[] {
   const specs: IHandlerSpec[] = [];
-  const factories = (key: keyof IClients) => {
-    const client = clients[key] as unknown as Record<string, unknown>;
+  const factories = (
+    client: Record<string, unknown>,
+    of: (on: IClients) => Record<string, unknown>,
+    prefix = '',
+  ) => {
     for (const name of memberNames(client)) {
       if (!/^get[A-Z]/.test(name)) continue;
       let made: unknown;
@@ -123,17 +184,27 @@ export function handlerSpecs(clients: IClients): IHandlerSpec[] {
       }
       if (!made || typeof made !== 'object') continue;
       specs.push({
-        label: `${name}()`,
-        of: (on) =>
-          (on[key] as unknown as Record<string, () => Handler>)[name].call(
-            on[key],
-          ),
+        label: `${prefix}${name}()`,
+        of: (on) => {
+          const owner = of(on);
+          return (owner[name] as () => Handler).call(owner);
+        },
       });
     }
   };
-  factories('adt');
-  factories('runtime');
-  factories('executor');
+  const base = (key: 'adt' | 'runtime' | 'executor') => (on: IClients) =>
+    on[key] as unknown as Record<string, unknown>;
+  factories(base('adt')(clients), base('adt'));
+  factories(base('runtime')(clients), base('runtime'));
+  factories(base('executor')(clients), base('executor'));
+  for (const set of CLIENT_SETS)
+    for (const key of Object.keys(clients.more))
+      if (key.startsWith(set.prefix))
+        factories(
+          clients.more[key] as Record<string, unknown>,
+          (on) => on.more[key] as Record<string, unknown>,
+          set.prefix,
+        );
   specs.push({
     label: 'AdtAbapGitClient',
     of: (on) => on.abapGit as unknown as Handler,
@@ -389,11 +460,13 @@ export interface IMemberEndpoint {
   hasBody?: boolean;
 }
 
-/** The corpus pair of a member, from pairs.ts. */
+/** The corpus pair of a member, from pairs.ts; a client set's from its own table. */
 export function pairOf(
   handler: string,
   member: string,
 ): Partial<IAdtHeaders> | undefined {
+  const set = setOf(handler);
+  if (set) return set.pairOf(handler, member);
   return (
     knownPair(handler, member) ??
     (handler === 'getClass()' || handler.startsWith('getLocal')
@@ -502,7 +575,8 @@ export async function recordMembers(): Promise<{
       const standIn = standInParameters(capture.requests);
       if (standIn.length) entry.standIn = standIn;
       entry.hasBody = capture.requests.some((request) => request.hasBody);
-      const notSent = NOT_SENT[key];
+      // A client set's member is the base client's: the same reason.
+      const notSent = NOT_SENT[`${baseHandler(spec.label)}.${member}`];
       if (notSent) entry.skipped = `skipped: ${notSent}`;
       else if (!entry.requests.length)
         entry.skipped = capture.failure

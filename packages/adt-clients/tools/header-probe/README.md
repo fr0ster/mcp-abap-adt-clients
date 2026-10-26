@@ -146,7 +146,10 @@ header corpus, everything batched and poisoned envelopes split:
      `POST` that switches a trace on or schedules one, and the reentrance
      ticket (its answer is a logon ticket, a secret).
    - `clients`: every member of every handler the clients hand out —
-     `AdtClient`, `AdtRuntimeClient`, `AdtExecutor` and `AdtAbapGitClient`, read from the clients themselves, not from a list.
+     `AdtClient`, `AdtRuntimeClient`, `AdtExecutor` and `AdtAbapGitClient`, read from the clients themselves, not from a list;
+     plus the clients of any set another package's entry point registers
+     (`registerClientSet`, handlers labelled `<prefix>get…()`, pairs from its
+     own table) before it calls `runAndExit()`.
      Each member is first called against a connection that sends nothing and
      answers every request with an empty 200; the requests it builds are its
      endpoints (path with the probe name as `{name}`, method, `_action`).

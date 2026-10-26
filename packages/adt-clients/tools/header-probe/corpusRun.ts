@@ -83,6 +83,7 @@ import {
   withCleanup,
 } from './ledger';
 import {
+  baseHandler,
   clientsOn,
   handlerSpecs,
   type IClients,
@@ -924,8 +925,12 @@ async function runClients(ctx: IContext): Promise<void> {
         row,
         call: (on, analyse) => {
           // Into the ledger before the write is sent, whatever follows.
+          // A client set's object is the base client's: one entry, read and
+          // deleted through the base handler (measured on 7.40: the other
+          // package's read answered nothing, so its entry could not be
+          // checked).
           if (write && readable) {
-            const owner = specs.get(member.handler) ?? spec;
+            const owner = specs.get(baseHandler(member.handler)) ?? spec;
             const ownerOf = (clients: IClients) =>
               owner.of(clients) as IHandler;
             ctx.register(`clients ${owner.label}`, () => ({

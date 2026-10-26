@@ -4719,3 +4719,63 @@ describe('every lock the run takes is released on every path', () => {
       expect([...system.held]).toEqual([]);
     });
 });
+
+describe("another package's client set", () => {
+  /** The probe's members module, fresh, with a set registered. */
+  const withSet = () => {
+    let members: typeof import('../../../../tools/header-probe/members') =
+      undefined as never;
+    jest.isolateModules(() => {
+      members = require('../../../../tools/header-probe/members');
+    });
+    const { AdtClient: Client } = require('../../../clients/AdtClient');
+    members.registerClientSet({
+      prefix: 'extra ',
+      build: (connection) => ({ client: new Client(connection) }),
+      pairOf: (handler, member) =>
+        handler === 'extra getClass()' && member === 'delete'
+          ? { accept: 'x/extra' }
+          : undefined,
+    });
+    return members;
+  };
+
+  it('hands out its handlers with its prefix, its pairs from its own table', async () => {
+    const members = withSet();
+    const { members: rows } = await members.recordMembers();
+    const row = rows.find(
+      (m) => m.handler === 'extra getClass()' && m.member === 'delete',
+    );
+    expect(row?.pair).toEqual({ accept: 'x/extra' });
+    expect(
+      rows.find((m) => m.handler === 'extra getClass()' && m.member === 'read')
+        ?.pair,
+    ).toBeUndefined();
+    expect(members.pairOf('getClass()', 'delete')).toBeDefined();
+  });
+
+  it("reads a set's handler as the base one, and only a word and a space as a prefix", () => {
+    const members = withSet();
+    expect(members.baseHandler('extra getClass()')).toBe('getClass()');
+    expect(members.baseHandler('getClass()')).toBe('getClass()');
+    expect(members.isSetHandler('extra getClass()')).toBe(true);
+    expect(members.isSetHandler('getClass()')).toBe(false);
+    expect(() =>
+      members.registerClientSet({
+        prefix: 'bad',
+        build: () => ({}),
+        pairOf: () => undefined,
+      }),
+    ).toThrow('a word and a space');
+  });
+
+  it('is not probed unless registered', async () => {
+    let members: typeof import('../../../../tools/header-probe/members') =
+      undefined as never;
+    jest.isolateModules(() => {
+      members = require('../../../../tools/header-probe/members');
+    });
+    const { members: rows } = await members.recordMembers();
+    expect(rows.some((m) => m.handler.startsWith('extra '))).toBe(false);
+  });
+});

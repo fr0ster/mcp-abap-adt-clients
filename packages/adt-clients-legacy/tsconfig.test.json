@@ -17,7 +17,9 @@
     // The root package's shared test harness, by relative path: test-only
     // source in this repository, never part of either published package.
     "../adt-clients/src/__tests__/helpers/**/*",
-    "src/**/*"
+    "src/**/*",
+    // The header probe's legacy half, run on the root package's probe.
+    "tools/**/*"
   ],
   "exclude": ["node_modules", "dist"]
 }

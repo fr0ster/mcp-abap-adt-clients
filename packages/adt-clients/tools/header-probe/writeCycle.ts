@@ -20,6 +20,7 @@ import type {
 import { byContrast, emptyNamed, judge, realMediaTypes } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
+import { isSetHandler } from './members';
 import {
   type IObjectSpec,
   type ISpecContext,
@@ -185,6 +186,8 @@ export async function runWriteCycle(
   const members = new Set<string>();
   for (const key of input.unknown) {
     const who = key.slice(0, key.indexOf(' — '));
+    // A client set's writes stay as phase 1 left them.
+    if (isSetHandler(who)) continue;
     const handler = who.slice(0, who.lastIndexOf('.'));
     const member = who.slice(who.lastIndexOf('.') + 1);
     const type = typeOfHandler(handler);

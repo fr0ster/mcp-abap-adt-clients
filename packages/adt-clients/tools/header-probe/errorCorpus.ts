@@ -54,6 +54,9 @@
  * answer, bodies whole) and `.md` (a table per endpoint group, the summary).
  * The corpus holds system answers: it stays out of the repository.
  *
+ * Another package's clients are probed beside these when its entry point
+ * registers them (`registerClientSet` in members.ts) and calls `runAndExit()`.
+ *
  * More in tools/header-probe/README.md.
  */
 
@@ -193,7 +196,7 @@ function isolateFrom(files: readonly string[]): Set<string> {
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
-async function main(): Promise<number> {
+export async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
   const OUT_DIR = outputDir(args.out);
   try {
@@ -318,10 +321,18 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
   return exitCode;
 }
 
-main().then(
-  (code) => process.exit(code),
-  (error: unknown) => {
-    loud(`error corpus: ${message(error)}`);
-    process.exit(1);
-  },
-);
+/**
+ * Run it and exit with its code. Another package's entry point that registers
+ * its clients first (`registerClientSet`) calls this too.
+ */
+export function runAndExit(): void {
+  main().then(
+    (code) => process.exit(code),
+    (error: unknown) => {
+      loud(`error corpus: ${message(error)}`);
+      process.exit(1);
+    },
+  );
+}
+
+if (require.main === module) runAndExit();
