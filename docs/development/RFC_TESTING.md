@@ -153,7 +153,8 @@ has no `IF_OO_ADT_CLASSRUN`, so they run through ABAP Unit
 |---|---|
 | `npm run legacy:setup` | installs `ZCL_LG7_ENV` and its runners (`$TMP`, written only when the source differs); runs prepare — releases the user's locks on ZLG7 names, deletes leftovers (not the fixtures) and their inactive versions, reuses or creates the request `ZLG7 LEGACY-TEST …`, creates package `ZLG7_TEST`; deletes leftover DDL sources over ADT; creates or refreshes the fixtures in `$TMP` |
 | `npm run legacy:status` | reads: the open request, the package, every ZLG7 object in scope |
-| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions; deletes the DDL sources over ADT; runs remove — package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT. A credential refusal stops it at once |
+| `npm run legacy:teardown` | runs teardown — locks, every ZLG7 object in scope (fixtures included), inactive versions; deletes the DDL sources over ADT; runs remove — package `ZLG7_TEST`, every marked request of the user (none is ever released); then deletes the env classes over ADT (`ZCL_LG7_ENV_RUN` too, where a manual setup left it). A credential refusal stops it at once |
+| `npm run legacy:uninstall` | deletes only the env classes over ADT — `ZCL_LG7_ENV`, its runners and `ZCL_LG7_ENV_RUN`, each that is there, in `$TMP` and of the session user; the manual runner's last step |
 
 Reports go to `.legacy-env/<action>.json` (gitignored). Each command first asks
 `isModernAdtSystem()` and refuses a system that answers
@@ -203,6 +204,14 @@ returning its report lines — `@@LOG {json}` per step, `@@RESULT {json}` last,
 whose `"ok"` must be `true`. In SE24: class `ZCL_LG7_ENV_RUN` → **Test (F8)** →
 the method → **Execute (F8)** → double-click `RT_LINES`. The npm scripts do
 only the ADT part around those steps, and run no ABAP Unit runner.
+
+**Log on to SAP GUI as the `.env`'s `SAP_USERNAME`, in client `SAP_CLIENT`** —
+the user the npm steps run as. Everything `ZCL_LG7_ENV` does is tied to
+`sy-uname`: the `$TMP` objects it takes (TADIR author), the locks it releases,
+the request and task it creates and deletes. With ABAP Unit that was the ADT
+session's user; in SE24 it is whoever is logged on. Another user would create
+the request for themselves (the live checks would then write into another
+user's request) and `TEARDOWN` / `REMOVE` would miss the test user's objects.
 
 | # | Who | Step |
 |---|---|---|

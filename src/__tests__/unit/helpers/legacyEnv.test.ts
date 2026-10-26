@@ -870,6 +870,9 @@ describe('legacy env: the class the owner runs by hand', () => {
       softwareComponent: 'HOME',
       transportLayer: 'ZABC',
     });
+    expect(step).toContain(
+      "logged on as the .env's SAP_USERNAME in client SAP_CLIENT",
+    );
     expect(step).toContain(`SE24: ${MANUAL_RUNNER} -> Test (F8) -> PREPARE`);
     expect(step).toContain(
       'IV_SOFTWARE_COMPONENT = HOME and IV_TRANSPORT_LAYER = ZABC',
@@ -1031,6 +1034,17 @@ describe('legacy env: the manual runner', () => {
     expect(deleted).toEqual([...ENV_CLASSES]);
     expect(t.runs).toEqual([]);
     expect(handOff.next).toEqual([]);
+  });
+
+  it('uninstall refuses a class another user is responsible for, and deletes nothing', async () => {
+    const t = stubTarget(OWNED('SOMEONE'));
+    await asUser('TESTER', async () => {
+      await expect(uninstall(t.target)).rejects.toThrow(
+        'is in $TMP, but another user is responsible for it; not touched',
+      );
+    });
+    expect(t.calls).not.toContain('lock');
+    expect(t.calls).not.toContain('delete');
   });
 });
 

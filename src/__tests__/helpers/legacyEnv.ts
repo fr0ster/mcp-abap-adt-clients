@@ -416,7 +416,7 @@ export function manualStep(
       : settings
         ? ` with IV_SOFTWARE_COMPONENT = ${settings.softwareComponent} and IV_TRANSPORT_LAYER = ${settings.transportLayer}`
         : " with the overlay's legacy_env.software_component and transport_layer";
-  return `SE24: ${MANUAL_RUNNER} -> Test (F8) -> ${action.toUpperCase()} -> Execute (F8)${values}; RT_LINES ends with an @@RESULT line whose "ok" must be true`;
+  return `SAP GUI logged on as the .env's SAP_USERNAME in client SAP_CLIENT, SE24: ${MANUAL_RUNNER} -> Test (F8) -> ${action.toUpperCase()} -> Execute (F8)${values}; RT_LINES ends with an @@RESULT line whose "ok" must be true`;
 }
 
 /** The prepare runner's test include, the settings filled in. */
