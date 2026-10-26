@@ -67,7 +67,7 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
 - **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Six members, one request each — `link`, `pull({ package, pullLink })` (starts the pull and does not wait; polling `listRepos` is the caller's), `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo`. The key, pull link and log link come from `listRepos`; there is no `getRepo`. Result set as the fourth constructor argument (`abapGitDocuments` by default). Not a factory on AdtClient — consumers `new` it directly. Available on cloud + modern on-prem (ABAP Platform 2022+).
 
-All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. No request is corrected, sent again or remembered: a `406`/`415` is the call's answer (Accept negotiation was removed in 36.0.0). A caller that knows a system's media types passes them per call (`options.accept`).
+All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. No request is corrected, sent again or remembered: a `406`/`415` is the call's answer (Accept negotiation was removed in 36.0.0). A caller that knows a system's media types passes them per call: `options.headers` (`{ accept, contentType }`) on the object members, `options.accept` on the `getUtils` reads.
 
 ### Core Modules (`src/core/`)
 
