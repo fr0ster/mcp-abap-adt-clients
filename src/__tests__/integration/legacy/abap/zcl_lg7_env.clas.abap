@@ -112,7 +112,13 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS ensure_request.
     METHODS create_request RETURNING VALUE(rv_trkorr) TYPE trkorr.
     METHODS delete_requests.
+    METHODS tadir_in_scope
+      IMPORTING iv_keep_fixtures  TYPE abap_bool
+      RETURNING VALUE(rt_objects) TYPE tt_object.
     METHODS objects_in_scope
+      IMPORTING iv_keep_fixtures  TYPE abap_bool
+      RETURNING VALUE(rt_objects) TYPE tt_object.
+    METHODS recorded_deletions
       IMPORTING iv_keep_fixtures  TYPE abap_bool
       RETURNING VALUE(rt_objects) TYPE tt_object.
     METHODS delete_objects IMPORTING iv_keep_fixtures TYPE abap_bool.
@@ -139,6 +145,10 @@ CLASS zcl_lg7_env DEFINITION PUBLIC FINAL CREATE PUBLIC.
     CLASS-METHODS in_scope
       IMPORTING iv_devclass   TYPE devclass
                 iv_author     TYPE tadir-author
+      RETURNING VALUE(rv_yes) TYPE abap_bool.
+    CLASS-METHODS object_exists
+      IMPORTING iv_object     TYPE trobjtype
+                iv_obj_name   TYPE sobj_name
       RETURNING VALUE(rv_yes) TYPE abap_bool.
     CLASS-METHODS type_rank
       IMPORTING iv_object      TYPE trobjtype
@@ -680,7 +690,7 @@ CLASS zcl_lg7_env IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD objects_in_scope.
+  METHOD tadir_in_scope.
     " Touches nothing: TADIR entries (not flagged for deletion) in ZLG7_TEST
     " or $TMP with the current user as author, whose name is ours, minus
     " the env classes (and the fixtures, when asked). The LIKE patterns only
@@ -705,6 +715,81 @@ CLASS zcl_lg7_env IMPLEMENTATION.
       ENDIF.
       APPEND ls_found TO rt_objects.
     ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD objects_in_scope.
+    " Touches nothing: the TADIR entries in scope whose object is still
+    " there. A transportable object deleted on a request keeps its TADIR row
+    " in ZLG7_TEST until the request is released (we never release one): it
+    " is no leftover, and its row is the request's (see recorded_deletions).
+    " In $TMP every entry counts, as before.
+    DATA lt_found TYPE tt_object.
+    DATA ls_found TYPE ty_object.
+    lt_found = tadir_in_scope( iv_keep_fixtures ).
+    LOOP AT lt_found INTO ls_found.
+      IF ls_found-devclass = c_package
+          AND object_exists( iv_object = ls_found-object iv_obj_name = ls_found-obj_name ) = abap_false.
+        CONTINUE.
+      ENDIF.
+      APPEND ls_found TO rt_objects.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD recorded_deletions.
+    " Touches nothing: the TADIR entries in scope in ZLG7_TEST whose object
+    " is gone - deleted, the deletion recorded in the request.
+    DATA lt_found TYPE tt_object.
+    DATA ls_found TYPE ty_object.
+    lt_found = tadir_in_scope( iv_keep_fixtures ).
+    LOOP AT lt_found INTO ls_found.
+      IF ls_found-devclass = c_package
+          AND object_exists( iv_object = ls_found-object iv_obj_name = ls_found-obj_name ) = abap_false.
+        APPEND ls_found TO rt_objects.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD object_exists.
+    " Is the object itself there, by its own table: PROG TRDIR, CLAS and
+    " INTF SEOCLASS, FUGR TLIBG, DDLS DDDDLSRC, MSAG T100A. Read dynamically:
+    " a table or field this release lacks, and any other type, reads as
+    " present, so the object is handled as before.
+    DATA lv_table TYPE string.
+    DATA lv_field TYPE string.
+    DATA lv_where TYPE string.
+    DATA lv_count TYPE i.
+    rv_yes = abap_true.
+    CASE iv_object.
+      WHEN 'PROG'.
+        lv_table = 'TRDIR'.
+        lv_field = 'NAME'.
+      WHEN 'CLAS' OR 'INTF'.
+        lv_table = 'SEOCLASS'.
+        lv_field = 'CLSNAME'.
+      WHEN 'FUGR'.
+        lv_table = 'TLIBG'.
+        lv_field = 'AREA'.
+      WHEN 'DDLS'.
+        lv_table = 'DDDDLSRC'.
+        lv_field = 'DDLNAME'.
+      WHEN 'MSAG'.
+        lv_table = 'T100A'.
+        lv_field = 'ARBGB'.
+      WHEN OTHERS.
+        RETURN.
+    ENDCASE.
+    lv_where = |{ lv_field } = { cl_abap_dyn_prg=>quote( iv_obj_name ) }|.
+    TRY.
+        SELECT COUNT(*) FROM (lv_table) INTO lv_count WHERE (lv_where).
+        IF lv_count = 0.
+          rv_yes = abap_false.
+        ENDIF.
+      CATCH cx_sy_dynamic_osql_error.
+        rv_yes = abap_true.
+    ENDTRY.
   ENDMETHOD.
 
 
@@ -733,6 +818,13 @@ CLASS zcl_lg7_env IMPLEMENTATION.
     DATA ls_ranked TYPE ty_ranked.
     DATA lv_status TYPE string.
     DATA lv_deleted TYPE i.
+
+    " Deleted on the request already: reported, the TADIR row left to it.
+    lt_objects = recorded_deletions( iv_keep_fixtures ).
+    LOOP AT lt_objects INTO ls_object.
+      add_log( iv_step = `objects` iv_object = |{ ls_object-object } { ls_object-obj_name }|
+               iv_status = `OK` iv_message = `deleted, recorded in the request` ).
+    ENDLOOP.
 
     " Several passes: an object a dependent still blocks goes in the next one.
     DO 3 TIMES.

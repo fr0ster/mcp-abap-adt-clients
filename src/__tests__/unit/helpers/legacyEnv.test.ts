@@ -847,7 +847,7 @@ describe('legacy env: the ABAP sources', () => {
 
   it('take an object, in ZLG7_TEST and $TMP alike, only when its author is the current user', () => {
     const env = code('zcl_lg7_env.clas.abap');
-    const scope = methodOf(env, 'objects_in_scope');
+    const scope = methodOf(env, 'tadir_in_scope');
     expect(scope).toContain(
       'AND ( devclass = c_package OR devclass = c_local_package )\n        AND author = sy-uname',
     );
@@ -869,6 +869,47 @@ describe('legacy env: the ABAP sources', () => {
     expect(methodOf(env, 'purge_deleted_entries')).toContain(
       "WHERE pgmid = 'R3TR' AND delflag = 'X' AND author = sy-uname",
     );
+  });
+
+  it('read a transportable object deleted on the request as no leftover, and leave its TADIR row', () => {
+    const env = code('zcl_lg7_env.clas.abap');
+    // Existence by the object's own table, read dynamically: a table this
+    // release lacks reads as present, so the object is handled as before.
+    const exists = methodOf(env, 'object_exists');
+    for (const [type, table] of [
+      ['PROG', 'TRDIR'],
+      ['CLAS', 'SEOCLASS'],
+      ['INTF', 'SEOCLASS'],
+      ['FUGR', 'TLIBG'],
+      ['DDLS', 'DDDDLSRC'],
+      ['MSAG', 'T100A'],
+    ])
+      expect(`${type}: ${exists}`).toContain(`'${type}'`);
+    for (const table of ['TRDIR', 'SEOCLASS', 'TLIBG', 'DDDDLSRC', 'T100A'])
+      expect(exists).toContain(`lv_table = '${table}'.`);
+    expect(exists).toContain(
+      'SELECT COUNT(*) FROM (lv_table) INTO lv_count WHERE (lv_where).',
+    );
+    expect(exists).toContain('CATCH cx_sy_dynamic_osql_error');
+    expect(exists).toContain('rv_yes = abap_true.');
+    // Only in ZLG7_TEST: the request owns that row. $TMP is as before.
+    const scope = methodOf(env, 'objects_in_scope');
+    expect(scope).toContain('lt_found = tadir_in_scope( iv_keep_fixtures ).');
+    expect(scope).toContain(
+      'IF ls_found-devclass = c_package\n          AND object_exists( iv_object = ls_found-object iv_obj_name = ls_found-obj_name ) = abap_false.',
+    );
+    const recorded = methodOf(env, 'recorded_deletions');
+    expect(recorded).toContain(
+      'IF ls_found-devclass = c_package\n          AND object_exists( iv_object = ls_found-object iv_obj_name = ls_found-obj_name ) = abap_false.',
+    );
+    const deletes = methodOf(env, 'delete_objects');
+    const logged = deletes.indexOf(
+      'iv_message = `deleted, recorded in the request`',
+    );
+    expect(logged).toBeGreaterThan(-1);
+    expect(deletes.lastIndexOf('iv_status = `OK`', logged)).toBeGreaterThan(-1);
+    expect(logged).toBeLessThan(deletes.indexOf('DO 3 TIMES.'));
+    expect(recorded + deletes).not.toContain('TR_TADIR_INTERFACE');
   });
 
   it('adopt or delete package ZLG7_TEST only when the current user owns it', () => {

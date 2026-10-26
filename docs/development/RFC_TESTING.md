@@ -177,6 +177,10 @@ metadata names no one) or test include (whose owner this side cannot read) is
 never replaced: setup refuses when its active source differs. An object is
 current only when its ACTIVE source is the one wanted; a written but inactive
 source is activated on the next run and read back after the activation.
+A transportable object a live check deleted keeps its TADIR row in
+`ZLG7_TEST` until its request is released (none ever is): an object whose own
+table (TRDIR, SEOCLASS, TLIBG, DDDDLSRC, T100A) no longer has it is reported
+`deleted, recorded in the request` and its row is left to the request.
 `TEARDOWN` deletes the function group `ZLG7_FX` whole, with every member in
 it: the group is the test user's, and a module someone else adds to it is
 theirs to agree with the group's owner.
