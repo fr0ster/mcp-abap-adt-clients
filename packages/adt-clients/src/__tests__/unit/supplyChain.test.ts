@@ -25,6 +25,7 @@ const ROOT = resolve(__dirname, '../../../../..');
 const PACKAGES = [
   '.',
   'packages/adt-clients',
+  'packages/adt-clients-legacy',
   'packages/adt-strategies',
 ] as const;
 /** The workspace siblings, the only entries of the lockfile npm links. */

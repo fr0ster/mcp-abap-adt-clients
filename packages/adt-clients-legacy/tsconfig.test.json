@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".."
+  },
+  "include": [
+    // The root package's shared test harness, by relative path: test-only
+    // source in this repository, never part of either published package.
+    "../adt-clients/src/__tests__/helpers/**/*",
+    "src/**/*"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
