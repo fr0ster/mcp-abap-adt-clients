@@ -11,6 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **mcp-abap-adt-clients** (`@mcp-abap-adt/adt-clients`) is a TypeScript library providing ADT (ABAP Development Tools) clients for SAP ABAP systems. It offers both read-only and CRUD operations for SAP ABAP ADT objects through REST API. Node.js >=18, CommonJS output, strict TypeScript.
 
+The repository is a private root (`"private": true`, `"workspaces": ["packages/*"]`) around its packages: `packages/adt-clients` (this library) and `packages/adt-strategies` (`@mcp-abap-adt/adt-strategies`). Every path in this file is relative to `packages/adt-clients`, and its npm scripts run there, unless it names a root file (`package.json`, `package-lock.json`, `.npmrc`, `biome.json`, `tsconfig.base.json`, `tools/`, `.github/`, `.husky/`, `docs/superpowers/`). At the root: `npm run build|test:check|lint:check` for every package, `npm test` the unit suites of every package (no SAP system), `npm run check` the release gate, and `npm run release:publish` (`tools/publish-changed.js`, copied from mcp-abap-adt-interfaces) publishes the packages whose version is not on the registry, in `publishOrder`; `-- --dry-run` publishes nothing. Tags are `<package directory>-v<version>` (`adt-clients-v<version>`, `adt-strategies-v<version>`); `release.yml` has a job per package.
+
 ## Common Commands
 
 ```bash
@@ -47,7 +49,7 @@ DEBUG_ADT_TESTS=true npm test -- integration/view 2>&1 | tee test-run.log # With
 # Ask SAP directly: one request to several systems, every answer printed whole
 # (status, headers, body). Targets are session files under ~/.config/mcp-abap-adt/sessions/;
 # the system kind is stated (:onprem|:cloud|:legacy or SAP_SYSTEM_TYPE), never inferred.
-node_modules/.bin/ts-node scripts/adt-nc.ts --to <system>-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
+../../node_modules/.bin/ts-node scripts/adt-nc.ts --to <system>-tunnel --to trial:cloud GET /sap/bc/adt/programs/programs/rsparam -H 'Accept: application/vnd.sap.adt.programs.programs.v2+xml'
 
 # Unit tests only (no SAP system)
 npm run test:unit
@@ -126,8 +128,8 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 - Comments explain "why" not "what"
 - Never change `package.json` version without explicit user request
 - When updating CHANGELOG, ask user which version to use
-- After changing the version in `package.json`, always run `npm install --package-lock-only` to update `package-lock.json` and include it in the same commit
-- All dependencies must resolve from npm registry only. No local links or symlinks (`"link": true`) in `package-lock.json`. Sibling repos exist in parent directory — npm may auto-link them. Always verify after `npm install`.
+- After changing the version in a package's `package.json`, always run `npm install --package-lock-only` at the repository root to update the one `package-lock.json` and include it in the same commit
+- All third-party dependencies must resolve from the npm registry only. In `package-lock.json`, `"link": true` is allowed only for the workspace siblings (`node_modules/@mcp-abap-adt/adt-clients` → `packages/adt-clients`, `node_modules/@mcp-abap-adt/adt-strategies` → `packages/adt-strategies`); any other link is a defect. Sibling repos exist in parent directory — npm may auto-link them. Always verify after `npm install`.
 - Biome config: single quotes, semicolons always, indent 2 spaces
 - `noExplicitAny: warn` in production code, relaxed in tests
 - **All diagnostic output goes through an injected `ILogger` — never `console.*`.** This holds for test helpers and stubs as much as for library code: a logger stays silent unless the caller asks for output, so runs stay clean and one helper serves both quiet and verbose use, while a `console.*` call cannot be turned off by the caller. Give a helper an optional `logger?: ILogger` parameter and call `logger?.debug('message', { meta })`. Enforced by `noConsole` — `error` in production code, `warn` in tests (existing test occurrences are debt, not a precedent)
@@ -137,7 +139,7 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 - All tests are integration tests against real SAP systems (no mocks); unit tests exist but are minimal (`src/__tests__/unit/`)
 - Tests read SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) from the session file `MCP_ENV_PATH` names, and object names and parameters from the base template plus the overlay `MCP_TEST_OVERLAY` names. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
 - **Where credentials come from**: `~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows (`<system>.env`, `<other-system>.env`, …) is the one source; a run names its file with `MCP_ENV_PATH`. The repository holds no `.env` and no per-system copy (they went stale as passwords rotated and produced 401s); the helpers read the repository's `.env` only when `MCP_ENV_PATH` is unset. The session files are not uniform: some carry the full set, some only `SAP_LOGIN` and `SAP_PASSWORD`; the file a run names must carry `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT` — keep such a copy in the session directory, mode 600.
-- **Test config setup**: the tracked `src/__tests__/helpers/test-config.yaml.template` is the base. The system-specific keys go into the gitignored `src/__tests__/helpers/test-config.overlay.yaml`. To create it, run `npm run test:init -- onprem|cloud`, which copies the empty form from `helpers/overlays/` and never overwrites a file that is there. Then fill in every value: `environment.system` (`onprem` or `cloud`, which picks the connector and is stated, never inferred from `SAP_URL` or the auth type), the packages, transports, master system, software component and transport layers. The config is refused, naming the key, when an overlay key is unknown or its value is missing or a placeholder, or when a full `test-config.yaml` is left over. `npm run test-config:migrate` converts an old full `test-config.yaml` into the overlay once. The key list and the rules are in `docs/development/TEST_CONFIG_SCHEMA.md`. One overlay per system: `MCP_TEST_OVERLAY` names the overlay a run reads (`src/__tests__/helpers/test-config.overlay.<system>.yaml`, gitignored); a named overlay that does not exist is refused, never replaced by the default.
+- **Test config setup**: the tracked `src/__tests__/helpers/test-config.yaml.template` is the base. The system-specific keys go into the gitignored `src/__tests__/helpers/test-config.overlay.yaml`. To create it, run `npm run test:init -- onprem|cloud`, which copies the empty form from `helpers/overlays/` and never overwrites a file that is there. Then fill in every value: `environment.system` (`onprem` or `cloud`, which picks the connector and is stated, never inferred from `SAP_URL` or the auth type), the packages, transports, master system, software component and transport layers. The config is refused, naming the key, when an overlay key is unknown or its value is missing or a placeholder, or when a full `test-config.yaml` is left over. `npm run test-config:migrate` converts an old full `test-config.yaml` into the overlay once. The key list and the rules are in `docs/development/TEST_CONFIG_SCHEMA.md`. One overlay per system: `MCP_TEST_OVERLAY` names the overlay a run reads (`src/__tests__/helpers/test-config.overlay.<system>.yaml`, gitignored), relative to `packages/adt-clients` or absolute; a named overlay that does not exist is refused, never replaced by the default.
 - **Root package prerequisite**: The package specified in `default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do not create this package — they only create objects inside it.
 - `TestConfigResolver` resolves params with priority: `testCase.params` > `environment.default_*` > `SAP_*` env vars
 - **Tests never build a connection themselves.** `createTestConnection(logger)` from `src/__tests__/helpers/sessionConfig.ts` reads the target system and the authentication from config, picks the connector accordingly, opens the session, and returns it ready to use; `await connection.disconnect()` in `afterAll` releases it. `createTestConnection(logger, { ownSession: true })` opens a session of its own instead of joining the run's — the caller closes it with `closeOwnTestConnection()`; `expectLockReleased` (`helpers/lockReleased.ts`) is its one user. `reset()` is gone as of `@mcp-abap-adt/connection` 5.0.0 — it dropped the cookie locally and left the session open on the server
@@ -155,8 +157,8 @@ RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP st
 1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
 2. **The RFC transport needs no build at install.** It is `@mcp-abap-adt/sap-rfc-lite`, reached
    through `@mcp-abap-adt/connection` (nested at
-   `node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite`, never at the
-   top level). It has no install script (0.3.x), so a plain `npm ci` compiles nothing and
+   `node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite` of the
+   repository root, where npm installs the workspace — never at the top level). It has no install script (0.3.x), so a plain `npm ci` compiles nothing and
    installs its prebuilt binding for linux-x64 (glibc), darwin-arm64 and win32-x64, which loads at run time with
    the SDK's libraries on the library path (below). On any other platform build the binding from sap-rfc-lite's own repository (its README,
    "Installation": `git checkout v0.3.x`, `npm ci`, `npm run prebuild:native` with `SAPNWRFC_HOME`
@@ -205,17 +207,17 @@ See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for ful
 
 Supply-chain worms (Shai-Hulud and its kind) spread through dependencies' install scripts. So:
 
-- `allowScripts` in both `package.json` files (the root and `packages/adt-strategies`) lists every
-  package in the lockfile that has an install script, each denied (`false`); both directories have
-  an `.npmrc` with `strict-allow-scripts=true` (the strategies one exists because npm with
-  `--prefix` reads that directory's `.npmrc`), so a new dependency with an unreviewed install
-  script fails the install. A new entry needs its reason; the default answer is deny.
+- The root `package.json` `allowScripts` lists every package in the root lockfile that has an
+  install script, each denied (`false`), and no package's `allowScripts` allows one; the root
+  `.npmrc` has `strict-allow-scripts=true`, so a new dependency with an unreviewed install script
+  fails the install. A new entry needs its reason; the default answer is deny.
 - No `min-release-age`: it blocked installing a security fix while the gating audit failed CI.
-- CI and the release workflow install both packages with `npm ci --ignore-scripts`, and
-  `npm audit --audit-level=moderate` gates both trees. An advisory with no fixed release gets an
-  `overrides` entry with its reason in the CHANGELOG — never a non-gating audit.
+- CI and the release workflow install the repository once, at the root, with
+  `npm ci --ignore-scripts`, and `npm audit --audit-level=moderate` gates the one tree. An advisory
+  with no fixed release gets an `overrides` entry with its reason in the CHANGELOG — never a
+  non-gating audit.
 - Never `npx`: scripts call the installed bins (`biome`, `tsc`, `jest`, `ts-node`), shell scripts
-  `node_modules/.bin/…`. `src/__tests__/unit/supplyChain.test.ts` holds all of this.
+  the root's `../../node_modules/.bin/…`. `src/__tests__/unit/supplyChain.test.ts` holds all of this.
 
 ## Key Dependencies
 
@@ -224,10 +226,10 @@ Supply-chain worms (Shai-Hulud and its kind) spread through dependencies' instal
 - `@mcp-abap-adt/interfaces-network` — `IWebSocketTransport`, `HttpError`; `@mcp-abap-adt/interfaces-utils` — `ILogger`, `XmlNode`
 - `@mcp-abap-adt/logger` — Logging implementation
 - `fast-xml-parser` — XML parsing for ADT responses
-- `ts-node` — **dev only** — runs the probe and read scripts in `scripts/` (`node_modules/.bin/ts-node`)
+- `ts-node` — **dev only** — runs the probe and read scripts in `scripts/` (`../../node_modules/.bin/ts-node`, installed at the repository root)
 - `axios` — HTTP client (used internally by connection layer)
 - `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests; `@mcp-abap-adt/interfaces-auth` and `-auth-sap` are dev-only too
-- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, published on its own, and **not a workspace**: no local link. adt-clients' tests take it from npm as a devDependency (`^0.10.0`); the package builds and tests against what it installs from the registry (`npm ci --prefix packages/adt-strategies`). A strategy change that adt-clients' tests need is published first.
+- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, a workspace of the repository, published on its own. adt-clients' tests take it from npm as a devDependency (`^0.10.0`, which the workspace's 0.15.0 does not satisfy, so npm installs the published 0.10.x in `packages/adt-clients/node_modules`, not a link). Its build writes `ERRATA.md` (copied from `packages/adt-clients/docs/usage/`), because the release publishes with `--ignore-scripts`; its tests read adt-clients' `corpus/adt/`. A strategy change that adt-clients' tests need is published first.
 
 ## Public API (`src/index.ts`)
 
@@ -235,4 +237,4 @@ Exports the client classes, the handler classes exported directly, the result se
 
 ## Plans and Specs
 
-Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.
+Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` at the repository root (not part of any package) are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.
