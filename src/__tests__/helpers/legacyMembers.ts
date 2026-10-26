@@ -1,7 +1,7 @@
 /**
  * Every public member the legacy client and the legacy executor hand out, and
- * the one decision of the spec each is held to
- * (`docs/superpowers/specs/2026-10-23-legacy-740-design.md`).
+ * the one decision each is held to, as recorded in
+ * `docs/architecture/LEGACY.md` (measured on SAP_BASIS 7.40 SP04).
  *
  * `legacyMemberInventory.test.ts` walks every getter of `AdtClientLegacy` and
  * `AdtExecutorLegacy`, collects the members of what each returns through its
