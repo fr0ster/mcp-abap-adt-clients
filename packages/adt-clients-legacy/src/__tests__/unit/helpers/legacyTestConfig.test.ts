@@ -94,6 +94,41 @@ describe('a legacy system in its overlay', () => {
     }
   });
 
+  it('carries one live cycle per type and the utils readers, off, each naming objects of its own', () => {
+    const cycles = [
+      'legacy_cycle_class',
+      'legacy_cycle_program',
+      'legacy_cycle_interface',
+      'legacy_cycle_function_group',
+      'legacy_cycle_function_include',
+      'legacy_cycle_include',
+      'legacy_cycle_ddl',
+      'legacy_cycle_message_class',
+      'legacy_utils_readers',
+    ];
+    const { config } = loadTestConfigFrom(directory, undefined, EXTENSIONS);
+    const names: string[] = [];
+    for (const name of cycles) {
+      expect(LEGACY_CASES).toContain(name);
+      const testCase = config.legacy_740.test_cases.find(
+        (c: { name: string }) => c.name === name,
+      );
+      expect([name, testCase?.enabled]).toEqual([name, false]);
+      const values = Object.values(testCase.params ?? {}) as string[];
+      expect([name, values.length > 0]).toEqual([name, true]);
+      for (const value of values) {
+        // The prefixes the test environment cleans (legacyEnv.ts).
+        expect([name, value]).toEqual([
+          name,
+          expect.stringMatching(/^(ZLG7|ZCL_LG7_|ZIF_LG7_|Z_LG7_|LZLG7)/),
+        ]);
+        names.push(value);
+      }
+    }
+    // No two cycles share an object.
+    expect(new Set(names).size).toBe(names.length);
+  });
+
   it('turns the legacy client, its checks and its package on', () => {
     const named = put(
       'test-config.overlay.sys.yaml',

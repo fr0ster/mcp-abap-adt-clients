@@ -284,6 +284,10 @@ describe('legacy env: names and packages', () => {
     expect(isOwnName('function module', 'ZLG7_FX_UNIT')).toBe(false);
     expect(isOwnName('function include', 'LZLG7_FXT99')).toBe(true);
     expect(isOwnName('interface', 'ZIF_LG7_DEL')).toBe(true);
+    expect(isOwnName('include', 'ZLG7_C_INCL')).toBe(true);
+    expect(isOwnName('include', 'ZOTHER_INCL')).toBe(false);
+    expect(isOwnName('message class', 'ZLG7_C_MSAG')).toBe(true);
+    expect(isOwnName('message class', 'ZMSAG')).toBe(false);
     expect(() => assertOwnName('program', 'ZAC_PROG')).toThrow(
       'program ZAC_PROG is not a ZLG7 name',
     );

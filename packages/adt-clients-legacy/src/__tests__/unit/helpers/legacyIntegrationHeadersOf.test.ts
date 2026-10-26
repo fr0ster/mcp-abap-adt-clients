@@ -21,6 +21,7 @@ import { resolverOffenders } from '../../../../../adt-clients/src/__tests__/unit
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
 import { AdtFunctionIncludeLegacy } from '../../../core/functionInclude/AdtFunctionIncludeLegacy';
+import { AdtIncludeLegacy } from '../../../core/include/AdtIncludeLegacy';
 import { LEGACY_REFUSED } from '../../helpers/legacyMembers';
 import { REFUSED_WITHOUT_REQUEST } from '../../helpers/legacyRegistrations';
 
@@ -244,6 +245,23 @@ describe('integrationHeadersOf', () => {
         'create',
       ).contentType,
     ).toBe('application/vnd.sap.adt.functions.fincludes.v2+xml');
+  });
+
+  it('records the measured unversioned pair for the include create on a legacy client', () => {
+    const include = new AdtClientLegacy(connection(), logger).getInclude();
+    expect(include).toBeInstanceOf(AdtIncludeLegacy);
+    const unversioned = 'application/vnd.sap.adt.programs.includes+xml';
+    expect(integrationHeadersOf(include, 'create')).toEqual({
+      accept: unversioned,
+      contentType: unversioned,
+    });
+    // The modern client keeps v2.
+    expect(
+      integrationHeadersOf(
+        new AdtClient(connection(), logger).getInclude(),
+        'create',
+      ).contentType,
+    ).toBe('application/vnd.sap.adt.programs.includes.v2+xml');
   });
 
   it('is the only resolver in the legacy tests that reach SAP', () => {

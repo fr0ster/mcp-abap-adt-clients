@@ -20,6 +20,17 @@ const LEGACY_CASES = Object.freeze([
   'legacy_function_include',
   'legacy_transports',
   'legacy_transportable',
+  // One live cycle per type 7.40 SP04 serves through ADT, and the utils
+  // readers (spec §4).
+  'legacy_cycle_class',
+  'legacy_cycle_program',
+  'legacy_cycle_interface',
+  'legacy_cycle_function_group',
+  'legacy_cycle_function_include',
+  'legacy_cycle_include',
+  'legacy_cycle_ddl',
+  'legacy_cycle_message_class',
+  'legacy_utils_readers',
 ]);
 
 /**

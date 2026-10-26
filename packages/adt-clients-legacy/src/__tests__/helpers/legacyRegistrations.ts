@@ -81,8 +81,19 @@ export const LEGACY_HEADER_PAIRS: [
   [AdtInterfaceLegacy, { delete: XML }],
   // completed for 36.0.0: accept was not sent, contentType was not sent
   [AdtProgramLegacy, { delete: XML }],
-  // measured on 7.40 SP04 (B4-cycles-20261026-2019): the delete under the lock
-  [AdtIncludeLegacy, { delete: XML }],
+  // measured on 7.40 SP04 (B4-cycles-20261026-2019): the delete under the
+  // lock; the create with the unversioned type both ways (n1-create-alt:
+  // 200), where v2 answers 400 ExceptionContentHandlerNotFound (n1-create)
+  [
+    AdtIncludeLegacy,
+    {
+      delete: XML,
+      create: {
+        accept: 'application/vnd.sap.adt.programs.includes+xml',
+        contentType: 'application/vnd.sap.adt.programs.includes+xml',
+      },
+    },
+  ],
   [AdtMessageClassLegacy, { delete: XML }],
   [AdtUtilsLegacy, { activateObjectsGroup: XML }],
 ];

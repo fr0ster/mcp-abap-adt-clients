@@ -83,7 +83,9 @@ export type OwnKind =
   | 'function group'
   | 'function module'
   | 'function include'
-  | 'DDL source';
+  | 'DDL source'
+  | 'include'
+  | 'message class';
 
 /** The prefix each kind of object of this environment carries. */
 const PREFIXES: Record<OwnKind, readonly string[]> = {
@@ -94,6 +96,8 @@ const PREFIXES: Record<OwnKind, readonly string[]> = {
   'function module': ['Z_LG7_'],
   'function include': ['LZLG7'],
   'DDL source': ['ZLG7'],
+  include: ['ZLG7'],
+  'message class': ['ZLG7'],
 };
 
 /** Whether `name` is one of this environment's names for its kind. */

@@ -34,10 +34,12 @@ legacy_env:
 # - The fixtures (ZCL_LG7_FX_UNIT, ZLG7_FX_UNIT, ZLG7_FX with Z_LG7_FX_UNIT and
 #   its test include) are created by legacy:setup in $TMP; their names are
 #   fixed there (legacyEnv.ts FIXTURES), not here.
-# - legacy_deletes and legacy_function_include create objects of their own in
-#   $TMP and delete them; legacy_transportable creates one in package
-#   ZLG7_TEST on the environment's request. Name objects that do not exist,
-#   keeping the prefix; leftovers of a crashed run are removed by legacy:setup.
+# - legacy_deletes, legacy_function_include and the legacy_cycle_* cases
+#   (with legacy_utils_readers) create objects of their own in $TMP and delete
+#   them; legacy_transportable creates one in package ZLG7_TEST on the
+#   environment's request. Name objects that do not exist, keeping the prefix;
+#   leftovers of a crashed run are removed by legacy:setup (the include and the
+#   message class of a cycle excepted: remove those by hand).
 legacy_740:
   test_cases:
     - name: "legacy_deletes"
@@ -83,3 +85,55 @@ legacy_740:
       params:
         # The package and the request are the environment's (legacy:setup).
         program_name: "ZLG7_TR_PROG"              # a ZLG7 name that does not exist yet
+    # One live cycle per type 7.40 SP04 serves through ADT (spec §4): each
+    # validates its names free, creates its objects in $TMP (no transport),
+    # runs the cycle on them asserting every request, and deletes them —
+    # also on failure, and only what it created.
+    - name: "legacy_cycle_class"
+      enabled: false
+      description: "Class: create, lock, write main and the four local includes, unlock, activate, read each, readMetadata, check each, versions of each, readTransport refused, lock → delete → unlock, 404"
+      params:
+        class_name: "ZCL_LG7_C_CLAS"              # a ZLG7 name that does not exist yet
+    - name: "legacy_cycle_program"
+      enabled: false
+      description: "Program: create, lock → update → unlock, activate, read, readMetadata, check, versions, readTransport refused, lock → delete → unlock, 404"
+      params:
+        program_name: "ZLG7_C_PROG"
+    - name: "legacy_cycle_interface"
+      enabled: false
+      description: "Interface: create, lock → update → unlock, activate, read, readMetadata, check, versions, readTransport refused, lock → delete → unlock, 404"
+      params:
+        interface_name: "ZIF_LG7_C_INTF"
+    - name: "legacy_cycle_function_group"
+      enabled: false
+      description: "Function group (create, activate, check) and module (create, lock → plain body → unlock, activate, read, readMetadata, check, versions, validate, lock → delete → unlock, 404), then the group lock → delete → unlock, 404"
+      params:
+        function_group_name: "ZLG7_C_FUGR"
+        function_module_name: "Z_LG7_C_FUNC"
+    - name: "legacy_cycle_function_include"
+      enabled: false
+      description: "Function include in a group of its own: create (v1 pair), lock → update → unlock, activate, read, readMetadata, check; removed with the group, read 404"
+      params:
+        function_group_name: "ZLG7_C_FI"
+        include_name: "LZLG7_C_FIF01"           # L<group>F01
+    - name: "legacy_cycle_include"
+      enabled: false
+      description: "Include: create (unversioned pair), lock → update → unlock, activate, read, readMetadata, lock → delete → unlock, 404"
+      params:
+        include_name: "ZLG7_C_INCL"
+    - name: "legacy_cycle_ddl"
+      enabled: false
+      description: "DDL source: create, lock → a view over T000 → unlock, activate, read, readMetadata, check, getVersions refused, lock → delete → unlock, 404"
+      params:
+        ddl_name: "ZLG7_C_DDLS"
+        sql_view_name: "ZLG7_C_DDLV"             # up to 16 characters
+    - name: "legacy_cycle_message_class"
+      enabled: false
+      description: "Message class: create, lock → unlock, readMetadata, updateMetadata refused; message 001 create, read, update, read, delete, read; lock → delete → unlock, readMetadata an empty 200"
+      params:
+        message_class_name: "ZLG7_C_MSAG"        # up to 20 characters
+    - name: "legacy_utils_readers"
+      enabled: false
+      description: "Utils readers on a program of its own: search, getObjectStructure, fetchNodeStructure of $TMP, discovery, getInactiveObjects before and after activateObjectsGroup"
+      params:
+        program_name: "ZLG7_C_UTIL"

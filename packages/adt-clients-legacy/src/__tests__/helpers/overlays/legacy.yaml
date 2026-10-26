@@ -17,3 +17,12 @@
 # "legacy_740.test_cases[legacy_function_include].enabled": true
 # "legacy_740.test_cases[legacy_transports].enabled": true
 # "legacy_740.test_cases[legacy_transportable].enabled": true
+# "legacy_740.test_cases[legacy_cycle_class].enabled": true
+# "legacy_740.test_cases[legacy_cycle_program].enabled": true
+# "legacy_740.test_cases[legacy_cycle_interface].enabled": true
+# "legacy_740.test_cases[legacy_cycle_function_group].enabled": true
+# "legacy_740.test_cases[legacy_cycle_function_include].enabled": true
+# "legacy_740.test_cases[legacy_cycle_include].enabled": true
+# "legacy_740.test_cases[legacy_cycle_ddl].enabled": true
+# "legacy_740.test_cases[legacy_cycle_message_class].enabled": true
+# "legacy_740.test_cases[legacy_utils_readers].enabled": true
