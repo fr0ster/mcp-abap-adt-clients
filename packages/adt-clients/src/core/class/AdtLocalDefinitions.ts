@@ -11,6 +11,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -30,6 +31,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -59,8 +61,9 @@ export type { ILocalDefinitionsConfig } from '@mcp-abap-adt/interfaces-adt';
  */
 export class AdtLocalDefinitions<
     R extends IClassResults = typeof classDocuments,
+    V extends AdtVariant = AdtModernVariant,
   >
-  extends AdtClassMemberBase<R>
+  extends AdtClassMemberBase<R, V, 'localDefinitions'>
   implements
     IAdtReadable<ILocalDefinitionsConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalDefinitionsConfig, ReturnType<R['metadata']>>,

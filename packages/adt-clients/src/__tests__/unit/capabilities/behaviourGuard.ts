@@ -105,9 +105,21 @@ export function bodyFor(url: string, activationBody: string): string {
   return OBJECT_BODY;
 }
 
-export function recordingClient(
+export function recordingClient(activationBody: string = ACTIVATION_OK) {
+  return recordingClientOf(AdtClient, activationBody);
+}
+
+/**
+ * The same recording over any client class: a subclass of another variant
+ * (the legacy package's), whose factories the modern manifest drives as a
+ * caller outside the type system would.
+ */
+export function recordingClientOf<C>(
+  Client: new (
+    connection: IAbapConnection,
+    logger: ReturnType<typeof createLibraryLogger>,
+  ) => C,
   activationBody: string = ACTIVATION_OK,
-  Client: typeof AdtClient = AdtClient,
 ) {
   const calls: Recorded[] = [];
   const sessionTypes: string[] = [];

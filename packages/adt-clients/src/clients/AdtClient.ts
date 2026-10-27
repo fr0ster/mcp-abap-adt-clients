@@ -17,6 +17,7 @@
  */
 
 import type {
+  AdtVariant,
   IAccessControlResults,
   IAdtClientOptions,
   IAdtContentTypes,
@@ -143,8 +144,16 @@ import {
 } from '../core/transformation';
 import { AdtRequest, transportDocuments } from '../core/transport';
 import { withRequestTrace } from '../utils/requestTrace';
+import type { AdtModernVariant, AdtServedBy } from './variant';
 
-export class AdtClient {
+export class AdtClient<V extends AdtVariant = AdtModernVariant> {
+  /**
+   * The variant, as a type only — never set. It makes the variant part of the
+   * client's structure: without it a 7.40 client would be assignable to a
+   * modern `AdtClient`, whose factories its gates refuse, and the upcast would
+   * call them.
+   */
+  protected readonly variant?: V;
   protected connection: IAbapConnection;
   protected logger: ILogger;
   protected systemContext: IAdtSystemContext;
@@ -239,10 +248,11 @@ export class AdtClient {
   // Generic in R, defaulting to the shipped set: erasing R here would build the
   // object at `unknown` while the members answer `ReturnType<R['source']>`.
   getClass<R extends IClassResults = typeof classDocuments>(
+    this: this & AdtServedBy<V, 'class'>,
     results: R = classDocuments as unknown as R,
-  ): AdtClass<R> {
+  ): AdtClass<R, V> {
     this.assertConnected();
-    return new AdtClass<R>(
+    return new AdtClass<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -257,10 +267,11 @@ export class AdtClient {
    * @returns IAdtObject instance for Program operations
    */
   getProgram<R extends IProgramResults = typeof programDocuments>(
+    this: this & AdtServedBy<V, 'program'>,
     results: R = programDocuments as unknown as R,
-  ): AdtProgram<R> {
+  ): AdtProgram<R, V> {
     this.assertConnected();
-    return new AdtProgram<R>(
+    return new AdtProgram<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -282,10 +293,11 @@ export class AdtClient {
    * collection an `app:accept`.
    */
   getInclude<R extends IIncludeResults = typeof includeDocuments>(
+    this: this & AdtServedBy<V, 'include'>,
     results: R = includeDocuments as unknown as R,
-  ): AdtInclude<R> {
+  ): AdtInclude<R, V> {
     this.assertConnected();
-    return new AdtInclude<R>(
+    return new AdtInclude<R, V>(
       this.connection,
       this.logger,
       this.contentTypes,
@@ -299,10 +311,11 @@ export class AdtClient {
    * @returns IAdtObject instance for Interface operations
    */
   getInterface<R extends IInterfaceResults = typeof interfaceDocuments>(
+    this: this & AdtServedBy<V, 'interface'>,
     results: R = interfaceDocuments as unknown as R,
-  ): AdtInterface<R> {
+  ): AdtInterface<R, V> {
     this.assertConnected();
-    return new AdtInterface<R>(
+    return new AdtInterface<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -317,6 +330,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Domain operations
    */
   getDomain<R extends IDomainResults = typeof domainDocuments>(
+    this: this & AdtServedBy<V, 'domain'>,
     results: R = domainDocuments as unknown as R,
   ): AdtDomain<R> {
     this.assertConnected();
@@ -386,6 +400,7 @@ export class AdtClient {
    * @returns IAdtObject instance for DataElement operations
    */
   getDataElement<R extends IDataElementResults = typeof dataElementDocuments>(
+    this: this & AdtServedBy<V, 'dataElement'>,
     results: R = dataElementDocuments as unknown as R,
   ): AdtDataElement<R> {
     this.assertConnected();
@@ -405,6 +420,7 @@ export class AdtClient {
   getAuthorizationField<
     R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
   >(
+    this: this & AdtServedBy<V, 'authorizationField'>,
     results: R = authorizationFieldDocuments as unknown as R,
   ): AdtAuthorizationField<R> {
     this.assertConnected();
@@ -422,6 +438,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Structure operations
    */
   getStructure<R extends IStructureResults = typeof structureDocuments>(
+    this: this & AdtServedBy<V, 'structure'>,
     results: R = structureDocuments as unknown as R,
   ): AdtStructure<R> {
     this.assertConnected();
@@ -439,6 +456,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Table operations
    */
   getTable<R extends ITableResults = typeof tableDocuments>(
+    this: this & AdtServedBy<V, 'table'>,
     results: R = tableDocuments as unknown as R,
   ): AdtTable<R> {
     this.assertConnected();
@@ -456,6 +474,7 @@ export class AdtClient {
    * @returns IAdtObject instance for TableType operations
    */
   getTableType<R extends ITableTypeResults = typeof tableTypeDocuments>(
+    this: this & AdtServedBy<V, 'tableType'>,
     results: R = tableTypeDocuments as unknown as R,
   ): AdtDdicTableType<R> {
     this.assertConnected();
@@ -476,10 +495,11 @@ export class AdtClient {
    * @returns IAdtObject instance for DDL source operations
    */
   getDdl<R extends IDdlResults = typeof ddlDocuments>(
+    this: this & AdtServedBy<V, 'ddl'>,
     results: R = ddlDocuments as unknown as R,
-  ): AdtDdl<R> {
+  ): AdtDdl<R, V> {
     this.assertConnected();
-    return new AdtDdl<R>(
+    return new AdtDdl<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -494,9 +514,12 @@ export class AdtClient {
    */
   getFunctionGroup<
     R extends IFunctionGroupResults = typeof functionGroupDocuments,
-  >(results: R = functionGroupDocuments as unknown as R): AdtFunctionGroup<R> {
+  >(
+    this: this & AdtServedBy<V, 'functionGroup'>,
+    results: R = functionGroupDocuments as unknown as R,
+  ): AdtFunctionGroup<R, V> {
     this.assertConnected();
-    return new AdtFunctionGroup<R>(
+    return new AdtFunctionGroup<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -513,10 +536,11 @@ export class AdtClient {
   getFunctionModule<
     R extends IFunctionModuleResults = typeof functionModuleDocuments,
   >(
+    this: this & AdtServedBy<V, 'functionModule'>,
     results: R = functionModuleDocuments as unknown as R,
-  ): AdtFunctionModule<R> {
+  ): AdtFunctionModule<R, V> {
     this.assertConnected();
-    return new AdtFunctionModule<R>(
+    return new AdtFunctionModule<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -533,10 +557,11 @@ export class AdtClient {
   getFunctionInclude<
     R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
   >(
+    this: this & AdtServedBy<V, 'functionInclude'>,
     results: R = functionIncludeDocuments as unknown as R,
-  ): AdtFunctionInclude<R> {
+  ): AdtFunctionInclude<R, V> {
     this.assertConnected();
-    return new AdtFunctionInclude<R>(
+    return new AdtFunctionInclude<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -551,6 +576,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Package operations
    */
   getPackage<R extends IPackageResults = typeof packageDocuments>(
+    this: this & AdtServedBy<V, 'package'>,
     results: R = packageDocuments as unknown as R,
   ): AdtPackage<R> {
     this.assertConnected();
@@ -569,9 +595,12 @@ export class AdtClient {
    */
   getMessageClass<
     R extends IMessageClassResults = typeof messageClassDocuments,
-  >(results: R = messageClassDocuments as unknown as R): AdtMessageClass<R> {
+  >(
+    this: this & AdtServedBy<V, 'messageClass'>,
+    results: R = messageClassDocuments as unknown as R,
+  ): AdtMessageClass<R, V> {
     this.assertConnected();
-    return new AdtMessageClass<R>(
+    return new AdtMessageClass<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -590,7 +619,10 @@ export class AdtClient {
    */
   getMessageClassMessage<
     R extends IMessageClassMessageResults = typeof messageDocuments,
-  >(results: R = messageDocuments as unknown as R): AdtMessageClassMessage<R> {
+  >(
+    this: this & AdtServedBy<V, 'messageClassMessage'>,
+    results: R = messageDocuments as unknown as R,
+  ): AdtMessageClassMessage<R> {
     this.assertConnected();
     return new AdtMessageClassMessage<R>(this.connection, this.logger, results);
   }
@@ -601,7 +633,10 @@ export class AdtClient {
    */
   getAccessControl<
     R extends IAccessControlResults = typeof accessControlDocuments,
-  >(results: R = accessControlDocuments as unknown as R): AdtAccessControl<R> {
+  >(
+    this: this & AdtServedBy<V, 'accessControl'>,
+    results: R = accessControlDocuments as unknown as R,
+  ): AdtAccessControl<R> {
     this.assertConnected();
     return new AdtAccessControl<R>(
       this.connection,
@@ -620,6 +655,7 @@ export class AdtClient {
   getTransformation<
     R extends ITransformationResults = typeof transformationDocuments,
   >(
+    this: this & AdtServedBy<V, 'transformation'>,
     results: R = transformationDocuments as unknown as R,
   ): AdtTransformation<R> {
     this.assertConnected();
@@ -639,6 +675,7 @@ export class AdtClient {
   getServiceDefinition<
     R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
   >(
+    this: this & AdtServedBy<V, 'serviceDefinition'>,
     results: R = serviceDefinitionDocuments as unknown as R,
   ): AdtServiceDefinition<R> {
     this.assertConnected();
@@ -657,6 +694,7 @@ export class AdtClient {
   getScalarFunction<
     R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
   >(
+    this: this & AdtServedBy<V, 'scalarFunction'>,
     results: R = scalarFunctionDocuments as unknown as R,
   ): AdtScalarFunction<R> {
     this.assertConnected();
@@ -676,6 +714,7 @@ export class AdtClient {
     R extends
       IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
   >(
+    this: this & AdtServedBy<V, 'scalarFunctionImplementation'>,
     results: R = scalarFunctionImplementationDocuments as unknown as R,
   ): AdtScalarFunctionImplementation<R> {
     this.assertConnected();
@@ -694,6 +733,7 @@ export class AdtClient {
   getAppendStructure<
     R extends IAppendStructureResults = typeof appendStructureDocuments,
   >(
+    this: this & AdtServedBy<V, 'appendStructure'>,
     results: R = appendStructureDocuments as unknown as R,
   ): AdtAppendStructure<R> {
     this.assertConnected();
@@ -711,6 +751,7 @@ export class AdtClient {
    * @returns a ServiceBinding handler — CRUD and lifecycle, as the atoms
    */
   getServiceBinding<R extends IServiceResults = typeof serviceDocuments>(
+    this: this & AdtServedBy<V, 'serviceBinding'>,
     results: R = serviceDocuments as unknown as R,
   ): AdtServiceBinding<R> {
     this.assertConnected();
@@ -729,6 +770,7 @@ export class AdtClient {
   getBehaviorDefinition<
     R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
   >(
+    this: this & AdtServedBy<V, 'behaviorDefinition'>,
     results: R = behaviorDefinitionDocuments as unknown as R,
   ): AdtBehaviorDefinition<R> {
     this.assertConnected();
@@ -746,6 +788,7 @@ export class AdtClient {
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
   getBehaviorImplementation<R extends IClassResults = typeof classDocuments>(
+    this: this & AdtServedBy<V, 'behaviorImplementation'>,
     results: R = classDocuments as unknown as R,
   ): AdtBehaviorImplementation<R> {
     this.assertConnected();
@@ -765,6 +808,7 @@ export class AdtClient {
   getMetadataExtension<
     R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
   >(
+    this: this & AdtServedBy<V, 'metadataExtension'>,
     results: R = metadataExtensionDocuments as unknown as R,
   ): AdtMetadataExtension<R> {
     this.assertConnected();
@@ -788,10 +832,11 @@ export class AdtClient {
    * @returns IAdtObject instance for Enhancement operations
    */
   getEnhancement<R extends IEnhancementResults = typeof enhancementDocuments>(
+    this: this & AdtServedBy<V, 'enhancement'>,
     results: R = enhancementDocuments as unknown as R,
-  ): AdtEnhancement<R> {
+  ): AdtEnhancement<R, V> {
     this.assertConnected();
-    return new AdtEnhancement<R>(
+    return new AdtEnhancement<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -806,7 +851,10 @@ export class AdtClient {
    */
   getFeatureToggle<
     R extends IFeatureToggleResults = typeof featureToggleDocuments,
-  >(results: R = featureToggleDocuments as unknown as R): AdtFeatureToggle<R> {
+  >(
+    this: this & AdtServedBy<V, 'featureToggle'>,
+    results: R = featureToggleDocuments as unknown as R,
+  ): AdtFeatureToggle<R> {
     this.assertConnected();
     return new AdtFeatureToggle<R>(
       this.connection,
@@ -837,10 +885,11 @@ export class AdtClient {
    * @returns the transport request contract
    */
   getRequest<R extends ITransportResults = typeof transportDocuments>(
+    this: this & AdtServedBy<V, 'request'>,
     results: R = transportDocuments as unknown as R,
-  ): AdtRequest<R> {
+  ): AdtRequest<R, V> {
     this.assertConnected();
-    return new AdtRequest<R>(
+    return new AdtRequest<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -892,10 +941,11 @@ export class AdtClient {
    * **container class's**, which is what ADT locks and activates.
    */
   getLocalTestClass<R extends IClassResults = typeof classDocuments>(
+    this: this & AdtServedBy<V, 'localTestClass'>,
     results: R = classDocuments as unknown as R,
-  ): AdtLocalTestClass<R> {
+  ): AdtLocalTestClass<R, V> {
     this.assertConnected();
-    return new AdtLocalTestClass<R>(
+    return new AdtLocalTestClass<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -914,10 +964,11 @@ export class AdtClient {
    * **container class's**, which is what ADT locks and activates.
    */
   getLocalTypes<R extends IClassResults = typeof classDocuments>(
+    this: this & AdtServedBy<V, 'localTypes'>,
     results: R = classDocuments as unknown as R,
-  ): AdtLocalTypes<R> {
+  ): AdtLocalTypes<R, V> {
     this.assertConnected();
-    return new AdtLocalTypes<R>(
+    return new AdtLocalTypes<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -936,10 +987,11 @@ export class AdtClient {
    * **container class's**, which is what ADT locks and activates.
    */
   getLocalDefinitions<R extends IClassResults = typeof classDocuments>(
+    this: this & AdtServedBy<V, 'localDefinitions'>,
     results: R = classDocuments as unknown as R,
-  ): AdtLocalDefinitions<R> {
+  ): AdtLocalDefinitions<R, V> {
     this.assertConnected();
-    return new AdtLocalDefinitions<R>(
+    return new AdtLocalDefinitions<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -958,10 +1010,11 @@ export class AdtClient {
    * **container class's**, which is what ADT locks and activates.
    */
   getLocalMacros<R extends IClassResults = typeof classDocuments>(
+    this: this & AdtServedBy<V, 'localMacros'>,
     results: R = classDocuments as unknown as R,
-  ): AdtLocalMacros<R> {
+  ): AdtLocalMacros<R, V> {
     this.assertConnected();
-    return new AdtLocalMacros<R>(
+    return new AdtLocalMacros<R, V>(
       this.connection,
       this.logger,
       this.systemContext,

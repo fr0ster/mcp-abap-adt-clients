@@ -13,6 +13,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -37,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -66,6 +68,7 @@ import { getInterfaceVersionSource, getInterfaceVersions } from './versions';
 
 export class AdtInterface<
   R extends IInterfaceResults = typeof interfaceDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>>,
     IAdtReadable<IInterfaceConfig, ReturnType<R['source']>>,
@@ -274,6 +277,7 @@ export class AdtInterface<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'interface', 'deletionCheck'>,
     config: Partial<IInterfaceConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -367,6 +371,7 @@ export class AdtInterface<
 
   /** The transport request the interface belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'interface', 'transport'>,
     config: Partial<IInterfaceConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

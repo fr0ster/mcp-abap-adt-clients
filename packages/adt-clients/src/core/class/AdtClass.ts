@@ -24,6 +24,7 @@ import {
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -48,6 +49,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
@@ -61,8 +63,11 @@ import { classDocuments, type IClassConfig } from './types';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
 
-export class AdtClass<R extends IClassResults = typeof classDocuments>
-  extends AdtClassMemberBase<R>
+export class AdtClass<
+    R extends IClassResults = typeof classDocuments,
+    V extends AdtVariant = AdtModernVariant,
+  >
+  extends AdtClassMemberBase<R, V, 'class'>
   implements
     IAdtEnhancementHost<
       IClassConfig,
@@ -304,6 +309,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    * Ask whether the class can be deleted now.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'class', 'deletionCheck'>,
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

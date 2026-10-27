@@ -11,9 +11,11 @@
 
 import {
   AdtFunctionInclude,
+  type AdtPerformedBy,
   type functionIncludeDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -28,10 +30,11 @@ import {
 
 export class AdtFunctionIncludeLegacy<
   R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
-> extends AdtFunctionInclude<R> {
+> extends AdtFunctionInclude<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    _config: Partial<IFunctionIncludeConfig>,
+    this: this & AdtPerformedBy<'basis740', 'functionInclude', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheckNorDelete<ReturnType<R['deletionCheck']>, E>();
@@ -39,7 +42,8 @@ export class AdtFunctionIncludeLegacy<
 
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/delete` (§4.3). */
   override async delete<E extends IAdtError = IAdtError>(
-    _config: Partial<IFunctionIncludeConfig>,
+    this: this & AdtPerformedBy<'basis740', 'functionInclude', 'delete'>,
+    _config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     return noDeletionApi<ReturnType<R['deletion']>, E>();

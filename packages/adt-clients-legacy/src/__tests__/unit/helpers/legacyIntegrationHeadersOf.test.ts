@@ -116,6 +116,7 @@ describe('integrationHeadersOf', () => {
       integrationHeadersOf({ objectType: 'Class', create: send }, 'create'),
     ).toThrow('Object.create');
     // A refused type's name and keys, but a member that sends.
+    // @ts-expect-error -- 7.40 does not serve domain; the refusal is for a caller outside the type system
     const real = new AdtClientLegacy(connection(), logger).getDomain();
     const forged: Record<string, unknown> = { ...real, create: send };
     expect(() => integrationHeadersOf(forged, 'create')).toThrow(
@@ -134,6 +135,7 @@ describe('integrationHeadersOf', () => {
     expect(integrationHeadersOf(real, 'create')).toBe(TEST_HEADERS);
     expect(
       integrationHeadersOf(
+        // @ts-expect-error -- 7.40 does not serve package; the refusal is for a caller outside the type system
         new AdtClientLegacy(connection(), logger).getPackage(),
         'create',
       ),
@@ -143,6 +145,7 @@ describe('integrationHeadersOf', () => {
 
   it('resolves every header member of every legacy handler, or proves it sends nothing', async () => {
     const conn = connection();
+    // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
     const legacy = handlersOf(new AdtClientLegacy(conn, logger)).flatMap(
       ({ factory, handler }) => headerMembers(`${factory}()`, handler),
     );

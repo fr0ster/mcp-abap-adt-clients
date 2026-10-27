@@ -38,6 +38,7 @@ describe('AdtDdl.checkCdsTestDoubles', () => {
     const { conn, calls } = makeConn();
 
     expectFailure(
+      // @ts-expect-error -- 7.40 does not serve ddl.checkCdsTestDoubles; the refusal is for a caller outside the type system
       await new AdtDdlLegacy(conn, createLibraryLogger()).checkCdsTestDoubles(
         'ZI_VIEW',
       ),

@@ -78,6 +78,8 @@ const RUNTIME_EXPORTS = [
   'AdtBehaviorImplementation',
   'AdtClass',
   'AdtClient',
+  'AdtClientCloud',
+  'AdtClientOnPrem',
   'AdtClientsWS',
   'AdtContentTypesBase',
   'AdtContentTypesModern',

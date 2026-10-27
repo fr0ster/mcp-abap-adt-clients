@@ -78,7 +78,9 @@ describe('the legacy registrations', () => {
       } = isolated(withRegistrations);
       const client = new Client(silentConnection().connection, logger);
       const pair = () => integrationHeadersOf(client.getClass(), 'delete');
+      // @ts-expect-error -- 7.40 does not serve package; the refusal is for a caller outside the type system
       const refusal = () => integrationHeadersOf(client.getPackage(), 'create');
+      // @ts-expect-error -- 7.40 does not serve domain; the refusal is for a caller outside the type system
       const absent = () => integrationHeadersOf(client.getDomain(), 'create');
       if (withRegistrations) {
         expect(pair()).toEqual(XML);

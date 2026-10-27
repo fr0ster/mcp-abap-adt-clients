@@ -12,8 +12,12 @@
  * their own package, which takes it with them.
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtClientOptions,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type IHandlerClass,
   registerHeaderPairs,
@@ -300,9 +304,29 @@ export function isLegacyEnvironment(): boolean {
  * `createTestAdtClient` takes, and the one the live sessions
  * (`legacyLive.ts`) build their client with.
  */
-export const legacyClientFactory = (async (connection, logger, options) => ({
-  client: new AdtClientLegacy(connection, logger, options),
-})) satisfies TestClientFactory;
+export function legacyClientOn(
+  connection: IAbapConnection,
+  logger: ILogger,
+  options?: IAdtClientOptions,
+): AdtClientLegacy {
+  return new AdtClientLegacy(connection, logger, options);
+}
+
+/**
+ * `legacyClientOn` as the modern harness's factory. The harness types its
+ * client as the modern `AdtClient`; a 7.40 client is not one — its gates
+ * refuse what 7.40 does not serve — so the harness drives it as a caller
+ * outside the type system would, and the run proves the runtime refusals.
+ */
+// @ts-expect-error -- a 7.40 client in the modern harness, outside the type system on purpose
+export const legacyClientFactory: TestClientFactory = async (
+  connection,
+  logger,
+  options,
+) => {
+  const client = legacyClientOn(connection, logger, options);
+  return { client };
+};
 
 /**
  * The connection options of a legacy session, for `createTestConnection`: a

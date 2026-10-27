@@ -12,6 +12,7 @@
 
 import {
   AdtDdl,
+  type AdtPerformedBy,
   answering,
   DDL_SOURCE,
   type ddlDocuments,
@@ -39,7 +40,7 @@ import {
 
 export class AdtDdlLegacy<
   R extends IDdlResults = typeof ddlDocuments,
-> extends AdtDdl<R> {
+> extends AdtDdl<R, 'basis740'> {
   /**
    * Delete DDL source — legacy override.
    *
@@ -75,6 +76,7 @@ export class AdtDdlLegacy<
 
   /** Refused without a request: the endpoint is absent on 7.40 SP04. */
   override async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'ddl', 'checkCdsTestDoubles'>,
     _cdsViewName: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {
@@ -92,6 +94,7 @@ export class AdtDdlLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'ddl', 'deletionCheck'>,
     _config: Partial<IDdlConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -103,6 +106,7 @@ export class AdtDdlLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'ddl', 'transport'>,
     config: Partial<IDdlConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -116,6 +120,7 @@ export class AdtDdlLegacy<
    * answers `404` (record B4-cycles-20261026-2019).
    */
   override async getVersions<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'ddl', 'versions'>,
     config: Partial<IDdlConfig>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
@@ -130,6 +135,7 @@ export class AdtDdlLegacy<
    * from answers `404` on 7.40 SP04 (record B4-cycles-20261026-2019).
    */
   override async getVersionSource<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'ddl', 'versions'>,
     _contentUri: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {

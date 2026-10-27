@@ -10,6 +10,7 @@
  * - Delete: check(deletion) → delete
  */
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -34,6 +35,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -58,8 +60,10 @@ import { updateDdl } from './update';
 import { validateDdlName } from './validation';
 import { getDdlVersionSource, getDdlVersions } from './versions';
 
-export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
-  implements
+export class AdtDdl<
+  R extends IDdlResults = typeof ddlDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtCreatable<IDdlConfig, ReturnType<R['created']>>,
     IAdtReadable<IDdlConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>>,
@@ -226,6 +230,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'ddl', 'transport'>,
     config: Partial<IDdlConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -285,6 +290,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'ddl', 'deletionCheck'>,
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -418,6 +424,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'ddl', 'versions'>,
     config: Partial<IDdlConfig>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
@@ -430,6 +437,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
 
   /** Source of one version, by the `contentUri` its entry carried. */
   async getVersionSource<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'ddl', 'versions'>,
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
@@ -452,6 +460,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
    * `AdtCdsUnitTest`, a handler for something that is not an object.
    */
   async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'ddl', 'checkCdsTestDoubles'>,
     cdsViewName: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {

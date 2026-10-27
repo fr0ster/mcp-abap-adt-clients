@@ -10,6 +10,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -28,6 +29,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -51,6 +53,7 @@ const VALIDATE_BASE = MESSAGE_CLASS.validation;
 
 export class AdtMessageClass<
   R extends IMessageClassResults = typeof messageClassDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
@@ -214,6 +217,7 @@ export class AdtMessageClass<
    * library composed in place of the caller's.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'messageClass', 'updateMetadata'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
@@ -257,6 +261,7 @@ export class AdtMessageClass<
    * means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'messageClass', 'deletionCheck'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

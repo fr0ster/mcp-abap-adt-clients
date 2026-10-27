@@ -18,6 +18,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -43,6 +44,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -74,8 +76,10 @@ import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 import { getProgramVersionSource, getProgramVersions } from './versions';
 
-export class AdtProgram<R extends IProgramResults = typeof programDocuments>
-  implements
+export class AdtProgram<
+  R extends IProgramResults = typeof programDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtEnhancementHost<
       IProgramConfig,
       ReturnType<R['enhancementElements']>,
@@ -335,6 +339,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'program', 'deletionCheck'>,
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -432,6 +437,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
 
   /** The transport request the program belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'program', 'transport'>,
     config: Partial<IProgramConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

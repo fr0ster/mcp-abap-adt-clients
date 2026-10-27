@@ -76,7 +76,7 @@ const measuredNotServed = new Set<string>([
 
 type Handler = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
-function handlerOf(client: AdtClient, getter: string): Handler {
+function handlerOf(client: object, getter: string): Handler {
   return (client as unknown as Record<string, () => Handler>)[getter]();
 }
 

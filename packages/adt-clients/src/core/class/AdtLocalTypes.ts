@@ -10,6 +10,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -29,6 +30,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -56,8 +58,11 @@ export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces-adt';
  * `delete()` stays as the convenience it always was — a name for writing
  * emptiness — rather than a claim that this is a deletable object.
  */
-export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
-  extends AdtClassMemberBase<R>
+export class AdtLocalTypes<
+    R extends IClassResults = typeof classDocuments,
+    V extends AdtVariant = AdtModernVariant,
+  >
+  extends AdtClassMemberBase<R, V, 'localTypes'>
   implements
     IAdtReadable<ILocalTypesConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalTypesConfig, ReturnType<R['metadata']>>,

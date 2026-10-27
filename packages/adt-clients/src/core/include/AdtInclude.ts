@@ -9,6 +9,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtContentTypes,
@@ -32,6 +33,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
@@ -57,8 +59,10 @@ function requireName(config: Partial<IIncludeConfig>): string {
   return config.includeName as string;
 }
 
-export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
-  implements
+export class AdtInclude<
+  R extends IIncludeResults = typeof includeDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtIncludeEnhancementHost<
       IIncludeConfig,
       ReturnType<R['enhancementElements']>,
@@ -302,6 +306,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * its own — unlike a class include, which is emptied by writing its parent.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'include', 'deletionCheck'>,
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

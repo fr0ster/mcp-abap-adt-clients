@@ -225,11 +225,13 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
         // B4 d7-getVersions: GET <source>/versions answered 404 — refused,
         // nothing sent; and so the version source (Task 2).
         expectRefusedUnsent(
+          // @ts-expect-error -- 7.40 does not serve ddl.versions; the refusal is for a caller outside the type system
           await ddl.handler.getVersions(config, { analyse: analyseException }),
           recorder,
           mark,
         );
         expectRefusedUnsent(
+          // @ts-expect-error -- 7.40 does not serve ddl.versions; the refusal is for a caller outside the type system
           await ddl.handler.getVersionSource(`${uri}/versions/0/content`, {
             analyse: analyseException,
           }),

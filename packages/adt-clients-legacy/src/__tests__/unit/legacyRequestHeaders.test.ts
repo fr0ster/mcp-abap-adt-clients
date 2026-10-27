@@ -69,7 +69,9 @@ const legacy = (connection: IAbapConnection) =>
   new AdtClientLegacy(connection, createLibraryLogger());
 
 const ROWS: Row[] = [
+  // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
   ...objectRows(legacy, 'legacy '),
+  // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
   ...requestRows(legacy, 'legacy '),
   ...utilRows(
     (connection) => new AdtUtilsLegacy(connection, createLibraryLogger()),

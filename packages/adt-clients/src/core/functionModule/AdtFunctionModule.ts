@@ -14,6 +14,8 @@
  */
 
 import type {
+  AdtObjectIdentity,
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -38,6 +40,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -66,6 +69,7 @@ import {
 
 export class AdtFunctionModule<
   R extends IFunctionModuleResults = typeof functionModuleDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>>,
     IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>>,
@@ -133,7 +137,9 @@ export class AdtFunctionModule<
   }
 
   /** Both names, or the caller's mistake. */
-  private names(config: Partial<IFunctionModuleConfig>): {
+  private names(
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+  ): {
     group: string;
     module: string;
   } {
@@ -145,7 +151,7 @@ export class AdtFunctionModule<
 
   /** Validate a function module name before creating it. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -192,7 +198,7 @@ export class AdtFunctionModule<
 
   /** Read the module's source. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
@@ -212,7 +218,7 @@ export class AdtFunctionModule<
 
   /** Read the module's metadata. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -229,7 +235,8 @@ export class AdtFunctionModule<
 
   /** The transport request the module belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    this: this & AdtPerformedBy<V, 'functionModule', 'transport'>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -264,7 +271,7 @@ export class AdtFunctionModule<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -300,7 +307,8 @@ export class AdtFunctionModule<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    this: this & AdtPerformedBy<V, 'functionModule', 'deletionCheck'>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -327,7 +335,7 @@ export class AdtFunctionModule<
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -348,7 +356,7 @@ export class AdtFunctionModule<
 
   /** Activate the function module. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -365,7 +373,7 @@ export class AdtFunctionModule<
 
   /** Check the function module. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
@@ -398,7 +406,7 @@ export class AdtFunctionModule<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const { group, module } = this.names(config);
@@ -418,7 +426,7 @@ export class AdtFunctionModule<
 
   /** Unlock the function module. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -440,7 +448,7 @@ export class AdtFunctionModule<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
     return answering(

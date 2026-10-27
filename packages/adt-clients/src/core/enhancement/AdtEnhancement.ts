@@ -9,6 +9,9 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtOperation,
+  AdtTypeCodeWith,
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -33,6 +36,8 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
+import type { CodeOf } from '../../constants/typeCodes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -67,8 +72,30 @@ import {
   getEnhancementVersions,
 } from './versions';
 
+/**
+ * The enhancement subtype of a code: `ENHO/XHH` is `enhoxhh`, as the address
+ * and `IEnhancementConfig.enhancementType` spell it.
+ */
+type SubtypeOf<C extends string> = C extends `${infer T}/${infer S}`
+  ? Lowercase<`${T}${S}`>
+  : never;
+
+/**
+ * The subtypes whose code lists `Op` on variant `V`. One API, three codes, and
+ * only `ENHO/XHH` has a source: `read` and `update` take this in their
+ * argument's type, so a call for `enhoxhb` or `enhsxsb` does not compile.
+ */
+export type EnhancementTypeWith<
+  V extends AdtVariant,
+  Op extends AdtOperation,
+> = Extract<
+  EnhancementType,
+  SubtypeOf<Extract<AdtTypeCodeWith<V, Op>, CodeOf<'enhancement'>>>
+>;
+
 export class AdtEnhancement<
   R extends IEnhancementResults = typeof enhancementDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
     IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,
@@ -229,7 +256,9 @@ export class AdtEnhancement<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: Partial<IEnhancementConfig> & {
+      enhancementType: EnhancementTypeWith<V, 'read'>;
+    },
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
@@ -345,7 +374,9 @@ export class AdtEnhancement<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: Partial<IEnhancementConfig> & {
+      enhancementType: EnhancementTypeWith<V, 'update'>;
+    },
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.

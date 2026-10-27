@@ -216,6 +216,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — interface cycle', () => {
         mark = at();
         // B4 i9-readTransport: 404 for every type — refused, nothing sent.
         expectRefusedUnsent(
+          // @ts-expect-error -- 7.40 does not serve interface.transport; the refusal is for a caller outside the type system
           await intf.handler.readTransport(config, {
             analyse: analyseException,
           }),

@@ -10,6 +10,7 @@
 
 import {
   AdtClass,
+  type AdtPerformedBy,
   answering,
   CLASS,
   type classDocuments,
@@ -29,7 +30,7 @@ import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtClassLegacy<
   R extends IClassResults = typeof classDocuments,
-> extends AdtClass<R> {
+> extends AdtClass<R, 'basis740'> {
   /**
    * Delete class — legacy override.
    *
@@ -70,6 +71,7 @@ export class AdtClassLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'class', 'deletionCheck'>,
     _config: Partial<IClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -81,6 +83,7 @@ export class AdtClassLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'class', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

@@ -15,7 +15,17 @@
  * compiler's — what such a subclass cannot build without — and nothing more.
  */
 export { AdtClient } from './clients/AdtClient';
-export { createAdtClient } from './clients/createAdtClient';
+export { AdtClientCloud, AdtClientOnPrem } from './clients/AdtClientVariants';
+export {
+  createAdtClient,
+  type ICreateAdtClientOptions,
+} from './clients/createAdtClient';
+export type {
+  AdtModernVariant,
+  AdtPerformedBy,
+  AdtServedBy,
+  IAdtNotServed,
+} from './clients/variant';
 export { AdtAccessControl } from './core/accessControl';
 export { AdtAppendStructure } from './core/appendStructure';
 export { AdtAuthorizationField } from './core/authorizationField';
@@ -32,7 +42,7 @@ export { startClassUnitTestRunSync } from './core/class/run';
 export { AdtDataElement } from './core/dataElement';
 export { AdtDdl } from './core/ddl';
 export { AdtDomain } from './core/domain';
-export { AdtEnhancement } from './core/enhancement';
+export { AdtEnhancement, type EnhancementTypeWith } from './core/enhancement';
 export { AdtFeatureToggle } from './core/featureToggle';
 export { AdtFunctionGroup } from './core/functionGroup';
 export { AdtFunctionInclude } from './core/functionInclude';

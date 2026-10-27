@@ -24,9 +24,11 @@ function setup() {
   } as unknown as IAbapConnection);
   return { client, request };
 }
-function config(
-  enhancementType: EnhancementType,
-): Omit<IEnhancementConfig, 'source'> {
+function config<T extends EnhancementType>(
+  enhancementType: T,
+): Omit<IEnhancementConfig, 'source' | 'enhancementType'> & {
+  enhancementType: T;
+} {
   return {
     enhancementType,
     enhancementName: 'ZENH',

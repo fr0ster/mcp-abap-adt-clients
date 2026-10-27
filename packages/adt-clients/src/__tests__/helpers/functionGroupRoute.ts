@@ -33,7 +33,14 @@ export type FunctionGroupRoute = (typeof ROUTES)[number];
  * client declares it — so the `analyse` option of every call is the
  * compiler's to keep, not a hand-written narrowing's.
  */
-export type IFunctionGroupClient = Pick<AdtClient, 'getFunctionGroup'>;
+/**
+ * What the route needs of a client. Not `Pick<AdtClient, …>`: a factory is
+ * gated by a `this` parameter on its client's variant, which a picked object
+ * is not.
+ */
+export interface IFunctionGroupClient {
+  getFunctionGroup(): ReturnType<AdtClient['getFunctionGroup']>;
+}
 
 /** The shared-dependency setup, as test-helper.js offers it. */
 export interface ISharedSetup {

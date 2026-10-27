@@ -385,6 +385,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
         mark = at();
         // B4 c6-readTransport: 404 for every type — refused, nothing sent.
         expectRefusedUnsent(
+          // @ts-expect-error -- 7.40 does not serve class.transport; the refusal is for a caller outside the type system
           await cls.handler.readTransport(config, {
             analyse: analyseException,
           }),
@@ -395,6 +396,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
         for (const include of includes) {
           mark = at();
           expectRefusedUnsent(
+            // @ts-expect-error -- 7.40 does not serve a local include's transport; the refusal is for a caller outside the type system
             await include.handler().readTransport(config, {
               analyse: analyseException,
             }),

@@ -106,11 +106,14 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     return value;
   }
 
-  function config(
+  function config<T extends IEnhancementConfig['enhancementType']>(
     resolver: TestConfigResolver,
-    enhancementType: IEnhancementConfig['enhancementType'],
+    enhancementType: T,
     key = 'enhancement_name',
-  ): Omit<IEnhancementConfig, 'source'> & { source?: never } {
+  ): Omit<IEnhancementConfig, 'source' | 'enhancementType'> & {
+    enhancementType: T;
+    source?: never;
+  } {
     const enhancementName = required(resolver, key);
     // Only this suite's user objects may be deleted, including leftovers.
     expect(enhancementName).toMatch(/^[ZY]/i);
@@ -169,13 +172,21 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     try {
       expect(handle).toBeTruthy();
       if (source !== undefined) {
+        // Only ENHO/XHH has a source, and `update` takes it in its type.
+        const { enhancementType } = object;
+        if (enhancementType !== 'enhoxhh') {
+          throw new Error(`${enhancementType} has no source to update`);
+        }
         expectResult(
-          await enhancement.update(object, {
-            headers: integrationHeadersOf(enhancement, 'update'),
-            ...analyse,
-            source,
-            lockHandle: handle,
-          }),
+          await enhancement.update(
+            { ...object, enhancementType },
+            {
+              headers: integrationHeadersOf(enhancement, 'update'),
+              ...analyse,
+              source,
+              lockHandle: handle,
+            },
+          ),
           'update source',
         );
       }

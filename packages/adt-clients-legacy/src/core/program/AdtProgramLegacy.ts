@@ -7,6 +7,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   AdtProgram,
   answering,
   PROGRAM,
@@ -27,7 +28,7 @@ import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtProgramLegacy<
   R extends IProgramResults = typeof programDocuments,
-> extends AdtProgram<R> {
+> extends AdtProgram<R, 'basis740'> {
   /**
    * Delete program — legacy override.
    *
@@ -68,6 +69,7 @@ export class AdtProgramLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'program', 'deletionCheck'>,
     _config: Partial<IProgramConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -79,6 +81,7 @@ export class AdtProgramLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'program', 'transport'>,
     config: Partial<IProgramConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

@@ -49,10 +49,7 @@ import {
 } from '../../../../adt-clients/src/__tests__/helpers/testLogger';
 import type { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { AdtExecutorLegacy } from '../../clients/AdtExecutorLegacy';
-import {
-  legacyClientFactory,
-  legacyConnectionOptions,
-} from './legacyRegistrations';
+import { legacyClientOn, legacyConnectionOptions } from './legacyRegistrations';
 
 export const LEGACY_740 = 'legacy_740';
 
@@ -122,9 +119,7 @@ export async function legacyClientsOn(
   return {
     connection,
     recorder,
-    client: (
-      await legacyClientFactory(recorder.connection, logger, systemContext)
-    ).client,
+    client: legacyClientOn(recorder.connection, logger, systemContext),
     executor: new AdtExecutorLegacy(recorder.connection, logger),
   };
 }

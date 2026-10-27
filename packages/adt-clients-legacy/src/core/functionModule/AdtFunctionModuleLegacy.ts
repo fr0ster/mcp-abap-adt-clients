@@ -9,12 +9,14 @@
 
 import {
   AdtFunctionModule,
+  type AdtPerformedBy,
   answering,
   FUNCTION_MODULE,
   type functionModuleDocuments,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -28,7 +30,7 @@ import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtFunctionModuleLegacy<
   R extends IFunctionModuleResults = typeof functionModuleDocuments,
-> extends AdtFunctionModule<R> {
+> extends AdtFunctionModule<R, 'basis740'> {
   /**
    * Delete function module — legacy override.
    *
@@ -42,7 +44,7 @@ export class AdtFunctionModuleLegacy<
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const group = config.functionGroupName as string;
@@ -69,7 +71,8 @@ export class AdtFunctionModuleLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    _config: Partial<IFunctionModuleConfig>,
+    this: this & AdtPerformedBy<'basis740', 'functionModule', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
@@ -80,7 +83,8 @@ export class AdtFunctionModuleLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    this: this & AdtPerformedBy<'basis740', 'functionModule', 'transport'>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     return noTransportResource<ReturnType<R['transport']>, E>(

@@ -109,23 +109,33 @@ describe('legacy transport members', () => {
   const headers = { headers: {} as IAdtHeaders };
   type Handler = AdtRequestLegacy;
   const refused: [string, (h: Handler) => Promise<unknown>][] = [
+    // @ts-expect-error -- 7.40 does not serve request.searchConfigurations; the refusal is for a caller outside the type system
     ['searchConfigurations', (h) => h.searchConfigurations()],
+    // @ts-expect-error -- 7.40 does not serve request.deletionCheck; the refusal is for a caller outside the type system
     ['checkDeletion', (h) => h.checkDeletion(cfg, headers)],
+    // @ts-expect-error -- 7.40 does not serve request.readObjects; the refusal is for a caller outside the type system
     ['readObjects', (h) => h.readObjects('GUARD_REQUEST')],
+    // @ts-expect-error -- 7.40 does not serve request.readActionLog; the refusal is for a caller outside the type system
     ['readActionLog', (h) => h.readActionLog('GUARD_REQUEST')],
+    // @ts-expect-error -- 7.40 does not serve request.addObject; the refusal is for a caller outside the type system
     ['addObject', (h) => h.addObject('GUARD_REQUEST', entry, headers)],
+    // @ts-expect-error -- 7.40 does not serve request.removeObject; the refusal is for a caller outside the type system
     ['removeObject', (h) => h.removeObject('GUARD_REQUEST', entry, headers)],
     [
       'moveObjects',
+      // @ts-expect-error -- 7.40 does not serve request.moveObjects; the refusal is for a caller outside the type system
       (h) => h.moveObjects('GUARD_TASK', 'GUARD_REQUEST', [entry], headers),
     ],
+    // @ts-expect-error -- 7.40 does not serve request.sortAndCompress; the refusal is for a caller outside the type system
     ['sortAndCompress', (h) => h.sortAndCompress('GUARD_TASK')],
     [
       'createTask',
+      // @ts-expect-error -- 7.40 does not serve request.createTask; the refusal is for a caller outside the type system
       (h) => h.createTask('GUARD_REQUEST', { ...headers, targetUser: 'GUARD' }),
     ],
     [
       'changeTaskType',
+      // @ts-expect-error -- 7.40 does not serve request.changeTaskType; the refusal is for a caller outside the type system
       (h) => h.changeTaskType('GUARD_TASK', 'Unclassified' as never, headers),
     ],
     ['create', (h) => h.create()],

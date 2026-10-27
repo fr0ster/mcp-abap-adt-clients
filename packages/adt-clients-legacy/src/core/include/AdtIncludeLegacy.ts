@@ -11,6 +11,7 @@
 
 import {
   AdtInclude,
+  type AdtPerformedBy,
   answering,
   type includeDocuments,
   PROGRAM_INCLUDE,
@@ -30,9 +31,10 @@ import { noDeletionCheck } from '../shared/refusalLegacy';
 
 export class AdtIncludeLegacy<
   R extends IIncludeResults = typeof includeDocuments,
-> extends AdtInclude<R> {
+> extends AdtInclude<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'include', 'deletionCheck'>,
     _config: Partial<IIncludeConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

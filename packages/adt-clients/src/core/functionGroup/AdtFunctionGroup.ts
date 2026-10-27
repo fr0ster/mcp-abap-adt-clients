@@ -14,6 +14,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -37,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -65,6 +67,7 @@ import { validateFunctionGroupName } from './validation';
 
 export class AdtFunctionGroup<
   R extends IFunctionGroupResults = typeof functionGroupDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtEnhancementHost<
       IFunctionGroupConfig,
@@ -248,6 +251,7 @@ export class AdtFunctionGroup<
 
   /** The transport request the group belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'functionGroup', 'transport'>,
     config: Partial<IFunctionGroupConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -320,6 +324,7 @@ export class AdtFunctionGroup<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'functionGroup', 'deletionCheck'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

@@ -24,6 +24,7 @@
 
 import type {
   AdtTaskType,
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -48,6 +49,7 @@ import type {
   IDeferredResponseConnection,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
@@ -90,8 +92,10 @@ export function hasDeferredResponses<T extends object>(
   );
 }
 
-export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
-  implements
+export class AdtRequest<
+  R extends ITransportResults = typeof transportDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<
@@ -162,6 +166,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * decision, made in the organizer.
    */
   async create<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'create'>,
     config: Omit<ITransportConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
@@ -250,6 +255,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * caller's `analyse`.
    */
   async searchConfigurations<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'searchConfigurations'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['searchConfigurations']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -279,6 +285,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'updateMetadata'>,
     config: Partial<ITransportConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
@@ -329,6 +336,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * other twenty-nine types use.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'deletionCheck'>,
     config: Partial<ITransportConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -347,6 +355,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   }
 
   async delete<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'delete'>,
     config: Partial<ITransportConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
@@ -400,6 +409,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * what confirms the removal happened.
    */
   async removeObject<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'removeObject'>,
     transportNumber: string,
     object: IAbapObjectEntry & { position: string },
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
@@ -437,6 +447,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * shows each entry once again.
    */
   async sortAndCompress<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'sortAndCompress'>,
     taskNumber: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['sortedAndCompressed']>, E>> {
@@ -471,6 +482,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    *   be moved to a request with the same target"*.
    */
   async moveObjects<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'moveObjects'>,
     sourceTask: string,
     targetNumber: string,
     objects: readonly (IAbapObjectEntry & { position: string })[],
@@ -520,6 +532,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * requests"*. Such objects belong in a local request.
    */
   async addObject<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'addObject'>,
     transportNumber: string,
     object: IAbapObjectEntry,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
@@ -560,6 +573,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * lower case name is refused with the same message.
    */
   async createTask<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'createTask'>,
     transportNumber: string,
     options: { headers: IAdtHeaders } & {
       targetUser: string;
@@ -593,6 +607,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * what it was asked.
    */
   async readActionLog<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'readActionLog'>,
     transportNumber: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['actionLog']>, E>> {
@@ -656,6 +671,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * Read the request back to see the type.
    */
   async changeTaskType<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'changeTaskType'>,
     taskNumber: string,
     type: AdtTaskType,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
@@ -711,6 +727,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * ```
    */
   async readObjects<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<V, 'request', 'readObjects'>,
     transportNumber: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['objects']>, E>> {

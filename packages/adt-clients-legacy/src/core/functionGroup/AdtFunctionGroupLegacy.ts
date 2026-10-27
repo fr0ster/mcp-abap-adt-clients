@@ -9,6 +9,7 @@
 
 import {
   AdtFunctionGroup,
+  type AdtPerformedBy,
   answering,
   FUNCTION_GROUP,
   type functionGroupDocuments,
@@ -28,7 +29,7 @@ import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtFunctionGroupLegacy<
   R extends IFunctionGroupResults = typeof functionGroupDocuments,
-> extends AdtFunctionGroup<R> {
+> extends AdtFunctionGroup<R, 'basis740'> {
   /**
    * Delete function group — legacy override.
    *
@@ -69,6 +70,7 @@ export class AdtFunctionGroupLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'functionGroup', 'deletionCheck'>,
     _config: Partial<IFunctionGroupConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -80,6 +82,7 @@ export class AdtFunctionGroupLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'basis740', 'functionGroup', 'transport'>,
     config: Partial<IFunctionGroupConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
