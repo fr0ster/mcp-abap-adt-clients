@@ -1,63 +1,107 @@
 /**
- * The three factories that answered their concrete class until #109 —
- * `getUtils`, `getFeatureToggle` and `getServiceBinding` — answer a composition of contracts now. That is only
- * honest while the composition holds every public member of the class: a
- * member outside it would be on the object and unreachable through the type,
- * the very gap the concrete return was kept for.
+ * The three factories whose classes carry members beyond the lifecycle atoms
+ * the manifest checks — `getUtils`, `getFeatureToggle` and `getServiceBinding`
+ * — answer their classes (38.0.0). A consumer reaches a member only through a
+ * contract it composes from `@mcp-abap-adt/interfaces-adt`, so every public
+ * method of what the factory answers must be declared by an atom there: a
+ * method no atom declares is on the object and unreachable through any
+ * consumer's contract.
  *
- * So this fails compiling when a class gains a member its composition lacks,
- * naming the member. Never imported at runtime; `npm run test:check` is the
- * test.
+ * So this fails compiling when one of these classes gains a method no atom
+ * of its object declares, naming the method. Never imported at runtime;
+ * `npm run test:check` is the test.
  */
 
 import type {
-  IFeatureToggleContract,
-  IServiceBindingContract,
-  IUtilsContract,
-} from '../../../clients/AdtClient';
-import type { AdtFeatureToggle } from '../../../core/featureToggle';
-import type { featureToggleDocuments } from '../../../core/featureToggle/types';
-import type { AdtServiceBinding } from '../../../core/service/AdtService';
-import type { serviceDocuments } from '../../../core/service/types';
-import type { AdtUtils } from '../../../core/shared/AdtUtils';
-import type { utilDocuments } from '../../../core/shared/utilResultSet';
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtDataPreview,
+  IAdtDeletable,
+  IAdtDiscovery,
+  IAdtGroupLifecycle,
+  IAdtInformationSystem,
+  IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
+  IAdtObjectAccess,
+  IAdtObjectProperties,
+  IAdtReadable,
+  IAdtRepositoryStructure,
+  IAdtServiceBindingTypes,
+  IAdtServiceGroupReadable,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IFeatureToggleObject,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { AdtClient } from '../../../clients/AdtClient';
 
 type Assert<T extends true> = T;
 
 /**
  * The public methods of `C` that `T` does not declare; `never` when none.
  * Methods, not every key: a data member like `objectType` is the handler's
- * label, not something a caller invokes, and no factory's contract carries it.
+ * label, not something a caller invokes, and no atom carries it.
  */
 type Methods<C> = {
   [K in keyof C]: C[K] extends (...args: never[]) => unknown ? K : never;
 }[keyof C];
 type Uncovered<C, T> = Exclude<Methods<C>, keyof T>;
 
+/** What a call answers — the class over its shipped default. */
+declare const client: AdtClient;
+const utils = client.getUtils();
+const featureToggle = client.getFeatureToggle();
+const serviceBinding = client.getServiceBinding();
+
+// Only the keys matter here; tsc checks each member's types in its class.
+type U = unknown;
+
+type LifecycleAtoms = IAdtCreatable<U, U> &
+  IAdtReadable<U, U> &
+  IAdtMetadataReadable<U, U> &
+  IAdtUpdatable<U, U> &
+  IAdtDeletable<U, U, U> &
+  IAdtValidatable<U, U> &
+  IAdtCheckable<U, U> &
+  IAdtActivatable<U, U> &
+  IAdtLockable<U>;
+
+type UtilsAtoms = IAdtInformationSystem<U, U, U, U, U> &
+  IAdtRepositoryStructure<U, U> &
+  IAdtGroupLifecycle<U, U, U, U, U, U> &
+  IAdtDataPreview<U, U, U> &
+  IAdtDiscovery<U> &
+  IAdtObjectAccess<U, U, U> &
+  IAdtObjectProperties<U>;
+
+type FeatureToggleAtoms = LifecycleAtoms &
+  IAdtMetadataUpdatable<U, U> &
+  IFeatureToggleObject<{
+    switched: U;
+    runtimeState: U;
+    checkState: U;
+    source: U;
+  }>;
+
+type ServiceBindingAtoms = LifecycleAtoms &
+  IAdtTransportAware<U, U> &
+  IAdtServiceBindingTypes<U> &
+  IAdtServiceGroupReadable<U>;
+
 export type _UtilsCovered = Assert<
-  [Uncovered<AdtUtils, IUtilsContract<typeof utilDocuments>>] extends [never]
-    ? true
-    : false
+  [Uncovered<typeof utils, UtilsAtoms>] extends [never] ? true : false
 >;
 
 export type _FeatureToggleCovered = Assert<
-  [
-    Uncovered<
-      AdtFeatureToggle,
-      IFeatureToggleContract<typeof featureToggleDocuments>
-    >,
-  ] extends [never]
+  [Uncovered<typeof featureToggle, FeatureToggleAtoms>] extends [never]
     ? true
     : false
 >;
 
 export type _ServiceBindingCovered = Assert<
-  [
-    Uncovered<
-      AdtServiceBinding,
-      IServiceBindingContract<typeof serviceDocuments>
-    >,
-  ] extends [never]
+  [Uncovered<typeof serviceBinding, ServiceBindingAtoms>] extends [never]
     ? true
     : false
 >;
