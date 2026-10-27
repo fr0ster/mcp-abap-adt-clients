@@ -83,8 +83,9 @@ a new API to build on):
   `ProgramTestRunner`;
 - client contract types: `IAppendStructureContract`, `IFunctionIncludeContract`,
   `IIncludeContract`, `ILocalDefinitionsContract`, `ILocalMacrosContract`,
-  `ILocalTestClassContract`, `ILocalTypesContract`, `IMessageClassContract`, `IScalarFunctionContract`,
-  `IScalarFunctionImplementationContract`, `ITransformationContract`;
+  `ILocalTestClassContract`, `ILocalTypesContract`, `IMessageClassContract`,
+  `IScalarFunctionContract`, `IScalarFunctionImplementationContract`,
+  `ITransformationContract`;
 - address records: `ACCESS_CONTROL`, `AUTHORIZATION_FIELD`,
   `BEHAVIOR_DEFINITION`, `CLASS`, `DATA_ELEMENT`, `DDL_SOURCE`, `DOMAIN`,
   `ENHANCEMENT`, `FEATURE_TOGGLE`, `FUNCTION_GROUP`, `FUNCTION_MODULE`,

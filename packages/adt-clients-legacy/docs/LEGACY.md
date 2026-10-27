@@ -345,8 +345,8 @@ The legacy classes of `@mcp-abap-adt/adt-clients` 37.3.x are this package's, wit
 
 - **Where they live.** Install `@mcp-abap-adt/adt-clients-legacy` and construct `AdtClientLegacy` / `AdtExecutorLegacy` from it over RFC; `createAdtClient()` / `createAdtExecutor()` no longer return them.
 - **Include and message class `delete` send** one `DELETE ?lockHandle=` under your lock (37.3 refused both).
-- **The four local class includes refuse `readTransport` too**: it is the container class's `GET …/transport` (`404`, B4 c6-readTransport).
 - **`readTransport` is refused** for a class, program, interface, function group, function module and DDL source (37.3 sent it). `GET <object>/transport` answered `404` for the first five (B4); the DDL source's `GET …/ddic/ddl/sources/<name>/transport` answered `404` too (`T6-20261027` t6-ddl-readTransport).
+- **The four local class includes refuse `readTransport` too**: it is the container class's `GET …/transport` (`404`, B4 c6-readTransport).
 - **A DDL source's `getVersions` and `getVersionSource` are refused** (`404` on `/ddic/ddl/sources/<n>/versions`).
 - **A message class's `updateMetadata` is refused** until its document is measured.
 - **`AdtPackageLegacy.read` is not carried over**: a member `AdtPackage` does not have.

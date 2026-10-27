@@ -52,7 +52,7 @@ Where a row says "sends" and its record is a read of a *system* object (a system
 program, class, function module or include) rather than of an object a cycle
 created, LEGACY.md says so; the cycle suites
 (`src/__tests__/integration/legacy/cycles/`) measure the read of a created object
-and `T6-20261027` ran them whole on 7.40 SP04 (2026-10-27): the reads of created objects, the free-name `validate` of a function group and module and the DDL source's `readTransport` are measured there.
+and `T6-20261027` ran them whole on 7.40 SP04 (2026-10-27): the reads of created objects, and the free-name `validate` of a function group and module are measured there; the DDL source's `readTransport` `404` by one raw read in the same record (`t6-ddl-readTransport`).
 
 ## What a consumer must know
 

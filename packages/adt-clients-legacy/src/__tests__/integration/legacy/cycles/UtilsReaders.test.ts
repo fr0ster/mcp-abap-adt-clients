@@ -209,7 +209,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
           }),
           'fetchNodeStructure',
         );
-        // Measured on 7.40 SP04, 2026-10-27: the package's root node answers
+        // Measured on 7.40 SP04 (T6-20261027 t6-nodestructure-root,
+        // t6-nodestructure-prog): the package's root node answers
         // its subpackages and one SEU_ADT_OBJECT_TYPE_INFO per object type
         // (PROG/P with its NODE_ID), not the objects themselves.
         expectSent(recorder, mark, [
