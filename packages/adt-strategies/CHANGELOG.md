@@ -14,7 +14,50 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
-## [Unreleased]
+## [0.16.0] - 2026-10-28
+
+A breaking 0.x minor: every reading that takes a type code from an answer
+answers it as an `IAdtAnsweredObject` of `@mcp-abap-adt/interfaces-adt`
+21.0.0.
+
+### Changed (breaking)
+
+- **A code read from an answer is looked up once against the ADT type
+  tables.** A code a table names is `type: AdtTypeCode`; any other text — a
+  code no table holds (`PROG/PS`, `CLAS/OM` are in the recorded answers) or
+  one of a newer release — is `unknownType`, exactly as ADT sent it. The two
+  are exclusive. The readings that do this:
+  - `readSearchHits` / `utilSearchHits` (`adtcore:type`);
+  - `readNodeStructure` and `utilNodeContents` (`OBJECT_TYPE` of a child type
+    and of an object);
+  - `utilInactiveObjects` (`adtcore:type`);
+  - `utilWhereUsedReferences` (the object's `type`; packages are still
+    skipped);
+  - the trace readings' `callingProgram` / `calledProgram` (`adtcore:type`).
+- The shapes they answer are type aliases over `IAdtAnsweredObject` now, not
+  interfaces: `IAdtObjectHit`, `ISearchResult`, `IWhereUsedReference`,
+  `IRepositoryObjectNode`, `IRepositoryNodeChild`, `ITraceProgramRef`.
+  `IRepositoryObjectNode` and `IRepositoryNodeChild` carry `type` /
+  `unknownType` where they carried `objectType: string`.
+- `IInactiveObjectsResponse.objects` is `IInactiveObject[]`
+  (`IAdtAnsweredObject & { name }`), no longer `IObjectReference[]`: an
+  unknown code is no reference `activateObjectsGroup` takes.
+- Depends on `@mcp-abap-adt/interfaces-adt` `^21.0.0`.
+
+### Added
+
+- `answeredObject(text)`: the lookup the readings use, for a consumer reading
+  a code from an answer itself.
+
+### Migration
+
+- Switch on `type` for the codes you act on, and handle `unknownType` — it is
+  what an older reading would have handed you as `type: string`.
+- `objectType` of a repository node or child is `type` (or `unknownType`).
+- To activate the inactive objects, keep those with a `type`:
+  `objects.flatMap((o) => (o.type ? [{ name: o.name, type: o.type }] : []))`.
+- A type that extended `IAdtObjectHit` or `ISearchResult` with `interface …
+  extends` intersects it instead: `type IMyHit = ISearchResult & { … }`.
 
 ### Security
 

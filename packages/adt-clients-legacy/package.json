@@ -68,7 +68,7 @@
   },
   "devDependencies": {
     "@mcp-abap-adt/adt-clients": "^38.0.0",
-    "@mcp-abap-adt/adt-strategies": "^0.10.0",
+    "@mcp-abap-adt/adt-strategies": "^0.16.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",

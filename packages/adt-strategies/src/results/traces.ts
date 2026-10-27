@@ -28,22 +28,27 @@
  */
 
 import type {
+  IAdtAnsweredObject,
   IResultStrategy,
   ITraceEntry,
   ITraceState,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { answeredObject } from './answeredObject';
 
-export interface ITraceProgramRef {
+/**
+ * A program a trace entry names. Its `adtcore:type` is looked up once: `type`
+ * when the ADT type tables know it, else `unknownType` as ADT sent it.
+ */
+export type ITraceProgramRef = IAdtAnsweredObject & {
   name: string;
-  type: string;
   uri: string;
   context?: string;
   byteCodeOffset?: number;
   /** Present on a statement's calling program: a query URI, not a plain URI. */
   objectReferenceQuery?: string;
-}
+};
 
 /**
  * `trc:grossTime` and `trc:traceEventNetTime`.
@@ -522,7 +527,7 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
   }
   return {
     name: attr(ref, 'name') as string,
-    type: attr(ref, 'type') as string,
+    ...answeredObject(attr(ref, 'type') ?? ''),
     uri: attr(ref, 'uri') as string,
     context: attr(ref, 'context'),
     byteCodeOffset: attrNum(ref, 'byteCodeOffset'),

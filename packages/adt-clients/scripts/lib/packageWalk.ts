@@ -82,7 +82,7 @@ export async function walkPackage(
   const all = [...nodes];
 
   for (const typeInfo of objectTypes) {
-    if (isPackageType(typeInfo.objectType)) continue;
+    if (isPackageType(typeInfo.type ?? typeInfo.unknownType)) continue;
     const perType = await fetchNodeStructure(
       connection,
       headersFor('AdtUtils.fetchNodeStructure'),

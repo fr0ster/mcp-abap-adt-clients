@@ -32,6 +32,7 @@ describe('the published surface', () => {
       'analyseUnitTestStart',
       'analyseUnsupportedStatus',
       'analyseValidation',
+      'answeredObject',
       'asItCame',
       'atcRunStatus',
       'atcStartedRun',

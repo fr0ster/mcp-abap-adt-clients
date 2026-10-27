@@ -14,6 +14,7 @@ import {
   type IWhereUsedListResult,
   utilWhereUsedReferences,
 } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtAnsweredObject } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -35,6 +36,10 @@ import {
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
+
+/** A reference's code as ADT sent it, known to the type tables or not. */
+const codeOf = (reference: IAdtAnsweredObject): string =>
+  reference.type ?? reference.unknownType;
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
@@ -669,7 +674,7 @@ describe('Shared - getWhereUsed', () => {
       const all = await searchWith(
         utils.modifyWhereUsedScope(await scopeOf(), { enableAll: true }),
       );
-      const allTypes = [...new Set(all.references.map((r) => r.type))].sort();
+      const allTypes = [...new Set(all.references.map(codeOf))].sort();
       testsLogger.info?.(
         `📊 ALL: ${all.references.length} refs across types [${allTypes.join(', ')}]`,
       );
@@ -687,7 +692,7 @@ describe('Shared - getWhereUsed', () => {
       const kept = await searchWith(
         utils.modifyWhereUsedScope(await scopeOf(), { enableOnly: [keepType] }),
       );
-      const keptTypes = [...new Set(kept.references.map((r) => r.type))].sort();
+      const keptTypes = [...new Set(kept.references.map(codeOf))].sort();
       testsLogger.info?.(
         `📊 KEEP [${keepType}]: ${kept.references.length} refs across types [${keptTypes.join(', ')}]`,
       );
@@ -695,7 +700,7 @@ describe('Shared - getWhereUsed', () => {
       // Every returned reference must be the type we asked for — proves SAP did
       // not search (and did not return) any of the other ~40 object types.
       for (const ref of kept.references) {
-        expect(ref.type).toBe(keepType);
+        expect(codeOf(ref)).toBe(keepType);
       }
       expect(kept.references.length).toBeLessThanOrEqual(all.references.length);
       if (allTypes.includes(keepType)) {

@@ -126,15 +126,15 @@ describe('utilNodeContents', () => {
   it('keeps each child node id with the type it holds, leading zeros intact', () => {
     const contents = utilNodeContents(wire(NODE_XML));
     expect(contents.childNodes).toEqual([
-      { objectType: 'PROG/I', nodeId: '000010' },
-      { objectType: 'CLAS/OC', nodeId: '000020' },
+      { type: 'PROG/I', nodeId: '000010' },
+      { type: 'CLAS/OC', nodeId: '000020' },
     ]);
   });
 
   it('drops a node that cannot be identified or fetched', () => {
     expect(utilNodeContents(wire(NODE_XML)).objects).toEqual([
       {
-        objectType: 'PROG/P',
+        type: 'PROG/P',
         objectName: 'ZMY_PROGRAM',
         techName: 'ZMY_PROGRAM',
         objectUri: '/sap/bc/adt/programs/programs/zmy_program',

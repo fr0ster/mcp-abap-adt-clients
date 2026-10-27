@@ -16,11 +16,12 @@
  */
 
 import type {
-  IObjectReference,
+  IAdtAnsweredObject,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { rawOf } from '../result';
+import { answeredObject } from './answeredObject';
 
 type XmlRecord = Record<string, unknown>;
 
@@ -33,28 +34,30 @@ const asArray = (value: unknown): XmlRecord[] =>
 // Shapes
 // ---------------------------------------------------------------------------
 
-/** What every object ADT names has in common. */
-export interface IAdtObjectHit {
+/**
+ * What every object ADT names has in common. Its code is an
+ * `IAdtAnsweredObject`: `type` when the ADT type tables know it, else
+ * `unknownType` with the text ADT sent.
+ */
+export type IAdtObjectHit = IAdtAnsweredObject & {
   /** Object name. */
   name: string;
-  /** ADT object type code, e.g. 'CLAS/OC', 'DDLS/DF', 'DEVC/K'. */
-  type: string;
   /** ADT URI of the object, where the producer knows it. */
   uri?: string;
   /** Package containing the object, where the producer knows it. */
   packageName?: string;
   /** Human-readable description, where the producer knows it. */
   description?: string;
-}
+};
 
 /** One hit of an object search. */
-export interface ISearchResult extends IAdtObjectHit {
+export type ISearchResult = IAdtObjectHit & {
   /** Search always reports a description, even when empty. */
   description: string;
-}
+};
 
 /** One object that uses the object asked about. */
-export interface IWhereUsedReference extends IAdtObjectHit {
+export type IWhereUsedReference = IAdtObjectHit & {
   /** ADT URI of the referencing object — always known for a where-used hit. */
   uri: string;
   /** Parent URI (for hierarchical display). */
@@ -67,7 +70,7 @@ export interface IWhereUsedReference extends IAdtObjectHit {
   usageInformation?: string;
   /** Object identifier for navigation. */
   objectIdentifier?: string;
-}
+};
 
 /**
  * What a where-used run answers, read.
@@ -84,9 +87,16 @@ export interface IWhereUsedListResult {
   references: IWhereUsedReference[];
 }
 
+/**
+ * One object of the inactive-objects listing: its name and its code. A known
+ * code is an `IObjectReference` to hand to `activateObjectsGroup`; an
+ * `unknownType` is not one, so a caller decides about it.
+ */
+export type IInactiveObject = IAdtAnsweredObject & { name: string };
+
 /** What the inactive-objects listing answers, read. */
 export interface IInactiveObjectsResponse {
-  objects: IObjectReference[];
+  objects: IInactiveObject[];
 }
 
 /** One entry of a named-item list — a URI and its description. */
@@ -101,22 +111,20 @@ export interface INamedItem {
  * needs to identify and fetch it; a node the server sends without all four is
  * not one.
  */
-export interface IRepositoryObjectNode {
-  objectType: string;
+export type IRepositoryObjectNode = IAdtAnsweredObject & {
   objectName: string;
   techName: string;
   objectUri: string;
-}
+};
 
 /**
  * One child level: an object type, and the node id holding objects of it.
  * `SEU_ADT_OBJECT_TYPE_INFO` pairs the two, and the pair is the unit — an id on
  * its own cannot say which node holds `PROG/I`.
  */
-export interface IRepositoryNodeChild {
-  objectType: string;
+export type IRepositoryNodeChild = IAdtAnsweredObject & {
   nodeId: string;
-}
+};
 
 /** One level of the repository tree: its objects, and how to ask for what is below. */
 export interface IRepositoryNodeContents {
@@ -171,7 +179,7 @@ export function readSearchHits(xml: string): ISearchResult[] {
     if (!name || !type) continue;
     results.push({
       name,
-      type,
+      ...answeredObject(type),
       description: searchAttr(ref, 'description') ?? '',
       packageName: searchAttr(ref, 'packageName'),
       uri: searchAttr(ref, 'uri'),
@@ -278,7 +286,9 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
   )) {
     const objectType = nodeValue(info?.OBJECT_TYPE);
     const nodeId = nodeValue(info?.NODE_ID);
-    if (objectType && nodeId) objectTypes.push({ objectType, nodeId });
+    if (objectType && nodeId) {
+      objectTypes.push({ ...answeredObject(objectType), nodeId });
+    }
   }
   return { nodes, objectTypes };
 }
@@ -299,7 +309,12 @@ export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
     const techName = nodeValue(node?.TECH_NAME);
     const objectUri = nodeValue(node?.OBJECT_URI);
     if (objectType && objectName && techName && objectUri) {
-      objects.push({ objectType, objectName, techName, objectUri });
+      objects.push({
+        ...answeredObject(objectType),
+        objectName,
+        techName,
+        objectUri,
+      });
     }
   }
   return { objects, childNodes: objectTypes };
@@ -323,7 +338,7 @@ export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
   answer,
 ) => {
   const xml = rawOf(answer);
-  const objects: IObjectReference[] = [];
+  const objects: IInactiveObject[] = [];
   if (!xml.trim()) return { objects };
   const parsed = inactiveParser.parse(xml) as XmlRecord;
   const root = parsed['ioc:inactiveObjects'] as XmlRecord | undefined;
@@ -335,7 +350,7 @@ export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
       | undefined;
     if (!ref) continue;
     objects.push({
-      type: String(ref['@_adtcore:type'] ?? ''),
+      ...answeredObject(String(ref['@_adtcore:type'] ?? '')),
       name: String(ref['@_adtcore:name'] ?? ''),
     });
   }
@@ -374,13 +389,13 @@ export const utilWhereUsedReferences: IResultStrategy<IWhereUsedListResult> = (
   )) {
     const adtObject = entry.adtObject as XmlRecord | undefined;
     if (!adtObject) continue;
-    const type = String(adtObject['@_type'] ?? '');
-    if (type === 'DEVC/K') continue;
+    const code = answeredObject(String(adtObject['@_type'] ?? ''));
+    if (code.type === 'DEVC/K') continue;
     const packageRef = adtObject.packageRef as XmlRecord | undefined;
     references.push({
       uri: String(entry['@_uri'] ?? ''),
       name: String(adtObject['@_name'] ?? ''),
-      type,
+      ...code,
       parentUri: entry['@_parentUri'] as string | undefined,
       packageName: packageRef?.['@_name'] as string | undefined,
       responsible: adtObject['@_responsible'] as string | undefined,
