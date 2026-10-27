@@ -29,6 +29,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IResultStrategy,
+  ITableResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -49,7 +50,7 @@ import { createTable } from './create';
 import { checkDeletion, deleteTable } from './delete';
 import { lockTable } from './lock';
 import { getTableMetadata, getTableSource, getTableTransport } from './read';
-import { type ITableConfig, type ITableResults, tableDocuments } from './types';
+import { type ITableConfig, tableDocuments } from './types';
 import { unlockTable } from './unlock';
 import { updateTable } from './update';
 import { validateTableName } from './validation';

@@ -16,7 +16,6 @@ import {
   DDL_SOURCE,
   type ddlDocuments,
   failed,
-  type IDdlResults,
   versionsUri,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
@@ -27,6 +26,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IDdlConfig,
+  IDdlResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';

@@ -19,7 +19,9 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IResultStrategy,
+  IServiceBindingPublicationConfig,
   IServiceGroupParams,
+  IServiceResults,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -47,9 +49,7 @@ import type {
   IDeleteServiceBindingParams,
   IReadServiceBindingParams,
   IServiceBindingConfig,
-  IServiceBindingPublicationConfig,
   IServiceBindingPublicationParams,
-  IServiceResults,
   ITransportCheckServiceBindingParams,
 } from './types';
 import { resolveBindingVariant, serviceDocuments } from './types';

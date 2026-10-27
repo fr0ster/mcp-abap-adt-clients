@@ -13,7 +13,6 @@ import {
   answering,
   CLASS,
   type classDocuments,
-  type IClassResults,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -22,6 +21,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IClassConfig,
+  IClassResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';

@@ -23,6 +23,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtValidatable,
+  IAuthorizationFieldResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -47,7 +48,6 @@ import { readAuthorizationField } from './read';
 import {
   authorizationFieldDocuments,
   type IAuthorizationFieldConfig,
-  type IAuthorizationFieldResults,
 } from './types';
 import { unlockAuthorizationField } from './unlock';
 import { updateAuthorizationField } from './update';

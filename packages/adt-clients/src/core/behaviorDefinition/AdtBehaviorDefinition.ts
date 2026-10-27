@@ -23,6 +23,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IBehaviorDefinitionResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -52,7 +53,6 @@ import {
   type BehaviorDefinitionImplementationType,
   behaviorDefinitionDocuments,
   type IBehaviorDefinitionConfig,
-  type IBehaviorDefinitionResults,
 } from './types';
 import { unlock as unlockBehaviorDefinition } from './unlock';
 import { update as updateBehaviorDefinition } from './update';

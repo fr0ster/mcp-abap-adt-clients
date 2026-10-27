@@ -9,7 +9,7 @@
  */
 
 import type {
-  IResultStrategy,
+  IScalarFunctionImplementationResults,
   ScalarFunctionEngine,
 } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -73,27 +73,6 @@ export type ScalarFunctionImplementationUpdated = string;
  * The transport document for the implementation.
  */
 export type ScalarFunctionImplementationTransport = string;
-
-/** One strategy per member of a scalarFunctionImplementation implementation. See `IClassResults`. */
-export interface IScalarFunctionImplementationResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  readonly transport: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** What the object's own document answers when written. */
-  readonly metadataUpdated: IResultStrategy<unknown>;
-  /** The version history — an Atom feed; `objectVersions` reads it. */
-  readonly versions: IResultStrategy<unknown>;
-  /** One version's source. */
-  readonly versionSource: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

@@ -30,6 +30,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IClassResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -44,11 +45,7 @@ import {
   getBehaviorImplementationSource,
   getBehaviorImplementationTransport,
 } from './read';
-import {
-  classDocuments,
-  type IBehaviorImplementationConfig,
-  type IClassResults,
-} from './types';
+import { classDocuments, type IBehaviorImplementationConfig } from './types';
 import { updateBehaviorImplementation } from './update';
 import { validateBehaviorImplementationName } from './validation';
 import {

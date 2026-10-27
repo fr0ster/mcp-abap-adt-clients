@@ -21,6 +21,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
+  IClassResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -39,7 +40,7 @@ import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { lockClass } from './lock';
 import { getClassMetadata, getClassTransport } from './read';
-import type { classDocuments, IClassConfig, IClassResults } from './types';
+import type { classDocuments, IClassConfig } from './types';
 import { unlockClass } from './unlock';
 import {
   type ClassIncludeType,

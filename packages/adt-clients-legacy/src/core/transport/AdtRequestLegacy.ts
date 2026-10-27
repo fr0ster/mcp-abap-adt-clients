@@ -29,7 +29,6 @@ import {
   AdtRequest,
   answering,
   failed,
-  type ITransportResults,
   TRANSPORT_REQUEST,
   type transportDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -44,6 +43,7 @@ import type {
   IListTransportsOptions,
   IResultStrategy,
   ITransportConfig,
+  ITransportResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import {

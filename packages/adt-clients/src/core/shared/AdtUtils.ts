@@ -94,6 +94,7 @@ import type {
   IAdtRepositoryStructure,
   IAdtResponse,
   IResultStrategy,
+  IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -154,7 +155,7 @@ import type {
   ISearchObjectsParams,
 } from './types';
 // Import types
-import { type IUtilResults, utilDocuments } from './utilResultSet';
+import { utilDocuments } from './utilResultSet';
 
 /**
  * Declared against every atom, not only `IAdtSearchable`.

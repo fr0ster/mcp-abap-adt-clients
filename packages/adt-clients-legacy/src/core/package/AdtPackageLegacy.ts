@@ -13,7 +13,6 @@
 import {
   AdtPackage,
   failed,
-  type IPackageResults,
   PACKAGE,
   type packageDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -24,6 +23,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IPackageConfig,
+  IPackageResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import {

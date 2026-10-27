@@ -14,6 +14,7 @@
  */
 
 import type {
+  IAccessControlResults,
   IAdtActivatable,
   IAdtCheckable,
   IAdtClientOptions,
@@ -45,10 +46,40 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAppendStructureResults,
+  IAuthorizationFieldResults,
+  IBehaviorDefinitionResults,
   ICdsTestDoubleCheckable,
+  IClassResults,
+  IDataElementResults,
+  IDdlResults,
+  IDomainResults,
+  IEnhancementResults,
   IFeatureToggleObject,
+  IFeatureToggleResults,
+  IFunctionGroupResults,
+  IFunctionIncludeResults,
+  IFunctionModuleResults,
   IIncludeConfig,
+  IIncludeResults,
+  IInterfaceResults,
+  IMessageClassMessageResults,
+  IMessageClassResults,
+  IMetadataExtensionResults,
+  IPackageResults,
+  IProgramResults,
+  IScalarFunctionImplementationResults,
+  IScalarFunctionResults,
   IServiceBindingConfig,
+  IServiceBindingPublicationConfig,
+  IServiceDefinitionResults,
+  IServiceResults,
+  IStructureResults,
+  ITableResults,
+  ITableTypeResults,
+  ITransformationResults,
+  ITransportResults,
+  IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -60,31 +91,26 @@ import {
   AdtAccessControl,
   accessControlDocuments,
   type IAccessControlConfig,
-  type IAccessControlResults,
 } from '../core/accessControl';
 import {
   AdtAppendStructure,
   appendStructureDocuments,
   type IAppendStructureConfig,
-  type IAppendStructureResults,
 } from '../core/appendStructure';
 import {
   AdtAuthorizationField,
   authorizationFieldDocuments,
   type IAuthorizationFieldConfig,
-  type IAuthorizationFieldResults,
 } from '../core/authorizationField';
 import {
   AdtBehaviorDefinition,
   behaviorDefinitionDocuments,
   type IBehaviorDefinitionConfig,
-  type IBehaviorDefinitionResults,
 } from '../core/behaviorDefinition';
 import {
   AdtBehaviorImplementation,
   classDocuments,
   type IBehaviorImplementationConfig,
-  type IClassResults,
 } from '../core/behaviorImplementation';
 import {
   AdtClass,
@@ -102,59 +128,38 @@ import {
   AdtDataElement,
   dataElementDocuments,
   type IDataElementConfig,
-  type IDataElementResults,
 } from '../core/dataElement';
-import {
-  AdtDdl,
-  ddlDocuments,
-  type IDdlConfig,
-  type IDdlResults,
-} from '../core/ddl';
-import {
-  AdtDomain,
-  domainDocuments,
-  type IDomainConfig,
-  type IDomainResults,
-} from '../core/domain';
+import { AdtDdl, ddlDocuments, type IDdlConfig } from '../core/ddl';
+import { AdtDomain, domainDocuments, type IDomainConfig } from '../core/domain';
 import {
   AdtEnhancement,
   enhancementDocuments,
   type IEnhancementConfig,
-  type IEnhancementResults,
 } from '../core/enhancement';
 import {
   AdtFeatureToggle,
   featureToggleDocuments,
   type IFeatureToggleConfig,
-  type IFeatureToggleResults,
 } from '../core/featureToggle';
 import {
   AdtFunctionGroup,
   functionGroupDocuments,
   type IFunctionGroupConfig,
-  type IFunctionGroupResults,
 } from '../core/functionGroup';
 import {
   AdtFunctionInclude,
   functionIncludeDocuments,
   type IFunctionIncludeConfig,
-  type IFunctionIncludeResults,
 } from '../core/functionInclude';
 import {
   AdtFunctionModule,
   functionModuleDocuments,
   type IFunctionModuleConfig,
-  type IFunctionModuleResults,
 } from '../core/functionModule';
-import {
-  AdtInclude,
-  type IIncludeResults,
-  includeDocuments,
-} from '../core/include';
+import { AdtInclude, includeDocuments } from '../core/include';
 import {
   AdtInterface,
   type IInterfaceConfig,
-  type IInterfaceResults,
   interfaceDocuments,
 } from '../core/interface';
 import {
@@ -162,84 +167,62 @@ import {
   AdtMessageClassMessage,
   type IMessageClassConfig,
   type IMessageClassMessageConfig,
-  type IMessageClassMessageResults,
-  type IMessageClassResults,
   messageClassDocuments,
   messageDocuments,
 } from '../core/messageClass';
 import {
   AdtMetadataExtension,
   type IMetadataExtensionConfig,
-  type IMetadataExtensionResults,
   metadataExtensionDocuments,
 } from '../core/metadataExtension';
 import {
   AdtPackage,
   type IPackageConfig,
-  type IPackageResults,
   packageDocuments,
 } from '../core/package';
 import {
   AdtProgram,
   type IProgramConfig,
-  type IProgramResults,
   programDocuments,
 } from '../core/program';
 import {
   AdtScalarFunction,
   type IScalarFunctionConfig,
-  type IScalarFunctionResults,
   scalarFunctionDocuments,
 } from '../core/scalarFunction';
 import {
   AdtScalarFunctionImplementation,
   type IScalarFunctionImplementationConfig,
-  type IScalarFunctionImplementationResults,
   scalarFunctionImplementationDocuments,
 } from '../core/scalarFunctionImplementation';
-import {
-  AdtServiceBinding,
-  type IServiceBindingPublicationConfig,
-  type IServiceResults,
-  serviceDocuments,
-} from '../core/service';
+import { AdtServiceBinding, serviceDocuments } from '../core/service';
 import {
   AdtServiceDefinition,
   type IServiceDefinitionConfig,
-  type IServiceDefinitionResults,
   serviceDefinitionDocuments,
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
-import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
+import { utilDocuments } from '../core/shared/utilResultSet';
 import {
   AdtStructure,
   type IStructureConfig,
-  type IStructureResults,
   structureDocuments,
 } from '../core/structure';
-import {
-  AdtTable,
-  type ITableConfig,
-  type ITableResults,
-  tableDocuments,
-} from '../core/table';
+import { AdtTable, type ITableConfig, tableDocuments } from '../core/table';
 import {
   AdtDdicTableType,
   type ITableTypeConfig,
-  type ITableTypeResults,
   tableTypeDocuments,
 } from '../core/tabletype';
 import {
   AdtTransformation,
   type ITransformationConfig,
-  type ITransformationResults,
   transformationDocuments,
 } from '../core/transformation';
 import {
   AdtRequest,
   type ITransportConfig,
-  type ITransportResults,
   transportDocuments,
 } from '../core/transport';
 import { withRequestTrace } from '../utils/requestTrace';

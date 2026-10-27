@@ -8,7 +8,7 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IFunctionGroupResults } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -72,25 +72,6 @@ export type FunctionGroupUpdated = string;
  * The transport document for the group, from its `objectstates` resource.
  */
 export type FunctionGroupTransport = string;
-
-/** One strategy per member of a functionGroup implementation. See `IClassResults`. */
-export interface IFunctionGroupResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  /** Enhancement implementations in the host's source. */
-  readonly enhancementElements: IResultStrategy<unknown>;
-  /** Places in the host that can be enhanced. */
-  readonly enhancementOptions: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly metadataUpdated: IResultStrategy<unknown>;
-  readonly transport: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

@@ -1,10 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { IUtilResults } from '@mcp-abap-adt/interfaces-adt';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
-import {
-  type IUtilResults,
-  utilDocuments,
-} from '../../../core/shared/utilResultSet';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { rawDocument } from '../../../utils/resultStrategy';
 
 /**

@@ -9,7 +9,7 @@
  */
 
 import type {
-  IResultStrategy,
+  ITransformationResults,
   TransformationType,
 } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -70,25 +70,6 @@ export type TransformationUpdated = string;
  * The transport document for the transformation.
  */
 export type TransformationTransport = string;
-
-/** One strategy per member of a transformation implementation. See `IClassResults`. */
-export interface ITransformationResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  readonly transport: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** The version history — an Atom feed; `objectVersions` reads it. */
-  readonly versions: IResultStrategy<unknown>;
-  /** One version's source. */
-  readonly versionSource: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

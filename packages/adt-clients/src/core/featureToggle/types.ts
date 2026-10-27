@@ -10,7 +10,7 @@
  * domain member, and what each looks like is the result strategy's to say.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IFeatureToggleResults } from '@mcp-abap-adt/interfaces-adt';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -53,29 +53,6 @@ export type FeatureToggleUpdated = string;
 
 /** What the source (JSON) write and read answer. */
 export type FeatureToggleSourceDocument = string;
-
-/** One strategy per member of a feature-toggle implementation. */
-export interface IFeatureToggleResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  readonly sourceDocument: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** What the object's own document answers when written. */
-  readonly metadataUpdated: IResultStrategy<unknown>;
-  /** What `switchOn` and `switchOff` answer — nothing worth reading. */
-  readonly switched: IResultStrategy<unknown>;
-  /** What `getRuntimeState` answers: the `…/states` JSON. */
-  readonly runtimeState: IResultStrategy<unknown>;
-  /** What `checkState` answers: the `…/check` JSON. */
-  readonly checkState: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

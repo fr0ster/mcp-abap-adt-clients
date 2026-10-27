@@ -8,7 +8,10 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IMessageClassMessageResults,
+  IMessageClassResults,
+} from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -54,18 +57,6 @@ export type MessageClassDeletionResult = string;
  */
 export type MessageClassUpdated = string;
 
-/** One strategy per member of a messageClass implementation. See `IClassResults`. */
-export interface IMessageClassResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly metadataUpdated: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-}
-
 /**
  * The shipped default: every member answers its document as it arrived.
  *
@@ -80,24 +71,6 @@ export const messageClassDocuments = {
   metadataUpdated: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IMessageClassResults;
-
-/**
- * What each member of the message-level handler answers.
- *
- * A message is written through its **parent class's** document: ADT has no
- * resource for one message, so `create`, `update` and `delete` all PUT the
- * whole class with that message added, changed or removed. Every one of them
- * therefore answers what that PUT answered.
- */
-export interface IMessageClassMessageResults<
-  TRead = string,
-  TWritten = string,
-  TDeleted = string,
-> {
-  readonly read: IResultStrategy<TRead>;
-  readonly written: IResultStrategy<TWritten>;
-  readonly deleted: IResultStrategy<TDeleted>;
-}
 
 /** The shipped default: the parent class's document, as it arrived. */
 export const messageDocuments = {

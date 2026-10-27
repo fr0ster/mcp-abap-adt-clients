@@ -8,7 +8,7 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IFunctionIncludeResults } from '@mcp-abap-adt/interfaces-adt';
 
 export type { IDeleteFunctionIncludeParams } from './delete';
 
@@ -72,26 +72,6 @@ export type FunctionIncludeDeletionResult = string;
  * consumer asks for one.
  */
 export type FunctionIncludeUpdated = string;
-
-/** One strategy per member of a functionInclude implementation. See `IClassResults`. */
-export interface IFunctionIncludeResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** What the object's own document answers when written. */
-  readonly metadataUpdated: IResultStrategy<unknown>;
-  /** The version history — an Atom feed; `objectVersions` reads it. */
-  readonly versions: IResultStrategy<unknown>;
-  /** One version's source. */
-  readonly versionSource: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

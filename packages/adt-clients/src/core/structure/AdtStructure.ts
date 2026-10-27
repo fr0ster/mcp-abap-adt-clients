@@ -27,6 +27,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IResultStrategy,
+  IStructureResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -51,11 +52,7 @@ import {
   getStructureSource,
   getStructureTransport,
 } from './read';
-import {
-  type IStructureConfig,
-  type IStructureResults,
-  structureDocuments,
-} from './types';
+import { type IStructureConfig, structureDocuments } from './types';
 import { unlockStructure } from './unlock';
 import { upload } from './update';
 import { validateStructureName } from './validation';

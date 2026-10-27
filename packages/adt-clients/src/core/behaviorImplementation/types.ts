@@ -12,10 +12,7 @@
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces-adt';
-export {
-  classDocuments,
-  type IClassResults,
-} from '../class/types';
+export { classDocuments } from '../class/types';
 
 /**
  * The shapes below describe the argument of the request builders in this

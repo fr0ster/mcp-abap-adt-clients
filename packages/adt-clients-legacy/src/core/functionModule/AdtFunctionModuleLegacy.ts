@@ -12,7 +12,6 @@ import {
   answering,
   FUNCTION_MODULE,
   type functionModuleDocuments,
-  type IFunctionModuleResults,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -21,6 +20,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IFunctionModuleConfig,
+  IFunctionModuleResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';

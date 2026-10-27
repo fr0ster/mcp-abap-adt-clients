@@ -43,6 +43,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IClassResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -56,7 +57,7 @@ import { create as createClass } from './create';
 import { checkDeletion, deleteClass } from './delete';
 import { getClassSource } from './read';
 import { activateClassTestClasses } from './testclasses';
-import { classDocuments, type IClassConfig, type IClassResults } from './types';
+import { classDocuments, type IClassConfig } from './types';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
 

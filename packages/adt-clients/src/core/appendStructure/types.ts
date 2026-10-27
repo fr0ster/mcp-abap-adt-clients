@@ -8,7 +8,7 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAppendStructureResults } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -67,25 +67,6 @@ export type AppendStructureUpdated = string;
  * The transport document for the object, from its `objectstates` resource.
  */
 export type AppendStructureTransport = string;
-
-/** One strategy per member of a appendStructure implementation. See `IClassResults`. */
-export interface IAppendStructureResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  readonly transport: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** The version history — an Atom feed; `objectVersions` reads it. */
-  readonly versions: IResultStrategy<unknown>;
-  /** One version's source. */
-  readonly versionSource: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

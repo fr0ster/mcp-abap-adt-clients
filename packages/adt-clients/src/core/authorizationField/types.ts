@@ -8,7 +8,7 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAuthorizationFieldResults } from '@mcp-abap-adt/interfaces-adt';
 
 export type { IDeleteAuthorizationFieldParams } from './delete';
 
@@ -60,20 +60,6 @@ export type AuthorizationFieldDeletionResult = string;
  * What the XML write answers.
  */
 export type AuthorizationFieldUpdated = string;
-
-/** One strategy per member of a authorizationField implementation. See `IClassResults`. */
-export interface IAuthorizationFieldResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly metadataUpdated: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

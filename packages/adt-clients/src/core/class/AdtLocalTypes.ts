@@ -23,6 +23,7 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
+  IClassResults,
   ILocalTypesConfig,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -37,7 +38,7 @@ import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import { getClassImplementationsInclude } from './read';
-import { classDocuments, type IClassResults } from './types';
+import { classDocuments } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces-adt';

@@ -30,6 +30,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
+  IPackageResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -50,11 +51,7 @@ import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
-import {
-  type IPackageConfig,
-  type IPackageResults,
-  packageDocuments,
-} from './types';
+import { type IPackageConfig, packageDocuments } from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';

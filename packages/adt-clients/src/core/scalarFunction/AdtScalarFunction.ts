@@ -24,6 +24,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IResultStrategy,
+  IScalarFunctionResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -48,11 +49,7 @@ import {
   getScalarFunctionSource,
   getScalarFunctionTransport,
 } from './read';
-import {
-  type IScalarFunctionConfig,
-  type IScalarFunctionResults,
-  scalarFunctionDocuments,
-} from './types';
+import { type IScalarFunctionConfig, scalarFunctionDocuments } from './types';
 import { unlockScalarFunction } from './unlock';
 import { updateScalarFunction } from './update';
 import { validateScalarFunctionName } from './validation';

@@ -12,11 +12,13 @@
  * point is what a consumer's editor tells them before they run anything.
  */
 
-import type { IAdtUpdatable } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtUpdatable,
+  IServiceBindingPublicationConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../../clients/AdtClient';
-import type { IServiceBindingPublicationConfig } from '../../../../core/service/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 
 const connection = {

@@ -24,6 +24,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IFeatureToggleObject,
+  IFeatureToggleResults,
   IFeatureToggleSource,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -55,7 +56,6 @@ import {
   type ICreateFeatureToggleParams,
   type IDeleteFeatureToggleParams,
   type IFeatureToggleConfig,
-  type IFeatureToggleResults,
 } from './types';
 import { unlockFeatureToggle } from './unlock';
 import { updateFeatureToggle } from './update';

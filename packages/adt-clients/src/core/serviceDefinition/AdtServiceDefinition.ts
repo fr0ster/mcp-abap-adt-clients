@@ -24,6 +24,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IResultStrategy,
+  IServiceDefinitionResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -50,7 +51,6 @@ import {
 } from './read';
 import {
   type IServiceDefinitionConfig,
-  type IServiceDefinitionResults,
   serviceDefinitionDocuments,
 } from './types';
 import { unlockServiceDefinition } from './unlock';

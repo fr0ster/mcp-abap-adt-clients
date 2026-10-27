@@ -12,7 +12,6 @@
 import {
   AdtInclude,
   answering,
-  type IIncludeResults,
   type includeDocuments,
   PROGRAM_INCLUDE,
   withCallTimeout,
@@ -23,6 +22,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IIncludeConfig,
+  IIncludeResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
