@@ -1,6 +1,6 @@
 /**
  * AdtLocalTypesLegacy - the class's `types` include handler for legacy SAP
- * systems (BASIS < 7.50)
+ * systems (SAP_BASIS 7.40, measured on 7.40 SP04)
  *
  * Overrides:
  * - readTransport() — refused without a request, as the container class's is.

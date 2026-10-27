@@ -1,5 +1,5 @@
 /**
- * AdtExecutorLegacy — executors for legacy SAP systems (BASIS < 7.50), over RFC.
+ * AdtExecutorLegacy — executors for legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04), over RFC.
  *
  * The ABAP Unit runners differ: 7.40 has no `/abapunit/runs`, so the
  * `/abapunit/testruns` request with `<options>` is what runs the tests —

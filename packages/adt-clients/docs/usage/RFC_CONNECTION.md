@@ -1,10 +1,10 @@
 # RFC Connection Guide
 
-RFC (Remote Function Call) transport allows ADT operations on legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions are not supported. It uses the standard SAP function module `SADT_REST_RFC_ENDPOINT` — the same mechanism Eclipse ADT uses via JCo.
+RFC (Remote Function Call) transport allows ADT operations on legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) where HTTP stateful sessions are not supported. It uses the standard SAP function module `SADT_REST_RFC_ENDPOINT` — the same mechanism Eclipse ADT uses via JCo.
 
 ## When to Use RFC
 
-- **Legacy systems** (BASIS < 7.50) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`, from `@mcp-abap-adt/adt-clients-legacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. Neither package detects the wire or refuses HTTP; it just is not supported. See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#http-is-not-a-supported-legacy-wire).
+- **Legacy systems** (SAP_BASIS 7.40) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`, from `@mcp-abap-adt/adt-clients-legacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. Neither package detects the wire or refuses HTTP; it just is not supported. See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#http-is-not-a-supported-legacy-wire).
 - **Systems without HTTP stateful support** — some custom configurations disable HTTP stateful sessions.
 
 Modern systems (BASIS >= 7.50, S/4 HANA, BTP) work fine with HTTP connections and don't need RFC.
@@ -109,7 +109,7 @@ const program = client.getProgram();
 await program.read({ programName: 'ZTEST' });
 ```
 
-On a legacy system (BASIS < 7.50) the consumer declares the system type by
+On a legacy system (SAP_BASIS 7.40, measured on 7.40 SP04) the consumer declares the system type by
 constructing `AdtClientLegacy` from the separate package
 `@mcp-abap-adt/adt-clients-legacy`, over an RFC connection:
 

@@ -1,5 +1,5 @@
 /**
- * AdtClientLegacy - ADT Client for older SAP systems (BASIS < 7.50), over RFC
+ * AdtClientLegacy - ADT Client for older SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04), over RFC
  *
  * Supported and measured over RFC only (SAP_BASIS 7.40 SP04); the library does
  * not detect or branch on the wire, and HTTP to a legacy system is unsupported.

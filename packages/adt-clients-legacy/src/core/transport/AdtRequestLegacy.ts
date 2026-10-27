@@ -1,6 +1,6 @@
 /**
  * AdtRequestLegacy - Transport request handler for legacy SAP systems
- * (BASIS < 7.50), over RFC.
+ * (SAP_BASIS 7.40, measured on 7.40 SP04), over RFC.
  *
  * Legacy systems use `/sap/bc/cts/` instead of `/sap/bc/adt/cts/`.
  *

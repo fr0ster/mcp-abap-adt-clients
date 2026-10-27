@@ -1,6 +1,6 @@
 /**
  * AdtIncludeLegacy - standalone include handler for legacy SAP systems
- * (BASIS < 7.50).
+ * (SAP_BASIS 7.40, measured on 7.40 SP04).
  *
  * Overrides:
  * - checkDeletion() — refused without a request: 7.40 has no deletion API.

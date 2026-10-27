@@ -231,7 +231,7 @@ see [The reading is injected once](#the-reading-is-injected-once) below.
 ### The legacy client (separate package)
 
 `createAdtClient(connection)` returns `AdtClient` and detects nothing. A legacy
-system (BASIS < 7.50) is served by `AdtClientLegacy` from
+system (SAP_BASIS 7.40, measured on 7.40 SP04) is served by `AdtClientLegacy` from
 `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs over an RFC
 connection — the consumer declares the system type:
 
@@ -285,7 +285,7 @@ const source = await fincl.read({
 });
 
 // Feature Toggle (FTG2/FT) — SAP feature-gate artifact with JSON source payload.
-// Available on modern on-prem and cloud MDD; absent on legacy kernels (BASIS < 7.50).
+// Available on modern on-prem and cloud MDD; not advertised on SAP_BASIS 7.40 SP04 (the legacy package refuses it).
 // Endpoint: /sap/bc/adt/sfw/featuretoggles/{name}
 // Besides the CRUD atoms a toggle has five members of its own (switchOn,
 // switchOff, getRuntimeState, checkState, readSource), each answering its own
@@ -483,7 +483,7 @@ Contract notes:
 |-------------|-----------------|--------------------------|---------------------|-------------------------------------------|
 | Modern on-prem (BASIS ≥ 7.50) | ✅ with S_DEVELOP | ✅ with lock + transport | ✅ with transport | ✅ |
 | Cloud MDD | ⚠️ usually SAP-reserved; HTTP 403 for customer creation | ⚠️ typically limited to SAP-provided toggles | ⚠️ depends on toggle's `configurable` flag | ✅ against SAP-provided toggles |
-| Legacy (BASIS < 7.50), `@mcp-abap-adt/adt-clients-legacy` | ❌ refused without a request | ❌ | ❌ | ❌ |
+| Legacy (SAP_BASIS 7.40 SP04), `@mcp-abap-adt/adt-clients-legacy` | ❌ refused without a request | ❌ | ❌ | ❌ |
 
 ### AbapGit (ADT-integrated)
 
@@ -602,7 +602,7 @@ if (repo.repositoryId) {
 }
 ```
 
-**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (BASIS < 7.50) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
+**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. SAP_BASIS 7.40 SP04 does not advertise `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
 **Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `listRepos()` until the repository's `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
 

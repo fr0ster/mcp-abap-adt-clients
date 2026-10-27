@@ -41,7 +41,7 @@ describe('AdtDdl.checkCdsTestDoubles', () => {
       await new AdtDdlLegacy(conn, createLibraryLogger()).checkCdsTestDoubles(
         'ZI_VIEW',
       ),
-      'no endpoint below 7.50',
+      'no endpoint on 7.40 SP04',
     );
     expect(calls).toHaveLength(0);
   });

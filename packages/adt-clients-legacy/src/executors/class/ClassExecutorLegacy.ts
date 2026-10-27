@@ -1,5 +1,5 @@
 /**
- * ClassExecutorLegacy — running a class on legacy SAP systems (BASIS < 7.50).
+ * ClassExecutorLegacy — running a class on legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04).
  *
  * SAP_BASIS 7.40 SP04 has no `IF_OO_ADT_CLASSRUN` and answers
  * `/sap/bc/adt/oo/classrun` with 404 (measured), so `run` and

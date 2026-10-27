@@ -1,10 +1,10 @@
 /**
- * AdtDdlLegacy - DDL source handler for legacy SAP systems (BASIS < 7.50)
+ * AdtDdlLegacy - DDL source handler for legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04)
  *
  * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
  * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API),
  * and refuses checkCdsTestDoubles(): the CDS test-doubles framework endpoint is
- * not present below 7.50 (issue #207).
+ * not present on 7.40 SP04 (issue #207).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
  * readTransport(), getVersions() and getVersionSource() are refused without a
  * request: measured on 7.40 SP04, their resources answer `404`.
@@ -73,7 +73,7 @@ export class AdtDdlLegacy<
     );
   }
 
-  /** Refused without a request: the endpoint does not exist below 7.50. */
+  /** Refused without a request: the endpoint is absent on 7.40 SP04. */
   override async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
     _cdsViewName: string,
     _options?: IAdtAnalyseOptions<E>,

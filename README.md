@@ -7,7 +7,7 @@ The repository of three packages, each with its README and CHANGELOG in its dire
 - [`packages/adt-strategies`](packages/adt-strategies/README.md) — `@mcp-abap-adt/adt-strategies`,
   the default result and failure strategies, derived from recorded ADT answers;
 - [`packages/adt-clients-legacy`](packages/adt-clients-legacy/README.md) —
-  `@mcp-abap-adt/adt-clients-legacy`, the clients for legacy systems (SAP_BASIS below 7.50,
+  `@mcp-abap-adt/adt-clients-legacy`, the clients for legacy systems (SAP_BASIS 7.40,
   measured on 7.40 SP04, over RFC only). It depends on `@mcp-abap-adt/adt-clients`
   `^37.4.0`; `adt-clients` holds no legacy code, and the consumer declares the system type by
   constructing `AdtClientLegacy` from it.

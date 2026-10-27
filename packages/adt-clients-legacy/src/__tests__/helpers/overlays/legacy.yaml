@@ -1,7 +1,7 @@
 # The keys a legacy system's overlay sets beside the root package's form
 # (packages/adt-clients/src/__tests__/helpers/overlays/onprem.yaml): one
 # overlay file, named by MCP_TEST_OVERLAY, holds both. Every line is optional.
-# A legacy system (SAP_BASIS < 7.50): the legacy client and its live checks, over RFC only. Also SAP_UNICODE=false in the session .env for a non-unicode system.
+# A legacy system (SAP_BASIS 7.40): the legacy client and its live checks, over RFC only. Also SAP_UNICODE=false in the session .env for a non-unicode system.
 # "environment.is_legacy": true
 # "environment.connection_type": "rfc"
 # Software component of the transportable package ZLG7_TEST the legacy test environment creates (npm run legacy:setup).

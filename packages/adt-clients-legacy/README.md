@@ -1,6 +1,6 @@
 # @mcp-abap-adt/adt-clients-legacy
 
-Clients for legacy SAP ABAP systems (SAP_BASIS below 7.50), built on
+Clients for legacy SAP ABAP systems (SAP_BASIS 7.40, measured on 7.40 SP04), built on
 [`@mcp-abap-adt/adt-clients`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients/README.md). `AdtClientLegacy` and
 `AdtExecutorLegacy` `extend` that package's `AdtClient` and `AdtExecutor` and only
 override: each member sends the request **measured accepted on SAP_BASIS 7.40

@@ -6,8 +6,8 @@ one changelog per package.
 
 ## [0.1.0] - 2026-10-27
 
-The first release: the clients for legacy SAP ABAP systems (SAP_BASIS below
-7.50), measured on SAP_BASIS 7.40 SP04 over RFC, moved out of
+The first release: the clients for legacy SAP ABAP systems (SAP_BASIS
+7.40), measured on SAP_BASIS 7.40 SP04 over RFC, moved out of
 `@mcp-abap-adt/adt-clients` (where they were `AdtClientLegacy`,
 `AdtExecutorLegacy` and `AdtRequestLegacy` up to 37.3.x, and are gone from 37.4.0).
 The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`.

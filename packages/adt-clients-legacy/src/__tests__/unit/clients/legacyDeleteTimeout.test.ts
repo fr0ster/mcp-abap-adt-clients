@@ -1,7 +1,7 @@
 /**
  * The caller's deadline reaches the legacy deletes too.
  *
- * The legacy overrides of `delete` (BASIS < 7.50) issue a direct DELETE of
+ * The legacy overrides of `delete` (SAP_BASIS 7.40, measured on 7.40 SP04) issue a direct DELETE of
  * their own instead of the modern deletion resource, and they handed the bare
  * connection to it — so `options.timeout`, which every other member puts on
  * its requests through `withCallTimeout`, was dropped there. With no deadline

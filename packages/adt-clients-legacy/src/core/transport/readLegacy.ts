@@ -1,5 +1,5 @@
 /**
- * Transport read operations — legacy systems (BASIS < 7.50)
+ * Transport read operations — legacy systems (SAP_BASIS 7.40, measured on 7.40 SP04)
  *
  * Uses /sap/bc/cts/transportrequests instead of /sap/bc/adt/cts/transportrequests
  *
@@ -14,7 +14,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
- * Below BASIS 7.50 the CTS endpoint sits outside `/sap/bc/adt/`. The one kind
+ * On SAP_BASIS 7.40 (measured on 7.40 SP04) the CTS endpoint sits outside `/sap/bc/adt/`. The one kind
  * whose address differs on legacy — so it is a record of its own, never a
  * substitution inside the root package's `TRANSPORT_REQUEST`.
  */

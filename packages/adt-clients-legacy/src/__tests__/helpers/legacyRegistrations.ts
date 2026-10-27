@@ -282,7 +282,7 @@ for (const [handlerClass, members] of REFUSED_WITHOUT_REQUEST)
 registerRefusingHandler(isAbsentOnLegacy);
 
 /**
- * Whether test-config.yaml marks the system as legacy (BASIS < 7.50):
+ * Whether test-config.yaml marks the system as legacy (SAP_BASIS 7.40):
  * `environment.is_legacy`.
  */
 export function isLegacyEnvironment(): boolean {
@@ -307,7 +307,7 @@ export const legacyClientFactory = (async (connection, logger, options) => ({
 /**
  * The connection options of a legacy session, for `createTestConnection`: a
  * legacy configuration takes the `legacy-http` wire on premise over HTTP
- * (BASIS < 7.50, where the session-type header sends locks to ABAP session
+ * (SAP_BASIS 7.40, where the session-type header sends locks to ABAP session
  * memory instead of the enqueue server), anything else plain `http`. RFC
  * and cloud ignore it.
  */

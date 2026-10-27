@@ -6,7 +6,7 @@
 
 Primary public entry points:
 - `AdtClient` - high-level CRUD-style object operations.
-- `createAdtClient()` - factory that returns `AdtClient`. It detects nothing and sends no request: the system type is the consumer's to declare (a legacy system, BASIS < 7.50, is served by `AdtClientLegacy` from the separate package `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs).
+- `createAdtClient()` - factory that returns `AdtClient`. It detects nothing and sends no request: the system type is the consumer's to declare (a legacy system, SAP_BASIS 7.40 (measured on 7.40 SP04), is served by `AdtClientLegacy` from the separate package `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs).
 - `AdtRuntimeClient` - stable runtime operations (traces, dumps, logs, feeds, ATC check runs, DDIC runtime helpers).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (class and program execution, run under the profiler, trace scheduling).
@@ -44,7 +44,7 @@ answered with a `401` comes back as a failure carrying that response, which
 
 ## Legacy System Support
 
-This package carries no legacy code. Legacy SAP systems (BASIS < 7.50) are served by the separate package `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), whose `AdtClientLegacy` and `AdtExecutorLegacy` `extend` this package's classes and only override. The consumer declares the system type by constructing them over an RFC connection; `createAdtClient()` and `createAdtExecutor()` detect nothing and always return the modern class.
+This package carries no legacy code. Legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) are served by the separate package `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), whose `AdtClientLegacy` and `AdtExecutorLegacy` `extend` this package's classes and only override. The consumer declares the system type by constructing them over an RFC connection; `createAdtClient()` and `createAdtExecutor()` detect nothing and always return the modern class.
 
 What the legacy package needs from this one is exported from this package's root: the handler classes it extends, their base types, `AdtContentTypesBase`, `answering` and the other wire helpers, the address records and the result-set types. Nothing here names a legacy class, and a test (`legacyStaysInLegacyClasses.test.ts`) keeps it so.
 

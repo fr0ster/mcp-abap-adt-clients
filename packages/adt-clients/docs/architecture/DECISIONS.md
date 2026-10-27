@@ -254,7 +254,7 @@ session that holds the handle. Cleanup switches back to `stateful`
 
 **Against.** Tearing the RFC session down on `setSessionType('stateless')`,
 which would defeat the transport rather than fix the bug — lock handles have to
-survive on BASIS < 7.50, and that survival is what RFC is for.
+survive on SAP_BASIS 7.40, and that survival is what RFC is for.
 
 **Why.** An Eclipse capture shows locks on one stateful session marked `enqueue`
 and every GET and the PUT on separate stateless ones. We have one connection, so

@@ -145,7 +145,7 @@ environment:
   cleanup_after_test: true
 ```
 
-A legacy system (BASIS < 7.50) is not configured here: its overlay keys
+A legacy system (SAP_BASIS 7.40, measured on 7.40 SP04) is not configured here: its overlay keys
 (`environment.is_legacy`, `legacy_env.*`, `legacy_740.*`) belong to
 `@mcp-abap-adt/adt-clients-legacy`, which registers them as an extension of this
 loader. This package's `check:config` refuses them by name; the legacy

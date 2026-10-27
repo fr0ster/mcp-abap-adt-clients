@@ -1,6 +1,6 @@
 /**
  * AdtFunctionIncludeLegacy - function include handler for legacy SAP systems
- * (BASIS < 7.50).
+ * (SAP_BASIS 7.40, measured on 7.40 SP04).
  *
  * Overrides:
  * - checkDeletion() and delete() — refused without a request: both go through

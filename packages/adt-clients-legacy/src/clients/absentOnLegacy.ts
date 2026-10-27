@@ -1,5 +1,5 @@
 /**
- * A handler for an object type a legacy system (BASIS < 7.50) does not have at
+ * A handler for an object type a legacy system (SAP_BASIS 7.40, measured on 7.40 SP04) does not have at
  * all.
  *
  * The legacy client still hands one out, so a caller of `AdtClient` that is

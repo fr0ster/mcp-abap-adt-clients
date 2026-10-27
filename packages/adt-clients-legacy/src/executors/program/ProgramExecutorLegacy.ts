@@ -1,5 +1,5 @@
 /**
- * ProgramExecutorLegacy — running a report on legacy SAP systems (BASIS < 7.50).
+ * ProgramExecutorLegacy — running a report on legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04).
  *
  * `/sap/bc/adt/programs/programrun/{program}` is not advertised by SAP_BASIS
  * 7.40 SP04 and nothing measured it, so `run` and `runWithProfiler` are

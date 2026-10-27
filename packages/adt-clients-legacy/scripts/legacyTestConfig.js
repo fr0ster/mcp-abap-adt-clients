@@ -34,7 +34,7 @@ const LEGACY_CASES = Object.freeze([
 ]);
 
 /**
- * A legacy system (SAP_BASIS < 7.50): the legacy client, its live checks
+ * A legacy system (SAP_BASIS 7.40): the legacy client, its live checks
  * (over RFC only) and the transportable package its test environment creates
  * (`npm run legacy:setup`).
  */

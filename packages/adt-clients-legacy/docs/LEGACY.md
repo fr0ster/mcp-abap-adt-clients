@@ -1,8 +1,8 @@
-# Legacy System Support (BASIS < 7.50)
+# Legacy System Support (SAP_BASIS 7.40)
 
 ## Overview
 
-Legacy SAP systems (BASIS versions older than 7.50) lack many ADT endpoints available on modern systems. The package `@mcp-abap-adt/adt-clients-legacy` provides `AdtClientLegacy` — a subclass of `AdtClient` — and `AdtExecutorLegacy` — a subclass of `AdtExecutor` — of `@mcp-abap-adt/adt-clients`. The consumer constructs them over an RFC connection (`new AdtClientLegacy(connection, logger)`); the package has the [README](../README.md) as its contract. They hand out the same getters; each member sends the request measured accepted on SAP_BASIS 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed under [Not measured on 7.40 SP04](#not-measured-on-740-sp04)), or answers the library's refusal **without sending a request**.
+Legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) lack many ADT endpoints available on modern systems. The package `@mcp-abap-adt/adt-clients-legacy` provides `AdtClientLegacy` — a subclass of `AdtClient` — and `AdtExecutorLegacy` — a subclass of `AdtExecutor` — of `@mcp-abap-adt/adt-clients`. The consumer constructs them over an RFC connection (`new AdtClientLegacy(connection, logger)`); the package has the [README](../README.md) as its contract. They hand out the same getters; each member sends the request measured accepted on SAP_BASIS 7.40 SP04, or keeps an unmeasured request under a collection 7.40 advertises (listed under [Not measured on 7.40 SP04](#not-measured-on-740-sp04)), or answers the library's refusal **without sending a request**.
 
 **What this covers, and what it does not.** The goal is to implement what 7.40 SP04 serves through ADT and to refuse the rest without a request. What ADT does not offer on 7.40 — where-used outside RIS, DDIC sources, transport changes, … — is not this library's: reading and changing it is the work of a separate legacy MCP server, which goes through local reports on the system.
 

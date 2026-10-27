@@ -17,7 +17,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 ## Architecture
 
 - [**ARCHITECTURE.md**](architecture/ARCHITECTURE.md) - System architecture, design patterns, and type system organization
-- [**LEGACY.md**](../../adt-clients-legacy/docs/LEGACY.md) - Legacy system support (BASIS < 7.50), in the separate package `@mcp-abap-adt/adt-clients-legacy` ([README](../../adt-clients-legacy/README.md)): what each member does on 7.40, RFC transport, endpoint availability
+- [**LEGACY.md**](../../adt-clients-legacy/docs/LEGACY.md) - Legacy system support (SAP_BASIS 7.40, measured on 7.40 SP04), in the separate package `@mcp-abap-adt/adt-clients-legacy` ([README](../../adt-clients-legacy/README.md)): what each member does on 7.40, RFC transport, endpoint availability
 - [**DECISIONS.md**](architecture/DECISIONS.md) - The choices that could have gone the other way, with the problem, the evidence and what would change them
 
 ## Usage Guides

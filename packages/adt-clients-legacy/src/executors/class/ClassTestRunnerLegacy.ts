@@ -1,5 +1,5 @@
 /**
- * ClassTestRunnerLegacy — running ABAP Unit on legacy SAP systems (BASIS < 7.50).
+ * ClassTestRunnerLegacy — running ABAP Unit on legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04).
  *
  * 7.40 has no `/sap/bc/adt/abapunit/runs`; `/sap/bc/adt/abapunit/testruns`
  * runs the tests and answers the finished result (`aunit:runResult`), so there

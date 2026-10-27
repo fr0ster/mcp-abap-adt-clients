@@ -2,7 +2,7 @@
  * The root package carries no legacy (spec §1, "The AST rule becomes two
  * rules").
  *
- * The classes for SAP_BASIS below 7.50 — the `*Legacy` subclasses, their
+ * The classes for SAP_BASIS 7.40 — the `*Legacy` subclasses, their
  * helpers, their tests and their test environment — live in
  * `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), which
  * builds on this package. Nothing here names them, loads them, or addresses
@@ -49,7 +49,7 @@ const ROOT = path.resolve(__dirname, '../../..');
 const WORD = ['leg', 'acy'].join('');
 /** The word as a class name carries it. */
 const SUFFIX = `${WORD.slice(0, 1).toUpperCase()}${WORD.slice(1)}`;
-/** The 7.40 CTS endpoint (below BASIS 7.50 it sits outside `/sap/bc/adt/`). */
+/** The 7.40 CTS endpoint (on SAP_BASIS 7.40 it sits outside `/sap/bc/adt/`). */
 const CTS = ['/sap/bc', 'cts'].join('/');
 
 /** What a node is, as far as this check is concerned. */

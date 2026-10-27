@@ -1,5 +1,5 @@
 /**
- * Legacy deletion for older SAP systems (BASIS < 7.50)
+ * Legacy deletion for older SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04)
  *
  * Uses direct DELETE on the object URL with lockHandle,
  * instead of the modern /sap/bc/adt/deletion/check + /deletion/delete API,

@@ -1,5 +1,5 @@
 /**
- * @mcp-abap-adt/adt-clients-legacy — clients for SAP_BASIS below 7.50 (7.40),
+ * @mcp-abap-adt/adt-clients-legacy — clients for SAP_BASIS 7.40 (measured on 7.40 SP04),
  * built on @mcp-abap-adt/adt-clients.
  *
  * The consumer declares the system: it constructs `AdtClientLegacy` or

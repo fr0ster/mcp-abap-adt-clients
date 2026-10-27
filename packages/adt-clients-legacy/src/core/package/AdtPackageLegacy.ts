@@ -1,5 +1,5 @@
 /**
- * AdtPackageLegacy - Package handler for legacy SAP systems (BASIS < 7.50)
+ * AdtPackageLegacy - Package handler for legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04)
  *
  * Every package operation is refused on legacy. The `/sap/bc/adt/packages`
  * collection is advertised, but 7.40 SP04 does not serve the item resource over

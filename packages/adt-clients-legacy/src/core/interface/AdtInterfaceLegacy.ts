@@ -1,5 +1,5 @@
 /**
- * AdtInterfaceLegacy - Interface handler for legacy SAP systems (BASIS < 7.50)
+ * AdtInterfaceLegacy - Interface handler for legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04)
  *
  * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
  * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API).

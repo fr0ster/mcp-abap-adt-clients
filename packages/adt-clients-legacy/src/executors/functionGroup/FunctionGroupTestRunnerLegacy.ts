@@ -1,6 +1,6 @@
 /**
  * FunctionGroupTestRunnerLegacy — a function group's ABAP Unit tests on a
- * legacy system (BASIS < 7.50), which has no `/sap/bc/adt/abapunit/runs`.
+ * legacy system (SAP_BASIS 7.40, measured on 7.40 SP04), which has no `/sap/bc/adt/abapunit/runs`.
  *
  * `runSync` is the inherited one: `/sap/bc/adt/abapunit/testruns` given the
  * group's URI, with `<options>`, answered the finished result on 7.40 SP04.
