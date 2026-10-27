@@ -10,23 +10,10 @@
 
 /**
  * What a subclass in another package extends or calls: the handler classes,
- * the client's contract types its getters return, the address records and the
- * wire helpers a subclass's overrides send through. The set is the
+ * the address records and the wire helpers a subclass's overrides send
+ * through. The set is the
  * compiler's — what such a subclass cannot build without — and nothing more.
  */
-export type {
-  IAppendStructureContract,
-  IFunctionIncludeContract,
-  IIncludeContract,
-  ILocalDefinitionsContract,
-  ILocalMacrosContract,
-  ILocalTestClassContract,
-  ILocalTypesContract,
-  IMessageClassContract,
-  IScalarFunctionContract,
-  IScalarFunctionImplementationContract,
-  ITransformationContract,
-} from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { createAdtClient } from './clients/createAdtClient';
 export { AdtAccessControl } from './core/accessControl';

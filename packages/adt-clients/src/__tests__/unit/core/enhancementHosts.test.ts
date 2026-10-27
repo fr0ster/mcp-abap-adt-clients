@@ -73,12 +73,12 @@ for (const [factory, nameKey, base] of hosts) {
             contentType,
           );
           const answer = await (
-            client[factory]() as IAdtEnhancementHost<
+            client[factory] as () => IAdtEnhancementHost<
               Record<string, string>,
               string,
               string
             >
-          )[member]({ [nameKey]: name });
+          )()[member]({ [nameKey]: name });
           expect(answer.ok).toBe(true);
           if (answer.ok) {
             expect(answer.getResult().value).toBe(body);
