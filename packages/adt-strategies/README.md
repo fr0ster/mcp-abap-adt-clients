@@ -107,7 +107,7 @@ a `403` on a service binding's LOCK that is to be ignored
 (`analysePublicationLock`), a refusal inside a `200` (`analysePublication`,
 `analyseActivation`, `analyseDeletion`). Why `analysePublicationLock` exists is in
 [ERRATA.md](ERRATA.md) — shipped in this package, and kept in adt-clients at
-[docs/usage/ERRATA.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/docs/usage/ERRATA.md).
+[docs/usage/ERRATA.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients/docs/usage/ERRATA.md).
 
 ### The whole surface
 

@@ -42,7 +42,7 @@ Only a `404` is the endpoint absent: it is the status seen for this endpoint on
 premise. `405` and `501` came from the probe helper shared with
 `isModernAdtSystem`, which still reads them as absent; `getSystemInformation`
 no longer does. Decision 16 in
-[`DECISIONS.md`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/docs/architecture/DECISIONS.md#16-systeminformation-answers-three-ways-and-only-a-404-is-absent)
+[`DECISIONS.md`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients/docs/architecture/DECISIONS.md#16-systeminformation-answers-three-ways-and-only-a-404-is-absent)
 has the reasons.
 
 ### What a caller does
