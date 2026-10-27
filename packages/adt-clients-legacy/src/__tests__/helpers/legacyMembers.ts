@@ -371,9 +371,6 @@ function localInclude(getter: string, kind: ClassIncludeKind): Rows<SendsRow> {
     sends('unlock', '§10.3 inherited: the container class', [unlockOf(cls)]),
     sends('activate', '§10.3 inherited: the container class', [activation()]),
     sends('readMetadata', '§10.3 inherited: the container class', [get(cls)]),
-    sends('readTransport', '§10.3 inherited, kept: the container class', [
-      get(transportUri(cls)),
-    ]),
     sends('getVersionSource', '§10.3 inherited, kept', [get(VERSION_URI)]),
   ]);
 }
@@ -653,6 +650,21 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
     cls.refused('checkDeletion', '§5'),
     cls.refused('readTransport', '§2 measured in B4'),
   ]),
+  ...Object.fromEntries(
+    (
+      [
+        'getLocalTestClass',
+        'getLocalTypes',
+        'getLocalDefinitions',
+        'getLocalMacros',
+      ] as const
+    ).map((getter) => [
+      getter,
+      Object.fromEntries([
+        rowsFor(getter).refused('readTransport', '§10.3 measured in B4'),
+      ]),
+    ]),
+  ),
   getProgram: Object.fromEntries([
     prog.refused('checkDeletion', '§5'),
     prog.refused('readTransport', '§2 measured in B4'),

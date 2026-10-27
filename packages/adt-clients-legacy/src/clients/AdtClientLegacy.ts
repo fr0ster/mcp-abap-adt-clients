@@ -79,6 +79,10 @@ import {
   type IIncludeContract,
   type IIncludeResults,
   type IInterfaceResults,
+  type ILocalDefinitionsContract,
+  type ILocalMacrosContract,
+  type ILocalTestClassContract,
+  type ILocalTypesContract,
   type IMessageClassContract,
   type IMessageClassResults,
   type IMetadataExtensionResults,
@@ -127,6 +131,10 @@ import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';
+import { AdtLocalDefinitionsLegacy } from '../core/class/AdtLocalDefinitionsLegacy';
+import { AdtLocalMacrosLegacy } from '../core/class/AdtLocalMacrosLegacy';
+import { AdtLocalTestClassLegacy } from '../core/class/AdtLocalTestClassLegacy';
+import { AdtLocalTypesLegacy } from '../core/class/AdtLocalTypesLegacy';
 import { AdtDdlLegacy } from '../core/ddl/AdtDdlLegacy';
 import { AdtFunctionGroupLegacy } from '../core/functionGroup/AdtFunctionGroupLegacy';
 import { AdtFunctionIncludeLegacy } from '../core/functionInclude/AdtFunctionIncludeLegacy';
@@ -244,6 +252,88 @@ export class AdtClientLegacy extends AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
+      results,
+    );
+  }
+
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getLocalTestClass(): ILocalTestClassContract<typeof classDocuments>;
+  override getLocalTestClass<R extends IClassResults>(
+    results: R,
+  ): ILocalTestClassContract<R>;
+  override getLocalTestClass<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalTestClassLegacy<R> {
+    this.assertConnected();
+    return new AdtLocalTestClassLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+      this.lockRegistry,
+      results,
+    );
+  }
+
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getLocalTypes(): ILocalTypesContract<typeof classDocuments>;
+  override getLocalTypes<R extends IClassResults>(
+    results: R,
+  ): ILocalTypesContract<R>;
+  override getLocalTypes<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalTypesLegacy<R> {
+    this.assertConnected();
+    return new AdtLocalTypesLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+      this.lockRegistry,
+      results,
+    );
+  }
+
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getLocalDefinitions(): ILocalDefinitionsContract<
+    typeof classDocuments
+  >;
+  override getLocalDefinitions<R extends IClassResults>(
+    results: R,
+  ): ILocalDefinitionsContract<R>;
+  override getLocalDefinitions<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalDefinitionsLegacy<R> {
+    this.assertConnected();
+    return new AdtLocalDefinitionsLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+      this.lockRegistry,
+      results,
+    );
+  }
+
+  // The base's two declarations, as they are: the legacy handler is the
+  // implementation, the contract is the type (no public type change).
+  override getLocalMacros(): ILocalMacrosContract<typeof classDocuments>;
+  override getLocalMacros<R extends IClassResults>(
+    results: R,
+  ): ILocalMacrosContract<R>;
+  override getLocalMacros<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalMacrosLegacy<R> {
+    this.assertConnected();
+    return new AdtLocalMacrosLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
       this.lockRegistry,
       results,
     );

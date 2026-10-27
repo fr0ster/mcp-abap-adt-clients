@@ -157,7 +157,7 @@ LEGACY.md. Every handler hands out the same getter as `AdtClient`.
 | `getVersions`, `getVersionSource` | sends `includes/<name>/versions`, `GET <contentUri>` |
 | `delete` | kept: an `update` with empty source; the write is the include `PUT` |
 | `lock`, `unlock`, `activate`, `readMetadata` | sends — **of the container class**, as `getClass()`'s |
-| `readTransport` | kept, not measured; also of the container class |
+| `readTransport` | **refused** — the container class's `GET …/transport` answered `404` (`B4-cycles-20261026-2019` c6-readTransport) |
 
 ### Program — `getProgram()`
 

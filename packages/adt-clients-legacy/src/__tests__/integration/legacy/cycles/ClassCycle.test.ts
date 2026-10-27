@@ -12,7 +12,9 @@
  * class-metadata-accept-2026-10-26. The reads of main and the includes of a
  * class this run wrote are not in B4 (B2-reads-20261023-1749 s7, s8 read a
  * system class) — Task 6 measures them here. The local includes'
- * `readTransport` is not measured on 7.40 and not asserted here.
+ * `readTransport` is the container class's request (`GET <class>/transport`,
+ * `404` in c6-readTransport): each include refuses it too, asserted beside
+ * the class's own.
  *
  * The local includes have no lock of their own: every write carries the
  * class's handle. The class is created by this run in `$TMP` (no transport)
@@ -389,6 +391,17 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
           recorder,
           mark,
         );
+        // The includes' inherited readTransport is that same request.
+        for (const include of includes) {
+          mark = at();
+          expectRefusedUnsent(
+            await include.handler().readTransport(config, {
+              analyse: analyseException,
+            }),
+            recorder,
+            mark,
+          );
+        }
 
         mark = at();
         expectResult(await cls.lock(), 'lock for delete');

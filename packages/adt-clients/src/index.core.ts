@@ -18,6 +18,10 @@ export type {
   IAppendStructureContract,
   IFunctionIncludeContract,
   IIncludeContract,
+  ILocalDefinitionsContract,
+  ILocalMacrosContract,
+  ILocalTestClassContract,
+  ILocalTypesContract,
   IMessageClassContract,
   IScalarFunctionContract,
   IScalarFunctionImplementationContract,
@@ -30,7 +34,13 @@ export { AdtAppendStructure } from './core/appendStructure';
 export { AdtAuthorizationField } from './core/authorizationField';
 export { AdtBehaviorDefinition } from './core/behaviorDefinition';
 export { AdtBehaviorImplementation } from './core/behaviorImplementation';
-export { AdtClass } from './core/class';
+export {
+  AdtClass,
+  AdtLocalDefinitions,
+  AdtLocalMacros,
+  AdtLocalTestClass,
+  AdtLocalTypes,
+} from './core/class';
 export { startClassUnitTestRunSync } from './core/class/run';
 export { AdtDataElement } from './core/dataElement';
 export { AdtDdl } from './core/ddl';

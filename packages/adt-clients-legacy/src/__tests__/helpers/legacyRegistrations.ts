@@ -26,6 +26,10 @@ import type {
 } from '../../../../adt-clients/src/__tests__/helpers/sessionConfig';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { AdtClassLegacy } from '../../core/class/AdtClassLegacy';
+import { AdtLocalDefinitionsLegacy } from '../../core/class/AdtLocalDefinitionsLegacy';
+import { AdtLocalMacrosLegacy } from '../../core/class/AdtLocalMacrosLegacy';
+import { AdtLocalTestClassLegacy } from '../../core/class/AdtLocalTestClassLegacy';
+import { AdtLocalTypesLegacy } from '../../core/class/AdtLocalTypesLegacy';
 import { AdtDdlLegacy } from '../../core/ddl/AdtDdlLegacy';
 import { AdtFunctionGroupLegacy } from '../../core/functionGroup/AdtFunctionGroupLegacy';
 import { AdtFunctionIncludeLegacy } from '../../core/functionInclude/AdtFunctionIncludeLegacy';
@@ -165,6 +169,11 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
   ],
   // No deletion API on 7.40 (spec §4.3, §5).
   [AdtClassLegacy, ['checkDeletion', 'readTransport']],
+  // The includes' inherited readTransport asks for the class's (B4 c6).
+  [AdtLocalTestClassLegacy, ['readTransport']],
+  [AdtLocalTypesLegacy, ['readTransport']],
+  [AdtLocalDefinitionsLegacy, ['readTransport']],
+  [AdtLocalMacrosLegacy, ['readTransport']],
   [AdtProgramLegacy, ['checkDeletion', 'readTransport']],
   [AdtInterfaceLegacy, ['checkDeletion', 'readTransport']],
   [AdtFunctionGroupLegacy, ['checkDeletion', 'readTransport']],

@@ -13,6 +13,10 @@ import { LEGACY_REFUSED, LEGACY_SENDS } from '../../helpers/legacyMembers';
 
 const MEASURED: [getter: string, member: string][] = [
   ['getClass', 'readTransport'],
+  ['getLocalTestClass', 'readTransport'],
+  ['getLocalTypes', 'readTransport'],
+  ['getLocalDefinitions', 'readTransport'],
+  ['getLocalMacros', 'readTransport'],
   ['getProgram', 'readTransport'],
   ['getInterface', 'readTransport'],
   ['getFunctionGroup', 'readTransport'],

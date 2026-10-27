@@ -39,6 +39,10 @@ The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`.
   interface, function group, function module and DDL source. `GET <object>/transport`
   answered `404` for the first five; the DDL source's refusal is inferred from
   them and measured in the next live run.
+- **The four local class includes refuse `readTransport` too**
+  (`getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`,
+  `getLocalMacros()`): their inherited member sends the container class's
+  `GET <class>/transport`, which answered `404` (B4 c6-readTransport).
 - **A DDL source's `getVersions` and `getVersionSource` are refused**:
   `GET /ddic/ddl/sources/<name>/versions` answered `404`.
 - **A message class's `updateMetadata` is refused** until its document is
