@@ -1,0 +1,314 @@
+/**
+ * Integration test for View
+ * Tests using AdtClient for unified CRUD operations
+ *
+ * Enable debug logs:
+ *   DEBUG_ADT_TESTS=true       - Integration test execution logs
+ *   DEBUG_ADT_LIBS=true        - View library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPatterns=view/View
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import type { AdtClient } from '../../../../clients/AdtClient';
+import type { IDdlConfig } from '../../../../core/ddl';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  configuredCase,
+  gate,
+  missingCaseMessage,
+} from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import { presenceOf } from '../../../helpers/objectPresence';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  resolveSystemContext,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+
+const {
+  resolvePackageName,
+  resolveTransportRequest,
+  checkDefaultTestEnvironment,
+  logDefaultTestEnvironment,
+  getTimeout,
+  ensureSharedPackage,
+  ensureSharedDependency,
+} = require('../../../helpers/test-helper');
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code (View) uses DEBUG_ADT_LIBS
+const libraryLogger: ILogger = createLibraryLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: ILogger = createTestsLogger();
+
+describe('View (using AdtClient)', () => {
+  let connection: IAbapConnection;
+  let client: AdtClient;
+  let hasConfig = false;
+  let defaultPackage: string = '';
+  let defaultTransport: string = '';
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
+  let tester: BaseTester<IDdlConfig>;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(connectionLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+      hasConfig = true;
+
+      const envCheck = await checkDefaultTestEnvironment(connection);
+      if (!envCheck.success) {
+        const reason = envCheck.reason || 'Unknown reason';
+        // A defective environment fails the suite; it never skips it.
+        throw new Error(`Environment check failed: ${reason}`);
+      }
+
+      defaultPackage = envCheck.defaultPackage || '';
+      defaultTransport = envCheck.defaultTransport || '';
+      logDefaultTestEnvironment(testsLogger, defaultPackage, defaultTransport);
+
+      await ensureSharedPackage(client, testsLogger);
+
+      tester = new BaseTester(
+        client.getDdl(),
+        'View',
+        'create_view',
+        'adt_view',
+        testsLogger,
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem: false,
+        buildConfig: (testCase: any, resolver?: any) => {
+          const params = testCase?.params || {};
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
+          return {
+            ddlName: params.ddl_name,
+            packageName,
+            transportRequest,
+            description: params.description,
+            source: params.ddl_source,
+          };
+        },
+        // See the note in BehaviorImplementation.test.ts: a killed run never
+        // reaches its teardown, so the reliable place to clear leftovers is the
+        // start of the next one.
+        ensureObjectReady: async (ddlName: string) => {
+          if (!connection || !ddlName) return { success: true };
+          const existing = presenceOf(
+            await client
+              .getDdl()
+              .read({ ddlName }, undefined, { analyse: analyseException }),
+            `DDL source ${ddlName}`,
+          );
+          // "Could not find out" is not "absent": the create would meet it.
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === false) return { success: true };
+          const removed = await client.getDdl().delete(
+            {
+              ddlName,
+              transportRequest: tester.getTransportRequest(),
+            },
+            {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(client.getDdl(), 'delete'),
+            },
+          );
+          // A leftover that would not delete is what the create meets next:
+          // the test fails here, naming what SAP said.
+          if (!removed.ok) {
+            return {
+              success: false,
+              objectExists: true,
+              reason: failureOf(
+                removed,
+                `delete leftover DDL source ${ddlName}`,
+              ),
+            };
+          }
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return { success: true };
+        },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorDetails =
+        error instanceof Error && error.stack ? error.stack : errorMessage;
+
+      // Log error with full details using the provided logger
+      testsLogger.error?.('Failed to setup test environment:', {
+        message: errorMessage,
+        details: errorDetails,
+        error: error,
+      });
+
+      // Check for specific error types
+      if (
+        errorMessage.includes('JWT token has expired') ||
+        errorMessage.includes('token has expired')
+      ) {
+        testsLogger.error?.(
+          'JWT token has expired. Please re-authenticate and update your .env file with fresh tokens.',
+        );
+      } else if (
+        errorMessage.includes('authentication') ||
+        errorMessage.includes('unauthorized')
+      ) {
+        testsLogger.error?.(
+          'Authentication failed. Please check your credentials in .env file.',
+        );
+      } else if (
+        errorMessage.includes('connection') ||
+        errorMessage.includes('ECONNREFUSED')
+      ) {
+        testsLogger.error?.(
+          'Connection failed. Please check your SAP system URL and network connectivity.',
+        );
+      }
+
+      // Skips only when there is no SAP here; anything else fails naming the
+      // reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  afterAll(() => tester?.afterAll()());
+
+  gate('read_ddl_table_function', 'readonly_read_table_function')(
+    'reads an AMDP table function (DDL source) when configured',
+    async () => {
+      const tfCase = configuredCase(
+        'read_ddl_table_function',
+        'readonly_read_table_function',
+      );
+      const ddlName = tfCase?.params?.ddl_name;
+      if (!ddlName) throw new Error('ddl_name not configured');
+
+      // A refused read (absent object, no authorisation, server error) fails
+      // with the reason; an empty body fails on the content below.
+      const answer = expectResult(
+        await client
+          .getDdl()
+          .read({ ddlName }, 'active', { analyse: analyseException }),
+        `read table function ${ddlName}`,
+      );
+
+      const src = String(answer ?? '').toLowerCase();
+      expect(src).toContain('define table function');
+      expect(src).toContain('implemented by method');
+    },
+    getTimeout('test'),
+  );
+
+  describe('Full workflow', () => {
+    beforeEach(async () => {
+      if (!hasConfig || !tester) {
+        if (!hasConfig) {
+          testsLogger.warn?.(
+            'Skipping test setup: hasConfig=false (check beforeAll errors above)',
+          );
+        }
+        if (!tester) {
+          testsLogger.warn?.(
+            'Skipping test setup: tester is undefined (check beforeAll errors above)',
+          );
+        }
+        return;
+      }
+      const testCase = tester.getTestCaseDefinition();
+      await tester.beforeEach()();
+
+      // Ensure shared dependency table exists (created once, never deleted)
+      if (testCase?.params?.table_name) {
+        await ensureSharedDependency(
+          client,
+          'tables',
+          testCase.params.table_name,
+          testsLogger,
+        );
+      }
+    });
+
+    afterEach(async () => {
+      if (!hasConfig || !tester) {
+        return;
+      }
+      await tester.afterEach()();
+    });
+
+    gate('create_view', 'adt_view')(
+      'should execute full workflow and store all results',
+      async () => {
+        const config = await tester.requireConfig();
+
+        const testCase = tester.getTestCaseDefinition();
+        if (!testCase) {
+          throw new Error(missingCaseMessage('create_view', 'adt_view'));
+        }
+
+        const ddlSource = testCase?.params?.ddl_source || config.source || '';
+        const updatedDdlSource =
+          testCase?.params?.updated_ddl_source || ddlSource;
+
+        await tester.flowTestAuto({
+          source: updatedDdlSource,
+          updateConfig: {
+            ddlName: config.ddlName,
+            packageName: config.packageName,
+            description: config.description || '',
+            source: updatedDdlSource,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
+  });
+});

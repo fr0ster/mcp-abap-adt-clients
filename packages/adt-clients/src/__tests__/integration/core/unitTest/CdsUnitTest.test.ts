@@ -1,0 +1,458 @@
+/**
+ * Integration test for a CDS view's ABAP Unit tests: the test-doubles check
+ * through getDdl(), the container class through getClass(), the run through
+ * AdtExecutor.getClassTestRunner()
+ *
+ * Enable debug logs:
+ *   DEBUG_ADT_TESTS=true       - Integration test execution logs
+ *   DEBUG_ADT_LIBS=true        - CdsUnitTest library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPatterns=unitTest/CdsUnitTest
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+  analyseUnitTestStart,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import type { AdtClient } from '../../../../clients/AdtClient';
+import { AdtExecutor } from '../../../../clients/AdtExecutor';
+import { classTestRunnerDocuments } from '../../../../executors/class/ClassTestRunner';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  readMethodVerdicts,
+  readRunResult,
+} from '../../../helpers/abapUnitRun';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { configuredCase, gate } from '../../../helpers/caseGate';
+import { expectResult, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import { removeLeftover } from '../../../helpers/objectPresence';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  releaseTestConnection,
+  resolveSystemContext,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+import {
+  logTestEnd,
+  logTestError,
+  logTestStart,
+  logTestStep,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
+
+const {
+  resolvePackageName,
+  resolveTransportRequest,
+  getEnvironmentConfig,
+  getTimeout,
+  ensureSharedPackage,
+  ensureSharedDependency,
+} = require('../../../helpers/test-helper');
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const libraryLogger: ILogger = createLibraryLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: ILogger = createTestsLogger();
+
+describe('ABAP Unit on a CDS view (AdtClient + AdtExecutor)', () => {
+  let connection: IAbapConnection & ISessionLifecycleAware;
+  let client: AdtClient;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(connectionLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+
+      await ensureSharedPackage(client, testsLogger);
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  afterAll(async () => {
+    if (connection) {
+      await releaseTestConnection(connection);
+    }
+  });
+
+  describe('Create CDS unit test class', () => {
+    gate('create_cds_unit_test', 'cds_unit_test')(
+      'should create CDS unit test class with template and test class source',
+      async () => {
+        const testCase = configuredCase(
+          'create_cds_unit_test',
+          'cds_unit_test',
+        );
+        if (!testCase?.params?.cds_unit_test) {
+          throw new Error(
+            'CDS unit test configuration not found in test-config.yaml',
+          );
+        }
+
+        const packageName = resolvePackageName(testCase.params.package_name);
+        if (!packageName) throw new Error('Package name not configured');
+
+        const cdsUnitTestConfig = testCase.params.cds_unit_test;
+        const className = cdsUnitTestConfig.class_name;
+        const testClassName = cdsUnitTestConfig.test_class_name;
+        const ddlName = testCase.params.ddl_name;
+        const classTemplate = cdsUnitTestConfig.template_xml;
+        const testClassSource = cdsUnitTestConfig.test_class_source;
+        const transportRequest = resolveTransportRequest(
+          cdsUnitTestConfig.transport_request ||
+            testCase.params.transport_request,
+        );
+
+        // Name the parameter that is actually absent. Listing all five joined
+        // by "or" says only that one of them is missing, which sent me looking
+        // in the wrong place twice: `ddl_name` alone was gone (the config had
+        // drifted to `view_name`), while the message implicated the four that
+        // were present.
+        const missingParams = Object.entries({
+          'cds_unit_test.class_name': className,
+          'cds_unit_test.test_class_name': testClassName,
+          ddl_name: ddlName,
+          'cds_unit_test.template_xml': classTemplate,
+          'cds_unit_test.test_class_source': testClassSource,
+        })
+          .filter(([, value]) => !value)
+          .map(([key]) => key);
+
+        if (missingParams.length > 0) {
+          throw new Error(
+            `Missing in test-config.yaml under create_cds_unit_test: ${missingParams.join(', ')}`,
+          );
+        }
+
+        logTestStart(testsLogger, 'CdsUnitTest - create CDS unit test class', {
+          name: 'create_cds_unit_test',
+          params: {
+            class_name: className,
+            test_class_name: testClassName,
+            ddl_name: ddlName,
+            package_name: packageName,
+          },
+        });
+
+        const depTableName = testCase.params.dep_table_name;
+
+        try {
+          // Ensure shared dependencies exist (created once, never deleted)
+          if (depTableName) {
+            await ensureSharedDependency(
+              client,
+              'tables',
+              depTableName,
+              testsLogger,
+            );
+          }
+
+          if (ddlName) {
+            const viewResult = await ensureSharedDependency(
+              client,
+              'views',
+              ddlName,
+              testsLogger,
+            );
+
+            // Wait for CDS metadata to propagate only when view was newly created
+            if (viewResult.created) {
+              testsLogger.info?.(
+                'Waiting for CDS metadata to propagate after view creation...',
+              );
+              await new Promise((resolve) => setTimeout(resolve, 10000));
+            }
+          }
+
+          // Delete existing test class if it exists (idempotent test)
+          // Absent is the expected answer; any other refusal fails here.
+          const leftover = await removeLeftover(
+            `delete existing CDS unit test class ${className}`,
+            () =>
+              client
+                .getClass()
+                .read({ className }, undefined, { analyse: analyseException }),
+            () =>
+              client.getClass().delete(
+                {
+                  className,
+                  transportRequest,
+                },
+                {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(client.getClass(), 'delete'),
+                },
+              ),
+          );
+          testsLogger.info?.(
+            `Existing CDS unit test class ${className}: ${leftover}`,
+          );
+
+          // Step 1: Check CDS view availability for unit test doubles
+          if (ddlName) {
+            logTestStep('checkCdsTestDoubles', testsLogger);
+            testsLogger.info?.(
+              'Checking CDS view for unit test doubles:',
+              ddlName,
+            );
+            const checkResponse = await client
+              .getDdl()
+              .checkCdsTestDoubles(ddlName, { analyse: analyseException });
+            expect(checkResponse.ok).toBe(true);
+            testsLogger.info?.('CDS view check passed');
+          }
+
+          // Step 2: Create CDS unit test class
+          logTestStep('create', testsLogger);
+          // A CDS view's tests live in a global class made for them from a
+          // template: an ordinary class create, final, with the template.
+          const createState = expectResult(
+            await client.getClass().create(
+              {
+                className,
+                packageName,
+                classTemplate,
+                final: true,
+                description:
+                  cdsUnitTestConfig.description ||
+                  `CDS unit test for ${ddlName}`,
+                transportRequest,
+              },
+              {
+                analyse: analyseException,
+                headers: integrationHeadersOf(client.getClass(), 'create'),
+              },
+            ),
+            'createState',
+          );
+          expect(createState).toBeDefined();
+          testsLogger.info?.('CDS unit test class created successfully');
+
+          // Step 2.1: Write the configured test class. The template makes the
+          // generator's class, whose test method is the placeholder
+          // `cl_abap_unit_assert=>fail( msg = 'Place your assertions here' )`
+          // — run as it is, the test fails by design (measured on premise).
+          logTestStep('update (testclasses)', testsLogger);
+          const cls = client.getClass();
+          const includeConfig = { className, transportRequest };
+          const includeHandle = String(
+            expectResult(
+              await cls.lock(includeConfig, { analyse: analyseException }),
+              'lock for testclasses',
+            ),
+          );
+          await releasing(
+            async () =>
+              expectResult(
+                await client.getLocalTestClass().update(includeConfig, {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getLocalTestClass(),
+                    'update',
+                  ),
+                  source: testClassSource,
+                  lockHandle: includeHandle,
+                }),
+                'write the testclasses include',
+              ),
+            () =>
+              cls.unlock(includeConfig, includeHandle, {
+                analyse: analyseException,
+              }),
+            'unlock after write the testclasses include',
+          );
+
+          // Step 3: Activate class
+          logTestStep('activate', testsLogger);
+          const activateState = expectResult(
+            await client.getClass().activate(
+              {
+                className,
+                transportRequest,
+              },
+              {
+                analyse: judged(analyseActivation),
+                headers: integrationHeadersOf(client.getClass(), 'activate'),
+              },
+            ),
+            'activate the CDS unit test class',
+          );
+          expect(activateState).toBeDefined();
+          testsLogger.info?.('CDS unit test class activated');
+
+          // Step 4: Read the created test class
+          logTestStep('read', testsLogger);
+          const readState = expectResult(
+            await client
+              .getClass()
+              .read({ className }, undefined, { analyse: analyseException }),
+            'readState',
+          );
+          expect(readState).toBeDefined();
+          testsLogger.info?.('CDS unit test class read successfully');
+          const metadataState = expectResult(
+            await client
+              .getClass()
+              .readMetadata({ className }, { analyse: analyseException }),
+            'metadataState',
+          );
+          expect(metadataState).toBeDefined();
+          testsLogger.info?.('CDS unit test class metadata read successfully');
+
+          // Step 5: Run the tests the generated class holds. No create and no
+          // update first — running is its own capability.
+          logTestStep('run (unit test)', testsLogger);
+          // The run's id is in a header of the start's answer; the reading that
+          // finds it, and the check that a start carried one, are strategies.
+          const unitTest = new AdtExecutor(
+            connection,
+            libraryLogger,
+          ).getClassTestRunner({
+            ...classTestRunnerDocuments,
+            run: unitTestRunId,
+          });
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass: className, testClass: testClassName }],
+              {
+                ...(testCase.params.unit_test_options || {}),
+                analyse: analyseUnitTestStart,
+              },
+            ),
+            'start CDS unit test run',
+          );
+          expect(runId).toBeDefined();
+          testsLogger.info?.('CDS unit test run started, run ID:', runId);
+
+          // Step 6: Ask about the run — its own interface since 16.0.0
+          logTestStep('getStatus (run)', testsLogger);
+          const statusResponse = expectResult(
+            await unitTest.getStatus(
+              runId,
+              testCase.params.unit_test_status?.with_long_polling ?? true,
+              { analyse: analyseException },
+            ),
+            'statusResponse',
+          );
+          expect(statusResponse).toBeDefined();
+          testsLogger.info?.('CDS unit test status retrieved');
+
+          // Step 7: Fetch the result document
+          logTestStep('getResult (run)', testsLogger);
+          const resultResponse = expectResult(
+            await unitTest.getResult(runId, {
+              analyse: analyseException,
+              withNavigationUris:
+                testCase.params.unit_test_result?.with_navigation_uris || false,
+              format: testCase.params.unit_test_result?.format || 'abapunit',
+            }),
+            'resultResponse',
+          );
+          expect(resultResponse).toBeDefined();
+          // The run's verdict, in the format it was asked for: the generated
+          // test class ran at least one method, and nothing failed at any
+          // scope (run, class or method).
+          const resultFormat =
+            testCase.params.unit_test_result?.format || 'abapunit';
+          const run = readRunResult(String(resultResponse), resultFormat);
+          expect(run.methods.length).toBeGreaterThan(0);
+          expect(run.failures).toEqual([]);
+          if (resultFormat === 'abapunit') {
+            const ranInTestClass = readMethodVerdicts(
+              String(resultResponse),
+            ).methods.filter(
+              (m) => m.testClass.toUpperCase() === testClassName.toUpperCase(),
+            );
+            expect(ranInTestClass.length).toBeGreaterThan(0);
+          }
+          testsLogger.info?.('CDS unit test result retrieved successfully');
+
+          // Step 10: Cleanup
+          const envConfig = getEnvironmentConfig();
+          const skipCleanup =
+            testCase.params.skip_cleanup === true ||
+            envConfig.skip_cleanup === true;
+
+          if (!skipCleanup) {
+            // Cleanup test class (shared dependencies are never deleted)
+            if (className) {
+              logTestStep('delete (cleanup)', testsLogger);
+              testsLogger.info?.('Cleaning up CDS unit test class:', className);
+              // The class this test created and could not remove fails it.
+              expectResult(
+                await client.getClass().delete(
+                  {
+                    className,
+                    transportRequest,
+                  },
+                  {
+                    analyse: judged(analyseDeletion),
+                    headers: integrationHeadersOf(client.getClass(), 'delete'),
+                  },
+                ),
+                `delete CDS unit test class ${className}`,
+              );
+              testsLogger.info?.('CDS unit test class deleted successfully');
+            }
+          } else {
+            testsLogger.info?.('Cleanup skipped - objects left for analysis');
+          }
+
+          logTestSuccess(
+            testsLogger,
+            'CdsUnitTest - create CDS unit test class',
+          );
+        } catch (error) {
+          logTestError(
+            testsLogger,
+            'CdsUnitTest - create CDS unit test class',
+            error,
+          );
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, 'CdsUnitTest - create CDS unit test class');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+});

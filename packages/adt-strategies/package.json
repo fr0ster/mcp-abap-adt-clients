@@ -19,9 +19,9 @@
   ],
   "scripts": {
     "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\"",
-    "build": "npm run --silent clean && tsc -p tsconfig.json",
+    "build": "npm run --silent clean && node scripts/copy-errata.js && tsc -p tsconfig.json",
     "test": "jest -c jest.config.js",
-    "prepack": "node scripts/copy-errata.js && npm run --silent build"
+    "prepack": "npm run --silent build"
   },
   "keywords": [
     "abap",

@@ -13,7 +13,11 @@ import { parseTransportTree } from '../results/transport';
 
 const fixture = (name: string): string =>
   readFileSync(
-    join(__dirname, '../../../../src/__tests__/fixtures/transport', name),
+    join(
+      __dirname,
+      '../../../adt-clients/src/__tests__/fixtures/transport',
+      name,
+    ),
     'utf8',
   );
 

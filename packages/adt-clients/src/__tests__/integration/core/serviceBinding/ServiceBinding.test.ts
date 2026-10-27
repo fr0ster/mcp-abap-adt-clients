@@ -1,0 +1,523 @@
+/**
+ * Integration test for ServiceBinding
+ * Tests using AdtClient for unified CRUD operations
+ *
+ * Enable debug logs:
+ *  DEBUG_ADT_TESTS=true   - Integration test execution logs
+ *  DEBUG_ADT_LIBS=true    - ServiceBinding library logs
+ *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPatterns=serviceBinding/ServiceBinding
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import { XMLParser } from 'fast-xml-parser';
+import type { AdtClient } from '../../../../clients/AdtClient';
+import type { IServiceBindingConfig } from '../../../../core/service';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
+import { expectResult, failureOf } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import { presenceOf } from '../../../helpers/objectPresence';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  resolveSystemContext,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import type { TestConfigResolver } from '../../../helpers/TestConfigResolver';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+import {
+  logTestEnd,
+  logTestError,
+  logTestStart,
+  logTestStep,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
+
+const {
+  resolvePackageName,
+  resolveTransportRequest,
+  getTimeout,
+} = require('../../../helpers/test-helper');
+
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+});
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+const connectionLogger: ILogger = createConnectionLogger();
+const libraryLogger: ILogger = createLibraryLogger();
+const testsLogger: ILogger = createTestsLogger();
+
+describe('ServiceBinding (using AdtClient)', () => {
+  let connection: IAbapConnection;
+  let client: AdtClient;
+  let hasConfig = false;
+  let isCloudSystem = false;
+  let tester: BaseTester<IServiceBindingConfig>;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(connectionLogger);
+      isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+      hasConfig = true;
+
+      tester = new BaseTester(
+        client.getServiceBinding(),
+        'ServiceBinding',
+        'create_service_binding',
+        'adt_service_binding',
+        testsLogger,
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+          const params = testCase?.params || {};
+          const parentPackage =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(
+              params.parent_package_name || params.package_name,
+            );
+          if (!parentPackage)
+            throw new Error('parent_package_name/package_name not configured');
+          const packageName =
+            params.test_subpackage_name || `${parentPackage}_SRVB`;
+
+          const bindingVariant = params.binding_variant || 'ODATA_V4_WEB_API';
+          const {
+            resolveBindingVariant,
+          } = require('../../../../core/service/types');
+          const resolved = resolveBindingVariant(bindingVariant);
+
+          return {
+            bindingName: params.binding_name,
+            packageName,
+            transportRequest:
+              resolver?.getTransportRequest?.() ||
+              resolveTransportRequest(params.transport_request),
+            description: params.description,
+            serviceDefinitionName: params.service_definition_name,
+            serviceName: params.service_name || params.service_definition_name,
+            serviceVersion: params.service_version || '0001',
+            bindingVariant,
+            serviceType: resolved.serviceType,
+            desiredPublicationState:
+              params.desired_publication_state || 'unchanged',
+          } as IServiceBindingConfig;
+        },
+        ensureObjectReady: async (bindingName: string) => {
+          if (!connection) {
+            return { success: true };
+          }
+
+          try {
+            // `!!value` on an unwrapped answer was always true, and
+            // `expectResult` failed the whole setup for a binding that simply
+            // is not there — which is the state this flow wants. The answer
+            // decides, on either version.
+            const active = presenceOf(
+              await client
+                .getServiceBinding()
+                .read({ bindingName }, 'active', { analyse: analyseException }),
+              `service binding ${bindingName} (active)`,
+            );
+            const inactive = presenceOf(
+              await client
+                .getServiceBinding()
+                .read({ bindingName }, 'inactive', {
+                  analyse: analyseException,
+                }),
+              `service binding ${bindingName} (inactive)`,
+            );
+            if (active.present === 'unknown') {
+              return { success: false, reason: `⚠️ ${active.reason}` };
+            }
+            if (inactive.present === 'unknown') {
+              return { success: false, reason: `⚠️ ${inactive.reason}` };
+            }
+            if (!(active.present || inactive.present)) {
+              return { success: true };
+            }
+
+            const testCase = tester.getTestCaseDefinition();
+            const params = testCase?.params || {};
+            const serviceType =
+              params.service_type ||
+              (params.binding_version === 'V2' ? 'odatav2' : 'odatav4');
+            const serviceName =
+              params.service_name || params.service_definition_name;
+            const serviceVersion = params.service_version || '0001';
+
+            // The unpublish is a step towards the delete, and the delete's
+            // answer is what decides: a binding already unpublished refuses
+            // the unpublish and deletes fine. A refused unpublish is kept and
+            // named beside a refused delete.
+            let unpublishRefusal = '';
+            if (active.present === true) {
+              const unpublished = await client.getServiceBinding().update(
+                {
+                  bindingName,
+                  desiredPublicationState: 'unpublished',
+                  serviceType,
+                  serviceName,
+                  serviceVersion,
+                },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(
+                    client.getServiceBinding(),
+                    'update',
+                  ),
+                },
+              );
+              unpublishRefusal = failureOf(
+                unpublished,
+                `unpublish leftover binding ${bindingName}`,
+              );
+            }
+
+            const removed = await client.getServiceBinding().delete(
+              {
+                bindingName,
+                transportRequest: resolveTransportRequest(
+                  params.transport_request,
+                ),
+              },
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(
+                  client.getServiceBinding(),
+                  'delete',
+                ),
+              },
+            );
+            if (!removed.ok) {
+              return {
+                success: false,
+                objectExists: true,
+                reason: [
+                  unpublishRefusal,
+                  failureOf(removed, `delete leftover binding ${bindingName}`),
+                ]
+                  .filter(Boolean)
+                  .join('; '),
+              };
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          } catch (error: any) {
+            if (error?.response?.status === 404) {
+              return { success: true };
+            }
+            return {
+              success: false,
+              objectExists: true,
+              reason: `Cannot ensure clean service binding state for ${bindingName}: ${error?.message || String(error)}`,
+            };
+          }
+
+          return { success: true };
+        },
+      });
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  afterAll(() => tester?.afterAll()());
+
+  async function ensureTestSubpackage(params: any): Promise<string> {
+    const parentPackage = resolvePackageName(
+      params.parent_package_name || params.package_name,
+    );
+    if (!parentPackage) {
+      throw new Error(
+        'parent_package_name or package_name must be configured for ServiceBinding test',
+      );
+    }
+
+    const testSubpackage =
+      params.test_subpackage_name || `${parentPackage}_SRVB`;
+
+    let parentSoftwareComponent =
+      params.software_component || params.parent_software_component;
+    let parentPackageType = params.package_type || 'development';
+    let parentTransportLayer = params.transport_layer;
+    let parentApplicationComponent = params.application_component;
+    let parentResponsible = params.responsible;
+    /** The parent's own `pak:recordChanges`, when it states one. */
+    let parentRecordChanges: boolean | undefined =
+      typeof params.record_changes === 'boolean'
+        ? params.record_changes
+        : undefined;
+
+    // The parent's document fills in what the configuration leaves out. The
+    // read is issued, so it must succeed: a refused or throwing read fails
+    // the setup instead of falling back to the YAML values.
+    {
+      const parentState = expectResult(
+        await client
+          .getPackage()
+          .readMetadata(
+            { packageName: parentPackage },
+            { analyse: analyseException },
+          ),
+        `read parent package ${parentPackage}`,
+      );
+      const raw = parentState;
+      if (typeof raw === 'string') {
+        const parsed = xmlParser.parse(raw) as Record<string, any>;
+        const pkg = parsed?.['pak:package'] ?? parsed?.package ?? {};
+        const attributes = pkg?.['pak:attributes'] ?? pkg?.attributes ?? {};
+        const transport = pkg?.['pak:transport'] ?? pkg?.transport ?? {};
+        const softwareComponent =
+          transport?.['pak:softwareComponent'] ??
+          transport?.softwareComponent ??
+          {};
+        const transportLayer =
+          transport?.['pak:transportLayer'] ?? transport?.transportLayer ?? {};
+        const applicationComponent =
+          pkg?.['pak:applicationComponent'] ?? pkg?.applicationComponent ?? {};
+
+        parentSoftwareComponent =
+          parentSoftwareComponent ??
+          softwareComponent?.['@_pak:name'] ??
+          softwareComponent?.['@_name'];
+        parentPackageType =
+          parentPackageType ??
+          attributes?.['@_pak:packageType'] ??
+          attributes?.['@_packageType'] ??
+          'development';
+        if (parentRecordChanges === undefined) {
+          const stated =
+            attributes?.['@_pak:recordChanges'] ??
+            attributes?.['@_recordChanges'];
+          if (stated !== undefined) parentRecordChanges = stated === 'true';
+        }
+        parentTransportLayer =
+          parentTransportLayer ??
+          transportLayer?.['@_pak:name'] ??
+          transportLayer?.['@_name'];
+        parentApplicationComponent =
+          parentApplicationComponent ??
+          applicationComponent?.['@_pak:name'] ??
+          applicationComponent?.['@_name'];
+        parentResponsible =
+          parentResponsible ??
+          pkg?.['@_adtcore:responsible'] ??
+          pkg?.['@_responsible'];
+      }
+    }
+
+    if (!parentSoftwareComponent) {
+      throw new Error(
+        'software_component is required (cannot resolve from parent package metadata)',
+      );
+    }
+
+    const existing = presenceOf(
+      await client
+        .getPackage()
+        .readMetadata(
+          { packageName: testSubpackage },
+          { analyse: analyseException },
+        ),
+      `package ${testSubpackage}`,
+    );
+    if (existing.present === 'unknown') {
+      throw new Error(existing.reason);
+    }
+    if (existing.present === true) {
+      return testSubpackage;
+    }
+
+    const wait = async (ms: number): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, ms));
+    // Readable after its create decides; a read that refuses for any reason
+    // but absence fails the setup.
+    const waitForPackage = async (): Promise<boolean> => {
+      for (let i = 0; i < 4; i += 1) {
+        const state = presenceOf(
+          await client.getPackage().readMetadata(
+            {
+              packageName: testSubpackage,
+              ...(i > 0 ? { withLongPolling: true } : {}),
+            } as { packageName: string },
+            { analyse: analyseException },
+          ),
+          `package ${testSubpackage}`,
+        );
+        if (state.present === 'unknown') throw new Error(state.reason);
+        if (state.present) return true;
+        await wait(1000);
+      }
+      return false;
+    };
+
+    const packageCreated = await client.getPackage().create(
+      {
+        packageName: testSubpackage,
+        superPackage: parentPackage,
+        description: `ServiceBinding test package ${testSubpackage}`,
+        softwareComponent: parentSoftwareComponent,
+        packageType: parentPackageType,
+        transportLayer: parentTransportLayer,
+        applicationComponent: parentApplicationComponent,
+        responsible: parentResponsible,
+        // **A package on a transport layer has to record changes.** Without
+        // this the create is refused with `TR 432`, "Change recording must be
+        // activated for package …", and the only symptom here was the package
+        // never becoming readable. It inherits the parent's setting where the
+        // parent states one, and a transport layer means yes either way.
+        recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
+        transportRequest: resolveTransportRequest(params.transport_request),
+      },
+      {
+        analyse: analyseException,
+        headers: integrationHeadersOf(client.getPackage(), 'create'),
+      },
+    );
+    // A refused create fails, a 404 or 409 included: a package that a later
+    // read finds does not forgive it.
+    expectResult(packageCreated, `create test subpackage ${testSubpackage}`);
+
+    const created = await waitForPackage();
+    if (!created) {
+      throw new Error(
+        `Test subpackage ${testSubpackage} was not readable after creation`,
+      );
+    }
+    return testSubpackage;
+  }
+
+  describe('Full workflow', () => {
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
+
+    gate('create_service_binding', 'adt_service_binding')(
+      'should execute full workflow and store all results',
+      async () => {
+        const config = await tester.requireConfig();
+
+        const testCase = tester.getTestCaseDefinition();
+        const params = testCase?.params || {};
+        const testSubpackage = await ensureTestSubpackage(params);
+        // From the config, not a constant. This read `'published'` outright,
+        // so `desired_publication_state` in test-config.yaml was decoration:
+        // the flow published every run whatever the file said, and then could
+        // not delete what it had published. Publishing is ~130s of server time
+        // and belongs in a case somebody turns on deliberately.
+        const updatePublicationState =
+          params.desired_publication_state || 'unchanged';
+        const updateDetails = `serviceType=${config.serviceType}, serviceName=${config.serviceName}, serviceVersion=${config.serviceVersion}`;
+        logTestStep(
+          `update publication state: ${updatePublicationState} :: ${updateDetails}`,
+          testsLogger,
+        );
+
+        // **No `updateConfig` when nothing is to be published.** A binding's
+        // `update` *is* its publication — one POST to a job endpoint — so there
+        // is no request that changes nothing, and asking for `unchanged` is a
+        // caller error rather than a no-op. The flow then covers create, write,
+        // activate and delete; publication is `publication.test.ts`, two
+        // deliberate runs.
+        await tester.flowTestAuto({
+          activateOnCreate: true,
+          ...(updatePublicationState === 'unchanged'
+            ? {}
+            : {
+                updateConfig: {
+                  bindingName: config.bindingName,
+                  packageName: testSubpackage,
+                  serviceType: config.serviceType,
+                  serviceName: config.serviceName,
+                  serviceVersion: config.serviceVersion,
+                  desiredPublicationState: updatePublicationState,
+                },
+              }),
+        });
+      },
+      getTimeout('long'),
+    );
+  });
+
+  describe('Read standard object', () => {
+    gateStandardObject('serviceBinding')(
+      'should read standard SAP service binding',
+      async () => {
+        const standardObject = tester.getStandardObject('serviceBinding');
+        if (!standardObject) {
+          throw new Error(
+            `Standard service binding not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+          );
+        }
+
+        const bindingName = standardObject.name;
+        logTestStart(testsLogger, 'ServiceBinding - read standard object', {
+          name: 'read_standard',
+          params: { binding_name: bindingName },
+        });
+
+        try {
+          const resultState = await tester.readTest({
+            bindingName,
+          });
+          if (!resultState) {
+            throw new Error(
+              `Service binding ${bindingName} was not found in current system`,
+            );
+          }
+          expect(resultState).toBeDefined();
+
+          logTestSuccess(testsLogger, 'ServiceBinding - read standard object');
+        } catch (error) {
+          logTestError(
+            testsLogger,
+            'ServiceBinding - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, 'ServiceBinding - read standard object');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+});

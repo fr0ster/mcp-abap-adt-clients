@@ -1,0 +1,313 @@
+/**
+ * Integration test for BehaviorImplementation
+ * Tests using AdtClient for unified CRUD operations
+ *
+ * Enable debug logs:
+ * - DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=behaviorImplementation    (ADT-clients logs)
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import type { AdtClient } from '../../../../clients/AdtClient';
+import type { IBehaviorImplementationConfig } from '../../../../core/behaviorImplementation';
+import { mainSourceFor } from '../../../../core/behaviorImplementation/AdtBehaviorImplementation';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { integrationHeadersOf } from '../../../helpers/adtHeaders';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { gate } from '../../../helpers/caseGate';
+import { expectResult, failureOf, releasing } from '../../../helpers/contract';
+import { judged } from '../../../helpers/judged';
+import { expectLockReleased } from '../../../helpers/lockReleased';
+import { presenceOf } from '../../../helpers/objectPresence';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  resolveSystemContext,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+
+const {
+  resolvePackageName,
+  getEnvironmentConfig,
+  getTimeout,
+  ensureSharedPackage,
+  ensureSharedDependency,
+} = require('../../../helpers/test-helper');
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const libraryLogger: ILogger = createLibraryLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: ILogger = createTestsLogger();
+
+describe('BehaviorImplementation (using AdtClient)', () => {
+  let connection: IAbapConnection;
+  let client: AdtClient;
+  let hasConfig = false;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
+  let tester: BaseTester<IBehaviorImplementationConfig>;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(connectionLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+      hasConfig = true;
+
+      await ensureSharedPackage(client, testsLogger);
+
+      tester = new BaseTester(
+        client.getBehaviorImplementation(),
+        'BehaviorImplementation',
+        'create_behavior_implementation',
+        'adt_behavior_implementation',
+        testsLogger,
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem: false,
+        buildConfig: (testCase: any, resolver?: any) => {
+          const params = testCase?.params || {};
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('Package name is not configured');
+          const className = params.class_name || params.test_class_name;
+          if (!className) throw new Error('class_name is not configured');
+          const behaviorDefinition = (
+            params.behavior_definition ||
+            params.bdef_name ||
+            params.root_entity
+          )?.trim();
+          if (!behaviorDefinition)
+            throw new Error('behavior_definition is not configured');
+          return {
+            className,
+            packageName,
+            behaviorDefinition,
+            description:
+              params.description ||
+              `Behavior Implementation for ${behaviorDefinition}`,
+            transportRequest:
+              params.transport_request ||
+              getEnvironmentConfig().default_transport ||
+              '',
+            source: params.source_code,
+          };
+        },
+        // **Cleanup belongs at the start, not only at the end.** A run that is
+        // killed — out of memory, a dropped connection, a stopped process —
+        // never reaches its own teardown, and the next run then meets its
+        // leftovers. This one used to do nothing here and went straight into
+        // `validate`, which correctly answered "Class … already exists" and
+        // failed the suite over an object a previous run had made. Twenty other
+        // tests already clear the way like this.
+        ensureObjectReady: async (className: string) => {
+          if (!connection || !className) return { success: true };
+          const existing = presenceOf(
+            await client
+              .getBehaviorImplementation()
+              .read({ className }, undefined, { analyse: analyseException }),
+            `behavior implementation ${className}`,
+          );
+          // "Could not find out" is not "absent": the create would meet it.
+          if (existing.present === 'unknown') {
+            return { success: false, reason: existing.reason };
+          }
+          if (existing.present === false) return { success: true };
+          const removed = await client.getBehaviorImplementation().delete(
+            {
+              className,
+              transportRequest: tester.getTransportRequest(),
+            },
+            {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(
+                client.getBehaviorImplementation(),
+                'delete',
+              ),
+            },
+          );
+          // A leftover that would not delete is what the create meets next:
+          // the test fails here, naming what SAP said.
+          if (!removed.ok) {
+            return {
+              success: false,
+              objectExists: true,
+              reason: failureOf(
+                removed,
+                `delete leftover behavior implementation ${className}`,
+              ),
+            };
+          }
+          // The deletion service is asynchronous; the create that follows meets
+          // a name still being freed otherwise.
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return { success: true };
+        },
+      });
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  afterAll(() => tester?.afterAll()());
+
+  describe('Full workflow test', () => {
+    beforeEach(async () => {
+      if (!hasConfig || !tester) return;
+
+      const testCase = tester.getTestCaseDefinition();
+      await tester.beforeEach()();
+
+      if (!testCase?.params) return;
+      const params = testCase.params;
+
+      // Ensure shared dependencies exist (created once, never deleted)
+      if (params.dep_table_name) {
+        await ensureSharedDependency(
+          client,
+          'tables',
+          params.dep_table_name,
+          testsLogger,
+        );
+      }
+      if (params.dep_view_name) {
+        await ensureSharedDependency(
+          client,
+          'views',
+          params.dep_view_name,
+          testsLogger,
+        );
+      }
+      if (params.dep_bdef_name) {
+        await ensureSharedDependency(
+          client,
+          'behavior_definitions',
+          params.dep_bdef_name,
+          testsLogger,
+        );
+      }
+    });
+
+    afterEach(async () => {
+      if (!hasConfig || !tester) return;
+      await tester.afterEach()();
+    });
+
+    gate('create_behavior_implementation', 'adt_behavior_implementation')(
+      'should execute full workflow and store all results',
+      async () => {
+        const config = await tester.requireConfig();
+
+        const testCase = tester.getTestCaseDefinition();
+        const sourceCode = testCase?.params?.source_code || config.source || '';
+
+        await tester.flowTestAuto({
+          source: sourceCode,
+          readMetadata: true,
+          readMetadataOptions: { withLongPolling: true },
+          // **The third request, and the flow cannot guess it.** `create` makes
+          // the class; `update` writes its implementation include. The class's
+          // own `source/main` — the generated shell that binds it to its
+          // behavior definition — is the class's own `update`, and until it is
+          // written the
+          // class is not readable at all: ADT answers `Resource …: wrong input
+          // data for processing` to every read, which is what the first run
+          // after the chains came out failed on.
+          afterCreate: async () => {
+            // A behavior implementation *is* a class, so its `source/main` —
+            // the generated shell binding it to its behavior definition — goes
+            // in with the class's own `update`, like any other class source.
+            // `mainSourceFor` is exported for exactly this; there used to be an
+            // `updateMain()` member composing the two, which was a second
+            // `update` on a type whose two resources are both sources.
+            const bimpl = client.getClass();
+            const target = { className: config.className };
+            const locked = expectResult(
+              await bimpl.lock(target, { analyse: analyseException }),
+              'lock for the generated shell',
+            );
+            await releasing(
+              async () =>
+                expectResult(
+                  await bimpl.update(
+                    {
+                      className: config.className,
+                      // **The request travels with the write.** Dropping it here
+                      // cost nothing while the test package was local, because
+                      // nothing was registered in CTS. Under a transportable
+                      // package the class is registered at create time, and a
+                      // source write carrying no `corrNr` is refused: `409
+                      // CTS_WBO_API 019`, "Object LIMU CLSD … is already locked
+                      // in request …" — naming the very request this suite works
+                      // in.
+                      transportRequest: config.transportRequest,
+                    },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(bimpl, 'update'),
+                      lockHandle: locked,
+                      source: mainSourceFor(
+                        config.className,
+                        config.behaviorDefinition,
+                      ),
+                    },
+                  ),
+                  'write the generated shell',
+                ),
+              () => bimpl.unlock(target, locked, { analyse: analyseException }),
+              'unlock after the generated shell',
+            );
+            await expectLockReleased(
+              (c) => c.getClass(),
+              target,
+              `behavior implementation class ${config.className}`,
+              testsLogger,
+            );
+          },
+          updateConfig: {
+            className: config.className,
+            packageName: config.packageName,
+            behaviorDefinition: config.behaviorDefinition,
+            description: config.description || '',
+            source: sourceCode,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
+  });
+});

@@ -43,7 +43,20 @@
   },
   "overrides": [
     {
-      "includes": ["scripts/**"],
+      "includes": ["tools/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/adt-clients/scripts/**",
+        "packages/adt-clients/tools/**"
+      ],
       "linter": {
         "rules": {
           "suspicious": {

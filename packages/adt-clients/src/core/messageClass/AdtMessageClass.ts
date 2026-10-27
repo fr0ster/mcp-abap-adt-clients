@@ -1,0 +1,350 @@
+/**
+ * AdtMessageClass - CRUD for `MSAG/N` message classes.
+ *
+ * The class is a shell — name, description, package. The messages inside it are
+ * written through `AdtMessageClassMessage`. There is no activation: a message
+ * class is not an activatable object.
+ *
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
+ */
+
+import type {
+  IAdtAnalyseOptions,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
+  IAdtHeaders,
+  IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IAdtSystemContext,
+  IAdtValidatable,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { MESSAGE_CLASS } from '../../endpoints/objects';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
+import { createMessageClass } from './create';
+import { checkDeletion, deleteMessageClass } from './delete';
+import { lockMessageClass } from './lock';
+import { getMessageClassSource } from './read';
+import {
+  type IMessageClassConfig,
+  type IMessageClassResults,
+  messageClassDocuments,
+} from './types';
+import { unlockMessageClass } from './unlock';
+import { updateMessageClass } from './update';
+
+const VALIDATE_BASE = MESSAGE_CLASS.validation;
+
+export class AdtMessageClass<
+  R extends IMessageClassResults = typeof messageClassDocuments,
+> implements
+    IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
+    IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<
+      Partial<IMessageClassConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
+    IAdtDeletable<
+      IMessageClassConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
+    IAdtLockable<IMessageClassConfig>
+{
+  protected readonly connection: IAbapConnection;
+  private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
+  public readonly objectType: string = 'MessageClass';
+
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = messageClassDocuments as unknown as R,
+  ) {
+    this.connection = connection;
+    this.logger = logger;
+    this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockMessageClass(this.connection, name, lockHandle),
+    );
+  }
+
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
+  private name(config: Partial<IMessageClassConfig>): string {
+    return config.name as string;
+  }
+
+  /**
+   * Validate name and description.
+   *
+   * POST with the params in the query string and an empty body — that is what
+   * Eclipse sends, and what the other types' validation endpoints take.
+   */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const params = new URLSearchParams({ objname: name });
+    if (config.description) {
+      params.set('description', config.description);
+    }
+
+    return answering(
+      () =>
+        connection.makeAdtRequest({
+          url: `${VALIDATE_BASE}?${params.toString()}`,
+          method: 'POST',
+          timeout: 0,
+        }),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Create the message class shell. No activation — message classes have none. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IMessageClassConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    this.logger?.info?.('Creating message class');
+    return answering(
+      () =>
+        createMessageClass(connection, options.headers, {
+          name,
+          description: config.description as string,
+          package_name: config.packageName as string,
+          // config → global systemContext → 'EN', like class/domain/package.
+          master_language:
+            config.masterLanguage?.trim() ||
+            this.systemContext.masterLanguage?.trim() ||
+            'EN',
+          // The message class config has no such fields: the client's context.
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+          // sent as ?corrNr= for a transportable package; empty for local
+          transport_request: config.transportRequest,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The same document `read` fetches — there is no metadata resource. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: {
+      withLongPolling?: boolean;
+      version?: 'active' | 'inactive';
+    } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => getMessageClassSource(connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the message class's document — one PUT, whose body is
+   * `options.source`, under the caller's `options.lockHandle`.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`; `parseMessageClass` and
+   * `buildMessageClassXml` are the readings beside it), change what you mean to
+   * change, and pass the result: anything left out is gone, because nothing is
+   * read here to keep it. Until 23.0.0 this read the class itself and patched
+   * `config.description` into it — a second request, and a document this
+   * library composed in place of the caller's.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        updateMessageClass(
+          connection,
+          options.headers,
+          name,
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Delete the message class.
+   *
+   * The stateless deletion service (check → delete), no lock: a stateful lock
+   * plus a direct DELETE leaves a lingering message-editing enqueue that blocks
+   * a same-name re-create. See delete.ts.
+   *
+   * The check is read, not merely performed — ADT states a refusal inside a
+   * 200.
+   */
+  /**
+   * Asks ADT whether the message class can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs it:
+   * a consumer that wants the check runs this first and decides what a refusal
+   * means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => checkDeletion(connection, options.headers, name),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        deleteMessageClass(
+          connection,
+          options.headers,
+          name,
+          config.transportRequest,
+        ),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Lock the message class — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    const name = this.name(config);
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          lockMessageClass(this.connection, name),
+        ),
+      lockHandleOf,
+      options?.analyse,
+    );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
+  }
+
+  /** Unlock the message class. */
+  async unlock<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
+    const name = this.name(config);
+
+    return answering(
+      // The UNLOCK reaches the context the LOCK opened only if it is sent
+      // stateful; stateless, it releases nothing and still answers 200.
+      async () => {
+        try {
+          return await inStatefulSession(this.connection, () =>
+            unlockMessageClass(this.connection, name, lockHandle),
+          );
+        } finally {
+          this.lockTracker.untrack(name);
+        }
+      },
+      nothing,
+      options?.analyse,
+    );
+  }
+}

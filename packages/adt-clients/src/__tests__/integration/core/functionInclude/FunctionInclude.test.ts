@@ -1,0 +1,317 @@
+/**
+ * Integration test for FunctionInclude
+ * Tests using AdtClient for unified CRUD operations
+ *
+ * Enable debug logs:
+ *  DEBUG_ADT_TESTS=true   - Integration test execution logs
+ *  DEBUG_ADT_LIBS=true    - FunctionInclude library logs
+ *  DEBUG_CONNECTORS=true  - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPatterns=functionInclude/FunctionInclude
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import type { AdtClient } from '../../../../clients/AdtClient';
+import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateOn } from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
+import { ensureFunctionGroupFor } from '../../../helpers/functionGroupRoute';
+import { presenceOf } from '../../../helpers/objectPresence';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  resolveSystemContext,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createRunIntegrityLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+import { logTestStep } from '../../../helpers/testProgressLogger';
+
+const {
+  resolvePackageName,
+  resolveTransportRequest,
+  resolveMasterSystem,
+  getTimeout,
+  getSharedDependenciesConfig,
+  activateSharedFunctionGroup,
+} = require('../../../helpers/test-helper');
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const libraryLogger: ILogger = createLibraryLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: ILogger = createTestsLogger();
+
+/** The shared include the read-source case reads, set up by `shared:setup`. */
+function sharedIncludeConfigured(): boolean {
+  const shared = getSharedDependenciesConfig()?.function_group_includes;
+  const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
+  return !!sharedInclude?.name && !!sharedInclude?.function_group;
+}
+
+describe('FunctionInclude (using AdtClient)', () => {
+  let connection: IAbapConnection;
+  let client: AdtClient;
+  let hasConfig = false;
+  let isCloudSystem = false;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
+  let tester: BaseTester<IFunctionIncludeConfig>;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(connectionLogger);
+      isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+      hasConfig = true;
+
+      tester = new BaseTester<IFunctionIncludeConfig>(
+        // getFunctionInclude() is narrowed to its honest capability composite
+        // (no readTransport); cast through the full interface.
+        client.getFunctionInclude(),
+        'FunctionInclude',
+        'create_function_include',
+        'adt_function_include',
+        testsLogger,
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any, resolver?: any) => {
+          const params = testCase?.params || {};
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
+          // package_name is not required for includes (they live in a FUGR)
+          // but we still resolve it so downstream helpers can look it up.
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
+          const cfg: IFunctionIncludeConfig & { packageName?: string } = {
+            functionGroupName: params.function_group_name,
+            includeName: params.include_name,
+            description: params.description,
+            transportRequest,
+            source: params.source_code,
+          };
+          if (packageName) {
+            (cfg as any).packageName = packageName;
+          }
+          return cfg;
+        },
+        ensureObjectReady: async () => {
+          if (!connection || !client) return { success: true };
+          const testCase = tester.getTestCaseDefinition();
+          const functionGroupName = testCase?.params?.function_group_name;
+          const includeName = testCase?.params?.include_name;
+          if (!functionGroupName || !includeName) return { success: true };
+
+          // The answer decides, not the absence of a throw — see
+          // `presenceOf` for what that mistake cost.
+          const presence = presenceOf(
+            await client.getFunctionInclude().readMetadata(
+              {
+                functionGroupName,
+                includeName,
+              },
+              { analyse: analyseException },
+            ),
+            `Function Include ${functionGroupName}/${includeName}`,
+          );
+          if (presence.present === 'unknown') {
+            return { success: false, reason: `⚠️ ${presence.reason}` };
+          }
+          if (presence.present) {
+            // Include exists — let post-test cleanup handle it.
+            return {
+              success: false,
+              objectExists: true,
+              reason: `⚠️ Function Include ${functionGroupName}/${includeName} already exists — this run is removing it, so the next one starts clean. Nothing was verified here.`,
+            };
+          }
+          return { success: true };
+        },
+      });
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  /**
+   * **Writing an include leaves the group above it inactive.** SAP regenerates
+   * `SAPL<group>` whenever an include inside it is written, and the
+   * regenerated main program comes back inactive. Activating the include does
+   * not activate the group, so this suite borrowed a shared function group and
+   * handed it back broken.
+   *
+   * Measured on an on-premise system, 2026-09-22, in isolation: the group
+   * active before the suite, and `FUGR/F ZAC_SHR_FUGR` with
+   * `FUGR/I SAPLZAC_SHR_FUGR` on the inactive list after it — while the suite
+   * itself reported two passing tests. It is a shared dependency, so the next
+   * suite to read it inherits that.
+   *
+   * A refusal fails the suite: `activateSharedFunctionGroup` throws when the
+   * group could not be activated, the inactive list could not be read, or the
+   * group is still inactive. A group left inactive is a failure of this run,
+   * not of the next suite that reads it.
+   *
+   * The repair goes BEFORE `tester.afterAll()`, which releases the connection.
+   * On a run that shares one session it is a no-op and the order would not
+   * show, but under `PER_FILE_SESSION=1` the file owns its session and that
+   * call ends it — and the request below would then go out on a connection
+   * nobody holds, turning the repair into a failure at the one moment there is
+   * nothing left to repair it with.
+   */
+  afterAll(async () => {
+    const functionGroupName =
+      tester?.getTestCaseDefinition()?.params?.function_group_name;
+    try {
+      if (hasConfig && client && functionGroupName) {
+        await activateSharedFunctionGroup(
+          client,
+          functionGroupName,
+          undefined,
+          createRunIntegrityLogger(),
+        );
+      }
+    } finally {
+      // `finally`, because releasing the connection is the part that must
+      // happen either way: a refused repair throws, and a session this file
+      // owns would then stay open for the rest of the run.
+      await tester?.afterAll()();
+    }
+  });
+
+  describe('Full workflow', () => {
+    beforeEach(async () => {
+      // The parent function group, by the route the case states
+      // (`params.function_group_route`); a failure of that route fails the
+      // test — the other route is never a recovery from it.
+      if (hasConfig && client) {
+        const params = tester.getTestCaseDefinition()?.params;
+        if (params) {
+          await ensureFunctionGroupFor(
+            client,
+            params,
+            'create_function_include[adt_function_include]',
+            'Shared FUGR for FunctionInclude tests',
+            testsLogger,
+          );
+        }
+      }
+      await tester?.beforeEach()();
+    });
+
+    afterEach(() => {
+      tester?.afterEach()();
+    });
+
+    gate('create_function_include', 'adt_function_include')(
+      'should execute full workflow and store all results',
+      async () => {
+        const config = await tester.requireConfig();
+
+        const testCase = tester.getTestCaseDefinition();
+        const source = testCase?.params?.source_code || config.source || '';
+        const updateSourceCode = testCase?.params?.update_source_code || source;
+
+        await tester.flowTestAuto({
+          source,
+          updateConfig: {
+            functionGroupName: config.functionGroupName,
+            includeName: config.includeName,
+            description: `${config.description || 'Function include'} (updated)`,
+            source: updateSourceCode,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
+
+    gateOn(sharedIncludeConfigured)(
+      'should read source via read()',
+      async () => {
+        // **The shared include, not the flow's own.** This used to read
+        // `params.include_name` — the same object the flow above creates and
+        // deletes — so by the time it ran the include was gone, and the test
+        // logged SKIP and passed. It did that on every full run: the assertion
+        // below had never once executed.
+        //
+        // It reads `shared_dependencies.function_group_includes` now. That one
+        // is created by `npm run shared:setup` and deleted by nothing, so
+        // absence is a real failure rather than the normal case.
+        const shared = getSharedDependenciesConfig()?.function_group_includes;
+        const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
+        if (!sharedInclude?.name || !sharedInclude?.function_group) {
+          throw new Error(
+            'shared_dependencies.function_group_includes is not configured',
+          );
+        }
+        const functionGroupName = String(sharedInclude.function_group);
+        const includeName = String(sharedInclude.name);
+
+        // There is no `readSource()` any more: `read()` is the source, as the
+        // contract says of an object that has one. The cast this used to need
+        // went with it.
+        logTestStep(
+          `read shared include ${functionGroupName}/${includeName}`,
+          testsLogger,
+        );
+        const answer = await client
+          .getFunctionInclude()
+          .read({ functionGroupName, includeName }, undefined, {
+            analyse: analyseException,
+          });
+
+        // No skip-on-absence branch any more. A shared dependency that is not
+        // there is a broken environment — `npm run shared:setup` fixes it — and
+        // reporting that as a pass is what hid this test for as long as it
+        // existed.
+        const source = expectResult(
+          answer,
+          `read shared include ${includeName}`,
+        );
+        expect(typeof source).toBe('string');
+        expect(String(source).trim()).not.toBe('');
+        // Printed, so a run says what this asserted. A test that passes while
+        // printing nothing is indistinguishable from one that skipped, which is
+        // exactly what this test used to be.
+        logTestStep(
+          `read shared include: ${String(source).length} characters`,
+          testsLogger,
+        );
+      },
+      getTimeout('test'),
+    );
+  });
+});

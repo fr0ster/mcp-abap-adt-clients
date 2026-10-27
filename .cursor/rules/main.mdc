@@ -13,7 +13,7 @@ Direct communication with the user must follow the language used by the user in 
 ## Project Context
 - **Name:** mcp-abap-adt-clients – ADT clients for SAP ABAP systems
 - **Purpose:** Provides Read-only and CRUD operations for SAP ABAP ADT objects
-- **Key Modules:** `src/clients/`, `src/core/`, `src/utils/`, `src/__tests__/`
+- **Key Modules:** `packages/adt-clients/src/clients/`, `packages/adt-clients/src/core/`, `packages/adt-clients/src/utils/`, `packages/adt-clients/src/__tests__/`
 
 ## Code Standards
 - Source code: English only
@@ -36,5 +36,5 @@ Direct communication with the user must follow the language used by the user in 
 ## Architecture Notes
 - Client classes: CrudClient, ReadOnlyClient
 - Builder pattern: All object types have corresponding Builder classes
-- Low-level functions: Located in `src/core/*/` modules
-- Testing: YAML-based configuration: tracked base `src/__tests__/helpers/test-config.yaml.template` + local `test-config.overlay.yaml`
+- Low-level functions: Located in `packages/adt-clients/src/core/*/` modules
+- Testing: YAML-based configuration: tracked base `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template` + local `test-config.overlay.yaml`

@@ -1,0 +1,205 @@
+# RFC Connection Guide
+
+RFC (Remote Function Call) transport allows ADT operations on legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) where HTTP stateful sessions are not supported. It uses the standard SAP function module `SADT_REST_RFC_ENDPOINT` — the same mechanism Eclipse ADT uses via JCo.
+
+## When to Use RFC
+
+- **Legacy systems** (SAP_BASIS 7.40) — **always.** The legacy client (`AdtClientLegacy`, `AdtExecutorLegacy`, from `@mcp-abap-adt/adt-clients-legacy`) is supported, and was measured on SAP_BASIS 7.40 SP04, over RFC only. **HTTP to a legacy system is unsupported**: measured on 7.40 SP04, the logon needs a CSRF endpoint override, a write under a lock answers `423` whatever the session shape, some reads disagree with RFC, absent endpoints answer an empty `200` the library reads as success, and `/sap/bc/cts/*` is unreachable. Neither package detects the wire or refuses HTTP; it just is not supported. See [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md#http-is-not-a-supported-legacy-wire).
+- **Systems without HTTP stateful support** — some custom configurations disable HTTP stateful sessions.
+
+Modern systems (BASIS >= 7.50, S/4 HANA, BTP) work fine with HTTP connections and don't need RFC.
+
+## Prerequisites
+
+### 1. SAP NW RFC SDK
+
+Download SAP NW RFC SDK from [SAP Support Portal](https://support.sap.com/en/product/connectors/nwrfcsdk.html) (requires S-user).
+
+Install it on your machine and configure environment variables:
+
+**Windows (PowerShell):**
+```powershell
+$env:SAPNWRFC_HOME = "C:\nwrfcsdk\nwrfcsdk"
+$env:PATH = "C:\nwrfcsdk\nwrfcsdk\lib;$env:PATH"
+```
+
+**Windows (cmd):**
+```cmd
+set SAPNWRFC_HOME=C:\nwrfcsdk\nwrfcsdk
+set PATH=C:\nwrfcsdk\nwrfcsdk\lib;%PATH%
+```
+
+**Linux/macOS (bash):**
+```bash
+export SAPNWRFC_HOME=~/nwrfcsdk
+export PATH=$SAPNWRFC_HOME/lib:$PATH
+# Linux also needs:
+export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
+```
+
+> **Note:** These variables must be set in the shell before running the application. They cannot be loaded from `.env` files because `dotenv` does not expand `$PATH`/`%PATH%` and does not modify the system PATH.
+
+### 2. RFC transport
+
+RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in automatically as a dependency of `@mcp-abap-adt/connection`. Nothing needs to be added to `package.json` — `adt-clients` consumes the `IAbapConnection` interface and does not depend on any RFC library directly.
+
+It is an **optional** dependency with no install script (sap-rfc-lite 0.3.x,
+`@mcp-abap-adt/connection` 19 and later): `npm install` compiles nothing and needs
+no SDK. It ships prebuilt bindings for linux-x64 (glibc), win32-x64 and
+darwin-arm64. On any other platform the install succeeds without a binding and
+the RFC connection fails when it loads sap-rfc-lite; build the binding from
+sap-rfc-lite's repository (its README, "Installation") and install the package
+you built.
+
+`@mcp-abap-adt/sap-rfc-lite` binds to the SAP NW RFC SDK at runtime; the SDK libraries must be on the shared-library path as shown in step 1.
+
+### 3. SAP Authorization
+
+The SAP user needs `S_RFC` authorization for function module `SADT_REST_RFC_ENDPOINT`. See SAP Note 3569684 for details.
+
+## Configuration
+
+### Connection Layer (`@mcp-abap-adt/connection`)
+
+RFC is a **transport**, not an auth type. `RfcAbapConnection` and
+`connectionType: 'rfc'` were both removed in `@mcp-abap-adt/connection` 6.0.0:
+the wire an on-prem system is reached over is now an argument, because that is
+what it always was.
+
+```typescript
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
+import {
+  AdtOnPremConnector,
+  RfcTransport,
+  rfcConversationFrom,
+} from '@mcp-abap-adt/connection';
+
+const config = {
+  url: 'http://saphost:8000',   // hostname and port derive the RFC parameters
+  authType: 'basic' as const,
+  client: '100',
+  username: 'DEVELOPER',
+  password: 'secret',
+};
+
+const connection = new AdtOnPremConnector(
+  config,
+  new BasicAuthProvider(config.username, config.password),
+  new RfcTransport(rfcConversationFrom(config)),
+);
+
+await connection.connect();
+```
+
+`rfcConversationFrom(config)` derives the connection parameters from the URL:
+- `ashost` — parsed from URL hostname
+- `sysnr` — derived from port (80XX -> XX, e.g. 8000 -> 00, 8001 -> 01)
+- `client`, `user`, `passwd` — from config
+
+### ADT Clients Layer (`@mcp-abap-adt/adt-clients`)
+
+ADT clients work transparently with RFC connections — no code changes needed. The `IAbapConnection` interface is the same for both HTTP and RFC.
+
+```typescript
+import { createAdtClient } from '@mcp-abap-adt/adt-clients';
+
+// AdtClient — the factory detects nothing and returns the modern client
+const client = await createAdtClient(connection, logger);
+const program = client.getProgram();
+await program.read({ programName: 'ZTEST' });
+```
+
+On a legacy system (SAP_BASIS 7.40, measured on 7.40 SP04) the consumer declares the system type by
+constructing `AdtClientLegacy` from the separate package
+`@mcp-abap-adt/adt-clients-legacy`, over an RFC connection:
+
+```typescript
+import { AdtClientLegacy } from '@mcp-abap-adt/adt-clients-legacy';
+
+const client = new AdtClientLegacy(connection, logger);
+```
+
+Over RFC it sends what SAP_BASIS 7.40 SP04 serves and refuses the rest without a
+request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). Two things differ for a
+caller: a `delete` takes the object's lock handle from your own `lock()`, and
+there is no `checkDeletion`. The member-by-member list is in the
+[package README](../../../adt-clients-legacy/README.md) and
+[LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md).
+
+### Legacy Content Types
+
+On legacy systems, some ADT endpoints don't support versioned content types (v2+, v3+, v4+). A request's `Accept` and `Content-Type` are the caller's (since 36.0.0), and nothing is chosen from the system:
+
+- Modern systems: `application/vnd.sap.adt.programs.programs.v2+xml`
+- Legacy systems: `application/vnd.sap.adt.programs.programs+xml` (no version)
+
+`AdtContentTypesBase` (versionless) and `AdtContentTypesModern` answer the pair for a create; the consumer who declared a legacy system passes the versionless one. Which pair 7.40 SP04 accepts per member is in the [package README](../../../adt-clients-legacy/README.md#headers-are-the-callers).
+
+### Unicode / Non-Unicode Systems
+
+Non-unicode legacy systems require `text/plain` (without `charset=utf-8`) as the source artifact content type in checkRun XML payloads. Set `SAP_UNICODE=false` in `.env` to configure this:
+
+```env
+SAP_UNICODE=false   # Non-unicode legacy system
+```
+
+If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setting this incorrectly causes checkRun to return `notProcessed` with `"Dirty Source: Wrong content type"`.
+
+## How It Works
+
+1. `connect()` opens an RFC conversation via `@mcp-abap-adt/sap-rfc-lite`. The SDK is loaded when
+   the conversation opens, not when `rfcConversationFrom()` is called, so a machine without it
+   fails at `connect()` with a message naming what to install
+2. Each `makeAdtRequest()` call invokes `SADT_REST_RFC_ENDPOINT` FM
+3. The FM proxies HTTP-like requests internally within the ABAP system
+4. **Stateful requests share one persistent conversation**, which is one ABAP session for the
+   wire's lifetime. A request is stateful when the connection is set stateful
+   (`setSessionType('stateful')`) or carries `x-sap-adt-sessiontype: stateful`. The lock window
+   is stateful, so lock handles persist across its calls
+5. **Every other request runs in a conversation of its own**: a kept one that is reset after
+   each call, or a throwaway one. `setSessionType()` is therefore not a no-op over RFC. Work that
+   must stay in one ABAP session — a lock window, a debugger conversation — needs it, exactly as
+   over HTTP
+
+## Differences from HTTP
+
+| Aspect | HTTP | RFC |
+|--------|------|-----|
+| Session | Toggle stateful/stateless | Stateful requests: one persistent conversation; the rest: reset or throwaway ones |
+| Lock handles | Lost on legacy systems (`423` on the write) | Preserved in the stateful conversation |
+| Legacy client (`@mcp-abap-adt/adt-clients-legacy`) | Unsupported | Supported (measured on 7.40 SP04) |
+| Content negotiation | Standard HTTP Accept | Some endpoints only accept `*/*` |
+| sap-client | Added to URL query | Not needed (set in RFC params) |
+| Authentication | Basic/JWT/XSUAA | Username/password only |
+| Dependencies | axios | @mcp-abap-adt/sap-rfc-lite + SAP NW RFC SDK |
+
+## Troubleshooting
+
+### "sap-rfc-lite is not available" / "RFC transport not loadable"
+
+SAP NW RFC SDK is not installed or not in PATH. Verify:
+```bash
+# Check SAPNWRFC_HOME
+echo $SAPNWRFC_HOME
+
+# Check the SDK loads (adjust the require() to the actual sap-rfc-lite entry point if needed)
+node -e "try { require('@mcp-abap-adt/sap-rfc-lite'); console.log('OK'); } catch(e) { console.log(e.message.substring(0, 200)); }"
+```
+
+### "The specified module could not be found: sapnwrfc.node"
+
+The native module exists but can't load its dependencies. Ensure `SAPNWRFC_HOME/lib` is in system PATH **before** starting Node.js.
+
+### 406 Not Acceptable on function group read
+
+Some endpoints via RFC don't support specific Accept content types. The library handles this by using `*/*` where needed.
+
+### Lock handle encoding errors (423 "invalid lock handle")
+
+RFC returns base64 lock handles that may contain spaces, `+`, `=`. All lock handles are encoded with `encodeURIComponent()` when placed in URL query parameters.
+
+## Packages: one save per ABAP session
+
+A package can be saved only once per ABAP session: the next update or delete
+from that session is refused with `PAK/058`. Over RFC every call shares one
+session, so an update straight after a create is already refused.

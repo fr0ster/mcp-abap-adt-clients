@@ -1,0 +1,225 @@
+/**
+ * Integration test for Structure
+ * Tests using AdtClient for unified CRUD operations
+ *
+ * Enable debug logs:
+ *  DEBUG_ADT_TESTS=true   - Integration test execution logs
+ *  DEBUG_ADT_LIBS=true    - Structure library logs
+ *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPatterns=structure/Structure
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import type { AdtClient } from '../../../../clients/AdtClient';
+import type { IStructureConfig } from '../../../../core/structure';
+import { getStructureSource } from '../../../../core/structure/read';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { gate, gateStandardObject } from '../../../helpers/caseGate';
+import { expectResult } from '../../../helpers/contract';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  resolveSystemContext,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
+import {
+  logTestEnd,
+  logTestError,
+  logTestStart,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
+
+const {
+  resolvePackageName,
+  resolveTransportRequest,
+  getTimeout,
+} = require('../../../helpers/test-helper');
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const libraryLogger: ILogger = createLibraryLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: ILogger = createTestsLogger();
+
+describe('Structure (using AdtClient)', () => {
+  let connection: IAbapConnection;
+  let client: AdtClient;
+  let hasConfig = false;
+  let isCloudSystem = false;
+  let tester: BaseTester<IStructureConfig>;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(connectionLogger);
+      isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+      hasConfig = true;
+
+      tester = new BaseTester(
+        client.getStructure(),
+        'Structure',
+        'create_structure',
+        'adt_structure',
+        testsLogger,
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any, resolver?: any) => {
+          const params = testCase?.params || {};
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
+          return {
+            structureName: params.structure_name,
+            packageName,
+            transportRequest,
+            description: params.description,
+            source: params.ddl_code,
+          };
+        },
+        ensureObjectReady: async (structureName: string) => {
+          if (!connection) return { success: true };
+          try {
+            await getStructureSource(connection, structureName);
+            return {
+              success: false,
+              objectExists: true,
+              reason: `⚠️ SAFETY: Structure ${structureName} already exists!`,
+            };
+          } catch (error: any) {
+            if (error.response?.status !== 404) {
+              return {
+                success: false,
+                reason: `Cannot verify structure existence: ${error.message}`,
+              };
+            }
+          }
+          return { success: true };
+        },
+      });
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  afterAll(() => tester?.afterAll()());
+
+  describe('Full workflow', () => {
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
+
+    gate('create_structure', 'adt_structure')(
+      'should execute full workflow and store all results',
+      async () => {
+        const config = await tester.requireConfig();
+
+        const testCase = tester.getTestCaseDefinition();
+        const updatedDdlCode =
+          testCase?.params?.updated_ddl_code || config.source || '';
+
+        await tester.flowTestAuto({
+          source: updatedDdlCode,
+          updateConfig: {
+            structureName: config.structureName,
+            packageName: config.packageName,
+            description: config.description || '',
+            source: updatedDdlCode,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
+  });
+
+  describe('Read standard object', () => {
+    gateStandardObject('structure')(
+      'should read standard SAP structure',
+      async () => {
+        // Use TestConfigResolver for consistent parameter resolution
+        const resolver = new TestConfigResolver({
+          isCloud: isCloudSystem,
+          logger: testsLogger,
+        });
+        const standardObject = resolver.getStandardObject('structure');
+
+        if (!standardObject) {
+          throw new Error(
+            `Standard structure not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+          );
+        }
+
+        const standardStructureName = standardObject.name;
+        logTestStart(testsLogger, 'Structure - read standard object', {
+          name: 'read_standard',
+          params: { structure_name: standardStructureName },
+        });
+
+        try {
+          const resultState = await tester.readTest({
+            structureName: standardStructureName,
+          });
+          expect(resultState).toBeDefined();
+          const structureConfig = resultState;
+          if (
+            structureConfig &&
+            typeof structureConfig === 'object' &&
+            'structureName' in structureConfig
+          ) {
+            expect((structureConfig as any).structureName).toBe(
+              standardStructureName,
+            );
+          }
+
+          logTestSuccess(testsLogger, 'Structure - read standard object');
+        } catch (error) {
+          logTestError(testsLogger, 'Structure - read standard object', error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, 'Structure - read standard object');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+});

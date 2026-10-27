@@ -6,12 +6,13 @@ This package's own changelog, and the only one that describes it.
 `adt-clients` is at 19.0.0 while this starts at 0.1.0, so a shared file would
 list entries against versions this package never had. A monorepo that bumps all
 its packages together can have a single changelog; this one cannot.
-`adt-clients`' is at the [repository root](../../CHANGELOG.md) for now, because
-that package still lives there.
+`adt-clients`' is [in its package](../adt-clients/CHANGELOG.md).
 
 Tags follow the same rule: these releases are tagged
-`adt-strategies@<version>`, never `v<version>` — that scheme is `adt-clients`'
-and fires its release workflow.
+`adt-strategies-v<version>` (`<package directory>-v<version>`), adt-clients'
+`adt-clients-v<version>`, and each fires its own job of the release workflow.
+The tags made before the packages moved under `packages/` are
+`adt-strategies@<version>`.
 
 ## [Unreleased]
 
@@ -190,7 +191,7 @@ Released together with `adt-clients` 23.0.0, which stopped applying any reading
 or verdict of its own. Everything it used to apply is here now, by name — a
 consumer on `adt-clients` 22.x who relied on a parsed default or a built-in
 verdict passes the strategy below instead.
-[MIGRATION-23.md](../../docs/usage/MIGRATION-23.md) has the replacing code for
+[MIGRATION-23.md](../adt-clients/docs/usage/MIGRATION-23.md) has the replacing code for
 each.
 
 ### Added

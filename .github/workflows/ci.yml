@@ -12,20 +12,20 @@ jobs:
     # whole run takes 2 to 5 minutes.
     timeout-minutes: 20
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
-      
-      # Two installs, both from the registry: the strategies package is not a
-      # workspace (no local links between packages — what is built and tested
-      # here is what a consumer installs).
+
+      # One install at the root: the packages are npm workspaces, and the
+      # root lockfile covers them all. Every third-party package comes from
+      # the registry; only the workspace siblings are linked.
       #
       # --ignore-scripts: the runner's npm may predate 11.19.0, which reads
       # package.json `allowScripts` and .npmrc `strict-allow-scripts` in full,
@@ -35,63 +35,59 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Install dependencies (strategies package)
-        run: npm ci --ignore-scripts --prefix packages/adt-strategies
-
       # Any known advisory of moderate severity or above fails the run, dev
       # dependencies included: they run here and on every developer's
-      # machine. Both trees: the strategies package has a lockfile of its own.
+      # machine. The root lockfile is the one tree of every package.
       - name: Security audit (moderate+)
         run: npm audit --audit-level=moderate
 
-      - name: Security audit, strategies package (moderate+)
-        run: npm audit --audit-level=moderate --prefix packages/adt-strategies
-      
-      # `src packages`, not `src`: a gate that lints only the root package is a
-      # gate that reports success about half the tree.
-      - name: Run Biome lint
-        run: node_modules/.bin/biome check src packages --diagnostic-level=error
-
-      # The strategies package builds against what it installed from the
-      # registry. adt-clients' tests use the PUBLISHED strategies (a
-      # devDependency), not this build.
-      - name: Build the strategies package
-        run: npm run build:packages
-
-      - name: Type check
-        run: node_modules/.bin/tsc -p tsconfig.json --noEmit
+      # Every package, each with its own build: adt-clients lints its `src`
+      # (errors only) and compiles it, the strategies package writes its
+      # ERRATA.md and compiles.
+      - name: Build
+        run: npm run build
 
       # Tests, scripts and examples are type-checked by their own configs. The
-      # root one covers `src` alone, so a script or an example naming a member
+      # build covers `src` alone, so a script or an example naming a member
       # that no longer exists compiled nowhere until this step existed.
       - name: Type check tests, scripts and examples
         run: npm run test:check
 
-      - name: Build
-        run: npm run build
+      # Biome over every package's sources and the root tools, then every
+      # package's documentation imports.
+      - name: Lint and documentation imports
+        run: npm run lint:check
 
       # No SAP system here, so the integration suites are out of reach — but
       # the unit suites are not, and they carry every invariant this release
       # is built on. `MCP_ENV_PATH` points at nothing so the preflight skips
-      # instead of aborting the run.
+      # instead of aborting the run. The strategies package is tested
+      # entirely against the recorded answers in adt-clients' `corpus/adt/`,
+      # so it needs no system at all.
       - name: Unit tests
-        run: MCP_ENV_PATH=/tmp/nonexistent-env npm run test:unit
+        run: MCP_ENV_PATH=/tmp/nonexistent-env npm test
 
-      # The strategies package is tested entirely against the recorded answers
-      # in `corpus/adt/`, so it needs no system at all.
-      - name: Strategies package tests
-        run: npm run test:packages
+      # Every file each package declares is in what `npm pack` would ship —
+      # with --ignore-scripts, as the release publishes.
+      - name: Packed contents
+        run: npm run check:packed
 
-      - name: Documentation imports
-        run: npm run check:docs
+      # The publish script against throwaway repositories with a fake npm,
+      # then against this repository's own manifests with --dry-run: no
+      # registry credentials, nothing published.
+      - name: Publish path
+        run: npm run check:publish
+
+      - name: Publish path, this repository's manifests
+        run: npm run check:publish:root
 
       - name: Summary
         if: success()
         run: |
           echo "✅ All checks passed!"
-          echo "- npm audit, both trees: OK"
-          echo "- Biome lint (src + packages): OK"
-          echo "- TypeScript, root and test configs: OK"
-          echo "- Build, root and strategies package: OK"
+          echo "- npm audit: OK"
+          echo "- Build, every package: OK"
+          echo "- TypeScript, test configs: OK"
+          echo "- Biome lint and documentation imports: OK"
           echo "- Unit tests and strategies tests: OK"
-          echo "- Documentation imports: OK"
+          echo "- Packed contents and publish path: OK"

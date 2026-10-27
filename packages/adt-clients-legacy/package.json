@@ -1,0 +1,82 @@
+{
+  "name": "@mcp-abap-adt/adt-clients-legacy",
+  "version": "0.1.0",
+  "description": "Clients for legacy SAP ABAP systems (7.40), built on @mcp-abap-adt/adt-clients",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "COPYING"
+  ],
+  "scripts": {
+    "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\"",
+    "build": "npm run --silent clean && tsc -p tsconfig.json",
+    "test": "jest -c jest.unit.config.js",
+    "pretest:live": "npm run --silent check:config",
+    "test:live": "jest -c jest.live.config.js --runInBand",
+    "check:config": "node scripts/check-config.js",
+    "header:discovery": "ts-node --project tsconfig.test.json tools/header-probe/errorCorpus.ts",
+    "check:docs": "node ../adt-clients/scripts/check-doc-imports.js .",
+    "test:check": "tsc --noEmit --project tsconfig.test.json",
+    "legacy:setup": "jest -c jest.live.config.js --runInBand --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/setup",
+    "legacy:status": "jest -c jest.live.config.js --runInBand --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/status",
+    "legacy:teardown": "jest -c jest.live.config.js --runInBand --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/teardown",
+    "legacy:uninstall": "jest -c jest.live.config.js --runInBand --testPathIgnorePatterns node_modules --testPathPatterns admin/legacy-env/uninstall",
+    "prepack": "npm run --silent build"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "legacy",
+    "clients"
+  ],
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "license": "LGPL-3.0-only",
+  "homepage": "https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/README.md",
+  "bugs": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt-clients/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git",
+    "directory": "packages/adt-clients-legacy"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/interfaces-adt": "^20.1.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.1"
+  },
+  "peerDependencies": {
+    "@mcp-abap-adt/adt-clients": "^37.4.0"
+  },
+  "devDependencies": {
+    "@mcp-abap-adt/adt-clients": "^37.4.0",
+    "@mcp-abap-adt/adt-strategies": "^0.10.0",
+    "@mcp-abap-adt/interfaces-auth": "^7.5.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.3.3",
+    "fast-xml-parser": "^5.9.3",
+    "jest": "^30.0.5",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "yaml": "^2.8.1"
+  }
+}
