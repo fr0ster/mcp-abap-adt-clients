@@ -26,7 +26,7 @@ published before adt-clients depends on it, and adt-clients before mcp-abap-adt 
    class's own default (`typeof xDocuments`), with slots exactly as narrow as today. Pinned by
    a type-level assertion per object kind group (Task B3).
 2. **Legacy factories.** `AdtClientLegacy` keeps assignable overrides after the compositions go,
-   including the seven getters re-declared with two overloads (Task B3b).
+   including the eleven getters re-declared with two overloads (Task B3b).
 3. **The shape check stays a guard.** After the switch to classes, it still refuses a factory that
    claims an atom its class does not offer. Proven by breaking one claim (Task B4).
 4. **Consumer substitution.** A contract composed from interfaces-adt alone accepts `AdtClient`
@@ -101,8 +101,9 @@ Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
 
 - `@mcp-abap-adt/adt-clients` moves to `^38.0.0`; the version goes to 0.2.0. (The result-set
   imports moved in B2.)
-- The seven getters with the base's two overloads each become one signature. Three answer their
-  legacy class (`getFunctionInclude`, `getInclude`, `getMessageClass`). Four answer the base class
+- The eleven getters with the base's two overloads each become one signature. Seven answer their
+  legacy class (`getFunctionInclude`, `getInclude`, `getMessageClass`, `getLocalTestClass`,
+  `getLocalTypes`, `getLocalDefinitions`, `getLocalMacros`). Four answer the base class
   through `absentOnLegacy` (`getTransformation`, `getScalarFunction`,
   `getScalarFunctionImplementation`, `getAppendStructure`). No composition is imported.
 - A type-level test composes a contract from interfaces-adt alone and proves `AdtClientLegacy`

@@ -27,9 +27,10 @@ It is measured again on main once #281 is merged, before Task B1.
   is `satisfies IXResults` and has no annotation.
 - **`createAdtClient()`** answers `Promise<AdtClient>` and probes nothing.
 - **The legacy client.** `AdtClientLegacy` lives in `packages/adt-clients-legacy` (0.1.0, on
-  `@mcp-abap-adt/adt-clients ^37.4.0`) and imports from `@mcp-abap-adt/adt-clients`. Seven of its
+  `@mcp-abap-adt/adt-clients ^37.4.0`) and imports from `@mcp-abap-adt/adt-clients`. Eleven of its
   getters re-declare the base's two overloads and import their compositions: `getFunctionInclude`,
-  `getInclude`, `getMessageClass` (answering their legacy classes) and `getTransformation`,
+  `getInclude`, `getMessageClass`, `getLocalTestClass`, `getLocalTypes`, `getLocalDefinitions`,
+  `getLocalMacros` (answering their legacy classes) and `getTransformation`,
   `getScalarFunction`, `getScalarFunctionImplementation`, `getAppendStructure` (answering through
   `absentOnLegacy`). The root's `legacyStaysInLegacyClasses.test.ts` forbids `legacy` anywhere in
   the root's `src`, tests included; the package's `legacyClassesOnlyOverride.test.ts` allows the
@@ -105,10 +106,10 @@ It is measured again on main once #281 is merged, before Task B1.
    the 30 client result-set contracts (or `IServiceBindingPublicationConfig`) from
    `@mcp-abap-adt/adt-clients` — on #281 thirteen files under `clients/` and `core/` — imports it
    from `@mcp-abap-adt/interfaces-adt`. The executors' result contracts are not moved (§6).
-2. **The seven getters.** Each becomes one signature,
+2. **The eleven getters.** Each becomes one signature,
    `getX<R extends IXResults = typeof xDocuments>(results?: R): …`, answering its legacy class
-   (`getFunctionInclude`, `getInclude`, `getMessageClass`) or the base class through
-   `absentOnLegacy` (the other four). No composition is imported. Every other override stays.
+   (`getFunctionInclude`, `getInclude`, `getMessageClass` and the four `getLocal*`) or the base
+   class through `absentOnLegacy` (the other four). No composition is imported. Every other override stays.
 3. **Still a subclass.** `AdtClientLegacy extends AdtClient`; each override is assignable to the
    base's factory; `legacyClassesOnlyOverride.test.ts` stays green.
 4. **The consumer-contract check**, the legacy half of §3.6: the same kind of contract, composed from
