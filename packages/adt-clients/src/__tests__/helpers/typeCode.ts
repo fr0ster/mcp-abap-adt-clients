@@ -63,7 +63,7 @@ export function metadataReadCode(value: string): AdtMetadataReadCode {
 function isActivationCode(
   code: AdtTypeCode,
 ): code is AdtActivationCode<AdtModernVariant> {
-  return code !== 'MSAG/NN' && codeHas(code, 'activate');
+  return code === 'DEVC/K' || (code !== 'MSAG/NN' && codeHas(code, 'activate'));
 }
 
 /** `value` as a code a group activation activates; throws for any other. */

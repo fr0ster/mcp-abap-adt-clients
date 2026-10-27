@@ -14,7 +14,11 @@ import type {
   AdtParentedTypeCode,
   AdtVariant,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { AdtCodeOf, AdtCodeWith } from '../../clients/variant';
+import type {
+  AdtCodeOf,
+  AdtCodeWith,
+  AdtModernVariant,
+} from '../../clients/variant';
 import {
   ACCEPT_CLASS,
   ACCEPT_DATA_ELEMENT,
@@ -125,13 +129,33 @@ export type AdtWhereUsedCode<V extends AdtVariant> = Exclude<
 >;
 
 /**
- * The codes a group activation activates: the codes whose API lists
- * `activate` on every variant of `V` — so no message class, no package.
+ * The codes the tables list no `activate` for that a modern group activation
+ * still sends: `DEVC/K`. A package in a group activation was sent before
+ * 38.0.0, so it stays — unmeasured, and listed for interfaces-adt 21.1.0 to
+ * measure. Not on 7.40, whose utilities take only 7.40's codes.
  */
-export type AdtActivationCode<V extends AdtVariant> = Exclude<
-  AdtCodeWith<V, 'activate'>,
-  'MSAG/NN'
->;
+export const ACTIVATED_WITHOUT_TABLE = { 'DEVC/K': true } as const;
+
+/** The codes of {@link ACTIVATED_WITHOUT_TABLE} on variant `V`. */
+type ActivatedWithoutTable<V extends AdtVariant> = [V] extends [
+  AdtModernVariant,
+]
+  ? keyof typeof ACTIVATED_WITHOUT_TABLE
+  : never;
+
+/**
+ * The codes a group activation activates: the codes whose API lists
+ * `activate` on every variant of `V` — so no message class — and, on a modern
+ * variant, a package (`ACTIVATED_WITHOUT_TABLE`).
+ */
+export type AdtActivationCode<V extends AdtVariant> =
+  | Exclude<AdtCodeWith<V, 'activate'>, 'MSAG/NN'>
+  | ActivatedWithoutTable<V>;
+
+/** Whether text from outside the types is activated without the table's word. */
+export function isActivatedWithoutTable(code: string): boolean {
+  return Object.hasOwn(ACTIVATED_WITHOUT_TABLE, code);
+}
 
 /** The codes a group deletion check asks about. */
 export type AdtDeletionCheckCode<V extends AdtVariant> = Exclude<

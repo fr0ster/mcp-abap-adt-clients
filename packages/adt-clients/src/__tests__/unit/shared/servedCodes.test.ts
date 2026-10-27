@@ -110,7 +110,7 @@ describe('readObjectSource serves the codes it served, and only those', () => {
 });
 
 describe('a group activation activates what the tables activate', () => {
-  it.each(['MSAG/N', 'DEVC/K'] as const)(
+  it.each(['MSAG/N'] as const)(
     'refuses %s, whose API lists no activate, without a request',
     async (code) => {
       const { utils, sent } = recording();
@@ -125,6 +125,19 @@ describe('a group activation activates what the tables activate', () => {
       expect(sent).toEqual([]);
     },
   );
+});
+
+describe('a package is activated in a group, as before 38.0.0', () => {
+  it('DEVC/K is sent, though its table lists no activate', async () => {
+    const { utils, sent } = recording();
+    await utils.activateObjectsGroup(
+      [{ name: 'ZPKG_GUARD', type: 'DEVC/K' }],
+      false,
+      { headers: headersOf(utils, 'activateObjectsGroup') },
+    );
+    expect(sent).toHaveLength(1);
+    expect(String(sent[0]?.data)).toContain('/sap/bc/adt/packages/zpkg_guard');
+  });
 });
 
 describe('where-used names a parent it can address', () => {

@@ -162,6 +162,7 @@ import {
   type AdtStructureCode,
   type AdtWhereUsedCode,
   type IAdtGroupReference,
+  isActivatedWithoutTable,
   isMetadataReadCode,
   METADATA_READ,
   type ParentedArguments,
@@ -520,7 +521,10 @@ export class AdtUtils<
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     addressEvery(objects);
-    performEvery(objects, 'activate');
+    performEvery(
+      objects.filter((o) => !isActivatedWithoutTable(o.type)),
+      'activate',
+    );
     return answering(
       () =>
         activateObjectsGroup(
