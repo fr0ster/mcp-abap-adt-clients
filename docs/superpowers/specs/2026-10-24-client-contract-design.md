@@ -5,12 +5,16 @@ Answers [`2026-10-24-client-contract-goal.md`](../2026-10-24-client-contract-goa
 A contract is either taken from the contract package or composed from that package's contracts.
 Nowhere is one taken from an implementation package.
 
-## 1. What there is today (measured in the code, 2026-10-24)
+## 1. What there is today (measured in the code, 2026-10-24; read again on #281, 2026-10-27)
+
+Since #281 the repository is a private root around `packages/adt-clients`, `packages/adt-strategies`
+and `packages/adt-clients-legacy`; every adt-clients path below is under `packages/adt-clients/`.
+It is measured again on main once #281 is merged, before Task B1.
 
 - **Factories.** `src/clients/AdtClient.ts` has 35. Each has two overloads,
   `getX(): IXContract<typeof xDocuments>` and `getX<R extends IXResults>(results: R): IXContract<R>`,
   and one implementation, `getX<R …>(results: R = xDocuments …): AdtX<R>`.
-- **Compositions.** The 35 `IXContract<R>` are declared in `AdtClient.ts`, lines 261–1040.
+- **Compositions.** The 35 `IXContract<R>` are declared in `AdtClient.ts`, from line 261.
   - They are built from atoms and config types that `@mcp-abap-adt/interfaces-adt` already exports.
   - The one local type they use is `IServiceBindingPublicationConfig` (`core/service/types.ts:128`).
   - mcp-abap-adt imports none of them.
@@ -21,7 +25,16 @@ Nowhere is one taken from an implementation package.
   - `getBehaviorImplementation` and the four `getLocal*` reuse `IClassResults`.
 - **Default result sets.** The `xDocuments` are values built from `rawDocument` and `nothing`. Each
   is `satisfies IXResults` and has no annotation.
-- **`createAdtClient()`** answers `Promise<AdtClient>`.
+- **`createAdtClient()`** answers `Promise<AdtClient>` and probes nothing.
+- **The legacy client.** `AdtClientLegacy` lives in `packages/adt-clients-legacy` (0.1.0, on
+  `@mcp-abap-adt/adt-clients ^37.4.0`) and imports from `@mcp-abap-adt/adt-clients`. Seven of its
+  getters re-declare the base's two overloads and import their compositions: `getFunctionInclude`,
+  `getInclude`, `getMessageClass` (answering their legacy classes) and `getTransformation`,
+  `getScalarFunction`, `getScalarFunctionImplementation`, `getAppendStructure` (answering through
+  `absentOnLegacy`). The root's `legacyStaysInLegacyClasses.test.ts` forbids `legacy` anywhere in
+  the root's `src`, tests included; the package's `legacyClassesOnlyOverride.test.ts` allows the
+  legacy class only overrides, getters, private helpers and a one-`super` constructor.
+- **adt-strategies** names no result-set contract and does not import adt-clients.
 - **Shape check.** The capability shape check (`src/__tests__/unit/capabilities/shape.ts`) reads
   each factory's no-argument return through the manifest, which types its factories as
   `(client: AdtClient) => unknown`. `factoryReturnsCoverClass.ts` imports three compositions.
@@ -64,9 +77,7 @@ Nowhere is one taken from an implementation package.
    - Every `xDocuments` stays, keeps `satisfies IXResults` against the imported contract, and
      stays unannotated, so `typeof xDocuments` keeps its narrow slots.
    - `rawDocument`, `nothing` and `LockFailure` stay.
-4. **The legacy client.** `AdtClient` and `AdtClientLegacy` stay as they are: the legacy one is a
-   subclass whose overrides answer their own legacy classes. `createAdtClient()` keeps answering
-   `Promise<AdtClient>`.
+4. **`createAdtClient()`** keeps answering `Promise<AdtClient>`. The legacy client is §3a.
 5. **The shape check** keeps reading each factory's no-argument return, now the class.
    - `OffersAtom` compares the class's members with each atom, as it compares a composition
      today.
@@ -74,9 +85,9 @@ Nowhere is one taken from an implementation package.
      compositions.
    - The runtime completeness test stays.
 6. **A consumer-contract check.** A type-level test composes a contract only from interfaces-adt
-   contracts, the way a consumer would (a few factories, a few atoms), and proves that both
-   `AdtClient` and `AdtClientLegacy` satisfy it, and that a hand-written object does too. This is
-   the substitution the goal promises.
+   contracts, the way a consumer would (a few factories, a few atoms), and proves that `AdtClient`
+   and a hand-written object satisfy it. This is the substitution the goal promises; the legacy
+   half is §3a, since the root names no legacy class.
 7. **No behaviour change.** No request or answer changes, and the unit suite passes unchanged
    apart from type imports.
 8. **Docs.**
@@ -85,6 +96,22 @@ Nowhere is one taken from an implementation package.
      - the compositions are gone;
      - a consumer's contract is either taken from interfaces-adt or composed from its contracts;
      - the result-set contracts are imported from interfaces-adt.
+
+## 3a. adt-clients-legacy: the getters answer classes (a minor of a 0.x package: 0.1.0 → 0.2.0)
+
+1. **The dependency.** `@mcp-abap-adt/adt-clients` moves to `^38.0.0`, from the registry, and
+   `@mcp-abap-adt/interfaces-adt` to `^20.2.0` where a result-set contract is named.
+2. **The seven getters.** Each becomes one signature,
+   `getX<R extends IXResults = typeof xDocuments>(results?: R): …`, answering its legacy class
+   (`getFunctionInclude`, `getInclude`, `getMessageClass`) or the base class through
+   `absentOnLegacy` (the other four). No composition is imported. Every other override stays.
+3. **Still a subclass.** `AdtClientLegacy extends AdtClient`; each override is assignable to the
+   base's factory; `legacyClassesOnlyOverride.test.ts` stays green.
+4. **The consumer-contract check**, the legacy half of §3.6: the same kind of contract, composed from
+   interfaces-adt alone, accepts `AdtClientLegacy`.
+5. **No behaviour change**, as §3.7.
+6. **Docs.** The package's README and CHANGELOG; the migration line says the getters answer classes
+   and a consumer composes its contract from interfaces-adt.
 
 ## 4. mcp-abap-adt: the consumer defines its client contract (its next major, 21.0.0)
 
@@ -116,19 +143,20 @@ Nowhere is one taken from an implementation package.
 
 ## 5. Order and versions
 
-1. PR #271 (adt-clients 37.3.0, the legacy client) merges and is released first, and this branch
-   rebases onto it.
+1. PR #281 (adt-clients 37.4.0 and adt-clients-legacy 0.1.0, the legacy package) merges and is
+   released first, and this branch rebases onto it.
 2. interfaces-adt 20.2.0 is published.
 3. adt-clients 38.0.0 is published, on `@mcp-abap-adt/interfaces-adt ^20.2.0` from the registry.
-4. mcp-abap-adt 21.0.0 is built on both from the registry: its own contract, with its handlers
+4. adt-clients-legacy 0.2.0 is published, on `@mcp-abap-adt/adt-clients ^38.0.0` from the registry.
+5. mcp-abap-adt 21.0.0 is built on both from the registry: its own contract, with its handlers
    typed against it.
 
 Each repository gets its own PR. The goal, this spec and the plan live in this one.
 
 ## 6. Not in this work
 
-- **No executor, runtime client or WebSocket client changes.** `AdtExecutor`, `AdtRuntimeClient`
-  and `AdtClientsWS` keep their types.
+- **No executor, runtime client or WebSocket client changes.** `AdtExecutor`, `AdtExecutorLegacy`,
+  `AdtRuntimeClient` and `AdtClientsWS` keep their types.
 - **No rename** of any result-set contract.
 - **No change to a class's members.** The two quirks of today's compositions go with them: the
   class's own members are what a consumer reads now.

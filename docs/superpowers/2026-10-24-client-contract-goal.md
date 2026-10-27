@@ -39,13 +39,15 @@ the compiler wherever a consumer's contract asks for them.
   adt-clients never depends on a consumer.
 - **Nothing is written twice.** No composition is declared by the library beside the one a
   consumer composes for itself.
-- **The legacy client stays a subclass** that answers refusals through the same members
-  (decision 11). A consumer's contract is satisfied by it or by `AdtClient`, as the compiler
+- **The legacy client stays a subclass**, in `@mcp-abap-adt/adt-clients-legacy`, that answers
+  refusals through the same members (decision 11). A consumer's contract is satisfied by it or by `AdtClient`, as the compiler
   checks.
 - **A consumer composes its own result sets** exactly as it does today, with the same generics and
   the same inference.
 - **Dependencies come from the registry**, in order: interfaces-adt is published first, then
-  adt-clients, then mcp-abap-adt.
+  adt-clients, then adt-clients-legacy, then mcp-abap-adt.
 - **Breaking where the types break, nowhere else.** For adt-clients, removing the compositions and
-  the local result-set contracts is a major. For mcp-abap-adt, typing against its own contract is
+  the local result-set contracts is a major. For adt-clients-legacy, its getters answering classes
+  instead of the removed compositions is a breaking change of a 0.x package, a minor (0.1.0 → 0.2.0).
+  For mcp-abap-adt, typing against its own contract is
   a major. For interfaces-adt, adding the result-set contracts is a minor.
