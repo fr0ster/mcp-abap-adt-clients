@@ -75,13 +75,15 @@ a new API to build on):
   `AdtBehaviorDefinition`, `AdtBehaviorImplementation`, `AdtClass`,
   `AdtDataElement`, `AdtDdicTableType`, `AdtDdl`, `AdtDomain`, `AdtEnhancement`,
   `AdtFeatureToggle`, `AdtFunctionGroup`, `AdtFunctionInclude`,
-  `AdtFunctionModule`, `AdtInterface`, `AdtMetadataExtension`, `AdtPackage`,
+  `AdtFunctionModule`, `AdtInterface`, `AdtLocalDefinitions`, `AdtLocalMacros`,
+  `AdtLocalTestClass`, `AdtLocalTypes`, `AdtMetadataExtension`, `AdtPackage`,
   `AdtProgram`, `AdtRequest`, `AdtServiceDefinition`, `AdtStructure`, `AdtTable`,
   `AdtTransformation`, `AdtUtils`; `ClassExecutor`, `ClassTestRunner`,
   `FunctionGroupTestRunner`, `FunctionModuleTestRunner`, `ProgramExecutor`,
   `ProgramTestRunner`;
 - client contract types: `IAppendStructureContract`, `IFunctionIncludeContract`,
-  `IIncludeContract`, `IMessageClassContract`, `IScalarFunctionContract`,
+  `IIncludeContract`, `ILocalDefinitionsContract`, `ILocalMacrosContract`,
+  `ILocalTestClassContract`, `ILocalTypesContract`, `IMessageClassContract`, `IScalarFunctionContract`,
   `IScalarFunctionImplementationContract`, `ITransformationContract`;
 - address records: `ACCESS_CONTROL`, `AUTHORIZATION_FIELD`,
   `BEHAVIOR_DEFINITION`, `CLASS`, `DATA_ELEMENT`, `DDL_SOURCE`, `DOMAIN`,
