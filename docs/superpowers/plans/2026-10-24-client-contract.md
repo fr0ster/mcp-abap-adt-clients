@@ -75,8 +75,8 @@ Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
 - Remove these names from adt-clients' public exports.
 - In `packages/adt-clients-legacy`, every file that imports one of the 30 client result-set
   contracts Part A moved (or `IServiceBindingPublicationConfig`) from `@mcp-abap-adt/adt-clients`
-  imports it from `@mcp-abap-adt/interfaces-adt` instead — on #281 thirteen files under `clients/`
-  and `core/` — and the package's `@mcp-abap-adt/interfaces-adt` moves to `^20.2.0`. The six
+  imports it from `@mcp-abap-adt/interfaces-adt` instead — seventeen files, `clients/AdtClientLegacy.ts`
+  and sixteen under `core/` — and the package's `@mcp-abap-adt/interfaces-adt` moves to `^20.2.0`. The six
   executor result contracts (`IClassExecutorResults`, `IClassTestRunnerResults`,
   `IFunctionGroupTestRunnerResults`, `IFunctionModuleTestRunnerResults`, `IProgramExecutorResults`,
   `IProgramTestRunnerResults`) stay in adt-clients and stay exported (spec §6).

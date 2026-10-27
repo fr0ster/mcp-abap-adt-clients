@@ -5,18 +5,19 @@ Answers [`2026-10-24-client-contract-goal.md`](../2026-10-24-client-contract-goa
 A contract is either taken from the contract package or composed from that package's contracts.
 Nowhere is one taken from an implementation package.
 
-## 1. What there is today (measured in the code, 2026-10-24; read again on #281, 2026-10-27)
+## 1. What there is today (measured in the code, 2026-10-24; measured again on main after #281, 2026-10-27)
 
 Since #281 the repository is a private root around `packages/adt-clients`, `packages/adt-strategies`
 and `packages/adt-clients-legacy`; every adt-clients path below is under `packages/adt-clients/`.
-It is measured again on main once #281 is merged, before Task B1.
+Measured again on this branch (main at #281's merge plus these documents) for Task B1.
 
 - **Factories.** `src/clients/AdtClient.ts` has 35. Each has two overloads,
   `getX(): IXContract<typeof xDocuments>` and `getX<R extends IXResults>(results: R): IXContract<R>`,
   and one implementation, `getX<R …>(results: R = xDocuments …): AdtX<R>`.
 - **Compositions.** The 35 `IXContract<R>` are declared in `AdtClient.ts`, from line 261.
   - They are built from atoms and config types that `@mcp-abap-adt/interfaces-adt` already exports.
-  - The one local type they use is `IServiceBindingPublicationConfig` (`core/service/types.ts:128`).
+  - The one local type they use is `IServiceBindingPublicationConfig`, a type alias
+    (`core/service/types.ts:127`), identical to the one interfaces-adt 20.2.0 exports.
   - mcp-abap-adt imports none of them.
 - **Result-set contracts.** `IXResults` live in each `core/<dir>/types.ts`.
   - Every slot is `readonly …: IResultStrategy<unknown>`, and `IResultStrategy` comes from
@@ -27,7 +28,10 @@ It is measured again on main once #281 is merged, before Task B1.
   is `satisfies IXResults` and has no annotation.
 - **`createAdtClient()`** answers `Promise<AdtClient>` and probes nothing.
 - **The legacy client.** `AdtClientLegacy` lives in `packages/adt-clients-legacy` (0.1.0, on
-  `@mcp-abap-adt/adt-clients ^37.4.0`) and imports from `@mcp-abap-adt/adt-clients`. Eleven of its
+  `@mcp-abap-adt/adt-clients ^37.4.0`, `@mcp-abap-adt/interfaces-adt ^20.1.0`) and imports from
+  `@mcp-abap-adt/adt-clients`. Seventeen of its files import client result-set contracts from there:
+  `clients/AdtClientLegacy.ts` and sixteen under `core/` (the four `AdtLocal*Legacy` among them).
+  Eleven of its
   getters re-declare the base's two overloads and import their compositions: `getFunctionInclude`,
   `getInclude`, `getMessageClass`, `getLocalTestClass`, `getLocalTypes`, `getLocalDefinitions`,
   `getLocalMacros` (answering their legacy classes) and `getTransformation`,
@@ -39,10 +43,13 @@ It is measured again on main once #281 is merged, before Task B1.
 - **Shape check.** The capability shape check (`src/__tests__/unit/capabilities/shape.ts`) reads
   each factory's no-argument return through the manifest, which types its factories as
   `(client: AdtClient) => unknown`. `factoryReturnsCoverClass.ts` imports three compositions.
-- **mcp-abap-adt** types its clients as the class: `GuardedAdtClient extends AdtClient` and
-  `ReturnType<typeof createAdtClient>` in `src/lib/clients.ts`, `type AdtClient` in
-  `resolveVersionedObject.ts`, and about 21 test files. It declares `@mcp-abap-adt/interfaces-adt`
-  `^20.1.0` directly.
+- **mcp-abap-adt** (its main, 2026-10-27) types its clients as the class: `GuardedAdtClient extends
+  AdtClient` in `src/lib/clients.ts`, whose `createAdtClient()` and `getAdtClient()` answer
+  `AdtClient`; `ReturnType<typeof createAdtClient>` in `src/lib/strategies/metadataReads.ts` and in
+  five handler files (`deletionTargets.ts`, `handleActivateObject.ts`, `handleUpdateUnderLock.ts`,
+  `handleGetObjectInfo.ts`, `writeTests.ts`); `type AdtClient` in `resolveVersionedObject.ts`; and
+  about 20 test files that import `AdtClient`. It declares `@mcp-abap-adt/interfaces-adt` `^20.1.0`
+  and `@mcp-abap-adt/adt-clients` `^37.2.0` directly.
 
 ## 2. `@mcp-abap-adt/interfaces-adt`: the contracts adt-clients accepts (a minor: 20.1.0 → 20.2.0)
 
@@ -104,7 +111,8 @@ It is measured again on main once #281 is merged, before Task B1.
    `@mcp-abap-adt/interfaces-adt` to `^20.2.0`.
 1a. **The result-set contracts come from interfaces-adt** here too: every file that imports one of
    the 30 client result-set contracts (or `IServiceBindingPublicationConfig`) from
-   `@mcp-abap-adt/adt-clients` — on #281 thirteen files under `clients/` and `core/` — imports it
+   `@mcp-abap-adt/adt-clients` — seventeen files, `clients/AdtClientLegacy.ts` and sixteen under
+   `core/` — imports it
    from `@mcp-abap-adt/interfaces-adt`. The executors' result contracts are not moved (§6).
 2. **The eleven getters.** Each becomes one signature,
    `getX<R extends IXResults = typeof xDocuments>(results?: R): …`, answering its legacy class
