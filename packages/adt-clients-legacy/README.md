@@ -18,6 +18,10 @@ behind each claim, and what is not measured, are in
 npm install @mcp-abap-adt/adt-clients-legacy @mcp-abap-adt/adt-clients
 ```
 
+`@mcp-abap-adt/adt-clients` is a peer dependency (`^37.4.0`): the consumer installs it, and the
+legacy classes extend that one copy, so `AdtClientLegacy` is an `AdtClient` of the consumer's own
+version. npm warns when the installed version is outside the range.
+
 ```typescript
 import { AdtClientLegacy, AdtExecutorLegacy } from '@mcp-abap-adt/adt-clients-legacy';
 

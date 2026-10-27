@@ -59,12 +59,15 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^37.4.0",
     "@mcp-abap-adt/interfaces-adt": "^20.1.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1"
   },
+  "peerDependencies": {
+    "@mcp-abap-adt/adt-clients": "^37.4.0"
+  },
   "devDependencies": {
+    "@mcp-abap-adt/adt-clients": "^37.4.0",
     "@mcp-abap-adt/adt-strategies": "^0.10.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@types/jest": "^30.0.0",

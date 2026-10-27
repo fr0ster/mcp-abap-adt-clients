@@ -10,7 +10,7 @@ The first release: the clients for legacy SAP ABAP systems (SAP_BASIS
 7.40), measured on SAP_BASIS 7.40 SP04 over RFC, moved out of
 `@mcp-abap-adt/adt-clients` (where they were `AdtClientLegacy`,
 `AdtExecutorLegacy` and `AdtRequestLegacy` up to 37.3.x, and are gone from 37.4.0).
-The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`.
+The package takes `@mcp-abap-adt/adt-clients` `^37.4.0` as a peer dependency: the consumer installs it, and the legacy classes extend that one copy.
 The live cycles were run on SAP_BASIS 7.40 SP04 over RFC and pass (15 suites, 385 tests; record `T6-20261027`).
 
 ### What the package is
