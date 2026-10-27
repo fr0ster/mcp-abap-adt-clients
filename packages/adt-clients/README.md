@@ -16,6 +16,15 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 37.x?** 38.0.0 (on `interfaces-adt` ^20.2.0) puts each contract where
+> it is accepted: the result-set contracts (`IClassResults`, …) are imported from
+> `@mcp-abap-adt/interfaces-adt`, and each factory answers its class
+> (`getClass(): AdtClass<…>`) — the compositions `IClassContract<R>` and its
+> siblings are gone, and a consumer composes the contract it accepts from
+> interfaces-adt. No request or answer changes. See
+> [The contract you accept is yours](#the-contract-you-accept-is-yours) and
+> [`docs/usage/MIGRATION-38.md`](docs/usage/MIGRATION-38.md).
+>
 > **From 36.x?** 37.0.0 (on `interfaces-adt` ^20.1.0) makes
 > `getSystemInformation` answer an `IAdtResponse` — present, absent (a `404`)
 > or failed — and adds the required `objectProperties` slot to `IUtilResults`
@@ -868,7 +877,7 @@ await client.getClass().read(
 ```
 
 - Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`), `client.getTable()`, `client.getScalarFunction()`, `client.getScalarFunctionImplementation()`, `client.getAppendStructure()`, `client.getRequest()`, `client.getUtils()`, etc.
-- Each accessor returns an `Adt*` object typed to its **honest capability set** (since 8.0.0, completed in 12.0.0). Every accessor returns the intersection of the capability atoms that object actually supports, written positively — there is no composite at all, and none named for what an object lacks. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
+- Each accessor returns its `Adt*` class, typed to its **honest capability set** (since 8.0.0, completed in 12.0.0): the class implements only the capability atoms that object actually supports, written positively — there is no composite at all, and none named for what an object lacks. Since 38.0.0 the accessor answers the class itself (`AdtClass<R>`, …), not a composition of its atoms. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
 - See `src/index.ts` for the full type exports and object configs.
 
 ### AdtObject Methods (with Long Polling Support)
@@ -1119,7 +1128,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^20.1.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^20.2.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -1146,7 +1155,7 @@ the contract naming one would be describing an implementation.
 
 Since **9.0.0** this is the only route: the package no longer re-exports types it does not own. It used to republish 145 of them, which was more than half its public surface — so a consumer could hold `IClassConfig` believing it came from this client, and a type would appear to change whenever this client released, for reasons that had nothing to do with it. Types now travel on the contract package's release cycle, which is where they are actually decided.
 
-What this package exports is what it owns: the clients, the handler classes, the batch and runtime facades, the result sets each implementation is built with (`<x>Documents` and their `I…Results` types), the building blocks `rawDocument`, `nothing`, `wireItself` and `nothingIsARefusal`, and a few helpers.
+What this package exports is what it owns: the clients, the handler classes, the batch and runtime facades, the default result sets each implementation is built with (`<x>Documents`; the client result-set contracts they satisfy are interfaces-adt's since 38.0.0, the executor, runtime and abapGit ones are still here), the building blocks `rawDocument`, `nothing`, `wireItself` and `nothingIsARefusal`, and a few helpers.
 
 ### Honest capability types (since 8.0.0)
 
@@ -1171,7 +1180,7 @@ Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` 
 
 The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` implements `IAtcRunStatusReadable & IAtcFindings`, plus `resolveCheckVariant`, `listCheckVariants`, `createWorklist` and `startRun` — a check run is three requests, started and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing. It is not `IAdtRunnable` since 19.0.0: that atom's `run` is one call.
 
-**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 37 factory return types against the 12 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling. The guard walks `AdtClient`; the legacy package runs the same guard over `AdtClientLegacy`; the runtime accessors are pinned by `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts`.
+**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares what every factory answers (its class, since 38.0.0) against the atoms in both directions at compile time, refuses a public method of `AdtUtils`, `AdtFeatureToggle` or `AdtServiceBinding` that no interfaces-adt atom declares, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling. The guard walks `AdtClient`; the legacy package runs the same guard over `AdtClientLegacy`; the runtime accessors are pinned by `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts`.
 
 One category deliberately remains local, because it is code, not contract:
 
@@ -1200,6 +1209,47 @@ package no longer declares or exports any contract type — every contract name 
 sourced from the contract packages.
 
 > **Version pairing.** `adt-clients` 32 pairs with `interfaces-adt` 18 and `interfaces-adt-connection` 3 (the enhancement subtype and host contracts), and `adt-strategies` 0.12.0 declares the same ranges. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
+
+### The contract you accept is yours
+
+Since **38.0.0** a contract lives in the package that accepts it. A factory
+accepts a result set, so the result-set contracts are
+`@mcp-abap-adt/interfaces-adt`'s; a consumer accepts the client, so the client
+contract is the consumer's. This package declares no composition: each factory
+answers its own class, and the class's members are what the factory offers.
+
+A consumer composes the contract it accepts from interfaces-adt alone — the
+factories it calls, each answering the atoms whose members it calls, generic
+over the result-set contract it is given — and types its code against it. The
+compiler checks, where the client is taken, that `AdtClient`,
+`AdtClientLegacy` or the consumer's own implementation satisfies it:
+
+```typescript
+import type {
+  IAdtLockable,
+  IAdtReadable,
+  IAdtUpdatable,
+  IClassConfig,
+  IClassResults,
+} from '@mcp-abap-adt/interfaces-adt';
+import { classDocuments, createAdtClient } from '@mcp-abap-adt/adt-clients';
+
+interface IMyClient {
+  getClass<R extends IClassResults>(
+    results: R,
+  ): IAdtReadable<IClassConfig, ReturnType<R['source']>> &
+    IAdtLockable<IClassConfig> &
+    IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>>;
+}
+
+const client: IMyClient = await createAdtClient(connection, logger);
+const classes = client.getClass(classDocuments); // read answers a string
+```
+
+`src/__tests__/unit/clients/consumerContract.test.ts` holds this package to it:
+such a contract accepts `AdtClient` and an object written by hand, and refuses
+one missing a member it names; the legacy package proves the same of
+`AdtClientLegacy`.
 
 ### Naming Conventions
 
@@ -1236,6 +1286,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[37.x → 38.0.0](docs/usage/MIGRATION-38.md)** — the result-set contracts are imported from `@mcp-abap-adt/interfaces-adt`; the compositions are gone and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt.
 - **[36.x → 37.0.0](docs/usage/MIGRATION-37.md)** — `getSystemInformation` answers an `IAdtResponse` (present, absent for a `404`, or a failure, through `options.analyse`), and `IUtilResults` has the required `objectProperties` slot.
 - **[35.x → 36.0.0](docs/usage/MIGRATION-36.md)** — a request's `Accept` and `Content-Type` are the caller's: 32 members take the required `options.headers` and send exactly that pair.
 - **[34.x → 35.0.0](docs/usage/MIGRATION-35.md)** — accept negotiation is off by default: a `406`/`415` is the call's answer unless you switch it on.

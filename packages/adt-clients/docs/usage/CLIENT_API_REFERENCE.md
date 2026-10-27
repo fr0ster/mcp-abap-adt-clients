@@ -15,6 +15,18 @@ This project exposes the following client classes:
 
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
 
+**A factory answers its class** (since 38.0.0). `client.getClass()` answers
+`AdtClass<typeof classDocuments>`, `client.getClass(results)` answers
+`AdtClass<typeof results>`, and so on for every factory: the class implements
+the capability atoms its object supports, and its members are what the factory
+offers. This package declares no composition of those atoms. A consumer that
+names the type of the client it accepts composes that contract from
+`@mcp-abap-adt/interfaces-adt` alone — the factories and atoms it calls, over
+the result-set contracts (`IClassResults`, …) that package declares — and the
+compiler checks, where the client is taken, that `AdtClient` satisfies it. See
+[The contract you accept is yours](../../README.md#the-contract-you-accept-is-yours)
+and [MIGRATION-38.md](MIGRATION-38.md).
+
 **Every member issues one ADT request.** `create` is the POST, `update` is the
 write and carries `options.lockHandle` as given, `delete` is the DELETE,
 `checkDeletion` is the approval ADT wants first — both on `IAdtDeletable`, since
@@ -254,7 +266,7 @@ measurement behind each and what is not measured: the
 
 ### More factories
 
-Additional factory methods follow the same shape — a config in, a contract back:
+Additional factory methods follow the same shape — a config in, an answer back:
 
 ```typescript
 // Authorization Field (SUSO / AUTH) — DDIC-style, XML-only.
@@ -612,7 +624,7 @@ if (repo.repositoryId) {
 
 ### Transport Requests (getRequest())
 
-`client.getRequest()` returns **`IAdtRequest`** — the contract, not the class, since 16.1.0. That is what makes the compiler check the handler: `AdtRequest` has to satisfy the interface at the factory, so a method removed from it fails the build there rather than only where something happens to call it. It also means a consumer can substitute their own handler, or intersect the contract with their own types. To name the type, import it from the contract package — this one does not re-export interface types:
+`client.getRequest()` returns **`AdtRequest`**, the class (since 38.0.0; 16.1.0–37.x declared the contract). `AdtRequest` implements `IAdtRequest` and the transport atoms, so a method removed from it fails the build at the class. A consumer that types what it holds by the contract — to substitute its own handler, or to intersect the contract with its own types — imports it from the contract package; this one does not re-export interface types:
 
 ```typescript
 import type { IAdtRequest } from '@mcp-abap-adt/interfaces-adt';
@@ -1246,7 +1258,8 @@ const parsed = client.getClass({
 
 One set per object type is exported, named after it — `classDocuments`,
 `transportDocuments`, `packageDocuments`, `utilDocuments` and the rest — beside
-the interface each satisfies (`IClassResults`, …). **Every default answers the
+the interface each satisfies (`IClassResults`, …, from
+`@mcp-abap-adt/interfaces-adt` since 38.0.0). **Every default answers the
 document as it arrived**, or nothing where ADT answers nothing. The three
 building blocks are `rawDocument` (the body as it arrived), `nothing` (for a
 member ADT answers with nothing worth reading) and `wireItself` (the whole
@@ -1455,13 +1468,14 @@ That is a read of the OData service group — its URL prefix, its collections,
 its deployment state — which carries `published` among them. It is not a
 job-status endpoint, and polling it is the consumer's to write.
 
-**What `getServiceBinding()` answers (27.0.0): `IServiceBindingContract`.** The
+**What `getServiceBinding()` answers: `AdtServiceBinding`** (the class since
+38.0.0; the composition `IServiceBindingContract` from 27.0.0 to 37.x). The
 lifecycle atoms — create, read, metadata, update (the publication), delete and
 its check, validate, check, activate, transport, lock — and the binding's two
 reads beyond them, `getServiceBindingTypes()` (the catalogue of binding types
 the system offers) and `getServiceGroup(params)`, both atoms of
 `@mcp-abap-adt/interfaces-adt` 13.2.0. That is every method the class has, and
-a compile-time check keeps it so. Each is one request; measured on premise and
+a compile-time check keeps each of them declared by an interfaces-adt atom. Each is one request; measured on premise and
 on the cloud.
 
 Gone in 27.0.0, with what to call instead:
@@ -1524,9 +1538,8 @@ const msg = await client.getMessageClassMessage().read(
 if (msg.ok) console.log(msg.getResult().value);   // the class document
 
 // Remove a single message, then delete the whole class.
-// `delete` is on the class, not on the contract `getMessageClassMessage()`
-// answers — construct it against the connection you hold.
-await new AdtMessageClassMessage(connection).delete({ className: 'ZMY_MSG', msgno: '001' }, { headers });
+// `getMessageClassMessage()` answers the class, `delete` included.
+await client.getMessageClassMessage().delete({ className: 'ZMY_MSG', msgno: '001' }, { headers });
 await client.getMessageClass().delete({ name: 'ZMY_MSG' }, { headers });
 ```
 

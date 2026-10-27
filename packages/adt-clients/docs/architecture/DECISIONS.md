@@ -303,6 +303,9 @@ is created, because that is the only place that knows it is a leftover.
 
 ## 10. A factory's return type is a contract, so the compiler checks the handler
 
+**Superseded in 38.0.0 by [decision 17](#17-a-contract-lives-where-it-is-accepted-a-factory-answers-its-class):**
+a factory answers its class, and the contract is the consumer's.
+
 **Problem.** `AdtClient` has 38 factories. Thirty-six return interfaces; two
 returned the implementation — `getRequest(): AdtRequest` and
 `getUtils(): AdtUtils`. A class as a return type asserts nothing: it satisfies
@@ -847,3 +850,53 @@ a caller who wants them read as absent clears them with `analyse`.
 
 **What would change it.** A system measured answering this endpoint's absence
 with another status.
+
+---
+
+## 17. A contract lives where it is accepted: a factory answers its class
+
+**Problem.** Since decision 10 each factory answered a composition of atoms
+declared in this package (`IClassContract<R>` and 34 siblings), and the result
+sets a factory accepts (`IClassResults`, …) were declared here too. A contract
+declared by the implementation is not the consumer's: mcp-abap-adt, which takes
+a client and calls part of it, could only type itself against this package's
+class or its compositions, and a consumer that wanted its own implementation had
+to satisfy a type written for this one. A composition here beside the one a
+consumer writes is the same contract twice. The compositions also drifted from
+the classes: `IUtilsContract` was documented as narrower than `AdtUtils` long
+after it was not, and `IMessageClassMessageContract` left out the
+`IAdtMetadataReadable` the class implements.
+
+**Decided.** Every contract lives in the package that accepts it as a
+parameter. The result-set contracts and `IServiceBindingPublicationConfig` are
+accepted by this package's factories, so they live in `@mcp-abap-adt/interfaces-adt`
+(20.2.0). The client is accepted by the consumer, so the consumer composes the
+client contract it needs from interfaces-adt's atoms, result-set contracts and
+config types. This package declares no composition: each factory answers its
+own class (`getClass<R …>(results?: R): AdtClass<R>`), and the values — the
+`<x>Documents` defaults, `rawDocument`, `nothing` — stay here.
+
+**Against.** Moving the compositions into interfaces-adt. The contract package
+would then hold a client contract nobody accepts there, and a consumer that
+calls three members of a class would still be handed a type naming twelve atoms;
+the consumer's contract is the one that says what it calls.
+
+**Why the compiler still checks the handler.** Decision 10 was about a method
+removed from a class with a green build. Each class `implements` the atoms it
+offers, so a removed member fails at the class's declaration;
+`src/__tests__/unit/capabilities/shape.ts` compares what each factory answers
+with the manifest in both directions; `factoryReturnsCoverClass.ts` refuses a
+public method of `AdtUtils`, `AdtFeatureToggle` or `AdtServiceBinding` that no
+interfaces-adt atom declares, since no consumer contract could reach it; and
+`consumerContract.test.ts` proves that a contract composed from interfaces-adt
+alone accepts `AdtClient` and a hand-written object. The consumer's compiler
+checks, where it takes the client, that the implementation satisfies its
+contract.
+
+**What it costs.** The class's members are what a consumer reads: one generic
+signature where an atom declares two (with and without `analyse`), and the
+members a composition hid (`AdtMessageClassMessage.readMetadata`).
+
+**What would change it.** A consumer that accepts the client and cannot express
+its contract from interfaces-adt alone.
+

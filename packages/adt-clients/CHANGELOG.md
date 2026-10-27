@@ -24,6 +24,53 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [38.0.0] - 2026-10-27
+
+A contract lives where it is accepted (#216). A factory accepts a result set, so
+the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a consumer
+accepts the client, so the consumer composes the client contract it needs, and
+this package declares no composition of its own. No request and no answer
+changes. [MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on
+37.x does.
+
+### Breaking
+
+- **The result-set contracts come from `@mcp-abap-adt/interfaces-adt` 20.2.0.**
+  The 30 client result-set contracts (`IClassResults`, `IProgramResults`, …,
+  `IUtilResults`, `IMessageClassMessageResults` with its generic parameters) and
+  `IServiceBindingPublicationConfig` are no longer declared or exported here;
+  import them from `@mcp-abap-adt/interfaces-adt`. The `<x>Documents` defaults
+  stay, each `satisfies` its contract with its narrow slots. The executor,
+  runtime, abapGit and WebSocket result sets are unchanged.
+- **The compositions are gone; each factory answers its class.**
+  `IClassContract<R>` and its 34 siblings are deleted, among them the eleven
+  exported for subclasses. Each of the 35 factories has one signature,
+  `getX<R extends IXResults = typeof xDocuments>(results?: R): AdtX<R>`; without
+  a result set its slots are as narrow as before. What a class has beyond its
+  old composition is now on the type: `getUtils()` answers `AdtUtils`,
+  `getMessageClassMessage()` answers `AdtMessageClassMessage` (with
+  `readMetadata`, the request `read` sends), and a member's signature is the
+  class's single generic one. `createAdtClient()` still answers
+  `Promise<AdtClient>`.
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` `^20.2.0` (was `^20.1.0`).
+- Decision 10 ("a factory's return type is a contract") is superseded by
+  decision 17 in `docs/architecture/DECISIONS.md`.
+
+### Tests
+
+- The shape check reads the classes the factories answer;
+  `factoryReturnsCoverClass.ts` asserts that every public method `getUtils`,
+  `getFeatureToggle` and `getServiceBinding` answer is declared by an
+  interfaces-adt atom; `messageClassMessage.metadataReadable` is recorded as a
+  known disagreement.
+- `factoryDefaults.ts` pins the slot types a factory answers without a result
+  set; `consumerContract.test.ts` proves that a contract composed from
+  interfaces-adt alone accepts `AdtClient` and a hand-written object and
+  refuses one missing a member it names.
+
 ## [37.4.0] - 2026-10-27
 
 The legacy classes leave this package. `AdtClientLegacy`, `AdtExecutorLegacy`
