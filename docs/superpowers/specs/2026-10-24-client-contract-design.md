@@ -99,8 +99,11 @@ It is measured again on main once #281 is merged, before Task B1.
 
 ## 3a. adt-clients-legacy: the getters answer classes (a minor of a 0.x package: 0.1.0 → 0.2.0)
 
-1. **The dependency.** `@mcp-abap-adt/adt-clients` moves to `^38.0.0`, from the registry, and
-   `@mcp-abap-adt/interfaces-adt` to `^20.2.0` where a result-set contract is named.
+1. **The dependencies.** `@mcp-abap-adt/adt-clients` moves to `^38.0.0`, from the registry, and
+   `@mcp-abap-adt/interfaces-adt` to `^20.2.0`.
+1a. **The result-set contracts come from interfaces-adt** here too: every file that imports one (or
+   `IServiceBindingPublicationConfig`) from `@mcp-abap-adt/adt-clients` — on #281 twenty files
+   under `clients/`, `core/` and `executors/` — imports it from `@mcp-abap-adt/interfaces-adt`.
 2. **The seven getters.** Each becomes one signature,
    `getX<R extends IXResults = typeof xDocuments>(results?: R): …`, answering its legacy class
    (`getFunctionInclude`, `getInclude`, `getMessageClass`) or the base class through

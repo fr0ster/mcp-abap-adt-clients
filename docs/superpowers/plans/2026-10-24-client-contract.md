@@ -73,7 +73,11 @@ Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
   Do the same for `IServiceBindingPublicationConfig`.
 - Every `xDocuments` keeps `satisfies IXResults` and no annotation.
 - Remove these names from adt-clients' public exports.
-- Verify: `build`, `test:check` and the unit suite pass.
+- In `packages/adt-clients-legacy`, every file that imports a result-set contract (or
+  `IServiceBindingPublicationConfig`) from `@mcp-abap-adt/adt-clients` imports it from
+  `@mcp-abap-adt/interfaces-adt` instead — on #281 twenty files under `clients/`, `core/` and
+  `executors/` — and the package's `@mcp-abap-adt/interfaces-adt` moves to `^20.2.0`.
+- Verify: the root's `build`, `test:check` and unit suites pass, both packages.
 
 ### Task B3: the compositions go; each factory answers its class
 
@@ -92,8 +96,8 @@ Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
 
 ### Task B3b: the legacy getters answer classes (`packages/adt-clients-legacy`, 0.2.0)
 
-- `@mcp-abap-adt/adt-clients` moves to `^38.0.0` and `@mcp-abap-adt/interfaces-adt` to `^20.2.0`
-  where a result-set contract is named; the version goes to 0.2.0.
+- `@mcp-abap-adt/adt-clients` moves to `^38.0.0`; the version goes to 0.2.0. (The result-set
+  imports moved in B2.)
 - The seven getters with the base's two overloads each become one signature. Three answer their
   legacy class (`getFunctionInclude`, `getInclude`, `getMessageClass`). Four answer the base class
   through `absentOnLegacy` (`getTransformation`, `getScalarFunction`,
