@@ -902,6 +902,13 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
     contentType: 'text/plain; charset=utf-8',
   },
+  // Not in 35.0.0: added with 38.0.0. Its Accept is the one recorded on
+  // every release; it sends no body, so its Content-Type is unmeasured.
+  'AdtUtils.getTypeStructure': {
+    accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.RepositoryTypeList',
+    contentType: 'application/xml',
+  },
   'AdtUtils.getVirtualFoldersContents': {
     accept: 'application/vnd.sap.adt.repository.virtualfolders.result.v1+xml',
     contentType:

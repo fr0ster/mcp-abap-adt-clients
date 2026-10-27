@@ -167,7 +167,9 @@ describe('legacy utilities', () => {
 
     it('getTypeStructure sends, as on the modern client', async () => {
       const { utils, sent } = legacyUtils();
-      const answer = await utils.getTypeStructure();
+      const answer = await utils.getTypeStructure({
+        headers: headersOf(utils, 'getTypeStructure'),
+      });
       expect(answer.ok).toBe(true);
       expect(sent).toEqual([
         { method: 'POST', url: '/sap/bc/adt/repository/typestructure' },

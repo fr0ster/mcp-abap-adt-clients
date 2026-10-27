@@ -1006,14 +1006,15 @@ export class AdtUtils<
    * a consumer composes from the contract package. It joins the set when the
    * contract package names it.
    *
-   * @param options.accept - The Accept to send; by default the type list's
-   *   own, which S/4HANA 2025, ABAP cloud and SAP_BASIS 7.40 SP04 answered
+   * @param options.headers - The Accept and Content-Type to send; the type
+   *   list's own Accept, which S/4HANA 2025, ABAP cloud and SAP_BASIS 7.40 SP04
+   *   answered, is `ACCEPT_TYPE_STRUCTURE`
    */
   async getTypeStructure<E extends IAdtError = IAdtError>(
-    options?: { accept?: string } & IAdtAnalyseOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     return answering(
-      () => getTypeStructureUtil(this.connection, options?.accept),
+      () => getTypeStructureUtil(this.connection, options.headers),
       rawDocument,
       options?.analyse,
     );

@@ -1216,7 +1216,7 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
         'getTypeStructure',
         '§10.2 recorded on 7.40 SP04: 200, 464 types',
         [post('/sap/bc/adt/repository/typestructure')],
-        calling('getTypeStructure'),
+        calling('getTypeStructure', (h) => [h('getTypeStructure')]),
       ),
     ]),
     ...METADATA.sends,
