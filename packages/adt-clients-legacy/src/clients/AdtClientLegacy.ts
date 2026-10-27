@@ -61,17 +61,6 @@ import {
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
-  type IAppendStructureContract,
-  type IFunctionIncludeContract,
-  type IIncludeContract,
-  type ILocalDefinitionsContract,
-  type ILocalMacrosContract,
-  type ILocalTestClassContract,
-  type ILocalTypesContract,
-  type IMessageClassContract,
-  type IScalarFunctionContract,
-  type IScalarFunctionImplementationContract,
-  type ITransformationContract,
   includeDocuments,
   interfaceDocuments,
   METADATA_EXTENSION,
@@ -193,14 +182,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getFunctionInclude(): IFunctionIncludeContract<
-    typeof functionIncludeDocuments
-  >;
-  override getFunctionInclude<R extends IFunctionIncludeResults>(
-    results: R,
-  ): IFunctionIncludeContract<R>;
   override getFunctionInclude<
     R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
   >(
@@ -217,12 +198,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getInclude(): IIncludeContract<typeof includeDocuments>;
-  override getInclude<R extends IIncludeResults>(
-    results: R,
-  ): IIncludeContract<R>;
   override getInclude<R extends IIncludeResults = typeof includeDocuments>(
     results: R = includeDocuments as unknown as R,
   ): AdtIncludeLegacy<R> {
@@ -236,14 +211,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getMessageClass(): IMessageClassContract<
-    typeof messageClassDocuments
-  >;
-  override getMessageClass<R extends IMessageClassResults>(
-    results: R,
-  ): IMessageClassContract<R>;
   override getMessageClass<
     R extends IMessageClassResults = typeof messageClassDocuments,
   >(
@@ -259,12 +226,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getLocalTestClass(): ILocalTestClassContract<typeof classDocuments>;
-  override getLocalTestClass<R extends IClassResults>(
-    results: R,
-  ): ILocalTestClassContract<R>;
   override getLocalTestClass<R extends IClassResults = typeof classDocuments>(
     results: R = classDocuments as unknown as R,
   ): AdtLocalTestClassLegacy<R> {
@@ -279,12 +240,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getLocalTypes(): ILocalTypesContract<typeof classDocuments>;
-  override getLocalTypes<R extends IClassResults>(
-    results: R,
-  ): ILocalTypesContract<R>;
   override getLocalTypes<R extends IClassResults = typeof classDocuments>(
     results: R = classDocuments as unknown as R,
   ): AdtLocalTypesLegacy<R> {
@@ -299,14 +254,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getLocalDefinitions(): ILocalDefinitionsContract<
-    typeof classDocuments
-  >;
-  override getLocalDefinitions<R extends IClassResults>(
-    results: R,
-  ): ILocalDefinitionsContract<R>;
   override getLocalDefinitions<R extends IClassResults = typeof classDocuments>(
     results: R = classDocuments as unknown as R,
   ): AdtLocalDefinitionsLegacy<R> {
@@ -321,12 +268,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getLocalMacros(): ILocalMacrosContract<typeof classDocuments>;
-  override getLocalMacros<R extends IClassResults>(
-    results: R,
-  ): ILocalMacrosContract<R>;
   override getLocalMacros<R extends IClassResults = typeof classDocuments>(
     results: R = classDocuments as unknown as R,
   ): AdtLocalMacrosLegacy<R> {
@@ -644,14 +585,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getTransformation(): ITransformationContract<
-    typeof transformationDocuments
-  >;
-  override getTransformation<R extends ITransformationResults>(
-    results: R,
-  ): ITransformationContract<R>;
   override getTransformation<
     R extends ITransformationResults = typeof transformationDocuments,
   >(_results?: R): AdtTransformation<R> {
@@ -664,14 +597,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getScalarFunction(): IScalarFunctionContract<
-    typeof scalarFunctionDocuments
-  >;
-  override getScalarFunction<R extends IScalarFunctionResults>(
-    results: R,
-  ): IScalarFunctionContract<R>;
   override getScalarFunction<
     R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
   >(_results?: R): AdtScalarFunction<R> {
@@ -684,14 +609,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getScalarFunctionImplementation(): IScalarFunctionImplementationContract<
-    typeof scalarFunctionImplementationDocuments
-  >;
-  override getScalarFunctionImplementation<
-    R extends IScalarFunctionImplementationResults,
-  >(results: R): IScalarFunctionImplementationContract<R>;
   override getScalarFunctionImplementation<
     R extends
       IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
@@ -705,14 +622,6 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  // The base's two declarations, as they are: the legacy handler is the
-  // implementation, the contract is the type (no public type change).
-  override getAppendStructure(): IAppendStructureContract<
-    typeof appendStructureDocuments
-  >;
-  override getAppendStructure<R extends IAppendStructureResults>(
-    results: R,
-  ): IAppendStructureContract<R>;
   override getAppendStructure<
     R extends IAppendStructureResults = typeof appendStructureDocuments,
   >(_results?: R): AdtAppendStructure<R> {
