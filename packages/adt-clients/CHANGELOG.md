@@ -27,8 +27,9 @@ The legacy classes leave this package. `AdtClientLegacy`, `AdtExecutorLegacy`
 and every `*Legacy` class are now the package
 [`@mcp-abap-adt/adt-clients-legacy`](../adt-clients-legacy/README.md), which
 `extends` this package's classes and only overrides; this package holds no
-legacy class, no legacy word and no `/sap/bc/cts` address. This is a minor: the
-legacy members never worked against a real 7.40 system (the owner's ruling), and
+legacy class, no legacy word and no `/sap/bc/cts` address. The 37.3 legacy
+members were measured on 7.40 SP04; they move because of the package layout.
+This is a minor: nobody used the legacy members (the owner's ruling), and
 nothing modern changes.
 
 ### Repository layout
