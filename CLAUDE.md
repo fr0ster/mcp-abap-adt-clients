@@ -152,7 +152,7 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 
 ### Running Tests with RFC (Legacy Systems)
 
-RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions don't work. Example: a legacy system. The legacy live suites (`npm run test:live` in `packages/adt-clients-legacy`) and their overlay keys are described in that package's `docs/LIVE_TESTING.md`; its own `check:config` checks an overlay carrying legacy keys, which the root's `check:config` refuses.
+RFC connections are required for legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) where HTTP stateful sessions don't work. Example: a legacy system. The legacy live suites (`npm run test:live` in `packages/adt-clients-legacy`) and their overlay keys are described in that package's `docs/LIVE_TESTING.md`; its own `check:config` checks an overlay carrying legacy keys, which the root's `check:config` refuses.
 
 **Prerequisites:**
 1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
