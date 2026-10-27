@@ -89,6 +89,11 @@ export class AdtFunctionInclude<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -371,7 +376,7 @@ export class AdtFunctionInclude<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'functionInclude', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'functionInclude', 'deletionCheck'>,
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -399,7 +404,7 @@ export class AdtFunctionInclude<
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
   async delete<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'functionInclude', 'delete'>,
+    this: this & AdtPerformedBy<'functionInclude', 'delete'>,
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {

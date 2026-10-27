@@ -33,7 +33,7 @@ export class AdtFunctionIncludeLegacy<
 > extends AdtFunctionInclude<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'functionInclude', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'functionInclude', 'deletionCheck'>,
     _config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -42,7 +42,7 @@ export class AdtFunctionIncludeLegacy<
 
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/delete` (§4.3). */
   override async delete<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'functionInclude', 'delete'>,
+    this: this & AdtPerformedBy<'functionInclude', 'delete'>,
     _config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {

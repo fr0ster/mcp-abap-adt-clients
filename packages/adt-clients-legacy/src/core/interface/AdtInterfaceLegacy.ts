@@ -69,7 +69,7 @@ export class AdtInterfaceLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'interface', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
     _config: Partial<IInterfaceConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -81,7 +81,7 @@ export class AdtInterfaceLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'interface', 'transport'>,
+    this: this & AdtPerformedBy<'interface', 'transport'>,
     config: Partial<IInterfaceConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

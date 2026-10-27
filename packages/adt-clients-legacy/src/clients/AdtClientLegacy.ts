@@ -156,7 +156,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   // --- Supported types with legacy overrides ---
 
   override getProgram<R extends IProgramResults = typeof programDocuments>(
-    this: this & AdtServedBy<'basis740', 'program'>,
+    this: this & AdtServedBy<'program'>,
     results: R = programDocuments as unknown as R,
   ): AdtProgramLegacy<R> {
     this.assertConnected();
@@ -171,7 +171,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getClass<R extends IClassResults = typeof classDocuments>(
-    this: this & AdtServedBy<'basis740', 'class'>,
+    this: this & AdtServedBy<'class'>,
     results: R = classDocuments as unknown as R,
   ): AdtClassLegacy<R> {
     this.assertConnected();
@@ -188,7 +188,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getFunctionInclude<
     R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'functionInclude'>,
+    this: this & AdtServedBy<'functionInclude'>,
     results: R = functionIncludeDocuments as unknown as R,
   ): AdtFunctionIncludeLegacy<R> {
     this.assertConnected();
@@ -203,7 +203,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getInclude<R extends IIncludeResults = typeof includeDocuments>(
-    this: this & AdtServedBy<'basis740', 'include'>,
+    this: this & AdtServedBy<'include'>,
     results: R = includeDocuments as unknown as R,
   ): AdtIncludeLegacy<R> {
     this.assertConnected();
@@ -219,7 +219,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getMessageClass<
     R extends IMessageClassResults = typeof messageClassDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'messageClass'>,
+    this: this & AdtServedBy<'messageClass'>,
     results: R = messageClassDocuments as unknown as R,
   ): AdtMessageClassLegacy<R> {
     this.assertConnected();
@@ -233,7 +233,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getLocalTestClass<R extends IClassResults = typeof classDocuments>(
-    this: this & AdtServedBy<'basis740', 'localTestClass'>,
+    this: this & AdtServedBy<'localTestClass'>,
     results: R = classDocuments as unknown as R,
   ): AdtLocalTestClassLegacy<R> {
     this.assertConnected();
@@ -248,7 +248,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getLocalTypes<R extends IClassResults = typeof classDocuments>(
-    this: this & AdtServedBy<'basis740', 'localTypes'>,
+    this: this & AdtServedBy<'localTypes'>,
     results: R = classDocuments as unknown as R,
   ): AdtLocalTypesLegacy<R> {
     this.assertConnected();
@@ -263,7 +263,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getLocalDefinitions<R extends IClassResults = typeof classDocuments>(
-    this: this & AdtServedBy<'basis740', 'localDefinitions'>,
+    this: this & AdtServedBy<'localDefinitions'>,
     results: R = classDocuments as unknown as R,
   ): AdtLocalDefinitionsLegacy<R> {
     this.assertConnected();
@@ -278,7 +278,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getLocalMacros<R extends IClassResults = typeof classDocuments>(
-    this: this & AdtServedBy<'basis740', 'localMacros'>,
+    this: this & AdtServedBy<'localMacros'>,
     results: R = classDocuments as unknown as R,
   ): AdtLocalMacrosLegacy<R> {
     this.assertConnected();
@@ -295,7 +295,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getInterface<
     R extends IInterfaceResults = typeof interfaceDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'interface'>,
+    this: this & AdtServedBy<'interface'>,
     results: R = interfaceDocuments as unknown as R,
   ): AdtInterfaceLegacy<R> {
     this.assertConnected();
@@ -312,7 +312,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getFunctionGroup<
     R extends IFunctionGroupResults = typeof functionGroupDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'functionGroup'>,
+    this: this & AdtServedBy<'functionGroup'>,
     results: R = functionGroupDocuments as unknown as R,
   ): AdtFunctionGroupLegacy<R> {
     this.assertConnected();
@@ -329,7 +329,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getFunctionModule<
     R extends IFunctionModuleResults = typeof functionModuleDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'functionModule'>,
+    this: this & AdtServedBy<'functionModule'>,
     results: R = functionModuleDocuments as unknown as R,
   ): AdtFunctionModuleLegacy<R> {
     this.assertConnected();
@@ -344,7 +344,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getPackage<R extends IPackageResults = typeof packageDocuments>(
-    this: this & AdtServedBy<'basis740', 'package'>,
+    this: this & AdtServedBy<'package'>,
     results: R = packageDocuments as unknown as R,
   ): AdtPackageLegacy<R> {
     this.assertConnected();
@@ -358,7 +358,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getDdl<R extends IDdlResults = typeof ddlDocuments>(
-    this: this & AdtServedBy<'basis740', 'ddl'>,
+    this: this & AdtServedBy<'ddl'>,
     results: R = ddlDocuments as unknown as R,
   ): AdtDdlLegacy<R> {
     this.assertConnected();
@@ -393,7 +393,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
    * and the gap is tracked rather than papered over: #109.
    */
   override getRequest<R extends ITransportResults = typeof transportDocuments>(
-    this: this & AdtServedBy<'basis740', 'request'>,
+    this: this & AdtServedBy<'request'>,
     results: R = transportDocuments as unknown as R,
   ): AdtRequestLegacy<R> {
     this.assertConnected();
@@ -436,7 +436,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   // request (see absentOnLegacy).
 
   override getDomain<R extends IDomainResults = typeof domainDocuments>(
-    this: this & AdtServedBy<'basis740', 'domain'>,
+    this: this & AdtServedBy<'domain'>,
     _results?: R,
   ): AdtDomain<R> {
     this.assertConnected();
@@ -450,10 +450,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
 
   override getDataElement<
     R extends IDataElementResults = typeof dataElementDocuments,
-  >(
-    this: this & AdtServedBy<'basis740', 'dataElement'>,
-    _results?: R,
-  ): AdtDataElement<R> {
+  >(this: this & AdtServedBy<'dataElement'>, _results?: R): AdtDataElement<R> {
     this.assertConnected();
     return absentOnLegacy<AdtDataElement<R>>(
       AdtDataElement,
@@ -465,10 +462,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
 
   override getStructure<
     R extends IStructureResults = typeof structureDocuments,
-  >(
-    this: this & AdtServedBy<'basis740', 'structure'>,
-    _results?: R,
-  ): AdtStructure<R> {
+  >(this: this & AdtServedBy<'structure'>, _results?: R): AdtStructure<R> {
     this.assertConnected();
     return absentOnLegacy<AdtStructure<R>>(
       AdtStructure,
@@ -479,7 +473,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   }
 
   override getTable<R extends ITableResults = typeof tableDocuments>(
-    this: this & AdtServedBy<'basis740', 'table'>,
+    this: this & AdtServedBy<'table'>,
     _results?: R,
   ): AdtTable<R> {
     this.assertConnected();
@@ -493,10 +487,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
 
   override getTableType<
     R extends ITableTypeResults = typeof tableTypeDocuments,
-  >(
-    this: this & AdtServedBy<'basis740', 'tableType'>,
-    _results?: R,
-  ): AdtDdicTableType<R> {
+  >(this: this & AdtServedBy<'tableType'>, _results?: R): AdtDdicTableType<R> {
     this.assertConnected();
     return absentOnLegacy<AdtDdicTableType<R>>(
       AdtDdicTableType,
@@ -509,7 +500,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getAccessControl<
     R extends IAccessControlResults = typeof accessControlDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'accessControl'>,
+    this: this & AdtServedBy<'accessControl'>,
     _results?: R,
   ): AdtAccessControl<R> {
     this.assertConnected();
@@ -524,7 +515,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getServiceDefinition<
     R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'serviceDefinition'>,
+    this: this & AdtServedBy<'serviceDefinition'>,
     _results?: R,
   ): AdtServiceDefinition<R> {
     this.assertConnected();
@@ -539,7 +530,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getServiceBinding<
     R extends IServiceResults = typeof serviceDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'serviceBinding'>,
+    this: this & AdtServedBy<'serviceBinding'>,
     _results?: R,
   ): AdtServiceBinding<R> {
     this.assertConnected();
@@ -554,7 +545,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getBehaviorDefinition<
     R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'behaviorDefinition'>,
+    this: this & AdtServedBy<'behaviorDefinition'>,
     _results?: R,
   ): AdtBehaviorDefinition<R> {
     this.assertConnected();
@@ -569,7 +560,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getBehaviorImplementation<
     R extends IClassResults = typeof classDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'behaviorImplementation'>,
+    this: this & AdtServedBy<'behaviorImplementation'>,
     _results?: R,
   ): AdtBehaviorImplementation<R> {
     this.assertConnected();
@@ -584,7 +575,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getMetadataExtension<
     R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'metadataExtension'>,
+    this: this & AdtServedBy<'metadataExtension'>,
     _results?: R,
   ): AdtMetadataExtension<R> {
     this.assertConnected();
@@ -599,11 +590,11 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getEnhancement<
     R extends IEnhancementResults = typeof enhancementDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'enhancement'>,
+    this: this & AdtServedBy<'enhancement'>,
     _results?: R,
-  ): AdtEnhancement<R> {
+  ): AdtEnhancement<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtEnhancement<R>>(
+    return absentOnLegacy<AdtEnhancement<R, 'basis740'>>(
       AdtEnhancement,
       'Enhancement',
       ENHANCEMENT.root,
@@ -614,7 +605,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getAuthorizationField<
     R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'authorizationField'>,
+    this: this & AdtServedBy<'authorizationField'>,
     _results?: R,
   ): AdtAuthorizationField<R> {
     this.assertConnected();
@@ -629,7 +620,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getFeatureToggle<
     R extends IFeatureToggleResults = typeof featureToggleDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'featureToggle'>,
+    this: this & AdtServedBy<'featureToggle'>,
     _results?: R,
   ): AdtFeatureToggle<R> {
     this.assertConnected();
@@ -644,7 +635,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getTransformation<
     R extends ITransformationResults = typeof transformationDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'transformation'>,
+    this: this & AdtServedBy<'transformation'>,
     _results?: R,
   ): AdtTransformation<R> {
     this.assertConnected();
@@ -659,7 +650,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getScalarFunction<
     R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'scalarFunction'>,
+    this: this & AdtServedBy<'scalarFunction'>,
     _results?: R,
   ): AdtScalarFunction<R> {
     this.assertConnected();
@@ -675,7 +666,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     R extends
       IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'scalarFunctionImplementation'>,
+    this: this & AdtServedBy<'scalarFunctionImplementation'>,
     _results?: R,
   ): AdtScalarFunctionImplementation<R> {
     this.assertConnected();
@@ -690,7 +681,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getAppendStructure<
     R extends IAppendStructureResults = typeof appendStructureDocuments,
   >(
-    this: this & AdtServedBy<'basis740', 'appendStructure'>,
+    this: this & AdtServedBy<'appendStructure'>,
     _results?: R,
   ): AdtAppendStructure<R> {
     this.assertConnected();

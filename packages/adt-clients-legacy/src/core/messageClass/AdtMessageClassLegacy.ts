@@ -40,7 +40,7 @@ export class AdtMessageClassLegacy<
 > extends AdtMessageClass<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'messageClass', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
     _config: Partial<IMessageClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -81,7 +81,7 @@ export class AdtMessageClassLegacy<
    * root element; until that document is measured it is not sent.
    */
   override async updateMetadata<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'messageClass', 'updateMetadata'>,
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     _config: Partial<IMessageClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {

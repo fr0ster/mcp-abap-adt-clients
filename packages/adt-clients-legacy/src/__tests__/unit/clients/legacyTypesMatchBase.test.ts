@@ -33,7 +33,6 @@ import type {
   ddlDocuments,
   functionGroupDocuments,
   functionModuleDocuments,
-  IAdtNotServed,
   interfaceDocuments,
   programDocuments,
   transportDocuments,
@@ -65,28 +64,27 @@ type Same<A, B> =
     : false;
 
 /**
- * What a member's gate refuses (`IAdtNotServed<What>`), or `'served'`.
- * Since 38.0.0 a gated member's receiver is `this & gate`, so the receiver
- * names each class; the gate, not the class, is what an override must keep.
+ * Whether a member can be called on `Receiver`. Since 38.0.0 a gated
+ * member's receiver is `this & gate`; an override must accept exactly the
+ * receivers the base does, so the gate, not the class, is compared.
  */
-type GateOf<F> =
-  ThisParameterType<F> extends IAdtNotServed<infer W> ? W : 'served';
+type Callable<Receiver, F> =
+  Receiver extends ThisParameterType<F> ? true : false;
 
 /**
- * `true` when the two members take and answer the same types and keep the
- * same gate. The receiver is compared through its gate alone: it is `this`,
- * the legacy class on one side and its base on the other.
+ * `true` when the two members take and answer the same types and are
+ * callable on their own classes alike.
  */
-type SameMember<A, B> = [
-  Same<OmitThisParameter<A>, OmitThisParameter<B>>,
-  Same<GateOf<A>, GateOf<B>>,
+type SameMember<L, LF, B, BF> = [
+  Same<OmitThisParameter<LF>, OmitThisParameter<BF>>,
+  Same<Callable<L, LF>, Callable<B, BF>>,
 ] extends [true, true]
   ? true
   : false;
 
 /** Every listed member of `L` has the type it has on `B`. */
 type SameMembers<L, B, K extends keyof L & keyof B> = {
-  [M in K]: SameMember<L[M], B[M]>;
+  [M in K]: SameMember<L, L[M], B, B[M]>;
 };
 
 /** Fails to compile unless every entry is `true`. */
@@ -116,30 +114,42 @@ type LegacyExecutorGetters = AllTrue<
 
 type LegacyCheckDeletion = AllTrue<{
   class: SameMember<
+    AdtClassLegacy,
     AdtClassLegacy['checkDeletion'],
+    AdtClass<typeof classDocuments, 'basis740'>,
     AdtClass<typeof classDocuments, 'basis740'>['checkDeletion']
   >;
   ddl: SameMember<
+    AdtDdlLegacy,
     AdtDdlLegacy['checkDeletion'],
+    AdtDdl<typeof ddlDocuments, 'basis740'>,
     AdtDdl<typeof ddlDocuments, 'basis740'>['checkDeletion']
   >;
   functionGroup: SameMember<
+    AdtFunctionGroupLegacy,
     AdtFunctionGroupLegacy['checkDeletion'],
+    AdtFunctionGroup<typeof functionGroupDocuments, 'basis740'>,
     AdtFunctionGroup<typeof functionGroupDocuments, 'basis740'>['checkDeletion']
   >;
   functionModule: SameMember<
+    AdtFunctionModuleLegacy,
     AdtFunctionModuleLegacy['checkDeletion'],
+    AdtFunctionModule<typeof functionModuleDocuments, 'basis740'>,
     AdtFunctionModule<
       typeof functionModuleDocuments,
       'basis740'
     >['checkDeletion']
   >;
   interface: SameMember<
+    AdtInterfaceLegacy,
     AdtInterfaceLegacy['checkDeletion'],
+    AdtInterface<typeof interfaceDocuments, 'basis740'>,
     AdtInterface<typeof interfaceDocuments, 'basis740'>['checkDeletion']
   >;
   program: SameMember<
+    AdtProgramLegacy,
     AdtProgramLegacy['checkDeletion'],
+    AdtProgram<typeof programDocuments, 'basis740'>,
     AdtProgram<typeof programDocuments, 'basis740'>['checkDeletion']
   >;
 }>;

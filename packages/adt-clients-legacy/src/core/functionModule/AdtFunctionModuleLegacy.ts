@@ -71,7 +71,7 @@ export class AdtFunctionModuleLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'functionModule', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'functionModule', 'deletionCheck'>,
     _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -83,7 +83,7 @@ export class AdtFunctionModuleLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'functionModule', 'transport'>,
+    this: this & AdtPerformedBy<'functionModule', 'transport'>,
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

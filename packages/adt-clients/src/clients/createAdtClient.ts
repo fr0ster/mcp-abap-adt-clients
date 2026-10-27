@@ -11,6 +11,7 @@
 import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtClient } from './AdtClient';
 import { AdtClientCloud, AdtClientOnPrem } from './AdtClientVariants';
 import type { AdtModernVariant } from './variant';
 
@@ -30,15 +31,18 @@ export async function createAdtClient(
   connection: IAbapConnection,
   options: ICreateAdtClientOptions<'cloud'>,
 ): Promise<AdtClientCloud>;
-/** A variant known only as one of the two: the client is one of the two. */
+/**
+ * A variant known only as one of the two — read from configuration, say: the
+ * client of the modern default, `AdtClient`, served what both tables serve.
+ */
 export async function createAdtClient(
   connection: IAbapConnection,
   options: ICreateAdtClientOptions<AdtModernVariant>,
-): Promise<AdtClientOnPrem | AdtClientCloud>;
+): Promise<AdtClient>;
 export async function createAdtClient(
   connection: IAbapConnection,
   options: ICreateAdtClientOptions<AdtModernVariant>,
-): Promise<AdtClientOnPrem | AdtClientCloud> {
+): Promise<AdtClient> {
   const { variant, logger, ...clientOptions } = options;
   return variant === 'onprem'
     ? new AdtClientOnPrem(connection, logger, clientOptions)

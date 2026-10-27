@@ -90,6 +90,11 @@ export class AdtInterface<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -277,7 +282,7 @@ export class AdtInterface<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'interface', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
     config: Partial<IInterfaceConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -371,7 +376,7 @@ export class AdtInterface<
 
   /** The transport request the interface belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'interface', 'transport'>,
+    this: this & AdtPerformedBy<'interface', 'transport'>,
     config: Partial<IInterfaceConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

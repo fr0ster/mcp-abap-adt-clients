@@ -81,6 +81,11 @@ export class AdtInclude<
     IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>,
     IAdtLockable<IIncludeConfig>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   constructor(
     protected readonly connection: IAbapConnection,
     // Part of the constructor shape every client in this library shares. It is
@@ -306,7 +311,7 @@ export class AdtInclude<
    * its own — unlike a class include, which is emptied by writing its parent.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'include', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

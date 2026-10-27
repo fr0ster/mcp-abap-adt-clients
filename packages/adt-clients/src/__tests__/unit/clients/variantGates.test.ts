@@ -8,6 +8,7 @@
  * Type-level: the checks sit in a function nothing calls. The one runtime
  * assertion keeps Jest from reporting an empty file.
  */
+import type { AdtApiWithIn, AdtOperation } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type {
@@ -15,6 +16,11 @@ import type {
   AdtClientOnPrem,
 } from '../../../clients/AdtClientVariants';
 import { createAdtClient } from '../../../clients/createAdtClient';
+import type {
+  AdtModernVariant,
+  AdtPerformingVariantsIn,
+  IAdtServedOn,
+} from '../../../clients/variant';
 import { buildObjectUri } from '../../../utils/activationUtils';
 
 async function variantGates(
@@ -23,6 +29,7 @@ async function variantGates(
   modern: AdtClient,
   basis740: AdtClient<'basis740'>,
   connection: IAbapConnection,
+  fromConfig: AdtModernVariant,
 ): Promise<void> {
   // A factory the variant lacks: 7.40's table has no `table`.
   onprem.getTable();
@@ -68,19 +75,89 @@ async function variantGates(
   // @ts-expect-error -- AdtClient<'basis740'> is not an AdtClient of the modern variant
   const upcast: AdtClient = basis740;
   void upcast;
-  // The variants are invariant to each other, the narrower one included: a
-  // gate's receiver is compared both ways. A consumer names one variant.
-  // @ts-expect-error -- AdtClientOnPrem is not AdtClient of the modern variant
   const narrowed: AdtClient = onprem;
   void narrowed;
 
-  // `createAdtClient` answers the declared variant's client.
+  // `createAdtClient` answers the declared variant's client…
   const declared: AdtClientCloud = await createAdtClient(connection, {
     variant: 'cloud',
   });
   void declared;
+  // …and, for a variant known only as modern, the default client.
+  const configured: AdtClient = await createAdtClient(connection, {
+    variant: fromConfig,
+  });
+  configured.getClass();
+  // @ts-expect-error -- the default client is no 7.40 one
+  const configuredAs740: AdtClient<'basis740'> = configured;
+  void configuredAs740;
+
+  // Both modern clients are the default client; the default is served what
+  // both serve, and a generic modern client is held to the same.
+  const both: AdtClient[] = [onprem, cloud];
+  void both;
+  const readsSource = <V extends AdtModernVariant>(client: AdtClient<V>) =>
+    client.getClass().getVersions({ className: 'ZCL_GATE' });
+  await readsSource(onprem);
+  await readsSource(cloud);
+  await readsSource(modern);
+}
+
+/**
+ * The default variant's gates are the intersection of the two modern tables,
+ * not their union. The real tables serve the same, so two synthetic ones show
+ * it: `one` lists `check` for the class, `two` does not.
+ */
+interface ISyntheticCode<Ops extends readonly AdtOperation[]> {
+  readonly parent: null;
+  readonly nameMaxLength: 30;
+  readonly operations: Ops;
+  readonly evidence: 'system-description-synthetic--07-typestructure';
+}
+interface ISyntheticTables {
+  one: {
+    class: {
+      kind: 'class';
+      collection: '/sap/bc/adt/oo/classes';
+      codes: { 'CLAS/OC': ISyntheticCode<readonly ['read', 'check']> };
+    };
+  };
+  two: {
+    class: {
+      kind: 'class';
+      collection: '/sap/bc/adt/oo/classes';
+      codes: { 'CLAS/OC': ISyntheticCode<readonly ['read']> };
+    };
+  };
+}
+
+function intersection(
+  ofBoth: IAdtServedOn<'one' | 'two'>,
+  ofOne: IAdtServedOn<'one'>,
+): void {
+  const reads: IAdtServedOn<
+    AdtPerformingVariantsIn<ISyntheticTables, 'class', 'read'>
+  > = ofBoth;
+  void reads;
+  // @ts-expect-error -- `two` lists no `check`, so a receiver of both is refused
+  const checksBoth: IAdtServedOn<
+    AdtPerformingVariantsIn<ISyntheticTables, 'class', 'check'>
+  > = ofBoth;
+  void checksBoth;
+  const checksOne: IAdtServedOn<
+    AdtPerformingVariantsIn<ISyntheticTables, 'class', 'check'>
+  > = ofOne;
+  void checksOne;
+  // interfaces-adt's own helper distributes over a union of tables: it would
+  // answer `check` as served by both (listed for interfaces-adt 21.1.0).
+  const distributes: AdtApiWithIn<
+    ISyntheticTables['one'] | ISyntheticTables['two'],
+    'check'
+  > = 'class';
+  void distributes;
 }
 
 it('the variant gates are type-checked by npm run test:check', () => {
   expect(typeof variantGates).toBe('function');
+  expect(typeof intersection).toBe('function');
 });

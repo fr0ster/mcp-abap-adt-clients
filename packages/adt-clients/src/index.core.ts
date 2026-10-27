@@ -23,8 +23,10 @@ export {
 export type {
   AdtModernVariant,
   AdtPerformedBy,
+  AdtPerformingVariantsIn,
   AdtServedBy,
-  IAdtNotServed,
+  AdtServingVariantsIn,
+  IAdtServedOn,
 } from './clients/variant';
 export { AdtAccessControl } from './core/accessControl';
 export { AdtAppendStructure } from './core/appendStructure';

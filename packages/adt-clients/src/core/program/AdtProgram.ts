@@ -105,6 +105,11 @@ export class AdtProgram<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -339,7 +344,7 @@ export class AdtProgram<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'program', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'program', 'deletionCheck'>,
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -437,7 +442,7 @@ export class AdtProgram<
 
   /** The transport request the program belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'program', 'transport'>,
+    this: this & AdtPerformedBy<'program', 'transport'>,
     config: Partial<IProgramConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

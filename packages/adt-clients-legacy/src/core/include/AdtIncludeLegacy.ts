@@ -34,7 +34,7 @@ export class AdtIncludeLegacy<
 > extends AdtInclude<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'include', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
     _config: Partial<IIncludeConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

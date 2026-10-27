@@ -71,7 +71,7 @@ export class AdtClassLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'class', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     _config: Partial<IClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -83,7 +83,7 @@ export class AdtClassLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'class', 'transport'>,
+    this: this & AdtPerformedBy<'class', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

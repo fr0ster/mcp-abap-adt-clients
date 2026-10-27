@@ -85,6 +85,11 @@ export class AdtDdl<
     >,
     ICdsTestDoubleCheckable<ReturnType<R['testDoubles']>>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -230,7 +235,7 @@ export class AdtDdl<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'ddl', 'transport'>,
+    this: this & AdtPerformedBy<'ddl', 'transport'>,
     config: Partial<IDdlConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -290,7 +295,7 @@ export class AdtDdl<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'ddl', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -424,7 +429,7 @@ export class AdtDdl<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'ddl', 'versions'>,
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
     config: Partial<IDdlConfig>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
@@ -437,7 +442,7 @@ export class AdtDdl<
 
   /** Source of one version, by the `contentUri` its entry carried. */
   async getVersionSource<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'ddl', 'versions'>,
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
@@ -460,7 +465,7 @@ export class AdtDdl<
    * `AdtCdsUnitTest`, a handler for something that is not an object.
    */
   async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'ddl', 'checkCdsTestDoubles'>,
+    this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
     cdsViewName: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {

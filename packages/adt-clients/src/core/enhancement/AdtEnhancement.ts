@@ -37,7 +37,6 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant } from '../../clients/variant';
-import type { CodeOf } from '../../constants/typeCodes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -60,6 +59,7 @@ import {
   getEnhancementTransport,
 } from './read';
 import {
+  type ENHANCEMENT_TYPE_CODES,
   type EnhancementType,
   enhancementDocuments,
   type IEnhancementConfig,
@@ -72,26 +72,28 @@ import {
   getEnhancementVersions,
 } from './versions';
 
-/**
- * The enhancement subtype of a code: `ENHO/XHH` is `enhoxhh`, as the address
- * and `IEnhancementConfig.enhancementType` spell it.
- */
-type SubtypeOf<C extends string> = C extends `${infer T}/${infer S}`
-  ? Lowercase<`${T}${S}`>
-  : never;
+/** The variants on which an enhancement subtype's code lists `Op`. */
+type VariantsWith<T extends EnhancementType, Op extends AdtOperation> = {
+  [W in AdtVariant]: (typeof ENHANCEMENT_TYPE_CODES)[T] extends AdtTypeCodeWith<
+    W,
+    Op
+  >
+    ? W
+    : never;
+}[AdtVariant];
 
 /**
- * The subtypes whose code lists `Op` on variant `V`. One API, three codes, and
- * only `ENHO/XHH` has a source: `read` and `update` take this in their
- * argument's type, so a call for `enhoxhb` or `enhsxsb` does not compile.
+ * The subtypes whose code lists `Op` on every variant of `V` — the
+ * intersection, for the default variant. One API, three codes, and only
+ * `ENHO/XHH` has a source: `read` and `update` take this in their argument's
+ * type, so a call for `enhoxhb` or `enhsxsb` does not compile.
  */
 export type EnhancementTypeWith<
   V extends AdtVariant,
   Op extends AdtOperation,
-> = Extract<
-  EnhancementType,
-  SubtypeOf<Extract<AdtTypeCodeWith<V, Op>, CodeOf<'enhancement'>>>
->;
+> = {
+  [T in EnhancementType]: [V] extends [VariantsWith<T, Op>] ? T : never;
+}[EnhancementType];
 
 export class AdtEnhancement<
   R extends IEnhancementResults = typeof enhancementDocuments,
@@ -118,6 +120,11 @@ export class AdtEnhancement<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;

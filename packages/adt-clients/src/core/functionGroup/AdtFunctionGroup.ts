@@ -91,6 +91,11 @@ export class AdtFunctionGroup<
     IAdtLockable<IFunctionGroupConfig>,
     IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -251,7 +256,7 @@ export class AdtFunctionGroup<
 
   /** The transport request the group belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'functionGroup', 'transport'>,
+    this: this & AdtPerformedBy<'functionGroup', 'transport'>,
     config: Partial<IFunctionGroupConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -324,7 +329,7 @@ export class AdtFunctionGroup<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'functionGroup', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

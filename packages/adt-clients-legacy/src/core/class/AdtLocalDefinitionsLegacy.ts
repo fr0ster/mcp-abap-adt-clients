@@ -31,7 +31,7 @@ export class AdtLocalDefinitionsLegacy<
    * `AdtClassLegacy.readTransport` refuses).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<'basis740', 'localDefinitions', 'transport'>,
+    this: this & AdtPerformedBy<'localDefinitions', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

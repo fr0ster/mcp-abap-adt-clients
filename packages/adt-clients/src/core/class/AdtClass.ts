@@ -309,7 +309,7 @@ export class AdtClass<
    * Ask whether the class can be deleted now.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'class', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

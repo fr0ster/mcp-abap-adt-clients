@@ -67,6 +67,11 @@ export abstract class AdtClassMemberBase<
   A extends ClassFamilyApi = 'class',
 > {
   /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
+  /**
    * The readings this implementation performs, given when it was constructed.
    *
    * Declared here and abstract, so every concrete subclass carries it: `activate`
@@ -220,7 +225,7 @@ export abstract class AdtClassMemberBase<
    * class, so this reads the class's.
    */
   async readTransport<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, A, 'transport'>,
+    this: this & AdtPerformedBy<A, 'transport'>,
     config: Partial<IClassConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

@@ -69,6 +69,11 @@ export class AdtMessageClass<
     IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
     IAdtLockable<IMessageClassConfig>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
@@ -217,7 +222,7 @@ export class AdtMessageClass<
    * library composed in place of the caller's.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'messageClass', 'updateMetadata'>,
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
@@ -261,7 +266,7 @@ export class AdtMessageClass<
    * means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    this: this & AdtPerformedBy<V, 'messageClass', 'deletionCheck'>,
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
