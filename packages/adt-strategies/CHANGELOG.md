@@ -54,8 +54,11 @@ answers it as an `IAdtAnsweredObject` of `@mcp-abap-adt/interfaces-adt`
 - Switch on `type` for the codes you act on, and handle `unknownType` — it is
   what an older reading would have handed you as `type: string`.
 - `objectType` of a repository node or child is `type` (or `unknownType`).
-- To activate the inactive objects, keep those with a `type`:
-  `objects.flatMap((o) => (o.type ? [{ name: o.name, type: o.type }] : []))`.
+- To activate the inactive objects, keep those with a `type`, and name the
+  function group of a function module or include — they are addressed under
+  it, and the listing names no parent:
+  `objects.flatMap((o) => (o.type === 'FUGR/FF' || o.type === 'FUGR/I' ? [{ name: o.name, type: o.type, parentName: groupOf(o) }] : o.type ? [{ name: o.name, type: o.type }] : []))`,
+  where `groupOf` is the caller's (the group the module was created in).
 - A type that extended `IAdtObjectHit` or `ISearchResult` with `interface …
   extends` intersects it instead: `type IMyHit = ISearchResult & { … }`.
 

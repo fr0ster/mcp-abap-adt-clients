@@ -24,14 +24,24 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [38.0.0] - 2026-10-27
+## [38.0.0] - 2026-10-28
 
 A contract lives where it is accepted (#216). A factory accepts a result set, so
 the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a consumer
 accepts the client, so the consumer composes the client contract it needs, and
-this package declares no composition of its own. No request and no answer
-changes. [MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on
-37.x does.
+this package declares no composition of its own. No answer changes, and one
+request does — a measured fix, below. [MIGRATION-38.md](docs/usage/MIGRATION-38.md)
+says what a consumer on 37.x does.
+
+### Fixed
+
+- **A function group's metadata through `getUtils().readObjectMetadata`
+  asks for `functions.groups.v3+xml` first.** Measured on S/4HANA 2025, read
+  only, 2026-10-28: `GET /sap/bc/adt/functions/groups/<group>` answers `406`
+  with the Accept it sent, `functions.groups.v2+xml, functions.groups.v1+xml`,
+  and `200` with `functions.groups.v3+xml`. The Accept now lists v3, then v2
+  and v1, so the releases that serve only those still answer.
+  `getFunctionGroup().readMetadata` sends `*/*` and is unchanged.
 
 ### Breaking
 
