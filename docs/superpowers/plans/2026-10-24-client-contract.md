@@ -43,7 +43,7 @@ published before adt-clients depends on it, and adt-clients before mcp-abap-adt 
 
 Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
 
-- Each of the 35 `IXResults` is added to its object's `src/adt/IAdtX.ts`, copied from adt-clients'
+- Each of the 30 `IXResults` (35 factories; `IClassResults` serves six) is added to its object's `src/adt/IAdtX.ts`, copied from adt-clients'
   `core/<dir>/types.ts`.
   - The names and slots stay as they are, all `readonly …: IResultStrategy<unknown>`.
   - `IMessageClassMessageResults` keeps its generics and their defaults.
@@ -73,7 +73,7 @@ Done: interfaces-adt 20.2.0 is published (the registry's `latest`).
   Do the same for `IServiceBindingPublicationConfig`.
 - Every `xDocuments` keeps `satisfies IXResults` and no annotation.
 - Remove these names from adt-clients' public exports.
-- In `packages/adt-clients-legacy`, every file that imports one of the 35 client result-set
+- In `packages/adt-clients-legacy`, every file that imports one of the 30 client result-set
   contracts Part A moved (or `IServiceBindingPublicationConfig`) from `@mcp-abap-adt/adt-clients`
   imports it from `@mcp-abap-adt/interfaces-adt` instead — on #281 thirteen files under `clients/`
   and `core/` — and the package's `@mcp-abap-adt/interfaces-adt` moves to `^20.2.0`. The six

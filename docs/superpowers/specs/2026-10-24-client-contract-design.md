@@ -47,7 +47,7 @@ It is measured again on main once #281 is merged, before Task B1.
 
 1. **The result-set contracts**, under their names, each in its object's `src/adt/IAdtX.ts` beside
    its config:
-   - all 35 `IXResults`, each a `readonly` slot map of `IResultStrategy<unknown>`;
+   - all 30 `IXResults` (35 factories; `IClassResults` serves six), each a `readonly` slot map of `IResultStrategy<unknown>`;
    - `IMessageClassMessageResults<TRead, TWritten, TDeleted>` keeps its generic parameters and
      their defaults;
    - `IClassResults` stays one interface, used by class, behavior implementation and the local
@@ -102,7 +102,7 @@ It is measured again on main once #281 is merged, before Task B1.
 1. **The dependencies.** `@mcp-abap-adt/adt-clients` moves to `^38.0.0`, from the registry, and
    `@mcp-abap-adt/interfaces-adt` to `^20.2.0`.
 1a. **The result-set contracts come from interfaces-adt** here too: every file that imports one of
-   the 35 client result-set contracts (or `IServiceBindingPublicationConfig`) from
+   the 30 client result-set contracts (or `IServiceBindingPublicationConfig`) from
    `@mcp-abap-adt/adt-clients` — on #281 thirteen files under `clients/` and `core/` — imports it
    from `@mcp-abap-adt/interfaces-adt`. The executors' result contracts are not moved (§6).
 2. **The seven getters.** Each becomes one signature,
