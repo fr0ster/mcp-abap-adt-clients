@@ -17,7 +17,7 @@
  * `member[case]`, and its cases are listed in {@link ARGUMENT_DEPENDENT}.
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtTypeCode, IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 // The address records by the root's own module: the tests read records the
 // root package does not export (the include kinds, the URI builders).
 import {
@@ -384,35 +384,23 @@ const objectReferences = [{ name: 'ZGUARD', type: 'PROG/P' }];
 const whereUsed = { object_name: 'ZGUARD', object_type: 'program' };
 
 /** `getUtils().readObjectMetadata` / `readObjectSource`, by object type (§10.2). */
-const METADATA_REFUSED = [
-  'domain',
-  'doma/dd',
-  'dataelement',
-  'dtel',
-  'dtel/de',
-  'structure',
-  'stru/dt',
-  'table',
-  'tabl/dt',
-  'tabletype',
-  'ttyp/df',
-  'package',
-  'devc/k',
-  'DEVC/K',
-] as const;
-const SOURCE_REFUSED = [
-  'structure',
-  'stru/dt',
-  'table',
-  'tabl/dt',
-  'tabletype',
-  'ttyp/df',
+/**
+ * The codes 7.40's reads refuse, by the ADT type tables' codes since
+ * interfaces-adt 21.0.0 — the friendly names and lower-case spellings they
+ * replaced (`domain`, `stru/dt`, `ttyp/df`, …) are no codes, and are refused
+ * at compile time.
+ */
+const METADATA_REFUSED: readonly AdtTypeCode[] = [
+  'DOMA/DD',
+  'DTEL/DE',
+  'TABL/DS',
   'TABL/DT',
-] as const;
+  'TTYP/DA',
+  'DEVC/K',
+];
+const SOURCE_REFUSED: readonly AdtTypeCode[] = ['TABL/DS', 'TABL/DT'];
 const SERVED = {
-  program: PROGRAM.uri('ZGUARD'),
-  'prog/p': PROGRAM.uri('ZGUARD'),
-  class: CLASS.uri('ZGUARD'),
+  'PROG/P': PROGRAM.uri('ZGUARD'),
   'CLAS/OC': CLASS.uri('ZGUARD'),
 } as const;
 
@@ -1216,13 +1204,19 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
         'supportsSourceCode',
         '§10.2 kept: pure',
         [],
-        calling('supportsSourceCode', () => ['program']),
+        calling('supportsSourceCode', () => ['PROG/P']),
       ),
       utils.sends(
         'getObjectSourceUri',
         '§10.2 kept: pure',
         [],
-        calling('getObjectSourceUri', () => ['program', 'ZGUARD']),
+        calling('getObjectSourceUri', () => ['PROG/P', 'ZGUARD']),
+      ),
+      utils.sends(
+        'getTypeStructure',
+        '§10.2 recorded on 7.40 SP04: 200, 464 types',
+        [post('/sap/bc/adt/repository/typestructure')],
+        calling('getTypeStructure'),
       ),
     ]),
     ...METADATA.sends,

@@ -27,7 +27,7 @@ export async function searchObjects(
   let url = `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodedQuery}&maxResults=${maxResults}`;
 
   if (params.objectType) {
-    url += `&objectType=${encodeSapObjectName(params.objectType as string)}`;
+    url += `&objectType=${encodeSapObjectName(params.objectType)}`;
   }
 
   return connection.makeAdtRequest({

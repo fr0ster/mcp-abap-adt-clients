@@ -42,8 +42,7 @@ export async function checkFunctionGroup(
     response = await runCheckRunWithSource(
       connection,
       headers,
-      'function_group',
-      functionGroupName,
+      { type: 'FUGR/F', name: functionGroupName },
       sourceCode,
       version,
       'abapCheckRun',
@@ -53,8 +52,7 @@ export async function checkFunctionGroup(
     response = await runCheckRun(
       connection,
       headers,
-      'function_group',
-      functionGroupName,
+      { type: 'FUGR/F', name: functionGroupName },
       version,
       'abapCheckRun',
     );

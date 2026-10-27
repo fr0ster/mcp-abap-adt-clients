@@ -8,6 +8,7 @@
  * from the parent function group and must NOT appear in the include payload.
  */
 
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import type { ICreateFunctionIncludeParams } from './types';
@@ -37,7 +38,7 @@ export function buildFunctionIncludeXml(
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<finclude:abapFunctionGroupInclude xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXml(name)}" adtcore:type="FUGR/I" adtcore:description="${description}">
-  <adtcore:containerRef adtcore:uri="${escapeXml(FUNCTION_GROUP.uri(args.function_group_name))}" adtcore:type="FUGR/F" adtcore:name="${escapeXml(groupUpper)}"/>
+<finclude:abapFunctionGroupInclude xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXml(name)}" adtcore:type="${TYPE_CODE.functionInclude}" adtcore:description="${description}">
+  <adtcore:containerRef adtcore:uri="${escapeXml(FUNCTION_GROUP.uri(args.function_group_name))}" adtcore:type="${TYPE_CODE.functionGroup}" adtcore:name="${escapeXml(groupUpper)}"/>
 </finclude:abapFunctionGroupInclude>`;
 }

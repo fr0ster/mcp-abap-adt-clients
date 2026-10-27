@@ -15,8 +15,7 @@ export async function checkAppendStructure(
   const response = await runCheckRun(
     connection,
     headers,
-    'append_structure',
-    name,
+    { type: 'TABL/DS', name: name },
     version,
     'abapCheckRun',
     sourceCode,

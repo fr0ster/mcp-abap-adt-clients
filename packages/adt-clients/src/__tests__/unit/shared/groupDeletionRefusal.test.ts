@@ -15,6 +15,7 @@
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
@@ -65,7 +66,9 @@ const answering = (data: string): IAbapConnection =>
     })),
   }) as unknown as IAbapConnection;
 
-const ONE_PACKAGE = [{ name: 'ZADT_BLD_PKG03', type: 'DEVC/K' }];
+const ONE_PACKAGE: IObjectReference[] = [
+  { name: 'ZADT_BLD_PKG03', type: 'DEVC/K' },
+];
 
 describe('deleteObjectsGroup', () => {
   it('answers the document as it came when no analyse is given', async () => {

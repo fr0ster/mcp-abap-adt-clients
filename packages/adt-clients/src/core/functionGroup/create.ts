@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -62,7 +63,7 @@ export async function create(
   const limitedDescription = limitDescription(params.description);
   // Build XML payload - no escaping (same as old working code)
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.functionGroupName}" adtcore:type="${TYPE_CODE.functionGroup}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${params.packageName}"/>
 </group:abapFunctionGroup>`;
 

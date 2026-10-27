@@ -390,7 +390,7 @@ describe('Shared - getWhereUsed', () => {
       const noName = await new AdtUtils(connection, testsLogger).getWhereUsed(
         {
           object_name: '',
-          object_type: 'class',
+          object_type: 'CLAS/OC',
         },
         {
           analyse: analyseException,
@@ -418,6 +418,7 @@ describe('Shared - getWhereUsed', () => {
         new AdtUtils(connection, testsLogger).getWhereUsed(
           {
             object_name: 'TEST',
+            // @ts-expect-error -- an empty code is no code of the tables
             object_type: '',
           },
           {

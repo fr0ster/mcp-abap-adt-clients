@@ -33,15 +33,10 @@ export async function checkMetadataExtension(
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtWireResponse> {
-  const objectType = 'DDLX/EX';
-  // Pass just the name, getObjectUri will build the full URI
-  const objectName = name;
-
   return runCheckRun(
     connection,
     headers,
-    objectType,
-    objectName,
+    { type: 'DDLX/EX', name },
     version,
     'abapCheckRun',
     sourceCode,

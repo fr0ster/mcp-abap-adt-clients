@@ -59,8 +59,9 @@ import {
   type utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type {
-  AdtObjectType,
-  AdtSourceObjectType,
+  AdtSourceTypeCode,
+  AdtTypeCode,
+  AdtTypeCodeOf,
   IAdtHeaders,
   IGetSqlQueryParams,
   IGetTableContentsParams,
@@ -95,46 +96,49 @@ const ACTIVATION_RESULTS = '/sap/bc/adt/activation/results';
 const WHERE_USED_ON_740 =
   '7.40 serves where-used through the RIS sequence fullnamemapping → metadata → whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY, which this library does not implement.';
 const OBJECT_TYPES_ON_740 =
-  '7.40 serves object types through repository/typestructure, which this library does not implement.';
+  '7.40 serves object types through repository/typestructure: getTypeStructure.';
 const NO_RUN_ID =
   'A legacy activateObjectsGroup is the synchronous /sap/bc/adt/activation: its answer is the result, and there is no run id to ask about.';
 
 const PACKAGE_ITEM = `${PACKAGE.collection}/{name}`;
+
 /**
- * The DDIC types 7.40 does not serve through these reads, by every alias the
- * switches in `objectWire` accept (lower case), to the endpoint it lacks.
+ * The codes of the ADT type tables that 7.40's table lacks: what a legacy
+ * client refuses by type. A caller typed against the 7.40 variant never names
+ * one; these maps answer the caller outside the type system.
  */
-const METADATA_REFUSED: Readonly<Record<string, string>> = {
-  domain: DOMAIN.collection,
-  'doma/dd': DOMAIN.collection,
-  dataelement: DATA_ELEMENT.collection,
-  dtel: DATA_ELEMENT.collection,
-  'dtel/de': DATA_ELEMENT.collection,
-  structure: STRUCTURE.collection,
-  'stru/dt': STRUCTURE.collection,
-  table: TABLE.collection,
-  'tabl/dt': TABLE.collection,
-  tabletype: TABLE_TYPE.collection,
-  'ttyp/df': TABLE_TYPE.collection,
-  package: PACKAGE_ITEM,
-  'devc/k': PACKAGE_ITEM,
+type AbsentOn740 = Exclude<AdtTypeCode, AdtTypeCodeOf<'basis740'>>;
+
+/**
+ * The DDIC types 7.40 does not serve through these reads, by code, to the
+ * endpoint it lacks. Keyed by the codes of the tables since interfaces-adt
+ * 21.0.0: the friendly names and lower-case spellings it was keyed by before
+ * (`domain`, `stru/dt`, `ttyp/df`, …) name these codes.
+ */
+const METADATA_REFUSED: { readonly [C in AbsentOn740]?: string } = {
+  'DOMA/DD': DOMAIN.collection,
+  'DTEL/DE': DATA_ELEMENT.collection,
+  'TABL/DS': STRUCTURE.collection,
+  'TABL/DT': TABLE.collection,
+  'TTYP/DA': TABLE_TYPE.collection,
+  'DEVC/K': PACKAGE_ITEM,
 };
-const SOURCE_REFUSED: Readonly<Record<string, string>> = {
-  structure: STRUCTURE.collection,
-  'stru/dt': STRUCTURE.collection,
-  table: TABLE.collection,
-  'tabl/dt': TABLE.collection,
-  tabletype: TABLE_TYPE.collection,
-  'ttyp/df': TABLE_TYPE.collection,
+/**
+ * The source types among them. A table type has none (`TTYP/DA` is no
+ * `AdtSourceTypeCode`), so it is not here.
+ */
+const SOURCE_REFUSED: { readonly [C in AbsentOn740]?: string } = {
+  'TABL/DS': STRUCTURE.collection,
+  'TABL/DT': TABLE.collection,
 };
 
 /** The endpoint 7.40 lacks for `objectType`, or `undefined` when it is served. */
 function refusedFor(
-  table: Readonly<Record<string, string>>,
-  objectType: string,
+  table: { readonly [C in AbsentOn740]?: string },
+  objectType: AdtTypeCode,
 ): string | undefined {
-  const type = objectType.toLowerCase();
-  return Object.hasOwn(table, type) ? table[type] : undefined;
+  const refused: Readonly<Partial<Record<AdtTypeCode, string>>> = table;
+  return Object.hasOwn(refused, objectType) ? refused[objectType] : undefined;
 }
 
 /**
@@ -385,7 +389,7 @@ ${objectReferences}
    * unknown one is still the caller's mistake and thrown.
    */
   override async readObjectMetadata<E extends IAdtError = IAdtError>(
-    objectType: AdtObjectType,
+    objectType: AdtTypeCode,
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions & IAdtAnalyseOptions<E>,
@@ -409,7 +413,7 @@ ${objectReferences}
    * §10.2); every other type goes to the base as it is.
    */
   override async readObjectSource<E extends IAdtError = IAdtError>(
-    objectType: AdtSourceObjectType,
+    objectType: AdtSourceTypeCode,
     objectName: string,
     functionGroup?: string,
     version?: 'active' | 'inactive',

@@ -107,8 +107,7 @@ export async function activateObjectsGroup(
   const objectReferences = objects
     .map((obj) => {
       const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
-      const typeAttr = obj.type ? ` adtcore:type="${obj.type}"` : '';
-      return `  <adtcore:objectReference adtcore:uri="${uri}"${typeAttr} adtcore:name="${obj.name}"/>`;
+      return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:type="${obj.type}" adtcore:name="${obj.name}"/>`;
     })
     .join('\n');
 

@@ -95,6 +95,9 @@ export const ACCEPT_JUNIT_RESULT =
 
 // Discovery
 export const ACCEPT_DISCOVERY = 'application/atomsvc+xml';
+/** The repository's type list — `/repository/typestructure` — as recorded on every release. */
+export const ACCEPT_TYPE_STRUCTURE =
+  'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.RepositoryTypeList';
 
 // Repository
 export const ACCEPT_NODE_STRUCTURE =

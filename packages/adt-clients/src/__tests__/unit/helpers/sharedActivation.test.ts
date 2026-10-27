@@ -23,6 +23,7 @@ jest.mock('../../helpers/adtHeaders', () => ({
 import {
   activateSharedGroup,
   analyseActivationExecuted,
+  type ISharedGroupMember,
 } from '../../helpers/sharedActivation';
 
 const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
@@ -32,7 +33,7 @@ const refused = (message: string) => ({
 });
 
 const logger = { debug() {}, info() {}, warn() {}, error() {} };
-const members = [{ type: 'DDLS/DF', name: 'ZAC_TF' }];
+const members: ISharedGroupMember[] = [{ type: 'DDLS/DF', name: 'ZAC_TF' }];
 const started = ok({ headers: { location: '/activation/runs/RUN1' } });
 const finished = ok('<run status="finished"/>');
 const executed = ok('<results activationExecuted="true"/>');

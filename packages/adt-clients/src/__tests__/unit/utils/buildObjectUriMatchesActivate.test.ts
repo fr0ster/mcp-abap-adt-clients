@@ -17,6 +17,7 @@
  * here — a wrong path segment is.
  */
 
+import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -70,7 +71,7 @@ async function sentUri(
 }
 
 type Row = [
-  type: string,
+  type: AdtTypeCode,
   name: string,
   parent: string | undefined,
   activate: (connection: IAbapConnection) => Promise<unknown>,
@@ -133,7 +134,7 @@ const rows: Row[] = [
     (c) => activateStructure(c, headersFor('AdtStructure.activate'), 'ZSTRU_X'),
   ],
   [
-    'TTYP/DF',
+    'TTYP/DA',
     'ZTTYP_X',
     undefined,
     (c) =>
@@ -327,14 +328,24 @@ describe('buildObjectUri matches each family’s own activation address', () => 
  * That is the caller's argument, not SAP's answer, so it is thrown.
  */
 describe('a type that cannot be addressed without more', () => {
-  it.each(['ENHO', 'ENHS'])(
-    '%s alone is refused, naming the subtype',
-    (type) => {
-      expect(() => buildObjectUri('ZENH_X', type)).toThrow(/subtype/);
-    },
-  );
+  it('a bare ENHO or ENHS is no code of the tables', () => {
+    // @ts-expect-error -- ENHO names no subtype, and the tables list none bare
+    expect(() => buildObjectUri('ZENH_X', 'ENHO')).toThrow(
+      /No ADT address is known/,
+    );
+    // @ts-expect-error -- ENHS names no subtype, and the tables list none bare
+    expect(() => buildObjectUri('ZENH_X', 'ENHS')).toThrow(
+      /No ADT address is known/,
+    );
+  });
 
-  it('a function include without its group is refused', () => {
-    expect(() => buildObjectUri('LZFG_XTOP', 'FUGR/I')).toThrow(/group/);
+  it('a function include without its group does not compile, and is refused', () => {
+    // @ts-expect-error -- FUGR/I is addressed under its group
+    expect(() => buildObjectUri('LZFG_XTOP', 'FUGR/I')).toThrow(/parent/);
+    // Typed only as a code of the tables, the parent is optional — and refused.
+    const typedAsAnyCode = (code: AdtTypeCode): AdtTypeCode => code;
+    expect(() => buildObjectUri('LZFG_XTOP', typedAsAnyCode('FUGR/I'))).toThrow(
+      /parent/,
+    );
   });
 });

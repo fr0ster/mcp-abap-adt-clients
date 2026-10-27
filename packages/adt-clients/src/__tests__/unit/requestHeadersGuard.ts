@@ -293,12 +293,12 @@ export function utilRows(
     const calls: Record<string, (h: never, x: IAdtHeaders) => unknown> = {
       getWhereUsed: (h, headers) =>
         m(h, 'getWhereUsed')(
-          { object_name: 'ZCL_GUARD', object_type: 'class' },
+          { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
           { headers },
         ),
       getWhereUsedScope: (h, headers) =>
         m(h, 'getWhereUsedScope')(
-          { object_name: 'ZCL_GUARD', object_type: 'class' },
+          { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
           { headers },
         ),
       getVirtualFoldersContents: (h, headers) =>

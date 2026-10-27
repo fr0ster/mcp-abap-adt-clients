@@ -15,7 +15,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { AdtObjectType } from '../../../core/shared/types';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { gate, gateAll, gateOn } from '../../helpers/caseGate';
@@ -110,16 +109,20 @@ describe('Shared - readMetadata', () => {
         testsLogger.info?.('📖 Reading metadata...');
 
         const activeResult = await orThrow(
-          client.getUtils().readObjectMetadata('class', className, undefined, {
-            analyse: analyseException,
-            version: 'active',
-          }),
+          client
+            .getUtils()
+            .readObjectMetadata('CLAS/OC', className, undefined, {
+              analyse: analyseException,
+              version: 'active',
+            }),
         );
         const inactiveResult = await orThrow(
-          client.getUtils().readObjectMetadata('class', className, undefined, {
-            analyse: analyseException,
-            version: 'inactive',
-          }),
+          client
+            .getUtils()
+            .readObjectMetadata('CLAS/OC', className, undefined, {
+              analyse: analyseException,
+              version: 'inactive',
+            }),
         );
 
         expect(activeResult).toBeDefined();
@@ -180,7 +183,7 @@ describe('Shared - readMetadata', () => {
         const result = await orThrow(
           client
             .getUtils()
-            .readObjectMetadata('domain', domainName, undefined, {
+            .readObjectMetadata('DOMA/DD', domainName, undefined, {
               analyse: analyseException,
             }),
         );
@@ -229,9 +232,11 @@ describe('Shared - readMetadata', () => {
       try {
         logTestStep('read table metadata', testsLogger);
         const result = await orThrow(
-          client.getUtils().readObjectMetadata('table', tableName, undefined, {
-            analyse: analyseException,
-          }),
+          client
+            .getUtils()
+            .readObjectMetadata('TABL/DT', tableName, undefined, {
+              analyse: analyseException,
+            }),
         );
         expect(result).toBeDefined();
       } catch (error: any) {
@@ -259,14 +264,15 @@ describe('Shared - readMetadata', () => {
       await expect(
         client
           .getUtils()
-          // Force runtime validation for invalid inputs.
+          // A caller outside the type system: the code is refused at run time.
           .readObjectMetadata(
-            'unsupported_type' as unknown as AdtObjectType,
+            // @ts-expect-error -- 'unsupported_type' is no code of the tables
+            'unsupported_type',
             'TEST',
             undefined,
             { analyse: analyseException },
           ),
-      ).rejects.toThrow('Unsupported object type for metadata');
+      ).rejects.toThrow('No ADT address is known for object type');
     },
   );
 });

@@ -6,219 +6,94 @@
  * 2. Group activation: /sap/bc/adt/activation/runs (for multiple objects)
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtParentedTypeCode,
+  AdtTypeCode,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { getEnhancementUri } from '../core/enhancement/types';
 import {
-  ACCESS_CONTROL,
-  AUTHORIZATION_FIELD,
-  BEHAVIOR_DEFINITION,
-  CLASS,
-  DATA_ELEMENT,
-  DDIC_VIEW,
-  DDL_SOURCE,
-  DOMAIN,
-  FEATURE_TOGGLE,
-  FUNCTION_GROUP,
-  FUNCTION_INCLUDE,
-  FUNCTION_MODULE,
-  INTERFACE,
-  METADATA_EXTENSION,
-  PACKAGE,
-  PROGRAM,
-  PROGRAM_INCLUDE,
-  SCALAR_FUNCTION,
-  SCALAR_FUNCTION_IMPLEMENTATION,
-  SERVICE_BINDING,
-  SERVICE_DEFINITION,
-  STRUCTURE,
-  TABLE,
-  TABLE_TYPE,
-  TRANSFORMATION,
-} from '../endpoints/objects';
+  codeEntries,
+  NO_OWN_ADDRESS,
+  PARENTED_SEGMENT,
+  parentEntry,
+} from '../endpoints/codes';
+import { seg } from '../endpoints/objects';
 import { requestHeaders } from './requestHeaders';
 
+/** {@link PARENTED_SEGMENT}, read by any code: absent for an unparented one. */
+const PARENTED_SEGMENT_BY_CODE: Readonly<Partial<Record<AdtTypeCode, string>>> =
+  PARENTED_SEGMENT;
+
 /**
- * Build object URI from name and type
- * Used by both individual and group activation
+ * What `buildObjectUri` takes after the code: the parent's name, required for
+ * a code that lives under a parent (`FUGR/FF`, `FUGR/I`) and optional
+ * otherwise. Not distributive, like `IObjectReference`: a code typed
+ * `AdtTypeCode` leaves it optional, and the address is refused at run time
+ * when it is missing.
+ */
+export type ParentArgument<C extends AdtTypeCode> = [C] extends [
+  AdtParentedTypeCode,
+]
+  ? [parentName: string]
+  : [parentName?: string];
+
+/**
+ * An object's ADT address, from the type tables of
+ * `@mcp-abap-adt/interfaces-adt`: its code's collection followed by its name,
+ * or, for a code with a parent API, the parent's address, the code's segment
+ * and its name. Used by individual and group activation, group deletion and
+ * where-used.
  *
  * @param name - Object name (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM')
- * @param type - Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')
- * @param parentName - Parent object name (e.g., function group name for FUGR/FF)
+ * @param type - A code of the tables (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')
+ * @param parentName - The parent's name, for a parented code (the function group of 'FUGR/FF')
  * @returns ADT URI for the object
  */
-export function buildObjectUri(
+export function buildObjectUri<C extends AdtTypeCode>(
   name: string,
-  type?: string,
-  parentName?: string,
+  type: C,
+  ...[parentName]: ParentArgument<C>
 ): string {
-  if (!type) {
-    // The name does not say what an object is: ZCL_ is a convention, not a
-    // type, and every other name used to be taken for a program.
-    throw new Error(`buildObjectUri needs the object type for ${name}`);
+  const [first] = codeEntries(type);
+  // Only a caller outside the type system reaches this: a code no table names
+  // is no `AdtTypeCode`. It is their argument, refused before any request.
+  if (!first) {
+    throw new Error(
+      `No ADT address is known for object type '${type}' (${name}); pass a code of the ADT type tables, e.g. CLAS/OC, PROG/P, PROG/I, FUGR/I.`,
+    );
+  }
+  const irregular = NO_OWN_ADDRESS[type];
+  if (irregular) {
+    throw new Error(`${type} ${name}: ${irregular}`);
   }
 
-  // Map type to URI path
-  switch (type.toUpperCase()) {
-    // A package is not `/sap/bc/adt/devc/k/…`, which is what the fallback at the
-    // bottom of this switch builds from the type code. ADT answers that address
-    // with `No URI-Mapping defined for URI`, and every group operation —
-    // deletion check, delete, activate — was asking about packages there.
-    // `AdtPackage` has always used the right resource directly, which is why
-    // package CRUD worked while the group operations did not.
-    case 'DEVC/K':
-    case 'DEVC':
-      return `${PACKAGE.uri(name)}`;
-
-    case 'CLAS/OC':
-    case 'CLAS':
-      return `${CLASS.uri(name)}`;
-
-    case 'PROG/P':
-    case 'PROG':
-      return `${PROGRAM.uri(name)}`;
-
-    case 'PROG/I':
-      return `${PROGRAM_INCLUDE.uri(name)}`;
-
-    case 'FUGR/FF': {
-      // A module is addressed under its group. This used to put the module's
-      // own name in the group's place when none was passed — an address that
-      // exists nowhere.
-      if (!parentName) {
-        throw new Error(
-          `A function module (FUGR/FF) is addressed under its function group; pass the group as parentName for ${name}`,
-        );
-      }
-      return FUNCTION_MODULE.uri(parentName, name);
-    }
-
-    case 'FUGR/I': {
-      // A function include lives under its group, and the address is
-      // meaningless without it: `/functions/groups/<group>/includes/<NAME>`,
-      // with the include's name upper-cased the way its own activation sends
-      // it. The group is the caller's to give — it is their argument that is
-      // missing, not anything SAP said, so it is thrown.
-      if (!parentName) {
-        throw new Error(
-          `A function include (FUGR/I) is addressed under its function group; pass the group as parentName for ${name}`,
-        );
-      }
-      return `${FUNCTION_INCLUDE.uri(parentName, name)}`;
-    }
-
-    case 'FUGR':
-    case 'FUGR/F':
-    case 'FUNC':
-      return `${FUNCTION_GROUP.uri(name)}`;
-
-    case 'TABL/DT':
-    case 'TABL':
-      return `${TABLE.uri(name)}`;
-
-    case 'TABL/DS':
-    case 'STRU/DS':
-    case 'STRU':
-      return `${STRUCTURE.uri(name)}`;
-
-    case 'DDLS/DF':
-    case 'DDLS':
-      return `${DDL_SOURCE.uri(name)}`;
-
-    case 'VIEW/DV':
-    case 'VIEW':
-      return `${DDIC_VIEW.uri(name)}`;
-
-    case 'DTEL/DE':
-    case 'DTEL':
-      return `${DATA_ELEMENT.uri(name)}`;
-
-    case 'DOMA/DD':
-    case 'DOMA':
-      return `${DOMAIN.uri(name)}`;
-
-    case 'INTF/OI':
-    case 'INTF':
-      return `${INTERFACE.uri(name)}`;
-
-    case 'TTYP/DF':
-    case 'TTYP/TT':
-    case 'TTYP':
-      return `${TABLE_TYPE.uri(name)}`;
-
-    case 'SRVD/SRV':
-    case 'SRVD':
-      return `${SERVICE_DEFINITION.uri(name)}`;
-
-    case 'SRVB/SVB':
-    case 'SRVB':
-      return SERVICE_BINDING.uri(name);
-
-    case 'DDLX/EX':
-    case 'DDLX':
-      return `${METADATA_EXTENSION.uri(name)}`;
-
-    case 'BDEF/BDO':
-    case 'BDEF':
-      // `/bo/behaviordefinitions`, as a BDEF's own activation and the
-      // inactive-objects list both address it. This read `/ddic/bdef/sources`
-      // until #173: SAP resolved that to nothing and answered
-      // `activationExecuted="false"` with no message, so a group activation
-      // reported success and left the behavior definition inactive.
-      return `${BEHAVIOR_DEFINITION.uri(name)}`;
-
-    case 'DCLS/DL':
-    case 'DCLS':
-      return `${ACCESS_CONTROL.uri(name)}`;
-
-    case 'DSFD/SCF':
-      return `${SCALAR_FUNCTION.uri(name)}`;
-
-    case 'DSFI/SFI':
-      return `${SCALAR_FUNCTION_IMPLEMENTATION.uri(name)}`;
-
-    case 'XSLT/VT':
-    case 'XSLT':
-      return `${TRANSFORMATION.uri(name)}`;
-
-    case 'AUTH':
-      return `${AUTHORIZATION_FIELD.uri(name)}`;
-
-    case 'FTG2/FT':
-    case 'FTG2':
-      return `${FEATURE_TOGGLE.uri(name)}`;
-
-    // The subtype is a path segment — `/enhancements/enhoxhb/<name>` — so it is
-    // read off the type code, and built by the same function the enhancement's
-    // own activation uses. This case built `/enhancements/<name>` until #173's
-    // check found it, and the subtyped codes fell through to `default`.
-    case 'ENHO/XHB':
-      return getEnhancementUri('enhoxhb', name);
-    case 'ENHO/XHH':
-      return getEnhancementUri('enhoxhh', name);
-    case 'ENHS/XSB':
-      return getEnhancementUri('enhsxsb', name);
-
-    case 'ENHO':
-    case 'ENHS':
-      // Which subtype is the caller's to say; guessing one is the `default`
-      // branch's mistake below. Their argument is short, not SAP's answer.
-      throw new Error(
-        `${type} does not say which enhancement subtype ${name} is, and the subtype is part of its address; pass the full type (e.g. ENHO/XHB, ENHO/XHH, ENHS/XSB)`,
-      );
-
-    default:
-      // Used to build `/sap/bc/adt/<type lowercased>/<name>` — right only when
-      // the ADT path happened to be the type code, and a 200 carrying ADT's
-      // complaint otherwise (`DEVC/K` showed it). A type this library has no
-      // record for is the caller's argument, so it is refused before a request.
-      throw new Error(
-        `No ADT address is known for object type '${type}' (${name}); pass one of the codes this library maps, e.g. CLAS/OC, PROG/P, PROG/I, FUGR/I.`,
-      );
+  const { entry, facts } = first;
+  if (facts.parent === null) {
+    return `${facts.collection ?? entry.collection}/${seg(name)}`;
   }
+
+  // A parented code is addressed under its parent, and the address means
+  // nothing without it. A reference typed by its code requires the parent; one
+  // typed `AdtTypeCode` may lack it, and that is the caller's argument.
+  const parent = parentEntry(first, facts.parent);
+  const segment: string | undefined = PARENTED_SEGMENT_BY_CODE[type];
+  if (!parentName) {
+    throw new Error(
+      `${type} is addressed under its parent (${facts.parent}); pass the parent's name as parentName for ${name}`,
+    );
+  }
+  if (!parent || !segment) {
+    // A table that names a parent API it has no entry for, or a parented code
+    // without its segment, is a defect of this library, not the caller's.
+    throw new Error(
+      `The ADT type tables name no address for ${type} under ${facts.parent}`,
+    );
+  }
+  return `${parent.collection}/${seg(parentName)}/${segment}/${seg(name)}`;
 }
 
 /**

@@ -64,8 +64,7 @@ export async function checkDataElement(
     response = await runCheckRun(
       connection,
       headers,
-      'data_element',
-      dataElementName,
+      { type: 'DTEL/DE', name: dataElementName },
       version,
       'abapCheckRun',
       undefined,

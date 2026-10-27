@@ -33,6 +33,7 @@ import {
   ACCEPT_TRANSPORT_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -126,7 +127,7 @@ export class AdtServiceBinding<
       ? ` adtcore:responsible="${responsible}"`
       : '';
 
-    return `<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${escapedDescription}" adtcore:language="${masterLanguage}" adtcore:name="${escapedBindingName}" adtcore:type="SRVB/SVB" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
+    return `<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${escapedDescription}" adtcore:language="${masterLanguage}" adtcore:name="${escapedBindingName}" adtcore:type="${TYPE_CODE.serviceBinding}" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapedPackageName}"/>
   <srvb:services srvb:name="${escapedServiceName}">
     <srvb:content srvb:version="${escapedServiceVersion}">

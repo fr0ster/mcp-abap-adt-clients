@@ -9,7 +9,7 @@
  * handed. That is why it is the one member here that answers a plain string.
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtTypeCode, IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
 
 // Since 36.0.0 a request's Accept and Content-Type are the caller's
@@ -30,7 +30,7 @@ const WHERE_USED: IAdtHeaders = {
 export async function whereUsed(
   client: AdtClient,
   objectName: string,
-  objectType = 'class',
+  objectType: AdtTypeCode = 'CLAS/OC',
   searchOnlyIn?: string[],
 ): Promise<string> {
   const utils = client.getUtils();

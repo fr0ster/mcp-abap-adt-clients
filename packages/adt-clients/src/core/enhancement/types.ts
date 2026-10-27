@@ -12,6 +12,7 @@ import type {
   IEnhancementConfig,
   IEnhancementResults,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { CodeOf } from '../../constants/typeCodes';
 import { ENHANCEMENT } from '../../endpoints/objects';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -23,11 +24,11 @@ export type {
 /**
  * Enhancement object type codes for ADT
  */
-export const ENHANCEMENT_TYPE_CODES: Record<EnhancementType, string> = {
+export const ENHANCEMENT_TYPE_CODES = {
   enhoxhb: 'ENHO/XHB', // BAdI Implementation
   enhoxhh: 'ENHO/XHH', // Source Code Plugin
   enhsxsb: 'ENHS/XSB', // BAdI Enhancement Spot
-};
+} as const satisfies Record<EnhancementType, CodeOf<'enhancement'>>;
 
 /**
  * Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces

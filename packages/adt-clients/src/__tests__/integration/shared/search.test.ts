@@ -113,14 +113,14 @@ describe('Shared - searchObjects', () => {
     'should search objects with object type filter',
     async () => {
       logTestStep('search objects with object type filter', testsLogger);
-      testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
+      testsLogger.info?.('🔍 Query: T*, objectType: TABL/DT, maxResults: 10');
 
       const hits = expectResult(
         await withAcceptHandling(
           hitsUtils().search(
             {
               query: 'T*',
-              objectType: 'TABL',
+              objectType: 'TABL/DT',
               maxResults: 10,
             },
             { analyse: analyseException },

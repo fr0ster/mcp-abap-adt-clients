@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { TYPE_CODE } from '../../constants/typeCodes';
 
 export interface IParsedMessage {
   msgno: string;
@@ -107,7 +108,7 @@ export function buildMessageClassXml(
     'adtcore:masterLanguage': cls.masterLanguage,
     'adtcore:masterSystem': cls.masterSystem,
     'adtcore:responsible': cls.responsible,
-    'adtcore:type': 'MSAG/N',
+    'adtcore:type': TYPE_CODE.messageClass,
   });
   const pkg = cls.packageName
     ? `<adtcore:packageRef adtcore:name="${esc(cls.packageName)}"/>`

@@ -7,10 +7,8 @@
  */
 
 export type {
-  AdtObjectType,
-  AdtObjectTypeLower,
-  AdtSourceObjectType,
-  AdtSourceObjectTypeLower,
+  AdtSourceTypeCode,
+  AdtTypeCode,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
   IGetSqlQueryParams,

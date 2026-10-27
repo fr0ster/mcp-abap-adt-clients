@@ -34,6 +34,7 @@ import {
   logTestStart,
   logTestSuccess,
 } from '../../helpers/testProgressLogger';
+import { adtTypeCode } from '../../helpers/typeCode';
 
 interface IObjectStructureParams {
   object_type: string;
@@ -94,7 +95,7 @@ class ObjectStructureObject implements TestableObject<IObjectStructureParams> {
     }
     return this.client
       .getUtils()
-      .getObjectStructure(config.object_type, config.object_name, {
+      .getObjectStructure(adtTypeCode(config.object_type), config.object_name, {
         analyse: analyseException,
       });
   }

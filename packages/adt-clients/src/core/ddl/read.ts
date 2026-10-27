@@ -19,7 +19,7 @@ export async function getDdlMetadata(
   ddlName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return objectMetadataWire(connection, 'view', ddlName, undefined, options);
+  return objectMetadataWire(connection, 'DDLS/DF', ddlName, undefined, options);
 }
 
 /**
@@ -33,7 +33,7 @@ export async function getDdlSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'view',
+    'DDLS/DF',
     ddlName,
     undefined,
     version,

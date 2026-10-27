@@ -18,8 +18,7 @@ export async function checkTransformation(
   const response = await runCheckRun(
     connection,
     headers,
-    'transformation',
-    transformationName,
+    { type: 'XSLT/VT', name: transformationName },
     version,
     'abapCheckRun',
     sourceCode,

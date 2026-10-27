@@ -11,6 +11,7 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
   ADT_NO_FAILURE,
+  type AdtTypeCode,
   type IAdtError,
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -31,8 +32,8 @@ import {
 } from './xmlTree';
 
 export interface ISharedGroupMember {
-  /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`. */
-  type: string;
+  /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`: a code of the tables. */
+  type: AdtTypeCode;
   name: string;
 }
 

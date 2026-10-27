@@ -42,6 +42,7 @@ import {
   logTestStart,
   logTestSuccess,
 } from '../../helpers/testProgressLogger';
+import { adtTypeCode } from '../../helpers/typeCode';
 
 interface INodeStructureParams {
   parent_type: string;
@@ -108,7 +109,7 @@ class NodeStructureObject implements TestableObject<INodeStructureParams> {
     // default answers the document as it came.
     return this.client
       .getUtils({ ...utilDocuments, node: utilNodeContents })
-      .fetchNodeStructure(config.parent_type, config.parent_name, {
+      .fetchNodeStructure(adtTypeCode(config.parent_type), config.parent_name, {
         analyse: analyseException,
         headers: integrationHeadersOf(
           this.client.getUtils({ ...utilDocuments, node: utilNodeContents }),

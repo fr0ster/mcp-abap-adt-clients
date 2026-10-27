@@ -10,6 +10,7 @@ import {
   ACCEPT_VALIDATION_CLASS_NAME,
   CHECK_RUN_HEADERS,
 } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { CLASS } from '../../endpoints/objects';
 
 /**
@@ -36,7 +37,7 @@ export async function validateClassName(
   // Build query parameters for class validation
   const params = new URLSearchParams({
     objname: className,
-    objtype: 'CLAS/OC',
+    objtype: TYPE_CODE.class,
     packagename: packageName,
   });
 
@@ -91,8 +92,7 @@ export async function validateClassSource(
     response = await runCheckRunWithSource(
       connection,
       CHECK_RUN_HEADERS,
-      'class',
-      className,
+      { type: 'CLAS/OC', name: className },
       sourceCode,
       version,
       'abapCheckRun',
@@ -102,8 +102,7 @@ export async function validateClassSource(
     response = await runCheckRun(
       connection,
       CHECK_RUN_HEADERS,
-      'class',
-      className,
+      { type: 'CLAS/OC', name: className },
       version,
       'abapCheckRun',
     );

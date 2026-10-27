@@ -5,7 +5,7 @@
  * Used by GetObjectInfo, GetIncludesList, and other tree navigation operations.
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtTypeCode, IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -33,7 +33,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function fetchNodeStructure(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  parentType: string,
+  parentType: AdtTypeCode,
   parentName: string,
   nodeId?: string,
   withShortDescriptions: boolean = true,

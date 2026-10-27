@@ -20,7 +20,10 @@ import {
   analyseValidation,
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtResponse,
+  IObjectReference,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -685,9 +688,9 @@ define structure ${structureName} {
           // Step 4: Group activation - activate all objects together
           currentStep = 'group activation';
           logTestStep(currentStep, testsLogger);
-          const objectsToActivate = [
-            { type: 'DOMA', name: domainName },
-            { type: 'DTEL', name: dataElementName },
+          const objectsToActivate: IObjectReference[] = [
+            { type: 'DOMA/DD', name: domainName },
+            { type: 'DTEL/DE', name: dataElementName },
             { type: 'TABL/DS', name: structureName },
           ];
 

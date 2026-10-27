@@ -19,7 +19,13 @@ export async function getTableMetadata(
   tableName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return objectMetadataWire(connection, 'table', tableName, undefined, options);
+  return objectMetadataWire(
+    connection,
+    'TABL/DT',
+    tableName,
+    undefined,
+    options,
+  );
 }
 
 /**
@@ -33,7 +39,7 @@ export async function getTableSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'table',
+    'TABL/DT',
     tableName,
     undefined,
     version,

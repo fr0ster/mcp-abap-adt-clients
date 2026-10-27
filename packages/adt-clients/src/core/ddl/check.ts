@@ -28,8 +28,7 @@ export async function checkDdl(
   return runCheckRun(
     connection,
     headers,
-    'view',
-    ddlName,
+    { type: 'DDLS/DF', name: ddlName },
     version,
     'abapCheckRun',
     sourceCode,

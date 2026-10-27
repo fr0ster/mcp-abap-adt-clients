@@ -21,7 +21,7 @@ export async function getStructureMetadata(
 ): Promise<IAdtWireResponse> {
   return objectMetadataWire(
     connection,
-    'structure',
+    'TABL/DS',
     structureName,
     undefined,
     options,
@@ -39,7 +39,7 @@ export async function getStructureSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'structure',
+    'TABL/DS',
     structureName,
     undefined,
     version,

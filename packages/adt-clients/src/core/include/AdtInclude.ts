@@ -32,6 +32,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -151,7 +152,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
 
     const params = new URLSearchParams({
       objname: includeName.toUpperCase(),
-      objtype: 'PROG/I',
+      objtype: TYPE_CODE.include,
       packagename: (config.packageName as string).toUpperCase(),
     });
     if (config.description) {

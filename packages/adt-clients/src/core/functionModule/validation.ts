@@ -3,11 +3,13 @@
  * Uses ADT validation endpoint: /sap/bc/adt/functions/validation
  */
 
+import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 
 /**
@@ -34,7 +36,7 @@ export async function validateFunctionModuleName(
 ): Promise<IAdtWireResponse> {
   const url = FUNCTION_GROUP.validation;
   const queryParams = new URLSearchParams({
-    objtype: 'FUGR/FF',
+    objtype: TYPE_CODE.functionModule,
     objname: functionModuleName,
     fugrname: functionGroupName,
   });
@@ -79,9 +81,11 @@ export async function validateFunctionModuleSource(
     '../../utils/checkRun'
   );
 
-  // Build object type path for function module
-  const objectType = 'function_module';
-  const objectName = `${functionGroupName}/${functionModuleName}`;
+  const object: IObjectReference<'FUGR/FF'> = {
+    type: 'FUGR/FF',
+    name: functionModuleName,
+    parentName: functionGroupName,
+  };
 
   let response: IAdtWireResponse;
 
@@ -90,8 +94,7 @@ export async function validateFunctionModuleSource(
     response = await runCheckRunWithSource(
       connection,
       CHECK_RUN_HEADERS,
-      objectType,
-      objectName,
+      object,
       sourceCode,
       version,
       'abapCheckRun',
@@ -101,8 +104,7 @@ export async function validateFunctionModuleSource(
     response = await runCheckRun(
       connection,
       CHECK_RUN_HEADERS,
-      objectType,
-      objectName,
+      object,
       version,
       'abapCheckRun',
     );

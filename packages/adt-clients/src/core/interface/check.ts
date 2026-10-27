@@ -23,8 +23,7 @@ export async function checkInterface(
   const response = await runCheckRun(
     connection,
     headers,
-    'interface',
-    interfaceName,
+    { type: 'INTF/OI', name: interfaceName },
     version,
     'abapCheckRun',
     sourceCode,

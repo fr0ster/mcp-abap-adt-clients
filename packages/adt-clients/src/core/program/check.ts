@@ -23,8 +23,7 @@ export async function checkProgram(
   const response = await runCheckRun(
     connection,
     headers,
-    'program',
-    programName,
+    { type: 'PROG/P', name: programName },
     version,
     'abapCheckRun',
     sourceCode,

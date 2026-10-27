@@ -13,8 +13,8 @@
  * question; it is the one way, used by the member and by us.
  */
 import type {
-  AdtObjectType,
-  AdtSourceObjectType,
+  AdtSourceTypeCode,
+  AdtTypeCode,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -36,25 +36,13 @@ import {
   ACCEPT_TABLE_TYPE,
   CT_VIEW,
 } from '../../constants/contentTypes';
-import {
-  CLASS,
-  DATA_ELEMENT,
-  DDL_SOURCE,
-  DOMAIN,
-  FUNCTION_GROUP,
-  FUNCTION_MODULE,
-  INTERFACE,
-  PACKAGE,
-  PROGRAM,
-  STRUCTURE,
-  sourceUri,
-  TABLE,
-  TABLE_TYPE,
-} from '../../endpoints/objects';
+import { codeHas } from '../../endpoints/codes';
+import { sourceUri } from '../../endpoints/objects';
+import { buildObjectUri } from '../../utils/activationUtils';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
-  objectType: AdtSourceObjectType,
+  objectType: AdtSourceTypeCode,
   objectName: string,
   functionGroup?: string,
   version?: 'active' | 'inactive',
@@ -95,7 +83,7 @@ export async function objectSourceWire(
  */
 export async function objectMetadataWire(
   connection: IAbapConnection,
-  objectType: AdtObjectType,
+  objectType: AdtTypeCode,
   objectName: string,
   functionGroup?: string,
   options?: IReadOptions,
@@ -123,166 +111,57 @@ export async function objectMetadataWire(
   });
 }
 
+/**
+ * An object's metadata address: its address from the type tables. A
+ * parented code takes its parent as `functionGroup`, the only parent the
+ * tables name (`FUGR/FF`, `FUGR/I` under `functionGroup`).
+ */
 export function getObjectMetadataUri(
-  objectType: AdtObjectType,
+  objectType: AdtTypeCode,
   objectName: string,
   functionGroup?: string,
 ): string {
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `${CLASS.uri(objectName)}`;
-    case 'program':
-    case 'prog/p':
-      return `${PROGRAM.uri(objectName)}`;
-    case 'interface':
-    case 'intf/if':
-    // ADT's own code for an interface; 'intf/if' stays because callers pass it.
-    case 'intf/oi':
-      return `${INTERFACE.uri(objectName)}`;
-    case 'functionmodule':
-    case 'fugr/ff': {
-      return `${FUNCTION_MODULE.uri(functionGroup as string, objectName)}`;
-    }
-    case 'view':
-    case 'ddls/df':
-      return `${DDL_SOURCE.uri(objectName)}`;
-    case 'structure':
-    case 'stru/dt':
-      return `${STRUCTURE.uri(objectName)}`;
-    case 'table':
-    case 'tabl/dt':
-      return `${TABLE.uri(objectName)}`;
-    case 'tabletype':
-    case 'ttyp/df':
-      return `${TABLE_TYPE.uri(objectName)}`;
-    case 'domain':
-    case 'doma/dd':
-      return `${DOMAIN.uri(objectName)}`;
-    case 'dataelement':
-    case 'dtel':
-    case 'dtel/de':
-      return `${DATA_ELEMENT.uri(objectName)}`;
-    case 'functiongroup':
-    case 'fugr':
-      return `${FUNCTION_GROUP.uri(objectName)}`;
-    case 'package':
-    case 'devc/k':
-      return `${PACKAGE.uri(objectName)}`;
-    default:
-      throw new Error(`Unsupported object type for metadata: ${objectType}`);
-  }
+  return buildObjectUri(objectName, objectType, functionGroup);
 }
 
-export function getMetadataAcceptHeader(objectType: AdtObjectType): string {
-  const type = objectType.toLowerCase();
+/**
+ * The Accept each code's metadata document is asked for by default; a code
+ * not listed is asked for `application/xml`, as before. Keyed by the tables'
+ * codes — the friendly names and the codes no release lists that it carried
+ * before interfaces-adt 21.0.0 map to these (`stru/dt` → `TABL/DS`,
+ * `ttyp/df` → `TTYP/DA`, `fugr` → `FUGR/F`).
+ */
+const METADATA_ACCEPT: Readonly<Partial<Record<AdtTypeCode, string>>> = {
+  'CLAS/OC': ACCEPT_CLASS,
+  'INTF/OI': ACCEPT_INTERFACE,
+  'TABL/DT': ACCEPT_TABLE,
+  'TTYP/DA': ACCEPT_TABLE_TYPE,
+  'DOMA/DD': ACCEPT_DOMAIN,
+  'DTEL/DE': ACCEPT_DATA_ELEMENT,
+  'TABL/DS': ACCEPT_STRUCTURE,
+  'DDLS/DF': CT_VIEW,
+  'PROG/P': ACCEPT_PROGRAM,
+  'FUGR/F': ACCEPT_FUNCTION_GROUP,
+  'FUGR/FF': ACCEPT_FUNCTION_MODULE,
+  'DEVC/K': ACCEPT_PACKAGE,
+};
 
-  switch (type) {
-    case 'class':
-    case 'clas/oc':
-      return ACCEPT_CLASS;
-    case 'interface':
-    case 'intf/if':
-    // ADT's own code for an interface; 'intf/if' stays because callers pass it.
-    case 'intf/oi':
-      return ACCEPT_INTERFACE;
-    case 'table':
-    case 'tabl/dt':
-      return ACCEPT_TABLE;
-    case 'tabletype':
-    case 'ttyp/df':
-      return ACCEPT_TABLE_TYPE;
-    case 'domain':
-    case 'doma/dd':
-      return ACCEPT_DOMAIN;
-    case 'dataelement':
-    case 'dtel':
-    case 'dtel/de':
-      return ACCEPT_DATA_ELEMENT;
-    case 'structure':
-    case 'stru/dt':
-      return ACCEPT_STRUCTURE;
-    case 'view':
-    case 'ddls/df':
-      return CT_VIEW;
-    case 'program':
-    case 'prog/p':
-      return ACCEPT_PROGRAM;
-    case 'functiongroup':
-    case 'fugr':
-      return ACCEPT_FUNCTION_GROUP;
-    case 'functionmodule':
-    case 'fugr/ff':
-      return ACCEPT_FUNCTION_MODULE;
-    case 'package':
-    case 'devc/k':
-      return ACCEPT_PACKAGE;
-    default:
-      return 'application/xml';
-  }
+export function getMetadataAcceptHeader(objectType: AdtTypeCode): string {
+  return METADATA_ACCEPT[objectType] ?? 'application/xml';
 }
 
+/** An object's main source: its address from the tables, then `/source/main`. */
 export function getObjectSourceUri(
-  objectType: AdtSourceObjectType,
+  objectType: AdtSourceTypeCode,
   objectName: string,
   functionGroup?: string,
   version?: 'active' | 'inactive',
 ): string {
   const versionParam = version ? `?version=${version}` : '';
-
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `${sourceUri(CLASS.uri(objectName))}${versionParam}`;
-    case 'program':
-    case 'prog/p':
-      return `${sourceUri(PROGRAM.uri(objectName))}${versionParam}`;
-    case 'interface':
-    case 'intf/if':
-    // ADT's own code for an interface; 'intf/if' stays because callers pass it.
-    case 'intf/oi':
-      return `${sourceUri(INTERFACE.uri(objectName))}${versionParam}`;
-    case 'functionmodule':
-    case 'fugr/ff': {
-      return `${sourceUri(FUNCTION_MODULE.uri(functionGroup as string, objectName))}${versionParam}`;
-    }
-    case 'view':
-    case 'ddls/df':
-      return `${sourceUri(DDL_SOURCE.uri(objectName))}${versionParam}`;
-    case 'structure':
-    case 'stru/dt':
-      return `${sourceUri(STRUCTURE.uri(objectName))}${versionParam}`;
-    case 'table':
-    case 'tabl/dt':
-      return `${sourceUri(TABLE.uri(objectName))}${versionParam}`;
-    case 'tabletype':
-    case 'ttyp/df':
-      return `${sourceUri(TABLE_TYPE.uri(objectName))}${versionParam}`;
-    default:
-      throw new Error(
-        `Object type ${objectType} does not support source code reading`,
-      );
-  }
+  return `${sourceUri(buildObjectUri(objectName, objectType, functionGroup))}${versionParam}`;
 }
 
-export function supportsSourceCode(objectType: AdtObjectType): boolean {
-  const supportedTypes = [
-    'class',
-    'clas/oc',
-    'program',
-    'prog/p',
-    'interface',
-    'intf/if',
-    'functionmodule',
-    'fugr/ff',
-    'view',
-    'ddls/df',
-    'structure',
-    'stru/dt',
-    'table',
-    'tabl/dt',
-    'tabletype',
-    'ttyp/df',
-  ];
-  return supportedTypes.includes(objectType.toLowerCase());
+/** Whether a table lists `source` for the code. */
+export function supportsSourceCode(objectType: AdtTypeCode): boolean {
+  return codeHas(objectType, 'source');
 }

@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { CLASS } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -58,7 +59,7 @@ export async function create(
     ? `\n\n  ${args.template_xml}\n\n`
     : '\n\n';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.class_name}" adtcore:type="${TYPE_CODE.class}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
 
 
 
@@ -70,7 +71,7 @@ export async function create(
 
 
 
-  <class:include adtcore:name="CLAS/OC" adtcore:type="CLAS/OC" class:includeType="testclasses"/>
+  <class:include adtcore:name="${TYPE_CODE.class}" adtcore:type="${TYPE_CODE.class}" class:includeType="testclasses"/>
 
 
 

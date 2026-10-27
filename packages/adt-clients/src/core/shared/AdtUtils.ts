@@ -18,13 +18,13 @@
  * const utils = client.getUtils();
  *
  * // Search for objects
- * const searchResult = await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+ * const searchResult = await utils.searchObjects({ query: 'Z*', objectType: 'CLAS/OC' });
  *
  * // Get where-used references
- * const whereUsed = await utils.getWhereUsed({ objectName: 'ZMY_CLASS', objectType: 'CLAS' });
+ * const whereUsed = await utils.getWhereUsed({ object_name: 'ZMY_CLASS', object_type: 'CLAS/OC' });
  *
  * // Group activation
- * await utils.activateObjectsGroup([{ type: 'DOMA', name: 'ZMY_DOMAIN' }]);
+ * await utils.activateObjectsGroup([{ type: 'DOMA/DD', name: 'ZMY_DOMAIN' }]);
  * ```
  *
  * ## Six members removed, and what went with them
@@ -101,6 +101,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { withRequestTrace } from '../../utils/requestTrace';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { fetchInactiveObjects } from './getInactiveObjects';
@@ -125,6 +126,7 @@ import {
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableColumns, getTableContents } from './tableContents';
+import { getTypeStructure as getTypeStructureUtil } from './typeStructure';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   getWhereUsed,
@@ -141,8 +143,8 @@ import {
 
 import { buildObjectUri } from '../../utils/activationUtils';
 import type {
-  AdtObjectType,
-  AdtSourceObjectType,
+  AdtSourceTypeCode,
+  AdtTypeCode,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
   IGetSqlQueryParams,
@@ -315,7 +317,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * // Get scope for a class
    * const scopeResponse = await utils.getWhereUsedScope({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class'
+   *   object_type: 'CLAS/OC'
    * });
    *
    * // Parse and display types to user, then modify XML
@@ -326,7 +328,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * // Execute search with modified scope
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class',
+   *   object_type: 'CLAS/OC',
    *   scopeXml: scopeXml
    * });
    */
@@ -359,7 +361,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Modified scope XML
    *
    * @example
-   * const scopeResponse = await utils.getWhereUsedScope({ object_name: 'ZMY_CLASS', object_type: 'class' });
+   * const scopeResponse = await utils.getWhereUsedScope({ object_name: 'ZMY_CLASS', object_type: 'CLAS/OC' });
    * let scopeXml = scopeResponse.data;
    *
    * // Enable function modules in search
@@ -370,7 +372,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    *
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class',
+   *   object_type: 'CLAS/OC',
    *   scopeXml: scopeXml
    * });
    */
@@ -405,19 +407,19 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * // Simple usage with default scope
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class'
+   *   object_type: 'CLAS/OC'
    * });
    *
    * // Advanced: use custom scope from getWhereUsedScope()
    * const scopeResponse = await utils.getWhereUsedScope({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class'
+   *   object_type: 'CLAS/OC'
    * });
    * let scopeXml = scopeResponse.data;
    * // Modify selections...
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class',
+   *   object_type: 'CLAS/OC',
    *   scopeXml: scopeXml
    *   searchInAllTypes: ['CLAS/OC', 'INTF/OI']
    * });
@@ -582,7 +584,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Metadata response
    */
   async readObjectMetadata<E extends IAdtError = IAdtError>(
-    objectType: AdtObjectType,
+    objectType: AdtTypeCode,
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions & IAdtAnalyseOptions<E>,
@@ -622,7 +624,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Source code response
    */
   async readObjectSource<E extends IAdtError = IAdtError>(
-    objectType: AdtSourceObjectType,
+    objectType: AdtSourceTypeCode,
     objectName: string,
     functionGroup?: string,
     version?: 'active' | 'inactive',
@@ -630,7 +632,9 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // Raised before anything is asked, rather than dressed as a verdict about
     // the server: a type with no source resource, and a function module with no
-    // function group, are both the caller's mistake. `getObjectSourceUri` is
+    // function group, are both the caller's mistake. The compiler holds the
+    // first (a type with no source is no `AdtSourceTypeCode`); a caller outside
+    // the type system still gets the refusal. `getObjectSourceUri` is
     // pure, so building the URI here is how its own guards surface as
     // themselves — inside `answering` they came back as
     // `origin: 'connection'`, advice to check a network nothing reached.
@@ -663,7 +667,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param objectType - Object type to check
    * @returns true if object type supports source code reading
    */
-  supportsSourceCode(objectType: AdtObjectType): boolean {
+  supportsSourceCode(objectType: AdtTypeCode): boolean {
     return supportsSourceCode(objectType);
   }
 
@@ -677,7 +681,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Source URI
    */
   getObjectSourceUri(
-    objectType: AdtSourceObjectType,
+    objectType: AdtSourceTypeCode,
     objectName: string,
     functionGroup?: string,
     version?: 'active' | 'inactive',
@@ -773,7 +777,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async fetchNodeStructure<E extends IAdtError = IAdtError>(
-    parentType: string,
+    parentType: AdtTypeCode,
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
@@ -808,7 +812,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async getObjectStructure<E extends IAdtError = IAdtError>(
-    objectType: string,
+    objectType: AdtTypeCode,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['objectStructure']>, E>> {
@@ -907,6 +911,33 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     return answering(
       () => getAllTypesUtil(this.connection, maxItemCount, name, data),
       this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The repository's object types, as the system states them —
+   * `POST /sap/bc/adt/repository/typestructure`, no body.
+   *
+   * Each type's code, label, category, `URI_TEMPLATE`, parent type, name
+   * length and capabilities: what the conformance check of the ADT type tables
+   * holds the tables to.
+   *
+   * **The document as it came, always.** `IUtilResults` of interfaces-adt
+   * 21.0.0 has no slot for this member, so no reading can be given for it;
+   * adding a slot here would make the set this class takes wider than the one
+   * a consumer composes from the contract package. It joins the set when the
+   * contract package names it.
+   *
+   * @param options.accept - The Accept to send; by default the type list's
+   *   own, which S/4HANA 2025, ABAP cloud and SAP_BASIS 7.40 SP04 answered
+   */
+  async getTypeStructure<E extends IAdtError = IAdtError>(
+    options?: { accept?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return answering(
+      () => getTypeStructureUtil(this.connection, options?.accept),
+      rawDocument,
       options?.analyse,
     );
   }
