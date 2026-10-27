@@ -925,9 +925,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getUtils<R extends IUtilResults = typeof utilDocuments>(
     results: R = utilDocuments as unknown as R,
-  ): AdtUtils<R> {
+  ): AdtUtils<R, V> {
     this.assertConnected();
-    return new AdtUtils<R>(this.connection, this.logger, results);
+    return new AdtUtils<R, V>(this.connection, this.logger, results);
   }
 
   /**

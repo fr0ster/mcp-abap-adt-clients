@@ -36,6 +36,7 @@ import type {
   interfaceDocuments,
   programDocuments,
   transportDocuments,
+  utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import type { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
@@ -182,7 +183,7 @@ type LegacyRequestRefusals = AllTrue<
 type LegacyUtilsOverrides = AllTrue<
   SameMembers<
     AdtUtilsLegacy,
-    AdtUtils,
+    AdtUtils<typeof utilDocuments, 'basis740'>,
     | 'checkDeletionGroup'
     | 'deleteObjectsGroup'
     | 'getWhereUsed'

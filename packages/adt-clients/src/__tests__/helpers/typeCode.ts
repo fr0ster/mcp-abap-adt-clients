@@ -9,6 +9,14 @@ import {
   type AdtSourceTypeCode,
   type AdtTypeCode,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtModernVariant } from '../../clients/variant';
+import {
+  type AdtActivationCode,
+  type AdtMetadataReadCode,
+  type AdtSourceReadCode,
+  isMetadataReadCode,
+  isSourceReadCode,
+} from '../../core/shared/codeSets';
 import { codeHas } from '../../endpoints/codes';
 
 const CODES: ReadonlySet<string> = new Set(
@@ -33,4 +41,38 @@ export function adtTypeCode(value: string): AdtTypeCode {
 /** Whether a table lists `source` for `code`. */
 export function isSourceTypeCode(code: AdtTypeCode): code is AdtSourceTypeCode {
   return codeHas(code, 'source');
+}
+
+/** `value` as a code `readObjectSource` reads; throws for any other. */
+export function sourceReadCode(value: string): AdtSourceReadCode {
+  if (!isSourceReadCode(value)) {
+    throw new Error(`readObjectSource reads no '${value}'`);
+  }
+  return value;
+}
+
+/** `value` as a code `readObjectMetadata` reads; throws for any other. */
+export function metadataReadCode(value: string): AdtMetadataReadCode {
+  if (!isMetadataReadCode(value)) {
+    throw new Error(`readObjectMetadata reads no '${value}'`);
+  }
+  return value;
+}
+
+/** Whether `code` is one a modern group activation activates. */
+function isActivationCode(
+  code: AdtTypeCode,
+): code is AdtActivationCode<AdtModernVariant> {
+  return code !== 'MSAG/NN' && codeHas(code, 'activate');
+}
+
+/** `value` as a code a group activation activates; throws for any other. */
+export function activationCode(
+  value: string,
+): AdtActivationCode<AdtModernVariant> {
+  const code = adtTypeCode(value);
+  if (!isActivationCode(code)) {
+    throw new Error(`a group activation activates no '${value}'`);
+  }
+  return code;
 }

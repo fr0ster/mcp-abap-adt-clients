@@ -7,9 +7,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtAddressableCode } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
-import type { IObjectReference } from './types';
+import type { IAdtGroupReference } from './codeSets';
 
 /**
  * What an activation run is doing — `/activation/runs/{runId}`.
@@ -97,7 +98,7 @@ export async function getActivationResults(
 export async function activateObjectsGroup(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  objects: IObjectReference[],
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
   preauditRequested: boolean = false,
 ): Promise<IAdtWireResponse> {
   // Step 1: Start activation run

@@ -13,8 +13,8 @@
  * question; it is the one way, used by the member and by us.
  */
 import type {
+  AdtParentedTypeCode,
   AdtSourceTypeCode,
-  AdtTypeCode,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -22,27 +22,19 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  ACCEPT_CLASS,
-  ACCEPT_DATA_ELEMENT,
-  ACCEPT_DOMAIN,
-  ACCEPT_FUNCTION_GROUP,
-  ACCEPT_FUNCTION_MODULE,
-  ACCEPT_INTERFACE,
-  ACCEPT_PACKAGE,
-  ACCEPT_PROGRAM,
-  ACCEPT_STRUCTURE,
-  ACCEPT_TABLE,
-  ACCEPT_TABLE_TYPE,
-  CT_VIEW,
-} from '../../constants/contentTypes';
-import { codeHas } from '../../endpoints/codes';
 import { sourceUri } from '../../endpoints/objects';
 import { buildObjectUri } from '../../utils/activationUtils';
+import { enhancementVersionToken } from '../enhancement/read';
+import {
+  type AdtMetadataReadCode,
+  type AdtSourceReadCode,
+  isSourceReadCode,
+  METADATA_READ,
+} from './codeSets';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
-  objectType: AdtSourceTypeCode,
+  objectType: AdtSourceReadCode,
   objectName: string,
   functionGroup?: string,
   version?: 'active' | 'inactive',
@@ -83,7 +75,7 @@ export async function objectSourceWire(
  */
 export async function objectMetadataWire(
   connection: IAbapConnection,
-  objectType: AdtTypeCode,
+  objectType: AdtMetadataReadCode,
   objectName: string,
   functionGroup?: string,
   options?: IReadOptions,
@@ -114,54 +106,58 @@ export async function objectMetadataWire(
 /**
  * An object's metadata address: its address from the type tables. A
  * parented code takes its parent as `functionGroup`, the only parent the
- * tables name (`FUGR/FF`, `FUGR/I` under `functionGroup`).
+ * tables name (`FUGR/FF` under `functionGroup`).
  */
 export function getObjectMetadataUri(
-  objectType: AdtTypeCode,
+  objectType: AdtMetadataReadCode,
   objectName: string,
   functionGroup?: string,
 ): string {
   return buildObjectUri(objectName, objectType, functionGroup);
 }
 
+/** The Accept a code's metadata document is asked for by default. */
+export function getMetadataAcceptHeader(
+  objectType: AdtMetadataReadCode,
+): string {
+  return METADATA_READ[objectType];
+}
+
 /**
- * The Accept each code's metadata document is asked for by default; a code
- * not listed is asked for `application/xml`, as before. Keyed by the tables'
- * codes — the friendly names and the codes no release lists that it carried
- * before interfaces-adt 21.0.0 map to these (`stru/dt` → `TABL/DS`,
- * `ttyp/df` → `TTYP/DA`, `fugr` → `FUGR/F`).
+ * The `version` each code's source is asked for, where it is not the word
+ * itself: an enhancement's inactive source is its `workingArea`.
  */
-const METADATA_ACCEPT: Readonly<Partial<Record<AdtTypeCode, string>>> = {
-  'CLAS/OC': ACCEPT_CLASS,
-  'INTF/OI': ACCEPT_INTERFACE,
-  'TABL/DT': ACCEPT_TABLE,
-  'TTYP/DA': ACCEPT_TABLE_TYPE,
-  'DOMA/DD': ACCEPT_DOMAIN,
-  'DTEL/DE': ACCEPT_DATA_ELEMENT,
-  'TABL/DS': ACCEPT_STRUCTURE,
-  'DDLS/DF': CT_VIEW,
-  'PROG/P': ACCEPT_PROGRAM,
-  'FUGR/F': ACCEPT_FUNCTION_GROUP,
-  'FUGR/FF': ACCEPT_FUNCTION_MODULE,
-  'DEVC/K': ACCEPT_PACKAGE,
+const VERSION_TOKEN: Readonly<
+  Partial<Record<AdtSourceTypeCode, (version: 'active' | 'inactive') => string>>
+> = {
+  'ENHO/XHH': enhancementVersionToken,
 };
 
-export function getMetadataAcceptHeader(objectType: AdtTypeCode): string {
-  return METADATA_ACCEPT[objectType] ?? 'application/xml';
-}
-
-/** An object's main source: its address from the tables, then `/source/main`. */
-export function getObjectSourceUri(
-  objectType: AdtSourceTypeCode,
+/**
+ * An object's main source address: its address from the tables, then
+ * `/source/main`, and the version as the code's own resource spells it. A
+ * pure address — it sends nothing — so it is built for every code with a
+ * source, the parent required for a parented one.
+ */
+export function getObjectSourceUri<C extends AdtSourceTypeCode>(
+  objectType: C,
   objectName: string,
-  functionGroup?: string,
-  version?: 'active' | 'inactive',
+  ...[functionGroup, version]: [C] extends [AdtParentedTypeCode]
+    ? [functionGroup: string, version?: 'active' | 'inactive']
+    : [functionGroup?: string, version?: 'active' | 'inactive']
 ): string {
-  const versionParam = version ? `?version=${version}` : '';
-  return `${sourceUri(buildObjectUri(objectName, objectType, functionGroup))}${versionParam}`;
+  const token = version
+    ? (VERSION_TOKEN[objectType]?.(version) ?? version)
+    : undefined;
+  const versionParam = token ? `?version=${token}` : '';
+  const code: AdtSourceTypeCode = objectType;
+  return `${sourceUri(buildObjectUri(objectName, code, functionGroup))}${versionParam}`;
 }
 
-/** Whether a table lists `source` for the code. */
-export function supportsSourceCode(objectType: AdtTypeCode): boolean {
-  return codeHas(objectType, 'source');
+/**
+ * Whether `readObjectSource` reads the code's source: the codes of
+ * {@link SOURCE_READ}. Answered for any code, from outside the types too.
+ */
+export function supportsSourceCode(objectType: string): boolean {
+  return isSourceReadCode(objectType);
 }

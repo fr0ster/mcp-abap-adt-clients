@@ -16,7 +16,10 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  type AdtAddressableCode,
   codeEntries,
+  GROUP_ONLY_ADDRESS,
+  isGroupOnlyCode,
   NO_OWN_ADDRESS,
   PARENTED_SEGMENT,
   parentEntry,
@@ -25,7 +28,7 @@ import { seg } from '../endpoints/objects';
 import { requestHeaders } from './requestHeaders';
 
 /** {@link PARENTED_SEGMENT}, read by any code: absent for an unparented one. */
-const PARENTED_SEGMENT_BY_CODE: Readonly<Partial<Record<AdtTypeCode, string>>> =
+const PARENTED_SEGMENT_BY_CODE: Readonly<Partial<Record<string, string>>> =
   PARENTED_SEGMENT;
 
 /**
@@ -35,9 +38,7 @@ const PARENTED_SEGMENT_BY_CODE: Readonly<Partial<Record<AdtTypeCode, string>>> =
  * `AdtTypeCode` leaves it optional, and the address is refused at run time
  * when it is missing.
  */
-export type ParentArgument<C extends AdtTypeCode> = [C] extends [
-  AdtParentedTypeCode,
-]
+export type ParentArgument<C extends string> = [C] extends [AdtParentedTypeCode]
   ? [parentName: string]
   : [parentName?: string];
 
@@ -49,15 +50,17 @@ export type ParentArgument<C extends AdtTypeCode> = [C] extends [
  * where-used.
  *
  * @param name - Object name (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM')
- * @param type - A code of the tables (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')
+ * @param type - A code with an address (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF'):
+ *   a code of the tables but `MSAG/NN`, or a group-only code (`VIEW/DV`)
  * @param parentName - The parent's name, for a parented code (the function group of 'FUGR/FF')
  * @returns ADT URI for the object
  */
-export function buildObjectUri<C extends AdtTypeCode>(
+export function buildObjectUri<C extends AdtAddressableCode>(
   name: string,
   type: C,
   ...[parentName]: ParentArgument<C>
 ): string {
+  if (isGroupOnlyCode(type)) return GROUP_ONLY_ADDRESS[type](name);
   const [first] = codeEntries(type);
   // Only a caller outside the type system reaches this: a code no table names
   // is no `AdtTypeCode`. It is their argument, refused before any request.

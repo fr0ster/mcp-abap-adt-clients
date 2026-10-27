@@ -23,6 +23,9 @@ import type {
   AdtApiName,
   AdtApiWithIn,
   AdtOperation,
+  AdtTypeCode,
+  AdtTypeCodeOf,
+  AdtTypeCodeWith,
   AdtVariant,
   IAdtTypeTables,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -75,3 +78,30 @@ export type AdtPerformedBy<
   A extends AdtApiName,
   Op extends AdtOperation,
 > = IAdtServedOn<AdtPerformingVariantsIn<IAdtTypeTables, A, Op>>;
+
+/** The variants whose table lists code `C`. */
+type VariantsListing<C extends AdtTypeCode> = {
+  [W in AdtVariant]: C extends AdtTypeCodeOf<W> ? W : never;
+}[AdtVariant];
+
+/** The variants whose table lists operation `Op` for code `C`. */
+type VariantsWhereCodeHas<C extends AdtTypeCode, Op extends AdtOperation> = {
+  [W in AdtVariant]: C extends AdtTypeCodeWith<W, Op> ? W : never;
+}[AdtVariant];
+
+/**
+ * The codes every variant of `V` lists — for the default variant, the codes
+ * both modern tables list. Not `AdtTypeCodeOf<V>`, which distributes over a
+ * union and answers the codes either lists.
+ */
+export type AdtCodeOf<V extends AdtVariant> = {
+  [C in AdtTypeCode]: [V] extends [VariantsListing<C>] ? C : never;
+}[AdtTypeCode];
+
+/**
+ * The codes for which every variant of `V` lists operation `Op` — the
+ * intersecting counterpart of `AdtTypeCodeWith<V, Op>`.
+ */
+export type AdtCodeWith<V extends AdtVariant, Op extends AdtOperation> = {
+  [C in AdtTypeCode]: [V] extends [VariantsWhereCodeHas<C, Op>] ? C : never;
+}[AdtTypeCode];

@@ -2,11 +2,12 @@
  * Where-used operations for ABAP objects
  */
 
-import type { AdtTypeCode, IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtAddressableCode } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
 import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
@@ -97,6 +98,22 @@ function setIsSelected(typeTag: string, selected: boolean): string {
 }
 
 /**
+ * What where-used addresses: every addressable code but a function include,
+ * whose group the parameters have no field for (`FUGR/FF` names its group as
+ * `GROUP|FM`). `VIEW/DV` included, as before 38.0.0.
+ */
+export type WhereUsedAddressCode = Exclude<AdtAddressableCode, 'FUGR/I'>;
+
+/** What the where-used requests take: their params, `object_type` addressable. */
+export type IWhereUsedScopeRequest = Omit<
+  IGetWhereUsedScopeParams,
+  'object_type'
+> & { object_type: WhereUsedAddressCode };
+export type IWhereUsedRequest = Omit<IGetWhereUsedParams, 'object_type'> & {
+  object_type: WhereUsedAddressCode;
+};
+
+/**
  * The address a where-used request asks about.
  *
  * `objectType` is a code of the ADT type tables (`CLAS/OC`, `BDEF/BDO`, …).
@@ -111,7 +128,7 @@ function setIsSelected(typeTag: string, selected: boolean): string {
  */
 export function whereUsedObjectUri(
   objectName: string,
-  objectType: AdtTypeCode,
+  objectType: WhereUsedAddressCode,
 ): string {
   if (objectType === 'FUGR/FF') {
     const [group, fm] = objectName.split('|');
@@ -156,7 +173,7 @@ export function whereUsedObjectUri(
 export async function getWhereUsedScope(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  params: IGetWhereUsedScopeParams,
+  params: IWhereUsedScopeRequest,
 ): Promise<IAdtWireResponse> {
   const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
@@ -189,7 +206,7 @@ export async function getWhereUsedScope(
 export async function getWhereUsed(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  params: IGetWhereUsedParams,
+  params: IWhereUsedRequest,
 ): Promise<IAdtWireResponse> {
   const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
 

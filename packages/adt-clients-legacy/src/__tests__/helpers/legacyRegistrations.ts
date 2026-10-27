@@ -103,7 +103,19 @@ export const LEGACY_HEADER_PAIRS: [
     },
   ],
   [AdtMessageClassLegacy, { delete: XML }],
-  [AdtUtilsLegacy, { activateObjectsGroup: XML }],
+  [
+    AdtUtilsLegacy,
+    {
+      activateObjectsGroup: XML,
+      // The override refuses a code 7.40 lacks, and otherwise sends the base's
+      // request with the base's pair (`AdtUtils.fetchNodeStructure`).
+      fetchNodeStructure: {
+        accept:
+          'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
+        contentType: 'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
+      },
+    },
+  ],
 ];
 
 /**

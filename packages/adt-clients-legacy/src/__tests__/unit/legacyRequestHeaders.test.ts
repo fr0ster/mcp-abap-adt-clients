@@ -74,6 +74,7 @@ const ROWS: Row[] = [
   // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
   ...requestRows(legacy, 'legacy '),
   ...utilRows(
+    // @ts-expect-error -- the modern harness drives the 7.40 utilities, whose codes are 7.40's, as a caller outside the type system would
     (connection) => new AdtUtilsLegacy(connection, createLibraryLogger()),
     'legacy ',
   ),

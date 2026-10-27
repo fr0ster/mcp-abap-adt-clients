@@ -81,6 +81,8 @@
  */
 
 import type {
+  AdtOperation,
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtDataPreview,
   IAdtDiscovery,
@@ -141,7 +143,29 @@ import {
 // Note: DDIC Activation Graph is in runtime/logs/ddic.ts
 // It is accessed via AdtRuntime.getDdicActivationGraph(), not AdtUtils
 
+import type { AdtModernVariant } from '../../clients/variant';
+import {
+  type AdtAddressableCode,
+  codeHas,
+  isGroupOnlyCode,
+} from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
+// Import types
+import {
+  type AdtActivationCode,
+  type AdtDeletionCheckCode,
+  type AdtDeletionCode,
+  type AdtMetadataReadCodeOf,
+  type AdtSearchCode,
+  type AdtSourceReadCode,
+  type AdtSourceReadCodeOf,
+  type AdtStructureCode,
+  type AdtWhereUsedCode,
+  type IAdtGroupReference,
+  isMetadataReadCode,
+  METADATA_READ,
+  type ParentedArguments,
+} from './codeSets';
 import type {
   AdtSourceTypeCode,
   AdtTypeCode,
@@ -156,7 +180,6 @@ import type {
   IReadOptions,
   ISearchObjectsParams,
 } from './types';
-// Import types
 import { utilDocuments } from './utilResultSet';
 
 /**
@@ -202,12 +225,33 @@ import { utilDocuments } from './utilResultSet';
  * argument of theirs. Built here, it is thrown, as decision 15 wants for a
  * cause on the caller's side.
  */
-function addressEvery(objects: IObjectReference[]): void {
+function addressEvery(
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
+): void {
   for (const o of objects) buildObjectUri(o.name, o.type, o.parentName);
 }
 
-export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
-  implements
+/**
+ * Every object's code lists `operation`, checked before a group request is
+ * sent. The member's type admits only such codes; this answers a caller
+ * outside the type system, whose code is thrown before any request.
+ */
+function performEvery(
+  objects: readonly IAdtGroupReference<string>[],
+  operation: AdtOperation,
+): void {
+  for (const o of objects) {
+    if (isGroupOnlyCode(o.type) || codeHas(o.type, operation)) continue;
+    throw new Error(
+      `${o.type} ${o.name}: the ADT type tables list no ${operation} for it, so no group request is sent`,
+    );
+  }
+}
+
+export class AdtUtils<
+  R extends IUtilResults = typeof utilDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtInformationSystem<
       ReturnType<R['search']>,
       ReturnType<R['whereUsed']>,
@@ -270,7 +314,9 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * from `@mcp-abap-adt/adt-strategies` for `search` when constructing this.
    */
   async search<E extends IAdtError = IAdtError>(
-    criteria: ISearchObjectsParams,
+    criteria: Omit<ISearchObjectsParams, 'objectType'> & {
+      objectType?: AdtSearchCode<V>;
+    },
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -333,7 +379,9 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * });
    */
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
-    params: IGetWhereUsedScopeParams,
+    params: Omit<IGetWhereUsedScopeParams, 'object_type'> & {
+      object_type: AdtWhereUsedCode<V>;
+    },
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
     // Built before the request: a type where-used cannot address is the
@@ -425,7 +473,9 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * });
    */
   async getWhereUsed<E extends IAdtError = IAdtError>(
-    params: IGetWhereUsedParams,
+    params: Omit<IGetWhereUsedParams, 'object_type'> & {
+      object_type: AdtWhereUsedCode<V>;
+    },
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
@@ -465,11 +515,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * exchange with `wireItself` and reads it with `extractRunId`).
    */
   async activateObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IObjectReference[],
+    objects: IAdtGroupReference<AdtActivationCode<V>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     addressEvery(objects);
+    performEvery(objects, 'activate');
     return answering(
       () =>
         activateObjectsGroup(
@@ -529,10 +580,11 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Check result
    */
   async checkDeletionGroup<E extends IAdtError = IAdtError>(
-    objects: IObjectReference[],
+    objects: IAdtGroupReference<AdtDeletionCheckCode<V>>[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     addressEvery(objects);
+    performEvery(objects, 'deletionCheck');
     return answering(
       () => checkDeletionGroup(this.connection, options.headers, objects),
       this.results.deletionCheck as IResultStrategy<
@@ -554,11 +606,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param transportRequest - Optional transport request
    */
   async deleteObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IObjectReference[],
+    objects: IAdtGroupReference<AdtDeletionCode<V>>[],
     transportRequest: string | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     addressEvery(objects);
+    performEvery(objects, 'delete');
     return answering(
       () =>
         deleteObjectsGroup(
@@ -583,16 +636,30 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param options.accept - Optional Accept override for the metadata request
    * @returns Metadata response
    */
-  async readObjectMetadata<E extends IAdtError = IAdtError>(
-    objectType: AdtTypeCode,
+  async readObjectMetadata<
+    C extends AdtMetadataReadCodeOf<V>,
+    E extends IAdtError = IAdtError,
+  >(
+    objectType: C,
     objectName: string,
-    functionGroup?: string,
-    options?: IReadOptions & IAdtAnalyseOptions<E>,
+    ...[functionGroup, options]: ParentedArguments<
+      C,
+      [options?: IReadOptions & IAdtAnalyseOptions<E>]
+    >
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
-    // Built here, not inside the request: `getObjectMetadataUri` refuses a type
-    // it has no resource for, and that is the caller's mistake. Classified
-    // inside `answering` it would come back as `origin: 'connection'`, pointing
-    // at a network nothing reached.
+    // Refused before anything is asked: the member reads only the codes whose
+    // request it sent before 38.0.0 (`METADATA_READ`), which its type holds; a
+    // caller outside the type system gets the refusal, and no request.
+    if (!isMetadataReadCode(objectType)) {
+      throw new Error(
+        `readObjectMetadata reads no ${objectType}; it reads ${Object.keys(METADATA_READ).join(', ')}`,
+      );
+    }
+    // Built here, not inside the request: `getObjectMetadataUri` refuses an
+    // object it cannot address (a function module without its group), and
+    // that is the caller's mistake. Classified inside `answering` it would
+    // come back as `origin: 'connection'`, pointing at a network nothing
+    // reached.
     getObjectMetadataUri(objectType, objectName, functionGroup);
 
     return answering(
@@ -623,27 +690,34 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param options.accept - Optional Accept override for the source request
    * @returns Source code response
    */
-  async readObjectSource<E extends IAdtError = IAdtError>(
-    objectType: AdtSourceTypeCode,
+  async readObjectSource<
+    C extends AdtSourceReadCodeOf<V>,
+    E extends IAdtError = IAdtError,
+  >(
+    objectType: C,
     objectName: string,
-    functionGroup?: string,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtAnalyseOptions<E>,
+    ...[functionGroup, version, options]: ParentedArguments<
+      C,
+      [
+        version?: 'active' | 'inactive',
+        options?: IReadOptions & IAdtAnalyseOptions<E>,
+      ]
+    >
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // Raised before anything is asked, rather than dressed as a verdict about
-    // the server: a type with no source resource, and a function module with no
-    // function group, are both the caller's mistake. The compiler holds the
-    // first (a type with no source is no `AdtSourceTypeCode`); a caller outside
-    // the type system still gets the refusal. `getObjectSourceUri` is
-    // pure, so building the URI here is how its own guards surface as
-    // themselves — inside `answering` they came back as
-    // `origin: 'connection'`, advice to check a network nothing reached.
+    // the server: a code this member does not read (`SOURCE_READ`, which its
+    // type holds), and a function module with no function group, are both
+    // the caller's mistake. `getObjectSourceUri` is pure, so building the URI
+    // here is how its own guards surface as themselves — inside `answering`
+    // they came back as `origin: 'connection'`, advice to check a network
+    // nothing reached.
     if (!supportsSourceCode(objectType)) {
       throw new Error(
         `Object type ${objectType} does not support source code reading`,
       );
     }
-    getObjectSourceUri(objectType, objectName, functionGroup, version);
+    const code: AdtSourceReadCode = objectType;
+    getObjectSourceUri(code, objectName, functionGroup, version);
 
     return answering(
       () =>
@@ -680,13 +754,16 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param version - 'active' or 'inactive'
    * @returns Source URI
    */
-  getObjectSourceUri(
-    objectType: AdtSourceTypeCode,
+  getObjectSourceUri<C extends AdtSourceTypeCode>(
+    objectType: C,
     objectName: string,
-    functionGroup?: string,
-    version?: 'active' | 'inactive',
+    ...[functionGroup, version]: ParentedArguments<
+      C,
+      [version?: 'active' | 'inactive']
+    >
   ): string {
-    return getObjectSourceUri(objectType, objectName, functionGroup, version);
+    const code: AdtSourceTypeCode = objectType;
+    return getObjectSourceUri(code, objectName, functionGroup, version);
   }
 
   /**
@@ -777,7 +854,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async fetchNodeStructure<E extends IAdtError = IAdtError>(
-    parentType: AdtTypeCode,
+    parentType: AdtStructureCode<V>,
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
@@ -812,7 +889,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async getObjectStructure<E extends IAdtError = IAdtError>(
-    objectType: AdtTypeCode,
+    objectType: AdtStructureCode<V>,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['objectStructure']>, E>> {

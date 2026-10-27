@@ -104,6 +104,7 @@ describe('every code of every table is addressed as its record addresses it', ()
     // address is written into EXPECTED before this passes.
     if (!covered(code)) throw new Error(`no expected address for ${code}`);
     if (code === 'MSAG/NN') {
+      // @ts-expect-error -- MSAG/NN has no address of its own
       expect(() => buildObjectUri(NAME, code)).toThrow(/row in its class/);
       return;
     }

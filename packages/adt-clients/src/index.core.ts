@@ -21,6 +21,8 @@ export {
   type ICreateAdtClientOptions,
 } from './clients/createAdtClient';
 export type {
+  AdtCodeOf,
+  AdtCodeWith,
   AdtModernVariant,
   AdtPerformedBy,
   AdtPerformingVariantsIn,
@@ -66,6 +68,20 @@ export {
 export { AdtServiceDefinition } from './core/serviceDefinition';
 export { AdtUtils } from './core/shared/AdtUtils';
 export { startUnitTestRunSync } from './core/shared/abapUnit';
+export type {
+  AdtActivationCode,
+  AdtDeletionCheckCode,
+  AdtDeletionCode,
+  AdtMetadataReadCode,
+  AdtMetadataReadCodeOf,
+  AdtSearchCode,
+  AdtSourceReadCode,
+  AdtSourceReadCodeOf,
+  AdtStructureCode,
+  AdtWhereUsedCode,
+  IAdtGroupReference,
+  ParentedArguments,
+} from './core/shared/codeSets';
 export {
   AdtContentTypesBase,
   AdtContentTypesModern,
@@ -76,6 +92,10 @@ export { AdtDdicTableType } from './core/tabletype';
 export { AdtTransformation } from './core/transformation';
 export { AdtRequest } from './core/transport';
 export { changeTransportTaskType } from './core/transport/objects';
+export type {
+  AdtAddressableCode,
+  AdtGroupOnlyCode,
+} from './endpoints/codes';
 export {
   ACCESS_CONTROL,
   AUTHORIZATION_FIELD,

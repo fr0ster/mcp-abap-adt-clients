@@ -23,6 +23,7 @@ import {
   type AdtTypeCode,
   type IAdtCodeFacts,
 } from '@mcp-abap-adt/interfaces-adt';
+import { DDIC_VIEW } from './objects';
 
 /**
  * Every table, read as the entry shape it satisfies. The variant does not
@@ -42,8 +43,11 @@ export interface ICodeEntry {
   readonly facts: IAdtCodeFacts<string>;
 }
 
-/** Every table's word on `code`, in table order; empty for a code no table names. */
-export function codeEntries(code: AdtTypeCode): ICodeEntry[] {
+/**
+ * Every table's word on `code`, in table order; empty for a code no table
+ * names — a group-only code, or text from outside the types.
+ */
+export function codeEntries(code: string): ICodeEntry[] {
   const found: ICodeEntry[] = [];
   for (const table of TABLES) {
     for (const entry of Object.values(table)) {
@@ -56,7 +60,7 @@ export function codeEntries(code: AdtTypeCode): ICodeEntry[] {
 }
 
 /** Whether any table lists `operation` for `code`. */
-export function codeHas(code: AdtTypeCode, operation: AdtOperation): boolean {
+export function codeHas(code: string, operation: AdtOperation): boolean {
   return codeEntries(code).some((e) => e.facts.operations.includes(operation));
 }
 
@@ -78,10 +82,44 @@ export const PARENTED_SEGMENT = {
  * collection is the class's, and the library writes the class — so
  * `/messageclass/<number>` would address a message class of that name.
  */
-export const NO_OWN_ADDRESS: Readonly<Partial<Record<AdtTypeCode, string>>> = {
+const NO_OWN_ADDRESS_REASON = {
   'MSAG/NN':
     'a message of a message class has no address of its own; it is a row in its class, addressed by the class (MSAG/N)',
-};
+} as const satisfies Partial<Record<AdtTypeCode, string>>;
+
+/** {@link NO_OWN_ADDRESS_REASON}, read by any code. */
+export const NO_OWN_ADDRESS: Readonly<Partial<Record<string, string>>> =
+  NO_OWN_ADDRESS_REASON;
+
+/**
+ * The codes a group operation addresses that no table of interfaces-adt
+ * 21.0.0 types: `VIEW/DV`, a DDIC database view. Every release lists it
+ * (`system-description-s4-2025--07-typestructure`,
+ * `system-description-abap-cloud--07-typestructure`,
+ * `system-description-basis-740--07-typestructure`), and before 38.0.0 group
+ * activation, group deletion and where-used addressed it under
+ * `/sap/bc/adt/ddic/views`; no API of the library serves it, so it is in no
+ * table. Kept for those three, typed here, until interfaces-adt can type it.
+ */
+export const GROUP_ONLY_ADDRESS = {
+  'VIEW/DV': (name: string) => DDIC_VIEW.uri(name),
+} as const;
+
+/** A code only the group operations address: see {@link GROUP_ONLY_ADDRESS}. */
+export type AdtGroupOnlyCode = keyof typeof GROUP_ONLY_ADDRESS;
+
+/**
+ * Every code with an address: a code of the tables but `MSAG/NN`, which has
+ * none of its own, and the group-only codes.
+ */
+export type AdtAddressableCode =
+  | Exclude<AdtTypeCode, keyof typeof NO_OWN_ADDRESS_REASON>
+  | AdtGroupOnlyCode;
+
+/** Whether `code` is a group-only code — a value from outside the types included. */
+export function isGroupOnlyCode(code: string): code is AdtGroupOnlyCode {
+  return Object.hasOwn(GROUP_ONLY_ADDRESS, code);
+}
 
 /** The parent's API entry in the table that names the child. */
 export function parentEntry(

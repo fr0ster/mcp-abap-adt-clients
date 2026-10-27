@@ -17,7 +17,6 @@
  * here — a wrong path segment is.
  */
 
-import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -45,6 +44,7 @@ import { activateStructure } from '../../../core/structure/activation';
 import { activateTable } from '../../../core/table/activation';
 import { activateTableType } from '../../../core/tabletype/activation';
 import { activateTransformation } from '../../../core/transformation/activation';
+import type { AdtAddressableCode } from '../../../endpoints/codes';
 import { buildObjectUri } from '../../../utils/activationUtils';
 import { headersFor } from '../../helpers/adtHeaders';
 
@@ -71,7 +71,7 @@ async function sentUri(
 }
 
 type Row = [
-  type: AdtTypeCode,
+  type: AdtAddressableCode,
   name: string,
   parent: string | undefined,
   activate: (connection: IAbapConnection) => Promise<unknown>,
@@ -343,7 +343,8 @@ describe('a type that cannot be addressed without more', () => {
     // @ts-expect-error -- FUGR/I is addressed under its group
     expect(() => buildObjectUri('LZFG_XTOP', 'FUGR/I')).toThrow(/parent/);
     // Typed only as a code of the tables, the parent is optional — and refused.
-    const typedAsAnyCode = (code: AdtTypeCode): AdtTypeCode => code;
+    const typedAsAnyCode = (code: AdtAddressableCode): AdtAddressableCode =>
+      code;
     expect(() => buildObjectUri('LZFG_XTOP', typedAsAnyCode('FUGR/I'))).toThrow(
       /parent/,
     );

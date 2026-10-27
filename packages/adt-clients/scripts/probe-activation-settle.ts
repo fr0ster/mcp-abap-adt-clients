@@ -90,7 +90,7 @@ import {
   releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
-import { adtTypeCode } from '../src/__tests__/helpers/typeCode';
+import { activationCode } from '../src/__tests__/helpers/typeCode';
 import { AdtClient } from '../src/clients/AdtClient';
 import { activateFunctionGroup } from '../src/core/functionGroup/activation';
 import {
@@ -409,7 +409,7 @@ async function main(): Promise<void> {
       const refs = stillThere.map((listed) => {
         const [type, name] = listed.split(/\s+/);
         // Read off a listing: each code is checked once against the tables.
-        return { type: adtTypeCode(type), name };
+        return { type: activationCode(type), name };
       });
       say(`  sending: ${refs.map((r) => `${r.type} ${r.name}`).join(', ')}`);
       const runWire = await activateObjectsGroup(

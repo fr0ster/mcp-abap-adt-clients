@@ -104,7 +104,8 @@ describe('no invented address', () => {
     // @ts-expect-error -- the type is required
     expect(() => buildObjectUri('ZCL_X')).toThrow(/type/i);
   });
-  it('a message of a message class has no address of its own', () => {
+  it('a message of a message class has no address of its own: it does not compile, and throws', () => {
+    // @ts-expect-error -- MSAG/NN has no address of its own
     expect(() => buildObjectUri('001', 'MSAG/NN')).toThrow(/row in its class/);
   });
 });

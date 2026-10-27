@@ -17,10 +17,6 @@ import {
   utilInactiveObjects,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
-  AdtTypeCode,
-  IObjectReference,
-} from '@mcp-abap-adt/interfaces-adt';
-import type {
   IAbapConnection,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -28,6 +24,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
+import type { AdtModernVariant } from '../../../clients/variant';
+import type {
+  AdtActivationCode,
+  IAdtGroupReference,
+} from '../../../core/shared/codeSets';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -44,7 +45,7 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
-import { adtTypeCode } from '../../helpers/typeCode';
+import { activationCode } from '../../helpers/typeCode';
 
 const {
   getSharedDependenciesConfig,
@@ -237,14 +238,16 @@ describe('Admin: Setup shared dependencies', () => {
       // Group activation for objects with skip_activation: true
       // Every type an entry may mark `skip_activation: true`. The AMDP debugger's
       // table function and class name each other, so they activate together.
-      const adtTypeMap: Record<string, AdtTypeCode> = {
+      const adtTypeMap: Record<string, AdtActivationCode<AdtModernVariant>> = {
         views: 'DDLS/DF',
         classes: 'CLAS/OC',
         service_definitions: 'SRVD/SRV',
         service_bindings: 'SRVB/SVB',
       };
 
-      const groupActivationObjects: IObjectReference[] = [];
+      const groupActivationObjects: IAdtGroupReference<
+        AdtActivationCode<AdtModernVariant>
+      >[] = [];
       for (const { type } of typeOrder) {
         const items = sharedConfig[type];
         if (!Array.isArray(items)) continue;
@@ -362,7 +365,7 @@ describe('Admin: Setup shared dependencies', () => {
             utils.activateObjectsGroup(
               // The inactive list is an ADT answer: each code is checked once.
               firstPass.map((o) => ({
-                type: adtTypeCode(o.type),
+                type: activationCode(o.type),
                 name: o.name,
               })),
               undefined,

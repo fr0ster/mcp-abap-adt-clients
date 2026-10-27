@@ -39,7 +39,11 @@ import {
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
 import type { AdtTypeCode } from '../src/core/shared/types';
-import { adtTypeCode } from '../src/__tests__/helpers/typeCode';
+import {
+  adtTypeCode,
+  metadataReadCode,
+  sourceReadCode,
+} from '../src/__tests__/helpers/typeCode';
 import { orThrow } from '../src/utils/adtResponse';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
@@ -199,7 +203,7 @@ async function readSource(
     try {
       const utils = client.getUtils();
       let url = utils.getObjectSourceUri(
-        options.objectType as any,
+        sourceReadCode(options.objectType),
         options.objectName,
         options.functionGroup,
         version,
@@ -330,7 +334,7 @@ async function run(): Promise<void> {
       try {
         const metadata = await orThrow(
           utils.readObjectMetadata(
-            options.objectType as any,
+            metadataReadCode(options.objectType),
             options.objectName,
             options.functionGroup,
           ),
@@ -340,7 +344,7 @@ async function run(): Promise<void> {
         logHttpError(error, 'Read metadata');
       }
 
-      if (utils.supportsSourceCode(options.objectType as any)) {
+      if (utils.supportsSourceCode(options.objectType)) {
         let activeSource = '';
         let inactiveSource = '';
         if (options.versions.has('active')) {

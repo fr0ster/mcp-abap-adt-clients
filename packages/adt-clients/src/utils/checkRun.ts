@@ -2,15 +2,13 @@
  * Shared check run utilities
  */
 
-import type {
-  AdtTypeCode,
-  IAdtHeaders,
-  IObjectReference,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAdtGroupReference } from '../core/shared/codeSets';
+import type { AdtAddressableCode } from '../endpoints/codes';
 import { buildObjectUri } from './activationUtils';
 import { requestHeaders } from './requestHeaders';
 
@@ -21,7 +19,7 @@ import { requestHeaders } from './requestHeaders';
  * slashes of its own, could not survive.
  */
 export function getObjectUri(
-  objectType: AdtTypeCode,
+  objectType: AdtAddressableCode,
   objectName: string,
   parentName?: string,
 ): string {
@@ -104,7 +102,7 @@ export function buildCheckRunXmlWithSource(
 export async function runCheckRun(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  object: IObjectReference,
+  object: IAdtGroupReference<AdtAddressableCode>,
   version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',
   sourceCode?: string,
@@ -148,7 +146,7 @@ export async function runCheckRun(
 export async function runCheckRunWithSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  object: IObjectReference,
+  object: IAdtGroupReference<AdtAddressableCode>,
   sourceCode: string,
   version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',

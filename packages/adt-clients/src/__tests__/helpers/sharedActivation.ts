@@ -11,13 +11,14 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
   ADT_NO_FAILURE,
-  type AdtTypeCode,
   type IAdtError,
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
 import { AdtUtils } from '../../core/shared/AdtUtils';
+import type { AdtActivationCode } from '../../core/shared/codeSets';
 import { utilDocuments } from '../../core/shared/utilResultSet';
 import { wireItself } from '../../utils/resultStrategy';
 import { integrationHeadersOf } from './adtHeaders';
@@ -32,8 +33,8 @@ import {
 } from './xmlTree';
 
 export interface ISharedGroupMember {
-  /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`: a code of the tables. */
-  type: AdtTypeCode;
+  /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`: a code a group activation activates. */
+  type: AdtActivationCode<AdtModernVariant>;
   name: string;
 }
 

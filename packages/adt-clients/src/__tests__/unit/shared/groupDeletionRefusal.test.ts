@@ -15,10 +15,10 @@
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
-import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import type { IAdtGroupReference } from '../../../core/shared/codeSets';
 import { headersOf } from '../../helpers/adtHeaders';
 
 /** What ADT answers when the objects were not deleted. */
@@ -66,7 +66,7 @@ const answering = (data: string): IAbapConnection =>
     })),
   }) as unknown as IAbapConnection;
 
-const ONE_PACKAGE: IObjectReference[] = [
+const ONE_PACKAGE: IAdtGroupReference<'DEVC/K'>[] = [
   { name: 'ZADT_BLD_PKG03', type: 'DEVC/K' },
 ];
 
