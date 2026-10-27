@@ -137,7 +137,7 @@ refused, never ignored.
 
 ## The live checks
 
-The suites below, and the nine cycle suites after them, are written; only what [LEGACY.md](LEGACY.md) records as measured has been run. No run result of a suite itself is recorded there yet.
+The suites below, and the nine cycle suites after them, were run whole on 7.40 SP04 on 2026-10-27: 15 suites, 385 tests, all passed (`T6-20261027`, recorded in [LEGACY.md](LEGACY.md)).
 Each runs under `describeLegacyRfc` — only when the loaded configuration says
 `is_legacy: true` and `connection_type: "rfc"`, a skipped test naming the reason
 otherwise — and every case is a `legacy_740` test case of the configuration

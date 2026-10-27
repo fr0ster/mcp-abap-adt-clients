@@ -11,6 +11,7 @@ The first release: the clients for legacy SAP ABAP systems (SAP_BASIS below
 `@mcp-abap-adt/adt-clients` (where they were `AdtClientLegacy`,
 `AdtExecutorLegacy` and `AdtRequestLegacy` up to 37.3.x, and are gone from 37.4.0).
 The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`.
+The live cycles were run on SAP_BASIS 7.40 SP04 over RFC and pass (15 suites, 385 tests; record `T6-20261027`).
 
 ### What the package is
 
@@ -37,8 +38,7 @@ The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`.
   message class answered `200`.
 - **`readTransport` is refused**, with no request, for a class, program,
   interface, function group, function module and DDL source. `GET <object>/transport`
-  answered `404` for the first five; the DDL source's refusal is inferred from
-  them and measured in the next live run.
+  answered `404` for the first five and for the DDL source (`T6-20261027`).
 - **The four local class includes refuse `readTransport` too**
   (`getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`,
   `getLocalMacros()`): their inherited member sends the container class's

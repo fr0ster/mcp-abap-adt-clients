@@ -52,7 +52,7 @@ Where a row says "sends" and its record is a read of a *system* object (a system
 program, class, function module or include) rather than of an object a cycle
 created, LEGACY.md says so; the cycle suites
 (`src/__tests__/integration/legacy/cycles/`) measure the read of a created object
-when they are run, and until then that part is **not yet measured**.
+and `T6-20261027` ran them whole on 7.40 SP04 (2026-10-27): the reads of created objects, the free-name `validate` of a function group and module and the DDL source's `readTransport` are measured there.
 
 ## What a consumer must know
 
@@ -242,7 +242,7 @@ A function group has no version members.
 | `validate` | sends: a free name `200` |
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `getVersions`, `getVersionSource` | **refused** — `GET …/ddic/ddl/sources/<name>/versions` answered `404` |
-| `readTransport` | **refused** — inferred from the five measured types (class, program, interface, function group, function module answered `404`); measured in the next live run |
+| `readTransport` | **refused** — `GET …/transport` answered `404` for a class, program, interface, function group, function module and (`T6-20261027`) DDL source |
 | `checkDeletion`, `checkCdsTestDoubles` | **refused** |
 
 ### Message class — `getMessageClass()`, and a message — `getMessageClassMessage()`
@@ -262,7 +262,7 @@ A function group has no version members.
 
 Every member **refused**: the item resource `/packages/<name>` answers `404` (the
 collection is advertised, the item is not served) and `POST /packages` `405`.
-Package contents come through `getUtils().fetchNodeStructure('DEVC/K', name)`.
+Package contents come through `getUtils().fetchNodeStructure('DEVC/K', name)`, one level per request: the root node answers the subpackages and one node per object type with its `NODE_ID`, and the objects come with that `NODE_ID` as `nodeId` (`T6-20261027`).
 
 ### Transport request — `getRequest()`
 
