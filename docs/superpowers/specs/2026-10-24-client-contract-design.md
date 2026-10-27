@@ -101,9 +101,10 @@ It is measured again on main once #281 is merged, before Task B1.
 
 1. **The dependencies.** `@mcp-abap-adt/adt-clients` moves to `^38.0.0`, from the registry, and
    `@mcp-abap-adt/interfaces-adt` to `^20.2.0`.
-1a. **The result-set contracts come from interfaces-adt** here too: every file that imports one (or
-   `IServiceBindingPublicationConfig`) from `@mcp-abap-adt/adt-clients` — on #281 twenty files
-   under `clients/`, `core/` and `executors/` — imports it from `@mcp-abap-adt/interfaces-adt`.
+1a. **The result-set contracts come from interfaces-adt** here too: every file that imports one of
+   the 35 client result-set contracts (or `IServiceBindingPublicationConfig`) from
+   `@mcp-abap-adt/adt-clients` — on #281 thirteen files under `clients/` and `core/` — imports it
+   from `@mcp-abap-adt/interfaces-adt`. The executors' result contracts are not moved (§6).
 2. **The seven getters.** Each becomes one signature,
    `getX<R extends IXResults = typeof xDocuments>(results?: R): …`, answering its legacy class
    (`getFunctionInclude`, `getInclude`, `getMessageClass`) or the base class through
