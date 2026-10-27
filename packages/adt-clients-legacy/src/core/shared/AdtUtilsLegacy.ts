@@ -204,13 +204,11 @@ function refuseCode<T, E extends IAdtError>(
   operation: string,
   code: string,
 ): IAdtResponse<T, E> {
-  // The library's own verdict, so `E` is its default `IAdtError` here — the
-  // same cast `answering` makes when no strategy supplied one.
-  return failed<T, E>({
-    origin: 'refusal',
-    code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-    message: `${operation}(${code}) is not supported on a legacy system (7.40 SP04): ADT_TYPES_BASIS_740 lists no ${code}, so nothing is sent.`,
-  } as E);
+  return legacyRefusal<T, E>(
+    `${operation}(${code})`,
+    `${code} in ADT_TYPES_BASIS_740`,
+    'Nothing is sent.',
+  );
 }
 
 export class AdtUtilsLegacy<
