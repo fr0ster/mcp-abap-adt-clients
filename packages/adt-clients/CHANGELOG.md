@@ -4,7 +4,9 @@ All notable changes to this package are documented here.
 
 **This repository holds more than one package, and each keeps its own
 changelog.** This file is `adt-clients`', in `packages/adt-clients`;
-`packages/adt-strategies` has [its own](../adt-strategies/CHANGELOG.md).
+`packages/adt-strategies` and `packages/adt-clients-legacy` have their own
+([adt-strategies](../adt-strategies/CHANGELOG.md),
+[adt-clients-legacy](../adt-clients-legacy/CHANGELOG.md)).
 
 There is no repository-wide changelog and there will not be one. The versions
 here move independently — `adt-clients` is at 19.0.0 while `adt-strategies`
@@ -12,7 +14,8 @@ starts at 0.1.0 — so a single file would be a list of entries most readers hav
 to skip, against versions their package never had. A monorepo that bumps every
 package together can have one; this one cannot. Tags follow the same rule:
 each package is tagged `<package directory>-v<version>` —
-`adt-clients-v<version>`, `adt-strategies-v<version>`. The tags made before the
+`adt-clients-v<version>`, `adt-strategies-v<version>`,
+`adt-clients-legacy-v<version>`. The tags made before the
 packages moved under `packages/` are `v<version>` and `adt-strategies@<version>`.
 
 Releases go out with `npm run release:publish` at the repository root, which
