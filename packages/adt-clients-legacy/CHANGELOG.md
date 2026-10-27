@@ -56,7 +56,8 @@ The live cycles were run on SAP_BASIS 7.40 SP04 over RFC and pass (15 suites, 38
 - The live suites (`src/__tests__/integration/legacy/`), the test environment
   (`ZCL_LG7_ENV*`, the `legacy:*` scripts) and the test configuration keys moved
   with the code, and one live cycle per type 7.40 serves was added
-  (`cycles/`); none has been run as a suite yet.
+  (`cycles/`); the cycles ran on SAP_BASIS 7.40 SP04 over RFC and pass
+  (`T6-20261027`).
 - `npm run check:config` checks an overlay that holds both the root package's keys
   and the legacy keys; the root package's `check:config` checks the modern
   overlays and refuses the legacy keys.
