@@ -78,6 +78,23 @@ const COLLECTIONS = [
   '/sap/bc/adt/repository/objectstructure',
 ];
 
+/**
+ * The NODE_ID of an object type's node in a nodestructure answer, read by
+ * plain search: the SEU_ADT_OBJECT_TYPE_INFO whose OBJECT_TYPE is `type`.
+ * Empty when there is none.
+ */
+function nodeIdOf(answer: string, type: string): string {
+  for (const info of answer.split('<SEU_ADT_OBJECT_TYPE_INFO>').slice(1)) {
+    const body = info.split('</SEU_ADT_OBJECT_TYPE_INFO>')[0] ?? '';
+    if (!body.includes(`<OBJECT_TYPE>${type}</OBJECT_TYPE>`)) continue;
+    const open = body.indexOf('<NODE_ID>');
+    const close = body.indexOf('</NODE_ID>');
+    if (open < 0 || close < open) return '';
+    return body.slice(open + '<NODE_ID>'.length, close);
+  }
+  return '';
+}
+
 describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
   withLegacyCase(CASE, (params) => {
     let session: LegacySession | undefined;
@@ -192,12 +209,32 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
           }),
           'fetchNodeStructure',
         );
-        // B3-unmeasured b1-3-raw-nodestructure (the raw request): 200, the
-        // package's objects as SEU_ADT_REPOSITORY_OBJ_NODE.
+        // Measured on 7.40 SP04, 2026-10-27: the package's root node answers
+        // its subpackages and one SEU_ADT_OBJECT_TYPE_INFO per object type
+        // (PROG/P with its NODE_ID), not the objects themselves.
         expectSent(recorder, mark, [
           ['POST /sap/bc/adt/repository/nodestructure', 200],
         ]);
-        expect(String(node)).toContain(`<OBJECT_NAME>${name}</OBJECT_NAME>`);
+        const programsNode = nodeIdOf(String(node), 'PROG/P');
+        expect(programsNode).not.toBe('');
+
+        mark = at();
+        const programs = expectResult(
+          await utils.fetchNodeStructure('DEVC/K', LOCAL_PACKAGE, {
+            headers: integrationHeadersOf(utils, 'fetchNodeStructure'),
+            nodeId: programsNode,
+            analyse: analyseException,
+          }),
+          'fetchNodeStructure PROG/P',
+        );
+        // The type's node answers the package's programs.
+        const [expanded] = expectSent(recorder, mark, [
+          ['POST /sap/bc/adt/repository/nodestructure', 200],
+        ]);
+        expect(queryOf(expanded, 'node_id')).toBe(programsNode);
+        expect(String(programs)).toContain(
+          `<OBJECT_NAME>${name}</OBJECT_NAME>`,
+        );
 
         mark = at();
         const catalogue = String(
