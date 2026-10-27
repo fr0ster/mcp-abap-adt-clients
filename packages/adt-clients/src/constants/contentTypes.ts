@@ -143,8 +143,13 @@ export const ACCEPT_PROGRAM =
 export const CT_PROGRAM = 'application/vnd.sap.adt.programs.programs.v2+xml';
 
 // Function Groups
+/**
+ * v3 first: S/4HANA 2025 answers a function group's GET `406` for v2 and v1
+ * and `200` for v3 (measured 2026-10-28, read only). v2 and v1 stay, for the
+ * releases that serve only those.
+ */
 export const ACCEPT_FUNCTION_GROUP =
-  'application/vnd.sap.adt.functions.groups.v2+xml, application/vnd.sap.adt.functions.groups.v1+xml';
+  'application/vnd.sap.adt.functions.groups.v3+xml, application/vnd.sap.adt.functions.groups.v2+xml, application/vnd.sap.adt.functions.groups.v1+xml';
 export const CT_FUNCTION_GROUP =
   'application/vnd.sap.adt.functions.groups.v3+xml';
 
