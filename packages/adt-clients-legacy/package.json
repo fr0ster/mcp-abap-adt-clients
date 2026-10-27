@@ -43,6 +43,10 @@
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
   "license": "LGPL-3.0-only",
+  "homepage": "https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/README.md",
+  "bugs": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt-clients/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git",
@@ -71,9 +75,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "yaml": "^2.8.1"
-  },
-  "allowScripts": {
-    "@parcel/watcher": false,
-    "unrs-resolver": false
   }
 }
