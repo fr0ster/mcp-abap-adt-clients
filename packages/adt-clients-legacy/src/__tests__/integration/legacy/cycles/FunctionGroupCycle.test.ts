@@ -9,7 +9,7 @@
  * unlock → read `404`. Every step asserts the requests it sent, their
  * statuses and its effect read back; the record of each answer is
  * B4-cycles-20261026-2019 (g0–g9, f1–f9, r2-f*), with these not measured
- * there and measured by Task 6 here:
+ * there and measured here, T6-20261027:
  * - the group's and the module's `validate` of a name that does not exist
  *   (B4 g7 and f7 asked of existing names: `200`);
  * - the group's activation before it holds a module (B4 activated the group
@@ -131,8 +131,8 @@ describeLegacyRfc(
           // --- the group ---
           let mark = at();
           await group.requireFree();
-          // validate of a free name: not measured (B4 g7-validate, an
-          // existing name: 200) — Task 6; B4 g0-absent (404).
+          // validate of a free name: 200, T6-20261027 (B4 g7-validate asked an
+          // existing name: 200); B4 g0-absent (404).
           expectSent(recorder, mark, [
             [VALIDATION, 200],
             [`GET ${groupUri}`, 404],
@@ -168,7 +168,7 @@ describeLegacyRfc(
             }),
             'activate group',
           );
-          // B4 g3-activate (there after the module; an empty group: Task 6).
+          // B4 g3-activate (there after the module; an empty group: 200, T6-20261027).
           expectSent(recorder, mark, [['POST /sap/bc/adt/activation', 200]]);
 
           mark = at();
@@ -185,8 +185,8 @@ describeLegacyRfc(
           // --- the module ---
           mark = at();
           await module.requireFree();
-          // validate of a free name: not measured (B4 f7-validate, an
-          // existing name: 200) — Task 6; absent: B3-fugr-v1 a2-2-read-fm
+          // validate of a free name: 200, T6-20261027 (B4 f7-validate asked an
+          // existing name: 200); absent: B3-fugr-v1 a2-2-read-fm
           // (404).
           expectSent(recorder, mark, [
             [VALIDATION, 200],
@@ -271,8 +271,8 @@ describeLegacyRfc(
             }),
             'readMetadata module',
           );
-          // Not measured on a module this run wrote (B2 s3-fm-meta: a system
-          // module, 200) — Task 6.
+          // Measured on a module this run wrote: 200, T6-20261027 (B2 s3-fm-meta
+          // read a system module).
           expectSent(recorder, mark, [[`GET ${moduleUri}`, 200]]);
           expect(String(metadata).toUpperCase()).toContain(`"${moduleName}"`);
 

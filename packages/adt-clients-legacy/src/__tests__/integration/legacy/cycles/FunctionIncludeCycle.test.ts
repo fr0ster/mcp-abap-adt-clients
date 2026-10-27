@@ -12,7 +12,7 @@
  * and delete, the include's create with
  * `application/vnd.sap.adt.functions.fincludes+xml`, its write under its
  * lock, its activation, its read `404` after the group's delete), with these
- * not measured there and measured by Task 6 here:
+ * not measured there and measured here, T6-20261027:
  * - the group's and the include's `validate` of a name that does not exist
  *   (the include's reads its group);
  * - the include's read and readMetadata of an include this run wrote
@@ -125,7 +125,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
       await runCycle(CASE, [include, group], async () => {
         let mark = at();
         await group.requireFree();
-        // validate of a free name: not measured — Task 6; absent:
+        // validate of a free name: 200, T6-20261027; absent:
         // B3-fugr-v1 a2-0-read (404).
         expectSent(recorder, mark, [
           ['POST /sap/bc/adt/functions/validation', 200],
@@ -157,9 +157,9 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
         mark = at();
         await include.requireFree();
         // The include's validate reads its group (the library's
-        // validateFunctionIncludeName), and the include reads absent: neither
-        // measured on 7.40 — Task 6 (B3-fugr-v1 a2-9-include-read: an absent
-        // include reads 404).
+        // validateFunctionIncludeName), and the include reads absent: the group
+        // `200`, the include `404`, T6-20261027 (B3-fugr-v1 a2-9-include-read:
+        // an absent include reads 404).
         expectSent(recorder, mark, [
           [`GET ${groupUri}`, 200],
           [`GET ${includeUri}`, 404],
@@ -229,8 +229,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
           }),
           'read include (active)',
         );
-        // Not measured on an include this run wrote (B2 s5-finc-read: a
-        // system include, 200) — Task 6.
+        // Measured on an include this run wrote: 200, T6-20261027 (B2 s5-finc-read
+        // read a system include).
         const [get] = expectSent(recorder, mark, [
           [`GET ${includeUri}/source/main`, 200],
         ]);
@@ -244,8 +244,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
           }),
           'readMetadata include',
         );
-        // Not measured on an existing include (B3-fugr-v1 a2-9-include-read:
-        // 404 once its group was deleted) — Task 6.
+        // Measured on an existing include: 200, T6-20261027 (B3-fugr-v1
+        // a2-9-include-read: 404 once its group was deleted).
         expectSent(recorder, mark, [[`GET ${includeUri}`, 200]]);
         expect(String(metadata).toUpperCase()).toContain(`"${includeName}"`);
 
@@ -261,7 +261,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
           ),
           'check include',
         );
-        // Not measured — Task 6.
+        // Measured: 200, T6-20261027.
         expectSent(recorder, mark, [['POST /sap/bc/adt/checkruns', 200]]);
 
         mark = at();

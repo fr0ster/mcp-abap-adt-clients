@@ -14,8 +14,8 @@
  *
  * The SQL view the activation generates is checked through `search`: no
  * object of its name before the create, the view after the activation, none
- * after the delete. A search for a DDIC view is not measured on 7.40 SP04 —
- * Task 6 (B2 s10-search: a program's name, `200`).
+ * after the delete. A search for a DDIC view answered `200` each time on
+ * 7.40 SP04 (T6-20261027; B2 s10-search searched a program's name).
  *
  * Runs on a legacy configuration over RFC with case
  * `legacy_740/legacy_cycle_ddl` enabled:
@@ -121,7 +121,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
           ['POST /sap/bc/adt/ddic/ddl/validation', 200],
           [`GET ${uri}`, 404],
         ]);
-        // The SQL view's name is free too (Task 6).
+        // The SQL view's name is free too (search `200`, T6-20261027).
         expect(await viewFound()).toBe(false);
 
         mark = at();
@@ -182,7 +182,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
         );
         // B4 d3-activate.
         expectSent(recorder, mark, [['POST /sap/bc/adt/activation', 200]]);
-        // The activation generated the SQL view (Task 6).
+        // The activation generated the SQL view (search `200`, T6-20261027).
         expect(await viewFound()).toBe(true);
 
         mark = at();
@@ -267,7 +267,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — DDL source cycle', () => {
         // B4 d8-read404.
         expect(gone.response?.status).toBe(404);
         expectSent(recorder, mark, [[`GET ${uri}`, 404]]);
-        // The SQL view went with its source (Task 6).
+        // The SQL view went with its source (search `200`, T6-20261027).
         expect(await viewFound()).toBe(false);
       });
     }, 900000);

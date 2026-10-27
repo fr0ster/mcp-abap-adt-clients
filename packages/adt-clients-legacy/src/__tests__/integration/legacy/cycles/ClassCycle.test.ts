@@ -11,7 +11,7 @@
  * (c0–c8, r2-c4-check-*, r3-class-validate), the class metadata Accept is
  * class-metadata-accept-2026-10-26. The reads of main and the includes of a
  * class this run wrote are not in B4 (B2-reads-20261023-1749 s7, s8 read a
- * system class) — Task 6 measures them here. The local includes'
+ * system class) — measured here, T6-20261027 (every request asserted, `200`). The local includes'
  * `readTransport` is the container class's request (`GET <class>/transport`,
  * `404` in c6-readTransport): each include refuses it too, asserted beside
  * the class's own.
@@ -266,8 +266,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — class cycle', () => {
             ),
           ).toContain(include.source);
         }
-        // Not measured on a class this run wrote (B2 s8-class-read, s7-*: a
-        // system class, 200) — Task 6.
+        // Measured on a class this run wrote: 200, T6-20261027 (B2 s8-class-read,
+        // s7-* read a system class).
         const reads = expectSent(recorder, mark, [
           [`GET ${uri}/source/main`, 200],
           ...includes.map(

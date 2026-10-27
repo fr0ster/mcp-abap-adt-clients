@@ -267,7 +267,8 @@ describeLegacyRfc(
           read = await readMessage('read message 001 after the delete');
           // B4 r2-m10-msg-read: 200, the class document without message 001,
           // which analyseMessageClassMessage answers as the message absent
-          // (the strategy's reading of the 7.40 document: Task 6).
+          // (the strategy's reading of the 7.40 document; the cycle passed on
+          // 7.40 SP04, T6-20261027).
           const absent = expectFailure(read.answer, read.what);
           expect(absent.code).toBe(AdtObjectErrorCodes.OBJECT_NOT_FOUND);
           expect(absent.message).toContain(

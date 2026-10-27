@@ -7,8 +7,8 @@
  * requests it sent, their statuses and its effect read back; the record of
  * each answer is B4-cycles-20261026-2019 (p0–p9, r3-prog-validate), except
  * the read and readMetadata of a program this run wrote: B4 did not read
- * them back, B2-reads-20261023-1749 (s1) read a system program — Task 6
- * measures them here.
+ * them back, B2-reads-20261023-1749 (s1) read a system program — measured
+ * here, T6-20261027 (`200` each).
  *
  * The program is created by this run in `$TMP` (no transport) and deleted
  * by it — by its last steps, or by the cleanup when a step failed; nothing
@@ -163,8 +163,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — program cycle', () => {
           }),
           'read active',
         );
-        // Not measured on a program this run wrote (B2 s1-prog-read: a system
-        // program, 200) — Task 6.
+        // Measured on a program this run wrote: 200, T6-20261027 (B2 s1-prog-read
+        // read a system program).
         const [get] = expectSent(recorder, mark, [
           [`GET ${uri}/source/main`, 200],
         ]);
@@ -178,8 +178,8 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — program cycle', () => {
           }),
           'readMetadata',
         );
-        // Not measured on a program this run wrote (B2 s1-prog-meta: a system
-        // program, 200) — Task 6.
+        // Measured on a program this run wrote: 200, T6-20261027 (B2 s1-prog-meta
+        // read a system program).
         expectSent(recorder, mark, [[`GET ${uri}`, 200]]);
         expect(String(metadata).toUpperCase()).toContain(`"${name}"`);
 

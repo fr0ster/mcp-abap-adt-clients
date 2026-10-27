@@ -18,7 +18,7 @@
  * b1-3), the collections in the RFC discovery (rfc-discovery.txt), the group
  * activation on a 7.40 system of unrecorded support package (docs/LEGACY.md,
  * "Measured on BASIS 7.40"). What each answers about an object of this run
- * is not measured — Task 6 measures every reader step here.
+ * was measured here, T6-20261027: every reader step's requests asserted.
  *
  * The program is created by this run in `$TMP` (no transport) and deleted by
  * it — by its last steps, or by the cleanup when a step failed; nothing this
@@ -281,7 +281,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
           'activateObjectsGroup',
         );
         // docs/LEGACY.md "Measured on BASIS 7.40" (support package not
-        // recorded): 200, empty — Task 6 measures it on 7.40 SP04.
+        // recorded): 200, and on 7.40 SP04 too, T6-20261027.
         const [activated] = expectSent(recorder, mark, [
           ['POST /sap/bc/adt/activation', 200],
         ]);
