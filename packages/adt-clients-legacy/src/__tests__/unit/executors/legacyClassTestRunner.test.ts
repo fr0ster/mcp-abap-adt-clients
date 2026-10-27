@@ -189,7 +189,9 @@ describe('ClassTestRunnerLegacy', () => {
     const { conn, calls } = makeConn();
     const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
 
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     expectFailure(await runner.getStatus(), 'no run to poll');
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     expectFailure(await runner.getResult(), 'no result to fetch');
     expect(calls).toHaveLength(0);
   });

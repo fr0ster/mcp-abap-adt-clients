@@ -47,13 +47,17 @@ describe.each([
     const runner = new Runner(conn, createLibraryLogger());
     const classRunner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
 
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const status = expectFailure(await runner.getStatus(), 'status');
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const result = expectFailure(await runner.getResult(), 'result');
 
     expect(status).toEqual(
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       expectFailure(await classRunner.getStatus(), 'class status'),
     );
     expect(result).toEqual(
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       expectFailure(await classRunner.getResult(), 'class result'),
     );
     expect(status.origin).toBe('refusal');

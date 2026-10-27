@@ -15,6 +15,7 @@ import type {
   AdtClientCloud,
   AdtClientOnPrem,
 } from '../../../clients/AdtClientVariants';
+import type { AdtExecutor } from '../../../clients/AdtExecutor';
 import { createAdtClient } from '../../../clients/createAdtClient';
 import type {
   AdtModernVariant,
@@ -30,7 +31,22 @@ async function variantGates(
   basis740: AdtClient<'basis740'>,
   connection: IAbapConnection,
   fromConfig: AdtModernVariant,
+  executor: AdtExecutor,
+  executor740: AdtExecutor<'basis740'>,
 ): Promise<void> {
+  // The executors and runners are gated by `run`, `profile` and the unit-test
+  // operations: the modern variant runs, profiles and polls…
+  await executor.getClassExecutor().run({ className: 'ZCL_GATE' });
+  await executor.getClassTestRunner().getStatus('RUN');
+  await executor.getFunctionModuleTestRunner().run('Z_FM_GATE');
+  // …and 7.40 does none of it.
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `CLAS/OC` lists no `run`
+  await executor740.getClassExecutor().run({ className: 'ZCL_GATE' });
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `CLAS/OC` lists no `unitTestStatus`
+  await executor740.getClassTestRunner().getStatus('RUN');
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `FUGR/FF` lists no `unitTestRun`
+  await executor740.getFunctionModuleTestRunner().run('Z_FM_GATE');
+
   // A factory the variant lacks: 7.40's table has no `table`.
   onprem.getTable();
   cloud.getTable();

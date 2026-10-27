@@ -40,7 +40,13 @@ describe.each([
   it(`one POST to /runs naming the object as ${type}`, async () => {
     const { conn, calls } = makeConn();
 
-    await new Runner(conn, createLibraryLogger()).run(name);
+    // One of two runner classes: each gates `run` on its own receiver, so
+    // the call goes through what both take.
+    const runner: { run(name: string): Promise<unknown> } = new Runner(
+      conn,
+      createLibraryLogger(),
+    );
+    await runner.run(name);
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');

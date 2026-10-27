@@ -36,7 +36,7 @@ import { FunctionModuleTestRunnerLegacy } from '../executors/functionModule/Func
 import { ProgramExecutorLegacy } from '../executors/program/ProgramExecutorLegacy';
 import { ProgramTestRunnerLegacy } from '../executors/program/ProgramTestRunnerLegacy';
 
-export class AdtExecutorLegacy extends AdtExecutor {
+export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   /** Runs and the trace type lists refuse on 7.40; the trace schedule is inherited. */
   override getClassExecutor<
     R extends IClassExecutorResults = typeof classExecutorDocuments,

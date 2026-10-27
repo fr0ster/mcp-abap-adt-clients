@@ -239,6 +239,7 @@ describe('legacy runners send the synchronous request', () => {
       createLibraryLogger(),
     );
 
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const refusal = expectFailure(await runner.run(), 'no module run on 7.40');
     expect(refusal.origin).toBe('refusal');
     expect(refusal.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);

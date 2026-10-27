@@ -21,6 +21,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
@@ -30,6 +31,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { FUNCTION_MODULE } from '../../endpoints/objects';
 import {
   AbapUnitRunner,
@@ -52,8 +54,9 @@ export const functionModuleTestRunnerDocuments = abapUnitRunnerDocuments;
 export class FunctionModuleTestRunner<
     R extends
       IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
+    V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R>
+  extends AbapUnitRunner<R, V, 'functionModule'>
   implements
     IAdtRunnable<string, ReturnType<R['run']>, IClassUnitTestRunOptions>
 {
@@ -68,6 +71,7 @@ export class FunctionModuleTestRunner<
 
   /** Run the test classes that exercise the module. One POST. */
   async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRun'>,
     functionModuleName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -104,6 +108,7 @@ export class FunctionModuleTestRunner<
    * `options.analyse`'s.
    */
   async runSync<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRunSync'>,
     target: IFunctionModuleTestRunSyncTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {

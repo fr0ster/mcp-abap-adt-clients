@@ -78,6 +78,7 @@ describe('legacy transport update/delete', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       await new AdtRequestLegacy(connection).updateMetadata(),
       'legacy update',
     );
@@ -92,6 +93,7 @@ describe('legacy transport update/delete', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       await new AdtRequestLegacy(connection).delete(),
       'legacy delete',
     );
@@ -138,8 +140,11 @@ describe('legacy transport members', () => {
       // @ts-expect-error -- 7.40 does not serve request.changeTaskType; the refusal is for a caller outside the type system
       (h) => h.changeTaskType('GUARD_TASK', 'Unclassified' as never, headers),
     ],
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     ['create', (h) => h.create()],
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     ['updateMetadata', (h) => h.updateMetadata()],
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     ['delete', (h) => h.delete()],
   ];
 

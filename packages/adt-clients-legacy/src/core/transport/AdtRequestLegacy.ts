@@ -71,9 +71,9 @@ export class AdtRequestLegacy<
    * Refused: the legacy CTS endpoint rejects every POST payload with "user
    * action is not supported" — no useraction value is accepted.
    */
-  override async create<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['created']>, E>
-  > {
+  override async create<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'request', 'create'>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     return failed<ReturnType<R['created']>, E>(
       unsupported(
         'Creating transport requests',
@@ -138,9 +138,9 @@ export class AdtRequestLegacy<
   }
 
   /** Refused: the legacy endpoint's update shape has never been captured. */
-  override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['metadataUpdated']>, E>
-  > {
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'request', 'updateMetadata'>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     return failed<ReturnType<R['metadataUpdated']>, E>(
       unsupported(
         'Updating transport requests',
@@ -150,9 +150,9 @@ export class AdtRequestLegacy<
   }
 
   /** Refused: the legacy endpoint's delete shape has never been captured. */
-  override async delete<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['deleted']>, E>
-  > {
+  override async delete<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'request', 'delete'>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     return failed<ReturnType<R['deleted']>, E>(
       unsupported(
         'Deleting transport requests',

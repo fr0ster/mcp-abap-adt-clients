@@ -9,6 +9,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   FUNCTION_GROUP,
   FunctionGroupTestRunner,
   type functionGroupTestRunnerDocuments,
@@ -30,9 +31,10 @@ import {
 export class FunctionGroupTestRunnerLegacy<
   R extends
     IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
-> extends FunctionGroupTestRunner<R> {
+> extends FunctionGroupTestRunner<R, 'basis740'> {
   /** Run every test class of the group: the `runSync` request, read by `run`. */
   override async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -44,15 +46,15 @@ export class FunctionGroupTestRunnerLegacy<
     );
   }
 
-  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['status']>, E>
-  > {
+  override async getStatus<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestStatus'>,
+  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
     return noRunToPoll<ReturnType<R['status']>, E>();
   }
 
-  override async getResult<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
+  override async getResult<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestResult'>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
     return noResultToFetch<ReturnType<R['result']>, E>();
   }
 }

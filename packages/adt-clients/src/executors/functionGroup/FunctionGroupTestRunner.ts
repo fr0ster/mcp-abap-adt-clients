@@ -17,6 +17,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
@@ -25,6 +26,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import {
   AbapUnitRunner,
@@ -38,8 +40,9 @@ export const functionGroupTestRunnerDocuments = abapUnitRunnerDocuments;
 export class FunctionGroupTestRunner<
     R extends
       IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
+    V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R>
+  extends AbapUnitRunner<R, V, 'functionGroup'>
   implements
     IAdtRunnable<string, ReturnType<R['run']>, IClassUnitTestRunOptions>
 {
@@ -54,6 +57,7 @@ export class FunctionGroupTestRunner<
 
   /** Run every test class of the group. One POST. */
   async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -77,6 +81,7 @@ export class FunctionGroupTestRunner<
    * `options.analyse`'s.
    */
   async runSync<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRunSync'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {

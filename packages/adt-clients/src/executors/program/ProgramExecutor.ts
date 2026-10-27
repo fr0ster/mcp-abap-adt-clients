@@ -1,4 +1,5 @@
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtHeaders,
@@ -14,6 +15,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { runProgram } from '../../core/program/run';
 import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -54,6 +56,7 @@ export const programExecutorDocuments = {
  */
 export class ProgramExecutor<
   R extends IProgramExecutorResults = typeof programExecutorDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtRunnable<IProgramExecutionTarget, ReturnType<R['run']>>,
     IRunnableWithProfiler<
@@ -67,6 +70,11 @@ export class ProgramExecutor<
       ReturnType<R['scheduled']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   private readonly connection: IAbapConnection;
   private readonly results: R;
   private readonly scheduling: TraceScheduling<R>;
@@ -119,6 +127,7 @@ export class ProgramExecutor<
   }
 
   async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'run'>,
     target: IProgramExecutionTarget,
     options?: IProgramExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -136,6 +145,7 @@ export class ProgramExecutor<
   }
 
   async runWithProfiler<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'profile'>,
     target: IProgramExecutionTarget,
     options: IProgramExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {

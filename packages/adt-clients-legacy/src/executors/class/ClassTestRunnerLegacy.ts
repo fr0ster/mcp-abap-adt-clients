@@ -12,6 +12,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   answering,
   ClassTestRunner,
   type classTestRunnerDocuments,
@@ -31,13 +32,14 @@ import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
 
 export class ClassTestRunnerLegacy<
   R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
-> extends ClassTestRunner<R> {
+> extends ClassTestRunner<R, 'basis740'> {
   /**
    * Run the tests. On a legacy system the POST answers the finished result:
    * the request `runSync` sends, with `<options>` — the caller's scope, risk
    * levels and durations — read by this runner's `run` strategy as it came.
    */
   override async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestRun'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -58,16 +60,16 @@ export class ClassTestRunnerLegacy<
    * Refused without a request: a legacy system finishes a run before it
    * answers and exposes no run to poll. `run`'s own answer is the result.
    */
-  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['status']>, E>
-  > {
+  override async getStatus<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestStatus'>,
+  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
     return noRunToPoll<ReturnType<R['status']>, E>();
   }
 
   /** Refused for the same reason: `run`'s answer is the result document. */
-  override async getResult<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
+  override async getResult<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestResult'>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
     return noResultToFetch<ReturnType<R['result']>, E>();
   }
 }

@@ -10,6 +10,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   type IProgramExecutorResults,
   ProgramExecutor,
   type programExecutorDocuments,
@@ -30,9 +31,10 @@ const PROCESS_TYPES = '/sap/bc/adt/runtime/traces/abaptraces/processtypes';
 
 export class ProgramExecutorLegacy<
   R extends IProgramExecutorResults = typeof programExecutorDocuments,
-> extends ProgramExecutor<R> {
+> extends ProgramExecutor<R, 'basis740'> {
   /** Refused without a request until measured: 7.40 does not advertise `programrun`. */
   override async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'run'>,
     _target: IProgramExecutionTarget,
     _options?: IProgramExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -41,6 +43,7 @@ export class ProgramExecutorLegacy<
 
   /** Refused without a request, for the same reason as `run`. */
   override async runWithProfiler<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'profile'>,
     _target: IProgramExecutionTarget,
     _options: IProgramExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {

@@ -1,3 +1,4 @@
+import type { AdtVariant } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
@@ -31,8 +32,16 @@ import {
   programTestRunnerDocuments,
 } from '../executors/program/ProgramTestRunner';
 import { withRequestTrace } from '../utils/requestTrace';
+import type { AdtModernVariant } from './variant';
 
-export class AdtExecutor {
+export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * executors and runners it answers are of this variant, and their members'
+   * gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
+
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
 
@@ -46,8 +55,8 @@ export class AdtExecutor {
 
   getClassExecutor<
     R extends IClassExecutorResults = typeof classExecutorDocuments,
-  >(results: R = classExecutorDocuments as unknown as R): ClassExecutor<R> {
-    return new ClassExecutor<R>(this.connection, this.logger, results);
+  >(results: R = classExecutorDocuments as unknown as R): ClassExecutor<R, V> {
+    return new ClassExecutor<R, V>(this.connection, this.logger, results);
   }
 
   /**
@@ -58,14 +67,18 @@ export class AdtExecutor {
    */
   getClassTestRunner<
     R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
-  >(results: R = classTestRunnerDocuments as unknown as R): ClassTestRunner<R> {
-    return new ClassTestRunner<R>(this.connection, this.logger, results);
+  >(
+    results: R = classTestRunnerDocuments as unknown as R,
+  ): ClassTestRunner<R, V> {
+    return new ClassTestRunner<R, V>(this.connection, this.logger, results);
   }
 
   getProgramExecutor<
     R extends IProgramExecutorResults = typeof programExecutorDocuments,
-  >(results: R = programExecutorDocuments as unknown as R): ProgramExecutor<R> {
-    return new ProgramExecutor<R>(this.connection, this.logger, results);
+  >(
+    results: R = programExecutorDocuments as unknown as R,
+  ): ProgramExecutor<R, V> {
+    return new ProgramExecutor<R, V>(this.connection, this.logger, results);
   }
 
   /**
@@ -77,8 +90,8 @@ export class AdtExecutor {
     R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
   >(
     results: R = programTestRunnerDocuments as unknown as R,
-  ): ProgramTestRunner<R> {
-    return new ProgramTestRunner<R>(this.connection, this.logger, results);
+  ): ProgramTestRunner<R, V> {
+    return new ProgramTestRunner<R, V>(this.connection, this.logger, results);
   }
 
   /**
@@ -90,8 +103,8 @@ export class AdtExecutor {
       IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
   >(
     results: R = functionGroupTestRunnerDocuments as unknown as R,
-  ): FunctionGroupTestRunner<R> {
-    return new FunctionGroupTestRunner<R>(
+  ): FunctionGroupTestRunner<R, V> {
+    return new FunctionGroupTestRunner<R, V>(
       this.connection,
       this.logger,
       results,
@@ -107,8 +120,8 @@ export class AdtExecutor {
       IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
   >(
     results: R = functionModuleTestRunnerDocuments as unknown as R,
-  ): FunctionModuleTestRunner<R> {
-    return new FunctionModuleTestRunner<R>(
+  ): FunctionModuleTestRunner<R, V> {
+    return new FunctionModuleTestRunner<R, V>(
       this.connection,
       this.logger,
       results,

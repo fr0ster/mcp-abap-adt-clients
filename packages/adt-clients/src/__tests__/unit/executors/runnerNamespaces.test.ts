@@ -35,7 +35,10 @@ describe.each([
   it('keeps its slashes in the osl:object, and in the title', async () => {
     const { conn, calls } = makeConn();
 
-    await new Runner(conn).run(name);
+    // One of four runner classes: each gates `run` on its own receiver, so
+    // the call goes through what all of them take.
+    const runner: { run(name: string): Promise<unknown> } = new Runner(conn);
+    await runner.run(name);
 
     const body = String(calls[0].data);
     const upper = name.toUpperCase();

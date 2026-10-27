@@ -108,7 +108,7 @@ type LegacyClientGetters = AllTrue<
 type LegacyExecutorGetters = AllTrue<
   SameMembers<
     AdtExecutorLegacy,
-    AdtExecutor,
+    AdtExecutor<'basis740'>,
     'getClassExecutor' | 'getProgramExecutor'
   >
 >;
