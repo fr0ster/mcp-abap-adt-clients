@@ -119,7 +119,9 @@ A consumer that used the legacy client through this package:
    return a legacy class on any system, so a consumer that relied on
    `createAdtClient()` finding a 7.40 system must now choose the legacy class
    itself.
-3. A consumer that does not use a legacy system changes nothing, and saves the
+3. A consumer that imported `AdtRequestLegacy` from this package imports it
+   from `@mcp-abap-adt/adt-clients-legacy`.
+4. A consumer that does not use a legacy system changes nothing, and saves the
    discovery request `createAdtClient()` used to send.
 
 ## [37.3.0] - 2026-10-26
