@@ -20,9 +20,9 @@
  *
  * Usage:
  *
- *   ../../node_modules/.bin/ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK906816
- *   ../../node_modules/.bin/ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK906816 --update-request=DEVK906818
- *   ../../node_modules/.bin/ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK906816 --clean
+ *   ../../node_modules/.bin/ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK900001
+ *   ../../node_modules/.bin/ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK900001 --update-request=DEVK900002
+ *   ../../node_modules/.bin/ts-node scripts/dev-loan-register.ts ZAC_TR_PKG DEVK900001 --clean
  *
  * Idempotent: an object that already exists is updated rather than created, so
  * a re-run is a second development cycle on the same five objects.

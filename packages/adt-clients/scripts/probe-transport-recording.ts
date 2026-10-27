@@ -13,9 +13,9 @@
  * contains, so that is what gets printed — before, after the create, and after
  * the update.
  *
- *   ../../node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816
- *   ../../node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816 --update-request=DEVK906818
- *   ../../node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK906816 ZAC_TR_CLS02 --keep
+ *   ../../node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK900001
+ *   ../../node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK900001 --update-request=DEVK900002
+ *   ../../node_modules/.bin/ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG DEVK900001 ZAC_TR_CLS02 --keep
  *
  * **`--update-request` is what makes the update half provable.** With one
  * request the class is already in it after the create, so a list that does not
@@ -73,7 +73,7 @@ ENDCLASS.`;
  * The objects a request holds.
  *
  * `readMetadata` is a GET on the request itself, and it carries the contents —
- * measured on DEVK906816, which answered with four `tm:abap_object` children.
+ * measured on a request, which answered with four `tm:abap_object` children.
  * That element name is the trap: `tm:abapObject` matches nothing, so a parser
  * spelling it that way reports every request as empty, including ones holding
  * a hundred objects. Found that way while deciding which requests were safe to

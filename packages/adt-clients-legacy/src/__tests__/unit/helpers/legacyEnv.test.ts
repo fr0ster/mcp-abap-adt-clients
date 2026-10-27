@@ -1176,7 +1176,7 @@ describe('legacy env: the request of a live check', () => {
   it('comes from the status run with abap_unit, which refuses the variable', () => {
     expect(requestSource('abap_unit', {})).toEqual({ from: 'status' });
     expect(() =>
-      requestSource('abap_unit', { [REQUEST_VARIABLE]: 'E77K900001' }),
+      requestSource('abap_unit', { [REQUEST_VARIABLE]: 'ABCK900001' }),
     ).toThrow(
       `${REQUEST_VARIABLE} is read only with legacy_env.runner: manual`,
     );
@@ -1184,8 +1184,8 @@ describe('legacy env: the request of a live check', () => {
 
   it('comes from the owner with manual, else the check skips naming the SE24 step', () => {
     expect(
-      requestSource('manual', { [REQUEST_VARIABLE]: ' e77k900001 ' }),
-    ).toEqual({ from: 'owner', request: 'E77K900001' });
+      requestSource('manual', { [REQUEST_VARIABLE]: ' abck900001 ' }),
+    ).toEqual({ from: 'owner', request: 'ABCK900001' });
     const none = requestSource('manual', {});
     expect(none.from).toBe('none');
     expect(none.from === 'none' && none.skip).toContain(
@@ -1195,7 +1195,7 @@ describe('legacy env: the request of a live check', () => {
       'none',
     );
     expect(() =>
-      requestSource('manual', { [REQUEST_VARIABLE]: "E77K'1" }),
+      requestSource('manual', { [REQUEST_VARIABLE]: "ABCK'1" }),
     ).toThrow('must be a request number');
   });
 });
