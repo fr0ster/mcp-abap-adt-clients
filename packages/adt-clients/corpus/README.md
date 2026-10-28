@@ -28,7 +28,7 @@ recorded name, which its `.json` names as `bodyFile`.
 | `answers/` | the answer shapes: reads, refusals, writes, with the collector's run manifests (`_run-*.json`) | `adt-strategies`' tests, this package's unit tests, `docs/usage/ANSWER_SHAPES.md`; written by `scripts/capture-adt-corpus.ts` |
 | `debugger/` | the debugger conversations and the memory snapshot list, kept for information | `adt-strategies`' tests, `docs/research/debugger-endpoints.md`, `docs/usage/ERRATA.md` |
 | `discovery/` | each release's `GET /sap/bc/adt/discovery`: its collections, their `app:accept` and templates — `system-description-<release>--03-discovery` | the type tables' evidence |
-| `typestructure/` | each release's `POST /repository/typestructure`: every type with its parent, name length, capabilities and the user's authorizations | the type tables' evidence |
+| `typestructure/` | each release's `POST /repository/typestructure`: every type with its parent, name length, capabilities and the user's authorizations — what each field means, from the handler's code: [`docs/research/typestructure.md`](../docs/research/typestructure.md) | the type tables' evidence |
 
 The releases are `s4-2025` (S/4HANA 2025 on-premise), `abap-cloud` (the BTP
 ABAP environment trial) and `basis-740` (SAP_BASIS 7.40 SP04). `discovery/`
