@@ -99,6 +99,7 @@ import {
 } from './members';
 import { coverageOf, runOnTemporaryObjects } from './objectRun';
 import type { ITemporaryContext } from './objects';
+import { phase2Skip, type Phase2Skip } from './phase2Filter';
 import { lockHandle } from './probe';
 import {
   endpointKey,
@@ -1623,14 +1624,20 @@ export interface IWriteCycleInput {
   interrupt: Interrupt;
   /** The needs keys (`handler.member — endpoint`) of the writes still unknown. */
   unknown: ReadonlySet<string>;
-  /** `--only` / `--except` of the run: an endpoint they exclude is not sent. */
-  filter?: IEndpointFilter;
+  /**
+   * Phase 2's predicate (`--only`, `--except`, phase 1's unauthorized
+   * members): a member it refuses is never sent, setup included. Cleanup of
+   * what phase 2 made is exempt.
+   */
+  skip?: Phase2Skip;
 }
 
 export interface IWriteCycleResult {
   evidence: IEvidence[];
   /** The cycle's answers as rows, for `exists`. */
   rows?: ICorpusRow[];
+  /** What the cycle did not send, `<type>.<member>: skipped: <why>`. */
+  skipped?: string[];
   removals: IRemoval[];
   error?: string;
 }
@@ -1685,11 +1692,9 @@ export async function runFull(
   const phase2Rows: ICorpusRow[] = [];
   let updates: IHeaderCorpusFile['updates'] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
-  const filter: IEndpointFilter = {
-    ...(input.only ? { only: input.only } : {}),
-    ...(input.except ? { except: input.except } : {}),
-  };
 
+  /** What phase 2 did not send, and why. */
+  const phase2Skipped: string[] = [];
   const unauthorized = new Set<string>();
   /** Phase 2's rows: an authorization 403 is recorded, never judged. */
   const noteUnauthorized = (rows: readonly ICorpusRow[]) => {
@@ -1760,6 +1765,22 @@ export async function runFull(
         .filter((entry) => /— (POST|PUT|DELETE) /.test(entry.endpoint))
         .map((entry) => entry.endpoint),
     );
+    // Phase 2's predicate, built once: --only, --except and what phase 1
+    // recorded as unauthorized, per `handler.member`.
+    const unauthorizedMembers = new Map<string, string>();
+    for (const corpus of corpora.values())
+      if (corpus.source === 'clients')
+        for (const row of corpus.rows)
+          if (row.unauthorized && row.endpoint)
+            unauthorizedMembers.set(
+              `${baseHandler(row.group)}.${row.label}`,
+              endpointKey(row.endpoint),
+            );
+    const skip = phase2Skip({
+      only: input.only,
+      except: input.except,
+      unauthorized: unauthorizedMembers,
+    });
     const cycle = input.writeCycle;
     if (!stopped() && unknownWrites.size && cycle)
       await timed(
@@ -1770,9 +1791,10 @@ export async function runFull(
             clientOptions: await input.clientOptions(connection),
             interrupt: input.interrupt,
             unknown: unknownWrites,
-            filter,
+            skip,
           });
           phase2Rows.push(...(writes.rows ?? []));
+          phase2Skipped.push(...(writes.skipped ?? []));
           noteUnauthorized(writes.rows ?? []);
           evidence.push(...withoutUnauthorized(writes.evidence));
           removals = [...removals, ...writes.removals];
@@ -1788,9 +1810,12 @@ export async function runFull(
             connection,
             clientOptions: await input.clientOptions(connection),
             interrupt: input.interrupt,
-            filter,
+            skip,
           });
           updates = measured.updates;
+          for (const update of measured.updates ?? [])
+            if (update.note?.startsWith('skipped: '))
+              phase2Skipped.push(`${update.type}.${update.member}: ${update.note}`);
           phase2Rows.push(...(measured.rows ?? []));
           noteUnauthorized(measured.rows ?? []);
           // Each update went with a bogus Accept: evidence for its Accept.
@@ -1906,6 +1931,7 @@ export async function runFull(
         ? { coverage: corpora.get('clients corpus')?.coverage }
         : {}),
       updates,
+      ...(phase2Skipped.length ? { phase2Skipped } : {}),
       endedBy: ended,
       ...(input.only?.length ? { only: input.only } : {}),
       ...(input.except?.length ? { except: input.except } : {}),

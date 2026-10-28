@@ -21,7 +21,6 @@ import {
   byContrast,
   emptyNamed,
   judge,
-  passesFilter,
   realMediaTypes,
 } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
@@ -34,6 +33,7 @@ import {
   OBJECT_SPECS,
 } from './objects';
 import { knownPair } from './pairs';
+import type { Phase2Skip } from './phase2Filter';
 import { Probe, randomRun } from './probe';
 import {
   endpointKey,
@@ -194,8 +194,8 @@ export async function runWriteCycle(
     const who = key.slice(0, key.indexOf(' — '));
     // A client set's writes stay as phase 1 left them.
     if (isSetHandler(who)) continue;
-    // An endpoint `--only` / `--except` leaves out is not sent.
-    if (!passesFilter(input.filter ?? {}, who)) continue;
+    // A member phase 2's predicate refuses is not probed.
+    if (input.skip?.(who) !== undefined) continue;
     const handler = who.slice(0, who.lastIndexOf('.'));
     const member = who.slice(who.lastIndexOf('.') + 1);
     const type = typeOfHandler(handler);
@@ -226,6 +226,7 @@ export async function runWriteCycle(
     },
     randomRun(),
     input.interrupt,
+    input.skip,
   );
   let error: string | undefined;
   try {
@@ -247,6 +248,9 @@ export async function runWriteCycle(
   return {
     evidence: evidenceOfRows(probe.rows, wanted),
     rows: rowsOfCycle(probe.rows),
+    skipped: probe.rows
+      .filter((row) => row.skipped)
+      .map((row) => `${row.objectType}.${row.member}: ${row.skipped}`),
     removals,
     ...(error ? { error } : {}),
   };
@@ -331,6 +335,7 @@ export async function measureUpdates(
     context,
     randomRun(),
     input.interrupt,
+    input.skip,
   );
   let error: string | undefined;
   const statusOf = (capture: ICapture) => capture.wire?.status;
@@ -346,15 +351,38 @@ export async function measureUpdates(
         if (input.only && !input.only.includes(spec.type)) continue;
         input.interrupt.check();
         const member = spec.write === 'source' ? 'update' : 'updateMetadata';
-        // An endpoint `--only` / `--except` leaves out is not sent.
-        if (!passesFilter(input.filter ?? {}, `${spec.handler}.${member}`))
-          continue;
         const row: IUpdateMeasure = {
           type: spec.type,
           member,
           applied: 'unknown',
         };
         updates.push(row);
+        // Nothing is sent when phase 2's predicate refuses a member the
+        // measurement needs (its setup included): recorded skipped, with why.
+        const parentSpec = spec.needs
+          ? OBJECT_SPECS.find(
+              (s) => s.type === (spec.needs === 'ddl' ? 'ddl' : 'functionGroup'),
+            )
+          : undefined;
+        const blocked = probe.blockedSetup([
+          ...probe.setupOf(spec),
+          { handler: spec.handler, member: 'lock' },
+          { handler: spec.handler, member: member },
+          {
+            handler: spec.handler,
+            member: spec.write === 'source' ? 'read' : 'readMetadata',
+          },
+          ...(parentSpec
+            ? ['lock', 'update', 'activate'].map((parentMember) => ({
+                handler: parentSpec.handler,
+                member: parentMember,
+              }))
+            : []),
+        ]);
+        if (blocked !== undefined) {
+          row.note = `skipped: ${blocked}`;
+          continue;
+        }
         const ctx: ISpecContext = { ...context };
         if (spec.needs) {
           const parentSpec = OBJECT_SPECS.find(

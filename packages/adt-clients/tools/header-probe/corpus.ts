@@ -2500,6 +2500,8 @@ export interface IHeaderCorpusFile {
   only?: string[];
   /** `--except` of the run: these endpoints were never sent. */
   except?: string[];
+  /** What phase 2 did not send because a member it needs is excluded or unauthorized (or its setup failed), and why. */
+  phase2Skipped?: string[];
   /** `--record-unauthorized`: an authorization 403 was recorded, not a stop. */
   recordUnauthorized?: true;
   /** The endpoints (method + path) the user is not authorized for. */
@@ -2598,6 +2600,13 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
         `| ${cell(update.type)} | ${update.member} | ${update.status ?? '—'}${update.sapType ? ` ${cell(update.sapType)}` : ''} | ${update.applied === 'unknown' ? `unknown${update.note ? ` (${cell(update.note)})` : ''}` : update.applied ? 'yes' : 'no'} |`,
       );
   }
+  if (file.phase2Skipped?.length)
+    lines.push(
+      '',
+      '## Phase 2 skipped',
+      '',
+      ...file.phase2Skipped.map((line) => `- ${cell(line)}`),
+    );
   lines.push('', '## Temporary objects', '');
   if (!file.objects.length) lines.push('None made.');
   for (const object of file.objects)

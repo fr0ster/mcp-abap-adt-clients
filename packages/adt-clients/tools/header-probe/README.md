@@ -46,7 +46,13 @@ of the texts; the full run honours it too. `--except <text>[,<text>]` is its
 counterpart: it leaves out the endpoints matched the same way, for an
 authorization the person cannot fix (a trial user who is refused at one
 endpoint stops the full run there by design). An excluded endpoint is never
-sent, never counted `unknown` and never tried on an object in phase 2; with
+sent, never counted `unknown` and never tried on an object in phase 2 — phase 2
+sends nothing to it in any request, the setup (creates, reads, locks, a parent
+object) included: a measurement that needs an excluded member is skipped and
+listed under `Phase 2 skipped` with the reason (`excluded by --except: <text>`).
+The one exception is the cleanup of the probe's own objects: removing or
+unlocking an object phase 2 created always runs, even if its delete matches
+`--except`; with
 `--only` an endpoint is probed when it passes `--only` and matches no
 `--except`. Nothing is guessed: the person names what is excluded, and the
 texts are written into every corpus file and the header corpus file (their
@@ -156,7 +162,10 @@ header corpus, everything batched and poisoned envelopes split:
    endpoint after the first discovery read does not stop the run: the row keeps
    its answer, is marked `unauthorized: true`, and is read as no header verdict
    (no `needs`, no named value in `--summary`) and never as `unknown`, so phase
-   2 does not retry it on an object. **Still a stop, flag or not:** any 401, a
+   2 does not retry it on an object: phase 2 sends nothing to such an
+   endpoint, the setup of a measurement included (it is skipped, with `not
+   authorized for this user: <endpoint>`); only the cleanup of the probe's own
+   objects is exempt. **Still a stop, flag or not:** any 401, a
    CSRF 403, the connection's logon and the first discovery read (exit 2). The
    endpoints (method and path, once each) are written as `unauthorized` and
    `recordUnauthorized: true` into every corpus and the header corpus file, and

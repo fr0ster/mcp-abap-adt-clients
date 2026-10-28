@@ -35,6 +35,7 @@ import {
 } from './objects';
 import { deletesUnderLock, temporaryClient } from './members';
 import { knownPair } from './pairs';
+import { guardedClient, type Phase2Skip } from './phase2Filter';
 import {
   endpointOf,
   type IObjectState,
@@ -83,9 +84,19 @@ export class Probe {
     private readonly context: Omit<ISpecContext, 'parent'>,
     private readonly run: string,
     private readonly interrupt: Interrupt,
+    /**
+     * Phase 2's predicate: a member it refuses is never sent (the probe's
+     * own client rejects it). The cleanup client is never guarded: removing
+     * what the probe made always runs.
+     */
+    private readonly phase2?: Phase2Skip,
   ) {
-    this.direct = this.client(traced(connection));
+    this.direct = this.guarded(this.client(traced(connection)));
     this.cleanupDirect = this.client(traced(cleanupOf(connection)));
+  }
+
+  private guarded(client: AdtClient): AdtClient {
+    return this.phase2 ? guardedClient(client, this.phase2) : client;
   }
 
   private client(connection: IAbapConnection): AdtClient {
@@ -95,6 +106,33 @@ export class Probe {
     const own = temporaryClient(connection, this.clientOptions);
     if (own) return own;
     return new AdtClient(connection, undefined, this.clientOptions);
+  }
+
+  /**
+   * The reason a step the cycle needs first is not sent, if one is: the
+   * members (`handler.member`) its setup calls. Nothing is sent for it.
+   */
+  blockedSetup(
+    needs: readonly { handler: string; member: string }[],
+  ): string | undefined {
+    for (const need of needs) {
+      const reason = this.phase2?.(`${need.handler}.${need.member}`);
+      if (reason !== undefined) return `${need.handler}.${need.member}: ${reason}`;
+    }
+    return undefined;
+  }
+
+  /** The setup members of an object type: its create and the reads that check its name. */
+  setupOf(spec: IObjectSpec): { handler: string; member: string }[] {
+    const parent = spec.needs
+      ? OBJECT_SPECS.find(
+          (s) => s.type === (spec.needs === 'ddl' ? 'ddl' : 'functionGroup'),
+        )
+      : undefined;
+    return [spec, ...(parent ? [parent] : [])].flatMap((of) => [
+      { handler: of.handler, member: 'create' },
+      { handler: of.handler, member: 'readMetadata' },
+    ]);
   }
 
   /** Runs the calls in one envelope, or one by one with `--sequential`. */
@@ -109,7 +147,7 @@ export class Probe {
       batched,
       connection: this.connection,
       direct: gated ? this.direct : this.cleanupDirect,
-      onBatch: (batch) => this.client(traced(batch)),
+      onBatch: (batch) => this.guarded(this.client(traced(batch))),
       interrupt: gated ? this.interrupt : undefined,
     });
   }
@@ -275,8 +313,9 @@ export class Probe {
       (
         await this.direct1(
           (client, analyse) =>
-            spec.handle(client).readMetadata?.(config, { analyse }) ??
-            Promise.resolve(),
+            spec.handle(this.guarded(client)).readMetadata?.(config, {
+              analyse,
+            }) ?? Promise.resolve(),
           false,
         )
       ).wire,
@@ -308,6 +347,8 @@ export class Probe {
       this.remember(spec, name, context);
       return true;
     }
+    // A read that is not sent says nothing of the name.
+    if (this.phase2?.(`${spec.handler}.readMetadata`) !== undefined) return false;
     if ((await this.stateOfName(spec, name, context)).exists !== false)
       this.possiblyOurs.push(`${spec.type} ${name}`);
     return false;
@@ -487,6 +528,23 @@ export class Probe {
   /** The whole cycle of one object type. */
   async objectType(spec: IObjectSpec): Promise<void> {
     progress(`${spec.type}`);
+    // The setup (the create, the reads that check the names, the parent's)
+    // is not sent when phase 2's predicate refuses one: the type is skipped.
+    const blocked = this.blockedSetup(this.setupOf(spec));
+    if (blocked !== undefined) {
+      for (const member of [
+        'create',
+        'update',
+        'updateMetadata',
+        'check',
+        'activate',
+        'checkDeletion',
+        'delete',
+      ])
+        if (knownPair(spec.handler, member) && this.wanted(spec.type, member))
+          this.skip(spec.type, member, `skipped: ${blocked}`);
+      return;
+    }
     const context: ISpecContext = { ...this.context };
     if (spec.needs) {
       const parentSpec = OBJECT_SPECS.find(
