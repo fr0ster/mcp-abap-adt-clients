@@ -3,8 +3,10 @@
  * indented two spaces.
  *
  * Nothing is parsed or re-serialised. The text is split into markup and
- * text; whitespace standing alone between two tags is replaced by a line
- * break and indentation, and nothing else changes: every tag is kept as it
+ * text; whitespace standing alone between two tags of an element that holds
+ * only elements is replaced by a line break and indentation, and nothing else
+ * changes: an element holding text or CDATA beside its children keeps its
+ * whole content as it came, and every tag is kept as it
  * was written (`<x></x>` and `<x/>` alike), every attribute, entity and text
  * node as ADT sent it, and an element whose whole content is whitespace
  * (`<VALUE>       </VALUE>`, a value of spaces) keeps it. Formatting a
@@ -29,7 +31,10 @@ function tagEnd(text: string, open: number): number {
   return 0;
 }
 
-/** Markup and text, in order: a comment, a CDATA section, a processing instruction and a tag are one token each. */
+/**
+ * Markup and text, in order: a comment, a processing instruction and a tag
+ * are one markup token each; a CDATA section is text.
+ */
 function tokens(text: string): Token[] {
   const out: Token[] = [];
   let at = 0;
@@ -40,9 +45,10 @@ function tokens(text: string): Token[] {
       break;
     }
     if (open > at) out.push({ kind: 'text', value: text.slice(at, open) });
+    const cdata = text.startsWith('<![CDATA[', open);
     const end = text.startsWith('<!--', open)
       ? text.indexOf('-->', open) + 3
-      : text.startsWith('<![CDATA[', open)
+      : cdata
         ? text.indexOf(']]>', open) + 3
         : text.startsWith('<?', open)
           ? text.indexOf('?>', open) + 2
@@ -51,7 +57,7 @@ function tokens(text: string): Token[] {
       out.push({ kind: 'text', value: text.slice(open) });
       break;
     }
-    out.push({ kind: 'tag', value: text.slice(open, end) });
+    out.push({ kind: cdata ? 'text' : 'tag', value: text.slice(open, end) });
     at = end;
   }
   return out;
@@ -62,42 +68,68 @@ const isOpening = (tag: string): boolean =>
   !isClosing(tag) && !tag.endsWith('/>') && !/^<[?!]/.test(tag);
 const isBlank = (value: string): boolean => value.trim() === '';
 
+/** The opening tags whose element holds text (or CDATA) beside its children. */
+function mixedElements(all: Token[]): Set<number> {
+  const mixed = new Set<number>();
+  const open: number[] = [];
+  all.forEach((token, index) => {
+    if (token.kind === 'text') {
+      const parent = open[open.length - 1];
+      if (parent !== undefined && !isBlank(token.value)) mixed.add(parent);
+    } else if (isClosing(token.value)) {
+      open.pop();
+    } else if (isOpening(token.value)) {
+      open.push(index);
+    }
+  });
+  return mixed;
+}
+
 export function formatCorpusXml(text: string): string {
   const all = tokens(text);
+  const mixed = mixedElements(all);
+  // One entry per open element: whether its content is kept as it came.
+  const verbatim: boolean[] = [];
+  const inside = (): boolean => verbatim.includes(true);
   let out = '';
   let depth = 0;
+  const newline = (): void => {
+    if (out !== '') out += `\n${'  '.repeat(Math.max(depth, 0))}`;
+  };
   for (let i = 0; i < all.length; i += 1) {
     const token = all[i] as Token;
+    const previous = all[i - 1];
     if (token.kind === 'text') {
-      const before = all[i - 1];
-      const after = all[i + 1];
-      const betweenTags = before?.kind === 'tag' && after?.kind === 'tag';
-      // Whitespace alone between two tags is layout, unless it is the whole
-      // content of an element (an opening tag, then its closing one).
-      const leafContent =
-        betweenTags &&
-        isOpening(before.value) &&
-        isClosing(after.value);
-      if (isBlank(token.value) && (betweenTags || i === 0 || !after) && !leafContent) {
-        continue;
-      }
+      const next = all[i + 1];
+      // The whole content of an element is whitespace: a value, kept.
+      const leaf =
+        isBlank(token.value) &&
+        previous?.kind === 'tag' &&
+        isOpening(previous.value) &&
+        next?.kind === 'tag' &&
+        isClosing(next.value);
+      if (inside() || leaf || !isBlank(token.value)) out += token.value;
+      continue;
+    }
+    if (isClosing(token.value)) {
+      const kept = inside();
+      verbatim.pop();
+      depth -= 1;
+      const emptyOrLeaf =
+        previous !== undefined &&
+        ((previous.kind === 'tag' && isOpening(previous.value)) ||
+          (previous.kind === 'text' && isBlank(previous.value) &&
+            all[i - 2]?.kind === 'tag' && isOpening((all[i - 2] as Token).value)));
+      if (!kept && !emptyOrLeaf) newline();
       out += token.value;
       continue;
     }
-    const previous = all[i - 1];
-    const previousKept =
-      previous?.kind === 'text' &&
-      !(isBlank(previous.value) && !(all[i - 2]?.kind === 'tag' && isOpening((all[i - 2] as Token).value) && isClosing(token.value)));
-    const closesLeaf =
-      isClosing(token.value) &&
-      (previousKept ||
-        (previous?.kind === 'tag' && isOpening(previous.value)));
-    if (isClosing(token.value)) depth -= 1;
-    if (out !== '' && !previousKept && !closesLeaf) {
-      out += `\n${'  '.repeat(Math.max(depth, 0))}`;
-    }
+    if (!inside()) newline();
     out += token.value;
-    if (isOpening(token.value)) depth += 1;
+    if (isOpening(token.value)) {
+      depth += 1;
+      verbatim.push(mixed.has(i));
+    }
   }
   return `${out.trim()}\n`;
 }

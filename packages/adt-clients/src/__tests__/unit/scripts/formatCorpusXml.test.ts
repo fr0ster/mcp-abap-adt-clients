@@ -35,6 +35,16 @@ describe('formatCorpusXml', () => {
     ['an entity', '<a>x &gt; y &amp; z</a>', 'x &gt; y &amp; z'],
     ['a text with padding', '<a>\n\ntext\n\n</a>', '\n\ntext\n\n'],
     ['mixed content', '<a>one<b>two</b>three</a>', 'one<b>two</b>three'],
+    [
+      'mixed content opening with a child',
+      '<r><a><b/>text</a></r>',
+      '<a><b/>text</a>',
+    ],
+    [
+      'a CDATA section',
+      '<r><VALUE><![CDATA[abc]]></VALUE></r>',
+      '<VALUE><![CDATA[abc]]></VALUE>',
+    ],
   ])('keeps %s', (_what, input, kept) => {
     expect(formatCorpusXml(input)).toContain(kept);
   });
