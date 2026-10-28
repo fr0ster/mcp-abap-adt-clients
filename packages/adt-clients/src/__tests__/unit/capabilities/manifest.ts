@@ -1103,6 +1103,7 @@ export const HANDLERS = {
       },
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      updateMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
       checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/cts/transportchecks',
@@ -1123,6 +1124,7 @@ export const HANDLERS = {
       'activatable',
       'transportAware',
       'lockable',
+      'metadataUpdatable',
     ],
     why:
       'No versions resource. It DOES lock: measured from Eclipse on an ABAP Cloud system, ' +

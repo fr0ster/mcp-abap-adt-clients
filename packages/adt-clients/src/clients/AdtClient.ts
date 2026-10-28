@@ -751,9 +751,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   getServiceBinding<R extends IServiceResults = typeof serviceDocuments>(
     this: this & AdtServedBy<'serviceBinding'>,
     results: R = serviceDocuments as unknown as R,
-  ): AdtServiceBinding<R> {
+  ): AdtServiceBinding<R, V> {
     this.assertConnected();
-    return new AdtServiceBinding<R>(
+    return new AdtServiceBinding<R, V>(
       this.connection,
       this.logger,
       this.systemContext,

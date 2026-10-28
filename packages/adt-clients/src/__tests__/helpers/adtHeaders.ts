@@ -842,6 +842,13 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
       'application/xml, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage',
     contentType: 'application/xml',
   },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200); v1 answers 406.
+  'AdtServiceBinding.updateMetadata': {
+    accept: 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
+    contentType:
+      'application/vnd.sap.adt.businessservices.servicebinding.v2+xml; charset=utf-8',
+  },
   'AdtServiceDefinition.activate': {
     accept: 'application/xml',
     contentType: 'application/xml',

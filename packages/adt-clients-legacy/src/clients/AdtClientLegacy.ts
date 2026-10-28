@@ -535,9 +535,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'serviceBinding'>,
     _results?: R,
-  ): AdtServiceBinding<R> {
+  ): AdtServiceBinding<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtServiceBinding<R>>(
+    return absentOnLegacy<AdtServiceBinding<R, 'basis740'>>(
       AdtServiceBinding,
       'ServiceBinding',
       SERVICE_BINDING.collection,

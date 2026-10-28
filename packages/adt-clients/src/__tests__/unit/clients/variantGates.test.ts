@@ -184,6 +184,13 @@ async function variantGates(
   await include740.updateMetadata({ includeName: 'ZGATE' }, write);
   // @ts-expect-error -- the append structure has no `updateMetadata`
   await onprem.getAppendStructure().updateMetadata({ name: 'ZGATE' }, write);
+  // The service binding: both modern variants, no 7.40 factory.
+  const binding = { bindingName: 'ZGATE' };
+  await onprem.getServiceBinding().updateMetadata(binding, write);
+  await cloud.getServiceBinding().updateMetadata(binding, write);
+  await modern.getServiceBinding().updateMetadata(binding, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `serviceBinding`: the factory is refused
+  basis740.getServiceBinding();
 
   // An operation one code of the API lacks: only `ENHO/XHH` reads source.
   await onprem

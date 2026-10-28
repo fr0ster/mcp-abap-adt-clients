@@ -212,6 +212,17 @@ const CASES: ICase[] = [
           options(headers),
         ),
   },
+  {
+    member: 'AdtServiceBinding.updateMetadata',
+    url: '/sap/bc/adt/businessservices/bindings/zsrvb_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getServiceBinding()
+        .updateMetadata(
+          { bindingName: 'ZSRVB_META', transportRequest },
+          options(headers),
+        ),
+  },
 ];
 
 describe('updateMetadata writes the caller’s document as it is', () => {

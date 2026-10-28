@@ -553,6 +553,7 @@ const ABSENT = {
     'readTransport',
     'unlock',
     'update',
+    'updateMetadata',
     'validate',
   ],
   getServiceDefinition: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],

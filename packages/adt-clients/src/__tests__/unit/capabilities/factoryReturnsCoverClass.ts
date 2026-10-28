@@ -42,10 +42,12 @@ type Assert<T extends true> = T;
 /**
  * The public methods of `C` that `T` does not declare; `never` when none.
  * Methods, not every key: a data member like `objectType` is the handler's
- * label, not something a caller invokes, and no atom carries it.
+ * label, not something a caller invokes, and no atom carries it. `-?` keeps an
+ * optional data member (`variant`, the gates' type-only marker) from leaving
+ * `undefined` among the keys.
  */
 type Methods<C> = {
-  [K in keyof C]: C[K] extends (...args: never[]) => unknown ? K : never;
+  [K in keyof C]-?: C[K] extends (...args: never[]) => unknown ? K : never;
 }[keyof C];
 type Uncovered<C, T> = Exclude<Methods<C>, keyof T>;
 
@@ -86,6 +88,7 @@ type FeatureToggleAtoms = LifecycleAtoms &
   }>;
 
 type ServiceBindingAtoms = LifecycleAtoms &
+  IAdtMetadataUpdatable<U, U> &
   IAdtTransportAware<U, U> &
   IAdtServiceBindingTypes<U> &
   IAdtServiceGroupReadable<U>;
