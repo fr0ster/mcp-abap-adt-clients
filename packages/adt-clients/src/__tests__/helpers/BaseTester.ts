@@ -110,6 +110,20 @@ export interface IFlowTestOptions {
    */
   updateTakesDocument?: boolean | ((current: string) => string);
   /**
+   * This type's write takes the object's **source**, and the flow edits what
+   * the object holds: the source is read (`read`, not `readMetadata`), the
+   * function receives it and returns the one to write, and after activation the
+   * source read back has to contain `marker` — the line the function added.
+   *
+   * The function group's `update` is its source since interfaces-adt 23.0.4;
+   * what the generated main program holds is the system's, so a test adds one
+   * comment line and writes the rest back untouched.
+   */
+  updateEditsSource?: {
+    edit: (current: string) => string;
+    marker: string;
+  };
+  /**
    * The validate step is not sent, and the run logs this sentence, which names
    * the configuration key that turned it off. Absent, the name is validated
    * and any refusal fails.
@@ -1161,7 +1175,16 @@ export class BaseTester<TConfig, TState = unknown> {
         // lock window would be this harness inventing a sequence the library no
         // longer performs.
         let documentToWrite: string | undefined;
-        if (options?.updateTakesDocument) {
+        if (options?.updateEditsSource) {
+          logTestStep('read source (before update)', this.logger);
+          const heldSource = getPayloadText(
+            expectResult(
+              await this.readWhatItHas(config as Partial<TConfig>),
+              'read source (before update)',
+            ),
+          );
+          documentToWrite = options.updateEditsSource.edit(heldSource ?? '');
+        } else if (options?.updateTakesDocument) {
           const current = await readMetadata(
             'read document (before update)',
             false,
@@ -1337,6 +1360,14 @@ export class BaseTester<TConfig, TState = unknown> {
             );
           }
         }
+      }
+
+      if (options?.updateEditsSource) {
+        // The write is proven by the read after it: the line the edit added
+        // is in the source the system holds now.
+        expect(postActivateActive ?? postUpdateInactive ?? '').toContain(
+          options.updateEditsSource.marker,
+        );
       }
 
       if (options?.readMetadata) {

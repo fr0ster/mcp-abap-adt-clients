@@ -22,7 +22,6 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
@@ -69,6 +68,9 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** The comment line the source step adds in front of the group's main program. */
+const SOURCE_MARKER = '* MCP function group source';
 
 describe('FunctionGroup (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -218,12 +220,14 @@ describe('FunctionGroup (using AdtClient)', () => {
 
         await tester.flowTestAuto({
           metadataUpdate: true,
-          updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config.description || ''} (updated)`.slice(0, 60),
-            ),
+          // The group's source is edited, not its document: one comment line
+          // in front of what the system generated, written back with the rest
+          // as it was, activated, read back. The description is the
+          // `metadataUpdate` step's.
+          updateEditsSource: {
+            edit: (current) => `${SOURCE_MARKER}\n${current}`,
+            marker: SOURCE_MARKER,
+          },
           updateConfig: {
             functionGroupName: config.functionGroupName,
             packageName: config.packageName,

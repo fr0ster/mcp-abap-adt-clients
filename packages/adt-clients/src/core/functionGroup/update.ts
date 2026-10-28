@@ -10,7 +10,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { FUNCTION_GROUP } from '../../endpoints/objects';
+import { FUNCTION_GROUP, sourceUri } from '../../endpoints/objects';
 import { requestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateFunctionGroupParams } from './types';
 
@@ -41,6 +41,32 @@ export async function updateFunctionGroup(
     method: 'PUT',
     timeout: 0,
     data: document,
+    headers: requestHeaders(headers),
+  });
+}
+
+/**
+ * Upload the function group's source (low-level - uses the caller's lockHandle).
+ * This function does NOT lock/unlock - it assumes the group is already locked.
+ */
+export async function uploadFunctionGroupSource(
+  connection: IAbapConnection,
+  headers: IAdtHeaders,
+  functionGroupName: string,
+  sourceCode: string,
+  lockHandle: string,
+  corrNr?: string,
+): Promise<IAdtWireResponse> {
+  let url = `${sourceUri(FUNCTION_GROUP.uri(functionGroupName))}?lockHandle=${encodeURIComponent(lockHandle)}`;
+  if (corrNr) {
+    url += `&corrNr=${corrNr}`;
+  }
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: 0,
+    data: sourceCode,
     headers: requestHeaders(headers),
   });
 }

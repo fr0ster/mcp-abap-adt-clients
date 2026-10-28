@@ -883,7 +883,9 @@ export const HANDLERS = {
       readEnhancementOptions:
         '/sap/bc/adt/functions/groups/zguard_fg/enhancements/options',
       create: '/sap/bc/adt/functions/groups',
+      read: '/sap/bc/adt/functions/groups/zguard_fg/source/main',
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      update: '/sap/bc/adt/functions/groups/zguard_fg/source/main',
       updateMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -900,7 +902,9 @@ export const HANDLERS = {
     capabilities: [
       'enhancementHost',
       'creatable',
+      'readable',
       'metadataReadable',
+      'updatable',
       'metadataUpdatable',
       'deletable',
       'validatable',

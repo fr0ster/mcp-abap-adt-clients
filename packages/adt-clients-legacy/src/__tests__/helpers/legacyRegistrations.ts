@@ -192,7 +192,10 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
   [AdtLocalMacrosLegacy, ['readTransport']],
   [AdtProgramLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
   [AdtInterfaceLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
-  [AdtFunctionGroupLegacy, ['checkDeletion', 'readTransport']],
+  [
+    AdtFunctionGroupLegacy,
+    ['checkDeletion', 'readTransport', 'read', 'update'],
+  ],
   [
     AdtFunctionModuleLegacy,
     ['checkDeletion', 'readTransport', 'updateMetadata'],

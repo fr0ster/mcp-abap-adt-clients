@@ -352,6 +352,8 @@ const SOURCE_READ: {
     c.getProgram().read({ programName: name }, undefined, JUDGED),
   include: (c, name) =>
     c.getInclude().read({ includeName: name }, undefined, JUDGED),
+  functionGroup: (c, name) =>
+    c.getFunctionGroup().read({ functionGroupName: name }, undefined, JUDGED),
   functionModule: (c, name) =>
     c
       .getFunctionModule()

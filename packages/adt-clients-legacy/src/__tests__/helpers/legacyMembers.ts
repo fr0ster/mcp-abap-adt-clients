@@ -668,6 +668,8 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getFunctionGroup: Object.fromEntries([
     fugr.refused('checkDeletion', '§5'),
     fugr.refused('readTransport', '§2 measured in B4'),
+    fugr.refused('read', 'not measured on 7.40'),
+    fugr.refused('update', 'not measured on 7.40'),
   ]),
   getFunctionModule: Object.fromEntries([
     func.refused('checkDeletion', '§5'),

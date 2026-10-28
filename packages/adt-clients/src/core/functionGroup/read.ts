@@ -8,6 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { FUNCTION_GROUP, transportUri } from '../../endpoints/objects';
+import { getObjectSourceUri } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -26,6 +27,28 @@ export async function getFunctionGroup(
     method: 'GET',
     timeout: 0,
     headers: { Accept: options?.accept ?? '*/*' },
+  });
+}
+
+/**
+ * Get ABAP function group source (the function pool's main program)
+ */
+export async function getFunctionGroupSource(
+  connection: IAbapConnection,
+  functionGroupName: string,
+  version?: 'active' | 'inactive',
+  options?: IReadOptions,
+): Promise<IAdtWireResponse> {
+  let url = getObjectSourceUri('FUGR/F', functionGroupName, undefined, version);
+  if (options?.withLongPolling) {
+    url += `${url.includes('?') ? '&' : '?'}withLongPolling=true`;
+  }
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: 0,
+    headers: { Accept: options?.accept ?? 'text/plain' },
   });
 }
 

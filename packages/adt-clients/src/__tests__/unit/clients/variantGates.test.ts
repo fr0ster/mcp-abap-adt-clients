@@ -56,10 +56,8 @@ async function variantGates(
   // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `package` API
   basis740.getPackage();
 
-  // An operation the API lacks: a function group has no source to read, and
-  // a program include no check — on any variant.
-  // @ts-expect-error -- `functionGroup` lists no `read`
-  onprem.getFunctionGroup().read;
+  // An operation the API lacks: a program include has no check — on any
+  // variant.
   // @ts-expect-error -- `include` lists no `check`
   onprem.getInclude().check;
   // …and one the API lacks on one variant: 7.40's `ddl` lists no `versions`.
@@ -191,6 +189,19 @@ async function variantGates(
   await modern.getServiceBinding().updateMetadata(binding, write);
   // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `serviceBinding`: the factory is refused
   basis740.getServiceBinding();
+  // A function group's source: both modern variants, not 7.40's.
+  const fg = { functionGroupName: 'ZFG_GATE' };
+  await onprem.getFunctionGroup().read(fg);
+  await cloud.getFunctionGroup().read(fg);
+  await modern.getFunctionGroup().read(fg);
+  await onprem.getFunctionGroup().update(fg, write);
+  await cloud.getFunctionGroup().update(fg, write);
+  await modern.getFunctionGroup().update(fg, write);
+  const fgs740 = basis740.getFunctionGroup();
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `FUGR/F` lists no `read`
+  await fgs740.read(fg);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `FUGR/F` lists no `update`
+  await fgs740.update(fg, write);
 
   // An operation one code of the API lacks: only `ENHO/XHH` reads source.
   await onprem

@@ -37,20 +37,9 @@ export interface IDivergence {
 const MESSAGE_OWN_URI =
   'the message\'s own address answers a GET with an empty <msg:message msg:msgno="" msg:msgtext=""/> even for a message number that does not exist; the message\'s content is only in the class document; measured on S/4HANA 2025 and ABAP cloud 2026-10-29 (owner: the library reads it from the class); by code: the route /messageclass/{mc_name}/messages/{msg_no} is CL_ADT_MSG_ATOM_RES_CONT, whose do_get reads only the short text (CL_ADT_MESSAGE_CLASS_API=>READ, no IV_FETCH_ALL) and serialises it with ST_ADT_MESSAGE, whose template writes msg:msgno and msg:msgtext with no tt:value — always empty; message 000 is initial as symsgno, so no body';
 
-const FUNCTION_GROUP_SOURCE =
-  "open: the function group's source/main answers 200 text/plain (the function pool's main program, measured 2026-10-29 on both releases); the table lists no source — interfaces-adt patch pending the owner";
-
 /** Per release, every conflict the check reports against its recorded answers. */
 export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
   's4-2025': [
-    {
-      rule: 'source',
-      api: 'functionGroup',
-      code: 'FUGR/F',
-      detail:
-        'source not listed, the metadata document links a text/plain or untyped source',
-      reason: FUNCTION_GROUP_SOURCE,
-    },
     {
       rule: 'address',
       api: 'messageClassMessage',
@@ -61,14 +50,6 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
     },
   ],
   'abap-cloud': [
-    {
-      rule: 'source',
-      api: 'functionGroup',
-      code: 'FUGR/F',
-      detail:
-        'source not listed, the metadata document links a text/plain or untyped source',
-      reason: FUNCTION_GROUP_SOURCE,
-    },
     {
       rule: 'address',
       api: 'messageClassMessage',

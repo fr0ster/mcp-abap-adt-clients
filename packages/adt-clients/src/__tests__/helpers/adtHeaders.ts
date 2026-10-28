@@ -429,6 +429,12 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
     contentType: 'application/vnd.sap.adt.deletion.request.v1+xml',
   },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200), 2026-10-29.
+  'AdtFunctionGroup.update': {
+    accept: 'text/plain',
+    contentType: 'text/plain; charset=utf-8',
+  },
   'AdtFunctionGroup.updateMetadata': {
     accept: 'application/vnd.sap.adt.functions.groups.v3+xml',
     contentType:
