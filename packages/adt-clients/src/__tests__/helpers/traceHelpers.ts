@@ -174,8 +174,12 @@ export function readingClassExecutor(
 export function readingProgramExecutor(
   connection: IAbapConnection,
   logger: ILogger,
-): ProgramExecutor<ReadingResults<typeof programExecutorDocuments>> {
-  return new ProgramExecutor(connection, logger, {
+): ProgramExecutor<ReadingResults<typeof programExecutorDocuments>, 'onprem'> {
+  // A program is run and profiled on premise only: ABAP cloud refuses both.
+  return new ProgramExecutor<
+    ReadingResults<typeof programExecutorDocuments>,
+    'onprem'
+  >(connection, logger, {
     ...programExecutorDocuments,
     ...schedulingReading,
   });
