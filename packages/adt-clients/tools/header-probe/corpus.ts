@@ -676,6 +676,10 @@ export interface ICorpus {
   sequential?: boolean;
   /** Phase 2 of a full run: real objects in place of the probe name. */
   phase?: 2;
+  /** `--only`: the run took the endpoints matching one of these texts. */
+  only?: string[];
+  /** `--except`: the run left out the endpoints matching one of these texts, never sent. */
+  except?: string[];
   /** What ended the run: `complete`, `interrupted (SIGINT)`, `stopped: authorization (…)`, `failed: …`. */
   endedBy?: string;
   /** Every envelope: parts, bytes, wall time from send to answer. */
@@ -1578,6 +1582,43 @@ function afterWriteText(check: IWriteCheck | undefined): string {
   return `unknown${check.status ? ` (${check.status})` : ''}${check.note ? `: ${check.note}` : ''}`;
 }
 
+/**
+ * `--only` / `--except`: an endpoint is probed when it matches one of `only`
+ * (when given) and none of `except`; `text` is the discovery href or the
+ * clients `handler.member`.
+ */
+export interface IEndpointFilter {
+  only?: readonly string[] | undefined;
+  except?: readonly string[] | undefined;
+}
+
+export function passesFilter(filter: IEndpointFilter, text: string): boolean {
+  if (filter.only && !filter.only.some((part) => text.includes(part)))
+    return false;
+  return !filter.except?.some((part) => text.includes(part));
+}
+
+/** The lines that say what a run was limited by, near the top of its .md. */
+export function filterLines(filter: IEndpointFilter): string[] {
+  const lines: string[] = [];
+  if (filter.only?.length) lines.push(`Only: ${filter.only.join(', ')}`, '');
+  if (filter.except?.length)
+    lines.push(`Excluded by --except: ${filter.except.join(', ')}`, '');
+  return lines;
+}
+
+/** The union of what several runs were limited by, each text once. */
+export function unionOfFilters(
+  filters: readonly IEndpointFilter[],
+): IEndpointFilter {
+  const only = [...new Set(filters.flatMap((filter) => filter.only ?? []))];
+  const except = [...new Set(filters.flatMap((filter) => filter.except ?? []))];
+  return {
+    ...(only.length ? { only } : {}),
+    ...(except.length ? { except } : {}),
+  };
+}
+
 /** The Markdown corpus: a table per endpoint group, then the summary. */
 export function renderCorpusMarkdown(corpus: ICorpus): string {
   const lines: string[] = [
@@ -1586,6 +1627,7 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
     `Started ${corpus.startedAt}${corpus.finishedAt ? `, finished ${corpus.finishedAt}` : ''}. Probe name \`${PROBE_NAME}\`, package \`${PROBE_PACKAGE}\`; bogus type \`${PROBE_TYPE}\`. The full bodies are in the JSON file.`,
     '',
   ];
+  lines.push(...filterLines(corpus));
   if (corpus.error)
     lines.push(`**The run stopped:** ${cell(corpus.error)}`, '');
   const groups = [...new Set(corpus.rows.map((row) => row.group))];
@@ -1906,6 +1948,7 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
   const lines = [
     '# Error corpus: what the system named, per endpoint',
     '',
+    ...filterLines(unionOfFilters(corpora)),
     'Runs:',
     '',
     ...corpora.map(
@@ -2371,6 +2414,10 @@ export interface IHeaderCorpusFile {
   removals: IRemoval[];
   /** What ended the run. */
   endedBy?: string;
+  /** `--only` of the run. */
+  only?: string[];
+  /** `--except` of the run: these endpoints were never sent. */
+  except?: string[];
   /** Phase 2's update measurement: per object type, the update's answer to a bogus Accept and whether it took effect. */
   updates?: {
     type: string;
@@ -2405,6 +2452,7 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
     `Started ${file.startedAt}${file.finishedAt ? `, finished ${file.finishedAt}` : ''}; total ${Math.round(file.totalMs / 1000)} s.`,
     '',
   ];
+  lines.push(...filterLines(file));
   if (file.error) lines.push(`**The run stopped:** ${cell(file.error)}`, '');
   lines.push('## Time', '', '| phase | s |', '|---|---|');
   for (const phase of file.phases)

@@ -68,6 +68,7 @@ import {
   runFull,
   systemFolder,
 } from '../../../../tools/header-probe/corpusRun';
+import { parseArgs } from '../../../../tools/header-probe/errorCorpus';
 import {
   Interrupt,
   Interrupted,
@@ -4777,5 +4778,184 @@ describe("another package's client set", () => {
     });
     const { members: rows } = await members.recordMembers();
     expect(rows.some((m) => m.handler.startsWith('extra '))).toBe(false);
+  });
+});
+
+describe('--except', () => {
+  it('is parsed as --only is: split on commas, empties dropped, both may be given', () => {
+    expect(parseArgs(['--except', 'a,,b'])).toEqual({ except: ['a', 'b'] });
+    expect(parseArgs(['--only', 'x', '--except', 'a,b'])).toEqual({
+      only: ['x'],
+      except: ['a', 'b'],
+    });
+    expect(parseArgs(['--except'])).toEqual({ except: [] });
+  });
+
+  const discoveryRun = (filter: { only?: string[]; except?: string[] }) => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 404 },
+    );
+    return runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'corpus',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      ...filter,
+    }).then((result) => ({
+      ...result,
+      sent: system.seen.filter((s) => s.url !== '/sap/bc/adt/discovery'),
+    }));
+  };
+
+  it('discovery: a collection whose href matches is never sent, the others are', async () => {
+    const { corpus, sent } = await discoveryRun({ except: ['probe/things'] });
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((s) => !s.url.includes('/probe/things'))).toBe(true);
+    expect(sent.some((s) => s.url.includes('/probe/reads'))).toBe(true);
+    expect(corpus.rows.some((r) => r.endpoint?.path.includes('things'))).toBe(
+      false,
+    );
+    expect(corpus.except).toEqual(['probe/things']);
+  });
+
+  it('discovery: with --only, an endpoint must pass --only and match no --except', async () => {
+    const { sent } = await discoveryRun({
+      only: ['/sap/bc/adt/probe'],
+      except: ['reads'],
+    });
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((s) => s.url.includes('/probe/things'))).toBe(true);
+    const none = await discoveryRun({ only: ['things'], except: ['things'] });
+    expect(none.sent).toHaveLength(0);
+  });
+
+  it('clients: a member whose handler.member matches is dropped, the others kept', async () => {
+    const run = (filter: { only?: string[]; except?: string[] }) => {
+      const system = fakeSystem((request) =>
+        request.url === '/sap/bc/adt/discovery'
+          ? { status: 200, body: DISCOVERY }
+          : { status: 404 },
+      );
+      return runCorpus({
+        connection: system.connection,
+        source: 'clients',
+        mode: 'corpus',
+        interrupt: new Interrupt(),
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: output().out,
+        ...filter,
+      });
+    };
+    const all = await run({ only: ['getClass()'] });
+    const without = await run({
+      only: ['getClass()'],
+      except: ['getClass().create', 'getClass().update'],
+    });
+    const labels = (r: Awaited<ReturnType<typeof run>>) =>
+      new Set(r.corpus.rows.map((row) => `${row.group}.${row.label}`));
+    expect(labels(all).has('getClass().create')).toBe(true);
+    expect(labels(all).has('getClass().update')).toBe(true);
+    expect(labels(without).has('getClass().create')).toBe(false);
+    expect(labels(without).has('getClass().update')).toBe(false);
+    expect(labels(without).has('getClass().readMetadata')).toBe(true);
+    expect(without.corpus.only).toEqual(['getClass()']);
+  });
+
+  it('the full run passes both down to phase 1 and phase 2, and records them', async () => {
+    const system = objectSystem();
+    const cycles: (readonly string[] | undefined)[] = [];
+    const measures: (readonly string[] | undefined)[] = [];
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
+      only: ['getClass()', 'getProgram()'],
+      except: ['getProgram()'],
+      writeCycle: async ({ filter }) => {
+        cycles.push(filter?.except);
+        return { evidence: [], removals: [] };
+      },
+      updateMeasure: async ({ filter }) => {
+        measures.push(filter?.except);
+        return { updates: [], removals: [] };
+      },
+    });
+    // Phase 1: no request for the excluded handler, in any run.
+    expect(
+      system.seen.some((s) => s.url.startsWith('/sap/bc/adt/programs/')),
+    ).toBe(false);
+    expect(
+      system.seen.some((s) => s.url.startsWith('/sap/bc/adt/oo/classes')),
+    ).toBe(true);
+    // The cycle runs only when a write is still unknown; when it does, it gets the filter.
+    expect(cycles.every((except) => except?.[0] === 'getProgram()')).toBe(true);
+    expect(measures).toEqual([['getProgram()']]);
+    const file = result.file as NonNullable<typeof result.file>;
+    expect(file.only).toEqual(['getClass()', 'getProgram()']);
+    expect(file.except).toEqual(['getProgram()']);
+    const md = fs.readFileSync(result.files[result.files.length - 1], 'utf8');
+    expect(md).toContain('Excluded by --except: getProgram()');
+    expect(md).toContain('Only: getClass(), getProgram()');
+    for (const written of result.files.filter((f) => f.endsWith('.json')))
+      if (!written.includes('header-corpus-'))
+        expect(JSON.parse(fs.readFileSync(written, 'utf8')).except).toEqual([
+          'getProgram()',
+        ]);
+  });
+
+  it('phase 2 sends nothing for an excluded endpoint: the cycle and the update measurement', async () => {
+    const system = objectSystem();
+    const measured = await measureUpdates({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      only: ['class'],
+      filter: { except: ['getClass().update'] },
+    });
+    expect(measured.updates).toEqual([]);
+    expect(system.seen).toHaveLength(0);
+    const cycle = await runWriteCycle({
+      connection: gate(system.connection, {}),
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      unknown: new Set([
+        'getClass().update — PUT /sap/bc/adt/oo/classes/{name}',
+      ]),
+      filter: { except: ['getClass()'] },
+    });
+    expect(cycle.evidence).toEqual([]);
+    expect(system.seen).toHaveLength(0);
+  });
+
+  it('the .md says what was excluded, and --summary lists the union once', () => {
+    const base = {
+      source: 'discovery' as const,
+      headers: 'corpus' as const,
+      startedAt: 'now',
+      rows: [],
+      removals: [],
+    };
+    const first: ICorpus = { ...base, except: ['bopf', 'atc'] };
+    const second: ICorpus = { ...base, headers: 'none', except: ['bopf'] };
+    expect(renderCorpusMarkdown(first)).toContain(
+      'Excluded by --except: bopf, atc',
+    );
+    expect(renderCorpusMarkdown(base)).not.toContain('--except');
+    const summary = renderNamedSummary([first, second]);
+    expect(summary).toContain('Excluded by --except: bopf, atc');
+    expect(summary.split('Excluded by --except:')).toHaveLength(2);
   });
 });

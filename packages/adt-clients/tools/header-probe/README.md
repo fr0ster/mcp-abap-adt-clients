@@ -23,6 +23,7 @@ package (`tools/` is outside `src/`, so nothing here reaches `dist/`, and
 npm run header:discovery                     # the full run: the system's header corpus
 npm run header:discovery -- --isolate ~/.config/mcp-abap-adt-clients/header-probe/<system>/header-corpus-<ts>.json
 npm run header:discovery -- --out <dir>        # write there instead
+npm run header:discovery -- --except bopf      # the full run without the endpoints matching "bopf"
 npm run header:discovery -- --from discovery --headers corpus
 npm run header:discovery -- --from discovery --headers none
 npm run header:discovery -- --from discovery --headers bogus
@@ -40,7 +41,16 @@ header corpus file stands for the corpora it lists); every other call is
 batched and split as usual. Without it the run is unchanged.
 Both `--from` and `--headers` are required. `--only <text>[,<text>]` keeps
 the endpoints whose `handler.member` (clients) or href (discovery) contains one
-of the texts. `--render` recomputes a saved
+of the texts; the full run honours it too. `--except <text>[,<text>]` is its
+counterpart: it leaves out the endpoints matched the same way, for an
+authorization the person cannot fix (a trial user who is refused at one
+endpoint stops the full run there by design). An excluded endpoint is never
+sent, never counted `unknown` and never tried on an object in phase 2; with
+`--only` an endpoint is probed when it passes `--only` and matches no
+`--except`. Nothing is guessed: the person names what is excluded, and the
+texts are written into every corpus file and the header corpus file (their
+`.md` says `Excluded by --except: …`, and `Only: …` for `--only`); `--summary`
+lists the union of the exclusions of the files it read. `--render` recomputes a saved
 corpus's `needs` and writes its `.md` again, sending nothing. `--sequential` sends every
 request on its own, without envelopes, to compare the time per request with a
 batched run. `--summary` reads corpus files and writes

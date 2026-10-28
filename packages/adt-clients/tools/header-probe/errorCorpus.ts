@@ -9,6 +9,7 @@
  *
  * Run:
  *   npm run header:discovery          # the full run: the system's header corpus
+ *   npm run header:discovery -- --except bopf   # the full run without the BOPF endpoints
  *   npm run header:discovery -- --from discovery --headers corpus
  *   npm run header:discovery -- --from clients --headers none
  *   npm run header:discovery -- --from clients --headers bogus
@@ -38,7 +39,14 @@
  * `<home>\Documents\mcp-abap-adt-clients\header-probe\<system>`), created
  * when missing; the run prints the absolute folder at the end.
  * `--only <text>[,<text>]` keeps the endpoints whose `handler.member`
- * (clients) or href (discovery) contains one of the texts.
+ * (clients) or href (discovery) contains one of the texts; the full run
+ * honours it too.
+ * `--except <text>[,<text>]` leaves out the endpoints matched the same way:
+ * never sent, never counted unknown, never tried on an object in phase 2. For
+ * an authorization the person cannot fix (a trial user's 403 at one endpoint).
+ * With `--only`, an endpoint is probed when it passes `--only` and matches no
+ * `--except`. The texts are written into the corpus and the header corpus
+ * (`Excluded by --except: …` in the .md) and into `--summary`'s output.
  * `--sequential` sends every request on its own, no envelope (to compare
  * the time per request with a batched run).
  * `--render` recomputes a saved corpus's `needs` and writes its .md again,
@@ -134,11 +142,12 @@ interface IArgs {
   render?: string[];
   sequential?: boolean;
   only?: string[];
+  except?: string[];
   isolate?: string[];
   out?: string;
 }
 
-function parseArgs(argv: readonly string[]): IArgs {
+export function parseArgs(argv: readonly string[]): IArgs {
   const args: IArgs = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -160,6 +169,8 @@ function parseArgs(argv: readonly string[]): IArgs {
       args.isolate = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--only') {
       args.only = (argv[++i] ?? '').split(',').filter(Boolean);
+    } else if (arg === '--except') {
+      args.except = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--render') {
       args.render = argv.slice(i + 1);
       break;
@@ -273,6 +284,8 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
       open,
       ...(temporary ? { temporaryObjects: temporary } : {}),
       ...(isolate ? { isolate } : {}),
+      ...(args.only ? { only: args.only } : {}),
+      ...(args.except ? { except: args.except } : {}),
       close: (connection) => closeOwnTestConnection(connection),
       interrupt,
       outDir: OUT_DIR,
@@ -313,6 +326,7 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
     out: { progress, loud },
     sequential: args.sequential === true,
     ...(args.only ? { only: args.only } : {}),
+    ...(args.except ? { except: args.except } : {}),
     ...(isolate ? { isolate } : {}),
     ...(args.from === 'clients' && temporaryObjects()
       ? { temporaryObjects: temporaryObjects() }

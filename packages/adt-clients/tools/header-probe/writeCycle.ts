@@ -17,7 +17,13 @@ import type {
   IEvidence,
   IHeaderVerdict,
 } from './corpus';
-import { byContrast, emptyNamed, judge, realMediaTypes } from './corpus';
+import {
+  byContrast,
+  emptyNamed,
+  judge,
+  passesFilter,
+  realMediaTypes,
+} from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
 import { isSetHandler } from './members';
@@ -188,6 +194,8 @@ export async function runWriteCycle(
     const who = key.slice(0, key.indexOf(' — '));
     // A client set's writes stay as phase 1 left them.
     if (isSetHandler(who)) continue;
+    // An endpoint `--only` / `--except` leaves out is not sent.
+    if (!passesFilter(input.filter ?? {}, who)) continue;
     const handler = who.slice(0, who.lastIndexOf('.'));
     const member = who.slice(who.lastIndexOf('.') + 1);
     const type = typeOfHandler(handler);
@@ -338,6 +346,9 @@ export async function measureUpdates(
         if (input.only && !input.only.includes(spec.type)) continue;
         input.interrupt.check();
         const member = spec.write === 'source' ? 'update' : 'updateMetadata';
+        // An endpoint `--only` / `--except` leaves out is not sent.
+        if (!passesFilter(input.filter ?? {}, `${spec.handler}.${member}`))
+          continue;
         const row: IUpdateMeasure = {
           type: spec.type,
           member,

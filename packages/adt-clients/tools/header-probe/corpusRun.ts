@@ -57,6 +57,7 @@ import {
   type ISplit,
   isIsolated,
   isLongPoll,
+  type IEndpointFilter,
   isWrite,
   judge,
   LONG_POLL_SKIP,
@@ -64,6 +65,7 @@ import {
   PROBE_NAME,
   PROBE_PACKAGE,
   parseDiscovery,
+  passesFilter,
   readCorpusAnswer,
   renderCorpusMarkdown,
   renderHeaderCorpus,
@@ -635,6 +637,7 @@ interface IContext {
   meter: IMeter;
   sequential: boolean;
   only?: string[];
+  except?: string[];
   envelopeProbes: number;
   /** The calls an earlier run found poisoning envelopes: each is sent alone. */
   isolate?: ReadonlySet<string>;
@@ -657,10 +660,8 @@ interface ITarget {
 async function runDiscovery(ctx: IContext, document: string): Promise<void> {
   const collections = parseDiscovery(document);
   ctx.corpus.collections = collections;
-  const only = ctx.only;
-  const probes = discoveryProbes(collections, ctx.mode).filter(
-    (probe) =>
-      !only || only.some((text) => probe.collection.href.includes(text)),
+  const probes = discoveryProbes(collections, ctx.mode).filter((probe) =>
+    passesFilter(ctx, probe.collection.href),
   );
   ctx.out.progress(
     `discovery: ${collections.length} collections, ${probes.length} probes`,
@@ -781,11 +782,8 @@ export function headersFor(
 
 async function runClients(ctx: IContext): Promise<void> {
   const recorded = await recordMembers();
-  const only = ctx.only;
-  const members = recorded.members.filter(
-    (member) =>
-      !only ||
-      only.some((text) => `${member.handler}.${member.member}`.includes(text)),
+  const members = recorded.members.filter((member) =>
+    passesFilter(ctx, `${member.handler}.${member.member}`),
   );
   const helpers = recorded.helpers;
   ctx.corpus.notMembers = helpers;
@@ -1249,6 +1247,11 @@ export interface ICorpusRunInput {
   sequential?: boolean;
   /** Keep only the endpoints whose `handler.member` or href contains one of these. */
   only?: string[];
+  /**
+   * Leave out the endpoints whose `handler.member` or href contains one of
+   * these (`--except`): never sent, never counted, never tried on an object.
+   */
+  except?: string[];
   /** The calls an earlier run's split found poisoning envelopes (`--isolate`): each is sent alone from the start. */
   isolate?: ReadonlySet<string>;
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
@@ -1362,7 +1365,10 @@ async function runWith(
 }
 
 const newCorpus = (
-  input: Pick<ICorpusRunInput, 'source' | 'mode' | 'sequential'>,
+  input: Pick<
+    ICorpusRunInput,
+    'source' | 'mode' | 'sequential' | 'only' | 'except'
+  >,
 ): ICorpus => ({
   source: input.source,
   headers: input.mode,
@@ -1371,6 +1377,8 @@ const newCorpus = (
   removals: [],
   envelopes: [],
   ...(input.sequential ? { sequential: true } : {}),
+  ...(input.only?.length ? { only: input.only } : {}),
+  ...(input.except?.length ? { except: input.except } : {}),
 });
 
 /** Marks a corpus with what ended it, and writes it. */
@@ -1453,6 +1461,7 @@ async function runOn(
       meter,
       sequential: input.sequential === true,
       ...(input.only ? { only: input.only } : {}),
+      ...(input.except ? { except: input.except } : {}),
       envelopeProbes: input.envelopeProbes ?? ENVELOPE_PROBES,
       ...(input.isolate ? { isolate: input.isolate } : {}),
       register: (key, entry) => {
@@ -1522,6 +1531,8 @@ export interface IWriteCycleInput {
   interrupt: Interrupt;
   /** The needs keys (`handler.member — endpoint`) of the writes still unknown. */
   unknown: ReadonlySet<string>;
+  /** `--only` / `--except` of the run: an endpoint they exclude is not sent. */
+  filter?: IEndpointFilter;
 }
 
 export interface IWriteCycleResult {
@@ -1582,6 +1593,10 @@ export async function runFull(
   const phase2Rows: ICorpusRow[] = [];
   let updates: IHeaderCorpusFile['updates'] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
+  const filter: IEndpointFilter = {
+    ...(input.only ? { only: input.only } : {}),
+    ...(input.except ? { except: input.except } : {}),
+  };
 
   const body = async (connection: IAbapConnection, state: IRunState) => {
     const stopped = () =>
@@ -1652,6 +1667,7 @@ export async function runFull(
             clientOptions: await input.clientOptions(connection),
             interrupt: input.interrupt,
             unknown: unknownWrites,
+            filter,
           });
           evidence.push(...writes.evidence);
           phase2Rows.push(...(writes.rows ?? []));
@@ -1668,6 +1684,7 @@ export async function runFull(
             connection,
             clientOptions: await input.clientOptions(connection),
             interrupt: input.interrupt,
+            filter,
           });
           updates = measured.updates;
           phase2Rows.push(...(measured.rows ?? []));
@@ -1783,6 +1800,8 @@ export async function runFull(
         : {}),
       updates,
       endedBy: ended,
+      ...(input.only?.length ? { only: input.only } : {}),
+      ...(input.except?.length ? { except: input.except } : {}),
       ...(ended !== 'complete' ? { error: ended } : {}),
     };
     fs.mkdirSync(input.outDir, { recursive: true });
