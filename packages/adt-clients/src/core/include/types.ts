@@ -80,6 +80,7 @@ export const includeDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: nothing,
+  metadataUpdated: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IIncludeResults;
 
