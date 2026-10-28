@@ -91,6 +91,7 @@ import { AdtClient } from '../src/clients/AdtClient';
 import { AdtExecutor } from '../src/clients/AdtExecutor';
 import { transportDocuments } from '../src/core/transport/types';
 import { classTestRunnerDocuments } from '../src/executors/class/ClassTestRunner';
+import { formatCorpusXml } from './lib/formatCorpusXml';
 import { walkPackage } from './lib/packageWalk';
 
 // The client answers transport documents as they arrived; this script reads
@@ -748,7 +749,11 @@ class Recorder {
 
     // Written immediately — this is the durability guarantee. If the process
     // dies on the very next line, this exchange is already on disk.
-    fs.writeFileSync(path.join(FIXTURES_DIR, bodyFile), text, 'utf-8');
+    fs.writeFileSync(
+      path.join(FIXTURES_DIR, bodyFile),
+      ext === 'xml' ? formatCorpusXml(text) : text,
+      'utf-8',
+    );
     fs.writeFileSync(
       path.join(FIXTURES_DIR, sidecarFile),
       JSON.stringify(

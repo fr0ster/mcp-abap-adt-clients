@@ -22,6 +22,17 @@ export const LEGACY_CLIENT_SET: IClientSet = {
     executor: new AdtExecutorLegacy(connection),
   }),
   pairOf: legacyPair,
+  // On 7.40 the base client cannot remove what the probe makes (its deletion
+  // endpoint is absent there), and an unknown `/sap/bc/adt/*` path answers
+  // 200 with an empty body, so such a read finds nothing (measured 2026-10-28).
+  // The legacy delete is made under the caller's lock (measured: lock, delete
+  // with the handle, unlock).
+  forTemporaryObjects: {
+    client: (connection, options) =>
+      new AdtClientLegacy(connection, undefined, options),
+    deleteUnderLock: true,
+    emptyBodyIsAbsent: true,
+  },
 };
 
 /** Probe the legacy clients beside the modern ones, from now on. */

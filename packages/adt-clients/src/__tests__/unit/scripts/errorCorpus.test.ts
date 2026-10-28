@@ -16,10 +16,12 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  cleanupOf,
   current,
   gate,
   type ICapture,
   onTheWire,
+  RequestRefused,
   runCalls,
   send,
   traced,
@@ -68,6 +70,7 @@ import {
   runFull,
   systemFolder,
 } from '../../../../tools/header-probe/corpusRun';
+import { parseArgs } from '../../../../tools/header-probe/errorCorpus';
 import {
   Interrupt,
   Interrupted,
@@ -90,6 +93,7 @@ import {
   stepOf,
 } from '../../../../tools/header-probe/objectRun';
 import { KNOWN_PAIRS } from '../../../../tools/header-probe/pairs';
+import { phase2Refusal } from '../../../../tools/header-probe/phase2Refusal';
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
 import {
   evidenceOfRows,
@@ -4780,5 +4784,759 @@ describe("another package's client set", () => {
     });
     const { members: rows } = await members.recordMembers();
     expect(rows.some((m) => m.handler.startsWith('extra '))).toBe(false);
+  });
+});
+
+/** The reason the gate refuses a request to `url`, or undefined when it is sent (to the fake system). */
+async function refusalOn(
+  connection: IAbapConnection,
+  url: string,
+  method: 'GET' | 'PUT' = 'GET',
+): Promise<string | undefined> {
+  try {
+    await send(connection, { url, method, timeout: 0 });
+    return undefined;
+  } catch (error) {
+    return error instanceof RequestRefused ? error.reason : undefined;
+  }
+}
+
+describe('--except', () => {
+  it('is parsed as --only is: split on commas, empties dropped, both may be given', () => {
+    expect(parseArgs(['--except', 'a,,b'])).toEqual({ except: ['a', 'b'] });
+    expect(parseArgs(['--only', 'x', '--except', 'a,b'])).toEqual({
+      only: ['x'],
+      except: ['a', 'b'],
+    });
+    expect(parseArgs(['--except'])).toEqual({ except: [] });
+  });
+
+  const discoveryRun = (filter: { only?: string[]; except?: string[] }) => {
+    const system = fakeSystem((request) =>
+      request.url === '/sap/bc/adt/discovery'
+        ? { status: 200, body: DISCOVERY }
+        : { status: 404 },
+    );
+    return runCorpus({
+      connection: system.connection,
+      source: 'discovery',
+      mode: 'corpus',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      ...filter,
+    }).then((result) => ({
+      ...result,
+      sent: system.seen.filter((s) => s.url !== '/sap/bc/adt/discovery'),
+    }));
+  };
+
+  it('discovery: a collection whose href matches is never sent, the others are', async () => {
+    const { corpus, sent } = await discoveryRun({ except: ['probe/things'] });
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((s) => !s.url.includes('/probe/things'))).toBe(true);
+    expect(sent.some((s) => s.url.includes('/probe/reads'))).toBe(true);
+    expect(corpus.rows.some((r) => r.endpoint?.path.includes('things'))).toBe(
+      false,
+    );
+    expect(corpus.except).toEqual(['probe/things']);
+  });
+
+  it('discovery: with --only, an endpoint must pass --only and match no --except', async () => {
+    const { sent } = await discoveryRun({
+      only: ['/sap/bc/adt/probe'],
+      except: ['reads'],
+    });
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((s) => s.url.includes('/probe/things'))).toBe(true);
+    const none = await discoveryRun({ only: ['things'], except: ['things'] });
+    expect(none.sent).toHaveLength(0);
+  });
+
+  it('clients: a member whose handler.member matches is dropped, the others kept', async () => {
+    const run = (filter: { only?: string[]; except?: string[] }) => {
+      const system = fakeSystem((request) =>
+        request.url === '/sap/bc/adt/discovery'
+          ? { status: 200, body: DISCOVERY }
+          : { status: 404 },
+      );
+      return runCorpus({
+        connection: system.connection,
+        source: 'clients',
+        mode: 'corpus',
+        interrupt: new Interrupt(),
+        outDir: tempDir(),
+        clientOptions: async () => ({}),
+        out: output().out,
+        ...filter,
+      });
+    };
+    const all = await run({ only: ['getClass()'] });
+    const without = await run({
+      only: ['getClass()'],
+      except: ['getClass().create', 'getClass().update'],
+    });
+    const labels = (r: Awaited<ReturnType<typeof run>>) =>
+      new Set(r.corpus.rows.map((row) => `${row.group}.${row.label}`));
+    expect(labels(all).has('getClass().create')).toBe(true);
+    expect(labels(all).has('getClass().update')).toBe(true);
+    expect(labels(without).has('getClass().create')).toBe(false);
+    expect(labels(without).has('getClass().update')).toBe(false);
+    expect(labels(without).has('getClass().readMetadata')).toBe(true);
+    expect(without.corpus.only).toEqual(['getClass()']);
+  });
+
+  it('the full run passes both down to phase 1 and phase 2, and records them', async () => {
+    const system = objectSystem();
+    const cycles: (string | undefined)[] = [];
+    const measures: (string | undefined)[] = [];
+    const classes: (string | undefined)[] = [];
+    const result = await runFull({
+      open: async () => system.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      temporaryObjects: TEMPORARY,
+      only: ['getClass()', 'getProgram()'],
+      except: ['getProgram()'],
+      writeCycle: async ({ connection }) => {
+        cycles.push(
+          await refusalOn(connection, '/sap/bc/adt/programs/programs/zx'),
+        );
+        return { evidence: [], removals: [] };
+      },
+      updateMeasure: async ({ connection }) => {
+        measures.push(
+          await refusalOn(connection, '/sap/bc/adt/programs/programs/zx'),
+        );
+        classes.push(await refusalOn(connection, '/sap/bc/adt/oo/classes/zx'));
+        return { updates: [], removals: [] };
+      },
+    });
+    // Phase 1: no request for the excluded handler, in any run.
+    expect(
+      system.seen.some((s) => s.url.startsWith('/sap/bc/adt/programs/')),
+    ).toBe(false);
+    expect(
+      system.seen.some((s) => s.url.startsWith('/sap/bc/adt/oo/classes')),
+    ).toBe(true);
+    // Phase 2: the gate refuses the excluded handler's endpoints, not the selected ones.
+    const refused = 'excluded by --except: getProgram()';
+    expect(cycles.every((reason) => reason === refused)).toBe(true);
+    expect(measures).toEqual([refused]);
+    expect(classes).toEqual([undefined]);
+    const file = result.file as NonNullable<typeof result.file>;
+    expect(file.only).toEqual(['getClass()', 'getProgram()']);
+    expect(file.except).toEqual(['getProgram()']);
+    const md = fs.readFileSync(result.files[result.files.length - 1], 'utf8');
+    expect(md).toContain('Excluded by --except: getProgram()');
+    expect(md).toContain('Only: getClass(), getProgram()');
+    for (const written of result.files.filter((f) => f.endsWith('.json')))
+      if (!written.includes('header-corpus-'))
+        expect(JSON.parse(fs.readFileSync(written, 'utf8')).except).toEqual([
+          'getProgram()',
+        ]);
+  });
+
+  it('the refusal: unauthorized first, then --except (a member or a path text), then --only', () => {
+    const members = new Map([
+      [
+        'getClass().read',
+        [{ method: 'GET', path: '/sap/bc/adt/oo/classes/{name}/source/main' }],
+      ],
+      [
+        'getClass().create',
+        [{ method: 'POST', path: '/sap/bc/adt/oo/classes' }],
+      ],
+    ]);
+    const refuse = phase2Refusal({
+      only: ['getClass()'],
+      except: ['getClass().read', '/bopf/'],
+      members,
+      unauthorized: [{ method: 'PUT', path: '/x/{name}' }],
+    });
+    const at = (method: string, url: string) =>
+      refuse({ method: method as 'GET', url });
+    expect(at('PUT', '/x/zabc')).toBe(
+      'not authorized for this user: PUT /x/{name}',
+    );
+    expect(at('GET', '/sap/bc/adt/oo/classes/zabc/source/main')).toBe(
+      'excluded by --except: getClass().read',
+    );
+    expect(at('GET', '/sap/bc/adt/bopf/businessobjects')).toBe(
+      'excluded by --except: /bopf/',
+    );
+    expect(at('GET', '/sap/bc/adt/programs/programs/zp')).toBe(
+      'not selected by --only',
+    );
+    expect(at('POST', '/sap/bc/adt/oo/classes')).toBeUndefined();
+    // The envelope itself is not a member's request: its parts are checked.
+    expect(at('POST', '/sap/bc/adt/communication/batch')).toBeUndefined();
+  });
+});
+
+describe('the gate refuses what phase 2 may not send', () => {
+  const LOCKED =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>';
+  /** Objects by name: a create (POST to a collection) makes one, the deletion endpoint removes it. */
+  const system = () => {
+    const created = new Set<string>();
+    const fake = fakeSystem((request) => {
+      const { method, url } = request;
+      if (
+        method === 'POST' &&
+        /^\/sap\/bc\/adt\/(oo\/classes|ddic\/ddl\/sources|acm\/dcl\/sources|messageclass)$/.test(
+          url,
+        )
+      ) {
+        const match = /adtcore:name="([^"]+)"/.exec(request.body);
+        if (match) created.add(match[1].toLowerCase());
+        return { status: 201 };
+      }
+      if (url.includes('_action=LOCK')) return { status: 200, body: LOCKED };
+      if (url.includes('_action=UNLOCK')) return { status: 200 };
+      if (url === '/sap/bc/adt/deletion/delete') {
+        for (const n of [...created])
+          if (request.body.toLowerCase().includes(n)) created.delete(n);
+        return { status: 200, body: '<del:deletionResult/>' };
+      }
+      const name = [...created].find((n) => url.toLowerCase().includes(n));
+      if (
+        /^\/sap\/bc\/adt\/(oo\/classes|ddic\/ddl\/sources|acm\/dcl\/sources|messageclass)\//.test(
+          url,
+        )
+      )
+        return name
+          ? {
+              status: 200,
+              body: url.includes('/source/main')
+                ? 'CLASS x DEFINITION. ENDCLASS.'
+                : `<class:abapClass adtcore:name="${name}" adtcore:version="inactive"/>`,
+            }
+          : { status: 404 };
+      return { status: 200 };
+    });
+    return { ...fake, created };
+  };
+  const gated = (
+    fake: ReturnType<typeof system>,
+    filter?: Parameters<typeof phase2Refusal>[0],
+  ) =>
+    gate(fake.connection, {
+      ...(filter ? { refusal: { current: phase2Refusal(filter) } } : {}),
+    });
+  const none = { members: new Map<string, never[]>(), unauthorized: [] };
+  const measure = (connection: IAbapConnection, type: string) =>
+    measureUpdates({
+      connection,
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      only: [type],
+    });
+  const cycle = (connection: IAbapConnection, unknown: string[]) =>
+    runWriteCycle({
+      connection,
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      unknown: new Set(unknown),
+    });
+  const UPDATE = 'PUT /sap/bc/adt/oo/classes/{name}/source/main';
+  const CLASS_UPDATE = [
+    'getClass().update — PUT /sap/bc/adt/oo/classes/{name}/source/main',
+  ];
+  const sent = (fake: ReturnType<typeof system>, method: string, url: RegExp) =>
+    fake.seen.some((seen) => seen.method === method && url.test(seen.url));
+
+  it('a refused request never reaches the connection; the cleanup sibling is exempt; a refused part of an envelope is not queued', async () => {
+    const fake = system();
+    const refusal = {
+      current: phase2Refusal({
+        ...none,
+        except: ['/sap/bc/adt/probe/'],
+      }),
+    };
+    const connection = gate(fake.connection, { refusal });
+    await expect(
+      send(connection, {
+        url: '/sap/bc/adt/probe/x',
+        method: 'GET',
+        timeout: 0,
+      }),
+    ).rejects.toBeInstanceOf(RequestRefused);
+    expect(fake.seen).toHaveLength(0);
+    await send(cleanupOf(connection), {
+      url: '/sap/bc/adt/probe/x',
+      method: 'GET',
+      timeout: 0,
+    });
+    expect(fake.seen).toHaveLength(1);
+    // An envelope: the refused part is rejected, the other goes out.
+    const captures = await runCalls({
+      calls: [
+        (on: IAbapConnection) =>
+          send(on, { url: '/sap/bc/adt/probe/y', method: 'GET', timeout: 0 }),
+        (on: IAbapConnection) =>
+          send(on, { url: '/sap/bc/adt/other/z', method: 'GET', timeout: 0 }),
+      ],
+      batched: true,
+      connection,
+      direct: connection,
+      onBatch: (batch) => batch,
+      interrupt: new Interrupt(),
+    });
+    expect(captures[0]?.failure).toBe(
+      'skipped: excluded by --except: /sap/bc/adt/probe/',
+    );
+    expect(fake.seen.some((seen) => seen.url === '/sap/bc/adt/other/z')).toBe(
+      true,
+    );
+    expect(fake.seen.some((seen) => seen.url === '/sap/bc/adt/probe/y')).toBe(
+      false,
+    );
+  });
+
+  it('an update unauthorized in phase 1 is not sent again, and is recorded skipped with the reason', async () => {
+    const control = system();
+    await measure(gated(control), 'class');
+    expect(sent(control, 'PUT', /\/source\/main/)).toBe(true);
+    const fake = system();
+    const result = await measure(
+      gated(fake, {
+        ...none,
+        unauthorized: [
+          { method: 'PUT', path: '/sap/bc/adt/oo/classes/{name}/source/main' },
+        ],
+      }),
+      'class',
+    );
+    expect(sent(fake, 'PUT', /\/source\/main/)).toBe(false);
+    expect(result.updates[0]?.note).toContain(
+      `not authorized for this user: ${UPDATE}`,
+    );
+    // What it created, it removed: the cleanup is not refused.
+    expect(fake.created.size).toBe(0);
+  });
+
+  it('--except getClass().create: no class create in phase 2; the measurement and the cycle are skipped with the reason', async () => {
+    const members = new Map([
+      [
+        'getClass().create',
+        [{ method: 'POST', path: '/sap/bc/adt/oo/classes' }],
+      ],
+    ]);
+    const filter = { ...none, members, except: ['getClass().create'] };
+    const fake = system();
+    const result = await measure(gated(fake, filter), 'class');
+    expect(result.updates[0]?.note).toContain(
+      'excluded by --except: getClass().create',
+    );
+    const cycled = system();
+    const written = await cycle(gated(cycled, filter), CLASS_UPDATE);
+    for (const run of [fake, cycled])
+      expect(sent(run, 'POST', /^\/sap\/bc\/adt\/oo\/classes$/)).toBe(false);
+    expect(written.skipped?.join(' ')).toContain(
+      'excluded by --except: getClass().create',
+    );
+    expect(written.error).toBeUndefined();
+  });
+
+  it("an excluded read inside a member's own chain is not sent (the message class source)", async () => {
+    const members = new Map([
+      [
+        'getMessageClassMessage().read',
+        [{ method: 'GET', path: '/sap/bc/adt/messageclass/{name}' }],
+      ],
+    ]);
+    const fake = system();
+    const written = await cycle(
+      gated(fake, {
+        ...none,
+        members,
+        except: ['getMessageClassMessage().read'],
+      }),
+      [
+        'getMessageClassMessage().create — POST /sap/bc/adt/messageclass/{name}',
+      ],
+    );
+    expect(sent(fake, 'GET', /\/sap\/bc\/adt\/messageclass\//)).toBe(false);
+    expect(written.skipped?.join(' ')).toContain(
+      'excluded by --except: getMessageClassMessage().read',
+    );
+  });
+
+  it('an activation unauthorized in phase 1 skips the dependent measurement with that reason', async () => {
+    const fake = system();
+    const result = await measure(
+      gated(fake, {
+        ...none,
+        unauthorized: [{ method: 'POST', path: '/sap/bc/adt/activation' }],
+      }),
+      'accessControl',
+    );
+    expect(sent(fake, 'POST', /\/sap\/bc\/adt\/activation/)).toBe(false);
+    expect(result.updates[0]?.note).toBe(
+      'skipped: not authorized for this user: POST /sap/bc/adt/activation',
+    );
+    expect(fake.created.size).toBe(0);
+  });
+
+  it("a parent's refused update skips the dependent measurement with that reason, and activates nothing", async () => {
+    const members = new Map([
+      [
+        'getDdl().update',
+        [
+          {
+            method: 'PUT',
+            path: '/sap/bc/adt/ddic/ddl/sources/{name}/source/main',
+          },
+        ],
+      ],
+    ]);
+    const fake = system();
+    const result = await measure(
+      gated(fake, { ...none, members, except: ['getDdl().update'] }),
+      'accessControl',
+    );
+    expect(sent(fake, 'PUT', /\/ddic\/ddl\/sources\/.+\/source\/main/)).toBe(
+      false,
+    );
+    expect(sent(fake, 'POST', /\/sap\/bc\/adt\/activation/)).toBe(false);
+    expect(result.updates[0]?.note).toBe(
+      'skipped: excluded by --except: getDdl().update',
+    );
+    expect(fake.created.size).toBe(0);
+  });
+
+  it('a refused read of the object to write back names its reason in the skip', async () => {
+    const members = new Map([
+      [
+        'getClass().read',
+        [{ method: 'GET', path: '/sap/bc/adt/oo/classes/{name}/source/main' }],
+      ],
+    ]);
+    const fake = system();
+    const written = await cycle(
+      gated(fake, { ...none, members, except: ['getClass().read'] }),
+      CLASS_UPDATE,
+    );
+    expect(sent(fake, 'GET', /\/oo\/classes\/.+\/source\/main/)).toBe(false);
+    expect(written.skipped?.join(' ')).toContain(
+      'excluded by --except: getClass().read',
+    );
+    expect(written.skipped?.join(' ')).not.toContain(
+      'the object could not be read to write it back',
+    );
+    expect(fake.created.size).toBe(0);
+  });
+
+  it('what phase 2 made is still deleted and unlocked when those endpoints match --except', async () => {
+    const fake = system();
+    const written = await cycle(
+      gated(fake, {
+        ...none,
+        except: ['/sap/bc/adt/deletion/', '_action=UNLOCK', 'UNLOCK'],
+      }),
+      CLASS_UPDATE,
+    );
+    expect(sent(fake, 'POST', /^\/sap\/bc\/adt\/oo\/classes$/)).toBe(true);
+    expect(fake.created.size).toBe(0);
+    expect(written.removals.every((removal) => removal.removed === true)).toBe(
+      true,
+    );
+    expect(
+      fake.seen.some((seen) => seen.url === '/sap/bc/adt/deletion/delete'),
+    ).toBe(true);
+  });
+
+  it('phase 1 is unchanged: no gate refusal there', async () => {
+    const fake = system();
+    const result = await runCorpus({
+      connection: fake.connection,
+      source: 'clients',
+      mode: 'corpus',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    expect(
+      result.corpus.rows.some((row) => row.failure?.startsWith('skipped: ')),
+    ).toBe(false);
+  });
+});
+
+describe('--except, the summary', () => {
+  it('the .md says what was excluded, and --summary lists the union once', () => {
+    const base = {
+      source: 'discovery' as const,
+      headers: 'corpus' as const,
+      startedAt: 'now',
+      rows: [],
+      removals: [],
+    };
+    const first: ICorpus = { ...base, except: ['bopf', 'atc'] };
+    const second: ICorpus = { ...base, headers: 'none', except: ['bopf'] };
+    expect(renderCorpusMarkdown(first)).toContain(
+      'Excluded by --except: bopf, atc',
+    );
+    expect(renderCorpusMarkdown(base)).not.toContain('--except');
+    const summary = renderNamedSummary([first, second]);
+    expect(summary).toContain('Excluded by --except: bopf, atc');
+    expect(summary.split('Excluded by --except:')).toHaveLength(2);
+  });
+});
+
+describe('--record-unauthorized', () => {
+  const NO_AUTH = AUTH_EXCEPTION(
+    'ExceptionResourceNoAuthorization',
+    'No authorization for this resource',
+  );
+  const system = (denied: Answer) =>
+    fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (request.url.startsWith('/sap/bc/adt/probe/things')) return denied;
+      if (request.url.startsWith('/sap/bc/adt/probe/reads'))
+        return { status: 200, body: '<ok/>' };
+      return { status: 404 };
+    });
+  const discoveryRun = (
+    denied: Answer,
+    recordUnauthorized: boolean,
+    mode: 'corpus' | 'bogus' = 'corpus',
+  ) => {
+    const fake = system(denied);
+    const { lines, out } = output();
+    return runCorpus({
+      connection: fake.connection,
+      source: 'discovery',
+      mode,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+      ...(recordUnauthorized ? { recordUnauthorized } : {}),
+    }).then((result) => ({ ...result, lines, seen: fake.seen }));
+  };
+  const FORBIDDEN = { status: 403, body: NO_AUTH };
+
+  it('is parsed as a flag with no value', () => {
+    expect(parseArgs(['--record-unauthorized'])).toEqual({
+      recordUnauthorized: true,
+    });
+    expect(parseArgs(['--record-unauthorized', '--except', 'a'])).toEqual({
+      recordUnauthorized: true,
+      except: ['a'],
+    });
+  });
+
+  it('without it an authorization 403 stops the run, as before', async () => {
+    const { exitCode, corpus } = await discoveryRun(FORBIDDEN, false);
+    expect(exitCode).toBe(2);
+    expect(corpus.endedBy).toMatch(/^stopped: authorization \(403/);
+    expect(corpus.recordUnauthorized).toBeUndefined();
+  });
+
+  it('with it the row is recorded, marked, and the run goes on to the later rows', async () => {
+    const { exitCode, corpus, lines } = await discoveryRun(FORBIDDEN, true);
+    expect(exitCode).toBe(0);
+    expect(corpus.endedBy).toBe('complete');
+    const things = corpus.rows.filter((r) =>
+      r.endpoint?.path.endsWith('/things'),
+    );
+    expect(things.length).toBeGreaterThan(0);
+    for (const row of things) {
+      expect(row.status).toBe(403);
+      expect(row.unauthorized).toBe(true);
+    }
+    const reads = corpus.rows.find((r) => r.endpoint?.path.endsWith('/reads'));
+    expect(reads?.status).toBe(200);
+    expect(reads?.unauthorized).toBeUndefined();
+    expect(corpus.recordUnauthorized).toBe(true);
+    expect(corpus.unauthorized).toEqual(
+      expect.arrayContaining(['GET /sap/bc/adt/probe/things']),
+    );
+    expect(new Set(corpus.unauthorized).size).toBe(corpus.unauthorized?.length);
+    expect(lines[lines.length - 1]).toMatch(
+      /^\d+ endpoint\(s\) not authorized for this user — recorded, not judged$/,
+    );
+    const md = renderCorpusMarkdown(corpus);
+    expect(md).toContain('## Not authorized for this user');
+    expect(md).toContain('- GET /sap/bc/adt/probe/things');
+  });
+
+  it('a 401 still stops with it, and so does a CSRF 403', async () => {
+    const unauthorized = await discoveryRun({ status: 401 }, true);
+    expect(unauthorized.exitCode).toBe(2);
+    expect(unauthorized.corpus.endedBy).toMatch(
+      /^stopped: authorization \(401/,
+    );
+    const csrf = await discoveryRun(
+      { status: 403, body: 'CSRF token validation failed' },
+      true,
+    );
+    expect(csrf.exitCode).toBe(2);
+    expect(csrf.corpus.endedBy).toMatch(
+      /^stopped: authorization \(403, CSRF\)/,
+    );
+  });
+
+  it('the first discovery read still stops with it', async () => {
+    const fake = fakeSystem(() => FORBIDDEN);
+    const result = await runCorpus({
+      connection: fake.connection,
+      source: 'discovery',
+      mode: 'corpus',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      recordUnauthorized: true,
+    });
+    expect(result.exitCode).toBe(2);
+  });
+
+  it('an unauthorized row is no header verdict: not in needs, not in the summary values', async () => {
+    const { corpus } = await discoveryRun(FORBIDDEN, true, 'bogus');
+    expect(
+      (corpus.needs ?? []).some((entry) => entry.endpoint.includes('/things')),
+    ).toBe(false);
+    const named = namedPerEndpoint([
+      {
+        ...corpus,
+        rows: corpus.rows.map((row) => ({
+          ...row,
+          named: { ...row.named, acceptedText: 'application/x+xml' },
+        })),
+      },
+    ]);
+    expect(named.some((entry) => entry.endpoint.includes('/things'))).toBe(
+      false,
+    );
+    expect(named.some((entry) => entry.endpoint.includes('/reads'))).toBe(true);
+  });
+
+  it('the summary lists the endpoints unauthorized in every file that probed them, apart from the table', () => {
+    const row = (path: string, unauthorized: boolean): ICorpusRow => ({
+      source: 'discovery',
+      group: 'g',
+      label: path,
+      endpoint: { method: 'GET', path },
+      requests: [],
+      onWire: [],
+      named: emptyNamed(),
+      status: unauthorized ? 403 : 200,
+      ...(unauthorized ? { unauthorized: true as const } : {}),
+    });
+    const base = {
+      source: 'discovery' as const,
+      startedAt: 'now',
+      removals: [],
+      recordUnauthorized: true as const,
+    };
+    const summary = renderNamedSummary([
+      { ...base, headers: 'corpus', rows: [row('/a', true), row('/b', true)] },
+      { ...base, headers: 'none', rows: [row('/a', true), row('/b', false)] },
+    ]);
+    const section = summary.split('## Not authorized for this user')[1] ?? '';
+    expect(section).toContain('- GET /a');
+    expect(section).not.toContain('- GET /b');
+  });
+
+  const fullRun = async (denied: boolean) => {
+    const fake = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (denied && request.url.startsWith('/sap/bc/adt/oo/classes'))
+        return FORBIDDEN;
+      return { status: 404 };
+    });
+    const { lines, out } = output();
+    const cycles: string[][] = [];
+    const measured: number[] = [];
+    const result = await runFull({
+      open: async () => fake.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+      recordUnauthorized: true,
+      writeCycle: async ({ unknown }) => {
+        cycles.push([...unknown]);
+        return { evidence: [], removals: [] };
+      },
+      updateMeasure: async () => {
+        measured.push(1);
+        return { updates: [], removals: [] };
+      },
+    });
+    return { result, lines, cycles, measured };
+  };
+  const CREATE = 'getClass().create — POST /sap/bc/adt/oo/classes';
+
+  it('phase 2 is handed the members phase 1 found unauthorized', async () => {
+    const fake = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (
+        request.method === 'PUT' &&
+        request.url.startsWith('/sap/bc/adt/oo/classes')
+      )
+        return FORBIDDEN;
+      return { status: 404 };
+    });
+    const reasons: (string | undefined)[] = [];
+    const result = await runFull({
+      open: async () => fake.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      recordUnauthorized: true,
+      updateMeasure: async ({ connection }) => {
+        reasons.push(
+          await refusalOn(
+            connection,
+            '/sap/bc/adt/oo/classes/zx/source/main',
+            'PUT',
+          ),
+        );
+        return { updates: [], removals: [] };
+      },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]).toBe(
+      'not authorized for this user: PUT /sap/bc/adt/oo/classes/{name}/source/main',
+    );
+  });
+
+  it('the full run records them in the header corpus and its .md, and phase 2 never tries them', async () => {
+    // Control: the same endpoint answering 404 is still unknown after phase 1.
+    const control = await fullRun(false);
+    expect(control.cycles.flat()).toContain(CREATE);
+    const { result, lines, cycles, measured } = await fullRun(true);
+    expect(result.exitCode).toBe(0);
+    const file = result.file as NonNullable<typeof result.file>;
+    expect(file.recordUnauthorized).toBe(true);
+    expect(file.unauthorized).toEqual(
+      expect.arrayContaining(['POST /sap/bc/adt/oo/classes']),
+    );
+    expect(new Set(file.unauthorized).size).toBe(file.unauthorized?.length);
+    expect(file.endedBy).toBe('complete');
+    expect(cycles.flat()).not.toContain(CREATE);
+    expect(measured).toHaveLength(1);
+    expect(file.entries.some((entry) => entry.endpoint === CREATE)).toBe(false);
+    const md = fs.readFileSync(result.files[result.files.length - 1], 'utf8');
+    expect(md).toContain('## Not authorized for this user');
+    expect(lines[lines.length - 1]).toBe(
+      `${file.unauthorized?.length} endpoint(s) not authorized for this user — recorded, not judged`,
+    );
   });
 });

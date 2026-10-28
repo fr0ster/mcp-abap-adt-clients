@@ -57,13 +57,16 @@ import {
   type ISplit,
   isIsolated,
   isLongPoll,
+  type IEndpointFilter,
   isWrite,
   judge,
   LONG_POLL_SKIP,
+  markUnauthorized,
   needsCounts,
   PROBE_NAME,
   PROBE_PACKAGE,
   parseDiscovery,
+  passesFilter,
   readCorpusAnswer,
   renderCorpusMarkdown,
   renderHeaderCorpus,
@@ -88,16 +91,25 @@ import {
   handlerSpecs,
   type IClients,
   type IMemberEndpoint,
+  deletesUnderLock,
   pairOf,
   recordMembers,
+  temporaryObjectsSet,
   UNIVERSAL,
 } from './members';
 import { coverageOf, runOnTemporaryObjects } from './objectRun';
 import type { ITemporaryContext } from './objects';
 import {
+  type IRefusalHolder,
+  phase2Refusal,
+} from './phase2Refusal';
+import { lockHandle } from './probe';
+import {
   endpointKey,
   endpointOf,
   type IRemoval,
+  type ISentRequest,
+  isEmptyAnswer,
   removalWord,
   unproven,
 } from './record';
@@ -525,6 +537,7 @@ export interface IAuthStop {
 export function guardAuthorization(
   interrupt: Interrupt,
   onStop?: (stop: IAuthStop) => void,
+  recordUnauthorized = false,
 ): {
   stop: () => IAuthStop | undefined;
   release: () => void;
@@ -534,6 +547,15 @@ export function guardAuthorization(
     if (stopped) return;
     const problem = authorizationProblem(wire);
     if (!problem) return;
+    // Recorded, not a stop: this user's authorization 403 after the first
+    // read. A 401, a CSRF 403 and the discovery read itself still stop.
+    if (
+      recordUnauthorized &&
+      problem.status === 403 &&
+      problem.kind !== 'CSRF' &&
+      String(request.url ?? '').split('?')[0] !== '/sap/bc/adt/discovery'
+    )
+      return;
     stopped = {
       ...problem,
       endpoint: endpointKey(
@@ -635,6 +657,7 @@ interface IContext {
   meter: IMeter;
   sequential: boolean;
   only?: string[];
+  except?: string[];
   envelopeProbes: number;
   /** The calls an earlier run found poisoning envelopes: each is sent alone. */
   isolate?: ReadonlySet<string>;
@@ -657,10 +680,8 @@ interface ITarget {
 async function runDiscovery(ctx: IContext, document: string): Promise<void> {
   const collections = parseDiscovery(document);
   ctx.corpus.collections = collections;
-  const only = ctx.only;
-  const probes = discoveryProbes(collections, ctx.mode).filter(
-    (probe) =>
-      !only || only.some((text) => probe.collection.href.includes(text)),
+  const probes = discoveryProbes(collections, ctx.mode).filter((probe) =>
+    passesFilter(ctx, probe.collection.href),
   );
   ctx.out.progress(
     `discovery: ${collections.length} collections, ${probes.length} probes`,
@@ -781,11 +802,8 @@ export function headersFor(
 
 async function runClients(ctx: IContext): Promise<void> {
   const recorded = await recordMembers();
-  const only = ctx.only;
-  const members = recorded.members.filter(
-    (member) =>
-      !only ||
-      only.some((text) => `${member.handler}.${member.member}`.includes(text)),
+  const members = recorded.members.filter((member) =>
+    passesFilter(ctx, `${member.handler}.${member.member}`),
   );
   const helpers = recorded.helpers;
   ctx.corpus.notMembers = helpers;
@@ -930,17 +948,27 @@ async function runClients(ctx: IContext): Promise<void> {
           // package's read answered nothing, so its entry could not be
           // checked).
           if (write && readable) {
-            const owner = specs.get(baseHandler(member.handler)) ?? spec;
-            const ownerOf = (clients: IClients) =>
-              owner.of(clients) as IHandler;
-            ctx.register(`clients ${owner.label}`, () => ({
-              label: `clients: ${owner.label} ${PROBE_NAME} (written by ${member.handler}.${member.member})`,
-              remove: clientsRemoval(
-                once,
-                (target) => ownerOf(clientsAt(target, undefined, true)),
-                ownerOf(reference),
-                owner.label,
-              ),
+            const base = specs.get(baseHandler(member.handler)) ?? spec;
+            // Where a registered set takes over the temporary objects (the
+            // base client cannot remove them on that system), through its
+            // handler of the same name.
+            const takeover = temporaryObjectsSet();
+            const takenOver = takeover
+              ? specs.get(`${takeover.prefix}${base.label}`)
+              : undefined;
+            // The set's handler first; the base handler when the set's sends
+            // no read (a type it refuses outright).
+            const handlers = [takenOver, base]
+              .filter((owner) => owner !== undefined)
+              .map((owner) => ({
+                label: owner.label,
+                at: (target: ITarget) =>
+                  owner.of(clientsAt(target, undefined, true)) as IHandler,
+                reference: owner.of(reference) as IHandler,
+              }));
+            ctx.register(`clients ${base.label}`, () => ({
+              label: `clients: ${base.label} ${PROBE_NAME} (written by ${member.handler}.${member.member})`,
+              remove: clientsRemoval(once, handlers),
             }));
           }
           return call(handlerOf(clientsAt(on, bogus)) as never, {
@@ -1084,17 +1112,33 @@ async function runClients(ctx: IContext): Promise<void> {
 /** Removes the probe object a member's write created: the handler's delete, then a read. */
 function clientsRemoval(
   once: (call: ICallOn<ITarget>) => Promise<ICapture>,
-  handlerAt: (on: ITarget) => IHandler,
-  reference: IHandler,
-  handler: string,
+  handlers: readonly {
+    label: string;
+    at: (on: ITarget) => IHandler;
+    reference: IHandler;
+  }[],
 ): () => Promise<{ removed: boolean | 'unknown'; detail: string }> {
+  // The first handler whose read sends a request does the removal.
+  let chosen = handlers[0];
   const read = () =>
     once((on, analyse) =>
-      Promise.resolve(handlerAt(on).readMetadata(UNIVERSAL, { analyse })),
+      Promise.resolve(chosen.at(on).readMetadata(UNIVERSAL, { analyse })),
     );
+  // Absent: a 404, or (where an unknown path answers 2xx) an empty 2xx.
+  const absent = (wire: IAdtWireResponse | undefined) =>
+    wire?.status === 404 || (wire !== undefined && isEmptyAnswer(wire));
   return async () => {
-    const before = (await read()).wire?.status;
-    if (before === 404) return { removed: true, detail: 'not there any more' };
+    let first: ICapture | undefined;
+    for (const candidate of handlers) {
+      chosen = candidate;
+      first = await read();
+      if (first.wire) break;
+    }
+    const { at: handlerAt, reference, label: handler } = chosen;
+    const beforeCapture = first?.wire;
+    const before = beforeCapture?.status;
+    if (absent(beforeCapture))
+      return { removed: true, detail: 'not there any more' };
     const pair = pairOf(handler, 'delete');
     if (
       !pair?.accept ||
@@ -1111,13 +1155,37 @@ function clientsRemoval(
             detail: `unknown ${before ?? 'no answer'}: ${handler} has no delete with a pair and the read cannot rule the object out`,
           };
     const headers = { accept: pair.accept, contentType: pair.contentType };
-    const deleted = await once((on, analyse) =>
-      Promise.resolve(handlerAt(on).delete(UNIVERSAL, { headers, analyse })),
-    );
-    const after = (await read()).wire?.status;
-    // A metadata read that answers 2xx finds the object.
+    // Where the delete is made under the caller's lock: lock, delete with the
+    // handle, unlock.
+    const held = deletesUnderLock()
+      ? lockHandle(
+          await once((on, analyse) =>
+            Promise.resolve(handlerAt(on).lock(UNIVERSAL, { analyse })),
+          ),
+        )
+      : undefined;
+    let deleted: ICapture;
+    try {
+      deleted = await once((on, analyse) =>
+        Promise.resolve(
+          handlerAt(on).delete(UNIVERSAL, {
+            headers,
+            analyse,
+            ...(held ? { lockHandle: held } : {}),
+          }),
+        ),
+      );
+    } finally {
+      if (held)
+        await once((on, analyse) =>
+          Promise.resolve(handlerAt(on).unlock(UNIVERSAL, held, { analyse })),
+        );
+    }
+    const afterCapture = (await read()).wire;
+    const after = afterCapture?.status;
+    // A metadata read that answers 2xx with a document finds the object.
     return removalOutcome(
-      after === 404
+      absent(afterCapture)
         ? 'absent'
         : after !== undefined && after >= 200 && after < 300
           ? 'exists'
@@ -1249,6 +1317,17 @@ export interface ICorpusRunInput {
   sequential?: boolean;
   /** Keep only the endpoints whose `handler.member` or href contains one of these. */
   only?: string[];
+  /**
+   * Leave out the endpoints whose `handler.member` or href contains one of
+   * these (`--except`): never sent, never counted, never tried on an object.
+   */
+  except?: string[];
+  /**
+   * An authorization 403 of this user (not a CSRF one, not the first
+   * discovery read) is recorded and the run goes on; any 401, a CSRF 403 and
+   * the logon still stop it (`--record-unauthorized`).
+   */
+  recordUnauthorized?: boolean;
   /** The calls an earlier run's split found poisoning envelopes (`--isolate`): each is sent alone from the start. */
   isolate?: ReadonlySet<string>;
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
@@ -1266,6 +1345,8 @@ export interface IRunState {
   stop?: IAuthStop;
   /** Any other failure: a failed discovery read, an error the run met. */
   failure?: string;
+  /** `--record-unauthorized`: the endpoints recorded as not authorized, each once. */
+  unauthorized?: Set<string>;
 }
 
 /** What ended the run, as its reports say it. */
@@ -1307,22 +1388,36 @@ export type OwnSession = (
 async function runWith(
   input: Pick<
     ICorpusRunInput,
-    'connection' | 'open' | 'close' | 'interrupt' | 'out'
+    | 'connection'
+    | 'open'
+    | 'close'
+    | 'interrupt'
+    | 'out'
+    | 'recordUnauthorized'
   >,
   body: (connection: IAbapConnection, state: IRunState) => Promise<void>,
   report: (state: IRunState, ended: string) => string[],
+  /** Phase 2's refusal, set when it starts: the gate refuses what it names. */
+  refusal?: IRefusalHolder,
 ): Promise<{ exitCode: number; files: string[]; state: IRunState }> {
   const state: IRunState = {};
-  const auth = guardAuthorization(input.interrupt, (stop) => {
-    state.stop ??= stop;
-  });
+  const auth = guardAuthorization(
+    input.interrupt,
+    (stop) => {
+      state.stop ??= stop;
+    },
+    input.recordUnauthorized === true,
+  );
   let raw = input.connection;
   try {
     if (!raw) {
       if (!input.open) throw new Error('the run needs a connection or open()');
       raw = await gateConnect(input.open, input.interrupt);
     }
-    const gated = gate(raw, { interrupt: input.interrupt });
+    const gated = gate(raw, {
+      interrupt: input.interrupt,
+      ...(refusal ? { refusal } : {}),
+    });
     const { open, close } = input;
     if (open && close && !input.connection)
       sessionsOf.set(gated, async (use) => {
@@ -1330,7 +1425,12 @@ async function runWith(
         // ends it and every lock it held (measured).
         const own = await gateConnect(open, input.interrupt);
         try {
-          await use(gate(own, { interrupt: input.interrupt }));
+          await use(
+            gate(own, {
+              interrupt: input.interrupt,
+              ...(refusal ? { refusal } : {}),
+            }),
+          );
         } finally {
           await close(own);
         }
@@ -1352,6 +1452,10 @@ async function runWith(
   } finally {
     if (raw && input.close && !input.connection) await input.close(raw);
   }
+  if (state.unauthorized?.size)
+    input.out.progress(
+      `${state.unauthorized.size} endpoint(s) not authorized for this user — recorded, not judged`,
+    );
   if (state.stop && input.interrupt.reason !== 'sigint')
     input.out.progress(
       state.stop.kind === 'logon'
@@ -1362,7 +1466,10 @@ async function runWith(
 }
 
 const newCorpus = (
-  input: Pick<ICorpusRunInput, 'source' | 'mode' | 'sequential'>,
+  input: Pick<
+    ICorpusRunInput,
+    'source' | 'mode' | 'sequential' | 'only' | 'except' | 'recordUnauthorized'
+  >,
 ): ICorpus => ({
   source: input.source,
   headers: input.mode,
@@ -1371,6 +1478,9 @@ const newCorpus = (
   removals: [],
   envelopes: [],
   ...(input.sequential ? { sequential: true } : {}),
+  ...(input.only?.length ? { only: input.only } : {}),
+  ...(input.except?.length ? { except: input.except } : {}),
+  ...(input.recordUnauthorized ? { recordUnauthorized: true as const } : {}),
 });
 
 /** Marks a corpus with what ended it, and writes it. */
@@ -1453,6 +1563,7 @@ async function runOn(
       meter,
       sequential: input.sequential === true,
       ...(input.only ? { only: input.only } : {}),
+      ...(input.except ? { except: input.except } : {}),
       envelopeProbes: input.envelopeProbes ?? ENVELOPE_PROBES,
       ...(input.isolate ? { isolate: input.isolate } : {}),
       register: (key, entry) => {
@@ -1488,6 +1599,11 @@ async function runOn(
   );
   if (input.source === 'clients' && remaining.length)
     state.failure ??= `${remaining.length} object(s) may remain: ${remaining.map((removal) => removal.label).join(', ')}`;
+  if (input.recordUnauthorized) {
+    corpus.unauthorized = markUnauthorized(corpus.rows);
+    for (const endpoint of corpus.unauthorized)
+      (state.unauthorized ??= new Set()).add(endpoint);
+  }
   if (input.mode === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
   const files = finishCorpus(corpus, endedBy(state, input.interrupt), input);
   // A temporary object is there after a write by design; the probe name is not.
@@ -1528,6 +1644,8 @@ export interface IWriteCycleResult {
   evidence: IEvidence[];
   /** The cycle's answers as rows, for `exists`. */
   rows?: ICorpusRow[];
+  /** What the cycle did not send, `<type>.<member>: skipped: <why>`. */
+  skipped?: string[];
   removals: IRemoval[];
   error?: string;
 }
@@ -1583,6 +1701,19 @@ export async function runFull(
   let updates: IHeaderCorpusFile['updates'] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
 
+  /** The gate's refusal, set once phase 1 is done. */
+  const refusal: IRefusalHolder = {};
+  /** What phase 2 did not send, and why. */
+  const phase2Skipped: string[] = [];
+  const unauthorized = new Set<string>();
+  /** Phase 2's rows: an authorization 403 is recorded, never judged. */
+  const noteUnauthorized = (rows: readonly ICorpusRow[]) => {
+    if (!input.recordUnauthorized) return;
+    for (const endpoint of markUnauthorized(rows)) unauthorized.add(endpoint);
+  };
+  const withoutUnauthorized = (items: readonly IEvidence[]): IEvidence[] =>
+    items.filter((item) => !unauthorized.has(item.endpoint));
+
   const body = async (connection: IAbapConnection, state: IRunState) => {
     const stopped = () =>
       Boolean(state.stop) ||
@@ -1617,6 +1748,8 @@ export async function runFull(
           state,
         );
         files.push(...result.files);
+        for (const endpoint of result.corpus.unauthorized ?? [])
+          unauthorized.add(endpoint);
         for (const row of result.corpus.rows) row.headersMode = mode;
         corpora.set(`${source} ${mode}`, result.corpus);
       }
@@ -1642,6 +1775,27 @@ export async function runFull(
         .filter((entry) => /— (POST|PUT|DELETE) /.test(entry.endpoint))
         .map((entry) => entry.endpoint),
     );
+    // Phase 2's refusal, built once and handed to the gate: --only, --except
+    // (a member text resolves to the endpoints the clients' recording lists
+    // for it — nothing is sent for that — and a path text matches the path)
+    // and the endpoints phase 1 recorded as unauthorized. From here on the
+    // gate sends none of them.
+    const members = new Map<string, ISentRequest[]>();
+    for (const member of (await recordMembers()).members) {
+      const key = `${baseHandler(member.handler)}.${member.member}`;
+      members.set(key, [...(members.get(key) ?? []), ...member.requests]);
+    }
+    const unauthorizedEndpoints: ISentRequest[] = [];
+    for (const corpus of corpora.values())
+      for (const row of corpus.rows)
+        if (row.unauthorized && row.endpoint)
+          unauthorizedEndpoints.push(row.endpoint);
+    refusal.current = phase2Refusal({
+      only: input.only,
+      except: input.except,
+      members,
+      unauthorized: unauthorizedEndpoints,
+    });
     const cycle = input.writeCycle;
     if (!stopped() && unknownWrites.size && cycle)
       await timed(
@@ -1653,8 +1807,10 @@ export async function runFull(
             interrupt: input.interrupt,
             unknown: unknownWrites,
           });
-          evidence.push(...writes.evidence);
           phase2Rows.push(...(writes.rows ?? []));
+          phase2Skipped.push(...(writes.skipped ?? []));
+          noteUnauthorized(writes.rows ?? []);
+          evidence.push(...withoutUnauthorized(writes.evidence));
           removals = [...removals, ...writes.removals];
           if (writes.error) state.failure ??= writes.error;
         },
@@ -1670,10 +1826,14 @@ export async function runFull(
             interrupt: input.interrupt,
           });
           updates = measured.updates;
+          for (const update of measured.updates ?? [])
+            if (update.note?.startsWith('skipped: '))
+              phase2Skipped.push(`${update.type}.${update.member}: ${update.note}`);
           phase2Rows.push(...(measured.rows ?? []));
+          noteUnauthorized(measured.rows ?? []);
           // Each update went with a bogus Accept: evidence for its Accept.
           for (const row of measured.rows ?? [])
-            if (row.endpoint)
+            if (row.endpoint && !row.unauthorized)
               evidence.push({
                 endpoint: endpointKey(row.endpoint),
                 source: 'clients',
@@ -1694,7 +1854,9 @@ export async function runFull(
       );
   };
 
-  const report = (_state: IRunState, ended: string): string[] => {
+  const report = (state: IRunState, ended: string): string[] => {
+    for (const endpoint of unauthorized)
+      (state.unauthorized ??= new Set()).add(endpoint);
     const discoveryContentType = new Map<string, string[]>();
     for (const collection of corpora.get('discovery corpus')?.collections ?? [])
       if (collection.accept.length)
@@ -1782,7 +1944,13 @@ export async function runFull(
         ? { coverage: corpora.get('clients corpus')?.coverage }
         : {}),
       updates,
+      ...(phase2Skipped.length ? { phase2Skipped } : {}),
       endedBy: ended,
+      ...(input.only?.length ? { only: input.only } : {}),
+      ...(input.except?.length ? { except: input.except } : {}),
+      ...(input.recordUnauthorized
+        ? { recordUnauthorized: true as const, unauthorized: [...unauthorized] }
+        : {}),
       ...(ended !== 'complete' ? { error: ended } : {}),
     };
     fs.mkdirSync(input.outDir, { recursive: true });
@@ -1803,7 +1971,7 @@ export async function runFull(
     return [...files, `${base}.json`, `${base}.md`];
   };
 
-  const result = await runWith(input, body, report);
+  const result = await runWith(input, body, report, refusal);
   return {
     exitCode: result.exitCode,
     files: result.files,
