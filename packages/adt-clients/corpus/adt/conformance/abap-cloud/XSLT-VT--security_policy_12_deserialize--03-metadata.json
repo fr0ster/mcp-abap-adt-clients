@@ -1,0 +1,36 @@
+{
+  "case": "XSLT-VT--security_policy_12_deserialize",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/xslt/transformations/security_policy_12_deserialize",
+    "params": {
+      "version": "active"
+    },
+    "effectiveUrl": "/sap/bc/adt/xslt/transformations/security_policy_12_deserialize?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.transformations+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "665",
+      "content-type": "application/vnd.sap.adt.transformations+xml; charset=utf-8",
+      "etag": "20110909225501001H76CD5122D57F8F7E76A08C60D265884967589CC8+1",
+      "last-modified": "Fri, 09 Sep 2011 22:55:01 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "150841.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "XSLT-VT--security_policy_12_deserialize--03-metadata.body.xml"
+  }
+}

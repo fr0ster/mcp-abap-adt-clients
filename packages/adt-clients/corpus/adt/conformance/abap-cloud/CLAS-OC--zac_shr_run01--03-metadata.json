@@ -1,0 +1,34 @@
+{
+  "case": "CLAS-OC--zac_shr_run01",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/classes/zac_shr_run01",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/zac_shr_run01",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "1114",
+      "content-type": "application/vnd.sap.adt.oo.classes.v4+xml; charset=utf-8",
+      "etag": "2026090506103400172026090811294600119205",
+      "last-modified": "Sat, 05 Sep 2026 06:10:34 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "157834.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "CLAS-OC--zac_shr_run01--03-metadata.body.xml"
+  }
+}

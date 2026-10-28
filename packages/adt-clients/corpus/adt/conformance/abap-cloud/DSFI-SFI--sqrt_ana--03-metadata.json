@@ -1,0 +1,36 @@
+{
+  "case": "DSFI-SFI--sqrt_ana",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/dsfi/sqrt_ana",
+    "params": {
+      "version": "inactive"
+    },
+    "effectiveUrl": "/sap/bc/adt/ddic/dsfi/sqrt_ana?version=inactive",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.blues.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "768",
+      "content-type": "application/vnd.sap.adt.blues.v2+xml; charset=utf-8",
+      "etag": "20220412095100001application/vnd.sap.adt.blues.v2+xmlp3Ug6RbEiUl1IyTqgAdH/0Q8ht4=nvwXXz9lh1+rviNbVoHocVUNQbI=",
+      "last-modified": "Tue, 12 Apr 2022 09:51:00 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "244502.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "DSFI-SFI--sqrt_ana--03-metadata.body.xml"
+  }
+}

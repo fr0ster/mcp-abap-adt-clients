@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SYCM_APS_E_ATC_FIND_ALP" adtcore:type="DDLX/EX" adtcore:changedAt="2026-03-30T10:53:14Z" adtcore:version="active" adtcore:createdAt="2018-01-10T00:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Metadata Extension" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sycm_aps" adtcore:type="DEVC/K" adtcore:name="SYCM_APS"/>
+</adtcore:mainObject>

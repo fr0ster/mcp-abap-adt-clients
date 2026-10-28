@@ -1,0 +1,31 @@
+{
+  "case": "PROG-I--saa_helpcl1",
+  "step": 1,
+  "stepTag": "template",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/wb/object_type/progi/object_name/%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20SAA_HELPCL1",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/vit/wb/object_type/progi/object_name/%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20SAA_HELPCL1",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-length": "536",
+      "content-type": "application/vnd.sap.adt.basic.object.properties+xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "29554.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "PROG-I--saa_helpcl1--01-template.body.xml"
+  }
+}

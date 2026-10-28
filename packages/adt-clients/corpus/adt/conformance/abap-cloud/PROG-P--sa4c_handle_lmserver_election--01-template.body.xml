@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="X" adtcore:name="SA4C_HANDLE_LMSERVER_ELECTION" adtcore:type="PROG/P" adtcore:version="active" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Program SA4C_HANDLE_LMSERVER_ELECTION" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sa4c_env" adtcore:type="DEVC/K" adtcore:name="SA4C_ENV"/>
+</adtcore:mainObject>

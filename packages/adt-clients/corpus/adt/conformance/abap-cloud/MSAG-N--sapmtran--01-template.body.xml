@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="SAPMTRAN" adtcore:type="MSAG/N" adtcore:changedAt="2023-01-31T13:39:49Z" adtcore:version="active" adtcore:changedBy="SAP" adtcore:description="Übersetzungsumgebung: Einstieg" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/slxe_fe" adtcore:type="DEVC/K" adtcore:name="SLXE_FE"/>
+</adtcore:mainObject>

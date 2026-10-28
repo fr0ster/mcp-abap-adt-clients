@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mc:messageClass adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="SAPMTRAN" adtcore:type="MSAG/N" adtcore:changedAt="2023-01-31T13:39:49Z" adtcore:version="active" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Übersetzungsumgebung: Einstieg" adtcore:language="EN" xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN217" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/217" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/messageclass/sapmtran" rel="self" type="text/html" title="Message Class HTTP Request" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/slxe_fe" adtcore:type="DEVC/K" adtcore:name="SLXE_FE"/>
+  <mc:messages mc:msgno="000" mc:msgtext="No information exists for the table" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN000" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/000" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="001" mc:msgtext="The table is not language-dependent" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN001" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/001" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="002" mc:msgtext="Error in short text translation" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN002" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/002" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="003" mc:msgtext="Error in long text translation" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN003" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/003" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="004" mc:msgtext="Enter current client" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN004" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/004" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="005" mc:msgtext="This function is not supported in this system" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN005" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/005" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="006" mc:msgtext="Specify which object is to be translated" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN006" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/006" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="007" mc:msgtext="Object not found" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN007" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/007" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="008" mc:msgtext="No authorization for language &amp;" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN008" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/008" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="010" mc:msgtext="&amp; &amp; &amp; &amp;" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2022-12-20" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN010" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/010" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="011" mc:msgtext="Object type unknown" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN011" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/011" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="012" mc:msgtext="Target language invalid" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN012" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/012" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="013" mc:msgtext="Source language invalid" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN013" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/013" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="014" mc:msgtext="Input incomplete" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN014" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/014" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="015" mc:msgtext="Translation area unknown" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN015" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/015" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="016" mc:msgtext="Object not found" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN016" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/016" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="017" mc:msgtext="Incorrect code page" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN017" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/017" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="018" mc:msgtext="Could not update worklist" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN018" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/018" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="019" mc:msgtext="You cannot create more than two worklists at the same time" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-10-04" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN019" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/019" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="020" mc:msgtext="No administration authorization" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN020" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/020" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="021" mc:msgtext="No worklist found" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN021" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/021" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="022" mc:msgtext="&amp;1 is not a translation language" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-10-04" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN022" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/022" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="023" mc:msgtext="Cannot lock reservation numbers" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-10-04" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN023" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/023" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="024" mc:msgtext="You cannot create two standard worklists at the same time" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-10-04" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN024" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/024" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="025" mc:msgtext="Your standard worklist is already open in a separate session" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-10-04" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN025" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/025" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="027" mc:msgtext="Your standard worklist is already open in worklist management" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2022-06-21" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN027" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/027" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="028" mc:msgtext="User &amp;1 already has a standard worklist" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2023-01-24" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN028" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/028" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="029" mc:msgtext="No source language specified in &amp;1’s user settings" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2023-01-31" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN029" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/029" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="030" mc:msgtext="Source language &amp;2 in &amp;1’s user settings is same as target language" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2023-01-31" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN030" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/030" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="101" mc:msgtext="Specify a transport request" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN101" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/101" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="200" mc:msgtext="Table &amp;1 is not relevant for translation or cannot be translated" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN200" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/200" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="201" mc:msgtext="Translate this table as object type &amp;1 (&amp;2)" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN201" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/201" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="202" mc:msgtext="The key value is incomplete or incorrect" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN202" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/202" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="203" mc:msgtext="Table &amp;1 is unknown in the system" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN203" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/203" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="204" mc:msgtext="Error expanding the table attributes" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN204" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/204" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="217" mc:msgtext="Recursive call of translation environment not possible" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2021-08-03" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPMTRAN217" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/sapmtran/messages/217" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+</mc:messageClass>
