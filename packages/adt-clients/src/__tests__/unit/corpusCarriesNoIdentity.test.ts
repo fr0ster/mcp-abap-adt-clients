@@ -79,6 +79,7 @@ describe('the recorded corpus', () => {
   const SERVERS = new Set([
     'appserver',
     'APPSERVER_00',
+    'appserver_SYS_00',
     'sap.example.local',
     'abap.example.com',
     'abap-cloud.example',
@@ -99,11 +100,15 @@ describe('the recorded corpus', () => {
   const URL_HOST = /https?:\/\/([A-Za-z0-9.-]+)/g;
   const SERVER_ELEMENT =
     /<(?:[A-Za-z]+:)?(?:host|HOST|hostname|server|APPSERVER|originalServer)>([^<]*)</g;
+  // A server named in an attribute (`serverName`), and the server a debuggee
+  // session id ends with.
+  const SERVER_ATTRIBUTE =
+    /\b[A-Za-z]*[Ss]erver[A-Za-z]*=\\?"([^"\\]*)\\?"|debuggeeSessionId=\\?"[0-9A-Fa-f]+\s+([^"\\]+)\\?"/g;
   const DASHED_IP = /\b(?:\d{1,3}-){3}\d{1,3}\b/g;
   // An attribute or a JSON field, escaped or not: the whole double- or
   // single-quoted value, or an unquoted one (a query parameter).
   const USER_FIELD =
-    /\b(?:[A-Za-z]*[Uu]ser(?:Name)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*(?:\\?"((?:[^"\\]|\\(?!"))*)\\?"|'([^']*)'|([^"'\\&<>\s,}]+))/g;
+    /\b(?:[A-Za-z]*[Uu]ser(?:Name|FullName|Id)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*(?:\\?"((?:[^"\\]|\\(?!"))*)\\?"|'([^']*)'|([^"'\\&<>\s,}]+))/g;
   // An element named for a user (`trc:user`, `mi:originalUser`,
   // `del:lockUser`, `DEBUGGEE_USER`), and a feed author's name.
   const USER_ELEMENT =
@@ -116,9 +121,12 @@ describe('the recorded corpus', () => {
         .map((match) => match[1] ?? '')
         .filter((host) => !HOSTS.has(host.toLowerCase())),
     server: (content) =>
-      [...content.matchAll(SERVER_ELEMENT)]
-        .map((match) => match[1] ?? '')
-        .filter((server) => !SERVERS.has(server)),
+      [
+        ...[...content.matchAll(SERVER_ELEMENT)].map((match) => match[1] ?? ''),
+        ...[...content.matchAll(SERVER_ATTRIBUTE)].map(
+          (match) => match[1] ?? match[2] ?? '',
+        ),
+      ].filter((server) => !SERVERS.has(server)),
     'dashed IP': (content) =>
       [...content.matchAll(DASHED_IP)].map((match) => match[0]),
     user: (content) => [
@@ -148,6 +156,8 @@ describe('the recorded corpus', () => {
     ['host', '<a href="https://host.realcorp.net:44300/sap/bc/adt"/>'],
     ['server', '<trc:host>realhost</trc:host>'],
     ['server', '<mi:originalServer>realhost_00</mi:originalServer>'],
+    ['server', '<x serverName="realhost_PRD_00"/>'],
+    ['server', '<x debuggeeSessionId="3D000000BA5F00  realhost_PRD_00"/>'],
     ['dashed IP', '<trc:host>10-1-2-3</trc:host>'],
     ['user', '<x adtcore:changedBy="REALUSER"/>'],
     ['user', '<x user="SAPUSER01 REALUSER"/>'],
@@ -159,6 +169,7 @@ describe('the recorded corpus', () => {
     ['user', '<mi:originalUser>REALUSER</mi:originalUser>'],
     ['user', '<DEBUGGEE_USER>REALUSER</DEBUGGEE_USER>'],
     ['user', '<atom:name>REALUSER</atom:name>'],
+    ['user', '{"userName":"SAPUSER01","userFullName":"Jane Smith"}'],
   ])('the %s detector refuses %s', (kind, planted) => {
     const detect = detectors[kind] ?? (() => []);
     expect(detect(planted)).not.toEqual([]);
@@ -167,6 +178,11 @@ describe('the recorded corpus', () => {
   it.each([
     ['host', '<a href="https://abap.example.com:44300/sap/bc/adt"/>'],
     ['server', '<trc:host>appserver</trc:host>'],
+    [
+      'server',
+      '<x serverName="appserver_SYS_00" debuggeeSessionId="3D00  appserver_SYS_00"/>',
+    ],
+    ['user', '{"userName":"SAPUSER01","userFullName":"SAPUSER01"}'],
     [
       'user',
       '<x changedBy="SAPUSER01" user="" /><atom:name>SAP SE</atom:name>',
