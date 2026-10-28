@@ -1,1 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"><chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/sap/bc/adt/programs/programs/%25scprcprof" chkrun:status="processed" chkrun:statusText="Object %SCPRCPROF has been checked"/></chkrun:checkRunReports>

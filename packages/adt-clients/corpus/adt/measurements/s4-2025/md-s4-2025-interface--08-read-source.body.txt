@@ -1,4 +1,0 @@
-INTERFACE zmcp_md_intf
-  PUBLIC .
-
-ENDINTERFACE.

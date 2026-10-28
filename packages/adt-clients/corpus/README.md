@@ -25,12 +25,11 @@ recorded name, which its `.json` names as `bodyFile`.
 | `debugger/` | the debugger conversations and the memory snapshot list, kept for information | `adt-strategies`' tests, `docs/research/debugger-endpoints.md`, `docs/usage/ERRATA.md` |
 | `discovery/` | what each release says about its endpoints and features: `core/discovery`, `discovery`, the compatibility graph, the system components, `objecttypes`, `releasestates` — `system-description-<release>--NN-*` | the type tables' evidence |
 | `typestructure/` | each release's `POST /repository/typestructure`: every type with its parent, name length, capabilities and the user's authorizations | the type tables' evidence |
-| `measurements/<release>/` | the live measurements behind the type tables: per object kind, create, read and update of source and metadata, locks, activation, the operations a release refuses — `md-<release>-<kind>--NN-*` | the type tables' evidence |
 
 The releases are `s4-2025` (S/4HANA 2025 on-premise), `abap-cloud` (the BTP
-ABAP environment trial) and `basis-740` (SAP_BASIS 7.40 SP04). In
-`measurements/`, the body of each CSRF fetch (`--NN-csrf-fetch`) is replaced by
-a note: it was the release's discovery document, which `discovery/` holds once.
+ABAP environment trial) and `basis-740` (SAP_BASIS 7.40 SP04). `discovery/`
+and `typestructure/` are each release's current answer: a new capture
+replaces them, and git keeps the earlier ones.
 
 ## It exists in two places, on purpose
 

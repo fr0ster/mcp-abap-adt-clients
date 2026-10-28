@@ -1,6 +1,0 @@
-FUNCTION zmcp_md_fm
- " You can use the template 'functionModuleParameter' to add here the signature!
-.
-
-  DATA lv_v1 TYPE i.
-ENDFUNCTION.

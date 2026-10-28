@@ -1,3 +1,0 @@
-REPORT zmcp_md_prog.
-
-WRITE / 'v1'.
