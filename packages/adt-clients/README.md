@@ -703,6 +703,46 @@ The script uses the same environment variables as the main package:
 
 See [Tools Documentation](tools/README.md) for complete details and options.
 
+### The type tables' conformance check
+
+The ADT type tables of `@mcp-abap-adt/interfaces-adt` (`ADT_TYPES_ONPREM`,
+`ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) are held to what each release
+answers: its `typestructure`, its `discovery` and, per sample object, its
+`urimapper` and metadata answers. The answers are recorded in `corpus/adt/`
+(`typestructure/`, `discovery/`, `conformance/<release>/`; see
+[`corpus/README.md`](corpus/README.md)).
+
+- **In CI** — `src/__tests__/unit/conformance/typeTablesConformance.test.ts`
+  runs the check against the recorded answers. What it finds is committed
+  beside it: the known divergences with their reasons and the list of creates
+  without `CREATE` (`recorded.ts`), and the coverage (`coverage.json`). A
+  change that changes what the check finds is an edit of those lists.
+- **On a live system** — `src/__tests__/integration/shared/typeTablesConformance.test.ts`
+  reads the same endpoints for the configured variant (`environment.system`)
+  and runs the same check. It prints the system's identity and writes it
+  nowhere:
+
+  ```bash
+  MCP_ENV_PATH=<env> MCP_TEST_OVERLAY=<overlay> \
+    npm test -- src/__tests__/integration/shared/typeTablesConformance.test.ts
+  ```
+
+**Refreshing a release's answers.** Run the live check with
+`CONFORMANCE_WRITE_DIR=<dir>` (refused when `CI` is set). It writes the
+answers, scrubbed with the corpus placeholders, under `<dir>` in the corpus
+layout: `typestructure/system-description-<release>--07-typestructure.*`,
+`discovery/system-description-<release>--03-discovery.*` and
+`conformance/<release>/` with its `_index.json`. Then:
+
+1. Review the written files: no host, user, system id or token may be left
+   (`src/__tests__/unit/corpusCarriesNoIdentity.test.ts` checks the corpus).
+2. Copy them over the release's files in `corpus/adt/`. A written
+   `_index.json` carries the sample, statuses, both addresses and the files;
+   keep the recorded index's notes and reasons where they still hold.
+3. Run `npm run corpus:format`, then the unit tests; edit `recorded.ts` and
+   `coverage.json` for what the check now finds, with a reason for each
+   divergence.
+
 ## API Reference
 
 ### AdtClient Overview
