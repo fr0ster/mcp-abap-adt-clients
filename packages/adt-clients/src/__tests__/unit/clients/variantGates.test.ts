@@ -105,6 +105,86 @@ async function variantGates(
   // @ts-expect-error -- ADT_TYPES_BASIS_740's `DDLS/DF` lists no updateMetadata
   await ddl740.updateMetadata({ ddlName: 'ZI_GATE' }, write);
 
+  // The second batch: the eight on both modern variants, the include on
+  // premise only, none on 7.40 — and the append structure, which shares
+  // `TABL/DS` with the structure and has no `updateMetadata` of its own.
+  await onprem
+    .getAccessControl()
+    .updateMetadata({ accessControlName: 'ZGATE' }, write);
+  await cloud
+    .getAccessControl()
+    .updateMetadata({ accessControlName: 'ZGATE' }, write);
+  await modern
+    .getAccessControl()
+    .updateMetadata({ accessControlName: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `accessControl`: the factory is refused, so no member is reached
+  basis740.getAccessControl();
+  await onprem.getMetadataExtension().updateMetadata({ name: 'ZGATE' }, write);
+  await cloud.getMetadataExtension().updateMetadata({ name: 'ZGATE' }, write);
+  await modern.getMetadataExtension().updateMetadata({ name: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `metadataExtension`: the factory is refused, so no member is reached
+  basis740.getMetadataExtension();
+  await onprem.getBehaviorDefinition().updateMetadata({ name: 'ZGATE' }, write);
+  await cloud.getBehaviorDefinition().updateMetadata({ name: 'ZGATE' }, write);
+  await modern.getBehaviorDefinition().updateMetadata({ name: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `behaviorDefinition`: the factory is refused, so no member is reached
+  basis740.getBehaviorDefinition();
+  await onprem
+    .getServiceDefinition()
+    .updateMetadata({ serviceDefinitionName: 'ZGATE' }, write);
+  await cloud
+    .getServiceDefinition()
+    .updateMetadata({ serviceDefinitionName: 'ZGATE' }, write);
+  await modern
+    .getServiceDefinition()
+    .updateMetadata({ serviceDefinitionName: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `serviceDefinition`: the factory is refused, so no member is reached
+  basis740.getServiceDefinition();
+  await onprem
+    .getScalarFunction()
+    .updateMetadata({ scalarFunctionName: 'ZGATE' }, write);
+  await cloud
+    .getScalarFunction()
+    .updateMetadata({ scalarFunctionName: 'ZGATE' }, write);
+  await modern
+    .getScalarFunction()
+    .updateMetadata({ scalarFunctionName: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `scalarFunction`: the factory is refused, so no member is reached
+  basis740.getScalarFunction();
+  await onprem
+    .getTransformation()
+    .updateMetadata({ transformationName: 'ZGATE' }, write);
+  await cloud
+    .getTransformation()
+    .updateMetadata({ transformationName: 'ZGATE' }, write);
+  await modern
+    .getTransformation()
+    .updateMetadata({ transformationName: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `transformation`: the factory is refused, so no member is reached
+  basis740.getTransformation();
+  await onprem.getTable().updateMetadata({ tableName: 'ZGATE' }, write);
+  await cloud.getTable().updateMetadata({ tableName: 'ZGATE' }, write);
+  await modern.getTable().updateMetadata({ tableName: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `table`: the factory is refused, so no member is reached
+  basis740.getTable();
+  await onprem.getStructure().updateMetadata({ structureName: 'ZGATE' }, write);
+  await cloud.getStructure().updateMetadata({ structureName: 'ZGATE' }, write);
+  await modern.getStructure().updateMetadata({ structureName: 'ZGATE' }, write);
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `structure`: the factory is refused, so no member is reached
+  basis740.getStructure();
+  await onprem.getInclude().updateMetadata({ includeName: 'ZGATE' }, write);
+  const cloudInclude = cloud.getInclude();
+  // @ts-expect-error -- ADT_TYPES_CLOUD lists no `updateMetadata` for the include
+  await cloudInclude.updateMetadata({ includeName: 'ZGATE' }, write);
+  const modernInclude = modern.getInclude();
+  // @ts-expect-error -- the default variant is served what both tables list
+  await modernInclude.updateMetadata({ includeName: 'ZGATE' }, write);
+  const include740 = basis740.getInclude();
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 lists no `updateMetadata` for its include
+  await include740.updateMetadata({ includeName: 'ZGATE' }, write);
+  // @ts-expect-error -- the append structure has no `updateMetadata`
+  await onprem.getAppendStructure().updateMetadata({ name: 'ZGATE' }, write);
+
   // An operation one code of the API lacks: only `ENHO/XHH` reads source.
   await onprem
     .getEnhancement()

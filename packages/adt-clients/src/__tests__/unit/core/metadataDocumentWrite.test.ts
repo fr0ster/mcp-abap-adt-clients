@@ -1,6 +1,8 @@
 /**
- * `updateMetadata` of a class, an interface, a program, a function module and
- * a DDL source: one PUT of the caller's document, as it is, to the object's
+ * `updateMetadata` of a class, an interface, a program, a function module, a
+ * DDL source, an access control, a metadata extension, a behavior definition,
+ * a service definition, a scalar function, a transformation, a table, a
+ * structure and an include: one PUT of the caller's document, as it is, to the object's
  * own resource, under the caller's lock handle and with the caller's headers.
  *
  * Measured on S/4HANA 2025 and ABAP cloud (the program on premise only), every
@@ -108,6 +110,105 @@ const CASES: ICase[] = [
         .getDdl()
         .updateMetadata(
           { ddlName: 'ZI_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtAccessControl.updateMetadata',
+    url: '/sap/bc/adt/acm/dcl/sources/zdcl_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getAccessControl()
+        .updateMetadata(
+          { accessControlName: 'ZDCL_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtMetadataExtension.updateMetadata',
+    url: '/sap/bc/adt/ddic/ddlx/sources/zddlx_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getMetadataExtension()
+        .updateMetadata(
+          { name: 'ZDDLX_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtBehaviorDefinition.updateMetadata',
+    url: '/sap/bc/adt/bo/behaviordefinitions/zbdef_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getBehaviorDefinition()
+        .updateMetadata(
+          { name: 'ZBDEF_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtServiceDefinition.updateMetadata',
+    url: '/sap/bc/adt/ddic/srvd/sources/zsrvd_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getServiceDefinition()
+        .updateMetadata(
+          { serviceDefinitionName: 'ZSRVD_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtScalarFunction.updateMetadata',
+    url: '/sap/bc/adt/ddic/dsfd/sources/zdsfd_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getScalarFunction()
+        .updateMetadata(
+          { scalarFunctionName: 'ZDSFD_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtTransformation.updateMetadata',
+    url: '/sap/bc/adt/xslt/transformations/zxslt_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getTransformation()
+        .updateMetadata(
+          { transformationName: 'ZXSLT_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtTable.updateMetadata',
+    url: '/sap/bc/adt/ddic/tables/ztab_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getTable()
+        .updateMetadata(
+          { tableName: 'ZTAB_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtStructure.updateMetadata',
+    url: '/sap/bc/adt/ddic/structures/zstru_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getStructure()
+        .updateMetadata(
+          { structureName: 'ZSTRU_META', transportRequest },
+          options(headers),
+        ),
+  },
+  {
+    member: 'AdtInclude.updateMetadata',
+    url: '/sap/bc/adt/programs/includes/zinc_meta',
+    write: (client, headers, transportRequest) =>
+      client
+        .getInclude()
+        .updateMetadata(
+          { includeName: 'ZINC_META', transportRequest },
           options(headers),
         ),
   },

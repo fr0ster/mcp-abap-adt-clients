@@ -65,6 +65,7 @@ const SENDS_NO_REQUEST: ReadonlySet<string> = new Set([
   'AdtInterfaceLegacy.updateMetadata',
   'AdtFunctionModuleLegacy.updateMetadata',
   'AdtDdlLegacy.updateMetadata',
+  'AdtIncludeLegacy.updateMetadata',
   // Measured 404 on 7.40 (spec §10.2).
   'AdtUtilsLegacy.getWhereUsed',
   'AdtUtilsLegacy.getWhereUsedScope',

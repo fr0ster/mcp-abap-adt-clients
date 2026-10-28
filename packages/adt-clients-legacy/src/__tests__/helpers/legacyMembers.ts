@@ -474,7 +474,7 @@ const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 
 /** The handlers absentOnLegacy builds today (§10.1), by their public members. */
 const ABSENT = {
-  getAccessControl: [...SOURCE_OBJECT_MEMBERS],
+  getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
   getAuthorizationField: [
     'activate',
@@ -488,7 +488,7 @@ const ABSENT = {
     'updateMetadata',
     'validate',
   ],
-  getBehaviorDefinition: [...SOURCE_OBJECT_MEMBERS],
+  getBehaviorDefinition: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getBehaviorImplementation: [...SOURCE_OBJECT_MEMBERS],
   getDataElement: [
     'activate',
@@ -536,8 +536,8 @@ const ABSENT = {
     'updateMetadata',
     'validate',
   ],
-  getMetadataExtension: [...SOURCE_OBJECT_MEMBERS],
-  getScalarFunction: [...SOURCE_OBJECT_MEMBERS],
+  getMetadataExtension: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getScalarFunction: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getScalarFunctionImplementation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getServiceBinding: [
     'activate',
@@ -555,10 +555,10 @@ const ABSENT = {
     'update',
     'validate',
   ],
-  getServiceDefinition: [...SOURCE_OBJECT_MEMBERS],
-  getStructure: [...SOURCE_OBJECT_MEMBERS],
-  getTable: [...SOURCE_OBJECT_MEMBERS],
-  getTransformation: [...SOURCE_OBJECT_MEMBERS],
+  getServiceDefinition: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getStructure: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getTable: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getTransformation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getTableType: [
     'activate',
     'check',
@@ -689,7 +689,10 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
     finc.refused('checkDeletion', '§5'),
     finc.refused('delete', '§4.3'),
   ]),
-  getInclude: Object.fromEntries([incl.refused('checkDeletion', '§5')]),
+  getInclude: Object.fromEntries([
+    incl.refused('checkDeletion', '§5'),
+    incl.refused('updateMetadata', 'not measured on 7.40'),
+  ]),
   getMessageClass: Object.fromEntries([
     msag.refused('checkDeletion', '§5'),
     msag.refused('updateMetadata', '§2 measured in B4'),

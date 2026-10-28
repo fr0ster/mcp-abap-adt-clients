@@ -209,7 +209,7 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'updateMetadata',
     ],
   ],
-  [AdtIncludeLegacy, ['checkDeletion']],
+  [AdtIncludeLegacy, ['checkDeletion', 'updateMetadata']],
   [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
   [AdtMessageClassLegacy, ['checkDeletion', 'updateMetadata']],
   // A legacy run is answered finished, with no run id to ask about; the

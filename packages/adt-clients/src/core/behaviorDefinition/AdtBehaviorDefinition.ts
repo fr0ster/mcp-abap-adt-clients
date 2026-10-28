@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -15,6 +16,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -28,11 +30,14 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import { writeObjectDocument } from '../shared/documentWrite';
 import {
   createLockTracker,
   type LockRegistry,
@@ -64,11 +69,16 @@ import {
 
 export class AdtBehaviorDefinition<
   R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>>,
     IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IBehaviorDefinitionConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IBehaviorDefinitionConfig,
       ReturnType<R['deletion']>,
@@ -85,6 +95,11 @@ export class AdtBehaviorDefinition<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -300,6 +315,41 @@ export class AdtBehaviorDefinition<
           transportRequest: config.transportRequest,
         }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the behavior definition's metadata document — one PUT of `options.source`,
+   * as the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'behaviorDefinition', 'updateMetadata'>,
+    config: Partial<IBehaviorDefinitionConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          BEHAVIOR_DEFINITION.uri(this.name(config)),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

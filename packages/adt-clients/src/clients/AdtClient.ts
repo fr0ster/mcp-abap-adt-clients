@@ -438,9 +438,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   getStructure<R extends IStructureResults = typeof structureDocuments>(
     this: this & AdtServedBy<'structure'>,
     results: R = structureDocuments as unknown as R,
-  ): AdtStructure<R> {
+  ): AdtStructure<R, V> {
     this.assertConnected();
-    return new AdtStructure<R>(
+    return new AdtStructure<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -456,9 +456,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   getTable<R extends ITableResults = typeof tableDocuments>(
     this: this & AdtServedBy<'table'>,
     results: R = tableDocuments as unknown as R,
-  ): AdtTable<R> {
+  ): AdtTable<R, V> {
     this.assertConnected();
-    return new AdtTable<R>(
+    return new AdtTable<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -634,9 +634,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   >(
     this: this & AdtServedBy<'accessControl'>,
     results: R = accessControlDocuments as unknown as R,
-  ): AdtAccessControl<R> {
+  ): AdtAccessControl<R, V> {
     this.assertConnected();
-    return new AdtAccessControl<R>(
+    return new AdtAccessControl<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -655,9 +655,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   >(
     this: this & AdtServedBy<'transformation'>,
     results: R = transformationDocuments as unknown as R,
-  ): AdtTransformation<R> {
+  ): AdtTransformation<R, V> {
     this.assertConnected();
-    return new AdtTransformation<R>(
+    return new AdtTransformation<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -675,9 +675,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   >(
     this: this & AdtServedBy<'serviceDefinition'>,
     results: R = serviceDefinitionDocuments as unknown as R,
-  ): AdtServiceDefinition<R> {
+  ): AdtServiceDefinition<R, V> {
     this.assertConnected();
-    return new AdtServiceDefinition<R>(
+    return new AdtServiceDefinition<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -694,9 +694,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   >(
     this: this & AdtServedBy<'scalarFunction'>,
     results: R = scalarFunctionDocuments as unknown as R,
-  ): AdtScalarFunction<R> {
+  ): AdtScalarFunction<R, V> {
     this.assertConnected();
-    return new AdtScalarFunction<R>(
+    return new AdtScalarFunction<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -770,9 +770,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   >(
     this: this & AdtServedBy<'behaviorDefinition'>,
     results: R = behaviorDefinitionDocuments as unknown as R,
-  ): AdtBehaviorDefinition<R> {
+  ): AdtBehaviorDefinition<R, V> {
     this.assertConnected();
-    return new AdtBehaviorDefinition<R>(
+    return new AdtBehaviorDefinition<R, V>(
       this.connection,
       this.logger,
       this.systemContext,
@@ -808,9 +808,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   >(
     this: this & AdtServedBy<'metadataExtension'>,
     results: R = metadataExtensionDocuments as unknown as R,
-  ): AdtMetadataExtension<R> {
+  ): AdtMetadataExtension<R, V> {
     this.assertConnected();
-    return new AdtMetadataExtension<R>(
+    return new AdtMetadataExtension<R, V>(
       this.connection,
       this.logger,
       this.systemContext,

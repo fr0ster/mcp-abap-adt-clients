@@ -21,6 +21,7 @@ import type {
   IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -42,6 +43,7 @@ import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
+import { writeObjectDocument } from '../shared/documentWrite';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
@@ -72,6 +74,10 @@ export class AdtInclude<
     IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IIncludeConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IIncludeConfig,
       ReturnType<R['deletion']>,
@@ -300,6 +306,41 @@ export class AdtInclude<
           config.transportRequest,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the include's metadata document — one PUT of `options.source`,
+   * as the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    config: Partial<IIncludeConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          PROGRAM_INCLUDE.uri(requireName(config)),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

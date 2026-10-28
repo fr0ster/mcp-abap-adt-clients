@@ -462,9 +462,12 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
 
   override getStructure<
     R extends IStructureResults = typeof structureDocuments,
-  >(this: this & AdtServedBy<'structure'>, _results?: R): AdtStructure<R> {
+  >(
+    this: this & AdtServedBy<'structure'>,
+    _results?: R,
+  ): AdtStructure<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtStructure<R>>(
+    return absentOnLegacy<AdtStructure<R, 'basis740'>>(
       AdtStructure,
       'Structure',
       STRUCTURE.collection,
@@ -475,9 +478,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   override getTable<R extends ITableResults = typeof tableDocuments>(
     this: this & AdtServedBy<'table'>,
     _results?: R,
-  ): AdtTable<R> {
+  ): AdtTable<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtTable<R>>(
+    return absentOnLegacy<AdtTable<R, 'basis740'>>(
       AdtTable,
       'Table',
       TABLE.collection,
@@ -502,9 +505,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'accessControl'>,
     _results?: R,
-  ): AdtAccessControl<R> {
+  ): AdtAccessControl<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtAccessControl<R>>(
+    return absentOnLegacy<AdtAccessControl<R, 'basis740'>>(
       AdtAccessControl,
       'AccessControl',
       ACCESS_CONTROL.collection,
@@ -517,9 +520,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'serviceDefinition'>,
     _results?: R,
-  ): AdtServiceDefinition<R> {
+  ): AdtServiceDefinition<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtServiceDefinition<R>>(
+    return absentOnLegacy<AdtServiceDefinition<R, 'basis740'>>(
       AdtServiceDefinition,
       'ServiceDefinition',
       SERVICE_DEFINITION.collection,
@@ -547,9 +550,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'behaviorDefinition'>,
     _results?: R,
-  ): AdtBehaviorDefinition<R> {
+  ): AdtBehaviorDefinition<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtBehaviorDefinition<R>>(
+    return absentOnLegacy<AdtBehaviorDefinition<R, 'basis740'>>(
       AdtBehaviorDefinition,
       'BehaviorDefinition',
       BEHAVIOR_DEFINITION.collection,
@@ -577,9 +580,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'metadataExtension'>,
     _results?: R,
-  ): AdtMetadataExtension<R> {
+  ): AdtMetadataExtension<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtMetadataExtension<R>>(
+    return absentOnLegacy<AdtMetadataExtension<R, 'basis740'>>(
       AdtMetadataExtension,
       'MetadataExtension',
       METADATA_EXTENSION.collection,
@@ -637,9 +640,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'transformation'>,
     _results?: R,
-  ): AdtTransformation<R> {
+  ): AdtTransformation<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtTransformation<R>>(
+    return absentOnLegacy<AdtTransformation<R, 'basis740'>>(
       AdtTransformation,
       'Transformation',
       TRANSFORMATION.collection,
@@ -652,9 +655,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   >(
     this: this & AdtServedBy<'scalarFunction'>,
     _results?: R,
-  ): AdtScalarFunction<R> {
+  ): AdtScalarFunction<R, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtScalarFunction<R>>(
+    return absentOnLegacy<AdtScalarFunction<R, 'basis740'>>(
       AdtScalarFunction,
       'ScalarFunction',
       SCALAR_FUNCTION.collection,
