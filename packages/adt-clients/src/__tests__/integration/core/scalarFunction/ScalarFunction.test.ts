@@ -42,7 +42,7 @@ import {
 } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
-import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
+import { removeLeftover } from '../../../helpers/objectPresence';
 import {
   readRootDescription,
   replaceRootDescription,
@@ -157,19 +157,27 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
         const sf = client.getScalarFunction();
 
         // ── 1) Idempotent cleanup of any leftover object from a previous run ──
-        // Absent is the expected answer; any other refusal fails here.
-        expectRemovedOrAbsent(
-          await sf.delete(
-            {
-              scalarFunctionName,
-              transportRequest,
-            },
-            {
-              analyse: judged(analyseDeletion),
-              headers: integrationHeadersOf(sf, 'delete'),
-            },
-          ),
+        // Read first, delete only what is there: ABAP cloud refuses a second
+        // delete of a DSFD it already removed ("ADT refuses to delete …"; the
+        // deletion check says "Object does not exist"), measured 2026-10-28.
+        await removeLeftover(
           `delete leftover scalar function ${scalarFunctionName}`,
+          () =>
+            sf.readMetadata(
+              { scalarFunctionName },
+              { analyse: analyseException },
+            ),
+          () =>
+            sf.delete(
+              {
+                scalarFunctionName,
+                transportRequest,
+              },
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(sf, 'delete'),
+              },
+            ),
         );
 
         // ── 2) Create (also confirms DSFD is supported on this system) ──
