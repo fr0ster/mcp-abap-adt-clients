@@ -75,16 +75,6 @@ describe('the recorded corpus', () => {
     'abap-cloud.example',
   ]);
 
-  it("names no host but a placeholder or SAP's own", () => {
-    const offenders = files.flatMap((name) =>
-      [...text(name).matchAll(/https?:\/\/([A-Za-z0-9.-]+)/g)]
-        .map((match) => match[1])
-        .filter((host) => !HOSTS.has(host.toLowerCase()))
-        .map((host) => `${name}: ${host}`),
-    );
-    expect(offenders).toEqual([]);
-  });
-
   /** An element naming a host or a server holds a placeholder. */
   const SERVERS = new Set([
     'appserver',
@@ -94,29 +84,7 @@ describe('the recorded corpus', () => {
     'abap-cloud.example',
   ]);
 
-  it('names no server but a placeholder', () => {
-    const element =
-      /<(?:[A-Za-z]+:)?(?:host|HOST|hostname|server|APPSERVER|originalServer)>([^<]*)</g;
-    const offenders = files.flatMap((name) =>
-      [...text(name).matchAll(element)]
-        .map((match) => match[1])
-        .filter((server) => !SERVERS.has(server))
-        .map((server) => `${name}: ${server}`),
-    );
-    expect(offenders).toEqual([]);
-  });
-
-  it('carries no IP address written with dashes either', () => {
-    const offenders = files.filter((name) =>
-      /\b(?:\d{1,3}-){3}\d{1,3}\b/.test(text(name)),
-    );
-    expect(offenders).toEqual([]);
-  });
-
-  /**
-   * A user is named only as the placeholder or as one of SAP's own users,
-   * in an attribute or a JSON field, escaped or not.
-   */
+  /** A user is named only as the placeholder or as one of SAP's own users. */
   const USERS = new Set([
     'SAPUSER01',
     'SAPUSER_NONE',
@@ -128,22 +96,85 @@ describe('the recorded corpus', () => {
     'SYS',
   ]);
 
-  it("names no user but the placeholder or SAP's own", () => {
-    // An attribute or a JSON field, double- or single-quoted, escaped or
-    // not; a query parameter; a feed author's name.
-    const field =
-      /\b(?:[A-Za-z]*[Uu]ser(?:Name)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*\\?(["']?)([^"'\\&<>\s,}]*)/g;
-    const author = /<atom:name>([^<]*)<\/atom:name>/g;
-    const offenders = files.flatMap((name) => {
-      const content = text(name);
-      return [
-        ...[...content.matchAll(field)].map((match) => match[2]),
-        ...[...content.matchAll(author)].map((match) => match[1]),
-      ]
-        .filter((user) => user.trim() !== '' && !USERS.has(user))
-        .map((user) => `${name}: ${user}`);
-    });
-    expect(offenders).toEqual([]);
+  const URL_HOST = /https?:\/\/([A-Za-z0-9.-]+)/g;
+  const SERVER_ELEMENT =
+    /<(?:[A-Za-z]+:)?(?:host|HOST|hostname|server|APPSERVER|originalServer)>([^<]*)</g;
+  const DASHED_IP = /\b(?:\d{1,3}-){3}\d{1,3}\b/g;
+  // An attribute or a JSON field, escaped or not: the whole double- or
+  // single-quoted value, or an unquoted one (a query parameter).
+  const USER_FIELD =
+    /\b(?:[A-Za-z]*[Uu]ser(?:Name)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*(?:\\?"((?:[^"\\]|\\(?!"))*)\\?"|'([^']*)'|([^"'\\&<>\s,}]+))/g;
+  // An element named for a user (`trc:user`, `mi:originalUser`,
+  // `del:lockUser`, `DEBUGGEE_USER`), and a feed author's name.
+  const USER_ELEMENT =
+    /<((?:[A-Za-z]+:)?(?:[A-Za-z]*[Uu]ser[A-Za-z]*|[A-Z_]*_USER|atom:name))>([^<]*)</g;
+
+  /** What a detector finds in one text that it refuses. */
+  const detectors: Record<string, (content: string) => string[]> = {
+    host: (content) =>
+      [...content.matchAll(URL_HOST)]
+        .map((match) => match[1] ?? '')
+        .filter((host) => !HOSTS.has(host.toLowerCase())),
+    server: (content) =>
+      [...content.matchAll(SERVER_ELEMENT)]
+        .map((match) => match[1] ?? '')
+        .filter((server) => !SERVERS.has(server)),
+    'dashed IP': (content) =>
+      [...content.matchAll(DASHED_IP)].map((match) => match[0]),
+    user: (content) => [
+      ...[...content.matchAll(USER_FIELD)]
+        .map((match) => match[1] ?? match[2] ?? match[3] ?? '')
+        .filter((user) => user !== '' && !USERS.has(user)),
+      ...[...content.matchAll(USER_ELEMENT)]
+        .map((match) => match[2] ?? '')
+        .filter((user) => user !== '' && !USERS.has(user)),
+    ],
+  };
+
+  it.each(Object.keys(detectors))(
+    "names no %s but a placeholder or SAP's own",
+    (kind) => {
+      const detect = detectors[kind] ?? (() => []);
+      const offenders = files.flatMap((name) =>
+        detect(text(name)).map((found) => `${name}: ${found}`),
+      );
+      expect(offenders).toEqual([]);
+    },
+  );
+
+  // The detectors themselves: each refuses what it is there to refuse, so a
+  // detector that stops matching fails here even on a clean corpus.
+  it.each([
+    ['host', '<a href="https://host.realcorp.net:44300/sap/bc/adt"/>'],
+    ['server', '<trc:host>realhost</trc:host>'],
+    ['server', '<mi:originalServer>realhost_00</mi:originalServer>'],
+    ['dashed IP', '<trc:host>10-1-2-3</trc:host>'],
+    ['user', '<x adtcore:changedBy="REALUSER"/>'],
+    ['user', '<x user="SAPUSER01 REALUSER"/>'],
+    ['user', "<x user='REALUSER'/>"],
+    ['user', '{"user": " REALUSER"}'],
+    ['user', '{"body": "<x responsible=\\"REALUSER\\"/>"}'],
+    ['user', '/sap/bc/adt/x?requestUser=REALUSER&a=b'],
+    ['user', '<trc:user>REALUSER</trc:user>'],
+    ['user', '<mi:originalUser>REALUSER</mi:originalUser>'],
+    ['user', '<DEBUGGEE_USER>REALUSER</DEBUGGEE_USER>'],
+    ['user', '<atom:name>REALUSER</atom:name>'],
+  ])('the %s detector refuses %s', (kind, planted) => {
+    const detect = detectors[kind] ?? (() => []);
+    expect(detect(planted)).not.toEqual([]);
+  });
+
+  it.each([
+    ['host', '<a href="https://abap.example.com:44300/sap/bc/adt"/>'],
+    ['server', '<trc:host>appserver</trc:host>'],
+    [
+      'user',
+      '<x changedBy="SAPUSER01" user="" /><atom:name>SAP SE</atom:name>',
+    ],
+    ['user', '{"body": "<x responsible=\\"SAPUSER01\\"/>"}'],
+  ])('the %s detector lets a placeholder through: %s', (kind, allowed) => {
+    const detect = detectors[kind] ?? (() => []);
+    expect(detect(allowed)).toEqual([]);
   });
 
   it('keeps the placeholders it promises, so a reading still sees the shape', () => {
