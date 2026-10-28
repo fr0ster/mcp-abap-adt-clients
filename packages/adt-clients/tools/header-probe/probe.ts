@@ -33,6 +33,7 @@ import {
   LOCAL_INCLUDES,
   OBJECT_SPECS,
 } from './objects';
+import { deletesUnderLock, temporaryClient } from './members';
 import { knownPair } from './pairs';
 import {
   endpointOf,
@@ -90,7 +91,34 @@ export class Probe {
   private client(connection: IAbapConnection): AdtClient {
     if (!throughGate(connection))
       throw new Error('Probe: the connection does not send through the gate');
+    // The client a registered set makes the temporary objects with, else the base's.
+    const own = temporaryClient(connection, this.clientOptions);
+    if (own) return own;
     return new AdtClient(connection, undefined, this.clientOptions);
+  }
+
+  /**
+   * The reason the gate last refused a request of this probe (phase 2's
+   * `--except`, `--only` or an unauthorized endpoint), cleared by
+   * {@link skipNote}'s callers per step. A refused request was never sent.
+   */
+  refusal: string | undefined;
+
+  /** The rows that work on the object of `spec` (a class's includes, a message class's messages) skipped with it. */
+  private skipDependents(spec: IObjectSpec, why: string): void {
+    if (spec.type === 'messageClass')
+      for (const member of ['create', 'update', 'delete'])
+        if (this.wanted('messageClassMessage', member))
+          this.skip('messageClassMessage', member, why);
+    if (spec.type === 'class')
+      for (const local of LOCAL_INCLUDES)
+        for (const member of ['update', 'delete', 'check'])
+          if (this.wanted(local.type, member)) this.skip(local.type, member, why);
+  }
+
+  /** `skipped: <reason>` when the gate refused a request of the step, else `otherwise`. */
+  skipNote(otherwise: string): string {
+    return this.refusal !== undefined ? `skipped: ${this.refusal}` : otherwise;
   }
 
   /** Runs the calls in one envelope, or one by one with `--sequential`. */
@@ -107,6 +135,13 @@ export class Probe {
       direct: gated ? this.direct : this.cleanupDirect,
       onBatch: (batch) => this.client(traced(batch)),
       interrupt: gated ? this.interrupt : undefined,
+    }).then((captures) => {
+      for (const capture of captures) {
+        const failure = capture.failure ?? '';
+        if (failure.startsWith('skipped: '))
+          this.refusal = failure.slice('skipped: '.length);
+      }
+      return captures;
     });
   }
 
@@ -273,7 +308,6 @@ export class Probe {
           (client, analyse) =>
             spec.handle(client).readMetadata?.(config, { analyse }) ??
             Promise.resolve(),
-          false,
         )
       ).wire,
     );
@@ -304,7 +338,14 @@ export class Probe {
       this.remember(spec, name, context);
       return true;
     }
-    if ((await this.stateOfName(spec, name, context)).exists !== false)
+    // A read the gate refused says nothing of the name.
+    const earlier = this.refusal;
+    this.refusal = undefined;
+    const state = await this.stateOfName(spec, name, context);
+    const refused = this.refusal !== undefined;
+    this.refusal ??= earlier;
+    if (refused) return false;
+    if (state.exists !== false)
       this.possiblyOurs.push(`${spec.type} ${name}`);
     return false;
   }
@@ -355,12 +396,38 @@ export class Probe {
           };
         const headers = knownPair(spec.handler, 'delete');
         if (!headers) return { removed: false, detail: 'no delete pair' };
-        const deleted = await this.direct1(
-          (client, analyse) =>
-            spec.handle(client).delete?.(config, { headers, analyse }) ??
-            Promise.resolve(),
-          false,
-        );
+        // Where the delete is made under the caller's lock: lock, delete with
+        // the handle, unlock (the unlock in a `finally`).
+        const held = deletesUnderLock()
+          ? lockHandle(
+              await this.direct1(
+                (client, analyse) =>
+                  spec.handle(client).lock?.(config, { analyse }) ??
+                  Promise.resolve(),
+                false,
+              ),
+            )
+          : undefined;
+        let deleted: ICapture;
+        try {
+          deleted = await this.direct1(
+            (client, analyse) =>
+              spec.handle(client).delete?.(config, {
+                headers,
+                analyse,
+                ...(held ? { lockHandle: held } : {}),
+              }) ?? Promise.resolve(),
+            false,
+          );
+        } finally {
+          if (held)
+            await this.direct1(
+              (client, analyse) =>
+                spec.handle(client).unlock?.(config, held, { analyse }) ??
+                Promise.resolve(),
+              false,
+            );
+        }
         const after = readState((await read()).wire);
         if (after.exists === false)
           return {
@@ -421,7 +488,7 @@ export class Probe {
       );
       const handle = lockHandle(locked);
       if (!handle) return false;
-      await withLock(
+      const updated = await withLock(
         handle,
         // Released after an interrupt too: unlocking is cleanup.
         (held) =>
@@ -443,6 +510,10 @@ export class Probe {
               }) ?? Promise.resolve(),
           ),
       );
+      // A refused or failed update is not a parent to build on: the dependent
+      // measurement is skipped, and a gate refusal keeps its reason
+      // (`skipNote` reads it).
+      if (!ok(updated)) return false;
     }
     const activated = await this.direct1(
       (client, analyse) =>
@@ -466,6 +537,7 @@ export class Probe {
         { code: `${spec.code[0]}${parentSpec.code[0]}` },
         'P',
       );
+      this.refusal = undefined;
       const made = await this.dependency(
         parentSpec,
         parent,
@@ -484,8 +556,16 @@ export class Probe {
             this.skip(
               spec.type,
               member,
-              `skipped: its ${spec.needs} could not be created and activated`,
+              this.skipNote(
+                `skipped: its ${spec.needs} could not be created and activated`,
+              ),
             );
+        this.skipDependents(
+          spec,
+          this.skipNote(
+            `skipped: its ${spec.needs} could not be created and activated`,
+          ),
+        );
         return;
       }
       context.parent = parent;
@@ -505,7 +585,8 @@ export class Probe {
           analyse,
         }) ?? Promise.resolve();
     // A name that is there is not ours: the type is left alone.
-    for (const kind of PROBE_KINDS)
+    for (const kind of PROBE_KINDS) {
+      this.refusal = undefined;
       if (!(await this.isFree(spec, names[kind], context))) {
         for (const member of [
           'create',
@@ -520,12 +601,22 @@ export class Probe {
             this.skip(
               spec.type,
               member,
-              `skipped: the name ${names[kind]} is there already, so it is not ours`,
+              this.skipNote(
+                `skipped: the name ${names[kind]} is there already, so it is not ours`,
+              ),
             );
+        this.skipDependents(
+          spec,
+          this.skipNote(
+            `skipped: the name ${names[kind]} is there already, so it is not ours`,
+          ),
+        );
         return;
       }
+    }
 
     // 1. Create: each probe on a name of its own, read right after.
+    this.refusal = undefined;
     const created = await this.operation({
       objectType: spec.type,
       handler: spec.handler,
@@ -539,7 +630,9 @@ export class Probe {
     for (const answer of this.lastProbes)
       await this.claim(spec, names[answer.probe], context, answer);
     if (!created || !isSuccess(created.status)) {
-      const why = `skipped: the known create answered ${created?.status ?? created?.failure ?? 'nothing'}`;
+      const why = this.skipNote(
+        `skipped: the known create answered ${created?.status ?? created?.failure ?? 'nothing'}`,
+      );
       for (const member of [
         'update',
         'updateMetadata',
@@ -550,6 +643,7 @@ export class Probe {
       ])
         if (knownPair(spec.handler, member) && this.wanted(spec.type, member))
           this.skip(spec.type, member, why);
+      this.skipDependents(spec, why);
       return;
     }
     const config = configOf('known');
@@ -565,6 +659,8 @@ export class Probe {
       );
     if (this.wanted(spec.type, writeMember) || writesLocals) {
       let body = spec.source?.(names.known, context);
+      // The read's own refusal names the skip below, not an earlier step's.
+      this.refusal = undefined;
       if (body === undefined) {
         const read = await this.direct1((client, analyse) =>
           spec.write === 'source'
@@ -606,7 +702,9 @@ export class Probe {
                 this.skip(
                   spec.type,
                   writeMember,
-                  'skipped: the object could not be read to write it back',
+                  this.skipNote(
+                    'skipped: the object could not be read to write it back',
+                  ),
                 );
             } else
               await this.operation({
@@ -815,6 +913,7 @@ export class Probe {
     ) as IObjectSpec;
     const name = this.name({ code: 'UT' }, 'P');
     const context: ISpecContext = { ...this.context };
+    this.refusal = undefined;
     const made = await this.dependency(program, name);
     const reads: { member: string; args: unknown[] }[] = [
       {
@@ -869,7 +968,7 @@ export class Probe {
           this.skip(
             'utils',
             member,
-            'skipped: its program could not be created and activated',
+            this.skipNote('skipped: its program could not be created and activated'),
           );
       return;
     }

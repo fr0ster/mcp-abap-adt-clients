@@ -14,6 +14,7 @@ import type {
 import { AdtBatchConnection } from '../../src/batch/AdtBatchConnection';
 import { innerRequest } from '../../src/batch/wire';
 import { eachInTurn, type Interrupt } from './ledger';
+import type { IRefusalHolder } from './phase2Refusal';
 
 /** Accept and Content-Type of one request as it went on the wire; `null` is "not sent". */
 export interface IWireHeaders {
@@ -314,6 +315,29 @@ function watched<T>(
   );
 }
 
+/** What a gate answers a request it refuses: nothing was sent; its reason is the failure text. */
+export class RequestRefused extends Error {
+  constructor(readonly reason: string) {
+    super(`skipped: ${reason}`);
+    this.name = 'RequestRefused';
+  }
+}
+
+/** The refusal predicate a gate holds (not its cleanup sibling), read by what builds an envelope over it. */
+const REFUSAL = Symbol('error-corpus refusal');
+
+/** The refusal a gate holds, if it holds one. */
+function refusalOf(
+  connection: unknown,
+): ((request: IAbapRequestOptions) => string | undefined) | undefined {
+  const held = (connection as Record<symbol, unknown> | null)?.[REFUSAL];
+  if (typeof held !== 'function') return undefined;
+  return (request) => {
+    const reason: unknown = held(request);
+    return typeof reason === 'string' ? reason : undefined;
+  };
+}
+
 /** A gate, and its sibling for cleanup and unlocks. */
 export interface IGated extends IAbapConnection {
   /** The same gate, without the interrupt check: for cleanup and unlocks only. */
@@ -323,19 +347,27 @@ export interface IGated extends IAbapConnection {
 /**
  * The gate every request of the run goes through. Before sending, it asks
  * the interrupt (Ctrl-C, or an authorization stop) — except on its cleanup
- * sibling, which removes and unlocks after a stop. It watches every answer
+ * sibling, which removes and unlocks after a stop. A request the `refusal`
+ * names is not sent: the gate answers {@link RequestRefused} (phase 2's
+ * `--except`, `--only` and unauthorized endpoints; the cleanup sibling is
+ * exempt, as it is from the interrupt). It watches every answer
  * for authorization (the run's guard), and records the request into the
  * call that issued it, unless `traced` already did.
  */
 export function gate(
   connection: IAbapConnection,
-  options: { interrupt?: Interrupt },
+  options: { interrupt?: Interrupt; refusal?: IRefusalHolder },
   forCleanup = false,
 ): IGated {
   const wrapper = forwarding(connection);
   wrapper[GATE] = true;
+  const refuse = (request: IAbapRequestOptions): string | undefined =>
+    forCleanup ? undefined : options.refusal?.current?.(request);
+  wrapper[REFUSAL] = refuse;
   wrapper.makeAdtRequest = (request: IAbapRequestOptions) => {
     if (!forCleanup) options.interrupt?.check();
+    const reason = refuse(request);
+    if (reason !== undefined) return Promise.reject(new RequestRefused(reason));
     const capture = current.getStore();
     if (capture && !(request as unknown as Record<symbol, unknown>)[RECORDED])
       capture.requests.push({
@@ -511,6 +543,19 @@ export async function runCalls<T>(input: {
   );
   // The envelope goes out through the gate below it.
   (batch as unknown as Record<symbol, unknown>)[GATE] = true;
+  // A part the gate would refuse is not queued: the envelope carries the rest.
+  const refuse = refusalOf(input.connection);
+  if (refuse) {
+    const queue = batch.makeAdtRequest.bind(batch);
+    (batch as { makeAdtRequest: unknown }).makeAdtRequest = (
+      request: IAbapRequestOptions,
+    ) => {
+      const reason = refuse(request);
+      return reason !== undefined
+        ? Promise.reject(new RequestRefused(reason))
+        : queue(request);
+    };
+  }
   const target = input.onBatch(batch);
   const pending = calls.map((call, i) => invoke(target, call, captures[i]));
   // A member may record its request a few turns after it was called.
@@ -529,7 +574,7 @@ export async function runCalls<T>(input: {
   // member made of the rejection.
   if (refused !== undefined)
     for (const capture of captures)
-      if (!capture.wire)
+      if (!capture.wire && !capture.failure?.startsWith('skipped: '))
         capture.failure = `envelope failed: ${message(refused)}`;
   if (input.meter) for (const capture of captures) capture.envelopes = [...ids];
   return captures;

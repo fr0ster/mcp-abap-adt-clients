@@ -298,10 +298,28 @@ export function readAnswer(input: {
   return answer;
 }
 
+/**
+ * On some systems an unknown path answers 2xx with an empty body, so such a
+ * read is no evidence of an object (set by a registered client set, see
+ * `IClientSet.forTemporaryObjects` in members.ts).
+ */
+export const presence = { emptyBodyIsAbsent: false };
+
+/** Whether a 2xx answer is not a document of the object: empty, where that says absent. */
+export function isEmptyAnswer(wire: IAdtWireResponse): boolean {
+  return (
+    presence.emptyBodyIsAbsent &&
+    wire.status >= 200 &&
+    wire.status < 300 &&
+    (typeof wire.data === 'string' ? wire.data : '').trim() === ''
+  );
+}
+
 /** What a metadata read says about the object. */
 export function readState(wire: IAdtWireResponse | undefined): IObjectState {
   if (!wire) return { exists: 'unknown' };
   if (wire.status === 404) return { status: 404, exists: false };
+  if (isEmptyAnswer(wire)) return { status: wire.status, exists: false };
   if (wire.status < 200 || wire.status >= 300)
     return { status: wire.status, exists: 'unknown' };
   const body = typeof wire.data === 'string' ? wire.data : '';

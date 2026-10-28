@@ -661,6 +661,11 @@ export interface ICorpusRow {
   envelope?: number;
   /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
   ms?: number;
+  /**
+   * `--record-unauthorized`: the answer is an authorization 403 of this user.
+   * It says nothing of the headers: no `needs`, no named value, not unknown.
+   */
+  unauthorized?: true;
 }
 
 export interface ICorpus {
@@ -676,6 +681,14 @@ export interface ICorpus {
   sequential?: boolean;
   /** Phase 2 of a full run: real objects in place of the probe name. */
   phase?: 2;
+  /** `--only`: the run took the endpoints matching one of these texts. */
+  only?: string[];
+  /** `--except`: the run left out the endpoints matching one of these texts, never sent. */
+  except?: string[];
+  /** `--record-unauthorized`: an authorization 403 was recorded, not a stop. */
+  recordUnauthorized?: true;
+  /** The endpoints (method + path) the user is not authorized for, recorded under the flag. */
+  unauthorized?: string[];
   /** What ended the run: `complete`, `interrupted (SIGINT)`, `stopped: authorization (…)`, `failed: …`. */
   endedBy?: string;
   /** Every envelope: parts, bytes, wall time from send to answer. */
@@ -838,6 +851,71 @@ export function authorizationProblem(
   return { status: 403, kind: type || 'authorization' };
 }
 
+/**
+ * Whether a recorded row is the user's authorization 403 (not a CSRF one: that
+ * always stops the run, so it is never recorded as a row of its own).
+ */
+export function isUnauthorizedAnswer(
+  row: Pick<ICorpusRow, 'status' | 'body'>,
+): boolean {
+  if (row.status !== 403) return false;
+  const problem = authorizationProblem({
+    status: 403,
+    data: row.body ?? '',
+    headers: {},
+  });
+  return problem !== undefined && problem.kind !== 'CSRF';
+}
+
+/**
+ * Marks every row that is the user's authorization 403 and returns their
+ * endpoints (method + path), each once.
+ */
+export function markUnauthorized(rows: readonly ICorpusRow[]): string[] {
+  const endpoints = new Set<string>();
+  for (const row of rows) {
+    if (!row.endpoint || !isUnauthorizedAnswer(row)) continue;
+    row.unauthorized = true;
+    endpoints.add(endpointKey(row.endpoint));
+  }
+  return [...endpoints];
+}
+
+/** The heading the endpoints of this user's missing authorizations are listed under. */
+export const UNAUTHORIZED_HEADING = 'Not authorized for this user';
+
+export function unauthorizedLines(endpoints: readonly string[]): string[] {
+  return [
+    `## ${UNAUTHORIZED_HEADING}`,
+    '',
+    ...(endpoints.length
+      ? [
+          'Recorded with `--record-unauthorized`, not judged: no header verdict, never sent again on an object.',
+          '',
+          ...endpoints.map((endpoint) => `- ${cell(endpoint)}`),
+        ]
+      : ['None.']),
+    '',
+  ];
+}
+
+/**
+ * The endpoints unauthorized in every corpus that probed them: a row of the
+ * endpoint that is not an authorization 403 (another run got through) keeps it out.
+ */
+export function unauthorizedInEvery(
+  corpora: readonly Pick<ICorpus, 'rows'>[],
+): string[] {
+  const state = new Map<string, boolean>();
+  for (const corpus of corpora)
+    for (const row of corpus.rows) {
+      if (!row.endpoint) continue;
+      const key = endpointKey(row.endpoint);
+      state.set(key, (state.get(key) ?? true) && row.unauthorized === true);
+    }
+  return [...state].filter(([, all]) => all).map(([key]) => key);
+}
+
 // --- the summary -------------------------------------------------------------
 
 export const statusOf = (row: ICorpusRow): string =>
@@ -970,7 +1048,7 @@ export function namedPerEndpoint(
   const by = new Map<string, IEndpointNamed>();
   for (const corpus of corpora)
     for (const row of corpus.rows) {
-      if (!row.endpoint) continue;
+      if (!row.endpoint || row.unauthorized) continue;
       const named = typesNamed(row);
       const texts = [row.named.acceptedText, row.named.supportedText].filter(
         (text): text is string => Boolean(text),
@@ -1391,9 +1469,12 @@ const verdictText = (name: string, verdict: IHeaderVerdict): string =>
  * shows the Accept check too.
  */
 export function classifyNeeds(
-  rows: readonly ICorpusRow[],
-  evidence: readonly ICorpusRow[] = [],
+  allRows: readonly ICorpusRow[],
+  allEvidence: readonly ICorpusRow[] = [],
 ): IEndpointNeeds[] {
+  // An authorization 403 of this user is no header verdict (`--record-unauthorized`).
+  const rows = allRows.filter((row) => !row.unauthorized);
+  const evidence = allEvidence.filter((row) => !row.unauthorized);
   const by = new Map<
     string,
     { accept?: ICorpusRow; contentType?: ICorpusRow }
@@ -1578,6 +1659,43 @@ function afterWriteText(check: IWriteCheck | undefined): string {
   return `unknown${check.status ? ` (${check.status})` : ''}${check.note ? `: ${check.note}` : ''}`;
 }
 
+/**
+ * `--only` / `--except`: an endpoint is probed when it matches one of `only`
+ * (when given) and none of `except`; `text` is the discovery href or the
+ * clients `handler.member`.
+ */
+export interface IEndpointFilter {
+  only?: readonly string[] | undefined;
+  except?: readonly string[] | undefined;
+}
+
+export function passesFilter(filter: IEndpointFilter, text: string): boolean {
+  if (filter.only && !filter.only.some((part) => text.includes(part)))
+    return false;
+  return !filter.except?.some((part) => text.includes(part));
+}
+
+/** The lines that say what a run was limited by, near the top of its .md. */
+export function filterLines(filter: IEndpointFilter): string[] {
+  const lines: string[] = [];
+  if (filter.only?.length) lines.push(`Only: ${filter.only.join(', ')}`, '');
+  if (filter.except?.length)
+    lines.push(`Excluded by --except: ${filter.except.join(', ')}`, '');
+  return lines;
+}
+
+/** The union of what several runs were limited by, each text once. */
+export function unionOfFilters(
+  filters: readonly IEndpointFilter[],
+): IEndpointFilter {
+  const only = [...new Set(filters.flatMap((filter) => filter.only ?? []))];
+  const except = [...new Set(filters.flatMap((filter) => filter.except ?? []))];
+  return {
+    ...(only.length ? { only } : {}),
+    ...(except.length ? { except } : {}),
+  };
+}
+
 /** The Markdown corpus: a table per endpoint group, then the summary. */
 export function renderCorpusMarkdown(corpus: ICorpus): string {
   const lines: string[] = [
@@ -1586,8 +1704,11 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
     `Started ${corpus.startedAt}${corpus.finishedAt ? `, finished ${corpus.finishedAt}` : ''}. Probe name \`${PROBE_NAME}\`, package \`${PROBE_PACKAGE}\`; bogus type \`${PROBE_TYPE}\`. The full bodies are in the JSON file.`,
     '',
   ];
+  lines.push(...filterLines(corpus));
   if (corpus.error)
     lines.push(`**The run stopped:** ${cell(corpus.error)}`, '');
+  if (corpus.recordUnauthorized)
+    lines.push(...unauthorizedLines(corpus.unauthorized ?? []));
   const groups = [...new Set(corpus.rows.map((row) => row.group))];
   for (const group of groups) {
     lines.push(
@@ -1906,6 +2027,10 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
   const lines = [
     '# Error corpus: what the system named, per endpoint',
     '',
+    ...filterLines(unionOfFilters(corpora)),
+    ...(corpora.some((corpus) => corpus.recordUnauthorized)
+      ? unauthorizedLines(unauthorizedInEvery(corpora))
+      : []),
     'Runs:',
     '',
     ...corpora.map(
@@ -2371,6 +2496,16 @@ export interface IHeaderCorpusFile {
   removals: IRemoval[];
   /** What ended the run. */
   endedBy?: string;
+  /** `--only` of the run. */
+  only?: string[];
+  /** `--except` of the run: these endpoints were never sent. */
+  except?: string[];
+  /** What phase 2 did not send because a member it needs is excluded or unauthorized (or its setup failed), and why. */
+  phase2Skipped?: string[];
+  /** `--record-unauthorized`: an authorization 403 was recorded, not a stop. */
+  recordUnauthorized?: true;
+  /** The endpoints (method + path) the user is not authorized for. */
+  unauthorized?: string[];
   /** Phase 2's update measurement: per object type, the update's answer to a bogus Accept and whether it took effect. */
   updates?: {
     type: string;
@@ -2405,7 +2540,10 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
     `Started ${file.startedAt}${file.finishedAt ? `, finished ${file.finishedAt}` : ''}; total ${Math.round(file.totalMs / 1000)} s.`,
     '',
   ];
+  lines.push(...filterLines(file));
   if (file.error) lines.push(`**The run stopped:** ${cell(file.error)}`, '');
+  if (file.recordUnauthorized)
+    lines.push(...unauthorizedLines(file.unauthorized ?? []));
   lines.push('## Time', '', '| phase | s |', '|---|---|');
   for (const phase of file.phases)
     lines.push(`| ${cell(phase.name)} | ${(phase.ms / 1000).toFixed(1)} |`);
@@ -2462,6 +2600,13 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
         `| ${cell(update.type)} | ${update.member} | ${update.status ?? '—'}${update.sapType ? ` ${cell(update.sapType)}` : ''} | ${update.applied === 'unknown' ? `unknown${update.note ? ` (${cell(update.note)})` : ''}` : update.applied ? 'yes' : 'no'} |`,
       );
   }
+  if (file.phase2Skipped?.length)
+    lines.push(
+      '',
+      '## Phase 2 skipped',
+      '',
+      ...file.phase2Skipped.map((line) => `- ${cell(line)}`),
+    );
   lines.push('', '## Temporary objects', '');
   if (!file.objects.length) lines.push('None made.');
   for (const object of file.objects)

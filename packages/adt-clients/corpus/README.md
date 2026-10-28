@@ -2,7 +2,11 @@
 
 Real exchanges with a running system, kept as files: one `.json` per step with
 the request and the response metadata, beside a `.body.xml` or `.body.txt` with
-the payload byte for byte.
+the payload. A `.body.txt` is byte for byte; a `.body.xml` is laid out one
+element per line (`npm run corpus:format`, which `corpus:capture` applies as it
+writes), and only the whitespace between tags differs from what ADT sent —
+every tag, attribute, entity and text, a value of spaces included, is as it
+came.
 
 **What they are for.** This package ships no error strategy and only documentary
 result readings, because the consumer's judgement cannot be made here. A
@@ -23,8 +27,8 @@ recorded name, which its `.json` names as `bodyFile`.
 |---|---|---|
 | `answers/` | the answer shapes: reads, refusals, writes, with the collector's run manifests (`_run-*.json`) | `adt-strategies`' tests, this package's unit tests, `docs/usage/ANSWER_SHAPES.md`; written by `scripts/capture-adt-corpus.ts` |
 | `debugger/` | the debugger conversations and the memory snapshot list, kept for information | `adt-strategies`' tests, `docs/research/debugger-endpoints.md`, `docs/usage/ERRATA.md` |
-| `discovery/` | what each release says about its endpoints and features: `core/discovery`, `discovery`, the compatibility graph, the system components, `objecttypes`, `releasestates` — `system-description-<release>--NN-*` | the type tables' evidence |
-| `typestructure/` | each release's `POST /repository/typestructure`: every type with its parent, name length, capabilities and the user's authorizations | the type tables' evidence |
+| `discovery/` | each release's `GET /sap/bc/adt/discovery`: its collections, their `app:accept` and templates — `system-description-<release>--03-discovery` | the type tables' evidence |
+| `typestructure/` | each release's `POST /repository/typestructure`: every type with its parent, name length, capabilities and the user's authorizations — what each field means, from the handler's code: [`docs/research/typestructure.md`](../docs/research/typestructure.md) | the type tables' evidence |
 
 The releases are `s4-2025` (S/4HANA 2025 on-premise), `abap-cloud` (the BTP
 ABAP environment trial) and `basis-740` (SAP_BASIS 7.40 SP04). `discovery/`
