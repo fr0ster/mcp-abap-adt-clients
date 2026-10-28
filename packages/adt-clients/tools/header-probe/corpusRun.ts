@@ -61,6 +61,7 @@ import {
   isWrite,
   judge,
   LONG_POLL_SKIP,
+  markUnauthorized,
   needsCounts,
   PROBE_NAME,
   PROBE_PACKAGE,
@@ -527,6 +528,7 @@ export interface IAuthStop {
 export function guardAuthorization(
   interrupt: Interrupt,
   onStop?: (stop: IAuthStop) => void,
+  recordUnauthorized = false,
 ): {
   stop: () => IAuthStop | undefined;
   release: () => void;
@@ -536,6 +538,15 @@ export function guardAuthorization(
     if (stopped) return;
     const problem = authorizationProblem(wire);
     if (!problem) return;
+    // Recorded, not a stop: this user's authorization 403 after the first
+    // read. A 401, a CSRF 403 and the discovery read itself still stop.
+    if (
+      recordUnauthorized &&
+      problem.status === 403 &&
+      problem.kind !== 'CSRF' &&
+      String(request.url ?? '').split('?')[0] !== '/sap/bc/adt/discovery'
+    )
+      return;
     stopped = {
       ...problem,
       endpoint: endpointKey(
@@ -1252,6 +1263,12 @@ export interface ICorpusRunInput {
    * these (`--except`): never sent, never counted, never tried on an object.
    */
   except?: string[];
+  /**
+   * An authorization 403 of this user (not a CSRF one, not the first
+   * discovery read) is recorded and the run goes on; any 401, a CSRF 403 and
+   * the logon still stop it (`--record-unauthorized`).
+   */
+  recordUnauthorized?: boolean;
   /** The calls an earlier run's split found poisoning envelopes (`--isolate`): each is sent alone from the start. */
   isolate?: ReadonlySet<string>;
   /** Probes per envelope ({@link ENVELOPE_PROBES} unless given). */
@@ -1269,6 +1286,8 @@ export interface IRunState {
   stop?: IAuthStop;
   /** Any other failure: a failed discovery read, an error the run met. */
   failure?: string;
+  /** `--record-unauthorized`: the endpoints recorded as not authorized, each once. */
+  unauthorized?: Set<string>;
 }
 
 /** What ended the run, as its reports say it. */
@@ -1310,15 +1329,24 @@ export type OwnSession = (
 async function runWith(
   input: Pick<
     ICorpusRunInput,
-    'connection' | 'open' | 'close' | 'interrupt' | 'out'
+    | 'connection'
+    | 'open'
+    | 'close'
+    | 'interrupt'
+    | 'out'
+    | 'recordUnauthorized'
   >,
   body: (connection: IAbapConnection, state: IRunState) => Promise<void>,
   report: (state: IRunState, ended: string) => string[],
 ): Promise<{ exitCode: number; files: string[]; state: IRunState }> {
   const state: IRunState = {};
-  const auth = guardAuthorization(input.interrupt, (stop) => {
-    state.stop ??= stop;
-  });
+  const auth = guardAuthorization(
+    input.interrupt,
+    (stop) => {
+      state.stop ??= stop;
+    },
+    input.recordUnauthorized === true,
+  );
   let raw = input.connection;
   try {
     if (!raw) {
@@ -1355,6 +1383,10 @@ async function runWith(
   } finally {
     if (raw && input.close && !input.connection) await input.close(raw);
   }
+  if (state.unauthorized?.size)
+    input.out.progress(
+      `${state.unauthorized.size} endpoint(s) not authorized for this user — recorded, not judged`,
+    );
   if (state.stop && input.interrupt.reason !== 'sigint')
     input.out.progress(
       state.stop.kind === 'logon'
@@ -1367,7 +1399,7 @@ async function runWith(
 const newCorpus = (
   input: Pick<
     ICorpusRunInput,
-    'source' | 'mode' | 'sequential' | 'only' | 'except'
+    'source' | 'mode' | 'sequential' | 'only' | 'except' | 'recordUnauthorized'
   >,
 ): ICorpus => ({
   source: input.source,
@@ -1379,6 +1411,7 @@ const newCorpus = (
   ...(input.sequential ? { sequential: true } : {}),
   ...(input.only?.length ? { only: input.only } : {}),
   ...(input.except?.length ? { except: input.except } : {}),
+  ...(input.recordUnauthorized ? { recordUnauthorized: true as const } : {}),
 });
 
 /** Marks a corpus with what ended it, and writes it. */
@@ -1497,6 +1530,11 @@ async function runOn(
   );
   if (input.source === 'clients' && remaining.length)
     state.failure ??= `${remaining.length} object(s) may remain: ${remaining.map((removal) => removal.label).join(', ')}`;
+  if (input.recordUnauthorized) {
+    corpus.unauthorized = markUnauthorized(corpus.rows);
+    for (const endpoint of corpus.unauthorized)
+      (state.unauthorized ??= new Set()).add(endpoint);
+  }
   if (input.mode === 'bogus') corpus.needs = classifyNeeds(corpus.rows);
   const files = finishCorpus(corpus, endedBy(state, input.interrupt), input);
   // A temporary object is there after a write by design; the probe name is not.
@@ -1598,6 +1636,15 @@ export async function runFull(
     ...(input.except ? { except: input.except } : {}),
   };
 
+  const unauthorized = new Set<string>();
+  /** Phase 2's rows: an authorization 403 is recorded, never judged. */
+  const noteUnauthorized = (rows: readonly ICorpusRow[]) => {
+    if (!input.recordUnauthorized) return;
+    for (const endpoint of markUnauthorized(rows)) unauthorized.add(endpoint);
+  };
+  const withoutUnauthorized = (items: readonly IEvidence[]): IEvidence[] =>
+    items.filter((item) => !unauthorized.has(item.endpoint));
+
   const body = async (connection: IAbapConnection, state: IRunState) => {
     const stopped = () =>
       Boolean(state.stop) ||
@@ -1632,6 +1679,8 @@ export async function runFull(
           state,
         );
         files.push(...result.files);
+        for (const endpoint of result.corpus.unauthorized ?? [])
+          unauthorized.add(endpoint);
         for (const row of result.corpus.rows) row.headersMode = mode;
         corpora.set(`${source} ${mode}`, result.corpus);
       }
@@ -1669,8 +1718,9 @@ export async function runFull(
             unknown: unknownWrites,
             filter,
           });
-          evidence.push(...writes.evidence);
           phase2Rows.push(...(writes.rows ?? []));
+          noteUnauthorized(writes.rows ?? []);
+          evidence.push(...withoutUnauthorized(writes.evidence));
           removals = [...removals, ...writes.removals];
           if (writes.error) state.failure ??= writes.error;
         },
@@ -1688,9 +1738,10 @@ export async function runFull(
           });
           updates = measured.updates;
           phase2Rows.push(...(measured.rows ?? []));
+          noteUnauthorized(measured.rows ?? []);
           // Each update went with a bogus Accept: evidence for its Accept.
           for (const row of measured.rows ?? [])
-            if (row.endpoint)
+            if (row.endpoint && !row.unauthorized)
               evidence.push({
                 endpoint: endpointKey(row.endpoint),
                 source: 'clients',
@@ -1711,7 +1762,9 @@ export async function runFull(
       );
   };
 
-  const report = (_state: IRunState, ended: string): string[] => {
+  const report = (state: IRunState, ended: string): string[] => {
+    for (const endpoint of unauthorized)
+      (state.unauthorized ??= new Set()).add(endpoint);
     const discoveryContentType = new Map<string, string[]>();
     for (const collection of corpora.get('discovery corpus')?.collections ?? [])
       if (collection.accept.length)
@@ -1802,6 +1855,9 @@ export async function runFull(
       endedBy: ended,
       ...(input.only?.length ? { only: input.only } : {}),
       ...(input.except?.length ? { except: input.except } : {}),
+      ...(input.recordUnauthorized
+        ? { recordUnauthorized: true as const, unauthorized: [...unauthorized] }
+        : {}),
       ...(ended !== 'complete' ? { error: ended } : {}),
     };
     fs.mkdirSync(input.outDir, { recursive: true });

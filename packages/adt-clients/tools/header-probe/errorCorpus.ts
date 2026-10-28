@@ -58,6 +58,17 @@
  * `GET /sap/bc/adt/discovery`: a 401 or 403 at either prints
  * `Oops: no authorization (<status>)` and exits 2, sending nothing more.
  *
+ * `--record-unauthorized` (no value; the full run and `--from` runs): without
+ * it an authorization problem later in the run stops it (exit 2). With it, an
+ * authorization 403 of this user (a `NoAuthorization` / `NotAuthorized` /
+ * `Unauthorized` type, or the tool's "not authorized" text rule) at an endpoint
+ * after the first discovery read is recorded and the run goes on: its row is
+ * marked `unauthorized`, read as no header verdict and never retried on an
+ * object in phase 2. Still a stop: any 401, a CSRF 403, the logon and the
+ * first discovery read. The endpoints are written into every corpus, the
+ * header corpus and their .md (`Not authorized for this user`), into
+ * `--summary`, and counted on the last console line.
+ *
  * Output (in `<out>`, below): `corpus-<source>-<headers>-<timestamp>.json` (every
  * answer, bodies whole) and `.md` (a table per endpoint group, the summary).
  * The corpus holds system answers: it stays out of the repository.
@@ -143,6 +154,7 @@ interface IArgs {
   sequential?: boolean;
   only?: string[];
   except?: string[];
+  recordUnauthorized?: boolean;
   isolate?: string[];
   out?: string;
 }
@@ -171,6 +183,8 @@ export function parseArgs(argv: readonly string[]): IArgs {
       args.only = (argv[++i] ?? '').split(',').filter(Boolean);
     } else if (arg === '--except') {
       args.except = (argv[++i] ?? '').split(',').filter(Boolean);
+    } else if (arg === '--record-unauthorized') {
+      args.recordUnauthorized = true;
     } else if (arg === '--render') {
       args.render = argv.slice(i + 1);
       break;
@@ -286,6 +300,7 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
       ...(isolate ? { isolate } : {}),
       ...(args.only ? { only: args.only } : {}),
       ...(args.except ? { except: args.except } : {}),
+      ...(args.recordUnauthorized ? { recordUnauthorized: true } : {}),
       close: (connection) => closeOwnTestConnection(connection),
       interrupt,
       outDir: OUT_DIR,
@@ -327,6 +342,7 @@ async function run(args: IArgs, OUT_DIR: string): Promise<number> {
     sequential: args.sequential === true,
     ...(args.only ? { only: args.only } : {}),
     ...(args.except ? { except: args.except } : {}),
+    ...(args.recordUnauthorized ? { recordUnauthorized: true } : {}),
     ...(isolate ? { isolate } : {}),
     ...(args.from === 'clients' && temporaryObjects()
       ? { temporaryObjects: temporaryObjects() }

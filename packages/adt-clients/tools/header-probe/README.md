@@ -23,6 +23,7 @@ package (`tools/` is outside `src/`, so nothing here reaches `dist/`, and
 npm run header:discovery                     # the full run: the system's header corpus
 npm run header:discovery -- --isolate ~/.config/mcp-abap-adt-clients/header-probe/<system>/header-corpus-<ts>.json
 npm run header:discovery -- --out <dir>        # write there instead
+npm run header:discovery -- --record-unauthorized  # an authorization 403 is recorded, the run goes on
 npm run header:discovery -- --except bopf      # the full run without the endpoints matching "bopf"
 npm run header:discovery -- --from discovery --headers corpus
 npm run header:discovery -- --from discovery --headers none
@@ -147,6 +148,23 @@ header corpus, everything batched and poisoned envelopes split:
    included — so that no lock is left held. The cleanup's own requests may still be refused:
    each such removal is `removed: unknown <status>`, listed under may remain.
    The connection's own CSRF token refresh is left as it is.
+
+   **`--record-unauthorized`** (no value) is the person's choice for a user
+   whose missing rights nobody can grant (a trial user without BOPF, say). With
+   it, a 403 that is this user's authorization refusal — the SAP exception
+   types and the "not authorized" text rule above, not a CSRF refusal — at an
+   endpoint after the first discovery read does not stop the run: the row keeps
+   its answer, is marked `unauthorized: true`, and is read as no header verdict
+   (no `needs`, no named value in `--summary`) and never as `unknown`, so phase
+   2 does not retry it on an object. **Still a stop, flag or not:** any 401, a
+   CSRF 403, the connection's logon and the first discovery read (exit 2). The
+   endpoints (method and path, once each) are written as `unauthorized` and
+   `recordUnauthorized: true` into every corpus and the header corpus file, and
+   listed under `Not authorized for this user` in their `.md`; `--summary`
+   lists there the endpoints unauthorized in every file that probed them, apart
+   from the header table; the run's last line says `N endpoint(s) not
+   authorized for this user — recorded, not judged`. Without the flag nothing
+   changes.
 2. **The endpoints** (`--from`):
    - `discovery`: every `app:collection` of the document just read — its
      href, its `app:accept` types and its template links with their `type`

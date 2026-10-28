@@ -4959,3 +4959,215 @@ describe('--except', () => {
     expect(summary.split('Excluded by --except:')).toHaveLength(2);
   });
 });
+
+describe('--record-unauthorized', () => {
+  const NO_AUTH = AUTH_EXCEPTION(
+    'ExceptionResourceNoAuthorization',
+    'No authorization for this resource',
+  );
+  const system = (denied: Answer) =>
+    fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (request.url.startsWith('/sap/bc/adt/probe/things')) return denied;
+      if (request.url.startsWith('/sap/bc/adt/probe/reads'))
+        return { status: 200, body: '<ok/>' };
+      return { status: 404 };
+    });
+  const discoveryRun = (
+    denied: Answer,
+    recordUnauthorized: boolean,
+    mode: 'corpus' | 'bogus' = 'corpus',
+  ) => {
+    const fake = system(denied);
+    const { lines, out } = output();
+    return runCorpus({
+      connection: fake.connection,
+      source: 'discovery',
+      mode,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+      ...(recordUnauthorized ? { recordUnauthorized } : {}),
+    }).then((result) => ({ ...result, lines, seen: fake.seen }));
+  };
+  const FORBIDDEN = { status: 403, body: NO_AUTH };
+
+  it('is parsed as a flag with no value', () => {
+    expect(parseArgs(['--record-unauthorized'])).toEqual({
+      recordUnauthorized: true,
+    });
+    expect(parseArgs(['--record-unauthorized', '--except', 'a'])).toEqual({
+      recordUnauthorized: true,
+      except: ['a'],
+    });
+  });
+
+  it('without it an authorization 403 stops the run, as before', async () => {
+    const { exitCode, corpus } = await discoveryRun(FORBIDDEN, false);
+    expect(exitCode).toBe(2);
+    expect(corpus.endedBy).toMatch(/^stopped: authorization \(403/);
+    expect(corpus.recordUnauthorized).toBeUndefined();
+  });
+
+  it('with it the row is recorded, marked, and the run goes on to the later rows', async () => {
+    const { exitCode, corpus, lines } = await discoveryRun(FORBIDDEN, true);
+    expect(exitCode).toBe(0);
+    expect(corpus.endedBy).toBe('complete');
+    const things = corpus.rows.filter((r) =>
+      r.endpoint?.path.endsWith('/things'),
+    );
+    expect(things.length).toBeGreaterThan(0);
+    for (const row of things) {
+      expect(row.status).toBe(403);
+      expect(row.unauthorized).toBe(true);
+    }
+    const reads = corpus.rows.find((r) => r.endpoint?.path.endsWith('/reads'));
+    expect(reads?.status).toBe(200);
+    expect(reads?.unauthorized).toBeUndefined();
+    expect(corpus.recordUnauthorized).toBe(true);
+    expect(corpus.unauthorized).toEqual(
+      expect.arrayContaining(['GET /sap/bc/adt/probe/things']),
+    );
+    expect(new Set(corpus.unauthorized).size).toBe(corpus.unauthorized?.length);
+    expect(lines[lines.length - 1]).toMatch(
+      /^\d+ endpoint\(s\) not authorized for this user — recorded, not judged$/,
+    );
+    const md = renderCorpusMarkdown(corpus);
+    expect(md).toContain('## Not authorized for this user');
+    expect(md).toContain('- GET /sap/bc/adt/probe/things');
+  });
+
+  it('a 401 still stops with it, and so does a CSRF 403', async () => {
+    const unauthorized = await discoveryRun({ status: 401 }, true);
+    expect(unauthorized.exitCode).toBe(2);
+    expect(unauthorized.corpus.endedBy).toMatch(
+      /^stopped: authorization \(401/,
+    );
+    const csrf = await discoveryRun(
+      { status: 403, body: 'CSRF token validation failed' },
+      true,
+    );
+    expect(csrf.exitCode).toBe(2);
+    expect(csrf.corpus.endedBy).toMatch(
+      /^stopped: authorization \(403, CSRF\)/,
+    );
+  });
+
+  it('the first discovery read still stops with it', async () => {
+    const fake = fakeSystem(() => FORBIDDEN);
+    const result = await runCorpus({
+      connection: fake.connection,
+      source: 'discovery',
+      mode: 'corpus',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+      recordUnauthorized: true,
+    });
+    expect(result.exitCode).toBe(2);
+  });
+
+  it('an unauthorized row is no header verdict: not in needs, not in the summary values', async () => {
+    const { corpus } = await discoveryRun(FORBIDDEN, true, 'bogus');
+    expect(
+      (corpus.needs ?? []).some((entry) => entry.endpoint.includes('/things')),
+    ).toBe(false);
+    const named = namedPerEndpoint([
+      {
+        ...corpus,
+        rows: corpus.rows.map((row) => ({
+          ...row,
+          named: { ...row.named, acceptedText: 'application/x+xml' },
+        })),
+      },
+    ]);
+    expect(named.some((entry) => entry.endpoint.includes('/things'))).toBe(
+      false,
+    );
+    expect(named.some((entry) => entry.endpoint.includes('/reads'))).toBe(true);
+  });
+
+  it('the summary lists the endpoints unauthorized in every file that probed them, apart from the table', () => {
+    const row = (path: string, unauthorized: boolean): ICorpusRow => ({
+      source: 'discovery',
+      group: 'g',
+      label: path,
+      endpoint: { method: 'GET', path },
+      requests: [],
+      onWire: [],
+      named: emptyNamed(),
+      status: unauthorized ? 403 : 200,
+      ...(unauthorized ? { unauthorized: true as const } : {}),
+    });
+    const base = {
+      source: 'discovery' as const,
+      startedAt: 'now',
+      removals: [],
+      recordUnauthorized: true as const,
+    };
+    const summary = renderNamedSummary([
+      { ...base, headers: 'corpus', rows: [row('/a', true), row('/b', true)] },
+      { ...base, headers: 'none', rows: [row('/a', true), row('/b', false)] },
+    ]);
+    const section = summary.split('## Not authorized for this user')[1] ?? '';
+    expect(section).toContain('- GET /a');
+    expect(section).not.toContain('- GET /b');
+  });
+
+  const fullRun = async (denied: boolean) => {
+    const fake = fakeSystem((request) => {
+      if (request.url === '/sap/bc/adt/discovery')
+        return { status: 200, body: DISCOVERY };
+      if (denied && request.url.startsWith('/sap/bc/adt/oo/classes'))
+        return FORBIDDEN;
+      return { status: 404 };
+    });
+    const { lines, out } = output();
+    const cycles: string[][] = [];
+    const measured: number[] = [];
+    const result = await runFull({
+      open: async () => fake.connection,
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out,
+      recordUnauthorized: true,
+      writeCycle: async ({ unknown }) => {
+        cycles.push([...unknown]);
+        return { evidence: [], removals: [] };
+      },
+      updateMeasure: async () => {
+        measured.push(1);
+        return { updates: [], removals: [] };
+      },
+    });
+    return { result, lines, cycles, measured };
+  };
+  const CREATE = 'getClass().create — POST /sap/bc/adt/oo/classes';
+
+  it('the full run records them in the header corpus and its .md, and phase 2 never tries them', async () => {
+    // Control: the same endpoint answering 404 is still unknown after phase 1.
+    const control = await fullRun(false);
+    expect(control.cycles.flat()).toContain(CREATE);
+    const { result, lines, cycles, measured } = await fullRun(true);
+    expect(result.exitCode).toBe(0);
+    const file = result.file as NonNullable<typeof result.file>;
+    expect(file.recordUnauthorized).toBe(true);
+    expect(file.unauthorized).toEqual(
+      expect.arrayContaining(['POST /sap/bc/adt/oo/classes']),
+    );
+    expect(new Set(file.unauthorized).size).toBe(file.unauthorized?.length);
+    expect(file.endedBy).toBe('complete');
+    expect(cycles.flat()).not.toContain(CREATE);
+    expect(measured).toHaveLength(1);
+    expect(file.entries.some((entry) => entry.endpoint === CREATE)).toBe(false);
+    const md = fs.readFileSync(result.files[result.files.length - 1], 'utf8');
+    expect(md).toContain('## Not authorized for this user');
+    expect(lines[lines.length - 1]).toBe(
+      `${file.unauthorized?.length} endpoint(s) not authorized for this user — recorded, not judged`,
+    );
+  });
+});

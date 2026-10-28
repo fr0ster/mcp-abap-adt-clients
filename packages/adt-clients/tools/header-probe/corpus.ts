@@ -661,6 +661,11 @@ export interface ICorpusRow {
   envelope?: number;
   /** Sent on its own: the call's wall time in ms. Batched: its envelope's ms per part. */
   ms?: number;
+  /**
+   * `--record-unauthorized`: the answer is an authorization 403 of this user.
+   * It says nothing of the headers: no `needs`, no named value, not unknown.
+   */
+  unauthorized?: true;
 }
 
 export interface ICorpus {
@@ -680,6 +685,10 @@ export interface ICorpus {
   only?: string[];
   /** `--except`: the run left out the endpoints matching one of these texts, never sent. */
   except?: string[];
+  /** `--record-unauthorized`: an authorization 403 was recorded, not a stop. */
+  recordUnauthorized?: true;
+  /** The endpoints (method + path) the user is not authorized for, recorded under the flag. */
+  unauthorized?: string[];
   /** What ended the run: `complete`, `interrupted (SIGINT)`, `stopped: authorization (…)`, `failed: …`. */
   endedBy?: string;
   /** Every envelope: parts, bytes, wall time from send to answer. */
@@ -842,6 +851,71 @@ export function authorizationProblem(
   return { status: 403, kind: type || 'authorization' };
 }
 
+/**
+ * Whether a recorded row is the user's authorization 403 (not a CSRF one: that
+ * always stops the run, so it is never recorded as a row of its own).
+ */
+export function isUnauthorizedAnswer(
+  row: Pick<ICorpusRow, 'status' | 'body'>,
+): boolean {
+  if (row.status !== 403) return false;
+  const problem = authorizationProblem({
+    status: 403,
+    data: row.body ?? '',
+    headers: {},
+  });
+  return problem !== undefined && problem.kind !== 'CSRF';
+}
+
+/**
+ * Marks every row that is the user's authorization 403 and returns their
+ * endpoints (method + path), each once.
+ */
+export function markUnauthorized(rows: readonly ICorpusRow[]): string[] {
+  const endpoints = new Set<string>();
+  for (const row of rows) {
+    if (!row.endpoint || !isUnauthorizedAnswer(row)) continue;
+    row.unauthorized = true;
+    endpoints.add(endpointKey(row.endpoint));
+  }
+  return [...endpoints];
+}
+
+/** The heading the endpoints of this user's missing authorizations are listed under. */
+export const UNAUTHORIZED_HEADING = 'Not authorized for this user';
+
+export function unauthorizedLines(endpoints: readonly string[]): string[] {
+  return [
+    `## ${UNAUTHORIZED_HEADING}`,
+    '',
+    ...(endpoints.length
+      ? [
+          'Recorded with `--record-unauthorized`, not judged: no header verdict, never sent again on an object.',
+          '',
+          ...endpoints.map((endpoint) => `- ${cell(endpoint)}`),
+        ]
+      : ['None.']),
+    '',
+  ];
+}
+
+/**
+ * The endpoints unauthorized in every corpus that probed them: a row of the
+ * endpoint that is not an authorization 403 (another run got through) keeps it out.
+ */
+export function unauthorizedInEvery(
+  corpora: readonly Pick<ICorpus, 'rows'>[],
+): string[] {
+  const state = new Map<string, boolean>();
+  for (const corpus of corpora)
+    for (const row of corpus.rows) {
+      if (!row.endpoint) continue;
+      const key = endpointKey(row.endpoint);
+      state.set(key, (state.get(key) ?? true) && row.unauthorized === true);
+    }
+  return [...state].filter(([, all]) => all).map(([key]) => key);
+}
+
 // --- the summary -------------------------------------------------------------
 
 export const statusOf = (row: ICorpusRow): string =>
@@ -974,7 +1048,7 @@ export function namedPerEndpoint(
   const by = new Map<string, IEndpointNamed>();
   for (const corpus of corpora)
     for (const row of corpus.rows) {
-      if (!row.endpoint) continue;
+      if (!row.endpoint || row.unauthorized) continue;
       const named = typesNamed(row);
       const texts = [row.named.acceptedText, row.named.supportedText].filter(
         (text): text is string => Boolean(text),
@@ -1395,9 +1469,12 @@ const verdictText = (name: string, verdict: IHeaderVerdict): string =>
  * shows the Accept check too.
  */
 export function classifyNeeds(
-  rows: readonly ICorpusRow[],
-  evidence: readonly ICorpusRow[] = [],
+  allRows: readonly ICorpusRow[],
+  allEvidence: readonly ICorpusRow[] = [],
 ): IEndpointNeeds[] {
+  // An authorization 403 of this user is no header verdict (`--record-unauthorized`).
+  const rows = allRows.filter((row) => !row.unauthorized);
+  const evidence = allEvidence.filter((row) => !row.unauthorized);
   const by = new Map<
     string,
     { accept?: ICorpusRow; contentType?: ICorpusRow }
@@ -1630,6 +1707,8 @@ export function renderCorpusMarkdown(corpus: ICorpus): string {
   lines.push(...filterLines(corpus));
   if (corpus.error)
     lines.push(`**The run stopped:** ${cell(corpus.error)}`, '');
+  if (corpus.recordUnauthorized)
+    lines.push(...unauthorizedLines(corpus.unauthorized ?? []));
   const groups = [...new Set(corpus.rows.map((row) => row.group))];
   for (const group of groups) {
     lines.push(
@@ -1949,6 +2028,9 @@ export function renderNamedSummary(corpora: readonly ICorpus[]): string {
     '# Error corpus: what the system named, per endpoint',
     '',
     ...filterLines(unionOfFilters(corpora)),
+    ...(corpora.some((corpus) => corpus.recordUnauthorized)
+      ? unauthorizedLines(unauthorizedInEvery(corpora))
+      : []),
     'Runs:',
     '',
     ...corpora.map(
@@ -2418,6 +2500,10 @@ export interface IHeaderCorpusFile {
   only?: string[];
   /** `--except` of the run: these endpoints were never sent. */
   except?: string[];
+  /** `--record-unauthorized`: an authorization 403 was recorded, not a stop. */
+  recordUnauthorized?: true;
+  /** The endpoints (method + path) the user is not authorized for. */
+  unauthorized?: string[];
   /** Phase 2's update measurement: per object type, the update's answer to a bogus Accept and whether it took effect. */
   updates?: {
     type: string;
@@ -2454,6 +2540,8 @@ export function renderHeaderCorpus(file: IHeaderCorpusFile): string {
   ];
   lines.push(...filterLines(file));
   if (file.error) lines.push(`**The run stopped:** ${cell(file.error)}`, '');
+  if (file.recordUnauthorized)
+    lines.push(...unauthorizedLines(file.unauthorized ?? []));
   lines.push('## Time', '', '| phase | s |', '|---|---|');
   for (const phase of file.phases)
     lines.push(`| ${cell(phase.name)} | ${(phase.ms / 1000).toFixed(1)} |`);
