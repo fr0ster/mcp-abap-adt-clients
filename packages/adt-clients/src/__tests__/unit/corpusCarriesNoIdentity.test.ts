@@ -43,7 +43,8 @@ describe('the recorded corpus', () => {
   it.each([
     [
       'a system id other than the placeholder or SAP',
-      /masterSystem="(?!SYS"|SAP")[^"]+"/,
+      // Also inside a recorded request body, where the quotes are escaped.
+      /masterSystem=\\?"(?!SYS\\?"|SAP\\?")[^"\\]+\\?"/,
     ],
     ['a system id of the recorded systems', /\b(?:T[R]L|E1[9]|E7[7])\b/],
     ['a transport request number', /\b[A-Z0-9]{3}K9\d{5}\b/],
