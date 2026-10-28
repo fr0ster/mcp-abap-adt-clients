@@ -8,6 +8,9 @@
  */
 
 import { runAndExit } from '../../../adt-clients/tools/header-probe/errorCorpus';
+// Registers the legacy sections and overlay keys with the root's loader, so
+// the overlay `test:live` reads (`MCP_TEST_OVERLAY`) serves this run as well.
+import '../../src/__tests__/helpers/legacyTestConfig';
 import { registerLegacyClients } from './legacyClients';
 
 registerLegacyClients();

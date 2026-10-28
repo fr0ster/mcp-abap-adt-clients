@@ -17,7 +17,12 @@ import type {
   IEvidence,
   IHeaderVerdict,
 } from './corpus';
-import { byContrast, emptyNamed, judge, realMediaTypes } from './corpus';
+import {
+  byContrast,
+  emptyNamed,
+  judge,
+  realMediaTypes,
+} from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
 import { isSetHandler } from './members';
@@ -239,6 +244,9 @@ export async function runWriteCycle(
   return {
     evidence: evidenceOfRows(probe.rows, wanted),
     rows: rowsOfCycle(probe.rows),
+    skipped: probe.rows
+      .filter((row) => row.skipped)
+      .map((row) => `${row.objectType}.${row.member}: ${row.skipped}`),
     removals,
     ...(error ? { error } : {}),
   };
@@ -344,6 +352,8 @@ export async function measureUpdates(
           applied: 'unknown',
         };
         updates.push(row);
+        // A request the gate refuses is never sent; the row says which.
+        probe.refusal = undefined;
         const ctx: ISpecContext = { ...context };
         if (spec.needs) {
           const parentSpec = OBJECT_SPECS.find(
@@ -359,7 +369,9 @@ export async function measureUpdates(
             spec.needs === 'ddl' ? parentSpec.source?.(parent, ctx) : undefined,
           );
           if (!made) {
-            row.note = `its ${spec.needs} could not be created and activated`;
+            row.note = probe.skipNote(
+              `its ${spec.needs} could not be created and activated`,
+            );
             continue;
           }
           ctx.parent = parent;
@@ -368,7 +380,7 @@ export async function measureUpdates(
         const config = spec.config(name, ctx);
         // A name that is there is not ours: nothing is created or deleted.
         if (!(await probe.isFree(spec, name, ctx))) {
-          row.note = `the name ${name} is there already, so it is not ours`;
+          row.note = probe.skipNote(`the name ${name} is there already, so it is not ours`);
           continue;
         }
         const pair = (m: string) => knownPair(spec.handler, m) as IAdtHeaders;
@@ -387,7 +399,7 @@ export async function measureUpdates(
             ...(status !== undefined ? { status } : {}),
           }))
         ) {
-          row.note = `the create answered ${status ?? created.failure}`;
+          row.note = probe.skipNote(`the create answered ${status ?? created.failure}`);
           continue;
         }
         const read = () =>
@@ -401,7 +413,7 @@ export async function measureUpdates(
         const before = await read();
         const content = bodyOf(before);
         if (!okOf(before) || content === undefined) {
-          row.note = `the read before answered ${statusOf(before) ?? before.failure}`;
+          row.note = probe.skipNote(`the read before answered ${statusOf(before) ?? before.failure}`);
           continue;
         }
         const changed =
@@ -417,9 +429,10 @@ export async function measureUpdates(
         const lockHandle =
           result?.ok && result.getResult ? result.getResult().value : undefined;
         if (typeof lockHandle !== 'string' || !lockHandle) {
-          row.note = `the lock answered ${statusOf(locked) ?? locked.failure}`;
+          row.note = probe.skipNote(`the lock answered ${statusOf(locked) ?? locked.failure}`);
           continue;
         }
+        let refusedUpdate = false;
         await withLock(
           lockHandle,
           // Released after an interrupt too: unlocking is cleanup.
@@ -446,6 +459,11 @@ export async function measureUpdates(
                 }),
               ),
             );
+            // The gate refused the update: it was never sent, so there is no answer to measure.
+            if (updated.failure?.startsWith('skipped: ')) {
+              refusedUpdate = true;
+              return;
+            }
             const status = statusOf(updated);
             if (status !== undefined) row.status = status;
             const request = updated.requests[updated.requests.length - 1];
@@ -477,10 +495,14 @@ export async function measureUpdates(
             if (sapType) row.sapType = sapType;
           },
         );
+        if (refusedUpdate) {
+          row.note = probe.skipNote('the update was not sent');
+          continue;
+        }
         const after = await read();
         const later = bodyOf(after);
         if (!okOf(after) || later === undefined) {
-          row.note = `the read after answered ${statusOf(after) ?? after.failure}`;
+          row.note = probe.skipNote(`the read after answered ${statusOf(after) ?? after.failure}`);
           continue;
         }
         row.applied = hashOf(later) !== hashOf(content);

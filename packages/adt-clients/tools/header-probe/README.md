@@ -23,6 +23,8 @@ package (`tools/` is outside `src/`, so nothing here reaches `dist/`, and
 npm run header:discovery                     # the full run: the system's header corpus
 npm run header:discovery -- --isolate ~/.config/mcp-abap-adt-clients/header-probe/<system>/header-corpus-<ts>.json
 npm run header:discovery -- --out <dir>        # write there instead
+npm run header:discovery -- --record-unauthorized  # an authorization 403 is recorded, the run goes on
+npm run header:discovery -- --except bopf      # the full run without the endpoints matching "bopf"
 npm run header:discovery -- --from discovery --headers corpus
 npm run header:discovery -- --from discovery --headers none
 npm run header:discovery -- --from discovery --headers bogus
@@ -40,7 +42,23 @@ header corpus file stands for the corpora it lists); every other call is
 batched and split as usual. Without it the run is unchanged.
 Both `--from` and `--headers` are required. `--only <text>[,<text>]` keeps
 the endpoints whose `handler.member` (clients) or href (discovery) contains one
-of the texts. `--render` recomputes a saved
+of the texts; the full run honours it too. `--except <text>[,<text>]` is its
+counterpart: it leaves out the endpoints matched the same way, for an
+authorization the person cannot fix (a trial user who is refused at one
+endpoint stops the full run there by design). An excluded endpoint is never
+sent, never counted `unknown` and never tried on an object in phase 2 — phase 2
+sends nothing to it in any request, the setup (creates, reads, locks, a parent
+object) included: a measurement that needs an excluded member is skipped and
+listed under `Phase 2 skipped` with the reason (`excluded by --except: <text>`).
+The gate enforces it (see "One gate, one exit"), so a request inside a
+member's own chain is refused as well. The one exception is the cleanup of the probe's own objects: removing or
+unlocking an object phase 2 created always runs, even if its delete matches
+`--except`; with
+`--only` an endpoint is probed when it passes `--only` and matches no
+`--except`. Nothing is guessed: the person names what is excluded, and the
+texts are written into every corpus file and the header corpus file (their
+`.md` says `Excluded by --except: …`, and `Only: …` for `--only`); `--summary`
+lists the union of the exclusions of the files it read. `--render` recomputes a saved
 corpus's `needs` and writes its `.md` again, sending nothing. `--sequential` sends every
 request on its own, without envelopes, to compare the time per request with a
 batched run. `--summary` reads corpus files and writes
@@ -137,6 +155,26 @@ header corpus, everything batched and poisoned envelopes split:
    included — so that no lock is left held. The cleanup's own requests may still be refused:
    each such removal is `removed: unknown <status>`, listed under may remain.
    The connection's own CSRF token refresh is left as it is.
+
+   **`--record-unauthorized`** (no value) is the person's choice for a user
+   whose missing rights nobody can grant (a trial user without BOPF, say). With
+   it, a 403 that is this user's authorization refusal — the SAP exception
+   types and the "not authorized" text rule above, not a CSRF refusal — at an
+   endpoint after the first discovery read does not stop the run: the row keeps
+   its answer, is marked `unauthorized: true`, and is read as no header verdict
+   (no `needs`, no named value in `--summary`) and never as `unknown`, so phase
+   2 does not retry it on an object: phase 2 sends nothing to such an
+   endpoint, the setup of a measurement included (it is skipped, with `not
+   authorized for this user: <endpoint>`); only the cleanup of the probe's own
+   objects is exempt. **Still a stop, flag or not:** any 401, a
+   CSRF 403, the connection's logon and the first discovery read (exit 2). The
+   endpoints (method and path, once each) are written as `unauthorized` and
+   `recordUnauthorized: true` into every corpus and the header corpus file, and
+   listed under `Not authorized for this user` in their `.md`; `--summary`
+   lists there the endpoints unauthorized in every file that probed them, apart
+   from the header table; the run's last line says `N endpoint(s) not
+   authorized for this user — recorded, not judged`. Without the flag nothing
+   changes.
 2. **The endpoints** (`--from`):
    - `discovery`: every `app:collection` of the document just read — its
      href, its `app:accept` types and its template links with their `type`
@@ -368,7 +406,23 @@ the cleanup and the unlocks. Before sending, the gate asks the interrupt
 (Ctrl-C, or an authorization stop); it watches every answer for an
 authorization problem; and it records the request into the call that
 issued it. Only the cleanup and the unlocks bypass the interrupt check,
-through the gate's cleanup sibling (`cleanupOf`). `traced`, `clientsOn`,
+through the gate's cleanup sibling (`cleanupOf`).
+
+In phase 2 the gate also holds the refusal built from `--only`, `--except` and
+the endpoints phase 1 recorded as unauthorized: a request to such an endpoint
+(its method and path template, `{name}` for the object's name) is not sent —
+a member's own request, a request of its internal chain, a setup request (a
+parent object, a lock, an activation), an envelope part alike. The caller gets
+a refusal of the tool's own (`RequestRefused`) carrying `excluded by --except:
+<text>`, `not selected by --only` or `not authorized for this user: <METHOD
+path>`, and the measurement that needed it is recorded skipped with that
+reason (`Phase 2 skipped`). A `--except` text names a member of the clients
+(`getX().read`, resolved to the endpoints the clients' recording lists for it,
+so an endpoint several members share is refused for all of them) or a part of
+a path (`/bopf/`). The cleanup sibling bypasses the refusal, as it bypasses the
+interrupt: removing and unlocking what phase 2 itself made always runs.
+
+`traced`, `clientsOn`,
 `runCalls` and the probe's clients refuse a connection that does not send
 through a gate, and a unit test scans `tools/header-probe/` for a request
 sent any other way.
@@ -425,6 +479,24 @@ only, and is never committed; removing a worktree keeps it. `--out <dir>`
 replaces the whole path. The run prints the absolute folder at the end.
 `.header-probe/` in the repository is no longer written (its `.gitignore`
 line stays for old checkouts). The files hold the system's answers.
+
+**What is committed: one summary per release.** The repository keeps, per
+measured release, the `--summary` of one full run, under
+`corpus/adt/headers/<release>/header-summary.md` (`s4-2025`, `abap-cloud`,
+`basis-740`, the names of `corpus/adt/discovery/`). Each is rendered over the
+six corpora of that run alone — one system per run, so one system per
+summary — and scrubbed before it is committed: hosts become
+`abap.example.com` / `abap-cloud.example`, users `SAPUSER01`, request numbers,
+IP addresses and UUIDs placeholders. `corpusCarriesNoIdentity.test.ts` reads
+every file under `corpus/adt/`, these too. The runs of 2026-10-28:
+
+| release | run | flags |
+|---|---|---|
+| `s4-2025` | `npm run header:discovery` (this package) | none |
+| `abap-cloud` | `npm run header:discovery` (this package) | `--record-unauthorized`: the trial user lacks rights no one can grant it; the endpoints refused are listed apart |
+| `basis-740` | `npm run header:discovery` in `packages/adt-clients-legacy`, over RFC, with the live-test overlay | `--record-unauthorized` |
+
+The corpora themselves stay out of the repository: they hold whole answers.
 
 Two files per run:
 
