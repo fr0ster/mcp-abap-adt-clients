@@ -39,6 +39,18 @@ describe('formatCorpusXml', () => {
     expect(formatCorpusXml(input)).toContain(kept);
   });
 
+  it('reads a > inside a quoted attribute as part of the tag', () => {
+    expect(formatCorpusXml('<a><b t=">"/><c/></a>')).toBe(
+      '<a>\n  <b t=">"/>\n  <c/>\n</a>\n',
+    );
+  });
+
+  it('reads a processing instruction to its ?>', () => {
+    expect(formatCorpusXml('<?pi x > <b/> ?><a/>')).toBe(
+      '<?pi x > <b/> ?>\n<a/>\n',
+    );
+  });
+
   it('changes nothing in a formatted body', () => {
     const once = formatCorpusXml('<a><b>t</b><c><d/></c></a>');
     expect(formatCorpusXml(once)).toBe(once);

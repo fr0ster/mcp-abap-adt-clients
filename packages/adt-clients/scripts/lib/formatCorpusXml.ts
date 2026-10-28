@@ -13,7 +13,23 @@
 
 type Token = { kind: 'tag' | 'text'; value: string };
 
-/** Markup and text, in order: a comment, a CDATA section, a declaration and a tag are one token each. */
+/** Just past the `>` that closes the tag at `open`; a `>` inside a quoted attribute value is not it. */
+function tagEnd(text: string, open: number): number {
+  let quote = '';
+  for (let at = open + 1; at < text.length; at += 1) {
+    const char = text[at];
+    if (quote) {
+      if (char === quote) quote = '';
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === '>') {
+      return at + 1;
+    }
+  }
+  return 0;
+}
+
+/** Markup and text, in order: a comment, a CDATA section, a processing instruction and a tag are one token each. */
 function tokens(text: string): Token[] {
   const out: Token[] = [];
   let at = 0;
@@ -28,7 +44,9 @@ function tokens(text: string): Token[] {
       ? text.indexOf('-->', open) + 3
       : text.startsWith('<![CDATA[', open)
         ? text.indexOf(']]>', open) + 3
-        : text.indexOf('>', open) + 1;
+        : text.startsWith('<?', open)
+          ? text.indexOf('?>', open) + 2
+          : tagEnd(text, open);
     if (end <= open) {
       out.push({ kind: 'text', value: text.slice(open) });
       break;
