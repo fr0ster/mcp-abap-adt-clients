@@ -179,6 +179,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
         const sourceCode = testCase?.params?.source_code || config.source || '';
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: sourceCode,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },

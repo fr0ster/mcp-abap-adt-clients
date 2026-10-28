@@ -299,6 +299,7 @@ describe('View (using AdtClient)', () => {
           testCase?.params?.updated_ddl_source || ddlSource;
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: updatedDdlSource,
           updateConfig: {
             ddlName: config.ddlName,

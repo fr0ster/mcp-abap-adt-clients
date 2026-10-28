@@ -217,6 +217,7 @@ describe('FunctionGroup (using AdtClient)', () => {
         const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           updateTakesDocument: (current) =>
             patchXmlAttribute(
               current,

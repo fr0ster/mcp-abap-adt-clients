@@ -235,6 +235,7 @@ describe('Class (using AdtClient)', () => {
           `CLASS ${config.className} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: sourceCode,
           updateConfig: {
             className: config.className,

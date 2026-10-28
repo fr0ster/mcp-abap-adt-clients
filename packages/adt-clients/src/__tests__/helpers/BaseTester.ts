@@ -26,6 +26,7 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
+import { randomBytes } from 'node:crypto';
 import {
   analyseActivation,
   analyseDeletion,
@@ -60,6 +61,7 @@ import {
   lockReleaseCheckEnabled,
   noteLockReleaseCheckOff,
 } from './lockReleased';
+import { readRootDescription, replaceRootDescription } from './rootDescription';
 import {
   createTestAdtClient,
   recycleTestSession,
@@ -133,6 +135,17 @@ export interface IFlowTestOptions {
    * of such knowledge.
    */
   afterCreate?: () => Promise<void>;
+  /**
+   * Prove `updateMetadata` live: after the flow's update and activation, read
+   * the object document, change only the root's `adtcore:description` to
+   * `MCP metadata <8 hex>`, write it under a lock, activate, and read it back.
+   *
+   * Runs only for an object that offers `updateMetadata`. A suite for a type
+   * the system does not offer (the program and the include on ABAP cloud)
+   * passes `false` there: the member's presence cannot say that, because the
+   * handler is the same on every system.
+   */
+  metadataUpdate?: boolean;
 }
 
 export interface IReadTestOptions {
@@ -524,14 +537,37 @@ export class BaseTester<TConfig, TState = unknown> {
     );
   }
 
+  /** The metadata write, named: the flow's `metadataUpdate` step goes through it. */
+  private writeMetadata(
+    config: Partial<TConfig>,
+    options?: Omit<IAdtOperationOptions, 'analyse'>,
+  ): Promise<IAdtResponse<unknown>> {
+    if (!this.adtObject.updateMetadata) {
+      throw new Error(
+        `${this.loggerPrefix} offers no updateMetadata() — the flow asked for ` +
+          'a metadata update and this type has none.',
+      );
+    }
+    return this.adtObject.updateMetadata(config, {
+      analyse: analyseException,
+      ...options,
+      headers: integrationHeadersOf(this.adtObject, 'updateMetadata'),
+    });
+  }
+
   private async updateUnderLock(
     config: Partial<TConfig>,
     options: IAdtOperationOptions,
+    /** Which write: the flow's own choice, or the metadata one, explicitly. */
+    write: (
+      config: Partial<TConfig>,
+      options: IAdtOperationOptions,
+    ) => Promise<IAdtResponse<unknown>> = (c, o) => this.writeWhatItHas(c, o),
   ): Promise<unknown> {
     if (!(this.adtObject.lock && this.adtObject.unlock)) {
       // No lock resource for this type. The write goes out without a handle,
       // and whether that is allowed is ADT's answer to give.
-      return await this.writeWhatItHas(config, options);
+      return await write(config, options);
     }
 
     const handle = expectResult(
@@ -545,7 +581,7 @@ export class BaseTester<TConfig, TState = unknown> {
     let writeThrew = false;
     let unlockRefusal = '';
     try {
-      written = await this.writeWhatItHas(config, {
+      written = await write(config, {
         ...options,
         lockHandle: handle,
       });
@@ -1316,6 +1352,49 @@ export class BaseTester<TConfig, TState = unknown> {
           config as Partial<TConfig>,
           options.readMetadataOptions,
         );
+      }
+
+      if (options?.metadataUpdate && this.adtObject.updateMetadata) {
+        currentStep = 'metadata update';
+        const description = `MCP metadata ${randomBytes(4).toString('hex')}`;
+        const current = await readMetadata(
+          'read metadata (before metadata update)',
+        );
+        const patched = replaceRootDescription(
+          current ?? '',
+          description,
+          this.loggerPrefix,
+        );
+        const target = {
+          ...config,
+          ...options.updateConfig,
+        } as Partial<TConfig>;
+        logTestStep(
+          `metadata update: description "${description}"`,
+          this.logger,
+        );
+        expectResult(
+          (await this.updateUnderLock(
+            target,
+            { source: patched, timeout: options.timeout },
+            (c, o) => this.writeMetadata(c, o),
+          )) as IAdtResponse<unknown>,
+          'updateMetadata',
+        );
+        if (this.adtObject.activate) {
+          logTestStep('activate (after metadata update)', this.logger);
+          expectResult(
+            await this.adtObject.activate(config as Partial<TConfig>, {
+              headers: integrationHeadersOf(this.adtObject, 'activate'),
+              analyse: judged(analyseActivation),
+            }),
+            'activate after metadata update',
+          );
+        }
+        const after = await readMetadata(
+          'read metadata (after metadata update)',
+        );
+        expect(readRootDescription(after ?? '')).toBe(description);
       }
 
       // 5. Cleanup (if enabled)

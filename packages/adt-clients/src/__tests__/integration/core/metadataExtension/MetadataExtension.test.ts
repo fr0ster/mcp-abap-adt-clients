@@ -172,6 +172,7 @@ extend view ${targetEntity} with "${extName}"
         const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: config.source,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },

@@ -204,6 +204,8 @@ describe('Include (PROG/I, using AdtClient)', () => {
         const updateSourceCode = testCase?.params?.update_source_code || source;
 
         await tester.flowTestAuto({
+          // The include is not offered on ABAP cloud (the include table has no cloud row).
+          metadataUpdate: !isCloudSystem,
           source,
           updateConfig: {
             includeName: config.includeName,

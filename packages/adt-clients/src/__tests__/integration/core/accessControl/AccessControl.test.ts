@@ -165,6 +165,7 @@ describe('AccessControl (using AdtClient)', () => {
           `@EndUserText.label: '${config.description || config.accessControlName}'\n@MappingRole: true\ndefine role ${config.accessControlName} {\n  grant select on ${config.accessControlName}\n  where ( ) = aspect pfcg_auth( , , );\n}`;
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: sourceCode,
           updateConfig: {
             accessControlName: config.accessControlName,

@@ -159,6 +159,7 @@ describe('Table (using AdtClient)', () => {
           testCase?.params?.updated_ddl_code || config.source || '';
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: updatedDdlCode,
           updateConfig: {
             tableName: config.tableName,
