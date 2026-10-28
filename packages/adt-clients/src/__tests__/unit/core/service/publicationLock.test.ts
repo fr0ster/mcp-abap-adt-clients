@@ -14,7 +14,7 @@ import { AdtClient } from '../../../../clients/AdtClient';
 const HELD = fs.readFileSync(
   path.resolve(
     __dirname,
-    '../../../../../corpus/adt/refusal-lock-held-by-other--01-lock.body.xml',
+    '../../../../../corpus/adt/answers/refusal-lock-held-by-other--01-lock.body.xml',
   ),
   'utf8',
 );

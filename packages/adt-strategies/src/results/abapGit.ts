@@ -21,7 +21,7 @@ import { rawOf } from '../result';
  *
  * Element names and atom-link types are as the live system answered them when
  * the client was written (its "Phase Z" probe); no recorded answer for these
- * endpoints is in `corpus/adt` yet.
+ * endpoints is in `corpus/adt/answers` yet.
  */
 
 const parser = new XMLParser({

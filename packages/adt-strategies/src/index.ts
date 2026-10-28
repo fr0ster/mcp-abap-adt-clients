@@ -19,7 +19,7 @@
  * await client.getClass().activate({ className: 'ZCL_X' }, { analyse: analyseActivation });
  * ```
  *
- * Every reading is tested against the recorded answers in `corpus/adt/` at the
+ * Every reading is tested against the recorded answers in `corpus/adt/` (`answers/`, `debugger/`) at the
  * root of this repository — against the refusal it came from, and against the
  * success it has to be told apart from.
  */

@@ -21,7 +21,7 @@ under `/sap/bc/adt/debugger`.
 Measured on S/4HANA 2023 on premise (SAP_BASIS 758), 2026-10-08, as raw HTTP:
 one stateful session for the debugger, a second session running a throwaway
 `if_oo_adt_classrun` class over `POST /sap/bc/adt/oo/classrun/<class>`. The
-exchanges are in `corpus/adt/`:
+exchanges are in `corpus/adt/debugger/`:
 
 - `debugger-conversation--*`: everything, including the refusals.
 - `debugger-run-to-line--*`: a run to a line and a continue to the end.
@@ -260,7 +260,7 @@ connection's business, not this package's, and it handles it.
 - **On 758** the debuggee ran on to the end in the same moment. The triggering
   request returned its output while that `400` was in flight, and the next
   request answered `debuggeeEnded`
-  (`corpus/adt/debugger-conversation--24-stepruntoline-no-uri` and the steps
+  (`corpus/adt/debugger/debugger-conversation--24-stepruntoline-no-uri` and the steps
   after it).
 - **On 816 and on the cloud** (2026-10-10) the debuggee stayed where it was:
   10 s later the stack still stood on the line, and the run returned only after

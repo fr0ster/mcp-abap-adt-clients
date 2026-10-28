@@ -8,7 +8,7 @@ import {
 /**
  * The abapGit readings, moved from adt-clients' parser.
  *
- * No answer for these endpoints is recorded in `corpus/adt` yet, so the
+ * No answer for these endpoints is recorded in `corpus/adt/answers` yet, so the
  * documents below are built from the element names and link types the client's
  * parser was written against (its live probe). They hold the shape; a capture
  * would hold the claim.

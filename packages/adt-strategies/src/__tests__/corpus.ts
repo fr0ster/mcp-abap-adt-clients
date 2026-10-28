@@ -10,6 +10,18 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
  */
 const CORPUS = join(__dirname, '../../../adt-clients/corpus/adt');
 
+/** The folders a case may be recorded in: the answers and the debugger's. */
+const FOLDERS = ['answers', 'debugger'].map((folder) => join(CORPUS, folder));
+
+/** The folder that holds a case's steps, and its files. */
+function caseFolder(caseName: string): { dir: string; files: string[] } {
+  for (const dir of FOLDERS) {
+    const files = readdirSync(dir).filter((f) => f.startsWith(`${caseName}--`));
+    if (files.length > 0) return { dir, files };
+  }
+  return { dir: CORPUS, files: [] };
+}
+
 interface ISidecar {
   case: string;
   stepTag: string;
@@ -22,9 +34,8 @@ interface ISidecar {
 
 /** Every step of one recorded case, in order. */
 export function stepsOf(caseName: string): IAdtWireResponse[] {
-  const sidecars = readdirSync(CORPUS)
-    .filter((f) => f.startsWith(`${caseName}--`) && f.endsWith('.json'))
-    .sort();
+  const { dir, files } = caseFolder(caseName);
+  const sidecars = files.filter((f) => f.endsWith('.json')).sort();
 
   if (sidecars.length === 0) {
     throw new Error(
@@ -33,11 +44,9 @@ export function stepsOf(caseName: string): IAdtWireResponse[] {
   }
 
   return sidecars.map((file) => {
-    const meta = JSON.parse(
-      readFileSync(join(CORPUS, file), 'utf-8'),
-    ) as ISidecar;
+    const meta = JSON.parse(readFileSync(join(dir, file), 'utf-8')) as ISidecar;
     const body = meta.response.bodyFile
-      ? readFileSync(join(CORPUS, meta.response.bodyFile), 'utf-8')
+      ? readFileSync(join(dir, meta.response.bodyFile), 'utf-8')
       : '';
     return {
       data: body,
@@ -53,17 +62,14 @@ export const answerFor = (caseName: string): IAdtWireResponse =>
 
 /** One step of a recorded case, by the tag it was recorded under. */
 export function stepTagged(caseName: string, tag: string): IAdtWireResponse {
-  const file = readdirSync(CORPUS).find(
-    (f) => f.startsWith(`${caseName}--`) && f.endsWith(`-${tag}.json`),
-  );
+  const { dir, files } = caseFolder(caseName);
+  const file = files.find((f) => f.endsWith(`-${tag}.json`));
   if (!file) {
     throw new Error(`no step "${tag}" in the recorded case "${caseName}"`);
   }
-  const meta = JSON.parse(
-    readFileSync(join(CORPUS, file), 'utf-8'),
-  ) as ISidecar;
+  const meta = JSON.parse(readFileSync(join(dir, file), 'utf-8')) as ISidecar;
   const body = meta.response.bodyFile
-    ? readFileSync(join(CORPUS, meta.response.bodyFile), 'utf-8')
+    ? readFileSync(join(dir, meta.response.bodyFile), 'utf-8')
     : '';
   return {
     data: body,

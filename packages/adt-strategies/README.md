@@ -67,7 +67,7 @@ if (!answer.ok) {
 ## Why it cannot be one rule
 
 ADT does not have a single way of saying no. From the recordings in
-[`corpus/adt/`](../adt-clients/corpus) in adt-clients' directory of this repository:
+[`corpus/adt/`](../adt-clients/corpus/adt) (`answers/` and `debugger/`) in adt-clients' directory of this repository:
 
 | the "no" | arrives as | shape |
 |---|---|---|

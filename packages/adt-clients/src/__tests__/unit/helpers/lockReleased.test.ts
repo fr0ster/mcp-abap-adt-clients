@@ -6,7 +6,7 @@
  * again, and the second session is closed whatever happened — a trial ABAP Cloud account grants
  * two, and a check that leaked its session would take the run's last one.
  *
- * The refusal is the recorded one (`corpus/adt/refusal-lock-held-by-other`),
+ * The refusal is the recorded one (`corpus/adt/answers/refusal-lock-held-by-other`),
  * answered through a real `AdtClass` on a fake connection, so the text asserted
  * is what `analyseException` reads out of SAP's document.
  */
@@ -28,7 +28,7 @@ import {
 } from '../../helpers/lockReleased';
 import { sessionToJoin } from '../../helpers/sessionConfig';
 
-const CORPUS = path.resolve(__dirname, '../../../../corpus/adt');
+const CORPUS = path.resolve(__dirname, '../../../../corpus/adt/answers');
 const HELD_BODY = fs.readFileSync(
   path.join(CORPUS, 'refusal-lock-held-by-other--01-lock.body.xml'),
   'utf8',
