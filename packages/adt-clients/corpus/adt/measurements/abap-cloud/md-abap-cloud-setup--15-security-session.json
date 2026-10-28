@@ -1,0 +1,27 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/core/http/sessions",
+  "params": {
+    "_": "1793141754077"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.core.http.session.v3+xml, application/vnd.sap.adt.core.http.session.v2+xml, application/vnd.sap.adt.core.http.session.v1+xml",
+    "sap-adt-purpose": "preflight_logon",
+    "x-sap-security-session": "create"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "799",
+      "content-type": "application/vnd.sap.adt.core.http.session.v3+xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "53538.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-setup--15-security-session.body.xml"
+  }
+}

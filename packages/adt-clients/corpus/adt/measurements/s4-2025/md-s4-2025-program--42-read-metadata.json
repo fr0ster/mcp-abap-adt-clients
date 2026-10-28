@@ -1,0 +1,29 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/programs/programs/zmcp_md_prog",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.programs.programs.v2+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-store",
+      "content-encoding": "gzip",
+      "content-length": "849",
+      "content-type": "application/vnd.sap.adt.programs.programs.v2+xml; charset=utf-8",
+      "etag": "202610272100550018",
+      "expires": "-1",
+      "last-modified": "Tue, 27 Oct 2026 21:00:55 GMT",
+      "pragma": "no-cache",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "39733.000000"
+    },
+    "bodyFile": "md-s4-2025-program--42-read-metadata.body.xml"
+  }
+}

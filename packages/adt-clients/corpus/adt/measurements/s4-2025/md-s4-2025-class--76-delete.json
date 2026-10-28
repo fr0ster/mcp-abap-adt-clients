@@ -1,0 +1,23 @@
+{
+  "method": "DELETE",
+  "url": "/sap/bc/adt/oo/classes/zmcp_md_clas",
+  "params": {
+    "lockHandle": "<lockHandle>",
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "2236383.000000"
+    },
+    "bodyFile": "md-s4-2025-class--76-delete.body.txt"
+  }
+}

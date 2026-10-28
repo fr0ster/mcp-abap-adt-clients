@@ -1,0 +1,24 @@
+{
+  "method": "DELETE",
+  "url": "/sap/bc/adt/oo/classes/zmcp_md_clas",
+  "params": {
+    "lockHandle": "<lockHandle>"
+  },
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "1422710.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-class--23-delete.body.txt"
+  }
+}

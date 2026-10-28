@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"><chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/sap/bc/adt/programs/includes/%25_hr1000" chkrun:status="notProcessed" chkrun:statusText="No main program for include %_HR1000 found"/></chkrun:checkRunReports>

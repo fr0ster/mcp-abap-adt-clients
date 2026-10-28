@@ -5,7 +5,7 @@ status, headers and body — captured from a running system and kept as a file, 
 that a consumer choosing a failure strategy chooses from measurements rather than
 from this package's opinion.
 
-The recordings live in this repository under [`corpus/adt/`](../../corpus): one
+The recordings live in this repository under [`corpus/adt/answers/`](../../corpus/adt/answers): one
 `.json` per step carrying the request and the response metadata, beside a
 `.body.xml` or `.body.txt` with the payload as it arrived. Case names say what
 each demonstrates — `refusal-check-nonexistent-object`,

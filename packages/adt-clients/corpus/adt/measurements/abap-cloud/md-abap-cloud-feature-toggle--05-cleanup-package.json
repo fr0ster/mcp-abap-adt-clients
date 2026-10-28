@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/deletion/delete",
+  "params": {},
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.deletion.request.v1+xml",
+    "Accept": "*/*"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><del:deletionRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><del:object adtcore:uri=\"/sap/bc/adt/packages/zmcp_md4_pkg\"><del:transportNumber/></del:object></del:deletionRequest>",
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "414",
+      "content-type": "application/vnd.sap.adt.deletion.response.v1+xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "1578469.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-feature-toggle--05-cleanup-package.body.xml"
+  }
+}

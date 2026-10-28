@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/core/http/systeminformation",
+  "params": {},
+  "headers": {
+    "Accept": "application/vnd.sap.adt.core.http.systeminformation.v1+json"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "129",
+      "content-type": "application/vnd.sap.adt.core.http.systeminformation.v1+json; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "42920.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-setup--01-systeminformation.body.txt"
+  }
+}

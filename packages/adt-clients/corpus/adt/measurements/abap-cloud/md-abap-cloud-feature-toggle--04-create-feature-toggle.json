@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/sfw/featuretoggles",
+  "params": {},
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.blues.v1+xml",
+    "Accept": "application/vnd.sap.adt.blues.v1+xml"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><blue:blueSource xmlns:blue=\"http://www.sap.com/wbobj/blue\" xmlns:adtcore=\"http://www.sap.com/adt/core\" xmlns:abapsource=\"http://www.sap.com/adt/abapsource\" adtcore:name=\"ZMCP_MD4_FTG\" adtcore:type=\"FTG2/FT\" adtcore:description=\"MD measure toggle\"><adtcore:packageRef adtcore:name=\"ZMCP_MD4_PKG\"/></blue:blueSource>",
+  "response": {
+    "status": 403,
+    "headers": {
+      "content-length": "598",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "14077.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-feature-toggle--04-create-feature-toggle.body.xml"
+  }
+}

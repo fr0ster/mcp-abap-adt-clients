@@ -1,6 +1,6 @@
 /**
  * Capture raw ADT wire exchanges — normal answers AND refusals — into
- * `corpus/adt/`, so a consumer's result and error strategies can be written
+ * `corpus/adt/answers/`, so a consumer's result and error strategies can be written
  * against real documents instead of imagined ones.
  *
  * It talks to the public surface of this package directly: the public `AdtClient` /
@@ -108,7 +108,7 @@ const transportReadings = {
 // Config
 // ---------------------------------------------------------------------------
 
-const FIXTURES_DIR = path.join(__dirname, '..', 'corpus', 'adt');
+const FIXTURES_DIR = path.join(__dirname, '..', 'corpus', 'adt', 'answers');
 const SCRATCH_CLASS_NAME = 'ZMCP_BLD_ANSCH01';
 const NONEXISTENT_CLASS_NAME = 'ZMCP_BLD_NOPE_CLS99';
 const NONEXISTENT_PACKAGE_NAME = 'ZMCP_BLD_NOPKG9X';

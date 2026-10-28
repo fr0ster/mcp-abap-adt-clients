@@ -1,0 +1,21 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/programs/includes/%25_hr1000/enhancements/options",
+  "params": {},
+  "headers": {
+    "Accept": "application/vnd.sap.adt.enhancementoptions.v2+xml"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "608",
+      "content-type": "application/vnd.sap.adt.enhancementoptions.v2+xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "90256.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-program-ops--06-enhancement-options-include.body.xml"
+  }
+}

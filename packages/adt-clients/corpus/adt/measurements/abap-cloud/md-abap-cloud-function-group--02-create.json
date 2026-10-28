@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/functions/groups",
+  "params": {},
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.functions.groups.v3+xml",
+    "Accept": "*/*"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><group:abapFunctionGroup xmlns:group=\"http://www.sap.com/adt/functions/groups\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"MD measure group\" adtcore:language=\"EN\" adtcore:name=\"ZMCP_MD_FUGR\" adtcore:type=\"FUGR/F\" adtcore:masterLanguage=\"EN\"><adtcore:packageRef adtcore:name=\"ZMCP_MD_PKG\"/></group:abapFunctionGroup>",
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "1538559.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-function-group--02-create.body.txt"
+  }
+}

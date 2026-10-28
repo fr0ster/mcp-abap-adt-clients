@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/oo/interfaces/zmcp_md_intf",
+  "params": {
+    "_action": "UNLOCK",
+    "lockHandle": "<lockHandle>"
+  },
+  "headers": {},
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "4139.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-interface--36-unlock.body.txt"
+  }
+}

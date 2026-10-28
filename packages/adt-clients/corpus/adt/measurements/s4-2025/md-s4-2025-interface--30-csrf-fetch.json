@@ -1,0 +1,27 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/discovery",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/atomsvc+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-store",
+      "content-encoding": "gzip",
+      "content-length": "29810",
+      "content-type": "application/atomsvc+xml",
+      "expires": "-1",
+      "pragma": "no-cache",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "208567.000000"
+    },
+    "bodyFile": "md-s4-2025-interface--30-csrf-fetch.body.xml"
+  }
+}

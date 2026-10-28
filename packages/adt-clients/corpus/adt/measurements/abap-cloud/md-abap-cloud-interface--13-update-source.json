@@ -1,0 +1,27 @@
+{
+  "method": "PUT",
+  "url": "/sap/bc/adt/oo/interfaces/zmcp_md_intf/source/main",
+  "params": {
+    "lockHandle": "<lockHandle>"
+  },
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Accept": "text/plain"
+  },
+  "body": "INTERFACE zmcp_md_intf\n  PUBLIC .\n\n  METHODS m_v1.\nENDINTERFACE.\n",
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "etag": "202610272257390001",
+      "last-modified": "Tue, 27 Oct 2026 22:57:39 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "243815.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-interface--13-update-source.body.txt"
+  }
+}

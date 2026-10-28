@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/packages/zmcp_md_pkg",
+  "params": {},
+  "headers": {
+    "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml;q=0.9"
+  },
+  "body": null,
+  "response": {
+    "status": 404,
+    "headers": {
+      "connection": "close",
+      "content-length": "539",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "41736.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-setup--11-exists-package.body.xml"
+  }
+}

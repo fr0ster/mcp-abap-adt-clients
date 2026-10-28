@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/packages/zmcp_md_pkg",
+  "params": {},
+  "headers": {
+    "Accept": "application/vnd.sap.adt.packages.v2+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "3788",
+      "content-type": "application/vnd.sap.adt.packages.v2+xml; charset=utf-8",
+      "etag": "20261027000000001application/vnd.sap.adt.packages.v2+xml6z5YqQ2kxSrUyWLmlteko5a6Gfw=",
+      "last-modified": "Tue, 27 Oct 2026 00:00:00 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "51301.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-setup--14-read-package.body.xml"
+  }
+}

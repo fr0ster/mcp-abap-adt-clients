@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 404,
+    "headers": {
+      "content-length": "488",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "5218.000000"
+    },
+    "bodyFile": "md-s4-2025-function-group--53-exists-after-delete.body.xml"
+  }
+}

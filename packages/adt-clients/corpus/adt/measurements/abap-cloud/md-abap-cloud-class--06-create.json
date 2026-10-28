@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/oo/classes",
+  "params": {},
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.oo.classes.v4+xml",
+    "Accept": "*/*"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><class:abapClass xmlns:class=\"http://www.sap.com/adt/oo/classes\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"MD measure class\" adtcore:language=\"EN\" adtcore:name=\"ZMCP_MD_CLAS\" adtcore:type=\"CLAS/OC\" adtcore:masterLanguage=\"EN\" class:final=\"true\" class:visibility=\"public\"><adtcore:packageRef adtcore:name=\"ZMCP_MD_PKG\"/><class:include adtcore:name=\"CLAS/OC\" adtcore:type=\"CLAS/OC\" class:includeType=\"testclasses\"/><class:superClassRef/></class:abapClass>",
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "1805872.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-class--06-create.body.txt"
+  }
+}

@@ -1,0 +1,390 @@
+PROGRAM %SCPRCPROF.
+TABLES: SCPRCPROF.
+
+FORM RANGE_SELECT_HV_SCPRCPROF
+     TABLES
+           KEYRANGE_TAB STRUCTURE HVSELOPT  " <--
+           SCPRCPROF_TAB STRUCTURE SCPRCPROF    " -->
+     USING
+           LANGU
+           VALUE(MAXROWS)
+           SUBRC.
+  DATA: INNER_JOIN.
+  DATA: LCOUNT TYPE I.
+
+  DATA: T000COMPONENT________F TYPE SCPRATTR-COMPONENT.
+  DATA: T000ID_______________F TYPE SCPRATTR-ID.
+  DATA: T000MAXRELEASE_______F TYPE SCPRATTR-MAXRELEASE.
+  DATA: T000MINRELEASE_______F TYPE SCPRATTR-MINRELEASE.
+  DATA: T000MODDATE__________F TYPE SCPRATTR-MODDATE.
+  DATA: T000MODIFIER_________F TYPE SCPRATTR-MODIFIER.
+  DATA: T000TYPE_____________F TYPE SCPRATTR-TYPE.
+  DATA: T000VERSION__________F TYPE SCPRATTR-VERSION.
+  DATA: T001TEXT_____________F TYPE SCPRTEXT-TEXT.
+
+  RANGES: T000COMPONENT________R FOR T000COMPONENT________F.
+
+  RANGES: T000ID_______________R FOR T000ID_______________F.
+
+  RANGES: T000MAXRELEASE_______R FOR T000MAXRELEASE_______F.
+
+  RANGES: T000MINRELEASE_______R FOR T000MINRELEASE_______F.
+
+  RANGES: T000MODDATE__________R FOR T000MODDATE__________F.
+
+  RANGES: T000MODIFIER_________R FOR T000MODIFIER_________F.
+
+  RANGES: T000TYPE_____________R FOR T000TYPE_____________F.
+
+  RANGES: T000VERSION__________R FOR T000VERSION__________F.
+
+  RANGES: T001TEXT_____________R FOR T001TEXT_____________F.
+
+
+  DATA SCPRATTR_TAB type table of SCPRATTR with header line.
+  DATA SCPRTEXT_TAB type table of SCPRTEXT with header line.
+
+
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'COMPONENT'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000COMPONENT________R.
+    APPEND T000COMPONENT________R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'ID'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000ID_______________R.
+    APPEND T000ID_______________R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'MAXRELEASE'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000MAXRELEASE_______R.
+    APPEND T000MAXRELEASE_______R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'MINRELEASE'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000MINRELEASE_______R.
+    APPEND T000MINRELEASE_______R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'MODDATE'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000MODDATE__________R.
+    APPEND T000MODDATE__________R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'MODIFIER'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000MODIFIER_________R.
+    APPEND T000MODIFIER_________R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'TYPE'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000TYPE_____________R.
+    APPEND T000TYPE_____________R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRATTR' AND
+             FIELDNAME = 'VERSION'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T000VERSION__________R.
+    APPEND T000VERSION__________R.
+    IF 'SCPRATTR' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  LOOP AT KEYRANGE_TAB WHERE
+             TABNAME = 'SCPRTEXT' AND
+             FIELDNAME = 'TEXT'.
+    CHECK KEYRANGE_TAB-OPTION <> 'CP' OR KEYRANGE_TAB-LOW <> '*'.
+    MOVE-CORRESPONDING KEYRANGE_TAB TO T001TEXT_____________R.
+    APPEND T001TEXT_____________R.
+    IF 'SCPRTEXT' <> 'SCPRATTR'.
+      INNER_JOIN = 'X'.
+    ENDIF.
+  ENDLOOP.
+  IF INNER_JOIN = 'X'. CLEAR MAXROWS. ENDIF.
+
+  SELECT * FROM SCPRATTR UP TO MAXROWS ROWS
+           INTO TABLE SCPRATTR_TAB
+
+            WHERE
+           ID IN T000ID_______________R AND
+           VERSION IN T000VERSION__________R AND
+           MODIFIER IN T000MODIFIER_________R AND
+           MODDATE IN T000MODDATE__________R AND
+           COMPONENT IN T000COMPONENT________R AND
+           MINRELEASE IN T000MINRELEASE_______R AND
+           MAXRELEASE IN T000MAXRELEASE_______R AND
+           TYPE IN T000TYPE_____________R
+            AND
+             VERSION
+           EQ 'N'  AND
+             TYPE
+           NE 'GEN'  AND
+             CATEGORY
+           EQ ' '  AND
+             STATE
+           NE 'D'
+           ORDER BY PRIMARY KEY.  "Damit nicht irgendwelche kommen
+  IF SY-DBCNT >= MAXROWS AND MAXROWS <> 0.
+      SUBRC = 1.
+   ENDIF.
+  SORT SCPRATTR_TAB BY ID VERSION.
+
+
+      DESCRIBE TABLE SCPRATTR_TAB LINES LCOUNT.
+      IF LCOUNT > 0.
+
+        IF LCOUNT < 200.   "Wert scheint einigermaßen sinnvoll
+        SELECT * FROM SCPRTEXT INTO TABLE SCPRTEXT_TAB
+
+              FOR ALL ENTRIES IN SCPRATTR_TAB
+              WHERE
+              ID = SCPRATTR_TAB-ID AND
+              VERSION = SCPRATTR_TAB-VERSION
+
+              AND
+              TEXT IN T001TEXT_____________R
+              AND
+              LANGU = LANGU.
+
+        ELSE.   "IF LCOUNT >= 200
+        SELECT * FROM SCPRTEXT INTO TABLE SCPRTEXT_TAB
+              WHERE
+              ID IN T000ID_______________R AND
+              VERSION IN T000VERSION__________R
+ AND
+              TEXT IN T001TEXT_____________R
+  AND
+              LANGU = LANGU .
+        ENDIF.  "LCOUNT >= 200
+
+      ENDIF.
+
+
+  SORT SCPRTEXT_TAB BY LANGU
+ID VERSION.
+
+  LOOP AT SCPRATTR_TAB.
+
+    CLEAR: SCPRCPROF_TAB.
+
+    SCPRCPROF_TAB-ID = SCPRATTR_TAB-ID.
+    SCPRCPROF_TAB-VERSION = SCPRATTR_TAB-VERSION.
+    SCPRCPROF_TAB-MODIFIER = SCPRATTR_TAB-MODIFIER.
+    SCPRCPROF_TAB-MODDATE = SCPRATTR_TAB-MODDATE.
+    SCPRCPROF_TAB-COMPONENT = SCPRATTR_TAB-COMPONENT.
+    SCPRCPROF_TAB-MINRELEASE = SCPRATTR_TAB-MINRELEASE.
+    SCPRCPROF_TAB-MAXRELEASE = SCPRATTR_TAB-MAXRELEASE.
+    SCPRCPROF_TAB-TYPE = SCPRATTR_TAB-TYPE.
+
+    CLEAR SCPRTEXT_TAB.
+    READ TABLE SCPRTEXT_TAB WITH KEY
+               LANGU = LANGU
+               ID = SCPRATTR_TAB-ID
+               VERSION = SCPRATTR_TAB-VERSION
+               BINARY SEARCH.
+    IF SY-SUBRC = 0.
+      SCPRCPROF_TAB-TEXT = SCPRTEXT_TAB-TEXT.
+    ELSEIF INNER_JOIN = 'X'.
+      CONTINUE.  "Kein APPEND
+    ENDIF.
+
+    APPEND SCPRCPROF_TAB.
+  ENDLOOP.  "AT SCPRATTR_TAB
+  SORT SCPRCPROF_TAB.
+  DELETE ADJACENT DUPLICATES FROM SCPRCPROF_TAB.
+ENDFORM.
+
+FORM GET_STRUCTAB TABLES STRUC_TAB STRUCTURE SHSTRUC
+     USING p_LANGU SELFIELD.
+  DATA I LIKE SY-TABIX.
+  data langu type sy-langu.
+
+  REFRESH STRUC_TAB.
+  langu = p_langu.
+
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'COMPONENT'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0005'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'ID'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0001'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'MAXRELEASE'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0007'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'MINRELEASE'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0006'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'MODDATE'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0004'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'MODIFIER'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0003'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'TYPE'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0009'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRATTR' 'VERSION'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0002'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+  clear struc_tab.
+  PERFORM GET_FIELD
+          USING LANGU 'SCPRTEXT' 'TEXT'
+          CHANGING STRUC_TAB.
+  STRUC_TAB-DISPLAY = 'X'.
+  STRUC_TAB-POS = '0008'.
+  IF STRUC_TAB-DISPLAY = 'X' and
+     struc_tab-fieldname = selfield.
+    CLEAR STRUC_TAB-SELECTFLAG.
+  ENDIF.
+  append struc_Tab.
+ENDFORM.
+
+form get_field
+     using langu type sy-langu
+           tabname type dfies-tabname
+           fieldname type dfies-fieldname
+     changing shstruc type shstruc.
+  statics dfies_tab type table of dfies.
+  data dfies type dfies.
+
+  read table dfies_Tab into dfies with key
+       tabname = tabname
+       fieldname = fieldname
+       binary search.
+  if sy-subrc <> 0.
+    clear dfies_tab[].
+    CALL FUNCTION 'DDIF_FIELDINFO_GET'
+         EXPORTING
+              tabname        = tabname
+              LANGU          = LANGU
+         TABLES
+              DFIES_TAB      = dfies_tab
+         EXCEPTIONS
+              OTHERS         = 3.
+    sort dfies_tab by tabname fieldname.
+    read table dfies_Tab into dfies with key
+         tabname = tabname
+         fieldname = fieldname
+         binary search.
+  endif.
+  check sy-subrc = 0.
+
+  SHSTRUC-TABNAME = dfies-tabname.
+  SHSTRUC-FIELDNAME = dfies-fieldname.
+  SHSTRUC-FIELDTYPE = dfies-DATATYPE.
+  SHSTRUC-FIELDTEXT = dfies-FIELDTEXT.
+  IF dfies-MASKLEN <> 0.
+    SHSTRUC-FIELDLEN = dfies-MASKLEN.
+  ELSE.
+    SHSTRUC-FIELDLEN = dfies-OUTPUTLEN.
+  ENDIF.
+  SHSTRUC-KEYWORD = dfies-REPTEXT.
+  SHSTRUC-KEYWORDLEN = STRLEN( SHSTRUC-KEYWORD ).
+  SHSTRUC-SCRTEXT_S = dfies-SCRTEXT_S.
+  SHSTRUC-SCRLEN_S = STRLEN( SHSTRUC-SCRTEXT_S ).
+  SHSTRUC-SCRTEXT_M = dfies-SCRTEXT_M.
+  SHSTRUC-SCRLEN_M = STRLEN( SHSTRUC-SCRTEXT_M ).
+  SHSTRUC-SCRTEXT_L = dfies-SCRTEXT_L.
+  SHSTRUC-SCRLEN_L = STRLEN( SHSTRUC-SCRTEXT_L ).
+  SHSTRUC-KEYFLAG = SPACE.
+
+endform.

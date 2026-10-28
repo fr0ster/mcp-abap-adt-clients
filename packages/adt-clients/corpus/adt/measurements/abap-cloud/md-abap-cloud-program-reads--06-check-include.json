@@ -1,0 +1,25 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/checkruns",
+  "params": {
+    "reporters": "abapCheckRun"
+  },
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.checkobjects+xml",
+    "Accept": "application/vnd.sap.adt.checkmessages+xml"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><chkrun:checkObject adtcore:uri=\"/sap/bc/adt/programs/includes/%25_hr1000\" chkrun:version=\"active\"/></chkrun:checkObjectList>",
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "342",
+      "content-type": "application/vnd.sap.adt.checkmessages+xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "41886.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-program-reads--06-check-include.body.xml"
+  }
+}

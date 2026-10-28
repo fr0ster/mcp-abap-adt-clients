@@ -1,0 +1,26 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/activation",
+  "params": {
+    "method": "activate",
+    "preauditRequested": "true",
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.activation+xml",
+    "Accept": "application/xml"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\"><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/ddic/ddl/sources/zmcp_md_ddls\" adtcore:name=\"ZMCP_MD_DDLS\"/></adtcore:objectReferences>",
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "211",
+      "content-type": "application/xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "1225486.000000"
+    },
+    "bodyFile": "md-s4-2025-ddl-source--12-activate.body.xml"
+  }
+}

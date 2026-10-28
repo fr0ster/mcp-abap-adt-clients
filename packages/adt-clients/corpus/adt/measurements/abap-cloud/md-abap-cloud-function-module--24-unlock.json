@@ -1,0 +1,23 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules/zmcp_md_fm",
+  "params": {
+    "_action": "UNLOCK",
+    "lockHandle": "<lockHandle>"
+  },
+  "headers": {},
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "7970.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-function-module--24-unlock.body.txt"
+  }
+}

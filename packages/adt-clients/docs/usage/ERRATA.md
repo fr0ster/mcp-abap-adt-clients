@@ -18,8 +18,8 @@ debuggee stops existing answer as if they had failed:
 program's run returns (with its output after `debuggeeEnded`, with an error
 after a termination), and the next request on the debug session answers
 `noSessionAttached`. Measured on premise, SAP_BASIS 758
-(`corpus/adt/debugger-run-to-line--08-stepcontinue`) and 816
-(`corpus/adt/debugger-terminate--01-terminate-debuggee`), and on the cloud,
+(`corpus/adt/debugger/debugger-run-to-line--08-stepcontinue`) and 816
+(`corpus/adt/debugger/debugger-terminate--01-terminate-debuggee`), and on the cloud,
 2026-10-08/10.
 
 **Why the library has a strategy for it.** `analyseDebuggeeEnd` from

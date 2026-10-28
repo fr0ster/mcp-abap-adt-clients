@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/public/bc/icf/logoff",
+  "params": {},
+  "headers": {
+    "Accept": "*/*",
+    "sap-cancel-on-close": "true"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-cache",
+      "connection": "close",
+      "content-length": "9625",
+      "content-type": "text/html; charset=utf-8",
+      "expires": "0",
+      "pragma": "no-cache",
+      "sap-authenticated": "not required",
+      "sap-perf-fesrec": "37885.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-setup--23-logoff.body.txt"
+  }
+}

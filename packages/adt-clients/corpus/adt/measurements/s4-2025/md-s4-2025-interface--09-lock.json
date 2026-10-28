@@ -1,0 +1,25 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/oo/interfaces/zmcp_md_intf",
+  "params": {
+    "_action": "LOCK",
+    "accessMode": "MODIFY",
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "359",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "11820.000000"
+    },
+    "bodyFile": "md-s4-2025-interface--09-lock.body.xml"
+  }
+}

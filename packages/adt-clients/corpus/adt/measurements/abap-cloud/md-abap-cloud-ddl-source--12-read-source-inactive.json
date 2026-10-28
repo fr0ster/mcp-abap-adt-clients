@@ -1,0 +1,27 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/ddic/ddl/sources/zmcp_md_ddls/source/main",
+  "params": {
+    "version": "inactive"
+  },
+  "headers": {
+    "Accept": "text/plain"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "168",
+      "content-type": "text/plain; charset=utf-8",
+      "etag": "202610272259470001",
+      "last-modified": "Tue, 27 Oct 2026 22:59:47 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "18039.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-ddl-source--12-read-source-inactive.body.txt"
+  }
+}

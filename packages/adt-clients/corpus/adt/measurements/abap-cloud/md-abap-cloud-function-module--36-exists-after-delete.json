@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules/zmcp_md_fm",
+  "params": {},
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 404,
+    "headers": {
+      "connection": "close",
+      "content-length": "1374",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "27961.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-function-module--36-exists-after-delete.body.xml"
+  }
+}

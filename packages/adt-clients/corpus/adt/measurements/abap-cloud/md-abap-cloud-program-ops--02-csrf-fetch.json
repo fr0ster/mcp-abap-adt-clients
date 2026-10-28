@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/discovery",
+  "params": {},
+  "headers": {
+    "Accept": "application/atomsvc+xml",
+    "x-csrf-token": "Fetch"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "29256",
+      "content-type": "application/atomsvc+xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "253185.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-program-ops--02-csrf-fetch.body.xml"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/packages/zlocal",
+  "params": {},
+  "headers": {
+    "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml;q=0.9"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "903664",
+      "content-type": "application/vnd.sap.adt.packages.v2+xml; charset=utf-8",
+      "etag": "20260408000000001application/vnd.sap.adt.packages.v2+xmlwlhAv/VvgybWgQW5wRfEVu9xsBU=",
+      "last-modified": "Wed, 08 Apr 2026 00:00:00 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "408603.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-setup--09-package-zlocal.body.xml"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/programs/includes/%25_hr1000/source/main/versions",
+  "params": {},
+  "headers": {
+    "Accept": "application/atom+xml;type=feed"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "532",
+      "content-type": "application/atom+xml;type=feed",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "406705.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-program-reads--05-versions-include.body.xml"
+  }
+}

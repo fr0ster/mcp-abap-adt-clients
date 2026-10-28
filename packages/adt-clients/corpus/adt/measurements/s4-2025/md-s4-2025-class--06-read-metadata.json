@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/oo/classes/zmcp_md_clas",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.oo.classes+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 406,
+    "headers": {
+      "content-length": "514",
+      "content-type": "application/xml",
+      "etag": "2026102720564300000000720261027205643000000001",
+      "last-modified": "Tue, 27 Oct 2026 20:56:43 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "19609.000000"
+    },
+    "bodyFile": "md-s4-2025-class--06-read-metadata.body.xml"
+  }
+}

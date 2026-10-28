@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/activation/inactiveobjects",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "863",
+      "content-type": "application/vnd.sap.adt.inactivectsobjects.v1+xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "14172.000000"
+    },
+    "bodyFile": "md-s4-2025-function-group--30-inactive-objects.body.xml"
+  }
+}

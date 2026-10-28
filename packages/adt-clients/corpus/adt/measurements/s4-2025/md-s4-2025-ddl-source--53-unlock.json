@@ -1,0 +1,22 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/ddic/ddl/sources/zmcp_md_ddls",
+  "params": {
+    "_action": "UNLOCK",
+    "lockHandle": "<lockHandle>",
+    "sap-client": "<client>"
+  },
+  "headers": {},
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "7253.000000"
+    },
+    "bodyFile": "md-s4-2025-ddl-source--53-unlock.body.txt"
+  }
+}

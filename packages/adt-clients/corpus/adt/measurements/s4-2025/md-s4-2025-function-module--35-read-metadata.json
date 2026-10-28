@@ -1,0 +1,29 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules/zmcp_md_fm",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.functions.fmodules.v3+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-store",
+      "content-encoding": "gzip",
+      "content-length": "650",
+      "content-type": "application/vnd.sap.adt.functions.fmodules.v3+xml; charset=utf-8",
+      "etag": "202610272101250016",
+      "expires": "-1",
+      "last-modified": "Tue, 27 Oct 2026 21:01:25 GMT",
+      "pragma": "no-cache",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "51375.000000"
+    },
+    "bodyFile": "md-s4-2025-function-module--35-read-metadata.body.xml"
+  }
+}

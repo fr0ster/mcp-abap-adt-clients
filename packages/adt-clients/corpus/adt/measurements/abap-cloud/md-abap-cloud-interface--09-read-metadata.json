@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/oo/interfaces/zmcp_md_intf",
+  "params": {},
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "2557",
+      "content-type": "application/vnd.sap.adt.oo.interfaces.v5+xml; charset=utf-8",
+      "etag": "2026102722573200059205",
+      "last-modified": "Tue, 27 Oct 2026 22:57:32 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "10642.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-interface--09-read-metadata.body.xml"
+  }
+}

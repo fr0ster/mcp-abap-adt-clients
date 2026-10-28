@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/repository/informationsystem/search",
+  "params": {
+    "operation": "quickSearch",
+    "query": "ZMCP_MD4*",
+    "maxResults": "20"
+  },
+  "headers": {
+    "Accept": "application/xml"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "109",
+      "content-type": "application/xml; charset=utf-8",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "87111.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-s4-2025-feature-toggle--04-search-after-cleanup.body.xml"
+  }
+}

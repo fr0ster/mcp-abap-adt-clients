@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 404,
+    "headers": {
+      "content-length": "478",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "5554.000000"
+    },
+    "bodyFile": "md-s4-2025-setup--05-exists-fugr.body.xml"
+  }
+}

@@ -62,7 +62,7 @@ jobs:
       # the unit suites are not, and they carry every invariant this release
       # is built on. `MCP_ENV_PATH` points at nothing so the preflight skips
       # instead of aborting the run. The strategies package is tested
-      # entirely against the recorded answers in adt-clients' `corpus/adt/`,
+      # entirely against the recorded answers in adt-clients' `corpus/adt/` (`answers/`, `debugger/`),
       # so it needs no system at all.
       - name: Unit tests
         run: MCP_ENV_PATH=/tmp/nonexistent-env npm test

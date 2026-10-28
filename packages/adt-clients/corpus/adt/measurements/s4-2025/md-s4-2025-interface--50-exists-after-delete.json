@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/oo/interfaces/zmcp_md_intf",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "*/*"
+  },
+  "body": null,
+  "response": {
+    "status": 404,
+    "headers": {
+      "content-length": "564",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "4149.000000"
+    },
+    "bodyFile": "md-s4-2025-interface--50-exists-after-delete.body.xml"
+  }
+}

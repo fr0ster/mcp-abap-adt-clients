@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/ddic/ddl/sources/zmcp_md_ddls/source/main",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "text/plain"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "169",
+      "content-type": "text/plain; charset=utf-8",
+      "etag": "202610272058380011",
+      "last-modified": "Tue, 27 Oct 2026 20:58:38 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "8979.000000"
+    },
+    "bodyFile": "md-s4-2025-ddl-source--13-read-source-active.body.txt"
+  }
+}

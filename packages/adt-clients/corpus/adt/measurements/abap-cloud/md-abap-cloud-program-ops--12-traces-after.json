@@ -1,0 +1,24 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/runtime/traces/abaptraces",
+  "params": {
+    "user": "CB9980006582"
+  },
+  "headers": {
+    "Accept": "application/xml"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "2231",
+      "content-type": "application/atom+xml;type=feed",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "251023.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-program-ops--12-traces-after.body.xml"
+  }
+}

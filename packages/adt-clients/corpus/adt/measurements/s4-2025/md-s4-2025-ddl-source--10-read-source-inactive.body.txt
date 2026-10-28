@@ -1,0 +1,7 @@
+@EndUserText.label: 'MD measure ddl v1'
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+define view entity ZMCP_MD_DDLS
+  as select from t000
+{
+  key mandt as Client
+}

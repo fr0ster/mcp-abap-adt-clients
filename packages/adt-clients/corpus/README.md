@@ -14,6 +14,24 @@ Case names say what each demonstrates: `check-success-verdict`,
 `refusal-check-nonexistent-object`, `refusal-validation-name-taken-ddl`,
 `read-empty-package-contents`.
 
+## Layout
+
+`corpus/adt/` holds one folder per kind of recording; a file keeps its
+recorded name, which its `.json` names as `bodyFile`.
+
+| Folder | What it holds | Read by |
+|---|---|---|
+| `answers/` | the answer shapes: reads, refusals, writes, with the collector's run manifests (`_run-*.json`) | `adt-strategies`' tests, this package's unit tests, `docs/usage/ANSWER_SHAPES.md`; written by `scripts/capture-adt-corpus.ts` |
+| `debugger/` | the debugger conversations and the memory snapshot list, kept for information | `adt-strategies`' tests, `docs/research/debugger-endpoints.md`, `docs/usage/ERRATA.md` |
+| `discovery/` | what each release says about its endpoints and features: `core/discovery`, `discovery`, the compatibility graph, the system components, `objecttypes`, `releasestates` — `system-description-<release>--NN-*` | the type tables' evidence |
+| `typestructure/` | each release's `POST /repository/typestructure`: every type with its parent, name length, capabilities and the user's authorizations | the type tables' evidence |
+| `measurements/<release>/` | the live measurements behind the type tables: per object kind, create, read and update of source and metadata, locks, activation, the operations a release refuses — `md-<release>-<kind>--NN-*` | the type tables' evidence |
+
+The releases are `s4-2025` (S/4HANA 2025 on-premise), `abap-cloud` (the BTP
+ABAP environment trial) and `basis-740` (SAP_BASIS 7.40 SP04). In
+`measurements/`, the body of each CSRF fetch (`--NN-csrf-fetch`) is replaced by
+a note: it was the release's discovery document, which `discovery/` holds once.
+
 ## It exists in two places, on purpose
 
 The same corpus is kept in the consumer repository
@@ -59,7 +77,7 @@ sees them. Cookie and CSRF headers are dropped by name as well.
 
 **Two identities are replaced, not dropped.** A strategy still has to see that a
 user id and a system id sit in those places, so each becomes a stable
-placeholder: `SAPUSER01` and `SYS`.
+placeholder: `SAPUSER01` and `SYS`. A cloud host becomes `abap-cloud.example`.
 
 **One header is dropped as topology**: `sap-adt-saplb` names the application
 server instance that answered, which says where the system runs and nothing

@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/oo/interfaces/zmcp_md_intf",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.oo.interfaces.v2+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 406,
+    "headers": {
+      "content-length": "514",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "4273.000000"
+    },
+    "bodyFile": "md-s4-2025-interface--05-read-metadata.body.xml"
+  }
+}

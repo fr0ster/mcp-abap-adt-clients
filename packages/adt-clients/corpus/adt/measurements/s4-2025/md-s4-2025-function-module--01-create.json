@@ -1,0 +1,24 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Content-Type": "application/vnd.sap.adt.functions.fmodules+xml",
+    "Accept": "*/*"
+  },
+  "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><fmodule:abapFunctionModule xmlns:fmodule=\"http://www.sap.com/adt/functions/fmodules\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"MD measure module\" adtcore:name=\"ZMCP_MD_FM\" adtcore:type=\"FUGR/FF\"><adtcore:containerRef adtcore:name=\"ZMCP_MD_FUGR\" adtcore:type=\"FUGR/F\" adtcore:uri=\"/sap/bc/adt/functions/groups/zmcp_md_fugr\"/></fmodule:abapFunctionModule>",
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-length": "0",
+      "location": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules/zmcp_md_fm",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "140016.000000"
+    },
+    "bodyFile": "md-s4-2025-function-module--01-create.body.txt"
+  }
+}

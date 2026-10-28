@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules/zmcp_md_fm",
+  "params": {
+    "sap-client": "<client>"
+  },
+  "headers": {
+    "Accept": "application/vnd.sap.adt.functions.fmodules+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 406,
+    "headers": {
+      "content-length": "695",
+      "content-type": "application/xml",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "16601.000000"
+    },
+    "bodyFile": "md-s4-2025-function-module--05-read-metadata.body.xml"
+  }
+}

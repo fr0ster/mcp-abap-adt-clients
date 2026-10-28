@@ -1,0 +1,26 @@
+{
+  "method": "PUT",
+  "url": "/sap/bc/adt/ddic/ddl/sources/zmcp_md_ddls/source/main",
+  "params": {
+    "lockHandle": "<lockHandle>"
+  },
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Accept": "text/plain"
+  },
+  "body": "@EndUserText.label: 'MD measure ddl v1'\n@AccessControl.authorizationCheck: #NOT_REQUIRED\ndefine view entity ZMCP_MD_DDLS\n  as select from I_Language\n{\n  key Language\n}\n",
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "0",
+      "etag": "202610272259470001",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "161426.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-ddl-source--10-update-source.body.txt"
+  }
+}

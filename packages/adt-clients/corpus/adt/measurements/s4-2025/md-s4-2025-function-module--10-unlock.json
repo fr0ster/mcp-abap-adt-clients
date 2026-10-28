@@ -1,0 +1,22 @@
+{
+  "method": "POST",
+  "url": "/sap/bc/adt/functions/groups/zmcp_md_fugr/fmodules/zmcp_md_fm",
+  "params": {
+    "_action": "UNLOCK",
+    "lockHandle": "<lockHandle>",
+    "sap-client": "<client>"
+  },
+  "headers": {},
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "4302.000000"
+    },
+    "bodyFile": "md-s4-2025-function-module--10-unlock.body.txt"
+  }
+}

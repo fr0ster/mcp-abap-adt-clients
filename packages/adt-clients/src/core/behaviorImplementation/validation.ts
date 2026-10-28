@@ -61,7 +61,7 @@ export async function validateBehaviorImplementationName(
   // It is an answer — but saying so is the caller's, and the code was saying it
   // for them, from one status.
   //
-  // Recorded in `corpus/adt/`: the same question answers `400` with an
+  // Recorded in `corpus/adt/answers/`: the same question answers `400` with an
   // `exc:exception` for a class, a domain and a table, and `200` with
   // `<SEVERITY>ERROR</SEVERITY>` for a DDL source and a function group. One
   // status cannot be the rule, and this package no longer offers one. The

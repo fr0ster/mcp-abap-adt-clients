@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "/sap/bc/adt/oo/classes/zmcp_md_clas",
+  "params": {},
+  "headers": {
+    "Accept": "application/vnd.sap.adt.oo.classes.v4+xml"
+  },
+  "body": null,
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "close",
+      "content-length": "8360",
+      "content-type": "application/vnd.sap.adt.oo.classes.v4+xml; charset=utf-8",
+      "etag": "2026102722565800172026102722565800119205",
+      "last-modified": "Tue, 27 Oct 2026 22:56:58 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "91534.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "md-abap-cloud-class--56-read-metadata.body.xml"
+  }
+}

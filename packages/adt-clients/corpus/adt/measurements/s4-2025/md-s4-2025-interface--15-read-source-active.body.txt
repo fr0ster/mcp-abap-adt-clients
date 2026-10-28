@@ -1,0 +1,5 @@
+INTERFACE zmcp_md_intf
+  PUBLIC .
+
+  METHODS m_v1.
+ENDINTERFACE.
