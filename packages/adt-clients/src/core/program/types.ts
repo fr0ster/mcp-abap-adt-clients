@@ -79,6 +79,7 @@ export const programDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: nothing,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
   versions: rawDocument,

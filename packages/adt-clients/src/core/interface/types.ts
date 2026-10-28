@@ -83,6 +83,7 @@ export const interfaceDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: nothing,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
   versions: rawDocument,

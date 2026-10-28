@@ -89,6 +89,7 @@ export const classDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: nothing,
+  metadataUpdated: rawDocument,
   deletionCheck: rawDocument,
   transport: rawDocument,
   versions: rawDocument,
