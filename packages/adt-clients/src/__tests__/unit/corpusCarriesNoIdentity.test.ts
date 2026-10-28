@@ -85,21 +85,64 @@ describe('the recorded corpus', () => {
     expect(offenders).toEqual([]);
   });
 
+  /** An element naming a host or a server holds a placeholder. */
+  const SERVERS = new Set([
+    'appserver',
+    'APPSERVER_00',
+    'sap.example.local',
+    'abap.example.com',
+    'abap-cloud.example',
+  ]);
+
+  it('names no server but a placeholder', () => {
+    const element =
+      /<(?:[A-Za-z]+:)?(?:host|HOST|hostname|server|APPSERVER|originalServer)>([^<]*)</g;
+    const offenders = files.flatMap((name) =>
+      [...text(name).matchAll(element)]
+        .map((match) => match[1])
+        .filter((server) => !SERVERS.has(server))
+        .map((server) => `${name}: ${server}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('carries no IP address written with dashes either', () => {
+    const offenders = files.filter((name) =>
+      /\b(?:\d{1,3}-){3}\d{1,3}\b/.test(text(name)),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * A user is named only as the placeholder or as one of SAP's own users,
    * in an attribute or a JSON field, escaped or not.
    */
-  const USERS = new Set(['SAPUSER01', 'SAP', 'SAP_SPC', '_SAPSUPPORT', 'SYS']);
+  const USERS = new Set([
+    'SAPUSER01',
+    'SAPUSER_NONE',
+    'SAP',
+    'SAP AG',
+    'SAP SE',
+    'SAP_SPC',
+    '_SAPSUPPORT',
+    'SYS',
+  ]);
 
   it("names no user but the placeholder or SAP's own", () => {
+    // An attribute or a JSON field, double- or single-quoted, escaped or
+    // not; a query parameter; a feed author's name.
     const field =
-      /\b(?:user|User|userName|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?"?\s*[=:]\s*\\?"([^"\\]+)\\?"/g;
-    const offenders = files.flatMap((name) =>
-      [...text(name).matchAll(field)]
-        .map((match) => match[1])
+      /\b(?:[A-Za-z]*[Uu]ser(?:Name)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*\\?(["']?)([^"'\\&<>\s,}]*)/g;
+    const author = /<atom:name>([^<]*)<\/atom:name>/g;
+    const offenders = files.flatMap((name) => {
+      const content = text(name);
+      return [
+        ...[...content.matchAll(field)].map((match) => match[2]),
+        ...[...content.matchAll(author)].map((match) => match[1]),
+      ]
         .filter((user) => user.trim() !== '' && !USERS.has(user))
-        .map((user) => `${name}: ${user}`),
-    );
+        .map((user) => `${name}: ${user}`);
+    });
     expect(offenders).toEqual([]);
   });
 
