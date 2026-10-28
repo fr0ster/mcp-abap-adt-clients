@@ -72,7 +72,7 @@ export const LEGACY_HEADER_PAIRS: [
   // completed for 36.0.0: accept was not sent, contentType was not sent
   [AdtDdlLegacy, { delete: XML }],
   // completed for 36.0.0: accept was not sent, contentType was not sent
-  [AdtFunctionGroupLegacy, { delete: XML }],
+  [AdtFunctionGroupLegacy, { delete: XML, activate: XML }],
   // measured on 7.40 SP04 over RFC: v2 answers 400 "No content handler found"
   [
     AdtFunctionIncludeLegacy,

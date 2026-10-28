@@ -5,6 +5,8 @@
  * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
  * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
+ * activate() sends the group alone, as before: its main program as a second
+ * reference is measured on S/4HANA 2025 and ABAP cloud only.
  * read() and update() (the group's source) are refused without a request: not
  * measured on 7.40.
  */
@@ -15,6 +17,7 @@ import {
   answering,
   FUNCTION_GROUP,
   type functionGroupDocuments,
+  requestHeaders,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -127,6 +130,37 @@ export class AdtFunctionGroupLegacy<
     return legacyNotMeasuredRefusal<ReturnType<R['updated']>, E>(
       'update',
       'PUT /sap/bc/adt/functions/groups/{name}/source/main',
+    );
+  }
+
+  /**
+   * Activate the group alone — the request the modern class sent before it
+   * added the group's main program (`FUGR/I SAPL<group>`) as a second
+   * reference. That second reference is measured on S/4HANA 2025 and ABAP
+   * cloud; on 7.40 it is not, so the single reference stays.
+   */
+  override async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IFunctionGroupConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    const name = config.functionGroupName as string;
+    const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="${FUNCTION_GROUP.uri(name)}" adtcore:name="${name}"/>
+</adtcore:objectReferences>`;
+
+    return answering(
+      () =>
+        connection.makeAdtRequest({
+          url: '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+          method: 'POST',
+          timeout: 0,
+          data: xmlPayload,
+          headers: requestHeaders(options.headers),
+        }),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
     );
   }
 }
