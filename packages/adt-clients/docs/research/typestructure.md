@@ -12,7 +12,12 @@ from the values. Every statement says where it comes from:
 - **Code** — read in the ABAP source of the handler on an ABAP cloud system
   (BTP trial, 2026-10-28): `CL_SEU_ADT_RES_REPO_TYPES`, its local class
   `lcl_wb_types`, `CL_WB_ADT_OBJTYPE_ACCESSIBILTY`,
-  `CL_ADT_URI_MAPPING_FALLBACK`, `CL_ADT_RES_VIT_URI_MAPPER`.
+  `CL_ADT_URI_MAPPING_FALLBACK`, `CL_ADT_RES_VIT_URI_MAPPER`, the content
+  handlers `CL_ADT_REST_COMP_CNT_HANDLER` and `CL_ADT_REST_ASXML_HANDLER`,
+  the program run `CL_SEDI_ADT_PROGRAMRUN`, and the REST authorization BAdI
+  `IF_ADT_REST_AUTHORIZATION` with its fallback
+  `CL_ADT_REST_AUTHORIZATION_DEVL`; and the where-used lists of the types and
+  the authorization object named below.
 - **Measured** — an answer recorded on a live system the same day.
 - **Inference** — not yet confirmed by either.
 
@@ -27,6 +32,47 @@ cannot be built or that has no category. The descriptor
 `OBJECT_TYPE_LABEL_PLURAL`, `CATEGORY`, `CATEGORY_LABEL`, `URI_TEMPLATE`,
 `PARENT_OBJECT_TYPE`, `OBJNAME_MAXLENGTH`, `CAPABILITIES`,
 `USER_AUTHORIZATIONS` and `SCOPES`.
+
+## How the answer is formed
+
+- **The request (Code).** No body and no parameter is read. The `Accept`
+  header must name `application/vnd.sap.as+xml`; its parameters, the
+  `dataname` included, are ignored ("ASXML is deprecated, ignore the
+  parameters"). Without an `Accept` the answer is `400`
+  (`acceptHeaderMissing`); with one naming another type, `406`
+  (`SADT_RESOURCE/044`).
+- **The data (Code).** The registry is read with
+  `cl_wb_registry=>get_instance( p_aie = abap_true p_langu = 'E' )`, so the
+  labels are, it seems, English whatever the logon language (Inference: not
+  measured in another language). One loop over its types builds the
+  descriptors; the made-up `FUGR/I` is appended and the list sorted by code.
+  Only `USER_AUTHORIZATIONS` depends on who asks; everything else is the same
+  for every user of the system.
+- **The serialisation (Code).** The answer is the ABAP table
+  `SEU_ADT_REPOSITORY_TYPE_LIST` written by `CALL TRANSFORMATION sadt_id`,
+  with `Content-Type: application/vnd.sap.as+xml; charset=utf-8;
+  dataname=<the DDIC type's data name>`. That `sadt_id` is an identity asXML
+  transformation is an Inference from its name and from the answer, whose
+  tags (`DATA`, `SEU_ADT_OBJECT_TYPE_DESCRIPTOR`, `SEU_ACTION`) are the
+  structure's field names; there is no ADT schema and no version in it. The
+  7.40 answer in the corpus has no `OBJECT_TYPE_LABEL_PLURAL`,
+  `USER_AUTHORIZATIONS` or `SCOPES` (Measured); that its structure lacks the
+  fields is an Inference.
+- **So a reader** reads the fields by name and takes a missing one as a field
+  that release lacks, not as an error; and `Accept:
+  application/vnd.sap.as+xml` is all the request needs.
+
+## Who reads it
+
+**Measured (where-used, direct references, ABAP cloud).** The only direct use
+of `SEU_ADT_OBJECT_TYPE_DESCRIPTOR` is the table type the answer is built
+from, and the only direct use of `SEU_ADT_REPOSITORY_CAP_LIST` is the two
+fields `CAPABILITIES` and `USER_AUTHORIZATIONS` of that structure; indirect
+references were not searched. The structure's own label (Code) says whom it
+serves: "Type descriptor for ADT project explorer type list". That the
+client's project explorer is its reader, and that no handler grants or
+refuses anything by these fields, is an Inference from that and from the
+handlers read here, each of which checks for itself.
 
 ## The fields
 
@@ -70,6 +116,43 @@ that holds is the group's (`FUGR`).
   and `WEBI/3I` to its own VIT address: it has no ADT resource, and `GET` on
   the VIT address answers only the object's basic properties
   (`application/vnd.sap.adt.basic.object.properties+xml`).
+
+## Running, and what ADT checks
+
+- **`EXECUTE` is not what ADT runs (Measured).**
+  `GET /sap/bc/adt/repository/informationsystem/executableobjecttypes` lists
+  eleven types on ABAP cloud — `CLAS/OC`, `DDLS/DF`, `FUGR/FF`, `PROG/P`,
+  `SRVB/SVB`, `TABL/DT`, `TRAN/T`, `VIEW/DV`, `WAPA/WO`, `WDCA/YA`,
+  `WDYA/YY` — while `typestructure` gives `EXECUTE` to three (`FF`, `P`,
+  `OC`, hard-coded).
+- **Running a program (Code, Measured).** `POST
+  /sap/bc/adt/programs/programrun/{programname}` (`CL_SEDI_ADT_PROGRAMRUN`)
+  checks `S_DEVELOP` with `OBJTYPE PROG`, the program's name and activity
+  `16` (execute) before it `SUBMIT`s the program; refused, it writes the text
+  of message `OO/755` as the body (Code), and the answer is `200` with "You
+  are not authorized to execute this object" (Measured on a delivered program,
+  2026-10-28). That `SUBMIT` adds no check of its own and the program checks
+  what it checks inside, and that through SAP GUI a user runs a report
+  without `S_DEVELOP`, is SAP's general behaviour, not measured here; through
+  ADT the developer authorization is asked first (Code). `S_DEVELOP`'s activities are separate —
+  `01` create, `02` change, `03` display, `16` execute — so a user may run and
+  read without creating; `typestructure` shows `01` alone.
+- **Every ADT endpoint (Code).** The fallback of the REST authorization BAdI
+  (`BADI_ADT_REST_AUTHORIZATION`, `IF_ADT_REST_AUTHORIZATION~CHECK_AUTHORITY(
+  uri_string )`, customer-customisable by URI) is empty; its comment states
+  that `S_ADT_RES` "is always checked by the ADT endpoints independently" of
+  it, that through RFC `S_RFC` (`SADT_REST_AUTHORIZATION`) is checked too, and
+  that individual development functions carry their own `S_DEVELOP` checks. In
+  the where-used list of `S_ADT_RES` (Measured) its references are roles and
+  IAM apps granting it, and the package interfaces `SADT_CORE_PRIVATE`,
+  `SADT_MAIN_PRIVATE` and `SADT_REST_PRIVATE`; that the check sits in the ADT
+  REST framework behind those packages is an Inference — where exactly is not
+  read.
+- **So the layers of a run through ADT are:** the ICF service and
+  `S_ADT_RES` (with `S_RFC` over RFC), the customer's BAdI by URI if one is
+  implemented, the handler's own check (`S_DEVELOP 16` for a program run),
+  and the program's own checks. A refusal of the handler's check is a `200`
+  whose body is the message — a reading has to look at the body.
 
 ## Open
 
