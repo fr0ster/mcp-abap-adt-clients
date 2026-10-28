@@ -67,6 +67,39 @@ async function variantGates(
   // @ts-expect-error -- ADT_TYPES_BASIS_740's `ddl` lists no `versions`
   await basis740.getDdl().getVersions({ ddlName: 'ZI_GATE' });
 
+  // A metadata write: on premise only for a program, on both modern variants
+  // for the other four, and on no 7.40 client, whose table lists none.
+  const write = {
+    headers: { accept: 'a', contentType: 'c' },
+    lockHandle: 'L',
+    source: '<x/>',
+  };
+  const program = { programName: 'ZGATE' };
+  await onprem.getProgram().updateMetadata(program, write);
+  const cloudProgram = cloud.getProgram();
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `PROG/P` lists no `updateMetadata`
+  await cloudProgram.updateMetadata(program, write);
+  const modernProgram = modern.getProgram();
+  // @ts-expect-error -- the default variant is served what both tables list
+  await modernProgram.updateMetadata(program, write);
+  const fm = { functionGroupName: 'ZFG_GATE', functionModuleName: 'Z_FM' };
+  await modern.getClass().updateMetadata({ className: 'ZCL_GATE' }, write);
+  await modern.getInterface().updateMetadata({ interfaceName: 'ZIF' }, write);
+  await modern.getFunctionModule().updateMetadata(fm, write);
+  await modern.getDdl().updateMetadata({ ddlName: 'ZI_GATE' }, write);
+  const class740 = basis740.getClass();
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `CLAS/OC` lists no updateMetadata
+  await class740.updateMetadata({ className: 'ZCL_GATE' }, write);
+  const interface740 = basis740.getInterface();
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `INTF/OI` lists no updateMetadata
+  await interface740.updateMetadata({ interfaceName: 'ZIF' }, write);
+  const fm740 = basis740.getFunctionModule();
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `FUGR/FF` lists no updateMetadata
+  await fm740.updateMetadata(fm, write);
+  const ddl740 = basis740.getDdl();
+  // @ts-expect-error -- ADT_TYPES_BASIS_740's `DDLS/DF` lists no updateMetadata
+  await ddl740.updateMetadata({ ddlName: 'ZI_GATE' }, write);
+
   // An operation one code of the API lacks: only `ENHO/XHH` reads source.
   await onprem
     .getEnhancement()

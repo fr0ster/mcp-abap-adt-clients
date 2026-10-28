@@ -25,6 +25,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -39,11 +40,13 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { INTERFACE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import { writeObjectDocument } from '../shared/documentWrite';
 import {
   createLockTracker,
   type LockRegistry,
@@ -74,6 +77,10 @@ export class AdtInterface<
     IAdtReadable<IInterfaceConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IInterfaceConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IInterfaceConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IInterfaceConfig,
       ReturnType<R['deletion']>,
@@ -270,6 +277,41 @@ export class AdtInterface<
           config.transportRequest,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the interface's metadata document — one PUT of `options.source`, as
+   * the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
+    config: Partial<IInterfaceConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          INTERFACE.uri(config.interfaceName as string),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

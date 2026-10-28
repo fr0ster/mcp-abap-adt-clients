@@ -6,6 +6,7 @@
  * and refuses checkCdsTestDoubles(): the CDS test-doubles framework endpoint is
  * not present on 7.40 SP04 (issue #207).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
+ * updateMetadata() is refused without a request: not measured on 7.40.
  * readTransport(), getVersions() and getVersionSource() are refused without a
  * request: measured on 7.40 SP04, their resources answer `404`.
  */
@@ -34,6 +35,7 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
   legacyMeasuredRefusal,
+  legacyNotMeasuredRefusal,
   noDeletionCheck,
   noTransportResource,
 } from '../shared/refusalLegacy';
@@ -99,6 +101,22 @@ export class AdtDdlLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the DDL source, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
+    _config: Partial<IDdlConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/ddic/ddl/sources/{name}',
+    );
   }
 
   /**

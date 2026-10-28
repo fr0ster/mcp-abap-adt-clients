@@ -21,6 +21,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -36,11 +37,13 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { DDL_SOURCE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import { writeObjectDocument } from '../shared/documentWrite';
 import {
   createLockTracker,
   type LockRegistry,
@@ -68,6 +71,10 @@ export class AdtDdl<
     IAdtReadable<IDdlConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IDdlConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IDdlConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IDdlConfig,
       ReturnType<R['deletion']>,
@@ -283,6 +290,42 @@ export class AdtDdl<
           config.transportRequest,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the DDL source's metadata document — one PUT of
+   * `options.source`, as the caller built it, under the caller's
+   * `options.lockHandle` (and `config.transportRequest` as `corrNr`), with
+   * the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
+    config: Partial<IDdlConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          DDL_SOURCE.uri(this.name(config)),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

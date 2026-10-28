@@ -183,17 +183,20 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'getObjectProperties',
     ],
   ],
-  // No deletion API on 7.40 (spec §4.3, §5).
-  [AdtClassLegacy, ['checkDeletion', 'readTransport']],
+  // No deletion API on 7.40 (spec §4.3, §5); updateMetadata not measured there.
+  [AdtClassLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
   // The includes' inherited readTransport asks for the class's (B4 c6).
   [AdtLocalTestClassLegacy, ['readTransport']],
   [AdtLocalTypesLegacy, ['readTransport']],
   [AdtLocalDefinitionsLegacy, ['readTransport']],
   [AdtLocalMacrosLegacy, ['readTransport']],
-  [AdtProgramLegacy, ['checkDeletion', 'readTransport']],
-  [AdtInterfaceLegacy, ['checkDeletion', 'readTransport']],
+  [AdtProgramLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
+  [AdtInterfaceLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
   [AdtFunctionGroupLegacy, ['checkDeletion', 'readTransport']],
-  [AdtFunctionModuleLegacy, ['checkDeletion', 'readTransport']],
+  [
+    AdtFunctionModuleLegacy,
+    ['checkDeletion', 'readTransport', 'updateMetadata'],
+  ],
   // `checkCdsTestDoubles` stays refused (spec §10.3).
   [
     AdtDdlLegacy,
@@ -203,6 +206,7 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'readTransport',
       'getVersions',
       'getVersionSource',
+      'updateMetadata',
     ],
   ],
   [AdtIncludeLegacy, ['checkDeletion']],

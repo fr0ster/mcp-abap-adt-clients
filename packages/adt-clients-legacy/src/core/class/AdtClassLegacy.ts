@@ -6,6 +6,7 @@
  *   holds, instead of the /sap/bc/adt/deletion/ API 7.40 SP04 lacks.
  *   `update` is the inherited stateless PUT; this class does not override it.
  * - checkDeletion() — refused without a request: 7.40 has no deletion API.
+ * - updateMetadata() — refused without a request: not measured on 7.40.
  */
 
 import {
@@ -26,7 +27,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
+import {
+  legacyNotMeasuredRefusal,
+  noDeletionCheck,
+  noTransportResource,
+} from '../shared/refusalLegacy';
 
 export class AdtClassLegacy<
   R extends IClassResults = typeof classDocuments,
@@ -76,6 +81,22 @@ export class AdtClassLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the class, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    _config: Partial<IClassConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/oo/classes/{name}',
+    );
   }
 
   /**

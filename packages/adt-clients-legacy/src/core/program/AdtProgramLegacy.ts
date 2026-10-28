@@ -4,6 +4,7 @@
  * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
  * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
+ * updateMetadata() is refused without a request: not measured on 7.40.
  */
 
 import {
@@ -24,7 +25,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
+import {
+  legacyNotMeasuredRefusal,
+  noDeletionCheck,
+  noTransportResource,
+} from '../shared/refusalLegacy';
 
 export class AdtProgramLegacy<
   R extends IProgramResults = typeof programDocuments,
@@ -74,6 +79,22 @@ export class AdtProgramLegacy<
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the program, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'updateMetadata'>,
+    _config: Partial<IProgramConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/programs/programs/{name}',
+    );
   }
 
   /**

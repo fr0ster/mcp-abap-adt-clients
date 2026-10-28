@@ -78,6 +78,24 @@ export function legacyUnmeasuredRefusal<T, E extends IAdtError = IAdtError>(
 }
 
 /**
+ * `operation` refused until measured: 7.40 SP04's type table lists no
+ * `operation` for the object, and no run on 7.40 has sent `request`. The same
+ * shape as {@link legacyRefusal}; no request is sent, and the words claim
+ * nothing about the endpoint beyond that.
+ */
+export function legacyNotMeasuredRefusal<T, E extends IAdtError = IAdtError>(
+  operation: string,
+  request: string,
+): IAdtResponse<T, E> {
+  // The library's own verdict, as in legacyRefusal.
+  return failed<T, E>({
+    origin: 'refusal',
+    code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+    message: `${operation}: refused until measured: no run on a legacy system (7.40 SP04) has sent ${request}.`,
+  } as E);
+}
+
+/**
  * 7.40 SP04 has no deletion API: `POST /sap/bc/adt/deletion/check` answered
  * `404` "No application class found for URI" over RFC (spec §5).
  */

@@ -637,6 +637,7 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getClass: Object.fromEntries([
     cls.refused('checkDeletion', '§5'),
     cls.refused('readTransport', '§2 measured in B4'),
+    cls.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   ...Object.fromEntries(
     (
@@ -656,10 +657,12 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getProgram: Object.fromEntries([
     prog.refused('checkDeletion', '§5'),
     prog.refused('readTransport', '§2 measured in B4'),
+    prog.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   getInterface: Object.fromEntries([
     intf.refused('checkDeletion', '§5'),
     intf.refused('readTransport', '§2 measured in B4'),
+    intf.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   getFunctionGroup: Object.fromEntries([
     fugr.refused('checkDeletion', '§5'),
@@ -668,12 +671,14 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getFunctionModule: Object.fromEntries([
     func.refused('checkDeletion', '§5'),
     func.refused('readTransport', '§2 measured in B4'),
+    func.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   getDdl: Object.fromEntries([
     ddl.refused('checkDeletion', '§5'),
     ddl.refused('readTransport', '§2 measured in B4'),
     ddl.refused('getVersions', '§2 measured in B4'),
     ddl.refused('getVersionSource', '§2 measured in B4'),
+    ddl.refused('updateMetadata', 'not measured on 7.40'),
     ddl.refused(
       'checkCdsTestDoubles',
       '§10.3 stays refused',

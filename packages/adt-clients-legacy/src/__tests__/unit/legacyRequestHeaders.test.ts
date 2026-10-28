@@ -59,6 +59,12 @@ const SENDS_NO_REQUEST: ReadonlySet<string> = new Set([
   // Measured on 7.40 SP04 (B4-cycles-20261026-2019): refused, no request
   // (readTransport and the DDL version reads take no headers: not in this table).
   'AdtMessageClassLegacy.updateMetadata',
+  // Not measured on 7.40: refused, no request.
+  'AdtClassLegacy.updateMetadata',
+  'AdtProgramLegacy.updateMetadata',
+  'AdtInterfaceLegacy.updateMetadata',
+  'AdtFunctionModuleLegacy.updateMetadata',
+  'AdtDdlLegacy.updateMetadata',
   // Measured 404 on 7.40 (spec §10.2).
   'AdtUtilsLegacy.getWhereUsed',
   'AdtUtilsLegacy.getWhereUsedScope',

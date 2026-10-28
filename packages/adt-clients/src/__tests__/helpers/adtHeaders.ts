@@ -216,6 +216,12 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
   },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200).
+  'AdtClass.updateMetadata': {
+    accept: 'application/vnd.sap.adt.oo.classes.v4+xml',
+    contentType: 'application/vnd.sap.adt.oo.classes.v4+xml; charset=utf-8',
+  },
   'AdtClassMemberBase.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
@@ -294,6 +300,12 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtDdl.update': {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
+  },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200).
+  'AdtDdl.updateMetadata': {
+    accept: 'application/vnd.sap.adt.ddlSource+xml',
+    contentType: 'application/vnd.sap.adt.ddlSource+xml; charset=utf-8',
   },
   'AdtDomain.activate': {
     accept: 'application/xml',
@@ -464,6 +476,13 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
   },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200).
+  'AdtFunctionModule.updateMetadata': {
+    accept: 'application/vnd.sap.adt.functions.fmodules.v3+xml',
+    contentType:
+      'application/vnd.sap.adt.functions.fmodules.v3+xml; charset=utf-8',
+  },
   'AdtInclude.activate': {
     accept: 'application/xml',
     contentType: 'application/vnd.sap.adt.activation+xml',
@@ -507,6 +526,12 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtInterface.update': {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
+  },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200).
+  'AdtInterface.updateMetadata': {
+    accept: 'application/vnd.sap.adt.oo.interfaces.v5+xml',
+    contentType: 'application/vnd.sap.adt.oo.interfaces.v5+xml; charset=utf-8',
   },
   'AdtLocalDefinitions.check': {
     accept: 'application/vnd.sap.adt.checkmessages+xml',
@@ -659,6 +684,13 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
   'AdtProgram.update': {
     accept: 'text/plain',
     contentType: 'text/plain; charset=utf-8',
+  },
+  // Not in 35.0.0: added with 38.0.0, measured on S/4HANA 2025 and ABAP
+  // cloud (200).
+  'AdtProgram.updateMetadata': {
+    accept: 'application/vnd.sap.adt.programs.programs.v3+xml',
+    contentType:
+      'application/vnd.sap.adt.programs.programs.v3+xml; charset=utf-8',
   },
   'AdtRequest.addObject': {
     accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',

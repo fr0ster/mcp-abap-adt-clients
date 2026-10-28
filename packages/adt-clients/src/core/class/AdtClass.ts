@@ -37,6 +37,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -50,7 +51,9 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
+import { writeObjectDocument } from '../shared/documentWrite';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
@@ -78,6 +81,10 @@ export class AdtClass<
     IAdtReadable<IClassConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IClassConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IClassConfig,
       ReturnType<R['deletion']>,
@@ -301,6 +308,41 @@ export class AdtClass<
           config.transportRequest,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the class's metadata document — one PUT of `options.source`, as
+   * the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    config: Partial<IClassConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          CLASS.uri(config.className as string),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }
