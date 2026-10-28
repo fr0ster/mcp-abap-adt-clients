@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<finclude:abapFunctionGroupInclude abapsource:sourceUri="source/main" adtcore:name="LZAC_SHR_FUGRZ02" adtcore:type="FUGR/I" adtcore:changedAt="2026-10-01T19:21:43Z" adtcore:version="active" adtcore:createdAt="2026-09-27T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:description="Shared function group include for read-only tests" adtcore:language="EN" xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/zac_shr_fugr" adtcore:type="FUGR/F" adtcore:name="ZAC_SHR_FUGR" adtcore:packageName="TEST_AC_SHR_PKG"/>
+  <atom:link href="source/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/plain" etag="202610011921430011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/html" etag="202610011921430011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/textelements/functiongroups/zac_shr_fugr" rel="http://www.sap.com/adt/relations/sources/textelements" title="Text elements" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/functions/groups/zac_shr_fugr/enhancements/implementations" rel="http://www.sap.com/adt/relations/enhancementImplementations" type="application/vnd.sap.adt.enhancementimplementations.v1+xml" title="Enhancement Implementations" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/functions/groups/zac_shr_fugr/includes/lzac_shr_fugrz02/source/main/enhancements/options" rel="http://www.sap.com/adt/relations/enhancementOptions" type="application/vnd.sap.adt.enhancementoptions.v2+xml" title="Enhancement Options" xmlns:atom="http://www.w3.org/2005/Atom"/>
+</finclude:abapFunctionGroupInclude>

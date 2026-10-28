@@ -1,0 +1,34 @@
+{
+  "case": "DTEL-DE--zac_shr_auth_dtel",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:41:02.327Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/dataelements/zac_shr_auth_dtel",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/dataelements/zac_shr_auth_dtel",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, sap-client and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-encoding": "gzip",
+      "content-length": "1069",
+      "content-type": "application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8",
+      "etag": "20261019130511001application/vnd.sap.adt.dataelements.v2+xmlZ+bTJUZwwVP2mj2471nFd7C+lac=",
+      "last-modified": "Mon, 19 Oct 2026 13:05:11 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "58726.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "DTEL-DE--zac_shr_auth_dtel--03-metadata.body.xml"
+  }
+}

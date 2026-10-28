@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="SAPLWOSA" adtcore:type="MSAG/N" adtcore:changedAt="2015-06-29T11:47:46Z" adtcore:version="active" adtcore:changedBy="SAP" adtcore:description="Message Class for Store Workbench, Store Order" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/wost" adtcore:type="DEVC/K" adtcore:name="WOST"/>
+</adtcore:mainObject>

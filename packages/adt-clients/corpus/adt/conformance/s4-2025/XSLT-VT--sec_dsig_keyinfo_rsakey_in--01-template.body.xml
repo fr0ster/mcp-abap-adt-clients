@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SEC_DSIG_KEYINFO_RSAKEY_IN" adtcore:type="XSLT/VT" adtcore:changedAt="2009-01-14T21:00:00Z" adtcore:version="active" adtcore:createdAt="2009-01-14T21:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="ds:KeyInfo" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/soap_security_saml2" adtcore:type="DEVC/K" adtcore:name="SOAP_SECURITY_SAML2"/>
+</adtcore:mainObject>

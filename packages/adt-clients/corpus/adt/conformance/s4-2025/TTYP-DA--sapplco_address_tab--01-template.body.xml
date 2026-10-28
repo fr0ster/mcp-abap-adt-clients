@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SAPPLCO_ADDRESS_TAB" adtcore:type="TTYP/DA" adtcore:changedAt="2021-03-05T10:40:54Z" adtcore:version="active" adtcore:changedBy="SAP" adtcore:description="Proxy Table Type (Generated)" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/appl_co_xi_proxy" adtcore:type="DEVC/K" adtcore:name="APPL_CO_XI_PROXY"/>
+</adtcore:mainObject>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<trans:transformation trans:transformationType="SimpleTransformation" abapsource:sourceUri="source/main" abapsource:fixPointArithmetic="false" abapsource:activeUnicodeCheck="true" adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SEC_DSIG_KEYINFO_RSAKEY_IN" adtcore:type="XSLT/VT" adtcore:changedAt="2011-09-08T15:41:22Z" adtcore:version="active" adtcore:createdAt="2009-01-14T21:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="ds:KeyInfo" adtcore:descriptionTextLimit="60" xmlns:trans="http://www.sap.com/adt/transformation" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/plain" etag="2CD78F87B8B179298F541DF4597D00857BACA140A" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/html" etag="2CD78F87B8B179298F541DF4597D00857BACA140A" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/xsltvt/object_name/SEC_DSIG_KEYINFO_RSAKEY_IN" rel="self" type="application/vnd.sap.sapgui" title="SAP GUI Link" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/soap_security_saml2" adtcore:type="DEVC/K" adtcore:name="SOAP_SECURITY_SAML2"/>
+  <abapsource:syntaxConfiguration>
+    <abapsource:language>
+      <abapsource:version>X</abapsource:version>
+      <abapsource:description>Standard ABAP</abapsource:description>
+      <atom:link href="/sap/bc/adt/abapsource/parsers/rnd/grammar" rel="http://www.sap.com/adt/relations/abapsource/parser" type="text/plain" title="Standard ABAP" etag="816" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    </abapsource:language>
+  </abapsource:syntaxConfiguration>
+</trans:transformation>

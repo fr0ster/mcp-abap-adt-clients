@@ -12,8 +12,8 @@ import { join, relative } from 'node:path';
  * Placeholders are deliberate rather than deletions — a strategy still has to
  * see that a user id and a system id sit in those attributes.
  *
- * The corpus is kept in subfolders (`answers/`, `debugger/`, `discovery/`,
- * `headers/`, `typestructure/`); every file under it is read.
+ * The corpus is kept in subfolders (`answers/`, `conformance/`, `debugger/`,
+ * `discovery/`, `headers/`, `typestructure/`); every file under it is read.
  */
 const CORPUS = join(__dirname, '../../../corpus/adt');
 
