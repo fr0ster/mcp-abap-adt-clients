@@ -49,28 +49,30 @@ cannot be built or that has no category. The descriptor
   Only `USER_AUTHORIZATIONS` depends on who asks; everything else is the same
   for every user of the system.
 - **The serialisation (Code).** The answer is the ABAP table
-  `SEU_ADT_REPOSITORY_TYPE_LIST` written by `CALL TRANSFORMATION sadt_id` —
-  the identity asXML transformation — with `Content-Type:
-  application/vnd.sap.as+xml; charset=utf-8; dataname=<the DDIC type's data
-  name>`. There is no ADT schema and no version: the tags (`DATA`,
-  `SEU_ADT_OBJECT_TYPE_DESCRIPTOR`, `SEU_ACTION`) are the structure's field
-  names, and a field the structure gains in a release simply appears — which
-  is why 7.40 answers no `OBJECT_TYPE_LABEL_PLURAL`, `USER_AUTHORIZATIONS` or
-  `SCOPES`.
+  `SEU_ADT_REPOSITORY_TYPE_LIST` written by `CALL TRANSFORMATION sadt_id`,
+  with `Content-Type: application/vnd.sap.as+xml; charset=utf-8;
+  dataname=<the DDIC type's data name>`. That `sadt_id` is an identity asXML
+  transformation is an Inference from its name and from the answer, whose
+  tags (`DATA`, `SEU_ADT_OBJECT_TYPE_DESCRIPTOR`, `SEU_ACTION`) are the
+  structure's field names; there is no ADT schema and no version in it. The
+  7.40 answer in the corpus has no `OBJECT_TYPE_LABEL_PLURAL`,
+  `USER_AUTHORIZATIONS` or `SCOPES` (Measured); that its structure lacks the
+  fields is an Inference.
 - **So a reader** reads the fields by name and takes a missing one as a field
   that release lacks, not as an error; and `Accept:
   application/vnd.sap.as+xml` is all the request needs.
 
 ## Who reads it
 
-**Measured (where-used, ABAP cloud).** In ABAP nothing reads it: the only use
+**Measured (where-used, direct references, ABAP cloud).** The only direct use
 of `SEU_ADT_OBJECT_TYPE_DESCRIPTOR` is the table type the answer is built
-from, and the only use of `SEU_ADT_REPOSITORY_CAP_LIST` is the two fields
-`CAPABILITIES` and `USER_AUTHORIZATIONS` of that structure. The structure's
-own label says whom it serves: "Type descriptor for ADT project explorer type
-list" — the client's project explorer (its type list, its new-object dialog).
-No ADT handler grants or refuses anything by these fields; each handler checks
-for itself.
+from, and the only direct use of `SEU_ADT_REPOSITORY_CAP_LIST` is the two
+fields `CAPABILITIES` and `USER_AUTHORIZATIONS` of that structure; indirect
+references were not searched. The structure's own label (Code) says whom it
+serves: "Type descriptor for ADT project explorer type list". That the
+client's project explorer is its reader, and that no handler grants or
+refuses anything by these fields, is an Inference from that and from the
+handlers read here, each of which checks for itself.
 
 ## The fields
 
@@ -126,12 +128,13 @@ that holds is the group's (`FUGR`).
 - **Running a program (Code, Measured).** `POST
   /sap/bc/adt/programs/programrun/{programname}` (`CL_SEDI_ADT_PROGRAMRUN`)
   checks `S_DEVELOP` with `OBJTYPE PROG`, the program's name and activity
-  `16` (execute) before it `SUBMIT`s the program; refused, it answers `200`
-  with the text of message `OO/755` as the body ("You are not authorized to
-  execute this object", measured on a delivered program). The program itself
-  runs unchecked by `SUBMIT` and checks what it checks inside. Through SAP
-  GUI a user runs a report without `S_DEVELOP`; through ADT the developer
-  authorization is asked first. `S_DEVELOP`'s activities are separate —
+  `16` (execute) before it `SUBMIT`s the program; refused, it writes the text
+  of message `OO/755` as the body (Code), and the answer is `200` with "You
+  are not authorized to execute this object" (Measured on a delivered program,
+  2026-10-28). That `SUBMIT` adds no check of its own and the program checks
+  what it checks inside, and that through SAP GUI a user runs a report
+  without `S_DEVELOP`, is SAP's general behaviour, not measured here; through
+  ADT the developer authorization is asked first (Code). `S_DEVELOP`'s activities are separate —
   `01` create, `02` change, `03` display, `16` execute — so a user may run and
   read without creating; `typestructure` shows `01` alone.
 - **Every ADT endpoint (Code).** The fallback of the REST authorization BAdI
@@ -142,8 +145,9 @@ that holds is the group's (`FUGR`).
   that individual development functions carry their own `S_DEVELOP` checks. In
   the where-used list of `S_ADT_RES` (Measured) its references are roles and
   IAM apps granting it, and the package interfaces `SADT_CORE_PRIVATE`,
-  `SADT_MAIN_PRIVATE` and `SADT_REST_PRIVATE`: the check sits in the ADT REST
-  framework itself.
+  `SADT_MAIN_PRIVATE` and `SADT_REST_PRIVATE`; that the check sits in the ADT
+  REST framework behind those packages is an Inference — where exactly is not
+  read.
 - **So the layers of a run through ADT are:** the ICF service and
   `S_ADT_RES` (with `S_RFC` over RFC), the customer's BAdI by URI if one is
   implemented, the handler's own check (`S_DEVELOP 16` for a program run),
