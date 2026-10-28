@@ -66,7 +66,8 @@ function tokens(text: string): Token[] {
 const isClosing = (tag: string): boolean => tag.startsWith('</');
 const isOpening = (tag: string): boolean =>
   !isClosing(tag) && !tag.endsWith('/>') && !/^<[?!]/.test(tag);
-const isBlank = (value: string): boolean => value.trim() === '';
+/** XML whitespace only — space, tab, CR, LF; a no-break space is character data. */
+const isBlank = (value: string): boolean => /^[ \t\r\n]*$/.test(value);
 
 /** The opening tags whose element holds text (or CDATA) beside its children. */
 function mixedElements(all: Token[]): Set<number> {

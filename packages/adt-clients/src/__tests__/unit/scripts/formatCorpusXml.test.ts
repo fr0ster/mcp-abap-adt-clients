@@ -36,6 +36,11 @@ describe('formatCorpusXml', () => {
     ['a text with padding', '<a>\n\ntext\n\n</a>', '\n\ntext\n\n'],
     ['mixed content', '<a>one<b>two</b>three</a>', 'one<b>two</b>three'],
     [
+      'a no-break space between children',
+      '<r><a><b/>\u00a0<c/></a></r>',
+      '<a><b/>\u00a0<c/></a>',
+    ],
+    [
       'mixed content opening with a child',
       '<r><a><b/>text</a></r>',
       '<a><b/>text</a>',
