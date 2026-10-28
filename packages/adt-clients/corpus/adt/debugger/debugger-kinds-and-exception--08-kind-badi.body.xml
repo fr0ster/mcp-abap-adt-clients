@@ -1,1 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><dbg:breakpoints xmlns:dbg="http://www.sap.com/adt/debugger"><breakpoint kind="badi" errorMessage="Invalid breakpoint kind  badi"/></dbg:breakpoints>
+<?xml version="1.0" encoding="utf-8"?>
+<dbg:breakpoints xmlns:dbg="http://www.sap.com/adt/debugger">
+  <breakpoint kind="badi" errorMessage="Invalid breakpoint kind  badi"/>
+</dbg:breakpoints>

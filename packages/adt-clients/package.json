@@ -108,7 +108,8 @@
     "pretest": "npm run test:check:integration && npm run --silent check:config",
     "prepublishOnly": "npm run build",
     "check:config": "node scripts/check-config-drift.js",
-    "corpus:capture": "ts-node scripts/capture-adt-corpus.ts"
+    "corpus:capture": "ts-node scripts/capture-adt-corpus.ts",
+    "corpus:format": "ts-node scripts/format-corpus-xml.ts"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -7,7 +7,8 @@ from this package's opinion.
 
 The recordings live in this repository under [`corpus/adt/answers/`](../../corpus/adt/answers): one
 `.json` per step carrying the request and the response metadata, beside a
-`.body.xml` or `.body.txt` with the payload as it arrived. Case names say what
+`.body.xml` or `.body.txt` with the payload as it arrived (an XML body laid
+out one element per line, only the whitespace between tags changed). Case names say what
 each demonstrates — `refusal-check-nonexistent-object`,
 `refusal-validation-name-taken-ddl`, and so on.
 
