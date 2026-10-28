@@ -488,7 +488,7 @@ export class Probe {
       );
       const handle = lockHandle(locked);
       if (!handle) return false;
-      await withLock(
+      const updated = await withLock(
         handle,
         // Released after an interrupt too: unlocking is cleanup.
         (held) =>
@@ -510,6 +510,10 @@ export class Probe {
               }) ?? Promise.resolve(),
           ),
       );
+      // A refused or failed update is not a parent to build on: the dependent
+      // measurement is skipped, and a gate refusal keeps its reason
+      // (`skipNote` reads it).
+      if (!ok(updated)) return false;
     }
     const activated = await this.direct1(
       (client, analyse) =>
@@ -655,6 +659,8 @@ export class Probe {
       );
     if (this.wanted(spec.type, writeMember) || writesLocals) {
       let body = spec.source?.(names.known, context);
+      // The read's own refusal names the skip below, not an earlier step's.
+      this.refusal = undefined;
       if (body === undefined) {
         const read = await this.direct1((client, analyse) =>
           spec.write === 'source'
@@ -696,7 +702,9 @@ export class Probe {
                 this.skip(
                   spec.type,
                   writeMember,
-                  'skipped: the object could not be read to write it back',
+                  this.skipNote(
+                    'skipped: the object could not be read to write it back',
+                  ),
                 );
             } else
               await this.operation({

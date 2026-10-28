@@ -5183,6 +5183,55 @@ describe('the gate refuses what phase 2 may not send', () => {
     expect(fake.created.size).toBe(0);
   });
 
+  it("a parent's refused update skips the dependent measurement with that reason, and activates nothing", async () => {
+    const members = new Map([
+      [
+        'getDdl().update',
+        [
+          {
+            method: 'PUT',
+            path: '/sap/bc/adt/ddic/ddl/sources/{name}/source/main',
+          },
+        ],
+      ],
+    ]);
+    const fake = system();
+    const result = await measure(
+      gated(fake, { ...none, members, except: ['getDdl().update'] }),
+      'accessControl',
+    );
+    expect(sent(fake, 'PUT', /\/ddic\/ddl\/sources\/.+\/source\/main/)).toBe(
+      false,
+    );
+    expect(sent(fake, 'POST', /\/sap\/bc\/adt\/activation/)).toBe(false);
+    expect(result.updates[0]?.note).toBe(
+      'skipped: excluded by --except: getDdl().update',
+    );
+    expect(fake.created.size).toBe(0);
+  });
+
+  it('a refused read of the object to write back names its reason in the skip', async () => {
+    const members = new Map([
+      [
+        'getClass().read',
+        [{ method: 'GET', path: '/sap/bc/adt/oo/classes/{name}/source/main' }],
+      ],
+    ]);
+    const fake = system();
+    const written = await cycle(
+      gated(fake, { ...none, members, except: ['getClass().read'] }),
+      CLASS_UPDATE,
+    );
+    expect(sent(fake, 'GET', /\/oo\/classes\/.+\/source\/main/)).toBe(false);
+    expect(written.skipped?.join(' ')).toContain(
+      'excluded by --except: getClass().read',
+    );
+    expect(written.skipped?.join(' ')).not.toContain(
+      'the object could not be read to write it back',
+    );
+    expect(fake.created.size).toBe(0);
+  });
+
   it('what phase 2 made is still deleted and unlocked when those endpoints match --except', async () => {
     const fake = system();
     const written = await cycle(
