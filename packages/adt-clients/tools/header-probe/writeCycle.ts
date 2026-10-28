@@ -17,17 +17,13 @@ import type {
   IEvidence,
   IHeaderVerdict,
 } from './corpus';
-import {
-  byContrast,
-  emptyNamed,
-  judge,
-  realMediaTypes,
-} from './corpus';
+import { byContrast, emptyNamed, judge, realMediaTypes } from './corpus';
 import type { IWriteCycleInput, IWriteCycleResult } from './corpusRun';
 import { Interrupted, Ledger, withCleanup, withLock } from './ledger';
 import { isSetHandler } from './members';
 import {
   type IObjectSpec,
+  type IProbeClient,
   type ISpecContext,
   LOCAL_INCLUDES,
   OBJECT_SPECS,
@@ -380,11 +376,13 @@ export async function measureUpdates(
         const config = spec.config(name, ctx);
         // A name that is there is not ours: nothing is created or deleted.
         if (!(await probe.isFree(spec, name, ctx))) {
-          row.note = probe.skipNote(`the name ${name} is there already, so it is not ours`);
+          row.note = probe.skipNote(
+            `the name ${name} is there already, so it is not ours`,
+          );
           continue;
         }
         const pair = (m: string) => knownPair(spec.handler, m) as IAdtHeaders;
-        const handle = (client: AdtClient) => spec.handle(client);
+        const handle = (client: IProbeClient) => spec.handle(client);
         const created = await probe.direct1((client, analyse) =>
           Promise.resolve(
             handle(client).create?.(config, {
@@ -399,7 +397,9 @@ export async function measureUpdates(
             ...(status !== undefined ? { status } : {}),
           }))
         ) {
-          row.note = probe.skipNote(`the create answered ${status ?? created.failure}`);
+          row.note = probe.skipNote(
+            `the create answered ${status ?? created.failure}`,
+          );
           continue;
         }
         const read = () =>
@@ -413,7 +413,9 @@ export async function measureUpdates(
         const before = await read();
         const content = bodyOf(before);
         if (!okOf(before) || content === undefined) {
-          row.note = probe.skipNote(`the read before answered ${statusOf(before) ?? before.failure}`);
+          row.note = probe.skipNote(
+            `the read before answered ${statusOf(before) ?? before.failure}`,
+          );
           continue;
         }
         const changed =
@@ -429,7 +431,9 @@ export async function measureUpdates(
         const lockHandle =
           result?.ok && result.getResult ? result.getResult().value : undefined;
         if (typeof lockHandle !== 'string' || !lockHandle) {
-          row.note = probe.skipNote(`the lock answered ${statusOf(locked) ?? locked.failure}`);
+          row.note = probe.skipNote(
+            `the lock answered ${statusOf(locked) ?? locked.failure}`,
+          );
           continue;
         }
         let refusedUpdate = false;
@@ -502,7 +506,9 @@ export async function measureUpdates(
         const after = await read();
         const later = bodyOf(after);
         if (!okOf(after) || later === undefined) {
-          row.note = probe.skipNote(`the read after answered ${statusOf(after) ?? after.failure}`);
+          row.note = probe.skipNote(
+            `the read after answered ${statusOf(after) ?? after.failure}`,
+          );
           continue;
         }
         row.applied = hashOf(later) !== hashOf(content);

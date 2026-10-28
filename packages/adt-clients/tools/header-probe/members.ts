@@ -30,8 +30,9 @@ import {
   traced,
 } from './capture';
 import { FIXED_TEXT, PROBE_HANDLE, PROBE_NAME, PROBE_PACKAGE } from './corpus';
+import type { IProbeClient } from './objects';
 import { knownPair } from './pairs';
-import { endpointOf, presence, type ISentRequest } from './record';
+import { endpointOf, type ISentRequest, presence } from './record';
 
 /** The clients a handler comes from, on one connection. */
 export interface IClients {
@@ -70,7 +71,7 @@ export interface IClientSet {
     client(
       connection: IAbapConnection,
       options?: ConstructorParameters<typeof AdtClient>[2],
-    ): AdtClient;
+    ): IProbeClient;
     /** Its delete is made under the caller's lock: lock, delete with the handle, unlock. */
     readonly deleteUnderLock: boolean;
     /** An unknown path answers 2xx with an empty body there: such a read finds nothing. */
@@ -88,7 +89,7 @@ export const temporaryObjectsSet = (): IClientSet | undefined =>
 export const temporaryClient = (
   connection: IAbapConnection,
   options?: ConstructorParameters<typeof AdtClient>[2],
-): AdtClient | undefined =>
+): IProbeClient | undefined =>
   temporaryObjectsSet()?.forTemporaryObjects?.client(connection, options);
 
 /** Whether a delete of a temporary object is made under its lock. */
