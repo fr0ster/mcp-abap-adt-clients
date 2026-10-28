@@ -50,6 +50,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtClient } from '../../clients/AdtClient';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
@@ -234,7 +235,7 @@ export class BaseTester<TConfig, TState = unknown> {
 
   // Setup state
   private connection?: IAbapConnection;
-  private client?: any;
+  private client?: AdtClient;
   private hasConfig: boolean = false;
   private isCloudSystem: boolean = false;
   private buildConfigFn?: (
@@ -750,7 +751,7 @@ export class BaseTester<TConfig, TState = unknown> {
       const configAny = config as any;
       if (configAny.className) {
         return utils.getObjectSourceUri(
-          'class',
+          'CLAS/OC',
           configAny.className,
           undefined,
           version,
@@ -758,7 +759,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.interfaceName) {
         return utils.getObjectSourceUri(
-          'interface',
+          'INTF/OI',
           configAny.interfaceName,
           undefined,
           version,
@@ -766,7 +767,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.programName) {
         return utils.getObjectSourceUri(
-          'program',
+          'PROG/P',
           configAny.programName,
           undefined,
           version,
@@ -774,7 +775,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.functionModuleName && configAny.functionGroupName) {
         return utils.getObjectSourceUri(
-          'functionmodule',
+          'FUGR/FF',
           configAny.functionModuleName,
           configAny.functionGroupName,
           version,
@@ -782,7 +783,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.ddlName) {
         return utils.getObjectSourceUri(
-          'view',
+          'DDLS/DF',
           configAny.ddlName,
           undefined,
           version,
@@ -790,7 +791,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.structureName) {
         return utils.getObjectSourceUri(
-          'structure',
+          'TABL/DS',
           configAny.structureName,
           undefined,
           version,
@@ -798,20 +799,13 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.tableName) {
         return utils.getObjectSourceUri(
-          'table',
+          'TABL/DT',
           configAny.tableName,
           undefined,
           version,
         );
       }
-      if (configAny.tableTypeName) {
-        return utils.getObjectSourceUri(
-          'tabletype',
-          configAny.tableTypeName,
-          undefined,
-          version,
-        );
-      }
+      // A table type has no source (no TTYP code among the source codes).
 
       return undefined;
     };
