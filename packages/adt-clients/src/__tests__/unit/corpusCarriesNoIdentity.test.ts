@@ -61,6 +61,48 @@ describe('the recorded corpus', () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * A host is named only as a placeholder or as SAP's own: the XML namespaces,
+   * SAP's people directory a feed author links to, and the corpus
+   * placeholders. Any other host is the recorded system's.
+   */
+  const HOSTS = new Set([
+    'www.sap.com',
+    'www.w3.org',
+    'people.wdf.sap.corp',
+    'abap.example.com',
+    'sap.example.local',
+    'abap-cloud.example',
+  ]);
+
+  it("names no host but a placeholder or SAP's own", () => {
+    const offenders = files.flatMap((name) =>
+      [...text(name).matchAll(/https?:\/\/([A-Za-z0-9.-]+)/g)]
+        .map((match) => match[1])
+        .filter((host) => !HOSTS.has(host.toLowerCase()))
+        .map((host) => `${name}: ${host}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * A user is named only as the placeholder or as one of SAP's own users,
+   * in an attribute or a JSON field, escaped or not.
+   */
+  const USERS = new Set(['SAPUSER01', 'SAP', 'SAP_SPC', '_SAPSUPPORT', 'SYS']);
+
+  it("names no user but the placeholder or SAP's own", () => {
+    const field =
+      /\b(?:user|User|userName|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?"?\s*[=:]\s*\\?"([^"\\]+)\\?"/g;
+    const offenders = files.flatMap((name) =>
+      [...text(name).matchAll(field)]
+        .map((match) => match[1])
+        .filter((user) => user.trim() !== '' && !USERS.has(user))
+        .map((user) => `${name}: ${user}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it('keeps the placeholders it promises, so a reading still sees the shape', () => {
     const documents = files.filter((name) => name.endsWith('.body.xml'));
     const withSystem = documents.filter((name) =>

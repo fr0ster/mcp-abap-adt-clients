@@ -2,7 +2,7 @@
   "method": "GET",
   "url": "/sap/bc/adt/runtime/traces/abaptraces",
   "params": {
-    "user": "CB9980006582"
+    "user": "SAPUSER01"
   },
   "headers": {
     "Accept": "application/xml"
