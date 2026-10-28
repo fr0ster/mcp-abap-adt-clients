@@ -578,7 +578,10 @@
         "template": "FTG2-FT--s2p_multiple_bp_addresses_1--01-template.json",
         "urimapper": "FTG2-FT--s2p_multiple_bp_addresses_1--02-urimapper.json",
         "metadata": "FTG2-FT--s2p_multiple_bp_addresses_1--03-metadata.json"
-      }
+      },
+      "reason": "no readable sample: every candidate answered 403",
+      "candidatesTried": 26,
+      "candidatesNote": "SAP standard objects of this code found by the quick search (30 in all, the recorded sample included); 26 were read and every metadata read answered 403 for the trial user. The recorded sample is the first of them."
     },
     "AUTH": {
       "apis": ["authorizationField"],
@@ -624,7 +627,10 @@
         "template": "ENHO-XHH--enh_copy_test_03--01-template.json",
         "urimapper": "ENHO-XHH--enh_copy_test_03--02-urimapper.json",
         "metadata": "ENHO-XHH--enh_copy_test_03--03-metadata.json"
-      }
+      },
+      "reason": "no readable sample: every candidate answered 403",
+      "candidatesTried": 5,
+      "candidatesNote": "SAP standard objects of this code found by the quick search (5 in all, the recorded sample included); 5 were read and every metadata read answered 403 for the trial user. The recorded sample is the first of them."
     },
     "ENHO/XHB": {
       "apis": ["enhancement"],
