@@ -15,6 +15,7 @@
  * Run: npm test -- --testPathPatterns=scalarFunction/ScalarFunction
  */
 
+import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -42,6 +43,10 @@ import {
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { expectRemovedOrAbsent } from '../../../helpers/objectPresence';
+import {
+  readRootDescription,
+  replaceRootDescription,
+} from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -262,6 +267,66 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               'readState',
             );
             expect(typeof readState).toBe('string');
+
+            // ── 4b) Metadata update: the whole document, its description changed ──
+            const description = `MCP metadata ${randomBytes(4).toString('hex')}`;
+            const current = expectResult(
+              await sf.readMetadata(
+                { scalarFunctionName },
+                { analyse: analyseException },
+              ),
+              'readMetadata scalar function',
+            );
+            const patched = replaceRootDescription(
+              String(current),
+              description,
+              'ScalarFunction',
+            );
+            const mdLock = expectResult(
+              await sf.lock(
+                { scalarFunctionName },
+                { analyse: analyseException },
+              ),
+              'lock scalar function (metadata)',
+            );
+            await releasing(
+              async () =>
+                expectResult(
+                  await sf.updateMetadata(
+                    { scalarFunctionName, transportRequest },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(sf, 'updateMetadata'),
+                      source: patched,
+                      lockHandle: mdLock,
+                    },
+                  ),
+                  'updateMetadata scalar function',
+                ),
+              () =>
+                sf.unlock({ scalarFunctionName }, mdLock, {
+                  analyse: analyseException,
+                }),
+              'unlock scalar function (metadata)',
+            );
+            expectResult(
+              await sf.activate(
+                { scalarFunctionName },
+                {
+                  analyse: judged(analyseActivation),
+                  headers: integrationHeadersOf(sf, 'activate'),
+                },
+              ),
+              'activate scalar function (after metadata update)',
+            );
+            const after = expectResult(
+              await sf.readMetadata(
+                { scalarFunctionName },
+                { analyse: analyseException },
+              ),
+              'readMetadata scalar function (after metadata update)',
+            );
+            expect(readRootDescription(String(after))).toBe(description);
           } else {
             // ── 3b) Metadata-only validation: read the inactive object back ──
             const readState = expectResult(
