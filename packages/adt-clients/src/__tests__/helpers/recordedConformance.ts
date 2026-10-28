@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import {
   type IReleaseAnswers,
   readDiscovery,
-  readHasSourceLink,
+  readSourceLinkTypes,
   readTypeStructure,
   readUrimapperUri,
   type SampleAnswer,
@@ -174,7 +174,7 @@ export function sampleAnswer(
     name: sample.name,
     parent: sample.parent,
     urimapperUri: readUrimapperUri(urimapper.body),
-    hasSourceLink: readHasSourceLink(metadata.body),
+    sourceLinkTypes: readSourceLinkTypes(metadata.body),
   };
 }
 

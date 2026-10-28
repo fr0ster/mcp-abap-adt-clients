@@ -60,8 +60,9 @@ import {
   checkTypeTable,
   conflictLine,
   libraryAddress,
+  librarySourceTypesOf,
   readDiscovery,
-  readHasSourceLink,
+  readSourceLinkTypes,
   readTypeStructure,
   readUrimapperUri,
   type SampleAnswer,
@@ -348,7 +349,7 @@ describe(
                   name: sample.name,
                   parent: sample.parent,
                   urimapperUri: readUrimapperUri(urimapper.body),
-                  hasSourceLink: readHasSourceLink(read.body),
+                  sourceLinkTypes: readSourceLinkTypes(read.body),
                 },
           );
           if (out) {
@@ -363,11 +364,15 @@ describe(
           }
         }
 
-        const report = checkTypeTable(table, {
-          types: readTypeStructure(typestructure),
-          collections: readDiscovery(discovery),
-          samples,
-        });
+        const report = checkTypeTable(
+          table,
+          {
+            types: readTypeStructure(typestructure),
+            collections: readDiscovery(discovery),
+            samples,
+          },
+          await librarySourceTypesOf(table),
+        );
 
         if (out) {
           const scrub = scrubber([
@@ -472,6 +477,7 @@ describe(
         const coverage = recordedCoverage(release);
         expect(report.notCreated).toEqual(coverage.notCreated);
         expect(Object.keys(report.unserved)).toEqual(coverage.unserved);
+        expect(report.capabilityNotUsed).toEqual(coverage.capabilityNotUsed);
         expect(Object.keys(report.unreadable)).toEqual(
           Object.keys(NO_READABLE_SAMPLE[release]),
         );

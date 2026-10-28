@@ -1,5 +1,5 @@
 {
-  "note": "The coverage of the conformance check (spec 4, item 3): per release, the codes whose typestructure entry lists CREATE that no entry of the release's table creates (notCreated), and the codes of the release's types no entry serves (unserved; the check reports each with its OBJECT_TYPE_LABEL, read from the answer). Asserted by typeTablesConformance.test.ts; a change to a table or to a recorded answer that changes it is an edit of this file.",
+  "note": "The coverage of the conformance check (spec 4, item 3): per release, the codes whose typestructure entry lists CREATE that no entry of the release's table creates (notCreated); the codes whose entry lists EXECUTE or PROFILE that no entry runs or profiles, with the capabilities unused (capabilityNotUsed); and the codes of the release's types no entry serves (unserved; the check reports each with its OBJECT_TYPE_LABEL, read from the answer). None of these is a conflict. Asserted by typeTablesConformance.test.ts; a change to a table or to a recorded answer that changes it is an edit of this file.",
   "s4-2025": {
     "notCreated": [
       "ACID/AD",
@@ -50,6 +50,11 @@
       "WTAG/WB",
       "WTHM/WH"
     ],
+    "capabilityNotUsed": {
+      "FUGR/FF": ["EXECUTE", "PROFILE"],
+      "TRAN/T": ["PROFILE"],
+      "WDYA/YY": ["PROFILE"]
+    },
     "unserved": [
       "/$TM",
       "/1F",
@@ -796,6 +801,12 @@
       "WTAG/WB",
       "WTHM/WH"
     ],
+    "capabilityNotUsed": {
+      "FUGR/FF": ["EXECUTE", "PROFILE"],
+      "PROG/P": ["EXECUTE", "PROFILE"],
+      "TRAN/T": ["PROFILE"],
+      "WDYA/YY": ["PROFILE"]
+    },
     "unserved": [
       "/$TM",
       "/1F",
@@ -1529,6 +1540,13 @@
       "WTHM/WH",
       "XSLT/VT"
     ],
+    "capabilityNotUsed": {
+      "CLAS/OC": ["EXECUTE", "PROFILE"],
+      "FUGR/FF": ["EXECUTE", "PROFILE"],
+      "PROG/P": ["EXECUTE", "PROFILE"],
+      "TRAN/T": ["PROFILE"],
+      "WDYA/YY": ["PROFILE"]
+    },
     "unserved": [
       "/$TM",
       "/3L",

@@ -36,9 +36,12 @@ import {
   codesWithTwoMeanings,
   conflictLine,
   type IConflict,
+  type IConformanceReport,
   type IReleaseAnswers,
+  librarySourceTypes,
+  librarySourceTypesOf,
   readDiscovery,
-  readHasSourceLink,
+  readSourceLinkTypes,
   readTypeStructure,
   readUrimapperUri,
   type SampleAnswer,
@@ -66,6 +69,19 @@ describe('one meaning per code', () => {
   });
 });
 
+/**
+ * What the library's source reads ask for, per `<api> <code>` of every table
+ * and of the fixture — read once, off a connection that records the request.
+ */
+const SOURCE_TYPES = new Map<string, readonly string[]>();
+beforeAll(async () => {
+  for (const table of [...Object.values(TYPE_TABLES), fixtureTable()]) {
+    for (const [key, types] of await librarySourceTypesOf(table)) {
+      SOURCE_TYPES.set(key, types);
+    }
+  }
+});
+
 const RECORDED: readonly RecordedRelease[] = [
   's4-2025',
   'abap-cloud',
@@ -75,7 +91,14 @@ const RECORDED: readonly RecordedRelease[] = [
 describe.each(RECORDED)(
   '%s: the table against the recorded answers',
   (release) => {
-    const report = checkTypeTable(tableOf(release), recordedAnswers(release));
+    let report: IConformanceReport;
+    beforeAll(() => {
+      report = checkTypeTable(
+        tableOf(release),
+        recordedAnswers(release),
+        SOURCE_TYPES,
+      );
+    });
 
     it('finds exactly the committed divergences', () => {
       expect(lines(report.conflicts)).toEqual(lines(DIVERGENCES[release]));
@@ -97,6 +120,7 @@ describe.each(RECORDED)(
       const recorded = recordedCoverage(release);
       expect(report.notCreated).toEqual(recorded.notCreated);
       expect(Object.keys(report.unserved)).toEqual(recorded.unserved);
+      expect(report.capabilityNotUsed).toEqual(recorded.capabilityNotUsed);
     });
 
     it('names every sample with no readable answer', () => {
@@ -130,7 +154,11 @@ describe('a deliberate break fails the check against the recorded answers', () =
         codes: { 'CLAS/OC': { ...facts, nameMaxLength: 31 } },
       },
     };
-    const report = checkTypeTable(broken, recordedAnswers('s4-2025'));
+    const report = checkTypeTable(
+      broken,
+      recordedAnswers('s4-2025'),
+      SOURCE_TYPES,
+    );
     expect(lines(report.conflicts)).toContain(
       'name-length: class CLAS/OC: nameMaxLength 31 exceeds OBJNAME_MAXLENGTH 30',
     );
@@ -140,10 +168,11 @@ describe('a deliberate break fails the check against the recorded answers', () =
     const recorded = recordedAnswers('s4-2025');
     const collections = new Map(recorded.collections);
     collections.delete('/sap/bc/adt/oo/classes');
-    const report = checkTypeTable(ADT_TYPES_ONPREM, {
-      ...recorded,
-      collections,
-    });
+    const report = checkTypeTable(
+      ADT_TYPES_ONPREM,
+      { ...recorded, collections },
+      SOURCE_TYPES,
+    );
     expect(lines(report.conflicts)).toContain(
       'collection: class CLAS/OC: /sap/bc/adt/oo/classes is not advertised',
     );
@@ -415,15 +444,20 @@ const samplesWith = (code: string, change: Partial<ISampleFixture>) => {
 };
 
 const conflictsOf = (table: AdtApiTable<string>, answers: IReleaseAnswers) =>
-  lines(checkTypeTable(table, answers).conflicts);
+  lines(checkTypeTable(table, answers, SOURCE_TYPES).conflicts);
 
 describe('the check bites: the fixture passes', () => {
   it('a table and answers that agree report no conflict', () => {
-    const report = checkTypeTable(fixtureTable(), fixtureAnswers());
+    const report = checkTypeTable(
+      fixtureTable(),
+      fixtureAnswers(),
+      SOURCE_TYPES,
+    );
     expect(lines(report.conflicts)).toEqual([]);
     expect(report.createWithoutCapability).toEqual([]);
     expect(report.notCreated).toEqual(['ZZZZ/Z']);
     expect(report.unserved).toEqual({ 'ZZZZ/Z': 'Other' });
+    expect(report.capabilityNotUsed).toEqual({});
     expect(report.unreadable).toEqual({});
   });
 });
@@ -499,14 +533,6 @@ describe('the check bites: each conflict rule, alone', () => {
       'execute: class CLAS/OC: run listed, EXECUTE is not',
     ],
     [
-      'execute — EXECUTE where no entry runs',
-      fixtureTable({
-        classOps: ['create', 'read', 'source', 'updateMetadata', 'profile'],
-      }),
-      fixtureAnswers(),
-      'execute: * CLAS/OC: EXECUTE listed, no entry runs it',
-    ],
-    [
       'profile — profile where the answer lists no PROFILE',
       fixtureTable(),
       fixtureAnswers({
@@ -515,12 +541,14 @@ describe('the check bites: each conflict rule, alone', () => {
       'profile: class CLAS/OC: profile listed, PROFILE is not',
     ],
     [
-      'profile — PROFILE where no entry profiles',
-      fixtureTable({
-        classOps: ['create', 'read', 'source', 'updateMetadata', 'run'],
+      'source — listed, where the document links a type the library does not read',
+      fixtureTable(),
+      fixtureAnswers({
+        samples: samplesWith('CLAS/OC', {
+          metadata: metadataXml([{ rel: SOURCE, type: 'application/json' }]),
+        }),
       }),
-      fixtureAnswers(),
-      'profile: * CLAS/OC: PROFILE listed, no entry profiles it',
+      'source: class CLAS/OC: source listed, the metadata document links none the library reads [text/plain]',
     ],
     [
       'source — listed, where the document links only an HTML source',
@@ -530,7 +558,7 @@ describe('the check bites: each conflict rule, alone', () => {
           metadata: metadataXml([{ rel: SOURCE, type: 'text/html' }]),
         }),
       }),
-      'source: class CLAS/OC: source listed, the metadata document links no text/plain or untyped source',
+      'source: class CLAS/OC: source listed, the metadata document links none the library reads [text/plain]',
     ],
     [
       'source — not listed, where the document links a plain-text source',
@@ -610,6 +638,7 @@ describe('the check bites: what is not a conflict', () => {
       fixtureAnswers({
         types: typesWith('CLAS/OC', { capabilities: ['EXECUTE', 'PROFILE'] }),
       }),
+      SOURCE_TYPES,
     );
     expect(lines(report.conflicts)).toEqual([]);
     expect(report.createWithoutCapability).toEqual(['CLAS/OC']);
@@ -621,6 +650,7 @@ describe('the check bites: what is not a conflict', () => {
         classOps: ['read', 'source', 'updateMetadata', 'run', 'profile'],
       }),
       fixtureAnswers(),
+      SOURCE_TYPES,
     );
     expect(lines(report.conflicts)).toEqual([]);
     expect(report.notCreated).toEqual(['CLAS/OC', 'ZZZZ/Z']);
@@ -637,6 +667,7 @@ describe('the check bites: what is not a conflict', () => {
           metadataStatus: 403,
         }),
       }),
+      SOURCE_TYPES,
     );
     expect(lines(report.conflicts)).toEqual([]);
     expect(report.unreadable).toEqual({
@@ -650,15 +681,57 @@ describe('the check bites: what is not a conflict', () => {
     ).toEqual([]);
   });
 
-  it('a release that advertises no app:accept anywhere runs no metadata-type rule', () => {
+  it('a collection without app:accept: the metadata-type rule is not applied there', () => {
     expect(
       conflictsOf(
         fixtureTable(),
         fixtureAnswers({
-          collections: BASE_COLLECTIONS.map((c) => ({ ...c, accepts: [] })),
+          collections: [
+            { href: '/sap/bc/adt/oo/classes', accepts: [] },
+            ...BASE_COLLECTIONS.slice(1),
+          ],
         }),
       ),
     ).toEqual([]);
+    // The same type against another advertised type is still refused.
+    expect(
+      conflictsOf(
+        fixtureTable(),
+        fixtureAnswers({
+          collections: [
+            {
+              href: '/sap/bc/adt/oo/classes',
+              accepts: ['application/vnd.sap.adt.oo.classes.v3+xml'],
+            },
+            ...BASE_COLLECTIONS.slice(1),
+          ],
+        }),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('EXECUTE listed, no entry runs it: coverage, not a conflict', () => {
+    const report = checkTypeTable(
+      fixtureTable({
+        classOps: ['create', 'read', 'source', 'updateMetadata', 'profile'],
+      }),
+      fixtureAnswers(),
+      SOURCE_TYPES,
+    );
+    expect(lines(report.conflicts)).toEqual([]);
+    expect(report.capabilityNotUsed).toEqual({ 'CLAS/OC': ['EXECUTE'] });
+  });
+
+  it('PROFILE listed, no entry profiles it: coverage, not a conflict', () => {
+    const report = checkTypeTable(
+      fixtureTable({
+        classOps: ['create', 'read', 'source', 'updateMetadata', 'run'],
+      }),
+      fixtureAnswers(),
+      SOURCE_TYPES,
+    );
+    expect(lines(report.conflicts)).toEqual([]);
+    expect(report.capabilityNotUsed).toEqual({ 'CLAS/OC': ['PROFILE'] });
   });
 });
 
@@ -683,6 +756,23 @@ describe('the check bites: one meaning per code', () => {
   });
 });
 
+describe("rule source reads the library's own source types", () => {
+  it.each([
+    ['class', 'CLAS/OC', ['text/plain']],
+    ['scalarFunctionImplementation', 'DSFI/SFI', ['application/json']],
+    [
+      'featureToggle',
+      'FTG2/FT',
+      ['application/vnd.sap.adt.toggle.content.v2+json'],
+    ],
+  ] as const)('%s %s', async (api, code, types) => {
+    expect(await librarySourceTypes(api, code)).toEqual(types);
+  });
+  it('an API with no source read has none', async () => {
+    expect(await librarySourceTypes('domain', 'DOMA/DD')).toBeUndefined();
+  });
+});
+
 describe('the readers refuse what is not the recorded shape', () => {
   it('a typestructure with a code twice', () => {
     expect(() =>
@@ -697,7 +787,7 @@ describe('the readers refuse what is not the recorded shape', () => {
     );
   });
   it('text that is not XML', () => {
-    expect(() => readHasSourceLink('<a><b></a>')).toThrow(
+    expect(() => readSourceLinkTypes('<a><b></a>')).toThrow(
       'metadata is not XML',
     );
   });

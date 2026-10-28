@@ -9,9 +9,11 @@
  * the library is not changed to make it pass. A finding that is fixed — in the
  * table, the library or the answer — fails the test until its entry is
  * removed here, and a new one fails it until it is entered with its reason.
+ * The others are the owner's rulings, stated in their reason.
  *
- * The coverage (the types no entry serves, and the codes that list `CREATE`
- * that no entry creates) is the longer list, in `coverage.json`, by code: the
+ * The coverage (the types no entry serves, the codes that list `CREATE` that
+ * no entry creates, and those that list `EXECUTE` or `PROFILE` that no entry
+ * runs or profiles) is the longer list, in `coverage.json`, by code: the
  * labels the check reports with them are the system's text, read from the
  * answer, and are not copied here.
  */
@@ -24,7 +26,7 @@ import type { ConformanceRule } from '../../helpers/typeTableConformance';
 /** A conflict the check reports and the reason it stands. */
 export interface IDivergence {
   readonly rule: ConformanceRule;
-  /** The API, or `*` for a rule judged per code over every entry. */
+  /** The API the entry is. */
   readonly api: string;
   readonly code: string;
   /** The conflict's detail, exactly as the check words it. */
@@ -33,31 +35,10 @@ export interface IDivergence {
 }
 
 const MESSAGE_OWN_URI =
-  'open: the owner decides whether the message reads its own URI';
+  'the message\'s own address answers a GET with an empty <msg:message msg:msgno="" msg:msgtext=""/> even for a message number that does not exist; the message\'s content is only in the class document; measured on S/4HANA 2025 and ABAP cloud 2026-10-29 (owner: the library reads it from the class); by code: the route /messageclass/{mc_name}/messages/{msg_no} is CL_ADT_MSG_ATOM_RES_CONT, whose do_get reads only the short text (CL_ADT_MESSAGE_CLASS_API=>READ, no IV_FETCH_ALL) and serialises it with ST_ADT_MESSAGE, whose template writes msg:msgno and msg:msgtext with no tt:value — always empty; message 000 is initial as symsgno, so no body';
 
 const FUNCTION_GROUP_SOURCE =
-  "open: the owner decides whether the function group serves its source — its metadata document links the group's main program (source/main, text/plain); the table lists no source for FUGR/F";
-
-const JSON_SOURCE =
-  'open: the owner decides whether rule source admits the source type the library reads — the document links its source as application/json, not text/plain or untyped';
-
-const TOGGLE_SOURCE =
-  'open: the owner decides whether rule source admits the source type the library reads — the document links its source as application/vnd.sap.adt.toggle.content.v2+json, not text/plain or untyped';
-
-const MESSAGE_CLASS_ACCEPT =
-  'open: the owner decides how rule metadata-type reads a collection that advertises no app:accept — /sap/bc/adt/messageclass has none on this release, and the library sends the type it measured (200)';
-
-const EMPTY_ACCEPT =
-  'open: the owner decides how rule metadata-type reads a collection whose app:accept is empty — the release advertises <app:accept/> for it, and the library sends the type it measured';
-
-const FUNCTION_MODULE_RUN =
-  'open: the owner decides whether the library runs and profiles a function module — typestructure lists EXECUTE and PROFILE for FUGR/FF, and no entry lists run or profile';
-
-const CLOUD_PROGRAM_RUN =
-  'open: the owner decides whether the library runs and profiles a program on ABAP cloud — typestructure lists EXECUTE and PROFILE for PROG/P, and the cloud table lists neither';
-
-const BASIS_740_RUN =
-  'open: the owner decides whether the library runs and profiles a class and a program on SAP_BASIS 7.40 — typestructure lists EXECUTE and PROFILE, and the 7.40 table lists neither';
+  "open: the function group's source/main answers 200 text/plain (the function pool's main program, measured 2026-10-29 on both releases); the table lists no source — interfaces-adt patch pending the owner";
 
 /** Per release, every conflict the check reports against its recorded answers. */
 export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
@@ -71,58 +52,12 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       reason: FUNCTION_GROUP_SOURCE,
     },
     {
-      rule: 'source',
-      api: 'scalarFunctionImplementation',
-      code: 'DSFI/SFI',
-      detail:
-        'source listed, the metadata document links no text/plain or untyped source',
-      reason: JSON_SOURCE,
-    },
-    {
-      rule: 'metadata-type',
-      api: 'messageClass',
-      code: 'MSAG/N',
-      detail:
-        "application/vnd.sap.adt.mc.messageclass+xml is not among /sap/bc/adt/messageclass's app:accept []",
-      reason: MESSAGE_CLASS_ACCEPT,
-    },
-    {
       rule: 'address',
       api: 'messageClassMessage',
       code: 'MSAG/NN',
       detail:
         'the library addresses /sap/bc/adt/messageclass/saplwosa, urimapper answers /sap/bc/adt/messageclass/saplwosa/messages/001',
       reason: MESSAGE_OWN_URI,
-    },
-    {
-      rule: 'metadata-type',
-      api: 'featureToggle',
-      code: 'FTG2/FT',
-      detail:
-        "application/vnd.sap.adt.blues.v1+xml is not among /sap/bc/adt/sfw/featuretoggles's app:accept []",
-      reason: EMPTY_ACCEPT,
-    },
-    {
-      rule: 'source',
-      api: 'featureToggle',
-      code: 'FTG2/FT',
-      detail:
-        'source listed, the metadata document links no text/plain or untyped source',
-      reason: TOGGLE_SOURCE,
-    },
-    {
-      rule: 'execute',
-      api: '*',
-      code: 'FUGR/FF',
-      detail: 'EXECUTE listed, no entry runs it',
-      reason: FUNCTION_MODULE_RUN,
-    },
-    {
-      rule: 'profile',
-      api: '*',
-      code: 'FUGR/FF',
-      detail: 'PROFILE listed, no entry profiles it',
-      reason: FUNCTION_MODULE_RUN,
     },
   ],
   'abap-cloud': [
@@ -135,22 +70,6 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       reason: FUNCTION_GROUP_SOURCE,
     },
     {
-      rule: 'source',
-      api: 'scalarFunctionImplementation',
-      code: 'DSFI/SFI',
-      detail:
-        'source listed, the metadata document links no text/plain or untyped source',
-      reason: JSON_SOURCE,
-    },
-    {
-      rule: 'metadata-type',
-      api: 'messageClass',
-      code: 'MSAG/N',
-      detail:
-        "application/vnd.sap.adt.mc.messageclass+xml is not among /sap/bc/adt/messageclass's app:accept []",
-      reason: MESSAGE_CLASS_ACCEPT,
-    },
-    {
       rule: 'address',
       api: 'messageClassMessage',
       code: 'MSAG/NN',
@@ -158,87 +77,8 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
         'the library addresses /sap/bc/adt/messageclass/sapmtran, urimapper answers /sap/bc/adt/messageclass/sapmtran/messages/000',
       reason: MESSAGE_OWN_URI,
     },
-    {
-      rule: 'metadata-type',
-      api: 'enhancement',
-      code: 'ENHO/XHH',
-      detail:
-        "application/vnd.sap.adt.enh.enhoxhh.v3+xml is not among /sap/bc/adt/enhancements/enhoxhh's app:accept []",
-      reason: EMPTY_ACCEPT,
-    },
-    {
-      rule: 'execute',
-      api: '*',
-      code: 'PROG/P',
-      detail: 'EXECUTE listed, no entry runs it',
-      reason: CLOUD_PROGRAM_RUN,
-    },
-    {
-      rule: 'profile',
-      api: '*',
-      code: 'PROG/P',
-      detail: 'PROFILE listed, no entry profiles it',
-      reason: CLOUD_PROGRAM_RUN,
-    },
-    {
-      rule: 'execute',
-      api: '*',
-      code: 'FUGR/FF',
-      detail: 'EXECUTE listed, no entry runs it',
-      reason: FUNCTION_MODULE_RUN,
-    },
-    {
-      rule: 'profile',
-      api: '*',
-      code: 'FUGR/FF',
-      detail: 'PROFILE listed, no entry profiles it',
-      reason: FUNCTION_MODULE_RUN,
-    },
   ],
-  'basis-740': [
-    {
-      rule: 'execute',
-      api: '*',
-      code: 'CLAS/OC',
-      detail: 'EXECUTE listed, no entry runs it',
-      reason: BASIS_740_RUN,
-    },
-    {
-      rule: 'profile',
-      api: '*',
-      code: 'CLAS/OC',
-      detail: 'PROFILE listed, no entry profiles it',
-      reason: BASIS_740_RUN,
-    },
-    {
-      rule: 'execute',
-      api: '*',
-      code: 'PROG/P',
-      detail: 'EXECUTE listed, no entry runs it',
-      reason: BASIS_740_RUN,
-    },
-    {
-      rule: 'profile',
-      api: '*',
-      code: 'PROG/P',
-      detail: 'PROFILE listed, no entry profiles it',
-      reason: BASIS_740_RUN,
-    },
-    {
-      rule: 'execute',
-      api: '*',
-      code: 'FUGR/FF',
-      detail: 'EXECUTE listed, no entry runs it',
-      reason: FUNCTION_MODULE_RUN,
-    },
-    {
-      rule: 'profile',
-      api: '*',
-      code: 'FUGR/FF',
-      detail: 'PROFILE listed, no entry profiles it',
-      reason: FUNCTION_MODULE_RUN,
-    },
-  ],
+  'basis-740': [],
 };
 
 /**
@@ -301,6 +141,8 @@ export const NO_READABLE_SAMPLE: {
 export interface IRecordedCoverage {
   readonly notCreated: readonly string[];
   readonly unserved: readonly string[];
+  /** Codes whose type lists `EXECUTE` / `PROFILE` that no entry uses, with those. */
+  readonly capabilityNotUsed: Readonly<Record<string, readonly string[]>>;
 }
 
 /** A list of codes, read from the file. */
@@ -327,8 +169,20 @@ export function recordedCoverage(release: RecordedRelease): IRecordedCoverage {
   }
   const field = (name: string): unknown =>
     Object.getOwnPropertyDescriptor(entry, name)?.value;
+  const unused = field('capabilityNotUsed');
+  if (!unused || typeof unused !== 'object') {
+    throw new Error(`${file}: ${release}.capabilityNotUsed is not an object`);
+  }
+  const capabilityNotUsed: Record<string, string[]> = {};
+  for (const [code, value] of Object.entries(unused)) {
+    capabilityNotUsed[code] = codes(
+      value,
+      `${file}: ${release}.capabilityNotUsed.${code}`,
+    );
+  }
   return {
     notCreated: codes(field('notCreated'), `${file}: ${release}.notCreated`),
     unserved: codes(field('unserved'), `${file}: ${release}.unserved`),
+    capabilityNotUsed,
   };
 }
