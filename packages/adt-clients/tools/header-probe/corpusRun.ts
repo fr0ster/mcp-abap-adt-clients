@@ -99,12 +99,16 @@ import {
 } from './members';
 import { coverageOf, runOnTemporaryObjects } from './objectRun';
 import type { ITemporaryContext } from './objects';
-import { phase2Skip, type Phase2Skip } from './phase2Filter';
+import {
+  type IRefusalHolder,
+  phase2Refusal,
+} from './phase2Refusal';
 import { lockHandle } from './probe';
 import {
   endpointKey,
   endpointOf,
   type IRemoval,
+  type ISentRequest,
   isEmptyAnswer,
   removalWord,
   unproven,
@@ -1393,6 +1397,8 @@ async function runWith(
   >,
   body: (connection: IAbapConnection, state: IRunState) => Promise<void>,
   report: (state: IRunState, ended: string) => string[],
+  /** Phase 2's refusal, set when it starts: the gate refuses what it names. */
+  refusal?: IRefusalHolder,
 ): Promise<{ exitCode: number; files: string[]; state: IRunState }> {
   const state: IRunState = {};
   const auth = guardAuthorization(
@@ -1408,7 +1414,10 @@ async function runWith(
       if (!input.open) throw new Error('the run needs a connection or open()');
       raw = await gateConnect(input.open, input.interrupt);
     }
-    const gated = gate(raw, { interrupt: input.interrupt });
+    const gated = gate(raw, {
+      interrupt: input.interrupt,
+      ...(refusal ? { refusal } : {}),
+    });
     const { open, close } = input;
     if (open && close && !input.connection)
       sessionsOf.set(gated, async (use) => {
@@ -1416,7 +1425,12 @@ async function runWith(
         // ends it and every lock it held (measured).
         const own = await gateConnect(open, input.interrupt);
         try {
-          await use(gate(own, { interrupt: input.interrupt }));
+          await use(
+            gate(own, {
+              interrupt: input.interrupt,
+              ...(refusal ? { refusal } : {}),
+            }),
+          );
         } finally {
           await close(own);
         }
@@ -1624,12 +1638,6 @@ export interface IWriteCycleInput {
   interrupt: Interrupt;
   /** The needs keys (`handler.member — endpoint`) of the writes still unknown. */
   unknown: ReadonlySet<string>;
-  /**
-   * Phase 2's predicate (`--only`, `--except`, phase 1's unauthorized
-   * members): a member it refuses is never sent, setup included. Cleanup of
-   * what phase 2 made is exempt.
-   */
-  skip?: Phase2Skip;
 }
 
 export interface IWriteCycleResult {
@@ -1693,6 +1701,8 @@ export async function runFull(
   let updates: IHeaderCorpusFile['updates'] = [];
   const rowsOf = (key: string) => corpora.get(key)?.rows ?? [];
 
+  /** The gate's refusal, set once phase 1 is done. */
+  const refusal: IRefusalHolder = {};
   /** What phase 2 did not send, and why. */
   const phase2Skipped: string[] = [];
   const unauthorized = new Set<string>();
@@ -1765,21 +1775,26 @@ export async function runFull(
         .filter((entry) => /— (POST|PUT|DELETE) /.test(entry.endpoint))
         .map((entry) => entry.endpoint),
     );
-    // Phase 2's predicate, built once: --only, --except and what phase 1
-    // recorded as unauthorized, per `handler.member`.
-    const unauthorizedMembers = new Map<string, string>();
+    // Phase 2's refusal, built once and handed to the gate: --only, --except
+    // (a member text resolves to the endpoints the clients' recording lists
+    // for it — nothing is sent for that — and a path text matches the path)
+    // and the endpoints phase 1 recorded as unauthorized. From here on the
+    // gate sends none of them.
+    const members = new Map<string, ISentRequest[]>();
+    for (const member of (await recordMembers()).members) {
+      const key = `${baseHandler(member.handler)}.${member.member}`;
+      members.set(key, [...(members.get(key) ?? []), ...member.requests]);
+    }
+    const unauthorizedEndpoints: ISentRequest[] = [];
     for (const corpus of corpora.values())
-      if (corpus.source === 'clients')
-        for (const row of corpus.rows)
-          if (row.unauthorized && row.endpoint)
-            unauthorizedMembers.set(
-              `${baseHandler(row.group)}.${row.label}`,
-              endpointKey(row.endpoint),
-            );
-    const skip = phase2Skip({
+      for (const row of corpus.rows)
+        if (row.unauthorized && row.endpoint)
+          unauthorizedEndpoints.push(row.endpoint);
+    refusal.current = phase2Refusal({
       only: input.only,
       except: input.except,
-      unauthorized: unauthorizedMembers,
+      members,
+      unauthorized: unauthorizedEndpoints,
     });
     const cycle = input.writeCycle;
     if (!stopped() && unknownWrites.size && cycle)
@@ -1791,7 +1806,6 @@ export async function runFull(
             clientOptions: await input.clientOptions(connection),
             interrupt: input.interrupt,
             unknown: unknownWrites,
-            skip,
           });
           phase2Rows.push(...(writes.rows ?? []));
           phase2Skipped.push(...(writes.skipped ?? []));
@@ -1810,7 +1824,6 @@ export async function runFull(
             connection,
             clientOptions: await input.clientOptions(connection),
             interrupt: input.interrupt,
-            skip,
           });
           updates = measured.updates;
           for (const update of measured.updates ?? [])
@@ -1958,7 +1971,7 @@ export async function runFull(
     return [...files, `${base}.json`, `${base}.md`];
   };
 
-  const result = await runWith(input, body, report);
+  const result = await runWith(input, body, report, refusal);
   return {
     exitCode: result.exitCode,
     files: result.files,

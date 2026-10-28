@@ -16,10 +16,12 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  cleanupOf,
   current,
   gate,
   type ICapture,
   onTheWire,
+  RequestRefused,
   runCalls,
   send,
   traced,
@@ -91,7 +93,7 @@ import {
   stepOf,
 } from '../../../../tools/header-probe/objectRun';
 import { KNOWN_PAIRS } from '../../../../tools/header-probe/pairs';
-import { phase2Skip } from '../../../../tools/header-probe/phase2Filter';
+import { phase2Refusal } from '../../../../tools/header-probe/phase2Refusal';
 import { PROBE_TYPE } from '../../../../tools/header-probe/record';
 import {
   evidenceOfRows,
@@ -4782,6 +4784,20 @@ describe("another package's client set", () => {
   });
 });
 
+/** The reason the gate refuses a request to `url`, or undefined when it is sent (to the fake system). */
+async function refusalOn(
+  connection: IAbapConnection,
+  url: string,
+  method: 'GET' | 'PUT' = 'GET',
+): Promise<string | undefined> {
+  try {
+    await send(connection, { url, method, timeout: 0 });
+    return undefined;
+  } catch (error) {
+    return error instanceof RequestRefused ? error.reason : undefined;
+  }
+}
+
 describe('--except', () => {
   it('is parsed as --only is: split on commas, empties dropped, both may be given', () => {
     expect(parseArgs(['--except', 'a,,b'])).toEqual({ except: ['a', 'b'] });
@@ -4872,6 +4888,7 @@ describe('--except', () => {
     const system = objectSystem();
     const cycles: (string | undefined)[] = [];
     const measures: (string | undefined)[] = [];
+    const classes: (string | undefined)[] = [];
     const result = await runFull({
       open: async () => system.connection,
       interrupt: new Interrupt(),
@@ -4881,12 +4898,17 @@ describe('--except', () => {
       temporaryObjects: TEMPORARY,
       only: ['getClass()', 'getProgram()'],
       except: ['getProgram()'],
-      writeCycle: async ({ skip }) => {
-        cycles.push(skip?.('getProgram().create'));
+      writeCycle: async ({ connection }) => {
+        cycles.push(
+          await refusalOn(connection, '/sap/bc/adt/programs/programs/zx'),
+        );
         return { evidence: [], removals: [] };
       },
-      updateMeasure: async ({ skip }) => {
-        measures.push(skip?.('getProgram().create'));
+      updateMeasure: async ({ connection }) => {
+        measures.push(
+          await refusalOn(connection, '/sap/bc/adt/programs/programs/zx'),
+        );
+        classes.push(await refusalOn(connection, '/sap/bc/adt/oo/classes/zx'));
         return { updates: [], removals: [] };
       },
     });
@@ -4897,10 +4919,11 @@ describe('--except', () => {
     expect(
       system.seen.some((s) => s.url.startsWith('/sap/bc/adt/oo/classes')),
     ).toBe(true);
-    // The cycle runs only when a write is still unknown; when it does, it gets the predicate.
+    // Phase 2: the gate refuses the excluded handler's endpoints, not the selected ones.
     const refused = 'excluded by --except: getProgram()';
     expect(cycles.every((reason) => reason === refused)).toBe(true);
     expect(measures).toEqual([refused]);
+    expect(classes).toEqual([undefined]);
     const file = result.file as NonNullable<typeof result.file>;
     expect(file.only).toEqual(['getClass()', 'getProgram()']);
     expect(file.except).toEqual(['getProgram()']);
@@ -4914,33 +4937,57 @@ describe('--except', () => {
         ]);
   });
 
-  it('the predicate: unauthorized first, then --except, then --only', () => {
-    const skip = phase2Skip({
+  it('the refusal: unauthorized first, then --except (a member or a path text), then --only', () => {
+    const members = new Map([
+      [
+        'getClass().read',
+        [{ method: 'GET', path: '/sap/bc/adt/oo/classes/{name}/source/main' }],
+      ],
+      [
+        'getClass().create',
+        [{ method: 'POST', path: '/sap/bc/adt/oo/classes' }],
+      ],
+    ]);
+    const refuse = phase2Refusal({
       only: ['getClass()'],
-      except: ['getClass().lock'],
-      unauthorized: new Map([['getClass().update', 'PUT /x']]),
+      except: ['getClass().read', '/bopf/'],
+      members,
+      unauthorized: [{ method: 'PUT', path: '/x/{name}' }],
     });
-    expect(skip('getClass().update')).toBe(
-      'not authorized for this user: PUT /x',
+    const at = (method: string, url: string) =>
+      refuse({ method: method as 'GET', url });
+    expect(at('PUT', '/x/zabc')).toBe(
+      'not authorized for this user: PUT /x/{name}',
     );
-    expect(skip('getClass().lock')).toBe(
-      'excluded by --except: getClass().lock',
+    expect(at('GET', '/sap/bc/adt/oo/classes/zabc/source/main')).toBe(
+      'excluded by --except: getClass().read',
     );
-    expect(skip('getProgram().create')).toBe('not selected by --only');
-    expect(skip('getClass().create')).toBeUndefined();
+    expect(at('GET', '/sap/bc/adt/bopf/businessobjects')).toBe(
+      'excluded by --except: /bopf/',
+    );
+    expect(at('GET', '/sap/bc/adt/programs/programs/zp')).toBe(
+      'not selected by --only',
+    );
+    expect(at('POST', '/sap/bc/adt/oo/classes')).toBeUndefined();
+    // The envelope itself is not a member's request: its parts are checked.
+    expect(at('POST', '/sap/bc/adt/communication/batch')).toBeUndefined();
   });
 });
 
-describe('phase 2 sends nothing a refused member names', () => {
+describe('the gate refuses what phase 2 may not send', () => {
   const LOCKED =
     '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>';
-  /** A system with one class lifecycle: create makes it, the deletion endpoint removes it. */
-  const classSystem = () => {
+  /** Objects by name: a create (POST to a collection) makes one, the deletion endpoint removes it. */
+  const system = () => {
     const created = new Set<string>();
-    const system = fakeSystem((request) => {
+    const fake = fakeSystem((request) => {
       const { method, url } = request;
-      const name = url.split('/')[6]?.split('?')[0];
-      if (method === 'POST' && url === '/sap/bc/adt/oo/classes') {
+      if (
+        method === 'POST' &&
+        /^\/sap\/bc\/adt\/(oo\/classes|ddic\/ddl\/sources|acm\/dcl\/sources|messageclass)$/.test(
+          url,
+        )
+      ) {
         const match = /adtcore:name="([^"]+)"/.exec(request.body);
         if (match) created.add(match[1].toLowerCase());
         return { status: 201 };
@@ -4952,8 +4999,13 @@ describe('phase 2 sends nothing a refused member names', () => {
           if (request.body.toLowerCase().includes(n)) created.delete(n);
         return { status: 200, body: '<del:deletionResult/>' };
       }
-      if (url.startsWith('/sap/bc/adt/oo/classes/') && name)
-        return created.has(name.toLowerCase())
+      const name = [...created].find((n) => url.toLowerCase().includes(n));
+      if (
+        /^\/sap\/bc\/adt\/(oo\/classes|ddic\/ddl\/sources|acm\/dcl\/sources|messageclass)\//.test(
+          url,
+        )
+      )
+        return name
           ? {
               status: 200,
               body: url.includes('/source/main')
@@ -4963,116 +5015,207 @@ describe('phase 2 sends nothing a refused member names', () => {
           : { status: 404 };
       return { status: 200 };
     });
-    return { ...system, created };
+    return { ...fake, created };
   };
-  const measure = (
-    fake: ReturnType<typeof classSystem>,
-    skip?: ReturnType<typeof phase2Skip>,
+  const gated = (
+    fake: ReturnType<typeof system>,
+    filter?: Parameters<typeof phase2Refusal>[0],
   ) =>
-    measureUpdates({
-      connection: gate(fake.connection, {}),
-      clientOptions: {},
-      interrupt: new Interrupt(),
-      packageName: 'ZPKG',
-      transportRequest: '',
-      only: ['class'],
-      ...(skip ? { skip } : {}),
+    gate(fake.connection, {
+      ...(filter ? { refusal: { current: phase2Refusal(filter) } } : {}),
     });
-  const cycle = (
-    fake: ReturnType<typeof classSystem>,
-    skip: ReturnType<typeof phase2Skip>,
-  ) =>
-    runWriteCycle({
-      connection: gate(fake.connection, {}),
+  const none = { members: new Map<string, never[]>(), unauthorized: [] };
+  const measure = (connection: IAbapConnection, type: string) =>
+    measureUpdates({
+      connection,
       clientOptions: {},
       interrupt: new Interrupt(),
       packageName: 'ZPKG',
       transportRequest: '',
-      unknown: new Set([
-        'getClass().update — PUT /sap/bc/adt/oo/classes/{name}/source/main',
-      ]),
-      skip,
+      only: [type],
+    });
+  const cycle = (connection: IAbapConnection, unknown: string[]) =>
+    runWriteCycle({
+      connection,
+      clientOptions: {},
+      interrupt: new Interrupt(),
+      packageName: 'ZPKG',
+      transportRequest: '',
+      unknown: new Set(unknown),
     });
   const UPDATE = 'PUT /sap/bc/adt/oo/classes/{name}/source/main';
-  const createSent = (fake: ReturnType<typeof classSystem>) =>
-    fake.seen.some(
-      (seen) => seen.method === 'POST' && seen.url === '/sap/bc/adt/oo/classes',
-    );
+  const CLASS_UPDATE = [
+    'getClass().update — PUT /sap/bc/adt/oo/classes/{name}/source/main',
+  ];
+  const sent = (fake: ReturnType<typeof system>, method: string, url: RegExp) =>
+    fake.seen.some((seen) => seen.method === method && url.test(seen.url));
 
-  it('an update unauthorized in phase 1 is not sent again, and is recorded skipped', async () => {
-    // Control: without the predicate the measurement sends the update.
-    const control = classSystem();
-    await measure(control);
-    expect(control.seen.some((seen) => seen.method === 'PUT')).toBe(true);
-    const fake = classSystem();
-    const result = await measure(
-      fake,
-      phase2Skip({ unauthorized: new Map([['getClass().update', UPDATE]]) }),
-    );
-    expect(result.updates).toEqual([
-      expect.objectContaining({
-        type: 'class',
-        member: 'update',
-        applied: 'unknown',
-        note: expect.stringContaining(
-          `not authorized for this user: ${UPDATE}`,
-        ),
+  it('a refused request never reaches the connection; the cleanup sibling is exempt; a refused part of an envelope is not queued', async () => {
+    const fake = system();
+    const refusal = {
+      current: phase2Refusal({
+        ...none,
+        except: ['/sap/bc/adt/probe/'],
       }),
-    ]);
+    };
+    const connection = gate(fake.connection, { refusal });
+    await expect(
+      send(connection, {
+        url: '/sap/bc/adt/probe/x',
+        method: 'GET',
+        timeout: 0,
+      }),
+    ).rejects.toBeInstanceOf(RequestRefused);
     expect(fake.seen).toHaveLength(0);
+    await send(cleanupOf(connection), {
+      url: '/sap/bc/adt/probe/x',
+      method: 'GET',
+      timeout: 0,
+    });
+    expect(fake.seen).toHaveLength(1);
+    // An envelope: the refused part is rejected, the other goes out.
+    const captures = await runCalls({
+      calls: [
+        (on: IAbapConnection) =>
+          send(on, { url: '/sap/bc/adt/probe/y', method: 'GET', timeout: 0 }),
+        (on: IAbapConnection) =>
+          send(on, { url: '/sap/bc/adt/other/z', method: 'GET', timeout: 0 }),
+      ],
+      batched: true,
+      connection,
+      direct: connection,
+      onBatch: (batch) => batch,
+      interrupt: new Interrupt(),
+    });
+    expect(captures[0]?.failure).toBe(
+      'skipped: excluded by --except: /sap/bc/adt/probe/',
+    );
+    expect(fake.seen.some((seen) => seen.url === '/sap/bc/adt/other/z')).toBe(
+      true,
+    );
+    expect(fake.seen.some((seen) => seen.url === '/sap/bc/adt/probe/y')).toBe(
+      false,
+    );
   });
 
-  it('--except getClass().create: no class create in phase 2, the measurement skipped with the reason', async () => {
-    const control = classSystem();
-    await measure(control);
-    expect(createSent(control)).toBe(true);
-    const skip = phase2Skip({ except: ['getClass().create'] });
-    const fake = classSystem();
-    const result = await measure(fake, skip);
+  it('an update unauthorized in phase 1 is not sent again, and is recorded skipped with the reason', async () => {
+    const control = system();
+    await measure(gated(control), 'class');
+    expect(sent(control, 'PUT', /\/source\/main/)).toBe(true);
+    const fake = system();
+    const result = await measure(
+      gated(fake, {
+        ...none,
+        unauthorized: [
+          { method: 'PUT', path: '/sap/bc/adt/oo/classes/{name}/source/main' },
+        ],
+      }),
+      'class',
+    );
+    expect(sent(fake, 'PUT', /\/source\/main/)).toBe(false);
+    expect(result.updates[0]?.note).toContain(
+      `not authorized for this user: ${UPDATE}`,
+    );
+    // What it created, it removed: the cleanup is not refused.
+    expect(fake.created.size).toBe(0);
+  });
+
+  it('--except getClass().create: no class create in phase 2; the measurement and the cycle are skipped with the reason', async () => {
+    const members = new Map([
+      [
+        'getClass().create',
+        [{ method: 'POST', path: '/sap/bc/adt/oo/classes' }],
+      ],
+    ]);
+    const filter = { ...none, members, except: ['getClass().create'] };
+    const fake = system();
+    const result = await measure(gated(fake, filter), 'class');
     expect(result.updates[0]?.note).toContain(
       'excluded by --except: getClass().create',
     );
-    expect(createSent(fake)).toBe(false);
-    const cycled = classSystem();
-    const written = await cycle(cycled, skip);
-    expect(createSent(cycled)).toBe(false);
-    expect(written.evidence).toEqual([]);
+    const cycled = system();
+    const written = await cycle(gated(cycled, filter), CLASS_UPDATE);
+    for (const run of [fake, cycled])
+      expect(sent(run, 'POST', /^\/sap\/bc\/adt\/oo\/classes$/)).toBe(false);
     expect(written.skipped?.join(' ')).toContain(
       'excluded by --except: getClass().create',
     );
     expect(written.error).toBeUndefined();
   });
 
-  it('an excluded lock or read used as setup skips the dependent measurement', async () => {
-    for (const member of ['lock', 'readMetadata']) {
-      const skip = phase2Skip({ except: [`getClass().${member}`] });
-      const fake = classSystem();
-      const result = await measure(fake, skip);
-      expect(result.updates[0]?.note).toContain(
-        `excluded by --except: getClass().${member}`,
-      );
-      expect(fake.seen).toHaveLength(0);
-    }
-    const cycled = classSystem();
-    await cycle(cycled, phase2Skip({ except: ['getClass().readMetadata'] }));
-    expect(createSent(cycled)).toBe(false);
+  it("an excluded read inside a member's own chain is not sent (the message class source)", async () => {
+    const members = new Map([
+      [
+        'getMessageClassMessage().read',
+        [{ method: 'GET', path: '/sap/bc/adt/messageclass/{name}' }],
+      ],
+    ]);
+    const fake = system();
+    const written = await cycle(
+      gated(fake, {
+        ...none,
+        members,
+        except: ['getMessageClassMessage().read'],
+      }),
+      [
+        'getMessageClassMessage().create — POST /sap/bc/adt/messageclass/{name}',
+      ],
+    );
+    expect(sent(fake, 'GET', /\/sap\/bc\/adt\/messageclass\//)).toBe(false);
+    expect(written.skipped?.join(' ')).toContain(
+      'excluded by --except: getMessageClassMessage().read',
+    );
   });
 
-  it('what phase 2 made is still deleted when its delete matches --except', async () => {
-    const fake = classSystem();
-    const written = await cycle(
-      fake,
-      phase2Skip({ except: ['getClass().delete'] }),
+  it('an activation unauthorized in phase 1 skips the dependent measurement with that reason', async () => {
+    const fake = system();
+    const result = await measure(
+      gated(fake, {
+        ...none,
+        unauthorized: [{ method: 'POST', path: '/sap/bc/adt/activation' }],
+      }),
+      'accessControl',
     );
-    expect(createSent(fake)).toBe(true);
-    // The probe's own delete step was refused; the cleanup removed the object.
+    expect(sent(fake, 'POST', /\/sap\/bc\/adt\/activation/)).toBe(false);
+    expect(result.updates[0]?.note).toBe(
+      'skipped: not authorized for this user: POST /sap/bc/adt/activation',
+    );
     expect(fake.created.size).toBe(0);
-    expect(
-      fake.seen.some((seen) => seen.url === '/sap/bc/adt/deletion/delete'),
-    ).toBe(true);
+  });
+
+  it('what phase 2 made is still deleted and unlocked when those endpoints match --except', async () => {
+    const fake = system();
+    const written = await cycle(
+      gated(fake, {
+        ...none,
+        except: ['/sap/bc/adt/deletion/', '_action=UNLOCK', 'UNLOCK'],
+      }),
+      CLASS_UPDATE,
+    );
+    expect(sent(fake, 'POST', /^\/sap\/bc\/adt\/oo\/classes$/)).toBe(true);
+    expect(fake.created.size).toBe(0);
     expect(written.removals.every((removal) => removal.removed === true)).toBe(
       true,
     );
+    expect(
+      fake.seen.some((seen) => seen.url === '/sap/bc/adt/deletion/delete'),
+    ).toBe(true);
+  });
+
+  it('phase 1 is unchanged: no gate refusal there', async () => {
+    const fake = system();
+    const result = await runCorpus({
+      connection: fake.connection,
+      source: 'clients',
+      mode: 'corpus',
+      interrupt: new Interrupt(),
+      outDir: tempDir(),
+      clientOptions: async () => ({}),
+      out: output().out,
+    });
+    expect(
+      result.corpus.rows.some((row) => row.failure?.startsWith('skipped: ')),
+    ).toBe(false);
   });
 });
 
@@ -5304,15 +5447,21 @@ describe('--record-unauthorized', () => {
       clientOptions: async () => ({}),
       out: output().out,
       recordUnauthorized: true,
-      updateMeasure: async ({ skip }) => {
-        reasons.push(skip?.('getClass().update'));
+      updateMeasure: async ({ connection }) => {
+        reasons.push(
+          await refusalOn(
+            connection,
+            '/sap/bc/adt/oo/classes/zx/source/main',
+            'PUT',
+          ),
+        );
         return { updates: [], removals: [] };
       },
     });
     expect(result.exitCode).toBe(0);
     expect(reasons).toHaveLength(1);
-    expect(reasons[0]).toMatch(
-      /^not authorized for this user: PUT \/sap\/bc\/adt\/oo\/classes/,
+    expect(reasons[0]).toBe(
+      'not authorized for this user: PUT /sap/bc/adt/oo/classes/{name}/source/main',
     );
   });
 

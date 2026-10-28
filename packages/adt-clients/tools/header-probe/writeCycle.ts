@@ -33,7 +33,6 @@ import {
   OBJECT_SPECS,
 } from './objects';
 import { knownPair } from './pairs';
-import type { Phase2Skip } from './phase2Filter';
 import { Probe, randomRun } from './probe';
 import {
   endpointKey,
@@ -194,8 +193,6 @@ export async function runWriteCycle(
     const who = key.slice(0, key.indexOf(' — '));
     // A client set's writes stay as phase 1 left them.
     if (isSetHandler(who)) continue;
-    // A member phase 2's predicate refuses is not probed.
-    if (input.skip?.(who) !== undefined) continue;
     const handler = who.slice(0, who.lastIndexOf('.'));
     const member = who.slice(who.lastIndexOf('.') + 1);
     const type = typeOfHandler(handler);
@@ -226,7 +223,6 @@ export async function runWriteCycle(
     },
     randomRun(),
     input.interrupt,
-    input.skip,
   );
   let error: string | undefined;
   try {
@@ -335,7 +331,6 @@ export async function measureUpdates(
     context,
     randomRun(),
     input.interrupt,
-    input.skip,
   );
   let error: string | undefined;
   const statusOf = (capture: ICapture) => capture.wire?.status;
@@ -357,32 +352,8 @@ export async function measureUpdates(
           applied: 'unknown',
         };
         updates.push(row);
-        // Nothing is sent when phase 2's predicate refuses a member the
-        // measurement needs (its setup included): recorded skipped, with why.
-        const parentSpec = spec.needs
-          ? OBJECT_SPECS.find(
-              (s) => s.type === (spec.needs === 'ddl' ? 'ddl' : 'functionGroup'),
-            )
-          : undefined;
-        const blocked = probe.blockedSetup([
-          ...probe.setupOf(spec),
-          { handler: spec.handler, member: 'lock' },
-          { handler: spec.handler, member: member },
-          {
-            handler: spec.handler,
-            member: spec.write === 'source' ? 'read' : 'readMetadata',
-          },
-          ...(parentSpec
-            ? ['lock', 'update', 'activate'].map((parentMember) => ({
-                handler: parentSpec.handler,
-                member: parentMember,
-              }))
-            : []),
-        ]);
-        if (blocked !== undefined) {
-          row.note = `skipped: ${blocked}`;
-          continue;
-        }
+        // A request the gate refuses is never sent; the row says which.
+        probe.refusal = undefined;
         const ctx: ISpecContext = { ...context };
         if (spec.needs) {
           const parentSpec = OBJECT_SPECS.find(
@@ -398,7 +369,9 @@ export async function measureUpdates(
             spec.needs === 'ddl' ? parentSpec.source?.(parent, ctx) : undefined,
           );
           if (!made) {
-            row.note = `its ${spec.needs} could not be created and activated`;
+            row.note = probe.skipNote(
+              `its ${spec.needs} could not be created and activated`,
+            );
             continue;
           }
           ctx.parent = parent;
@@ -407,7 +380,7 @@ export async function measureUpdates(
         const config = spec.config(name, ctx);
         // A name that is there is not ours: nothing is created or deleted.
         if (!(await probe.isFree(spec, name, ctx))) {
-          row.note = `the name ${name} is there already, so it is not ours`;
+          row.note = probe.skipNote(`the name ${name} is there already, so it is not ours`);
           continue;
         }
         const pair = (m: string) => knownPair(spec.handler, m) as IAdtHeaders;
@@ -426,7 +399,7 @@ export async function measureUpdates(
             ...(status !== undefined ? { status } : {}),
           }))
         ) {
-          row.note = `the create answered ${status ?? created.failure}`;
+          row.note = probe.skipNote(`the create answered ${status ?? created.failure}`);
           continue;
         }
         const read = () =>
@@ -440,7 +413,7 @@ export async function measureUpdates(
         const before = await read();
         const content = bodyOf(before);
         if (!okOf(before) || content === undefined) {
-          row.note = `the read before answered ${statusOf(before) ?? before.failure}`;
+          row.note = probe.skipNote(`the read before answered ${statusOf(before) ?? before.failure}`);
           continue;
         }
         const changed =
@@ -456,9 +429,10 @@ export async function measureUpdates(
         const lockHandle =
           result?.ok && result.getResult ? result.getResult().value : undefined;
         if (typeof lockHandle !== 'string' || !lockHandle) {
-          row.note = `the lock answered ${statusOf(locked) ?? locked.failure}`;
+          row.note = probe.skipNote(`the lock answered ${statusOf(locked) ?? locked.failure}`);
           continue;
         }
+        let refusedUpdate = false;
         await withLock(
           lockHandle,
           // Released after an interrupt too: unlocking is cleanup.
@@ -485,6 +459,11 @@ export async function measureUpdates(
                 }),
               ),
             );
+            // The gate refused the update: it was never sent, so there is no answer to measure.
+            if (updated.failure?.startsWith('skipped: ')) {
+              refusedUpdate = true;
+              return;
+            }
             const status = statusOf(updated);
             if (status !== undefined) row.status = status;
             const request = updated.requests[updated.requests.length - 1];
@@ -516,10 +495,14 @@ export async function measureUpdates(
             if (sapType) row.sapType = sapType;
           },
         );
+        if (refusedUpdate) {
+          row.note = probe.skipNote('the update was not sent');
+          continue;
+        }
         const after = await read();
         const later = bodyOf(after);
         if (!okOf(after) || later === undefined) {
-          row.note = `the read after answered ${statusOf(after) ?? after.failure}`;
+          row.note = probe.skipNote(`the read after answered ${statusOf(after) ?? after.failure}`);
           continue;
         }
         row.applied = hashOf(later) !== hashOf(content);

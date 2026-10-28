@@ -50,7 +50,8 @@ sent, never counted `unknown` and never tried on an object in phase 2 — phase 
 sends nothing to it in any request, the setup (creates, reads, locks, a parent
 object) included: a measurement that needs an excluded member is skipped and
 listed under `Phase 2 skipped` with the reason (`excluded by --except: <text>`).
-The one exception is the cleanup of the probe's own objects: removing or
+The gate enforces it (see "One gate, one exit"), so a request inside a
+member's own chain is refused as well. The one exception is the cleanup of the probe's own objects: removing or
 unlocking an object phase 2 created always runs, even if its delete matches
 `--except`; with
 `--only` an endpoint is probed when it passes `--only` and matches no
@@ -405,7 +406,23 @@ the cleanup and the unlocks. Before sending, the gate asks the interrupt
 (Ctrl-C, or an authorization stop); it watches every answer for an
 authorization problem; and it records the request into the call that
 issued it. Only the cleanup and the unlocks bypass the interrupt check,
-through the gate's cleanup sibling (`cleanupOf`). `traced`, `clientsOn`,
+through the gate's cleanup sibling (`cleanupOf`).
+
+In phase 2 the gate also holds the refusal built from `--only`, `--except` and
+the endpoints phase 1 recorded as unauthorized: a request to such an endpoint
+(its method and path template, `{name}` for the object's name) is not sent —
+a member's own request, a request of its internal chain, a setup request (a
+parent object, a lock, an activation), an envelope part alike. The caller gets
+a refusal of the tool's own (`RequestRefused`) carrying `excluded by --except:
+<text>`, `not selected by --only` or `not authorized for this user: <METHOD
+path>`, and the measurement that needed it is recorded skipped with that
+reason (`Phase 2 skipped`). A `--except` text names a member of the clients
+(`getX().read`, resolved to the endpoints the clients' recording lists for it,
+so an endpoint several members share is refused for all of them) or a part of
+a path (`/bopf/`). The cleanup sibling bypasses the refusal, as it bypasses the
+interrupt: removing and unlocking what phase 2 itself made always runs.
+
+`traced`, `clientsOn`,
 `runCalls` and the probe's clients refuse a connection that does not send
 through a gate, and a unit test scans `tools/header-probe/` for a request
 sent any other way.
