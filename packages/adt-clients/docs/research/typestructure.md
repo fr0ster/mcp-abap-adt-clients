@@ -36,9 +36,9 @@ cannot be built or that has no category. The descriptor
 | `OBJECT_TYPE_LABEL`, `_PLURAL`, `OBJNAME_MAXLENGTH` | The registry entry's singular and plural names and name length. |
 | `CATEGORY`, `CATEGORY_LABEL` | `cl_adt_type_group_util=>get_group`; a type without one is left out. |
 | `URI_TEMPLATE` | Built for a create request with a placeholder name, by the **VIT** URI mapper: it is always a `/sap/bc/adt/vit/wb/object_type/<type>/object_name/{name}` template, whether or not the type has an ADT resource of its own. |
-| `PARENT_OBJECT_TYPE` | Hard-coded ("HACK: the only known relevant subtype so far"): `FF` → `FUGR/F`, and Web Dynpro's `WQ`, `WZ`, `WW`, `YG` → `WDYN/YC`, `YA` → `WDYA/YY`, `YW` → `WDYN/YD`. Every other type has none. |
-| `CAPABILITIES` | Operations the **type** offers, the same for every user: `EXECUTE` for the subtypes `FF`, `P` and `OC`; `PROFILE` for `PROG/P`, `TRAN/T`, `FUGR/FF`, `CLAS/OC` and `WDYA/YY`; `CREATE` when ADT can create the type (a hard-coded list of workbench types, the function module, or the type's own workbench actions holding create, less a hard-coded exclusion list); `INDEX_UPD` for `PROG`, `FUGR`, `CLAS/OC`, `INTF/OI`, `TYPE` and `BDEF/BDO`; `KTD_DOCU` when the type has a documentation access object. Nothing else — reads, locks, updates and deletes are not in the vocabulary. |
-| `USER_AUTHORIZATIONS` | `CREATE` when this **user on this system** may create the type: `CL_WB_ADT_OBJTYPE_ACCESSIBILTY` asks the BAdI `BADI_ADT_REST_SUBTYPE_ACCESS` whether the type is accessible on the system, **and** runs `AUTHORITY-CHECK OBJECT 'S_DEVELOP'` with the type's transport type as `OBJTYPE` and activity `01` (create; `02` for a `LIMU` type). It is computed per transport type and cached, so every subtype of one transport type shares it. |
+| `PARENT_OBJECT_TYPE` | Hard-coded ("HACK: the only known relevant subtype so far"): `FF` → `FUGR/F`, and Web Dynpro's `WQ`, `WZ`, `WW`, `YG` → `WDYN/YC`, `YA` → `WDYA/YY`, `YW` → `WDYN/YD`; and `FUGR/I`, copied from `FUGR/FF`, keeps `FUGR/F`. Every other type has none. |
+| `CAPABILITIES` | Operations the **type** offers, the same for every user: `EXECUTE` for the subtypes `FF`, `P` and `OC`; `PROFILE` for `PROG/P`, `TRAN/T`, `FUGR/FF`, `CLAS/OC` and `WDYA/YY`; `CREATE` when ADT can create the type — a hard-coded list of workbench types, the function module, or the type's own workbench actions holding create; then a hard-coded exclusion list removes it, `DU`, `DV` and `DUP` lose it where the system has no NHI support, and a transport type on a hard-coded global list, or an `MO*` transport type with no subtype, gets it whatever came before; `INDEX_UPD` for `PROG`, `FUGR`, `CLAS/OC`, `INTF/OI`, `TYPE` with the type-pool subtype and `BDEF/BDO`; `KTD_DOCU` when the type has a documentation access object. Nothing else — reads, locks, updates and deletes are not in the vocabulary. |
+| `USER_AUTHORIZATIONS` | `CREATE` when this **user on this system** may create the type: `CL_WB_ADT_OBJTYPE_ACCESSIBILTY` asks the BAdI `BADI_ADT_REST_SUBTYPE_ACCESS` whether the type is accessible on the system, **and** runs `AUTHORITY-CHECK OBJECT 'S_DEVELOP'` with the type's transport type as `OBJTYPE` and activity `01` (create) — `02` (change) when the transport type derived from it differs, as a `LIMU` sub-object's does; the handler passes the transport type alone, without the subtype. It is computed per transport type and cached, so every subtype of one transport type shares it. |
 | `SCOPES` | The registry's scopes for the type (`INFOSYSTEM`, `WB_EDITORTOOL`, `ADT_CHECKABLE`, …). |
 
 **`FUGR/I` is a made-up entry (Code).** After the loop, the handler copies the
@@ -59,11 +59,14 @@ that holds is the group's (`FUGR`).
   create/update feature toggles in this system" (`FTG2/035`) — a setting of
   that system, checked after the authorization.
 - **The template is not the object's address (Code, Measured).**
-  `GET /sap/bc/adt/vit/urimapper?uri=<template with a name>` answers the
-  address: `CL_ADT_URI_MAPPING_FALLBACK` gives the type's
-  `adt_resource_uri_path` from the registry plus the name when the type has
-  one and is neither hidden nor filtered, and the VIT address itself
-  otherwise. On ABAP cloud `PROG/P` maps to `/sap/bc/adt/programs/programs/…`,
+  `GET /sap/bc/adt/vit/urimapper?uri=<template with a name>`
+  (`CL_ADT_RES_VIT_URI_MAPPER`) reads the VIT address into a workbench request
+  and hands it to the general URI mapper. For a type with an
+  `adt_resource_uri_path` in the registry that is neither hidden nor
+  filtered, `CL_ADT_URI_MAPPING_FALLBACK` first asks the type's own mapper
+  (`cl_blue_adt_uri_mapper=>map_wb_request`) and answers what it gives; only
+  where that has nothing does it build the address itself — that path plus
+  the name, or, for a type without one, the VIT address again. On ABAP cloud `PROG/P` maps to `/sap/bc/adt/programs/programs/…`,
   and `WEBI/3I` to its own VIT address: it has no ADT resource, and `GET` on
   the VIT address answers only the object's basic properties
   (`application/vnd.sap.adt.basic.object.properties+xml`).
