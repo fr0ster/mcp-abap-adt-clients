@@ -31,7 +31,7 @@ import {
 } from './capture';
 import { FIXED_TEXT, PROBE_HANDLE, PROBE_NAME, PROBE_PACKAGE } from './corpus';
 import { knownPair } from './pairs';
-import { endpointOf, type ISentRequest } from './record';
+import { endpointOf, presence, type ISentRequest } from './record';
 
 /** The clients a handler comes from, on one connection. */
 export interface IClients {
@@ -60,9 +60,40 @@ export interface IClientSet {
   ): Readonly<Record<string, object>>;
   /** The corpus pair of `handler.member` (its label prefixed), or `undefined`. */
   pairOf(handler: string, member: string): Partial<IAdtHeaders> | undefined;
+  /**
+   * Set when the system the run probes is one the base client cannot make,
+   * read back and remove its temporary objects on: they are made, read and
+   * removed through this set's client instead.
+   */
+  readonly forTemporaryObjects?: {
+    /** The client that makes, reads and removes the temporary objects. */
+    client(
+      connection: IAbapConnection,
+      options?: ConstructorParameters<typeof AdtClient>[2],
+    ): AdtClient;
+    /** Its delete is made under the caller's lock: lock, delete with the handle, unlock. */
+    readonly deleteUnderLock: boolean;
+    /** An unknown path answers 2xx with an empty body there: such a read finds nothing. */
+    readonly emptyBodyIsAbsent: boolean;
+  };
 }
 
 const CLIENT_SETS: IClientSet[] = [];
+
+/** The registered set that takes over the temporary objects, if any. */
+export const temporaryObjectsSet = (): IClientSet | undefined =>
+  CLIENT_SETS.find((set) => set.forTemporaryObjects !== undefined);
+
+/** The client a registered set makes the temporary objects with, if one does. */
+export const temporaryClient = (
+  connection: IAbapConnection,
+  options?: ConstructorParameters<typeof AdtClient>[2],
+): AdtClient | undefined =>
+  temporaryObjectsSet()?.forTemporaryObjects?.client(connection, options);
+
+/** Whether a delete of a temporary object is made under its lock. */
+export const deletesUnderLock = (): boolean =>
+  temporaryObjectsSet()?.forTemporaryObjects?.deleteUnderLock === true;
 
 /** Probe another package's clients as well, from now on. */
 export function registerClientSet(set: IClientSet): void {
@@ -72,6 +103,8 @@ export function registerClientSet(set: IClientSet): void {
     );
   if (CLIENT_SETS.some((known) => known.prefix === set.prefix)) return;
   CLIENT_SETS.push(set);
+  if (set.forTemporaryObjects?.emptyBodyIsAbsent)
+    presence.emptyBodyIsAbsent = true;
 }
 
 /** The registered client set a handler label belongs to, if any. */

@@ -91,16 +91,20 @@ import {
   handlerSpecs,
   type IClients,
   type IMemberEndpoint,
+  deletesUnderLock,
   pairOf,
   recordMembers,
+  temporaryObjectsSet,
   UNIVERSAL,
 } from './members';
 import { coverageOf, runOnTemporaryObjects } from './objectRun';
 import type { ITemporaryContext } from './objects';
+import { lockHandle } from './probe';
 import {
   endpointKey,
   endpointOf,
   type IRemoval,
+  isEmptyAnswer,
   removalWord,
   unproven,
 } from './record';
@@ -939,17 +943,27 @@ async function runClients(ctx: IContext): Promise<void> {
           // package's read answered nothing, so its entry could not be
           // checked).
           if (write && readable) {
-            const owner = specs.get(baseHandler(member.handler)) ?? spec;
-            const ownerOf = (clients: IClients) =>
-              owner.of(clients) as IHandler;
-            ctx.register(`clients ${owner.label}`, () => ({
-              label: `clients: ${owner.label} ${PROBE_NAME} (written by ${member.handler}.${member.member})`,
-              remove: clientsRemoval(
-                once,
-                (target) => ownerOf(clientsAt(target, undefined, true)),
-                ownerOf(reference),
-                owner.label,
-              ),
+            const base = specs.get(baseHandler(member.handler)) ?? spec;
+            // Where a registered set takes over the temporary objects (the
+            // base client cannot remove them on that system), through its
+            // handler of the same name.
+            const takeover = temporaryObjectsSet();
+            const takenOver = takeover
+              ? specs.get(`${takeover.prefix}${base.label}`)
+              : undefined;
+            // The set's handler first; the base handler when the set's sends
+            // no read (a type it refuses outright).
+            const handlers = [takenOver, base]
+              .filter((owner) => owner !== undefined)
+              .map((owner) => ({
+                label: owner.label,
+                at: (target: ITarget) =>
+                  owner.of(clientsAt(target, undefined, true)) as IHandler,
+                reference: owner.of(reference) as IHandler,
+              }));
+            ctx.register(`clients ${base.label}`, () => ({
+              label: `clients: ${base.label} ${PROBE_NAME} (written by ${member.handler}.${member.member})`,
+              remove: clientsRemoval(once, handlers),
             }));
           }
           return call(handlerOf(clientsAt(on, bogus)) as never, {
@@ -1093,17 +1107,33 @@ async function runClients(ctx: IContext): Promise<void> {
 /** Removes the probe object a member's write created: the handler's delete, then a read. */
 function clientsRemoval(
   once: (call: ICallOn<ITarget>) => Promise<ICapture>,
-  handlerAt: (on: ITarget) => IHandler,
-  reference: IHandler,
-  handler: string,
+  handlers: readonly {
+    label: string;
+    at: (on: ITarget) => IHandler;
+    reference: IHandler;
+  }[],
 ): () => Promise<{ removed: boolean | 'unknown'; detail: string }> {
+  // The first handler whose read sends a request does the removal.
+  let chosen = handlers[0];
   const read = () =>
     once((on, analyse) =>
-      Promise.resolve(handlerAt(on).readMetadata(UNIVERSAL, { analyse })),
+      Promise.resolve(chosen.at(on).readMetadata(UNIVERSAL, { analyse })),
     );
+  // Absent: a 404, or (where an unknown path answers 2xx) an empty 2xx.
+  const absent = (wire: IAdtWireResponse | undefined) =>
+    wire?.status === 404 || (wire !== undefined && isEmptyAnswer(wire));
   return async () => {
-    const before = (await read()).wire?.status;
-    if (before === 404) return { removed: true, detail: 'not there any more' };
+    let first: ICapture | undefined;
+    for (const candidate of handlers) {
+      chosen = candidate;
+      first = await read();
+      if (first.wire) break;
+    }
+    const { at: handlerAt, reference, label: handler } = chosen;
+    const beforeCapture = first?.wire;
+    const before = beforeCapture?.status;
+    if (absent(beforeCapture))
+      return { removed: true, detail: 'not there any more' };
     const pair = pairOf(handler, 'delete');
     if (
       !pair?.accept ||
@@ -1120,13 +1150,37 @@ function clientsRemoval(
             detail: `unknown ${before ?? 'no answer'}: ${handler} has no delete with a pair and the read cannot rule the object out`,
           };
     const headers = { accept: pair.accept, contentType: pair.contentType };
-    const deleted = await once((on, analyse) =>
-      Promise.resolve(handlerAt(on).delete(UNIVERSAL, { headers, analyse })),
-    );
-    const after = (await read()).wire?.status;
-    // A metadata read that answers 2xx finds the object.
+    // Where the delete is made under the caller's lock: lock, delete with the
+    // handle, unlock.
+    const held = deletesUnderLock()
+      ? lockHandle(
+          await once((on, analyse) =>
+            Promise.resolve(handlerAt(on).lock(UNIVERSAL, { analyse })),
+          ),
+        )
+      : undefined;
+    let deleted: ICapture;
+    try {
+      deleted = await once((on, analyse) =>
+        Promise.resolve(
+          handlerAt(on).delete(UNIVERSAL, {
+            headers,
+            analyse,
+            ...(held ? { lockHandle: held } : {}),
+          }),
+        ),
+      );
+    } finally {
+      if (held)
+        await once((on, analyse) =>
+          Promise.resolve(handlerAt(on).unlock(UNIVERSAL, held, { analyse })),
+        );
+    }
+    const afterCapture = (await read()).wire;
+    const after = afterCapture?.status;
+    // A metadata read that answers 2xx with a document finds the object.
     return removalOutcome(
-      after === 404
+      absent(afterCapture)
         ? 'absent'
         : after !== undefined && after >= 200 && after < 300
           ? 'exists'

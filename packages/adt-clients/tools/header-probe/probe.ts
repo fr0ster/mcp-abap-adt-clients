@@ -33,6 +33,7 @@ import {
   LOCAL_INCLUDES,
   OBJECT_SPECS,
 } from './objects';
+import { deletesUnderLock, temporaryClient } from './members';
 import { knownPair } from './pairs';
 import {
   endpointOf,
@@ -90,6 +91,9 @@ export class Probe {
   private client(connection: IAbapConnection): AdtClient {
     if (!throughGate(connection))
       throw new Error('Probe: the connection does not send through the gate');
+    // The client a registered set makes the temporary objects with, else the base's.
+    const own = temporaryClient(connection, this.clientOptions);
+    if (own) return own;
     return new AdtClient(connection, undefined, this.clientOptions);
   }
 
@@ -355,12 +359,38 @@ export class Probe {
           };
         const headers = knownPair(spec.handler, 'delete');
         if (!headers) return { removed: false, detail: 'no delete pair' };
-        const deleted = await this.direct1(
-          (client, analyse) =>
-            spec.handle(client).delete?.(config, { headers, analyse }) ??
-            Promise.resolve(),
-          false,
-        );
+        // Where the delete is made under the caller's lock: lock, delete with
+        // the handle, unlock (the unlock in a `finally`).
+        const held = deletesUnderLock()
+          ? lockHandle(
+              await this.direct1(
+                (client, analyse) =>
+                  spec.handle(client).lock?.(config, { analyse }) ??
+                  Promise.resolve(),
+                false,
+              ),
+            )
+          : undefined;
+        let deleted: ICapture;
+        try {
+          deleted = await this.direct1(
+            (client, analyse) =>
+              spec.handle(client).delete?.(config, {
+                headers,
+                analyse,
+                ...(held ? { lockHandle: held } : {}),
+              }) ?? Promise.resolve(),
+            false,
+          );
+        } finally {
+          if (held)
+            await this.direct1(
+              (client, analyse) =>
+                spec.handle(client).unlock?.(config, held, { analyse }) ??
+                Promise.resolve(),
+              false,
+            );
+        }
         const after = readState((await read()).wire);
         if (after.exists === false)
           return {
