@@ -97,7 +97,10 @@ describe('the recorded corpus', () => {
     'SYS',
   ]);
 
-  const URL_HOST = /https?:\/\/([A-Za-z0-9.-]+)/g;
+  // The whole authority: a host after any `user@` and without its port.
+  const URL_AUTHORITY = /https?:\/\/([^/\s"'<>\\?#]+)/g;
+  const hostOf = (authority: string): string =>
+    (authority.split('@').pop() ?? '').split(':')[0] ?? '';
   const SERVER_ELEMENT =
     /<(?:[A-Za-z]+:)?(?:host|HOST|hostname|server|APPSERVER|originalServer)>([^<]*)</g;
   // A server named in an attribute (`serverName`), and the server a debuggee
@@ -108,7 +111,7 @@ describe('the recorded corpus', () => {
   // An attribute or a JSON field, escaped or not: the whole double- or
   // single-quoted value, or an unquoted one (a query parameter).
   const USER_FIELD =
-    /\b(?:[A-Za-z]*[Uu]ser(?:Name|FullName|Id)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*(?:\\?"((?:[^"\\]|\\(?!"))*)\\?"|'([^']*)'|([^"'\\&<>\s,}]+))/g;
+    /\b(?:[A-Za-z]*[Uu]ser(?:Name|FullName|Id)?|responsible|changedBy|createdBy|owner|executedBy|lockedBy)\\?["']?\s*[=:]\s*(?:\\"((?:[^"\\]|\\(?!"))*)\\"|"((?:[^"\\]|\\.)*)"|'([^']*)'|([^"'\\&<>\s,}]+))/g;
   // An element named for a user (`trc:user`, `mi:originalUser`,
   // `del:lockUser`, `DEBUGGEE_USER`), and a feed author's name.
   const USER_ELEMENT =
@@ -117,8 +120,8 @@ describe('the recorded corpus', () => {
   /** What a detector finds in one text that it refuses. */
   const detectors: Record<string, (content: string) => string[]> = {
     host: (content) =>
-      [...content.matchAll(URL_HOST)]
-        .map((match) => match[1] ?? '')
+      [...content.matchAll(URL_AUTHORITY)]
+        .map((match) => hostOf(match[1] ?? ''))
         .filter((host) => !HOSTS.has(host.toLowerCase())),
     server: (content) =>
       [
@@ -131,7 +134,7 @@ describe('the recorded corpus', () => {
       [...content.matchAll(DASHED_IP)].map((match) => match[0]),
     user: (content) => [
       ...[...content.matchAll(USER_FIELD)]
-        .map((match) => match[1] ?? match[2] ?? match[3] ?? '')
+        .map((match) => match[1] ?? match[2] ?? match[3] ?? match[4] ?? '')
         .filter((user) => user !== '' && !USERS.has(user)),
       ...[...content.matchAll(USER_ELEMENT)]
         .map((match) => match[2] ?? '')
@@ -154,6 +157,7 @@ describe('the recorded corpus', () => {
   // detector that stops matching fails here even on a clean corpus.
   it.each([
     ['host', '<a href="https://host.realcorp.net:44300/sap/bc/adt"/>'],
+    ['host', '<a href="https://abap.example.com@private.realcorp.net/sap"/>'],
     ['server', '<trc:host>realhost</trc:host>'],
     ['server', '<mi:originalServer>realhost_00</mi:originalServer>'],
     ['server', '<x serverName="realhost_PRD_00"/>'],
@@ -170,6 +174,7 @@ describe('the recorded corpus', () => {
     ['user', '<DEBUGGEE_USER>REALUSER</DEBUGGEE_USER>'],
     ['user', '<atom:name>REALUSER</atom:name>'],
     ['user', '{"userName":"SAPUSER01","userFullName":"Jane Smith"}'],
+    ['user', '{"userFullName":"SAPUSER01\\" Jane Smith"}'],
   ])('the %s detector refuses %s', (kind, planted) => {
     const detect = detectors[kind] ?? (() => []);
     expect(detect(planted)).not.toEqual([]);
