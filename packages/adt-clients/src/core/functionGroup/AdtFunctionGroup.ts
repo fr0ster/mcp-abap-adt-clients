@@ -288,6 +288,7 @@ export class AdtFunctionGroup<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'updateMetadata'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {

@@ -87,6 +87,11 @@ async function variantGates(
   await modern.getInterface().updateMetadata({ interfaceName: 'ZIF' }, write);
   await modern.getFunctionModule().updateMetadata(fm, write);
   await modern.getDdl().updateMetadata({ ddlName: 'ZI_GATE' }, write);
+  // The function group's is gated too, and every table lists it.
+  const group = { functionGroupName: 'ZFG_GATE' };
+  await modern.getFunctionGroup().updateMetadata(group, write);
+  await cloud.getFunctionGroup().updateMetadata(group, write);
+  await basis740.getFunctionGroup().updateMetadata(group, write);
   const class740 = basis740.getClass();
   // @ts-expect-error -- ADT_TYPES_BASIS_740's `CLAS/OC` lists no updateMetadata
   await class740.updateMetadata({ className: 'ZCL_GATE' }, write);
