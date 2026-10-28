@@ -454,6 +454,24 @@ replaces the whole path. The run prints the absolute folder at the end.
 `.header-probe/` in the repository is no longer written (its `.gitignore`
 line stays for old checkouts). The files hold the system's answers.
 
+**What is committed: one summary per release.** The repository keeps, per
+measured release, the `--summary` of one full run, under
+`corpus/adt/headers/<release>/header-summary.md` (`s4-2025`, `abap-cloud`,
+`basis-740`, the names of `corpus/adt/discovery/`). Each is rendered over the
+six corpora of that run alone — one system per run, so one system per
+summary — and scrubbed before it is committed: hosts become
+`abap.example.com` / `abap-cloud.example`, users `SAPUSER01`, request numbers,
+IP addresses and UUIDs placeholders. `corpusCarriesNoIdentity.test.ts` reads
+every file under `corpus/adt/`, these too. The runs of 2026-10-28:
+
+| release | run | flags |
+|---|---|---|
+| `s4-2025` | `npm run header:discovery` (this package) | none |
+| `abap-cloud` | `npm run header:discovery` (this package) | `--record-unauthorized`: the trial user lacks rights no one can grant it; the endpoints refused are listed apart |
+| `basis-740` | `npm run header:discovery` in `packages/adt-clients-legacy`, over RFC, with the live-test overlay | `--record-unauthorized` |
+
+The corpora themselves stay out of the repository: they hold whole answers.
+
 Two files per run:
 
 - `corpus-<source>-<headers>-<timestamp>.json` — every row: the endpoint and

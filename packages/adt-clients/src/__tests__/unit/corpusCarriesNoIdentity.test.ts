@@ -13,7 +13,7 @@ import { join, relative } from 'node:path';
  * see that a user id and a system id sit in those attributes.
  *
  * The corpus is kept in subfolders (`answers/`, `debugger/`, `discovery/`,
- * `typestructure/`); every file under it is read.
+ * `headers/`, `typestructure/`); every file under it is read.
  */
 const CORPUS = join(__dirname, '../../../corpus/adt');
 
