@@ -12,7 +12,12 @@ from the values. Every statement says where it comes from:
 - **Code** — read in the ABAP source of the handler on an ABAP cloud system
   (BTP trial, 2026-10-28): `CL_SEU_ADT_RES_REPO_TYPES`, its local class
   `lcl_wb_types`, `CL_WB_ADT_OBJTYPE_ACCESSIBILTY`,
-  `CL_ADT_URI_MAPPING_FALLBACK`, `CL_ADT_RES_VIT_URI_MAPPER`.
+  `CL_ADT_URI_MAPPING_FALLBACK`, `CL_ADT_RES_VIT_URI_MAPPER`, the content
+  handlers `CL_ADT_REST_COMP_CNT_HANDLER` and `CL_ADT_REST_ASXML_HANDLER`,
+  the program run `CL_SEDI_ADT_PROGRAMRUN`, and the REST authorization BAdI
+  `IF_ADT_REST_AUTHORIZATION` with its fallback
+  `CL_ADT_REST_AUTHORIZATION_DEVL`; and the where-used lists of the types and
+  the authorization object named below.
 - **Measured** — an answer recorded on a live system the same day.
 - **Inference** — not yet confirmed by either.
 
@@ -27,6 +32,45 @@ cannot be built or that has no category. The descriptor
 `OBJECT_TYPE_LABEL_PLURAL`, `CATEGORY`, `CATEGORY_LABEL`, `URI_TEMPLATE`,
 `PARENT_OBJECT_TYPE`, `OBJNAME_MAXLENGTH`, `CAPABILITIES`,
 `USER_AUTHORIZATIONS` and `SCOPES`.
+
+## How the answer is formed
+
+- **The request (Code).** No body and no parameter is read. The `Accept`
+  header must name `application/vnd.sap.as+xml`; its parameters, the
+  `dataname` included, are ignored ("ASXML is deprecated, ignore the
+  parameters"). Without an `Accept` the answer is `400`
+  (`acceptHeaderMissing`); with one naming another type, `406`
+  (`SADT_RESOURCE/044`).
+- **The data (Code).** The registry is read with
+  `cl_wb_registry=>get_instance( p_aie = abap_true p_langu = 'E' )`, so the
+  labels are, it seems, English whatever the logon language (Inference: not
+  measured in another language). One loop over its types builds the
+  descriptors; the made-up `FUGR/I` is appended and the list sorted by code.
+  Only `USER_AUTHORIZATIONS` depends on who asks; everything else is the same
+  for every user of the system.
+- **The serialisation (Code).** The answer is the ABAP table
+  `SEU_ADT_REPOSITORY_TYPE_LIST` written by `CALL TRANSFORMATION sadt_id` —
+  the identity asXML transformation — with `Content-Type:
+  application/vnd.sap.as+xml; charset=utf-8; dataname=<the DDIC type's data
+  name>`. There is no ADT schema and no version: the tags (`DATA`,
+  `SEU_ADT_OBJECT_TYPE_DESCRIPTOR`, `SEU_ACTION`) are the structure's field
+  names, and a field the structure gains in a release simply appears — which
+  is why 7.40 answers no `OBJECT_TYPE_LABEL_PLURAL`, `USER_AUTHORIZATIONS` or
+  `SCOPES`.
+- **So a reader** reads the fields by name and takes a missing one as a field
+  that release lacks, not as an error; and `Accept:
+  application/vnd.sap.as+xml` is all the request needs.
+
+## Who reads it
+
+**Measured (where-used, ABAP cloud).** In ABAP nothing reads it: the only use
+of `SEU_ADT_OBJECT_TYPE_DESCRIPTOR` is the table type the answer is built
+from, and the only use of `SEU_ADT_REPOSITORY_CAP_LIST` is the two fields
+`CAPABILITIES` and `USER_AUTHORIZATIONS` of that structure. The structure's
+own label says whom it serves: "Type descriptor for ADT project explorer type
+list" — the client's project explorer (its type list, its new-object dialog).
+No ADT handler grants or refuses anything by these fields; each handler checks
+for itself.
 
 ## The fields
 
@@ -70,6 +114,41 @@ that holds is the group's (`FUGR`).
   and `WEBI/3I` to its own VIT address: it has no ADT resource, and `GET` on
   the VIT address answers only the object's basic properties
   (`application/vnd.sap.adt.basic.object.properties+xml`).
+
+## Running, and what ADT checks
+
+- **`EXECUTE` is not what ADT runs (Measured).**
+  `GET /sap/bc/adt/repository/informationsystem/executableobjecttypes` lists
+  eleven types on ABAP cloud — `CLAS/OC`, `DDLS/DF`, `FUGR/FF`, `PROG/P`,
+  `SRVB/SVB`, `TABL/DT`, `TRAN/T`, `VIEW/DV`, `WAPA/WO`, `WDCA/YA`,
+  `WDYA/YY` — while `typestructure` gives `EXECUTE` to three (`FF`, `P`,
+  `OC`, hard-coded).
+- **Running a program (Code, Measured).** `POST
+  /sap/bc/adt/programs/programrun/{programname}` (`CL_SEDI_ADT_PROGRAMRUN`)
+  checks `S_DEVELOP` with `OBJTYPE PROG`, the program's name and activity
+  `16` (execute) before it `SUBMIT`s the program; refused, it answers `200`
+  with the text of message `OO/755` as the body ("You are not authorized to
+  execute this object", measured on a delivered program). The program itself
+  runs unchecked by `SUBMIT` and checks what it checks inside. Through SAP
+  GUI a user runs a report without `S_DEVELOP`; through ADT the developer
+  authorization is asked first. `S_DEVELOP`'s activities are separate —
+  `01` create, `02` change, `03` display, `16` execute — so a user may run and
+  read without creating; `typestructure` shows `01` alone.
+- **Every ADT endpoint (Code).** The fallback of the REST authorization BAdI
+  (`BADI_ADT_REST_AUTHORIZATION`, `IF_ADT_REST_AUTHORIZATION~CHECK_AUTHORITY(
+  uri_string )`, customer-customisable by URI) is empty; its comment states
+  that `S_ADT_RES` "is always checked by the ADT endpoints independently" of
+  it, that through RFC `S_RFC` (`SADT_REST_AUTHORIZATION`) is checked too, and
+  that individual development functions carry their own `S_DEVELOP` checks. In
+  the where-used list of `S_ADT_RES` (Measured) its references are roles and
+  IAM apps granting it, and the package interfaces `SADT_CORE_PRIVATE`,
+  `SADT_MAIN_PRIVATE` and `SADT_REST_PRIVATE`: the check sits in the ADT REST
+  framework itself.
+- **So the layers of a run through ADT are:** the ICF service and
+  `S_ADT_RES` (with `S_RFC` over RFC), the customer's BAdI by URI if one is
+  implemented, the handler's own check (`S_DEVELOP 16` for a program run),
+  and the program's own checks. A refusal of the handler's check is a `200`
+  whose body is the message — a reading has to look at the body.
 
 ## Open
 
