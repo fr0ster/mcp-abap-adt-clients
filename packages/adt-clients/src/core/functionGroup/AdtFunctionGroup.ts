@@ -1,8 +1,9 @@
 /**
  * AdtFunctionGroup - CRUD for `FUGR/F` function groups.
  *
- * A function group is a **container**: it has no source of its own, so `read`
- * answers its metadata document and `update` changes only its description.
+ * A function group is a container whose own source is the function pool's main
+ * program: `read` / `update` read and write it; `readMetadata` /
+ * `updateMetadata` are its metadata document.
  *
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
  * at construction makes of that endpoint's answer.
@@ -14,6 +15,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -28,25 +30,25 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
+  IAdtReadable,
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtUpdatable,
   IAdtValidatable,
   IFunctionGroupResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
@@ -57,14 +59,19 @@ import {
   getFunctionGroupEnhancementOptions,
 } from './enhancements';
 import { lockFunctionGroup } from './lock';
-import { getFunctionGroup, getFunctionGroupTransport } from './read';
-import { functionGroupDocuments, type IFunctionGroupConfig } from './types';
+import {
+  getFunctionGroup,
+  getFunctionGroupSource,
+  getFunctionGroupTransport,
+} from './read';
+import type { functionGroupDocuments, IFunctionGroupConfig } from './types';
 import { unlockFunctionGroup } from './unlock';
-import { updateFunctionGroup } from './update';
+import { updateFunctionGroup, uploadFunctionGroupSource } from './update';
 import { validateFunctionGroupName } from './validation';
 
 export class AdtFunctionGroup<
   R extends IFunctionGroupResults = typeof functionGroupDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtEnhancementHost<
       IFunctionGroupConfig,
@@ -72,7 +79,9 @@ export class AdtFunctionGroup<
       ReturnType<R['enhancementOptions']>
     >,
     IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
+    IAdtReadable<IFunctionGroupConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,
+    IAdtUpdatable<Partial<IFunctionGroupConfig>, ReturnType<R['updated']>>,
     IAdtMetadataUpdatable<
       Partial<IFunctionGroupConfig>,
       ReturnType<R['metadataUpdated']>
@@ -88,6 +97,11 @@ export class AdtFunctionGroup<
     IAdtLockable<IFunctionGroupConfig>,
     IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -95,15 +109,17 @@ export class AdtFunctionGroup<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FunctionGroup';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = functionGroupDocuments as unknown as R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -221,11 +237,32 @@ export class AdtFunctionGroup<
     );
   }
 
+  /** Read the group's source — the function pool's main program. */
+  async read<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'read'>,
+    config: Partial<IFunctionGroupConfig>,
+    version?: 'active' | 'inactive',
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        getFunctionGroupSource(
+          connection,
+          config.functionGroupName as string,
+          version,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
   /**
-   * Read the group's metadata.
-   *
-   * The same resource `read` fetches — a group has no source to tell it apart
-   * from — declared separately because the contract asks both of a readable.
+   * Read the group's metadata: the group's own document, beside `read`,
+   * which reads its source (the function pool's main program).
    */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
@@ -248,6 +285,7 @@ export class AdtFunctionGroup<
 
   /** The transport request the group belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'transport'>,
     config: Partial<IFunctionGroupConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -269,7 +307,39 @@ export class AdtFunctionGroup<
   }
 
   /**
-   * Update the group's description — the only thing a container has to change.
+   * Write the group's source — one PUT of `options.source` as the caller built
+   * it, under the caller's `options.lockHandle` (and `config.transportRequest`
+   * as `corrNr`), with the caller's headers. The caller holds the lock.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
+   */
+  async update<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'update'>,
+    config: Partial<IFunctionGroupConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        uploadFunctionGroupSource(
+          connection,
+          options.headers,
+          config.functionGroupName as string,
+          options?.source as string,
+          options?.lockHandle as string,
+          config.transportRequest,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the group's metadata document — its description is what it holds.
    *
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request.
@@ -279,6 +349,7 @@ export class AdtFunctionGroup<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'updateMetadata'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
@@ -320,6 +391,7 @@ export class AdtFunctionGroup<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

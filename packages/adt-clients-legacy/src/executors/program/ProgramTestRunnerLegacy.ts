@@ -9,6 +9,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   type IProgramTestRunnerResults,
   PROGRAM,
   ProgramTestRunner,
@@ -29,9 +30,10 @@ import {
 
 export class ProgramTestRunnerLegacy<
   R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
-> extends ProgramTestRunner<R> {
+> extends ProgramTestRunner<R, 'basis740'> {
   /** Run every test class of the report: the `runSync` request, read by `run`. */
   override async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestRun'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -43,15 +45,15 @@ export class ProgramTestRunnerLegacy<
     );
   }
 
-  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['status']>, E>
-  > {
+  override async getStatus<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestStatus'>,
+  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
     return noRunToPoll<ReturnType<R['status']>, E>();
   }
 
-  override async getResult<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
+  override async getResult<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestResult'>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
     return noResultToFetch<ReturnType<R['result']>, E>();
   }
 }

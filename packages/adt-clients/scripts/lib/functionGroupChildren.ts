@@ -45,7 +45,7 @@ export async function functionGroupChildren(
   );
   const { objectTypes } = readNodeStructure(bodyOf(root.data));
 
-  const wanted = objectTypes.find((t) => t.objectType === childType);
+  const wanted = objectTypes.find((t) => t.type === childType);
   if (!wanted) return [];
 
   const children = await fetchNodeStructure(

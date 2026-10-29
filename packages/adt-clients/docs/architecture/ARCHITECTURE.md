@@ -6,14 +6,14 @@
 
 Primary public entry points:
 - `AdtClient` - high-level CRUD-style object operations.
-- `createAdtClient()` - factory that returns `AdtClient`. It detects nothing and sends no request: the system type is the consumer's to declare (a legacy system, SAP_BASIS 7.40 (measured on 7.40 SP04), is served by `AdtClientLegacy` from the separate package `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs).
+- `createAdtClient(connection, { variant })` - factory that returns the declared modern variant's client, `AdtClientOnPrem` or `AdtClientCloud`. It detects nothing and sends no request: the system type is the consumer's to declare (a legacy system, SAP_BASIS 7.40 (measured on 7.40 SP04), is served by `AdtClientLegacy` from the separate package `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs).
 - `AdtRuntimeClient` - stable runtime operations (traces, dumps, logs, feeds, ATC check runs, DDIC runtime helpers).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (class and program execution, run under the profiler, trace scheduling).
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^20`); `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^3`); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
+- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^23`), and with them the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) the clients are typed by; `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^3`); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
 - **The library interprets nothing.** Every member makes one ADT request. What the answer becomes is the result strategy the implementation was built with; whether it is a failure is the `analyse` the caller passes with the call. The shipped result sets answer documents as they arrived; the readings and verdicts are in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). Decision 15 in [DECISIONS.md](DECISIONS.md).
 
 ## Layered Structure
@@ -44,7 +44,7 @@ answered with a `401` comes back as a failure carrying that response, which
 
 ## Legacy System Support
 
-This package carries no legacy code. Legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) are served by the separate package `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), whose `AdtClientLegacy` and `AdtExecutorLegacy` `extend` this package's classes and only override. The consumer declares the system type by constructing them over an RFC connection; `createAdtClient()` and `createAdtExecutor()` detect nothing and always return the modern class.
+This package carries no legacy code. Legacy SAP systems (SAP_BASIS 7.40, measured on 7.40 SP04) are served by the separate package `@mcp-abap-adt/adt-clients-legacy` (`packages/adt-clients-legacy`), whose `AdtClientLegacy` and `AdtExecutorLegacy` `extend` this package's classes and only override. The consumer declares the system type by constructing them over an RFC connection; `createAdtClient()` and `createAdtExecutor()` detect nothing and always return a modern class. `AdtClientLegacy` is `AdtClient<'basis740'>`: every override keeps its base's variant gate.
 
 What the legacy package needs from this one is exported from this package's root: the handler classes it extends, their base types, `AdtContentTypesBase`, `answering` and the other wire helpers, the address records and the result-set types. Nothing here names a legacy class, and a test (`legacyStaysInLegacyClasses.test.ts`) keeps it so.
 
@@ -109,6 +109,35 @@ check runs, ATC, discovery) are not in the registry yet.
 
 `scripts/address-matrix.ts` reads every address in the registry on real systems
 in both cases, so a change can be checked against SAP rather than assumed.
+
+**An address by type code** (`buildObjectUri`, `src/endpoints/codes.ts`, since
+38.0.0) is read from the ADT type tables of `@mcp-abap-adt/interfaces-adt`: the
+code's collection (the entry's, or the code's own where it differs), then the
+name, and for a code with a parent API the parent's address followed by the
+child's segment. What does not follow the rule is a typed exception with its
+reason: `MSAG/NN` has no address of its own (a message is a row of its class),
+and `VIEW/DV`, which no API serves, keeps the group operations' address under
+`/sap/bc/adt/ddic/views` (`GROUP_ONLY_ADDRESS`). No code outside the tables is
+addressed.
+
+## Release variants
+
+The ADT type tables are one per release variant — `ADT_TYPES_ONPREM`,
+`ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740` — keyed by API (the client's factory),
+each code with its parent, name length and operations. `src/clients/variant.ts`
+turns them into gates: `AdtClient<V>` and every gated handler declare a
+type-only `variant?: V`; a factory takes `this: this & AdtServedBy<'<api>'>`
+and a member `this: this & AdtPerformedBy<'<api>', '<operation>'>`, which
+demand that `V` be one of the variants whose table serves it. The default
+`AdtModernVariant` (on premise or cloud) is served the intersection of both
+modern tables; `AdtClientOnPrem` and `AdtClientCloud` fix one. Nothing is
+probed and nothing is checked at run time for a caller inside the type system;
+the legacy refusals stay for callers outside it. `getUtils()` takes its codes
+from the same tables (`src/core/shared/codeSets.ts`). The tables are held to
+what each release answers by the conformance check
+(`src/__tests__/unit/conformance/`, and live in
+`src/__tests__/integration/shared/typeTablesConformance.test.ts`; how to run it
+is in the [README](../../README.md#the-type-tables-conformance-check)).
 
 ## Public API Architecture
 
@@ -210,9 +239,10 @@ Notably, where-used is three calls, in the caller's order:
 - execution (`getWhereUsed`) — the document by default; `utilWhereUsedReferences` in adt-strategies reads it into references.
 
 Both requests address the object with `buildObjectUri`, the address group
-activation and deletion use, so the three cannot disagree (#173). Friendly names
-(`class`, `interface`, `table`, `view`, `functionmodule`, …) map onto type codes;
-a type neither vocabulary knows is thrown before any request.
+activation and deletion use, so the three cannot disagree (#173). Since 38.0.0
+`object_type` is a code of the ADT type tables, and the friendly names that
+mapped onto codes are gone; a code it cannot address is thrown before any
+request.
 
 ## A request's own headers
 
@@ -347,7 +377,7 @@ When adding a new ADT object type:
 1. **Define the types in the contract package first** — `@mcp-abap-adt/interfaces-adt`, or the sibling that owns them — release it, then consume it here. Do not declare params/config/state locally — that is what caused the drift resolved in 7.5.0. `src/core/<object>/types.ts` should contain only re-exports (plus any genuine runtime helpers).
 2. Create `src/core/<object>/` low-level endpoint modules.
 3. Implement `Adt<Object>.ts` against the capability atoms the type supports, generic over an `I<Object>Results` set whose `<object>Documents` default is `rawDocument` (or `nothing`) in every slot. Every member takes `options.analyse` and hands it to `answering()` untouched.
-4. Add factory method in `AdtClient`, with the no-argument and the result-set overloads.
+4. Add the API to the ADT type tables of `@mcp-abap-adt/interfaces-adt` for every variant that serves it (its codes, parent, name length, operations, evidence), and the factory method in `AdtClient`, generic over the result set and gated with `this: this & AdtServedBy<'<api>'>`; a member whose operation differs by variant takes `AdtPerformedBy`. Record a sample per code for the conformance check (`corpus/adt/conformance/`).
 5. Export the result set and its default from `src/index.readings.ts`. A reading of the document belongs in `packages/adt-strategies`, tested against the corpus — not here.
 6. Add integration tests under `src/__tests__/integration/core/<object>/`.
 7. Keep stateful/lock cleanup semantics consistent.

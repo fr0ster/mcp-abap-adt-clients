@@ -21,6 +21,7 @@ import type {
   ITraceScheduling,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import {
   createTraceParameters,
   getTraceRequestsByUri,
@@ -71,11 +72,14 @@ export class TraceScheduling<
       ReturnType<R['scheduled']>
     >
 {
+  private readonly results: R;
+
   constructor(
     private readonly connection: IAbapConnection,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = traceSchedulingDocuments as unknown as R,
-  ) {}
+    options: AdtHandlerOptions<R>,
+  ) {
+    this.results = options.results;
+  }
 
   async listObjectTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,

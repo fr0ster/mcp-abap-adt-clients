@@ -13,6 +13,11 @@ export { createAdtExecutor } from './clients/createAdtExecutor';
  * containers with. The set is the compiler's, and nothing more.
  */
 export {
+  AbapUnitTestRunner,
+  abapUnitTestRunnerDocuments,
+  type IAbapUnitTestRunnerResults,
+} from './executors/abapUnitTestRunner';
+export {
   ClassExecutor,
   classExecutorDocuments,
   type IClassExecutorResults,

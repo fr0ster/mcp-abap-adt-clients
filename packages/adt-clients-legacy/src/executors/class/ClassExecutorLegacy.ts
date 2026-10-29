@@ -11,6 +11,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   ClassExecutor,
   type classExecutorDocuments,
   type IClassExecutorResults,
@@ -34,9 +35,10 @@ const PROCESS_TYPES = '/sap/bc/adt/runtime/traces/abaptraces/processtypes';
 
 export class ClassExecutorLegacy<
   R extends IClassExecutorResults = typeof classExecutorDocuments,
-> extends ClassExecutor<R> {
+> extends ClassExecutor<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `IF_OO_ADT_CLASSRUN` and no classrun endpoint. */
   override async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'run'>,
     _target: IClassExecutionTarget,
     _options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -45,6 +47,7 @@ export class ClassExecutorLegacy<
 
   /** Refused without a request, for the same reason as `run`. */
   override async runWithProfiler<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'profile'>,
     _target: IClassExecutionTarget,
     _options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {

@@ -26,14 +26,15 @@ import {
   type Ledger,
   withLock,
 } from './ledger';
+import { deletesUnderLock, temporaryClient } from './members';
 import {
   type IObjectSpec,
   type IProbeable,
+  type IProbeClient,
   type ISpecContext,
   LOCAL_INCLUDES,
   OBJECT_SPECS,
 } from './objects';
-import { deletesUnderLock, temporaryClient } from './members';
 import { knownPair } from './pairs';
 import {
   endpointOf,
@@ -66,14 +67,14 @@ export interface IArgs {
   contentTypeFirst?: boolean;
 }
 
-type ICall = ICallOn<AdtClient>;
+type ICall = ICallOn<IProbeClient>;
 
 export class Probe {
   readonly rows: IOperationRow[] = [];
   readonly names: string[] = [];
-  private readonly direct: AdtClient;
+  private readonly direct: IProbeClient;
   /** For what releases or removes: the gate's cleanup sibling, past a stop. */
-  private readonly cleanupDirect: AdtClient;
+  private readonly cleanupDirect: IProbeClient;
 
   constructor(
     private readonly connection: IAbapConnection,
@@ -88,7 +89,7 @@ export class Probe {
     this.cleanupDirect = this.client(traced(cleanupOf(connection)));
   }
 
-  private client(connection: IAbapConnection): AdtClient {
+  private client(connection: IAbapConnection): IProbeClient {
     if (!throughGate(connection))
       throw new Error('Probe: the connection does not send through the gate');
     // The client a registered set makes the temporary objects with, else the base's.
@@ -113,7 +114,8 @@ export class Probe {
     if (spec.type === 'class')
       for (const local of LOCAL_INCLUDES)
         for (const member of ['update', 'delete', 'check'])
-          if (this.wanted(local.type, member)) this.skip(local.type, member, why);
+          if (this.wanted(local.type, member))
+            this.skip(local.type, member, why);
   }
 
   /** `skipped: <reason>` when the gate refused a request of the step, else `otherwise`. */
@@ -345,8 +347,7 @@ export class Probe {
     const refused = this.refusal !== undefined;
     this.refusal ??= earlier;
     if (refused) return false;
-    if (state.exists !== false)
-      this.possiblyOurs.push(`${spec.type} ${name}`);
+    if (state.exists !== false) this.possiblyOurs.push(`${spec.type} ${name}`);
     return false;
   }
 
@@ -577,7 +578,7 @@ export class Probe {
       badContentType: this.name(spec, 'C'),
     };
     const configOf = (kind: ProbeKind) => spec.config(names[kind], context);
-    const handle = (client: AdtClient) => spec.handle(client);
+    const handle = (client: IProbeClient) => spec.handle(client);
     const stateOf =
       (name: string): ICall =>
       (client, analyse) =>
@@ -833,7 +834,7 @@ export class Probe {
   /** A message class's messages: each write is the member's own chain. */
   async messages(className: string): Promise<void> {
     const handler = 'getMessageClassMessage()';
-    const handle = (client: AdtClient): IProbeable =>
+    const handle = (client: IProbeClient): IProbeable =>
       client.getMessageClassMessage() as unknown as IProbeable;
     const msgno: Record<ProbeKind, string> = {
       known: '001',
@@ -906,7 +907,7 @@ export class Probe {
   async utils(): Promise<void> {
     progress('utils');
     const handler = 'getUtils()';
-    const utils = (client: AdtClient): IProbeable =>
+    const utils = (client: IProbeClient): IProbeable =>
       client.getUtils() as unknown as IProbeable;
     const program = OBJECT_SPECS.find(
       (s) => s.type === 'program',
@@ -968,7 +969,9 @@ export class Probe {
           this.skip(
             'utils',
             member,
-            this.skipNote('skipped: its program could not be created and activated'),
+            this.skipNote(
+              'skipped: its program could not be created and activated',
+            ),
           );
       return;
     }

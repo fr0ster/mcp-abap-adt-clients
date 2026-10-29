@@ -98,11 +98,21 @@ The script automatically creates the output directory if it doesn't exist.
 npm run adt:entities
 # or
 npm run adt:entities -- --output docs/usage/ADT_OBJECT_ENTITIES.md
+# compare with the committed file, write nothing (part of check:docs)
+npm run check:entities
 ```
 
 **Options:**
 - `--output <file>` - Output markdown file path (default: `docs/usage/ADT_OBJECT_ENTITIES.md`)
+- `--check` - Exit non-zero when the output file differs from what would be generated
 - `--help, -h` - Show help message
+
+**How it reads the sources:** with the TypeScript parser (no type checker,
+no regular expressions): the public methods of `AdtClient` named `get…`
+(overloads and type parameters read as one name), the exported classes and
+functions of each `src/core/<module>/`, and the exported classes of
+`src/clients/` and `src/runtime/` with their public methods, static ones
+included, and what each extends.
 
 **Output:**
 - Default: `docs/usage/ADT_OBJECT_ENTITIES.md`

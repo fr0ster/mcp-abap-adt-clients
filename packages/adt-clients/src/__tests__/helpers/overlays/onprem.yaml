@@ -87,3 +87,10 @@
 # "enhancement.test_cases[include_host].params.include_name": "<INCLUDE>"
 # On-prem: the main program of that include.
 # "enhancement.test_cases[include_host].params.main_program": "<MAIN_PROGRAM>"
+# The generic ABAP Unit runner's live cases (off by default): turn each on and name the local package its objects go into — a `$` package, created by hand (a transportable one makes SAP generate a change-recording request).
+# "run_abap_unit.test_cases[adt_abap_unit_class_run].enabled": true
+# "run_abap_unit.test_cases[adt_abap_unit_class_run].params.package_name": "$<LOCAL_PACKAGE>"
+# "run_abap_unit.test_cases[adt_abap_unit_cds_run].enabled": true
+# "run_abap_unit.test_cases[adt_abap_unit_cds_run].params.package_name": "$<LOCAL_PACKAGE>"
+# "run_abap_unit.test_cases[adt_abap_unit_package_run].enabled": true
+# "run_abap_unit.test_cases[adt_abap_unit_package_run].params.package_name": "$<LOCAL_PACKAGE>"

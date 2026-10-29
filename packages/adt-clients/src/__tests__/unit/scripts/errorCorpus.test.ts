@@ -3902,13 +3902,16 @@ describe('members on temporary objects', () => {
       Awaited<ReturnType<typeof run>>['file']
     >;
     const name = objectOf(file, 'program');
-    const puts = system.seen.filter(
-      (seen) =>
-        seen.method === 'PUT' &&
-        seen.url
-          .toLowerCase()
-          .includes(`/programs/programs/${name}/source/main`),
-    );
+    // The source write and, since the program has one, the metadata write
+    // (`PUT …/programs/programs/<name>?lockHandle=…`).
+    const puts = system.seen.filter((seen) => {
+      if (seen.method !== 'PUT') return false;
+      const url = seen.url.toLowerCase();
+      return (
+        url.includes(`/programs/programs/${name}/source/main`) ||
+        url.startsWith(`/sap/bc/adt/programs/programs/${name}?`)
+      );
+    });
     expect(puts.length).toBeGreaterThan(0);
     for (const put of puts) expect(put.url).toContain('lockHandle=H1');
     const corpus = JSON.parse(

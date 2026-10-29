@@ -145,7 +145,7 @@ describe('Response contract - 17.0.0', () => {
 
         const answer = await client
           .getUtils()
-          .readObjectMetadata('class', NEVER_EXISTS, undefined, {
+          .readObjectMetadata('CLAS/OC', NEVER_EXISTS, undefined, {
             analyse: analyseException,
           });
 
@@ -184,7 +184,7 @@ describe('Response contract - 17.0.0', () => {
       async () => {
         const answer = await client
           .getUtils()
-          .readObjectSource('class', NEVER_EXISTS, undefined, undefined, {
+          .readObjectSource('CLAS/OC', NEVER_EXISTS, undefined, undefined, {
             analyse: analyseException,
           });
 

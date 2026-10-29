@@ -10,6 +10,8 @@
  */
 
 import type {
+  AbapUnitRunObjectType,
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
@@ -20,12 +22,14 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../clients/variant';
 import {
   getUnitTestRunResult,
   getUnitTestRunStatus,
   startUnitTestRunByObject,
   startUnitTestRunSync,
 } from '../core/shared/abapUnit';
+import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import { rawDocument } from '../utils/resultStrategy';
 
@@ -52,19 +56,34 @@ export const abapUnitRunnerDocuments = {
   result: rawDocument,
 } satisfies IAbapUnitRunnerResults;
 
-export abstract class AbapUnitRunner<R extends IAbapUnitRunnerResults>
-  implements
+/** The APIs whose objects an ABAP Unit runner runs. */
+export type AbapUnitApi =
+  | 'class'
+  | 'program'
+  | 'functionGroup'
+  | 'functionModule';
+
+export abstract class AbapUnitRunner<
+  R extends IAbapUnitRunnerResults,
+  V extends AdtVariant = AdtModernVariant,
+  A extends AbapUnitApi = AbapUnitApi,
+> implements
     ITestRunInformation<ReturnType<R['status']>, ReturnType<R['result']>>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly results: R;
 
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;
@@ -73,7 +92,7 @@ export abstract class AbapUnitRunner<R extends IAbapUnitRunnerResults>
   /** Start a run of every test class the one named object holds. */
   protected startByObject<E extends IAdtError>(
     name: string,
-    type: string,
+    type: AbapUnitRunObjectType,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     return answering(
@@ -110,6 +129,7 @@ export abstract class AbapUnitRunner<R extends IAbapUnitRunnerResults>
    * started, because ADT does not either — any holder of the id may ask.
    */
   async getStatus<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<A, 'unitTestStatus'>,
     runId: string,
     withLongPolling: boolean | undefined = true,
     options?: IAdtAnalyseOptions<E>,
@@ -124,6 +144,7 @@ export abstract class AbapUnitRunner<R extends IAbapUnitRunnerResults>
 
   /** The result document of a finished run. */
   async getResult<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<A, 'unitTestResult'>,
     runId: string,
     options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {

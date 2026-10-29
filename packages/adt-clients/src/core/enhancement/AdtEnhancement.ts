@@ -9,6 +9,9 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtOperation,
+  AdtTypeCodeWith,
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -33,16 +36,14 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
 import { check as checkEnhancementSource } from './check';
@@ -54,10 +55,11 @@ import {
   getEnhancementSource,
   getEnhancementTransport,
 } from './read';
-import {
-  type EnhancementType,
+import type {
+  ENHANCEMENT_TYPE_CODES,
+  EnhancementType,
   enhancementDocuments,
-  type IEnhancementConfig,
+  IEnhancementConfig,
 } from './types';
 import { unlockEnhancement } from './unlock';
 import { updateEnhancement, updateEnhancementMetadata } from './update';
@@ -67,8 +69,32 @@ import {
   getEnhancementVersions,
 } from './versions';
 
+/** The variants on which an enhancement subtype's code lists `Op`. */
+type VariantsWith<T extends EnhancementType, Op extends AdtOperation> = {
+  [W in AdtVariant]: (typeof ENHANCEMENT_TYPE_CODES)[T] extends AdtTypeCodeWith<
+    W,
+    Op
+  >
+    ? W
+    : never;
+}[AdtVariant];
+
+/**
+ * The subtypes whose code lists `Op` on every variant of `V` — the
+ * intersection, for the default variant. One API, three codes, and only
+ * `ENHO/XHH` has a source: `read` and `update` take this in their argument's
+ * type, so a call for `enhoxhb` or `enhsxsb` does not compile.
+ */
+export type EnhancementTypeWith<
+  V extends AdtVariant,
+  Op extends AdtOperation,
+> = {
+  [T in EnhancementType]: [V] extends [VariantsWith<T, Op>] ? T : never;
+}[EnhancementType];
+
 export class AdtEnhancement<
   R extends IEnhancementResults = typeof enhancementDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
     IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,
@@ -91,6 +117,11 @@ export class AdtEnhancement<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -99,17 +130,14 @@ export class AdtEnhancement<
   private readonly lockedTypes = new Map<string, EnhancementType>();
   public readonly objectType: string = 'Enhancement';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = enhancementDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -229,7 +257,9 @@ export class AdtEnhancement<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: Partial<IEnhancementConfig> & {
+      enhancementType: EnhancementTypeWith<V, 'read'>;
+    },
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
@@ -345,7 +375,9 @@ export class AdtEnhancement<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: Partial<IEnhancementConfig> & {
+      enhancementType: EnhancementTypeWith<V, 'update'>;
+    },
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.

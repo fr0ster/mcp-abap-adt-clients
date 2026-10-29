@@ -11,6 +11,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { INTERFACE } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -56,7 +57,7 @@ export async function create(
     ? ` adtcore:responsible="${finalResponsible}"`
     : '';
 
-  const payload = `<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.interfaceName}" adtcore:type="INTF/OI" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+  const payload = `<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.interfaceName}" adtcore:type="${TYPE_CODE.interface}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
 
 
 

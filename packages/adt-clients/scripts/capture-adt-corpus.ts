@@ -1603,7 +1603,7 @@ async function main(): Promise<void> {
       await utils.getWhereUsed(
         {
           object_name: SHARED_CLASS,
-          object_type: 'class',
+          object_type: 'CLAS/OC',
         },
         { headers: headersOf(utils, 'getWhereUsed') },
       );

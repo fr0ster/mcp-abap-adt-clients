@@ -16,7 +16,9 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
 import { AdtUtils } from '../../core/shared/AdtUtils';
+import type { AdtActivationCode } from '../../core/shared/codeSets';
 import { utilDocuments } from '../../core/shared/utilResultSet';
 import { wireItself } from '../../utils/resultStrategy';
 import { integrationHeadersOf } from './adtHeaders';
@@ -31,8 +33,8 @@ import {
 } from './xmlTree';
 
 export interface ISharedGroupMember {
-  /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`. */
-  type: string;
+  /** The ADT type, e.g. `DDLS/DF`, `CLAS/OC`: a code a group activation activates. */
+  type: AdtActivationCode<AdtModernVariant>;
   name: string;
 }
 
@@ -42,9 +44,12 @@ export async function activateSharedGroup(
   logger: ILogger,
 ): Promise<void> {
   const what = objects.map((o) => `${o.type} ${o.name}`).join(', ');
-  const utils = new AdtUtils(connection, logger, {
-    ...utilDocuments,
-    activation: wireItself,
+  const utils = new AdtUtils(connection, {
+    logger,
+    results: {
+      ...utilDocuments,
+      activation: wireItself,
+    },
   });
   const started = await utils.activateObjectsGroup(objects, undefined, {
     analyse: analyseException,

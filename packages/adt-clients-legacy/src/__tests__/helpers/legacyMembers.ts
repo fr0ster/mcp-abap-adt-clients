@@ -17,7 +17,7 @@
  * `member[case]`, and its cases are listed in {@link ARGUMENT_DEPENDENT}.
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtTypeCode, IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 // The address records by the root's own module: the tests read records the
 // root package does not export (the include kinds, the URI builders).
 import {
@@ -384,35 +384,23 @@ const objectReferences = [{ name: 'ZGUARD', type: 'PROG/P' }];
 const whereUsed = { object_name: 'ZGUARD', object_type: 'program' };
 
 /** `getUtils().readObjectMetadata` / `readObjectSource`, by object type (§10.2). */
-const METADATA_REFUSED = [
-  'domain',
-  'doma/dd',
-  'dataelement',
-  'dtel',
-  'dtel/de',
-  'structure',
-  'stru/dt',
-  'table',
-  'tabl/dt',
-  'tabletype',
-  'ttyp/df',
-  'package',
-  'devc/k',
-  'DEVC/K',
-] as const;
-const SOURCE_REFUSED = [
-  'structure',
-  'stru/dt',
-  'table',
-  'tabl/dt',
-  'tabletype',
-  'ttyp/df',
+/**
+ * The codes 7.40's reads refuse, by the ADT type tables' codes since
+ * interfaces-adt 21.0.0 — the friendly names and lower-case spellings they
+ * replaced (`domain`, `stru/dt`, `ttyp/df`, …) are no codes, and are refused
+ * at compile time.
+ */
+const METADATA_REFUSED: readonly AdtTypeCode[] = [
+  'DOMA/DD',
+  'DTEL/DE',
+  'TABL/DS',
   'TABL/DT',
-] as const;
+  'TTYP/DA',
+  'DEVC/K',
+];
+const SOURCE_REFUSED: readonly AdtTypeCode[] = ['TABL/DS', 'TABL/DT'];
 const SERVED = {
-  program: PROGRAM.uri('ZGUARD'),
-  'prog/p': PROGRAM.uri('ZGUARD'),
-  class: CLASS.uri('ZGUARD'),
+  'PROG/P': PROGRAM.uri('ZGUARD'),
   'CLAS/OC': CLASS.uri('ZGUARD'),
 } as const;
 
@@ -486,7 +474,7 @@ const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 
 /** The handlers absentOnLegacy builds today (§10.1), by their public members. */
 const ABSENT = {
-  getAccessControl: [...SOURCE_OBJECT_MEMBERS],
+  getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
   getAuthorizationField: [
     'activate',
@@ -500,7 +488,7 @@ const ABSENT = {
     'updateMetadata',
     'validate',
   ],
-  getBehaviorDefinition: [...SOURCE_OBJECT_MEMBERS],
+  getBehaviorDefinition: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getBehaviorImplementation: [...SOURCE_OBJECT_MEMBERS],
   getDataElement: [
     'activate',
@@ -548,8 +536,8 @@ const ABSENT = {
     'updateMetadata',
     'validate',
   ],
-  getMetadataExtension: [...SOURCE_OBJECT_MEMBERS],
-  getScalarFunction: [...SOURCE_OBJECT_MEMBERS],
+  getMetadataExtension: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getScalarFunction: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getScalarFunctionImplementation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getServiceBinding: [
     'activate',
@@ -565,12 +553,13 @@ const ABSENT = {
     'readTransport',
     'unlock',
     'update',
+    'updateMetadata',
     'validate',
   ],
-  getServiceDefinition: [...SOURCE_OBJECT_MEMBERS],
-  getStructure: [...SOURCE_OBJECT_MEMBERS],
-  getTable: [...SOURCE_OBJECT_MEMBERS],
-  getTransformation: [...SOURCE_OBJECT_MEMBERS],
+  getServiceDefinition: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getStructure: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getTable: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getTransformation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getTableType: [
     'activate',
     'check',
@@ -627,6 +616,7 @@ const CLIENT_GETTERS = [
 ] as const;
 
 const EXECUTOR_GETTERS = [
+  'getAbapUnitTestRunner',
   'getClassExecutor',
   'getClassTestRunner',
   'getFunctionGroupTestRunner',
@@ -649,6 +639,7 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getClass: Object.fromEntries([
     cls.refused('checkDeletion', '§5'),
     cls.refused('readTransport', '§2 measured in B4'),
+    cls.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   ...Object.fromEntries(
     (
@@ -668,10 +659,12 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getProgram: Object.fromEntries([
     prog.refused('checkDeletion', '§5'),
     prog.refused('readTransport', '§2 measured in B4'),
+    prog.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   getInterface: Object.fromEntries([
     intf.refused('checkDeletion', '§5'),
     intf.refused('readTransport', '§2 measured in B4'),
+    intf.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   getFunctionGroup: Object.fromEntries([
     fugr.refused('checkDeletion', '§5'),
@@ -680,12 +673,14 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getFunctionModule: Object.fromEntries([
     func.refused('checkDeletion', '§5'),
     func.refused('readTransport', '§2 measured in B4'),
+    func.refused('updateMetadata', 'not measured on 7.40'),
   ]),
   getDdl: Object.fromEntries([
     ddl.refused('checkDeletion', '§5'),
     ddl.refused('readTransport', '§2 measured in B4'),
     ddl.refused('getVersions', '§2 measured in B4'),
     ddl.refused('getVersionSource', '§2 measured in B4'),
+    ddl.refused('updateMetadata', 'not measured on 7.40'),
     ddl.refused(
       'checkCdsTestDoubles',
       '§10.3 stays refused',
@@ -696,7 +691,10 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
     finc.refused('checkDeletion', '§5'),
     finc.refused('delete', '§4.3'),
   ]),
-  getInclude: Object.fromEntries([incl.refused('checkDeletion', '§5')]),
+  getInclude: Object.fromEntries([
+    incl.refused('checkDeletion', '§5'),
+    incl.refused('updateMetadata', 'not measured on 7.40'),
+  ]),
   getMessageClass: Object.fromEntries([
     msag.refused('checkDeletion', '§5'),
     msag.refused('updateMetadata', '§2 measured in B4'),
@@ -883,6 +881,22 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
       call: calling('getResult', () => ['GUARD']),
     },
   },
+  getAbapUnitTestRunner: {
+    run: {
+      section: '§6.2',
+      call: calling('run', () => [
+        { kind: 'object', name: 'ZCL_GUARD', type: 'CLAS/OC' },
+      ]),
+    },
+    getStatus: {
+      section: '§6.2',
+      call: calling('getStatus', () => ['GUARD']),
+    },
+    getResult: {
+      section: '§6.2',
+      call: calling('getResult', () => ['GUARD']),
+    },
+  },
   getFunctionModuleTestRunner: {
     run: {
       section: '§6.2',
@@ -1027,6 +1041,8 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     fugr.sends('unlock', '§10.3 measured', [unlockOf(GROUP_URI)]),
     fugr.sends('delete', '§4.2 measured', [deleteWith(GROUP_URI)]),
     fugr.sends('readMetadata', '§10.3 measured', [get(GROUP_URI)]),
+    fugr.sends('read', '§10.3 measured', [get(sourceUri(GROUP_URI))]),
+    fugr.sends('update', '§10.3 measured', [writeWith(sourceUri(GROUP_URI))]),
     fugr.sends('activate', '§10.3 measured', [activation()]),
     fugr.sends('updateMetadata', '§10.3 kept', [writeWith(GROUP_URI)]),
     fugr.sends('check', '§10.3 kept', [checkRun()]),
@@ -1216,13 +1232,19 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
         'supportsSourceCode',
         '§10.2 kept: pure',
         [],
-        calling('supportsSourceCode', () => ['program']),
+        calling('supportsSourceCode', () => ['PROG/P']),
       ),
       utils.sends(
         'getObjectSourceUri',
         '§10.2 kept: pure',
         [],
-        calling('getObjectSourceUri', () => ['program', 'ZGUARD']),
+        calling('getObjectSourceUri', () => ['PROG/P', 'ZGUARD']),
+      ),
+      utils.sends(
+        'getTypeStructure',
+        '§10.2 recorded on 7.40 SP04: 200, 464 types',
+        [post('/sap/bc/adt/repository/typestructure')],
+        calling('getTypeStructure', (h) => [h('getTypeStructure')]),
       ),
     ]),
     ...METADATA.sends,
@@ -1266,6 +1288,14 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     runSync: {
       section: '§6.2 measured',
       call: calling('runSync', () => ['ZGUARD_FG']),
+      sends: testRun,
+      body: OPTIONS,
+    },
+  },
+  getAbapUnitTestRunner: {
+    runSync: {
+      section: '§6.2 measured',
+      call: calling('runSync', (h) => [[CLASS_URI], h('runSync')]),
       sends: testRun,
       body: OPTIONS,
     },

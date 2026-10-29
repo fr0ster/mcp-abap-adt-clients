@@ -25,7 +25,6 @@ import type {
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
-  IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
@@ -38,14 +37,14 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { AdtClass } from '../class/AdtClass';
-import type { LockRegistry } from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { IReadOptions } from '../shared/types';
 import {
   getBehaviorImplementationMetadata,
   getBehaviorImplementationSource,
   getBehaviorImplementationTransport,
 } from './read';
-import { classDocuments, type IBehaviorImplementationConfig } from './types';
+import type { classDocuments, IBehaviorImplementationConfig } from './types';
 import { updateBehaviorImplementation } from './update';
 import { validateBehaviorImplementationName } from './validation';
 import {
@@ -120,29 +119,21 @@ export class AdtBehaviorImplementation<
   private readonly class: AdtClass<R>;
   public readonly objectType: string = 'BehaviorImplementation';
 
+  private readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = classDocuments as unknown as R,
-    // Handed to the inner class so a create carries the master system and
-    // master language the client knows, like a class create does.
-    systemContext?: IAdtSystemContext,
+    options: AdtHandlerOptions<R, 'logger' | 'lockRegistry' | 'systemContext'>,
   ) {
+    this.results = options.results;
     this.connection = connection;
-    this.logger = logger;
+    this.logger = options.logger;
     // Behavior implementation locks are class locks delegated to this internal
-    // AdtClass — pass the session registry so those locks are tracked too, and
-    // the caller's result set so what it answers is what this answers.
-    this.class = new AdtClass<R>(
-      connection,
-      logger,
-      systemContext,
-      undefined,
-      lockRegistry,
-      results,
-    );
+    // AdtClass — the options carry the session registry so those locks are
+    // tracked too, the system context so a create carries the master system
+    // and master language the client knows, like a class create does, and the
+    // caller's result set so what it answers is what this answers.
+    this.class = new AdtClass<R>(connection, options);
   }
 
   /** The class name, or the caller's mistake. */

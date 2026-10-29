@@ -25,12 +25,39 @@ describe('AdtUtils readings', () => {
     expect(source).not.toContain('Promise<IAdtResponse<string>>');
   });
 
+  /**
+   * `getTypeStructure` is the one member whose reading cannot be injected yet:
+   * `IUtilResults` of interfaces-adt 21.0.0 has no slot for it, and a slot
+   * added here would make `getUtils` take a wider set than the one a consumer
+   * composes from the contract package. It answers the document as it came
+   * until the contract names the slot; every other member stays held.
+   */
+  const AWAITING_ITS_SLOT = ['getTypeStructure'];
+
   it('reads every answer through the injected set, never a fixed strategy', () => {
-    const bodies = source.split('\n').filter((line) => /^\s{6}\w/.test(line));
-    const fixed = bodies.filter((line) =>
-      /^\s+(rawDocument|nothing|util[A-Z]\w*)[,)]/.test(line),
-    );
+    const members = source.split('\n  async ').slice(1);
+    const fixed = members
+      .filter((member) => !AWAITING_ITS_SLOT.some((n) => member.startsWith(n)))
+      .flatMap((member) =>
+        member
+          .split('\n')
+          .filter((line) => /^\s{6}\w/.test(line))
+          .filter((line) =>
+            /^\s+(rawDocument|nothing|util[A-Z]\w*)[,)]/.test(line),
+          ),
+      );
     expect(fixed).toEqual([]);
+  });
+
+  it('the member awaiting its slot answers the document, and only it', () => {
+    const awaiting = source
+      .split('\n  async ')
+      .slice(1)
+      .filter((member) =>
+        member.split('\n').some((line) => /^\s{6}rawDocument[,)]/.test(line)),
+      )
+      .map((member) => member.slice(0, member.indexOf('<')));
+    expect(awaiting).toEqual(AWAITING_ITS_SLOT);
   });
 
   it('names a slot for each of the twenty-one members that make a request', () => {
@@ -43,15 +70,15 @@ describe('AdtUtils readings', () => {
   });
 
   it('ships a default for every slot', () => {
-    const shipped = utilDocuments as unknown as Record<string, unknown>;
-    for (const slot of Object.keys(shipped)) {
-      expect(typeof shipped[slot]).toBe('function');
+    const shipped = Object.values(utilDocuments);
+    for (const reading of shipped) {
+      expect(typeof reading).toBe('function');
     }
     // Every default is the document. The parses that were defaults — search
     // hits, the type catalogue, the tree level, the inactive list, the run id —
     // are strategies in adt-strategies a caller passes.
-    for (const slot of Object.keys(shipped)) {
-      expect(shipped[slot]).toBe(rawDocument);
+    for (const reading of shipped) {
+      expect(reading).toBe(rawDocument);
     }
     // `satisfies`, so the shipped set is assignable to the contract it fills.
     const asContract: IUtilResults = utilDocuments;

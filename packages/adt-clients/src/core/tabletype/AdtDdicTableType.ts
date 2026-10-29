@@ -36,11 +36,8 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateTableType } from './activation';
 import { runTableTypeCheckRun } from './check';
@@ -48,7 +45,7 @@ import { createTableType } from './create';
 import { checkDeletion, deleteTableType } from './delete';
 import { lockTableType } from './lock';
 import { getTableTypeMetadata, getTableTypeTransport } from './read';
-import { type ITableTypeConfig, tableTypeDocuments } from './types';
+import type { ITableTypeConfig, tableTypeDocuments } from './types';
 import { unlockTableType } from './unlock';
 import { updateTableType } from './update';
 import { validateTableTypeName } from './validation';
@@ -85,17 +82,14 @@ export class AdtDdicTableType<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'TableType';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = tableTypeDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

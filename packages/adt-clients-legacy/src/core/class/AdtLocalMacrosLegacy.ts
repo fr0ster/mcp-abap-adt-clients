@@ -8,6 +8,7 @@
 
 import {
   AdtLocalMacros,
+  type AdtPerformedBy,
   CLASS,
   type classDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -22,7 +23,7 @@ import { noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtLocalMacrosLegacy<
   R extends IClassResults = typeof classDocuments,
-> extends AdtLocalMacros<R> {
+> extends AdtLocalMacros<R, 'basis740'> {
   /**
    * Refused without a request: the inherited member asks for the container
    * class's `GET <class URI>/transport`, which answers `404` on 7.40 SP04
@@ -30,6 +31,7 @@ export class AdtLocalMacrosLegacy<
    * `AdtClassLegacy.readTransport` refuses).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'localMacros', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

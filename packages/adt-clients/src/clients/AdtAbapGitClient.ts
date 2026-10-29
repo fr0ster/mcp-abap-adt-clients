@@ -3,7 +3,10 @@
  *
  * Standalone top-level class — NOT a factory on AdtClient (which is
  * reserved for IAdtObject<Config, State> implementations only).
- * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, results?).
+ * Consumers build it themselves: `AdtAbapGitClient.create(connection, { logger })`
+ * answers the shipped documents, `create(connection, { logger, results })` the
+ * caller's; `new AdtAbapGitClient(connection, { logger, results })` takes its
+ * results always.
  *
  * Implements IAdtAbapGitClient. HTTP operations are delegated to
  * low-level functions in ./abapGit/*; this class owns the options,
@@ -26,6 +29,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type {
+  AdtHandlerOptions,
+  AdtShippedOptions,
+} from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';
@@ -59,14 +66,36 @@ export class AdtAbapGitClient<
   private readonly logger?: ILogger;
   private readonly results: R;
 
+  /**
+   * An abapGit client with the shipped documents, or with the caller's results.
+   * No client hands one out, so this is where the shipped documents are the
+   * default, as a getter's are.
+   */
+  static create(
+    connection: IAbapConnection,
+    options?: AdtShippedOptions<'logger'>,
+  ): AdtAbapGitClient<typeof abapGitDocuments>;
+  static create<R extends IAbapGitResults>(
+    connection: IAbapConnection,
+    options: AdtHandlerOptions<R, 'logger'>,
+  ): AdtAbapGitClient<R>;
+  static create(
+    connection: IAbapConnection,
+    options: Partial<AdtHandlerOptions<IAbapGitResults, 'logger'>> = {},
+  ): AdtAbapGitClient<IAbapGitResults> {
+    return new AdtAbapGitClient<IAbapGitResults>(connection, {
+      ...options,
+      results: options.results ?? abapGitDocuments,
+    });
+  }
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    // The options (`contentTypeVersion`, which chose what `link` and `pull`
-    // sent) are gone since 36.0.0: those members send the caller's `headers`.
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = abapGitDocuments as unknown as R,
+    // `contentTypeVersion`, which chose what `link` and `pull` sent, is gone
+    // since 36.0.0: those members send the caller's `headers`.
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;

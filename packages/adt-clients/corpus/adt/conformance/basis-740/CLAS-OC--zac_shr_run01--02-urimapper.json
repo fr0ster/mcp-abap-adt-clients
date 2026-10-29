@@ -1,0 +1,27 @@
+{
+  "case": "CLAS-OC--zac_shr_run01",
+  "step": 2,
+  "stepTag": "urimapper",
+  "capturedAt": "2026-10-29T13:02:12.457Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/urimapper",
+    "params": {
+      "uri": "/sap/bc/adt/vit/wb/object_type/clasoc/object_name/ZAC_SHR_RUN01"
+    },
+    "effectiveUrl": "/sap/bc/adt/vit/urimapper?uri=%2Fsap%2Fbc%2Fadt%2Fvit%2Fwb%2Fobject_type%2Fclasoc%2Fobject_name%2FZAC_SHR_RUN01",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "",
+    "headers": {
+      "content-type": "text/plain"
+    },
+    "bodyFile": "CLAS-OC--zac_shr_run01--02-urimapper.body.txt"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<include:abapInclude include:contextRefCount="0" abapsource:sourceUri="source/main" abapsource:sourceLanguageType="ABAP_SOURCE" adtcore:responsible="SAP" adtcore:masterLanguage="DE" adtcore:masterSystem="SAP" adtcore:name="S0600F01" adtcore:type="PROG/I" adtcore:changedAt="1997-10-07T02:07:04Z" adtcore:version="active" adtcore:createdAt="1995-04-04T00:00:00Z" adtcore:changedBy="SAP" adtcore:language="EN" xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="source/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" etag="199710070207040011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/progpx/object_name/" rel="http://www.sap.com/adt/relations/sources/textelements" type="application/vnd.sap.sapgui" title="Text elements" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/vit/wb/object_type/devck/object_name/LVS" adtcore:type="DEVC/K" adtcore:name="LVS"/>
+</include:abapInclude>

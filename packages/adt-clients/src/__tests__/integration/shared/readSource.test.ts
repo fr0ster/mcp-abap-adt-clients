@@ -16,7 +16,6 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { AdtSourceObjectType } from '../../../core/shared/types';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { gate, gateAll, gateOn } from '../../helpers/caseGate';
 import { expectResult } from '../../helpers/contract';
@@ -96,14 +95,14 @@ describe('Shared - readSource', () => {
   gateOn(() => true)('should check if object type supports source code', () => {
     logTestStep('check if object type supports source code', testsLogger);
     const utils = client.getUtils();
-    expect(utils.supportsSourceCode('class')).toBe(true);
-    expect(utils.supportsSourceCode('program')).toBe(true);
-    expect(utils.supportsSourceCode('interface')).toBe(true);
-    expect(utils.supportsSourceCode('table')).toBe(true);
-    expect(utils.supportsSourceCode('structure')).toBe(true);
-    expect(utils.supportsSourceCode('view')).toBe(true);
-    expect(utils.supportsSourceCode('domain')).toBe(false);
-    expect(utils.supportsSourceCode('dataelement')).toBe(false);
+    expect(utils.supportsSourceCode('CLAS/OC')).toBe(true);
+    expect(utils.supportsSourceCode('PROG/P')).toBe(true);
+    expect(utils.supportsSourceCode('INTF/OI')).toBe(true);
+    expect(utils.supportsSourceCode('TABL/DT')).toBe(true);
+    expect(utils.supportsSourceCode('TABL/DS')).toBe(true);
+    expect(utils.supportsSourceCode('DDLS/DF')).toBe(true);
+    expect(utils.supportsSourceCode('DOMA/DD')).toBe(false);
+    expect(utils.supportsSourceCode('DTEL/DE')).toBe(false);
   });
 
   objectCase(
@@ -134,7 +133,7 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, undefined, {
+            .readObjectSource('CLAS/OC', className, undefined, undefined, {
               analyse: analyseException,
             }),
         ),
@@ -172,7 +171,7 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, 'inactive', {
+            .readObjectSource('CLAS/OC', className, undefined, 'inactive', {
               analyse: analyseException,
             }),
         ),
@@ -211,7 +210,7 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, 'active', {
+            .readObjectSource('CLAS/OC', className, undefined, 'active', {
               analyse: analyseException,
             }),
         ),
@@ -227,7 +226,7 @@ describe('Shared - readSource', () => {
         await withAcceptHandling(
           client
             .getUtils()
-            .readObjectSource('class', className, undefined, 'inactive', {
+            .readObjectSource('CLAS/OC', className, undefined, 'inactive', {
               analyse: analyseException,
             }),
         ),
@@ -260,9 +259,10 @@ describe('Shared - readSource', () => {
       await expect(
         client
           .getUtils()
-          // Force runtime validation for invalid inputs.
+          // A caller outside the type system: refused at run time.
           .readObjectSource(
-            'domain' as unknown as AdtSourceObjectType,
+            // @ts-expect-error -- the tables list no source for DOMA/DD
+            'DOMA/DD',
             domainName,
             undefined,
             undefined,

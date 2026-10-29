@@ -64,8 +64,7 @@ export async function checkDomainSyntax(
     response = await runCheckRun(
       connection,
       headers,
-      'domain',
-      domainName,
+      { type: 'DOMA/DD', name: domainName },
       version,
       'abapCheckRun',
       undefined,

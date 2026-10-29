@@ -6,12 +6,14 @@
  * and refuses checkCdsTestDoubles(): the CDS test-doubles framework endpoint is
  * not present on 7.40 SP04 (issue #207).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
+ * updateMetadata() is refused without a request: not measured on 7.40.
  * readTransport(), getVersions() and getVersionSource() are refused without a
  * request: measured on 7.40 SP04, their resources answer `404`.
  */
 
 import {
   AdtDdl,
+  type AdtPerformedBy,
   answering,
   DDL_SOURCE,
   type ddlDocuments,
@@ -33,13 +35,14 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
   legacyMeasuredRefusal,
+  legacyNotMeasuredRefusal,
   noDeletionCheck,
   noTransportResource,
 } from '../shared/refusalLegacy';
 
 export class AdtDdlLegacy<
   R extends IDdlResults = typeof ddlDocuments,
-> extends AdtDdl<R> {
+> extends AdtDdl<R, 'basis740'> {
   /**
    * Delete DDL source — legacy override.
    *
@@ -75,6 +78,7 @@ export class AdtDdlLegacy<
 
   /** Refused without a request: the endpoint is absent on 7.40 SP04. */
   override async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
     _cdsViewName: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {
@@ -92,6 +96,7 @@ export class AdtDdlLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
     _config: Partial<IDdlConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -99,10 +104,27 @@ export class AdtDdlLegacy<
   }
 
   /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the DDL source, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
+    _config: Partial<IDdlConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/ddic/ddl/sources/{name}',
+    );
+  }
+
+  /**
    * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'transport'>,
     config: Partial<IDdlConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
@@ -116,6 +138,7 @@ export class AdtDdlLegacy<
    * answers `404` (record B4-cycles-20261026-2019).
    */
   override async getVersions<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
     config: Partial<IDdlConfig>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
@@ -130,6 +153,7 @@ export class AdtDdlLegacy<
    * from answers `404` on 7.40 SP04 (record B4-cycles-20261026-2019).
    */
   override async getVersionSource<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
     _contentUri: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {

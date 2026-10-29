@@ -54,13 +54,15 @@ const refuse: IAdtAnalyseOptions = {
 describe.each([
   [
     'ClassExecutor',
-    (c: IAbapConnection) => new ClassExecutor(c),
+    (c: IAbapConnection) =>
+      new ClassExecutor(c, { results: classExecutorDocuments }),
     { className: 'ZCL_X' },
     '/sap/bc/adt/oo/classrun/ZCL_X?profilerId=',
   ],
   [
     'ProgramExecutor',
-    (c: IAbapConnection) => new ProgramExecutor(c),
+    (c: IAbapConnection) =>
+      new ProgramExecutor(c, { results: programExecutorDocuments }),
     { programName: 'ZPROG' },
     '/sap/bc/adt/programs/programrun/ZPROG?profilerId=',
   ],
@@ -124,11 +126,13 @@ describe.each([
 
 describe('the scheduling readings, given at construction', () => {
   it('reads the catalogue, the schedule and the request id', async () => {
-    const executor = new ClassExecutor(connection(), undefined, {
-      ...classExecutorDocuments,
-      types: traceSchedulingTypes,
-      requests: traceSchedulingRequests,
-      scheduled: traceSchedulingProfilerId,
+    const executor = new ClassExecutor(connection(), {
+      results: {
+        ...classExecutorDocuments,
+        types: traceSchedulingTypes,
+        requests: traceSchedulingRequests,
+        scheduled: traceSchedulingProfilerId,
+      },
     });
 
     expect(expectResult(await executor.listProcessTypes(), 'types')).toEqual([
@@ -153,9 +157,11 @@ describe('the scheduling readings, given at construction', () => {
         .fn()
         .mockResolvedValue({ status: 201, data: '', headers: {} }),
     } as unknown as IAbapConnection;
-    const executor = new ProgramExecutor(c, undefined, {
-      ...programExecutorDocuments,
-      scheduled: traceSchedulingProfilerId,
+    const executor = new ProgramExecutor(c, {
+      results: {
+        ...programExecutorDocuments,
+        scheduled: traceSchedulingProfilerId,
+      },
     });
     expect(
       expectResult(

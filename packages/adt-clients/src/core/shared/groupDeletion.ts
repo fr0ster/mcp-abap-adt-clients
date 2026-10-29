@@ -7,9 +7,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtAddressableCode } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
-import type { IObjectReference } from './types';
+import type { IAdtGroupReference } from './codeSets';
 
 /**
  * Check if multiple objects can be deleted (group deletion check)
@@ -43,7 +44,7 @@ import type { IObjectReference } from './types';
 export async function checkDeletionGroup(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  objects: IObjectReference[],
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
 ): Promise<IAdtWireResponse> {
   const checkUrl = `/sap/bc/adt/deletion/check`;
 
@@ -101,7 +102,7 @@ ${objectElements}
 export async function deleteObjectsGroup(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  objects: IObjectReference[],
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
   const deletionUrl = `/sap/bc/adt/deletion/delete`;

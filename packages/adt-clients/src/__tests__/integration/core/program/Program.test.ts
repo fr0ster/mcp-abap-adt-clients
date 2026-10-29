@@ -220,6 +220,8 @@ describe('Program (using AdtClient)', () => {
           testCase?.params?.update_source_code || sourceCode;
 
         await tester.flowTestAuto({
+          // The program is not offered on ABAP cloud (the program table has no cloud row).
+          metadataUpdate: !isCloudSystem,
           source: sourceCode,
           updateConfig: {
             programName: config.programName,

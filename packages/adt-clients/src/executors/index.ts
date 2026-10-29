@@ -4,6 +4,11 @@ export {
   type IAbapUnitRunnerResults,
 } from './abapUnitRunner';
 export {
+  AbapUnitTestRunner,
+  abapUnitTestRunnerDocuments,
+  type IAbapUnitTestRunnerResults,
+} from './abapUnitTestRunner';
+export {
   ClassExecutor,
   ClassTestRunner,
   classExecutorDocuments,

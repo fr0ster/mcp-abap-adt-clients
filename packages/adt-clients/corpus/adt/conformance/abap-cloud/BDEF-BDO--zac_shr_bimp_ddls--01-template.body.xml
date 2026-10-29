@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="cloudDevelopment" adtcore:name="ZAC_SHR_BIMP_DDLS" adtcore:type="BDEF/BDO" adtcore:changedAt="2026-10-01T20:18:06Z" adtcore:version="active" adtcore:createdAt="2026-08-15T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" adtcore:description="Shared BDEF for BehaviorImplementation" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="ZAC_SHR_PKG"/>
+</adtcore:mainObject>

@@ -3,14 +3,15 @@
  *
  * It kept a vocabulary of its own until now — `intf/if`, `stru/dt`, no
  * behavior definition — beside `buildObjectUri`, which is verified against
- * every family's activate address. These cases pin that the two agree, that the
- * friendly names callers pass still resolve, and that a type neither knows is
- * the caller's argument, thrown before any request.
+ * every family's activate address. These cases pin that the two agree, and
+ * that a code outside the ADT type tables does not compile — and, from a
+ * caller outside the type system, is thrown before any request.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { whereUsedObjectUri } from '../../../core/shared/whereUsed';
 import { buildObjectUri } from '../../../utils/activationUtils';
 import { headersOf } from '../../helpers/adtHeaders';
@@ -41,52 +42,34 @@ describe('whereUsedObjectUri', () => {
     ['ZIF_X', 'INTF/OI'],
     ['ZSTRUCT', 'TABL/DS'],
     ['ZI_TRAVEL', 'BDEF/BDO'],
-  ])('builds the same address as buildObjectUri for %s (%s)', (name, type) => {
-    expect(whereUsedObjectUri(name, type)).toBe(buildObjectUri(name, type));
-  });
-
-  it('accepts the code in any case', () => {
-    expect(whereUsedObjectUri('ZCL_X', 'clas/oc')).toBe(
-      buildObjectUri('ZCL_X', 'CLAS/OC'),
-    );
-  });
-
-  it.each([
-    ['class', 'CLAS/OC'],
-    ['program', 'PROG/P'],
-    ['include', 'PROG/I'],
-    ['function', 'FUGR/F'],
-    ['functiongroup', 'FUGR/F'],
-    ['interface', 'INTF/OI'],
-    ['package', 'DEVC/K'],
-    ['table', 'TABL/DT'],
-    ['structure', 'STRU/DS'],
-    ['domain', 'DOMA/DD'],
-    ['dataelement', 'DTEL/DE'],
-    ['view', 'DDLS/DF'],
-  ])('maps the friendly name %s to %s', (alias, code) => {
-    expect(whereUsedObjectUri('ZOBJ', alias)).toBe(
-      buildObjectUri('ZOBJ', code),
-    );
-  });
+  ] as const)(
+    'builds the same address as buildObjectUri for %s (%s)',
+    (name, type) => {
+      expect(whereUsedObjectUri(name, type)).toBe(buildObjectUri(name, type));
+    },
+  );
 
   it('reads a function module as GROUP|FM', () => {
-    expect(whereUsedObjectUri('ZFG|Z_FM', 'functionmodule')).toBe(
+    expect(whereUsedObjectUri('ZFG|Z_FM', 'FUGR/FF')).toBe(
       '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm',
     );
-    expect(() => whereUsedObjectUri('Z_FM', 'functionmodule')).toThrow(
+    expect(() => whereUsedObjectUri('Z_FM', 'FUGR/FF')).toThrow(
       /GROUP\|FM_NAME/,
     );
   });
 
-  it('throws for a type neither vocabulary knows, and for none at all', () => {
-    // `intf/if` and `stru/dt` were where-used's own spellings; ADT uses neither.
-    expect(() => whereUsedObjectUri('ZIF_X', 'intf/if')).toThrow(
+  it('a code outside the tables does not compile, and is thrown at run time', () => {
+    // `intf/if` and `stru/dt` were where-used's own spellings; ADT uses
+    // neither. A caller outside the type system still gets no request.
+    // @ts-expect-error -- INTF/IF is no code of the tables
+    expect(() => whereUsedObjectUri('ZIF_X', 'INTF/IF')).toThrow(
       /No ADT address is known for object type/,
     );
-    expect(() => whereUsedObjectUri('ZX', 'NOPE/XX')).toThrow(
+    // @ts-expect-error -- a friendly name is no code of the tables
+    expect(() => whereUsedObjectUri('ZCL_X', 'class')).toThrow(
       /No ADT address is known for object type/,
     );
+    // @ts-expect-error -- an empty code is no code of the tables
     expect(() => whereUsedObjectUri('ZX', '')).toThrow(/object type/);
   });
 });
@@ -94,7 +77,7 @@ describe('whereUsedObjectUri', () => {
 describe('AdtUtils where-used members', () => {
   it('ask about the shared address', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtils(connection, logger);
+    const utils = new AdtUtils(connection, { logger, results: utilDocuments });
 
     await utils.getWhereUsed(
       {
@@ -106,7 +89,7 @@ describe('AdtUtils where-used members', () => {
     await utils.getWhereUsedScope(
       {
         object_name: 'ZCL_X',
-        object_type: 'class',
+        object_type: 'CLAS/OC',
       },
       { headers: headersOf(utils, 'getWhereUsedScope') },
     );
@@ -119,16 +102,18 @@ describe('AdtUtils where-used members', () => {
 
   it('throw an unknown type before any request is made', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtils(connection, logger);
+    const utils = new AdtUtils(connection, { logger, results: utilDocuments });
 
     await expect(
       utils.getWhereUsed(
+        // @ts-expect-error -- NOPE/XX is no code of the tables
         { object_name: 'ZX', object_type: 'NOPE/XX' },
         { headers: headersOf(utils, 'getWhereUsed') },
       ),
     ).rejects.toThrow(/No ADT address is known for object type/);
     await expect(
       utils.getWhereUsedScope(
+        // @ts-expect-error -- an empty code is no code of the tables
         { object_name: 'ZX', object_type: '' },
         { headers: headersOf(utils, 'getWhereUsedScope') },
       ),

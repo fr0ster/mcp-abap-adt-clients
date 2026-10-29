@@ -11,17 +11,16 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
-  IAdtContentTypes,
   IAdtError,
   IAdtHeaders,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
-  IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
   IClassResults,
@@ -29,17 +28,17 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant } from '../../clients/variant';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import type { LockRegistry } from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassDefinitions } from './check';
 import { updateClassDefinitions } from './includes';
 import { getClassDefinitionsInclude } from './read';
-import { classDocuments } from './types';
+import type { classDocuments } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalDefinitionsConfig } from '@mcp-abap-adt/interfaces-adt';
@@ -59,8 +58,9 @@ export type { ILocalDefinitionsConfig } from '@mcp-abap-adt/interfaces-adt';
  */
 export class AdtLocalDefinitions<
     R extends IClassResults = typeof classDocuments,
+    V extends AdtVariant = AdtModernVariant,
   >
-  extends AdtClassMemberBase<R>
+  extends AdtClassMemberBase<R, V, 'localDefinitions'>
   implements
     IAdtReadable<ILocalDefinitionsConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalDefinitionsConfig, ReturnType<R['metadata']>>,
@@ -71,16 +71,18 @@ export class AdtLocalDefinitions<
 {
   public readonly objectType: string = 'LocalDefinitions';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // See AdtClass: the one cast is on the default, never on a member.
-    protected readonly results: R = classDocuments as unknown as R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
     super(connection, logger, systemContext, contentTypes, lockRegistry);
+    this.results = options.results;
   }
 
   /** Syntax-check the source a caller is about to write. */

@@ -16,6 +16,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
+import { messageDocuments } from '../../../../core/messageClass/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure } from '../../../helpers/contract';
 
@@ -73,7 +74,10 @@ describe('message-class cleanup after a refused PUT', () => {
 
     expect(
       expectFailure(
-        await new AdtMessageClassMessage(connection, logger).update(
+        await new AdtMessageClassMessage(connection, {
+          logger,
+          results: messageDocuments,
+        }).update(
           {
             className: 'ZTEST_MSG',
             msgno: '001',
@@ -81,7 +85,10 @@ describe('message-class cleanup after a refused PUT', () => {
           },
           {
             headers: headersOf(
-              new AdtMessageClassMessage(connection, logger),
+              new AdtMessageClassMessage(connection, {
+                logger,
+                results: messageDocuments,
+              }),
               'update',
             ),
           },
@@ -107,14 +114,20 @@ describe('message-class cleanup after a refused PUT', () => {
 
     expect(
       expectFailure(
-        await new AdtMessageClassMessage(connection, logger).delete(
+        await new AdtMessageClassMessage(connection, {
+          logger,
+          results: messageDocuments,
+        }).delete(
           {
             className: 'ZTEST_MSG',
             msgno: '001',
           },
           {
             headers: headersOf(
-              new AdtMessageClassMessage(connection, logger),
+              new AdtMessageClassMessage(connection, {
+                logger,
+                results: messageDocuments,
+              }),
               'delete',
             ),
           },

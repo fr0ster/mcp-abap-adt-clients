@@ -33,7 +33,10 @@ import {
 import { AdtClient } from '../src/clients/AdtClient';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
 import { utilDocuments } from '../src/core/shared/utilResultSet';
-import { ClassExecutor } from '../src/executors/class/ClassExecutor';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+} from '../src/executors/class/ClassExecutor';
 import { wireItself } from '../src/utils/resultStrategy';
 
 const {
@@ -157,7 +160,10 @@ async function main(): Promise<void> {
     if (args.includes('--run')) {
       const t0 = Date.now();
       out(`running ${CLASS_NAME}…`);
-      const ran = await new ClassExecutor(connection, quiet).run({
+      const ran = await new ClassExecutor(connection, {
+        logger: quiet,
+        results: classExecutorDocuments,
+      }).run({
         className: CLASS_NAME,
       });
       out(
@@ -207,9 +213,12 @@ async function main(): Promise<void> {
 
     // One group run for both.
     // The run id comes back in Location, so the activation answer is read whole.
-    const utils = new AdtUtils(connection, quiet, {
-      ...utilDocuments,
-      activation: wireItself,
+    const utils = new AdtUtils(connection, {
+      logger: quiet,
+      results: {
+        ...utilDocuments,
+        activation: wireItself,
+      },
     });
     const started = await utils.activateObjectsGroup(
       [

@@ -54,8 +54,23 @@ function isStrategyFile(file: string): boolean {
   );
 }
 
-/** The parameters of a method-like declaration, or `undefined`. */
+/**
+ * The parameters a call's arguments bind to, or `undefined`: a `this`
+ * parameter — the variant gate of 38.0.0 — takes no argument, so it is left
+ * out, or every index after it would be off by one.
+ */
 function parametersOf(
+  declaration: ts.Declaration,
+): readonly ts.ParameterDeclaration[] | undefined {
+  const all = declaredParametersOf(declaration);
+  return all?.filter(
+    (parameter) =>
+      !(ts.isIdentifier(parameter.name) && parameter.name.text === 'this'),
+  );
+}
+
+/** The declared parameters of a method-like declaration, or `undefined`. */
+function declaredParametersOf(
   declaration: ts.Declaration,
 ): ts.NodeArray<ts.ParameterDeclaration> | undefined {
   if (

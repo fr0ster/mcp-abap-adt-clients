@@ -1,0 +1,29 @@
+{
+  "case": "FUGR-FF--z_ac_shr_fm01",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-29T13:02:31.411Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/functions/groups/zac_shr_fugr/fmodules/z_ac_shr_fm01",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/functions/groups/zac_shr_fugr/fmodules/z_ac_shr_fm01",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.functions.fmodules+xml",
+      "etag": "202603120827400012",
+      "last-modified": "Thu, 12 Mar 2026 08:27:40 GMT",
+      "x-sap-adt-profiling": "server-time=9319976",
+      "~server_protocol": "HTTP/1.1"
+    },
+    "bodyFile": "FUGR-FF--z_ac_shr_fm01--03-metadata.body.xml"
+  }
+}

@@ -293,12 +293,12 @@ export function utilRows(
     const calls: Record<string, (h: never, x: IAdtHeaders) => unknown> = {
       getWhereUsed: (h, headers) =>
         m(h, 'getWhereUsed')(
-          { object_name: 'ZCL_GUARD', object_type: 'class' },
+          { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
           { headers },
         ),
       getWhereUsedScope: (h, headers) =>
         m(h, 'getWhereUsedScope')(
-          { object_name: 'ZCL_GUARD', object_type: 'class' },
+          { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
           { headers },
         ),
       getVirtualFoldersContents: (h, headers) =>
@@ -424,7 +424,7 @@ function memberName(
  * not a plain literal — an arrow function, a function expression, or any
  * expression such as `create = this.makeCreate()`, which implements `create`
  * as well. A method alone was all this used to accept, so a function field
- * passed uncovered.
+ * passed uncovered. A static member is none of these.
  */
 function implementedName(
   member: ts.ClassElement,
@@ -435,6 +435,14 @@ function implementedName(
   // Every computed name is resolved, whatever the member is, so none is left
   // unread.
   const name = memberName(member.name, checker, where, unresolvedNames);
+  // A static member implements no contract: a contract types an instance. The
+  // static `create` of a class no client hands out builds one and sends
+  // nothing.
+  if (
+    ts.canHaveModifiers(member) &&
+    ts.getModifiers(member)?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)
+  )
+    return undefined;
   if (ts.isMethodDeclaration(member) && member.body) return name;
   if (ts.isGetAccessorDeclaration(member) && member.body) return name;
   if (ts.isPropertyDeclaration(member) && member.initializer) {

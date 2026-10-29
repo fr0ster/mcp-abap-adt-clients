@@ -20,6 +20,7 @@ describe('defect 1: ENHO/ENH is not a transformation', () => {
   it('ENHO/ENH no longer reaches the XSLT collection', () => {
     let built: string | undefined;
     try {
+      // @ts-expect-error -- ENHO/ENH is no code of the tables
       built = buildObjectUri('ZENH', 'ENHO/ENH');
     } catch {
       built = undefined;
@@ -30,10 +31,10 @@ describe('defect 1: ENHO/ENH is not a transformation', () => {
 
 describe("defect 2: an interface by ADT's own code", () => {
   it('INTF/OI reads', () => {
-    expect(getObjectMetadataUri('INTF/OI' as never, 'ZIF_X')).toBe(
+    expect(getObjectMetadataUri('INTF/OI', 'ZIF_X')).toBe(
       '/sap/bc/adt/oo/interfaces/zif_x',
     );
-    expect(getObjectSourceUri('INTF/OI' as never, 'ZIF_X')).toBe(
+    expect(getObjectSourceUri('INTF/OI', 'ZIF_X')).toBe(
       '/sap/bc/adt/oo/interfaces/zif_x/source/main',
     );
   });
@@ -41,7 +42,7 @@ describe("defect 2: an interface by ADT's own code", () => {
 
 describe('defect 3: a data element by DTEL/DE', () => {
   it('DTEL/DE reads', () => {
-    expect(getObjectMetadataUri('DTEL/DE' as never, 'ZDE')).toBe(
+    expect(getObjectMetadataUri('DTEL/DE', 'ZDE')).toBe(
       '/sap/bc/adt/ddic/dataelements/zde',
     );
   });
@@ -53,8 +54,9 @@ describe('defect 5: a function module needs its group', () => {
       '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm',
     );
   });
-  it('without it, throws before any request', () => {
-    expect(() => buildObjectUri('Z_FM', 'FUGR/FF')).toThrow(/function group/i);
+  it('without it, does not compile — and throws before any request', () => {
+    // @ts-expect-error -- FUGR/FF is addressed under its group
+    expect(() => buildObjectUri('Z_FM', 'FUGR/FF')).toThrow(/functionGroup/);
   });
 });
 
@@ -73,8 +75,8 @@ describe('every table agrees on a class', () => {
   it('one address', () => {
     const expected = '/sap/bc/adt/oo/classes/zcl_x';
     expect(buildObjectUri('ZCL_X', 'CLAS/OC')).toBe(expected);
-    expect(getObjectUri('class', 'ZCL_X')).toBe(expected);
-    expect(getObjectMetadataUri('class' as never, 'ZCL_X')).toBe(expected);
+    expect(getObjectUri('CLAS/OC', 'ZCL_X')).toBe(expected);
+    expect(getObjectMetadataUri('CLAS/OC', 'ZCL_X')).toBe(expected);
     expect(
       buildAtcObjectUri({ objectType: 'class', objectName: 'ZCL_X' }),
     ).toBe(expected);
@@ -90,13 +92,20 @@ describe('an enhancement name is encoded once', () => {
 });
 
 describe('no invented address', () => {
-  it('an unknown type throws', () => {
+  it('an unknown type does not compile, and throws', () => {
+    // @ts-expect-error -- ABCD/XY is no code of the tables
     expect(() => buildObjectUri('ZX', 'ABCD/XY')).toThrow(/ABCD\/XY/);
   });
-  it('ENHO/ENH, which names no subtype, throws', () => {
+  it('ENHO/ENH, which names no subtype, does not compile, and throws', () => {
+    // @ts-expect-error -- ENHO/ENH is no code of the tables
     expect(() => buildObjectUri('ZENH', 'ENHO/ENH')).toThrow();
   });
-  it('a missing type throws rather than guessing from the name', () => {
+  it('a missing type does not compile, and throws rather than guessing from the name', () => {
+    // @ts-expect-error -- the type is required
     expect(() => buildObjectUri('ZCL_X')).toThrow(/type/i);
+  });
+  it('a message of a message class has no address of its own: it does not compile, and throws', () => {
+    // @ts-expect-error -- MSAG/NN has no address of its own
+    expect(() => buildObjectUri('001', 'MSAG/NN')).toThrow(/row in its class/);
   });
 });

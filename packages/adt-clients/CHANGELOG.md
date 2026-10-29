@@ -24,17 +24,149 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [38.0.0] - 2026-10-27
+## [38.0.0] - 2026-10-29
 
-A contract lives where it is accepted (#216). A factory accepts a result set, so
-the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a consumer
-accepts the client, so the consumer composes the client contract it needs, and
-this package declares no composition of its own. No request and no answer
-changes. [MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on
-37.x does.
+Two changes of contract, released once, on `@mcp-abap-adt/interfaces-adt`
+`^23.1.1`:
+
+- **A contract lives where it is accepted** (#216). A factory accepts a result
+  set, so the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a
+  consumer accepts the client, so the consumer composes the client contract it
+  needs, and this package declares no composition of its own.
+- **The ADT type tables decide** (#282). interfaces-adt declares, per release
+  variant, every API the library offers, its codes and the operations each
+  performs (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`).
+  A client is fixed to its variant (`AdtClient<V>`, `AdtClientOnPrem`,
+  `AdtClientCloud`), a factory or member the variant's table lacks does not
+  compile, every type code is a code of the tables (`AdtTypeCode`), and every
+  address is built from them. New members fill the table's operations:
+  `updateMetadata` for fifteen types, and a function group's source. ABAP
+  Unit runs what its registry (`ABAP_UNIT_RUN_TYPES`) names, through a
+  generic runner beside the four per-object ones.
+
+[MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on 37.x
+does. Requests change in four places, each listed below: the function group's
+metadata Accept, its activation, the codes a member takes (a code no table
+holds is no longer sent), and the new members.
+
+### Fixed
+
+- **A function group's metadata through `getUtils().readObjectMetadata`
+  asks for `functions.groups.v3+xml` first.** Measured on S/4HANA 2025, read
+  only, 2026-10-28: `GET /sap/bc/adt/functions/groups/<group>` answers `406`
+  with the Accept it sent, `functions.groups.v2+xml, functions.groups.v1+xml`,
+  and `200` with `functions.groups.v3+xml`. The Accept now lists v3, then v2
+  and v1, so the releases that serve only those still answer.
+  `getFunctionGroup().readMetadata` sends `*/*` and is unchanged.
+- **A function group's activation names its main program too.** A group's
+  `source/main` is an activation object of its own (`FUGR/I` `SAPL<group>`):
+  in a transportable package, activating the group alone left both inactive.
+  `getFunctionGroup().activate()` sends both references in one request
+  (measured 2026-10-29 on S/4HANA 2025 and ABAP cloud). The legacy group
+  keeps the one reference (adt-clients-legacy 0.2.0).
+- **A required member of the connection is called as the contract types
+  it.** `inStatefulSession` called `setSessionType?.(…)`, a program's upload
+  `getSessionId?.()`, and `withRequestTrace` handed back a connection without
+  `makeAdtRequest` unwrapped — runtime guards on members `IAbapConnection`
+  declares required, which let a fake lacking one skip the stateful switch
+  of every lock window in silence. They are called directly now. A
+  connection that implements the contract sees no change; two test fakes
+  cast from `{}` implement it instead (`RecordingConnection`).
 
 ### Breaking
 
+- **A getter answers what it was given; a constructor takes an options
+  object with its results.** Every getter of `AdtClient` (35),
+  `AdtRuntimeClient` (11) and `AdtExecutor` (7), and every handler's,
+  runner's and executor's constructor, had
+  `results: R = <x>Documents as unknown as R`:
+  `client.getClass<MyResults>()` compiled and answered the shipped documents
+  typed as `MyResults`. Each getter now has two overloads — `getX()` answers
+  `X<typeof xDocuments, V>`, `getX(results)` answers `X<R, V>` — so a custom
+  `R` without its results does not compile; the variant gates are unchanged.
+  The constructors of every `core/*` handler (`AdtClass` … `AdtUtils`,
+  `AdtRequest`), every `runtime/*` handler (`Profiler` … `AbapDebugger`,
+  `AmdpDebugger`, `MemorySnapshots`), `AdtAbapGitClient`, `ClassExecutor`,
+  `ProgramExecutor`, `ClassTestRunner`, `ProgramTestRunner`,
+  `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
+  `AbapUnitTestRunner`, `TraceScheduling` and the abstract `AbapUnitRunner`
+  take `(connection, options)`: `options.results` required, every other
+  parameter they took — `logger`, `systemContext`, `contentTypes`,
+  `lockRegistry`, `AbapDebugger`'s `onConflict` — optional and by name
+  (`AdtHandlerOptions<R, K>`; a part the class does not read is refused). A
+  logger a class required is a required field of its options: `AdtUtils` and
+  the runtime handlers but the debuggers and memory snapshots take
+  `(connection, { logger, results })` (`AdtLoggedOptions<R>`; a call without
+  the logger does not compile), so every constructor has the one shape
+  `(connection, options)`. The fields and the behaviour of each
+  class are unchanged; the legacy classes inherit the constructors. No
+  `as unknown as` is left in the package's source. No request and no answer
+  changes. A caller of a getter with no argument, or with its own documents,
+  changes nothing; `getX<MyResults>()` passes its results; a caller
+  constructing a handler directly passes the options
+  (`new AdtClass(connection, { logger, results: classDocuments })`,
+  `new AdtUtils(connection, { logger, results: utilDocuments })`,
+  `new ClassTestRunner(connection, { logger, results: classTestRunnerDocuments })`),
+  takes it from the getter, or — for the four classes no client hands out —
+  from their static `create` (below). See MIGRATION-38, "A getter answers
+  what it was given; a constructor takes an options object".
+- **A client is fixed to its release variant.** `AdtClient<V extends
+  AdtVariant = AdtModernVariant>`; `AdtClientOnPrem` (`'onprem'`, S/4HANA
+  2025) and `AdtClientCloud` (`'cloud'`, ABAP cloud) fix it, and a plain
+  `AdtClient` serves what both modern tables serve. A factory takes
+  `this: this & AdtServedBy<'<api>'>` and a member whose availability differs
+  by variant `this: this & AdtPerformedBy<'<api>', '<operation>'>`, so a
+  factory or an operation the variant's table lacks is a compile error naming
+  it. The executors and ABAP Unit runners are gated the same way
+  (`AdtExecutor<V>`: `run`, `runWithProfiler`, `run` / `runSync` /
+  `getStatus` / `getResult` of the runners). Nothing is checked at run time
+  for a caller inside the type system.
+- **`createAdtClient(connection, { variant, logger?, …options })`** — the
+  variant is declared, required, and answers `AdtClientOnPrem` or
+  `AdtClientCloud` (`AdtClient` for a variant known only as one of the two).
+  It was `createAdtClient(connection, logger?, options?)`. It still probes
+  nothing; `new AdtClient(connection, logger?, options?)` stays.
+- **Every type code is a code of the tables.** The unions
+  `AdtObjectType`, `AdtObjectTypeLower`, `AdtSourceObjectType` and
+  `AdtSourceObjectTypeLower` are gone from interfaces-adt with 21.0.0;
+  `IObjectReference.type`, `ISearchObjectsParams.objectType` and where-used's
+  `object_type` are `AdtTypeCode`s. Gone with them, because no table holds
+  them: `FUNC`, the bare R3TR aliases (`CLAS`, `PROG`, …), the lower-case
+  spellings (`clas/oc`, …), the friendly names (`class`, `functionmodule`,
+  `view`, `structure`, `table`, …), `STRU/DS`, `STRU/DT`, `TTYP/DF`,
+  `TTYP/TT` and `INTF/IF`. New from the tables: `TTYP/DA` (table type),
+  `MSAG/N` (message class). `VIEW/DV` stays for group activation, group
+  deletion and where-used only, typed as a group-only code
+  (`AdtGroupOnlyCode`).
+- **`getUtils()` takes each code as its variant serves it** (`AdtUtils<R, V>`,
+  the code sets exported as `AdtMetadataReadCode`, `AdtSourceReadCode`,
+  `AdtActivationCode`, `AdtDeletionCode`, `AdtDeletionCheckCode`,
+  `AdtWhereUsedCode`, `AdtStructureCode`, `AdtSearchCode`). The generic reads
+  take exactly the codes they read before: `readObjectMetadata` `CLAS/OC`,
+  `INTF/OI`, `PROG/P`, `FUGR/F`, `FUGR/FF`, `DDLS/DF`, `TABL/DT`, `TABL/DS`,
+  `TTYP/DA`, `DOMA/DD`, `DTEL/DE`, `DEVC/K`; `readObjectSource` `CLAS/OC`,
+  `INTF/OI`, `PROG/P`, `FUGR/FF`, `DDLS/DF`, `TABL/DT`, `TABL/DS`. A group
+  activation takes the codes whose API lists `activate` (and `DEVC/K` on the
+  modern variants, as before); deletion and its check take `delete` /
+  `deletionCheck`. Any other code does not compile, and from a caller outside
+  the type system is refused before any request.
+- **An API with a parent takes it.** A function module (`FUGR/FF`) and a
+  function include (`FUGR/I`) are addressed under their group: their members
+  take the group by type (`functionGroupName`), `readObjectMetadata` /
+  `readObjectSource` / `getObjectSourceUri` require it for `FUGR/FF`, an
+  `IObjectReference<'FUGR/FF'>` requires `parentName`. Where-used does not take `FUGR/I`; a function module there is still
+  named `GROUP|FM`.
+- **Addresses come from the tables.** `buildObjectUri` builds a code's
+  collection, then the name, and a parented code under its parent's address;
+  its hand-written switch and `WHERE_USED_ALIASES` are gone. `MSAG/NN` has no
+  address of its own: a message is read from its class's document (the
+  owner's ruling, recorded as a conformance divergence with its reason).
+- **`getUtils().getTypeStructure({ headers })`** reads
+  `/sap/bc/adt/repository/typestructure` with the caller's headers, answered
+  as the document came.
+- `@mcp-abap-adt/adt-strategies` `^0.16.0` (was `^0.10.0`): a code read from an answer is an
+  `IAdtAnsweredObject` — `type` (an `AdtTypeCode`) or `unknownType` (the text
+  as ADT sent it). See its [CHANGELOG](../adt-strategies/CHANGELOG.md).
 - **The result-set contracts come from `@mcp-abap-adt/interfaces-adt` 20.2.0.**
   The 30 client result-set contracts (`IClassResults`, `IProgramResults`, …,
   `IUtilResults`, `IMessageClassMessageResults` with its generic parameters) and
@@ -53,13 +185,141 @@ changes. [MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on
   class's single generic one. `createAdtClient()` still answers
   `Promise<AdtClient>`.
 
+### Added
+
+- **The generic ABAP Unit runner, `AbapUnitTestRunner`**
+  (`AdtExecutor.getAbapUnitTestRunner()`, default result set
+  `abapUnitTestRunnerDocuments`), implementing interfaces-adt 23.1.0's
+  `IAbapUnitRunner`. `run(target)` starts one `AbapUnitRunTarget` on
+  `POST /sap/bc/adt/abapunit/runs`: `{ kind: 'object', name, type }` as an
+  `osl:flatObjectSet` with one `osl:object`, `type` any key of
+  `ABAP_UNIT_RUN_TYPES` (`AbapUnitRunObjectType`) — `CLAS/OC`, `CLAS/OCL`,
+  `DDLS/DF`, `FUGR/F`, … —, or `{ kind: 'package', name,
+  includeSubpackages }` as an `osl:packageSet` with one `osl:package`, the
+  one form measured to run a package's tests (2026-10-29, S/4HANA 2025 and
+  ABAP cloud). `runSync(uris, { headers })` runs objects by ADT URI on
+  `/abapunit/testruns`, always with `<options>`; `getStatus` / `getResult`
+  by the run id. Scope, risk levels and durations as every runner's. **A CDS
+  view's tests are assigned tests**: local test classes marked
+  `"! @testing <view>`, executed by `DDLS/DF` (or `DDLS`) only with
+  `scope: { foreignTests: true }`; with the default
+  `addForeignTestsAsPreview: true` they are listed without being executed —
+  no alerts, a failing test looks like a pass — so a consumer reading a CDS
+  run sets `foreignTests: true`. **A wrong type is no error**: the endpoint
+  answers `201` and an empty `<aunit:runResult/>`, so only the compiler
+  catches it. `run`, `getStatus` and `getResult` are gated on a modern
+  variant; adt-clients-legacy 0.2.0 refuses them on 7.40 and keeps
+  `runSync`.
+- **`updateMetadata`** for the class, interface, program, function module,
+  DDL source, access control (`DCLS/DL`), metadata extension (`DDLX/EX`),
+  behavior definition (`BDEF/BDO`), service definition (`SRVD/SRV`), scalar
+  function (`DSFD/SCF`), transformation (`XSLT/VT`), table, structure,
+  include and service binding. One PUT of the caller's document
+  (`options.source`) as it is, to the object's resource with the caller's `lockHandle` (and `corrNr` when the
+  config names a request) and headers, answered through
+  `results.metadataUpdated`. The library builds and merges no field: read
+  the metadata, change it, pass the whole document back. Gated by the
+  tables: the program's and the include's on premise only, the service
+  binding's on both modern variants; `update` of a service binding stays its
+  publication.
+- **A function group's source:** `getFunctionGroup().read(config, version?)`
+  is one GET of `.../source/main` (`text/plain`), and `update(config,
+  { source, lockHandle, headers })` one PUT of the caller's text — the
+  function pool's main program. Every variant: 7.40's table lists them too
+  since interfaces-adt 23.1.1 (measured on SAP_BASIS 7.40 SP04,
+  2026-10-29), and `@mcp-abap-adt/adt-clients-legacy` 0.2.0 serves them.
+- **The conformance check of the type tables**: in CI against the recorded
+  answers of each release (`corpus/adt/conformance/`), and live on demand —
+  see the README's [conformance section](README.md#the-type-tables-conformance-check).
+- **A static `create` on the four classes no client hands out** —
+  `AdtAbapGitClient`, `AbapDebugger`, `AmdpDebugger`, `MemorySnapshots` —
+  with the getters' two overloads: `X.create(connection, options?)` answers
+  `X<typeof xDocuments>` with the shipped documents (`options` takes the
+  logger and, for `AbapDebugger`, `onConflict`, and no `results`);
+  `X.create(connection, { results, … })` answers `X<R>`. A custom `R`
+  without its results does not compile. Each builds the instance its
+  constructor builds, so what it sends is the same. `AdtAbapGitClient` stays
+  a standalone client, not a factory on `AdtClient`.
+- `AdtHandlerOptions<R, K>`, `AdtLoggedOptions<R>`, `IAdtHandlerContext` and
+  `AdtShippedOptions<K>` (what a constructor and a `create` take), and
+  `AbapDebuggerConstructorOptions<R>`.
+- `AdtClientOnPrem`, `AdtClientCloud`, `ICreateAdtClientOptions`, the gate
+  types (`AdtServedBy`, `AdtPerformedBy`, `IAdtServedOn`, `AdtCodeOf`,
+  `AdtCodeWith`, `AdtModernVariant`, …), `EnhancementTypeWith`,
+  `IAdtGroupReference`, `ParentedArguments`, `AdtAddressableCode`.
+
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` `^20.2.0` (was `^20.1.0`).
+- `@mcp-abap-adt/interfaces-adt` `^23.1.1` (was `^20.1.0`; #216 needed
+  `^20.2.0`, the type tables `^21.0.0`, the `metadataUpdated` slots and the
+  function group's source `^23.0.1`–`^23.0.4`, the ABAP Unit run registry
+  and the generic runner's contract `^23.1.0`, the function group's source
+  on 7.40 `^23.1.1`).
+- **The four ABAP Unit runners' `osl:object type` is typed
+  `AbapUnitRunObjectType`**, the union of `ABAP_UNIT_RUN_TYPES`' keys:
+  `AbapUnitRunner.startByObject`'s `type` (protected) and
+  `IUnitTestRunObject.type` were `string`. The union holds every value the
+  endpoint was measured to run or that `/abapunit/metadata` lists; a
+  subclass passing any other text no longer compiles (such a run answered an
+  empty result). The runners keep sending `CLAS`, `PROG`, `FUGR` and
+  `FUNC` — requests unchanged.
 - Decision 10 ("a factory's return type is a contract") is superseded by
   decision 17 in `docs/architecture/DECISIONS.md`.
 
 ### Tests
+
+- **The literal scan of type codes** (`typeCodeLiterals.test.ts` in each
+  package, `typeCodeScan.ts`): a code literal in production source passes
+  only where the compiler types it by the tables, and a code named in a
+  comment or inside a longer string (a message, a template's text span) must
+  be a code of the tables; the allow-list of non-codes carries a reason per
+  entry.
+- The literal scan counts the ABAP Unit run registry's keys among the codes
+  of the tables, so a literal typed `AbapUnitRunObjectType` passes, and the
+  four allow-list entries for the runners' `CLAS`, `PROG`, `FUGR` went.
+- **The conformance check's ABAP Unit rules**, against the recorded
+  `GET /abapunit/metadata` of S/4HANA 2025 and ABAP cloud
+  (`corpus/adt/abapunit/`): every listed `globalWorkbenchType` is a key of
+  `ABAP_UNIT_RUN_TYPES`, and every key entered on the metadata's evidence is
+  listed; a negative fixture per rule.
+- Request-shape tests of the generic runner: an object target, a package
+  target with and without subpackages, a URI run with the headers as given.
+  Live suites (`unitTest/AbapUnit{Class,Cds,Package}Run`, case section
+  `run_abap_unit`, off by default): a class by `CLAS/OC`, a CDS view's
+  assigned tests by `DDLS/DF` — executed with `foreignTests` (a failing
+  one carries its `failedAssertion`), absent with own tests only and no
+  preview, listed without an alert with the preview —, a package run —
+  each in a local package, under fresh names, deleted and read back absent.
+- **The constructors' options and the static `create`**
+  (`clientResultDefaults`, `executorResultDefaults`, `handlerFactories`, and
+  the legacy `legacyClientResultDefaults`): options without `results` do not
+  compile, a part a class does not read is refused, and each `create` answers
+  the shipped documents' type with no results, the given type with them — from
+  a variable too — and refuses a custom `R` without them; `create` sends what
+  the constructor sends, `onConflict` included. The header guard's scan skips
+  static members, which implement no contract. `requiredLogger` (and the
+  legacy `AdtUtilsLegacy` case): each of the twelve classes that require a
+  logger refuses options without it at compile time.
+- **The critical section** (`utils/criticalSection.test.ts`,
+  `messageClassMessageCriticalSection.test.ts`, with the recording
+  connection's `CriticalSectionConnection`): `beginCriticalSection` opens
+  before the request and closes after it, also when the body throws, and once
+  however often its closer is called; a message's write opens it after the
+  class is read and before the first lock, closes it after the last unlock —
+  once, after the unwinding unlocks, when the PUT fails — and answers the
+  PUT's answer. No test had supplied the capability before.
+- **The header probe's wire capture fails loudly** (`onTheWire`,
+  `tools/header-probe/capture.ts`; `unit/scripts/onTheWire.test.ts`): a
+  connection without the connector's `transport.send` throws instead of being
+  handed back unchanged, when the probe would have run recording nothing on
+  the wire. The seam is typed by the connector's `IAdtTransport`, read
+  through a type guard, with no cast; with the seam, every request but a CSRF
+  fetch is recorded into the call that sent it.
+- Negative compile checks (`variantGates`): a factory the variant lacks, an
+  operation the API lacks, an operation one code lacks, a missing parent.
+- Request-shape tests for every `updateMetadata`, the function group's
+  source and its two-reference activation; a live metadata-update step in
+  the integration flow (on in 16 suites).
 
 - The shape check reads the classes the factories answer;
   `factoryReturnsCoverClass.ts` asserts that every public method `getUtils`,
@@ -70,6 +330,47 @@ changes. [MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on
   set; `consumerContract.test.ts` proves that a contract composed from
   interfaces-adt alone accepts `AdtClient` and a hand-written object and
   refuses one missing a member it names.
+
+### Documentation
+
+- `docs/usage/ADT_OBJECT_ENTITIES.md` is regenerated from the sources and can
+  no longer go stale silently. `npm run adt:entities` reads them with the
+  TypeScript parser instead of regular expressions — a getter with type
+  parameters had dropped out of the regular expression, and with it every
+  object section of the file — and `npm run check:entities` (part of
+  `check:docs`, so of `lint:check`) fails when the committed file differs.
+  The file gains the function group's source read and upload, the
+  enhancement's version token, `AdtClassMemberBase`, `AdtAbapGitClient.create`,
+  `AdtClientOnPrem` / `AdtClientCloud` with what they extend, and a section
+  for the runtime classes, among them the static `create` of `AbapDebugger`,
+  `AmdpDebugger` and `MemorySnapshots`.
+
+### Migration
+
+See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
+
+- Name the variant: `createAdtClient(connection, { variant: 'onprem', logger })`
+  or `new AdtClientOnPrem(connection, logger)`; a 7.40 system is
+  `AdtClientLegacy` of adt-clients-legacy.
+- Pass codes of the tables (`'CLAS/OC'`, `'FUGR/FF'`, `'TABL/DT'`) where a
+  friendly name, a bare R3TR type or a lower-case spelling was passed; type
+  them `AdtTypeCode` (or a code set above), never `string`.
+- Name the function group of a function module or include wherever it is
+  addressed.
+- Read `type ?? unknownType` from an answered object (adt-strategies 0.16.0).
+- A runner subclass that passes a `string` to `startByObject` types it
+  `AbapUnitRunObjectType`; text outside the registry no longer compiles.
+- Read a CDS view's ABAP Unit run with `scope: { foreignTests: true }`:
+  without it the view's assigned tests are listed, not executed.
+- Import the result-set contracts from interfaces-adt, and compose the client
+  contract you accept from it (#216).
+- Construct a handler, runner or executor with its options:
+  `new AdtClass(connection, logger)` → `new AdtClass(connection, { logger,
+  results: classDocuments })`, or take it from the getter; a debugger, memory
+  snapshots or the abapGit client from its `create`. A required logger moves
+  into the options too: `new AdtUtils(connection, logger)` →
+  `new AdtUtils(connection, { logger, results: utilDocuments })`, likewise
+  the runtime handlers but the debuggers and memory snapshots.
 
 ## [37.4.0] - 2026-10-27
 

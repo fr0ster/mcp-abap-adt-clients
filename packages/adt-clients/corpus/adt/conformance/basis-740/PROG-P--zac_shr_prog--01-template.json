@@ -1,0 +1,25 @@
+{
+  "case": "PROG-P--zac_shr_prog",
+  "step": 1,
+  "stepTag": "template",
+  "capturedAt": "2026-10-29T13:02:15.746Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/wb/object_type/progp/object_name/ZAC_SHR_PROG",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/vit/wb/object_type/progp/object_name/ZAC_SHR_PROG",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "",
+    "headers": {
+      "content-type": "text/plain"
+    },
+    "bodyFile": "PROG-P--zac_shr_prog--01-template.body.txt"
+  }
+}

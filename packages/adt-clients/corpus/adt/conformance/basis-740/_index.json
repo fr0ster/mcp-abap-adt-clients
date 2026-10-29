@@ -1,0 +1,290 @@
+{
+  "release": "basis-740",
+  "table": "ADT_TYPES_BASIS_740",
+  "interfacesAdt": "23.1.0",
+  "note": "One sample object per code the release table lists for an API the legacy package serves, read over RFC through the legacy client's connection: 01 the typestructure URI_TEMPLATE address, 02 /sap/bc/adt/vit/urimapper for that address, 03 the metadata read the library sends (its own Accept). Reads only. SAP_BASIS 7.40 SP04 has neither the /sap/bc/adt/vit/wb/object_type/… addresses its typestructure gives nor /sap/bc/adt/vit/urimapper: both answer 404 'No application class found for URI', recorded as answered.",
+  "endpointsAbsent": {
+    "/sap/bc/adt/vit/wb/object_type/{type}/object_name/{name}": "404 text/plain 'No application class found for URI: /sap/bc/adt/vit/wb/object_type/<type>/object_name/' for every code (step 01)",
+    "/sap/bc/adt/vit/urimapper": "404 text/plain 'No application class found for URI: /sap/bc/adt/vit/urimapper?uri=…' for every code (step 02); not in discovery"
+  },
+  "codes": {
+    "CLAS/OC": {
+      "apis": ["class"],
+      "sample": {
+        "name": "ZAC_SHR_RUN01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/oo/classes/zac_shr_run01",
+      "metadataUri": "/sap/bc/adt/oo/classes/zac_shr_run01",
+      "metadataAccept": "application/vnd.sap.adt.oo.classes+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "CLAS-OC--zac_shr_run01--01-template.json",
+        "urimapper": "CLAS-OC--zac_shr_run01--02-urimapper.json",
+        "metadata": "CLAS-OC--zac_shr_run01--03-metadata.json"
+      }
+    },
+    "INTF/OI": {
+      "apis": ["interface"],
+      "sample": {
+        "name": "ZAC_SHR_IF01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/oo/interfaces/zac_shr_if01",
+      "metadataUri": "/sap/bc/adt/oo/interfaces/zac_shr_if01",
+      "metadataAccept": "application/vnd.sap.adt.oo.interfaces.v5+xml, application/vnd.sap.adt.oo.interfaces.v4+xml, application/vnd.sap.adt.oo.interfaces.v3+xml, application/vnd.sap.adt.oo.interfaces.v2+xml, application/vnd.sap.adt.oo.interfaces+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "INTF-OI--zac_shr_if01--01-template.json",
+        "urimapper": "INTF-OI--zac_shr_if01--02-urimapper.json",
+        "metadata": "INTF-OI--zac_shr_if01--03-metadata.json"
+      }
+    },
+    "PROG/P": {
+      "apis": ["program"],
+      "sample": {
+        "name": "ZAC_SHR_PROG",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/programs/programs/zac_shr_prog",
+      "metadataUri": "/sap/bc/adt/programs/programs/zac_shr_prog",
+      "metadataAccept": "application/vnd.sap.adt.programs.programs.v2+xml, application/vnd.sap.adt.programs.programs.v1+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "PROG-P--zac_shr_prog--01-template.json",
+        "urimapper": "PROG-P--zac_shr_prog--02-urimapper.json",
+        "metadata": "PROG-P--zac_shr_prog--03-metadata.json"
+      }
+    },
+    "PROG/I": {
+      "apis": ["include"],
+      "sample": {
+        "name": "S0600F01",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/programs/includes/s0600f01",
+      "metadataUri": "/sap/bc/adt/programs/includes/s0600f01",
+      "metadataAccept": "application/vnd.sap.adt.programs.includes.v2+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "PROG-I--s0600f01--01-template.json",
+        "urimapper": "PROG-I--s0600f01--02-urimapper.json",
+        "metadata": "PROG-I--s0600f01--03-metadata.json"
+      }
+    },
+    "FUGR/F": {
+      "apis": ["functionGroup"],
+      "sample": {
+        "name": "ZAC_SHR_FUGR",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/functions/groups/zac_shr_fugr",
+      "metadataUri": "/sap/bc/adt/functions/groups/zac_shr_fugr",
+      "metadataAccept": "*/*",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "FUGR-F--zac_shr_fugr--01-template.json",
+        "urimapper": "FUGR-F--zac_shr_fugr--02-urimapper.json",
+        "metadata": "FUGR-F--zac_shr_fugr--03-metadata.json"
+      }
+    },
+    "FUGR/FF": {
+      "apis": ["functionModule"],
+      "sample": {
+        "name": "Z_AC_SHR_FM01",
+        "parent": "ZAC_SHR_FUGR",
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/functions/groups/zac_shr_fugr/fmodules/z_ac_shr_fm01",
+      "metadataUri": "/sap/bc/adt/functions/groups/zac_shr_fugr/fmodules/z_ac_shr_fm01",
+      "metadataAccept": "application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "FUGR-FF--z_ac_shr_fm01--01-template.json",
+        "urimapper": "FUGR-FF--z_ac_shr_fm01--02-urimapper.json",
+        "metadata": "FUGR-FF--z_ac_shr_fm01--03-metadata.json"
+      }
+    },
+    "FUGR/I": {
+      "apis": ["functionInclude"],
+      "sample": {
+        "name": "LZLG7_FXTOP",
+        "parent": "ZLG7_FX",
+        "origin": "own",
+        "skipped": ["LZAC_SHR_FUGRZ02: metadata 404"]
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/functions/groups/zlg7_fx/includes/lzlg7_fxtop",
+      "metadataUri": "/sap/bc/adt/functions/groups/zlg7_fx/includes/lzlg7_fxtop",
+      "metadataAccept": "application/vnd.sap.adt.functions.fincludes.v2+xml, application/vnd.sap.adt.functions.fincludes+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "FUGR-I--lzlg7_fxtop--01-template.json",
+        "urimapper": "FUGR-I--lzlg7_fxtop--02-urimapper.json",
+        "metadata": "FUGR-I--lzlg7_fxtop--03-metadata.json"
+      }
+    },
+    "DDLS/DF": {
+      "apis": ["ddl"],
+      "sample": {
+        "name": "SADL_V_CDS_VIEW",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/ddic/ddl/sources/sadl_v_cds_view",
+      "metadataUri": "/sap/bc/adt/ddic/ddl/sources/sadl_v_cds_view",
+      "metadataAccept": "application/vnd.sap.adt.ddlSource+xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "DDLS-DF--sadl_v_cds_view--01-template.json",
+        "urimapper": "DDLS-DF--sadl_v_cds_view--02-urimapper.json",
+        "metadata": "DDLS-DF--sadl_v_cds_view--03-metadata.json"
+      }
+    },
+    "MSAG/N": {
+      "apis": ["messageClass"],
+      "sample": {
+        "name": "SAPLWOSA",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/messageclass/saplwosa",
+      "metadataUri": "/sap/bc/adt/messageclass/saplwosa",
+      "metadataAccept": "application/vnd.sap.adt.mc.messageclass+xml, application/xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "MSAG-N--saplwosa--01-template.json",
+        "urimapper": "MSAG-N--saplwosa--02-urimapper.json",
+        "metadata": "MSAG-N--saplwosa--03-metadata.json"
+      }
+    },
+    "MSAG/NN": {
+      "apis": ["messageClassMessage"],
+      "sample": {
+        "name": "001",
+        "parent": "SAPLWOSA",
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 404,
+        "urimapper": 404,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": null,
+      "libraryUri": "/sap/bc/adt/messageclass/saplwosa",
+      "metadataUri": "/sap/bc/adt/messageclass/saplwosa",
+      "metadataAccept": "application/vnd.sap.adt.mc.messageclass+xml, application/xml",
+      "urimapperMatchesLibrary": null,
+      "reason": "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to",
+      "files": {
+        "template": "MSAG-NN--saplwosa-001--01-template.json",
+        "urimapper": "MSAG-NN--saplwosa-001--02-urimapper.json",
+        "metadata": "MSAG-NN--saplwosa-001--03-metadata.json"
+      }
+    }
+  },
+  "apisWithoutCodes": {
+    "localTestClass": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "localTypes": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "localDefinitions": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "localMacros": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "request": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    }
+  }
+}

@@ -177,7 +177,10 @@ gate('batch', 'domains')(
       const start = Date.now();
       const runId = value(
         await utils.activateObjectsGroup(
-          configs.map((config) => ({ type: 'DOMA', name: config.domainName })),
+          configs.map((config) => ({
+            type: 'DOMA/DD',
+            name: config.domainName,
+          })),
           false,
           {
             headers: integrationHeadersOf(utils, 'activateObjectsGroup'),

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mc:messageClass adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="SAPLWOSA" adtcore:type="MSAG/N" adtcore:changedAt="2015-06-29T12:47:46Z" adtcore:version="active" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Message Class for Store Workbench, Store Order" adtcore:language="EN" xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA006" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/006" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/messageclass/saplwosa" rel="self" type="text/html" title="Message Class HTTP Request" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/wost" adtcore:type="DEVC/K" adtcore:name="WOST"/>
+  <mc:messages mc:msgno="001" mc:msgtext="Document &amp; successfully created" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2015-06-29" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA001" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/001" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="002" mc:msgtext="No order quantity entered for any material" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2015-06-29" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA002" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/002" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="003" mc:msgtext="Quantity not numerical" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2015-06-29" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA003" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/003" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="004" mc:msgtext="Order proposales were changed successfully" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2015-06-29" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA004" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/004" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="005" mc:msgtext="Enter material number" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2015-06-29" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA005" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/005" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+  <mc:messages mc:msgno="006" mc:msgtext="The EAN you entered could not be found" mc:selfexplainatory="true" mc:documented="false" mc:lastchangedby="SAP" mc:lastmodified="2015-06-29" adtcore:name="">
+    <atom:link href="/sap/bc/adt/vit/docu/object_type/NA/object_name/SAPLWOSA006" rel="http://www.sap.com/adt/relations/longtext" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/saplwosa/messages/006" rel="http://www.sap.com/adt/relations/messageclasses/messages" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </mc:messages>
+</mc:messageClass>

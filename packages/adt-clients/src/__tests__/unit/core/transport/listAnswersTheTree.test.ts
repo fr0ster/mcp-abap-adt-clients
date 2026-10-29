@@ -20,6 +20,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { transportDocuments } from '../../../../core/transport/types';
 import { expectResult } from '../../../helpers/contract';
 import { transportParsing } from '../../../helpers/transportParsing';
 
@@ -61,7 +62,9 @@ describe('AdtRequest.list()', () => {
     const { connection } = connectionOver(xml);
 
     const document = expectResult(
-      await new AdtRequest(connection).list({ configUri: '/sap/bc/adt/cts/x' }),
+      await new AdtRequest(connection, { results: transportDocuments }).list({
+        configUri: '/sap/bc/adt/cts/x',
+      }),
       'list transport requests',
     );
 
@@ -75,12 +78,7 @@ describe('AdtRequest.list()', () => {
     );
 
     const tree = expectResult(
-      await new AdtRequest(
-        connection,
-        undefined,
-        undefined,
-        transportParsing,
-      ).list({
+      await new AdtRequest(connection, { results: transportParsing }).list({
         configUri: '/sap/bc/adt/cts/x',
       }),
       'list transport requests',

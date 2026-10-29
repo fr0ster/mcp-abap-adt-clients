@@ -6,10 +6,12 @@
  *   holds, instead of the /sap/bc/adt/deletion/ API 7.40 SP04 lacks.
  *   `update` is the inherited stateless PUT; this class does not override it.
  * - checkDeletion() — refused without a request: 7.40 has no deletion API.
+ * - updateMetadata() — refused without a request: not measured on 7.40.
  */
 
 import {
   AdtClass,
+  type AdtPerformedBy,
   answering,
   CLASS,
   type classDocuments,
@@ -25,11 +27,15 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
+import {
+  legacyNotMeasuredRefusal,
+  noDeletionCheck,
+  noTransportResource,
+} from '../shared/refusalLegacy';
 
 export class AdtClassLegacy<
   R extends IClassResults = typeof classDocuments,
-> extends AdtClass<R> {
+> extends AdtClass<R, 'basis740'> {
   /**
    * Delete class — legacy override.
    *
@@ -70,6 +76,7 @@ export class AdtClassLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     _config: Partial<IClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -77,10 +84,27 @@ export class AdtClassLegacy<
   }
 
   /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the class, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    _config: Partial<IClassConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/oo/classes/{name}',
+    );
+  }
+
+  /**
    * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

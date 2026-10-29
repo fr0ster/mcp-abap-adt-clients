@@ -25,7 +25,7 @@ export async function getBehaviorImplementationMetadata(
 ): Promise<IAdtWireResponse> {
   return objectMetadataWire(
     connection,
-    'class',
+    'CLAS/OC',
     className,
     undefined,
     options,
@@ -48,7 +48,7 @@ export async function getBehaviorImplementationSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'class',
+    'CLAS/OC',
     className,
     undefined,
     version,

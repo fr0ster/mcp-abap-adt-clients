@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fmodule:abapFunctionModule abapsource:sourceUri="source/main" adtcore:name="Z_AC_SHR_FM01" adtcore:type="FUGR/FF" adtcore:changedAt="2026-03-12T08:27:40Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:description="Shared FM for read-only tests" adtcore:language="EN" xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/zac_shr_fugr" adtcore:type="FUGR/F" adtcore:name="ZAC_SHR_FUGR" adtcore:packageName="TEST_AC_SHR_PKG"/>
+  <atom:link href="source/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" etag="202603120827400012" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/progpx/object_name/SAPLZAC_SHR_FUGR" rel="http://www.sap.com/adt/relations/sources/textelements" type="application/vnd.sap.sapgui" title="Text elements" xmlns:atom="http://www.w3.org/2005/Atom"/>
+</fmodule:abapFunctionModule>

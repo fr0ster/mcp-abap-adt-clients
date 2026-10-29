@@ -7,9 +7,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtAddressableCode } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
-import type { IObjectReference } from './types';
+import type { IAdtGroupReference } from './codeSets';
 
 /**
  * What an activation run is doing — `/activation/runs/{runId}`.
@@ -97,7 +98,7 @@ export async function getActivationResults(
 export async function activateObjectsGroup(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  objects: IObjectReference[],
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
   preauditRequested: boolean = false,
 ): Promise<IAdtWireResponse> {
   // Step 1: Start activation run
@@ -107,8 +108,7 @@ export async function activateObjectsGroup(
   const objectReferences = objects
     .map((obj) => {
       const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
-      const typeAttr = obj.type ? ` adtcore:type="${obj.type}"` : '';
-      return `  <adtcore:objectReference adtcore:uri="${uri}"${typeAttr} adtcore:name="${obj.name}"/>`;
+      return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:type="${obj.type}" adtcore:name="${obj.name}"/>`;
     })
     .join('\n');
 

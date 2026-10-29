@@ -10,6 +10,7 @@
  */
 
 import {
+  type AdtPerformedBy,
   FunctionModuleTestRunner,
   failed,
   type functionModuleTestRunnerDocuments,
@@ -22,11 +23,11 @@ import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
 export class FunctionModuleTestRunnerLegacy<
   R extends
     IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
-> extends FunctionModuleTestRunner<R> {
+> extends FunctionModuleTestRunner<R, 'basis740'> {
   /** Refused without a request: see the class's comment. */
-  override async run<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['run']>, E>
-  > {
+  override async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRun'>,
+  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     return failed<ReturnType<R['run']>, E>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
@@ -35,15 +36,15 @@ export class FunctionModuleTestRunnerLegacy<
     } as E);
   }
 
-  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['status']>, E>
-  > {
+  override async getStatus<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestStatus'>,
+  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
     return noRunToPoll<ReturnType<R['status']>, E>();
   }
 
-  override async getResult<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['result']>, E>
-  > {
+  override async getResult<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestResult'>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
     return noResultToFetch<ReturnType<R['result']>, E>();
   }
 }

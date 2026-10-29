@@ -22,7 +22,7 @@ export async function getFunctionMetadata(
 ): Promise<IAdtWireResponse> {
   return objectMetadataWire(
     connection,
-    'functionmodule',
+    'FUGR/FF',
     functionName,
     functionGroup,
     options,
@@ -45,7 +45,7 @@ export async function getFunctionSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'functionmodule',
+    'FUGR/FF',
     functionName,
     functionGroup,
     version,

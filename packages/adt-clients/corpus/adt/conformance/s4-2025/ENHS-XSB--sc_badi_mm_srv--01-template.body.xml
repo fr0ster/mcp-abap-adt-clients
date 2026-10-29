@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SC_BADI_MM_SRV" adtcore:type="ENHS/XSB" adtcore:changedAt="2005-03-29T21:00:00Z" adtcore:version="active" adtcore:createdAt="2005-03-29T21:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="MM SRV" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/ml" adtcore:type="DEVC/K" adtcore:name="ML"/>
+</adtcore:mainObject>

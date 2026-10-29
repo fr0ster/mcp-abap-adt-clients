@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="DE" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SBIZC_CONFIGURATION" adtcore:type="ENHO/XHB" adtcore:changedAt="2005-06-20T00:00:00Z" adtcore:version="active" adtcore:createdAt="2005-06-20T00:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Implementations for the Configuration" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sbizca" adtcore:type="DEVC/K" adtcore:name="SBIZCA"/>
+</adtcore:mainObject>

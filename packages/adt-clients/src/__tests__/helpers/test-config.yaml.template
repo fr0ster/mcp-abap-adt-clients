@@ -2127,6 +2127,43 @@ run_unit_test:
         passing_method: "ADDS_TWO"
         failing_method: "FAILS_ON_PURPOSE"
 
+# ABAP Unit through the generic runner (AdtExecutor.getAbapUnitTestRunner()):
+# an object target named by a type of the run registry (ABAP_UNIT_RUN_TYPES),
+# and a package target. Each case creates its objects under fresh names, runs
+# them, deletes them and reads their absence back (src/__tests__/helpers/
+# abapUnitProbes.ts). Measured on S/4HANA 2025 and ABAP cloud, 2026-10-29.
+#
+# The objects go into a LOCAL package, named per case in package_name:
+#   ON-PREM: a `$` package (e.g. "$ZAC_AUNIT"), created by hand first. Not the
+#            transportable default package: there SAP records every change in
+#            a request it generates.
+#   CLOUD:   a package of the local software component (ZLOCAL).
+# transport_request stays "" for a local package. The cases are off until the
+# overlay turns each on and names its package (both keys optional).
+run_abap_unit:
+  test_cases:
+    - name: "adt_abap_unit_class_run"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A class's test through the generic runner, object target CLAS/OC"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "adt_abap_unit_cds_run"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A CDS view's assigned test through the generic runner, object target DDLS/DF, with and without foreignTests"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "adt_abap_unit_package_run"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A package's tests through the generic runner, package target, with a class of one test in it"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+
 # Create CDS Unit Test
 # NOTE: run_program_unit_test and run_function_group_unit_test were added to the
 # template after many local configs were made from it. A config without them

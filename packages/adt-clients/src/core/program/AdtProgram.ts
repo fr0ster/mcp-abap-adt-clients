@@ -18,6 +18,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -30,6 +31,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -43,16 +45,16 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { PROGRAM } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
@@ -68,14 +70,16 @@ import {
   getProgramSource,
   getProgramTransport,
 } from './read';
-import { type IProgramConfig, programDocuments } from './types';
+import type { IProgramConfig, programDocuments } from './types';
 import { unlockProgram } from './unlock';
 import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 import { getProgramVersionSource, getProgramVersions } from './versions';
 
-export class AdtProgram<R extends IProgramResults = typeof programDocuments>
-  implements
+export class AdtProgram<
+  R extends IProgramResults = typeof programDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtEnhancementHost<
       IProgramConfig,
       ReturnType<R['enhancementElements']>,
@@ -85,6 +89,10 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     IAdtReadable<IProgramConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IProgramConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IProgramConfig,
       ReturnType<R['deletion']>,
@@ -101,6 +109,11 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -108,18 +121,17 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Program';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: `programDocuments`
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = programDocuments as unknown as R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -309,7 +321,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const source = options?.source;
-    const sessionId = connection.getSessionId?.() || '';
+    const sessionId = connection.getSessionId() || '';
 
     return answering(
       () =>
@@ -328,6 +340,41 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
   }
 
   /**
+   * Write the program's metadata document — one PUT of `options.source`, as
+   * the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'updateMetadata'>,
+    config: Partial<IProgramConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          PROGRAM.uri(config.programName as string),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
    * Asks ADT whether the object can be deleted.
    *
    * Its own member because it is its own endpoint. `delete` no longer runs
@@ -335,6 +382,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'deletionCheck'>,
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -432,6 +480,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
 
   /** The transport request the program belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'transport'>,
     config: Partial<IProgramConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

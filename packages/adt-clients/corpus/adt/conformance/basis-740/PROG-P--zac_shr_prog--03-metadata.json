@@ -1,0 +1,29 @@
+{
+  "case": "PROG-P--zac_shr_prog",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-29T13:02:15.565Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/programs/programs/zac_shr_prog",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/programs/programs/zac_shr_prog",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.programs.programs.v2+xml, application/vnd.sap.adt.programs.programs.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.programs.programs+xml",
+      "etag": "202603111733580011",
+      "last-modified": "Wed, 11 Mar 2026 17:33:58 GMT",
+      "x-sap-adt-profiling": "server-time=1533454",
+      "~server_protocol": "HTTP/1.1"
+    },
+    "bodyFile": "PROG-P--zac_shr_prog--03-metadata.body.xml"
+  }
+}

@@ -36,11 +36,8 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateAppendStructure } from './activation';
 import { checkAppendStructure } from './check';
@@ -52,7 +49,7 @@ import {
   getAppendStructureSource,
   getAppendStructureTransport,
 } from './read';
-import { appendStructureDocuments, type IAppendStructureConfig } from './types';
+import type { appendStructureDocuments, IAppendStructureConfig } from './types';
 import { unlockAppendStructure } from './unlock';
 import { updateAppendStructure } from './update';
 import { validateAppendStructureName } from './validation';
@@ -90,14 +87,14 @@ export class AdtAppendStructure<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AppendStructure';
 
+  private readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = appendStructureDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

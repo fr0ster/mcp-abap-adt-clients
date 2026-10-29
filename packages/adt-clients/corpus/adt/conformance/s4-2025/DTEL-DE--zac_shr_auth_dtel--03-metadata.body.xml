@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<blue:wbobj adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="standard" adtcore:name="ZAC_SHR_AUTH_DTEL" adtcore:type="DTEL/DE" adtcore:changedAt="2026-10-19T13:05:11Z" adtcore:version="active" adtcore:createdAt="2026-09-30T21:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" adtcore:description="Shared data element for the authorization field tests" adtcore:language="EN" xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/repository/informationsystem/abaplanguageversions?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fdataelements%2Fzac_shr_auth_dtel" rel="http://www.sap.com/adt/relations/informationsystem/abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="Allowed ABAP language versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/dtelde/object_name/ZAC_SHR_AUTH_DTEL" rel="self" type="application/vnd.sap.sapgui" title="Representation in SAP Gui" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/docu/object_type/de/object_name/zac_shr_auth_dtel?masterLanguage=E&amp;mode=edit" rel="http://www.sap.com/adt/relations/documentation" type="application/vnd.sap.sapgui" title="Documentation" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/ddic/logs/db/ACTDTELZAC_SHR_AUTH_DTEL" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.adt.logs+xml" title="Activation Log" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./zac_shr_auth_dtel" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Landing Page (HTML)" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="ZAC_SHR_PKG" adtcore:description="Shared test dependencies package"/>
+  <dtel:dataElement xmlns:dtel="http://www.sap.com/adt/dictionary/dataelements">
+    <dtel:typeKind>domain</dtel:typeKind>
+    <dtel:typeName>ZAC_SHR_GA_DOM</dtel:typeName>
+    <dtel:dataType>CHAR</dtel:dataType>
+    <dtel:dataTypeLength>000010</dtel:dataTypeLength>
+    <dtel:dataTypeDecimals>000000</dtel:dataTypeDecimals>
+    <dtel:shortFieldLabel/>
+    <dtel:shortFieldLength>10</dtel:shortFieldLength>
+    <dtel:shortFieldMaxLength>10</dtel:shortFieldMaxLength>
+    <dtel:mediumFieldLabel/>
+    <dtel:mediumFieldLength>20</dtel:mediumFieldLength>
+    <dtel:mediumFieldMaxLength>20</dtel:mediumFieldMaxLength>
+    <dtel:longFieldLabel/>
+    <dtel:longFieldLength>40</dtel:longFieldLength>
+    <dtel:longFieldMaxLength>40</dtel:longFieldMaxLength>
+    <dtel:headingFieldLabel/>
+    <dtel:headingFieldLength>55</dtel:headingFieldLength>
+    <dtel:headingFieldMaxLength>55</dtel:headingFieldMaxLength>
+    <dtel:searchHelp/>
+    <dtel:searchHelpParameter/>
+    <dtel:setGetParameter/>
+    <dtel:defaultComponentName/>
+    <dtel:deactivateInputHistory>false</dtel:deactivateInputHistory>
+    <dtel:changeDocument>false</dtel:changeDocument>
+    <dtel:leftToRightDirection>false</dtel:leftToRightDirection>
+    <dtel:deactivateBIDIFiltering>false</dtel:deactivateBIDIFiltering>
+  </dtel:dataElement>
+</blue:wbobj>

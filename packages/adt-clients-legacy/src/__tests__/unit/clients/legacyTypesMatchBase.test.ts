@@ -1,6 +1,7 @@
 /**
  * The members the legacy classes override for the first time in 37.3 keep the
- * base's public type.
+ * base's public type — since 38.0.0 the base fixed to `'basis740'`, and the
+ * gate a member's `this` carries kept as the base's.
  *
  * 37.3.0 is a minor: a consumer's code that compiled against 37.2 must compile
  * against it. Where a legacy class overrides a member it inherited in 37.2,
@@ -28,6 +29,14 @@ import type {
   AdtProgram,
   AdtRequest,
   AdtUtils,
+  classDocuments,
+  ddlDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  interfaceDocuments,
+  programDocuments,
+  transportDocuments,
+  utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import type { AdtExecutorLegacy } from '../../../clients/AdtExecutorLegacy';
@@ -55,9 +64,28 @@ type Same<A, B> =
     ? true
     : false;
 
+/**
+ * Whether a member can be called on `Receiver`. Since 38.0.0 a gated
+ * member's receiver is `this & gate`; an override must accept exactly the
+ * receivers the base does, so the gate, not the class, is compared.
+ */
+type Callable<Receiver, F> =
+  Receiver extends ThisParameterType<F> ? true : false;
+
+/**
+ * `true` when the two members take and answer the same types and are
+ * callable on their own classes alike.
+ */
+type SameMember<L, LF, B, BF> = [
+  Same<OmitThisParameter<LF>, OmitThisParameter<BF>>,
+  Same<Callable<L, LF>, Callable<B, BF>>,
+] extends [true, true]
+  ? true
+  : false;
+
 /** Every listed member of `L` has the type it has on `B`. */
 type SameMembers<L, B, K extends keyof L & keyof B> = {
-  [M in K]: Same<L[M], B[M]>;
+  [M in K]: SameMember<L, L[M], B, B[M]>;
 };
 
 /** Fails to compile unless every entry is `true`. */
@@ -66,7 +94,7 @@ type AllTrue<T extends Record<string, true>> = T;
 type LegacyClientGetters = AllTrue<
   SameMembers<
     AdtClientLegacy,
-    AdtClient,
+    AdtClient<'basis740'>,
     | 'getInclude'
     | 'getFunctionInclude'
     | 'getMessageClass'
@@ -80,27 +108,51 @@ type LegacyClientGetters = AllTrue<
 type LegacyExecutorGetters = AllTrue<
   SameMembers<
     AdtExecutorLegacy,
-    AdtExecutor,
+    AdtExecutor<'basis740'>,
     'getClassExecutor' | 'getProgramExecutor'
   >
 >;
 
 type LegacyCheckDeletion = AllTrue<{
-  class: Same<AdtClassLegacy['checkDeletion'], AdtClass['checkDeletion']>;
-  ddl: Same<AdtDdlLegacy['checkDeletion'], AdtDdl['checkDeletion']>;
-  functionGroup: Same<
+  class: SameMember<
+    AdtClassLegacy,
+    AdtClassLegacy['checkDeletion'],
+    AdtClass<typeof classDocuments, 'basis740'>,
+    AdtClass<typeof classDocuments, 'basis740'>['checkDeletion']
+  >;
+  ddl: SameMember<
+    AdtDdlLegacy,
+    AdtDdlLegacy['checkDeletion'],
+    AdtDdl<typeof ddlDocuments, 'basis740'>,
+    AdtDdl<typeof ddlDocuments, 'basis740'>['checkDeletion']
+  >;
+  functionGroup: SameMember<
+    AdtFunctionGroupLegacy,
     AdtFunctionGroupLegacy['checkDeletion'],
-    AdtFunctionGroup['checkDeletion']
+    AdtFunctionGroup<typeof functionGroupDocuments, 'basis740'>,
+    AdtFunctionGroup<typeof functionGroupDocuments, 'basis740'>['checkDeletion']
   >;
-  functionModule: Same<
+  functionModule: SameMember<
+    AdtFunctionModuleLegacy,
     AdtFunctionModuleLegacy['checkDeletion'],
-    AdtFunctionModule['checkDeletion']
+    AdtFunctionModule<typeof functionModuleDocuments, 'basis740'>,
+    AdtFunctionModule<
+      typeof functionModuleDocuments,
+      'basis740'
+    >['checkDeletion']
   >;
-  interface: Same<
+  interface: SameMember<
+    AdtInterfaceLegacy,
     AdtInterfaceLegacy['checkDeletion'],
-    AdtInterface['checkDeletion']
+    AdtInterface<typeof interfaceDocuments, 'basis740'>,
+    AdtInterface<typeof interfaceDocuments, 'basis740'>['checkDeletion']
   >;
-  program: Same<AdtProgramLegacy['checkDeletion'], AdtProgram['checkDeletion']>;
+  program: SameMember<
+    AdtProgramLegacy,
+    AdtProgramLegacy['checkDeletion'],
+    AdtProgram<typeof programDocuments, 'basis740'>,
+    AdtProgram<typeof programDocuments, 'basis740'>['checkDeletion']
+  >;
 }>;
 
 type LegacyPackageRefusals = AllTrue<
@@ -114,7 +166,7 @@ type LegacyPackageRefusals = AllTrue<
 type LegacyRequestRefusals = AllTrue<
   SameMembers<
     AdtRequestLegacy,
-    AdtRequest,
+    AdtRequest<typeof transportDocuments, 'basis740'>,
     | 'searchConfigurations'
     | 'checkDeletion'
     | 'readObjects'
@@ -131,7 +183,7 @@ type LegacyRequestRefusals = AllTrue<
 type LegacyUtilsOverrides = AllTrue<
   SameMembers<
     AdtUtilsLegacy,
-    AdtUtils,
+    AdtUtils<typeof utilDocuments, 'basis740'>,
     | 'checkDeletionGroup'
     | 'deleteObjectsGroup'
     | 'getWhereUsed'

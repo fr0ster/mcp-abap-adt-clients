@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
+import {
+  RuntimeDumps,
+  runtimeDumpsDocuments,
+} from '../../../runtime/dumps/RuntimeDumps';
 
 describe('RuntimeDumps', () => {
   function createConnectionMock() {
@@ -19,7 +22,10 @@ describe('RuntimeDumps', () => {
 
   it('list() URL contains $top=10 when top option is provided', async () => {
     const connection = createConnectionMock();
-    const dumps = new RuntimeDumps(connection, createLogger());
+    const dumps = new RuntimeDumps(connection, {
+      logger: createLogger(),
+      results: runtimeDumpsDocuments,
+    });
 
     await dumps.list({ top: 10 });
 
@@ -30,7 +36,10 @@ describe('RuntimeDumps', () => {
 
   it('getById() delegates to /sap/bc/adt/runtime/dump/DUMP123', async () => {
     const connection = createConnectionMock();
-    const dumps = new RuntimeDumps(connection, createLogger());
+    const dumps = new RuntimeDumps(connection, {
+      logger: createLogger(),
+      results: runtimeDumpsDocuments,
+    });
 
     await dumps.getById('DUMP123');
 
@@ -44,7 +53,10 @@ describe('RuntimeDumps', () => {
 
   it('getById() with view=summary delegates to /sap/bc/adt/runtime/dump/DUMP123/summary', async () => {
     const connection = createConnectionMock();
-    const dumps = new RuntimeDumps(connection, createLogger());
+    const dumps = new RuntimeDumps(connection, {
+      logger: createLogger(),
+      results: runtimeDumpsDocuments,
+    });
 
     await dumps.getById('DUMP123', { view: 'summary' });
 
@@ -57,15 +69,15 @@ describe('RuntimeDumps', () => {
   });
 
   it('buildIdPrefix() composes the correct prefix string', () => {
-    const dumps = new RuntimeDumps(
-      {} as unknown as IAbapConnection,
-      {
+    const dumps = new RuntimeDumps({} as unknown as IAbapConnection, {
+      logger: {
         log: jest.fn(),
         error: jest.fn(),
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-    );
+      results: runtimeDumpsDocuments,
+    });
 
     const prefix = dumps.buildIdPrefix(
       '20260331215347',
@@ -78,15 +90,15 @@ describe('RuntimeDumps', () => {
   });
 
   it('buildUserQuery() returns undefined when user is empty', () => {
-    const dumps = new RuntimeDumps(
-      {} as unknown as IAbapConnection,
-      {
+    const dumps = new RuntimeDumps({} as unknown as IAbapConnection, {
+      logger: {
         log: jest.fn(),
         error: jest.fn(),
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-    );
+      results: runtimeDumpsDocuments,
+    });
 
     expect(dumps.buildUserQuery()).toBeUndefined();
     expect(dumps.buildUserQuery('')).toBeUndefined();
@@ -94,15 +106,15 @@ describe('RuntimeDumps', () => {
   });
 
   it('buildUserQuery() returns ADT query expression for a given user', () => {
-    const dumps = new RuntimeDumps(
-      {} as unknown as IAbapConnection,
-      {
+    const dumps = new RuntimeDumps({} as unknown as IAbapConnection, {
+      logger: {
         log: jest.fn(),
         error: jest.fn(),
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-    );
+      results: runtimeDumpsDocuments,
+    });
 
     const query = dumps.buildUserQuery('DEVELOPER');
 

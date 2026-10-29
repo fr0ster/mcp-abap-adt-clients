@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="MM06EFKO_KOND_TAXES_01" adtcore:type="ENHO/XHH" adtcore:changedAt="2009-07-23T21:00:00Z" adtcore:version="active" adtcore:createdAt="2009-07-23T21:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="MM06EFKO_KOND_TAXES_01" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/oih_cv_br" adtcore:type="DEVC/K" adtcore:name="OIH_CV_BR"/>
+</adtcore:mainObject>

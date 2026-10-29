@@ -29,6 +29,7 @@ export {
 // not handed out by AdtRuntimeClient.
 export {
   AbapDebugger,
+  type AbapDebuggerConstructorOptions,
   abapDebuggerDocuments,
   type IAbapDebuggerOptions,
   type IAbapDebuggerResults,

@@ -26,8 +26,7 @@ export async function checkStructure(
   const response = await runCheckRun(
     connection,
     headers,
-    'structure',
-    structureName,
+    { type: 'TABL/DS', name: structureName },
     version,
     'abapCheckRun',
     sourceCode,

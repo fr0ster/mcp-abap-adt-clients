@@ -5,6 +5,8 @@
  * not have it, while listTransportsLegacy() — written for exactly this — was
  * never called from anywhere.
  */
+
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -43,12 +45,9 @@ describe('legacy transport list', () => {
     const { connection, calls } = recordingConnection();
 
     const tree = expectResult(
-      await new AdtRequestLegacy(
-        connection,
-        undefined,
-        undefined,
-        transportParsing,
-      ).list(),
+      await new AdtRequestLegacy(connection, {
+        results: transportParsing,
+      }).list(),
       'legacy list',
     );
 
@@ -62,7 +61,9 @@ describe('legacy transport list', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      await new AdtRequestLegacy(connection).list({ configUri: '/x' }),
+      await new AdtRequestLegacy(connection, {
+        results: transportDocuments,
+      }).list({ configUri: '/x' }),
       'legacy list with configUri',
     );
 
@@ -77,8 +78,12 @@ describe('legacy transport update/delete', () => {
   it('refuses update() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
+    const request = new AdtRequestLegacy(connection, {
+      results: transportDocuments,
+    });
     const failure = expectFailure(
-      await new AdtRequestLegacy(connection).updateMetadata(),
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
+      await request.updateMetadata(),
       'legacy update',
     );
 
@@ -91,8 +96,12 @@ describe('legacy transport update/delete', () => {
   it('refuses delete() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
+    const request = new AdtRequestLegacy(connection, {
+      results: transportDocuments,
+    });
     const failure = expectFailure(
-      await new AdtRequestLegacy(connection).delete(),
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
+      await request.delete(),
       'legacy delete',
     );
 
@@ -109,27 +118,40 @@ describe('legacy transport members', () => {
   const headers = { headers: {} as IAdtHeaders };
   type Handler = AdtRequestLegacy;
   const refused: [string, (h: Handler) => Promise<unknown>][] = [
+    // @ts-expect-error -- 7.40 does not serve request.searchConfigurations; the refusal is for a caller outside the type system
     ['searchConfigurations', (h) => h.searchConfigurations()],
+    // @ts-expect-error -- 7.40 does not serve request.deletionCheck; the refusal is for a caller outside the type system
     ['checkDeletion', (h) => h.checkDeletion(cfg, headers)],
+    // @ts-expect-error -- 7.40 does not serve request.readObjects; the refusal is for a caller outside the type system
     ['readObjects', (h) => h.readObjects('GUARD_REQUEST')],
+    // @ts-expect-error -- 7.40 does not serve request.readActionLog; the refusal is for a caller outside the type system
     ['readActionLog', (h) => h.readActionLog('GUARD_REQUEST')],
+    // @ts-expect-error -- 7.40 does not serve request.addObject; the refusal is for a caller outside the type system
     ['addObject', (h) => h.addObject('GUARD_REQUEST', entry, headers)],
+    // @ts-expect-error -- 7.40 does not serve request.removeObject; the refusal is for a caller outside the type system
     ['removeObject', (h) => h.removeObject('GUARD_REQUEST', entry, headers)],
     [
       'moveObjects',
+      // @ts-expect-error -- 7.40 does not serve request.moveObjects; the refusal is for a caller outside the type system
       (h) => h.moveObjects('GUARD_TASK', 'GUARD_REQUEST', [entry], headers),
     ],
+    // @ts-expect-error -- 7.40 does not serve request.sortAndCompress; the refusal is for a caller outside the type system
     ['sortAndCompress', (h) => h.sortAndCompress('GUARD_TASK')],
     [
       'createTask',
+      // @ts-expect-error -- 7.40 does not serve request.createTask; the refusal is for a caller outside the type system
       (h) => h.createTask('GUARD_REQUEST', { ...headers, targetUser: 'GUARD' }),
     ],
     [
       'changeTaskType',
+      // @ts-expect-error -- 7.40 does not serve request.changeTaskType; the refusal is for a caller outside the type system
       (h) => h.changeTaskType('GUARD_TASK', 'Unclassified' as never, headers),
     ],
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     ['create', (h) => h.create()],
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     ['updateMetadata', (h) => h.updateMetadata()],
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     ['delete', (h) => h.delete()],
   ];
 
@@ -137,9 +159,9 @@ describe('legacy transport members', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      (await call(new AdtRequestLegacy(connection))) as Parameters<
-        typeof expectFailure
-      >[0],
+      (await call(
+        new AdtRequestLegacy(connection, { results: transportDocuments }),
+      )) as Parameters<typeof expectFailure>[0],
       'legacy transport member',
     );
 
@@ -156,12 +178,7 @@ describe('legacy transport members', () => {
     ]) {
       const { connection, calls } = recordingConnection();
       await call(
-        new AdtRequestLegacy(
-          connection,
-          undefined,
-          undefined,
-          transportParsing,
-        ),
+        new AdtRequestLegacy(connection, { results: transportParsing }),
       );
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe('GET');

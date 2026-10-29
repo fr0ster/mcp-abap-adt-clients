@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ddl:ddlSource abapsource:sourceUri="source/main" abapsource:sourceLanguageType="DDL_SOURCE" adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="SADL_V_CDS_VIEW" adtcore:type="DDLS/DF" adtcore:changedAt="2015-03-05T10:41:58Z" adtcore:version="active" adtcore:createdAt="2013-03-19T23:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:description="Test View" adtcore:language="EN" xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" etag="201503051041580011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/ddic/logs/db/ACTDDLSSADL_V_CDS_VIEW" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.sapgui" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/ddic/logs/db/ACTDDLSSADL_V_CDS_VIEW" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.adt.logs+xml" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/vit/wb/object_type/devck/object_name/SADL_ENTITY" adtcore:type="DEVC/K" adtcore:name="SADL_ENTITY" adtcore:packageName="SADL_ENTITY"/>
+</ddl:ddlSource>

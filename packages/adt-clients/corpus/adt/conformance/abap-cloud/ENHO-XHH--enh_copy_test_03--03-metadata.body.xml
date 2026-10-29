@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">
+  <namespace id="com.sap.adt"/>
+  <type id="ExceptionResourceNoAuthorization"/>
+  <message lang="EN">No authorization to access the resource  /sap/bc/adt/enhancements/enhoxhh/enh_cop.</message>
+  <localizedMessage lang="EN">No authorization to access the resource  /sap/bc/adt/enhancements/enhoxhh/enh_cop.</localizedMessage>
+  <properties>
+    <entry key="T100KEY-ID">SADT_RESOURCE</entry>
+    <entry key="T100KEY-NO">003</entry>
+    <entry key="T100KEY-V2">/sap/bc/adt/enhancements/enhoxhh/enh_cop</entry>
+  </properties>
+</exc:exception>

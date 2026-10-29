@@ -97,10 +97,10 @@ const runners = [
       results: IAbapUnitRunnerResults = marked,
       options?: object,
     ) =>
-      new ProgramTestRunner(conn, createLibraryLogger(), results).runSync(
-        'ZR_REPORT',
-        options,
-      ),
+      new ProgramTestRunner(conn, {
+        logger: createLibraryLogger(),
+        results,
+      }).runSync('ZR_REPORT', options),
     uri: '/sap/bc/adt/programs/programs/zr_report',
   },
   {
@@ -110,10 +110,10 @@ const runners = [
       results: IAbapUnitRunnerResults = marked,
       options?: object,
     ) =>
-      new FunctionGroupTestRunner(conn, createLibraryLogger(), results).runSync(
-        'Z_GROUP',
-        options,
-      ),
+      new FunctionGroupTestRunner(conn, {
+        logger: createLibraryLogger(),
+        results,
+      }).runSync('Z_GROUP', options),
     uri: '/sap/bc/adt/functions/groups/z_group',
   },
   {
@@ -123,11 +123,10 @@ const runners = [
       results: IAbapUnitRunnerResults = marked,
       options?: object,
     ) =>
-      new FunctionModuleTestRunner(
-        conn,
-        createLibraryLogger(),
+      new FunctionModuleTestRunner(conn, {
+        logger: createLibraryLogger(),
         results,
-      ).runSync(
+      }).runSync(
         { functionGroupName: 'Z_GROUP', functionModuleName: 'Z_MODULE' },
         options,
       ),

@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { MemorySnapshots } from '../../../runtime/memory/MemorySnapshots';
+import {
+  MemorySnapshots,
+  memorySnapshotsDocuments,
+} from '../../../runtime/memory/MemorySnapshots';
 
 describe('MemorySnapshots', () => {
   function createConnectionMock() {
@@ -19,7 +22,10 @@ describe('MemorySnapshots', () => {
 
   it('list() delegates to /sap/bc/adt/runtime/memory/snapshots without params', async () => {
     const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
+    const snapshots = new MemorySnapshots(connection, {
+      logger: createLogger(),
+      results: memorySnapshotsDocuments,
+    });
 
     await snapshots.list();
 
@@ -33,7 +39,10 @@ describe('MemorySnapshots', () => {
 
   it('list() includes user and originalUser as query params when provided', async () => {
     const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
+    const snapshots = new MemorySnapshots(connection, {
+      logger: createLogger(),
+      results: memorySnapshotsDocuments,
+    });
 
     await snapshots.list({ user: 'DEVELOPER', originalUser: 'ORIG_USER' });
 
@@ -47,7 +56,10 @@ describe('MemorySnapshots', () => {
 
   it('getById() delegates to /sap/bc/adt/runtime/memory/snapshots/snap123', async () => {
     const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
+    const snapshots = new MemorySnapshots(connection, {
+      logger: createLogger(),
+      results: memorySnapshotsDocuments,
+    });
 
     await snapshots.getById('snap123');
 
@@ -61,7 +73,10 @@ describe('MemorySnapshots', () => {
 
   it('getOverview() delegates to /sap/bc/adt/runtime/memory/snapshots/{id}/overview', async () => {
     const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
+    const snapshots = new MemorySnapshots(connection, {
+      logger: createLogger(),
+      results: memorySnapshotsDocuments,
+    });
 
     await snapshots.getOverview('snap123');
 
@@ -75,7 +90,10 @@ describe('MemorySnapshots', () => {
 
   it('getRankingList() delegates to /sap/bc/adt/runtime/memory/snapshots/{id}/rankinglist', async () => {
     const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
+    const snapshots = new MemorySnapshots(connection, {
+      logger: createLogger(),
+      results: memorySnapshotsDocuments,
+    });
 
     await snapshots.getRankingList('snap123', { maxNumberOfObjects: 5 });
 
@@ -89,7 +107,10 @@ describe('MemorySnapshots', () => {
 
   it('getDeltaOverview() delegates to /sap/bc/adt/runtime/memory/snapdelta/overview', async () => {
     const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
+    const snapshots = new MemorySnapshots(connection, {
+      logger: createLogger(),
+      results: memorySnapshotsDocuments,
+    });
 
     await snapshots.getDeltaOverview('SNAP1', 'SNAP2');
 
@@ -115,7 +136,9 @@ describe('MemorySnapshots', () => {
         }),
       ),
     } as unknown as IAbapConnection;
-    const answer = await new MemorySnapshots(connection).getById('MISSING');
+    const answer = await new MemorySnapshots(connection, {
+      results: memorySnapshotsDocuments,
+    }).getById('MISSING');
     expect(answer.ok).toBe(false);
     if (!answer.ok) {
       expect(String(answer.getError().response?.data)).toContain(
@@ -132,7 +155,9 @@ describe('MemorySnapshots', () => {
         data: '<mi:overview/>',
       }),
     } as unknown as IAbapConnection;
-    const answer = await new MemorySnapshots(connection).getOverview('S');
+    const answer = await new MemorySnapshots(connection, {
+      results: memorySnapshotsDocuments,
+    }).getOverview('S');
     expect(answer.ok && answer.getResult().value).toBe('<mi:overview/>');
   });
 });

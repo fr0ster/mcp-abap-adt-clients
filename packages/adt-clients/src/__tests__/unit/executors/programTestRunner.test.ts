@@ -40,9 +40,12 @@ function makeConn() {
 describe('ProgramTestRunner', () => {
   it('one POST to /runs naming the report as PROG, and the id from the header', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ProgramTestRunner(conn, createLibraryLogger(), {
-      ...programTestRunnerDocuments,
-      run: unitTestRunId,
+    const runner = new ProgramTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: {
+        ...programTestRunnerDocuments,
+        run: unitTestRunId,
+      },
     });
 
     const runId = expectResult(await runner.run('zr_report'), 'start a run');
@@ -58,7 +61,10 @@ describe('ProgramTestRunner', () => {
 
   it('asks about a run by its id, as a class runner does', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ProgramTestRunner(conn, createLibraryLogger());
+    const runner = new ProgramTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: programTestRunnerDocuments,
+    });
 
     await runner.getStatus('0CC47A-RUN', false);
     await runner.getResult('0CC47A-RUN');

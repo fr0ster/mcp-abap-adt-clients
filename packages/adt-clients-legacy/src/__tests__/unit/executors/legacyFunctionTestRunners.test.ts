@@ -5,6 +5,7 @@
  * `functionTestRunners.test.ts`'s.
  */
 
+import { classTestRunnerDocuments } from '@mcp-abap-adt/adt-clients';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -44,16 +45,26 @@ describe.each([
 ] as const)('%s', (_label, Runner) => {
   it("refuses to poll or fetch without a request, with the class runner's reason", async () => {
     const { conn, calls } = makeConn();
-    const runner = new Runner(conn, createLibraryLogger());
-    const classRunner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+    const runner = new Runner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
+    const classRunner = new ClassTestRunnerLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const status = expectFailure(await runner.getStatus(), 'status');
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const result = expectFailure(await runner.getResult(), 'result');
 
     expect(status).toEqual(
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       expectFailure(await classRunner.getStatus(), 'class status'),
     );
     expect(result).toEqual(
+      // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       expectFailure(await classRunner.getResult(), 'class result'),
     );
     expect(status.origin).toBe('refusal');

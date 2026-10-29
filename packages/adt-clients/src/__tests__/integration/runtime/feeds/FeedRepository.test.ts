@@ -87,7 +87,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      feeds = new FeedRepository(connection, libraryLogger, feedReading);
+      feeds = new FeedRepository(connection, {
+        logger: libraryLogger,
+        results: feedReading,
+      });
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.

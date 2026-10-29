@@ -5,6 +5,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/AdtScalarFunctionImplementation';
+import { scalarFunctionImplementationDocuments } from '../../../../core/scalarFunctionImplementation/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure } from '../../../helpers/contract';
 
@@ -41,7 +42,9 @@ const LOCK_XML =
 describe('AdtScalarFunctionImplementation handler', () => {
   it('create() is metadata-only (one POST, no lock/update)', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
-    const h = new AdtScalarFunctionImplementation(conn);
+    const h = new AdtScalarFunctionImplementation(conn, {
+      results: scalarFunctionImplementationDocuments,
+    });
     // No source either way — the create is the POST of the metadata document.
     await h.create(
       {
@@ -59,7 +62,9 @@ describe('AdtScalarFunctionImplementation handler', () => {
 
   it('update() is the PUT on /source/main, with the handle it was given', async () => {
     const { conn, calls, sessionTypes } = makeConn(() => ({ data: '' }));
-    const h = new AdtScalarFunctionImplementation(conn);
+    const h = new AdtScalarFunctionImplementation(conn, {
+      results: scalarFunctionImplementationDocuments,
+    });
     await h.update(
       { implementationName: 'ZI', scalarFunctionName: 'ZF' },
       {
@@ -80,7 +85,9 @@ describe('AdtScalarFunctionImplementation handler', () => {
 
   it('updateMetadata() is the PUT on the object itself, in blues v2', async () => {
     const { conn, calls, sessionTypes } = makeConn(() => ({ data: '' }));
-    const h = new AdtScalarFunctionImplementation(conn);
+    const h = new AdtScalarFunctionImplementation(conn, {
+      results: scalarFunctionImplementationDocuments,
+    });
     await h.updateMetadata(
       { implementationName: 'ZI' },
       {
@@ -103,7 +110,9 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nf'), { response: { status: 404 } }),
     );
-    const h = new AdtScalarFunctionImplementation(conn);
+    const h = new AdtScalarFunctionImplementation(conn, {
+      results: scalarFunctionImplementationDocuments,
+    });
     // `undefined` used to be the answer, and it read like an empty object.
     expect(
       expectFailure(
@@ -117,7 +126,9 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const v = makeConn(() =>
       Object.assign(new Error('no'), { response: { status: 405 } }),
     );
-    const hv = new AdtScalarFunctionImplementation(v.conn);
+    const hv = new AdtScalarFunctionImplementation(v.conn, {
+      results: scalarFunctionImplementationDocuments,
+    });
     // Some systems have no validation resource. That is not a verdict about
     // the name; the library reports the status as it came, and a caller who
     // wants it named passes the reading that names it.
@@ -145,7 +156,9 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const u = makeConn((r) =>
       r.url.includes('_action=UNLOCK') ? new Error('boom') : { data: '' },
     );
-    const hu = new AdtScalarFunctionImplementation(u.conn);
+    const hu = new AdtScalarFunctionImplementation(u.conn, {
+      results: scalarFunctionImplementationDocuments,
+    });
     expect(
       expectFailure(
         await hu.unlock({ implementationName: 'ZI' }, 'LH1'),

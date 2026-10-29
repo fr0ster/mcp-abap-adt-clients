@@ -1,0 +1,25 @@
+{
+  "case": "MSAG-N--saplwosa",
+  "step": 1,
+  "stepTag": "template",
+  "capturedAt": "2026-10-29T13:02:36.588Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/wb/object_type/msagn/object_name/SAPLWOSA",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/vit/wb/object_type/msagn/object_name/SAPLWOSA",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "",
+    "headers": {
+      "content-type": "text/plain"
+    },
+    "bodyFile": "MSAG-N--saplwosa--01-template.body.txt"
+  }
+}

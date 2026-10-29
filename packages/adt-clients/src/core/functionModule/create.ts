@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP, FUNCTION_MODULE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -34,8 +35,8 @@ export async function create(
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:name="${params.functionModuleName}" adtcore:type="FUGR/FF"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:containerRef adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:uri="${FUNCTION_GROUP.uri(params.functionGroupName)}"/>
+<fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:name="${params.functionModuleName}" adtcore:type="${TYPE_CODE.functionModule}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:containerRef adtcore:name="${params.functionGroupName}" adtcore:type="${TYPE_CODE.functionGroup}" adtcore:uri="${FUNCTION_GROUP.uri(params.functionGroupName)}"/>
 </fmodule:abapFunctionModule>`;
 
   return connection.makeAdtRequest({

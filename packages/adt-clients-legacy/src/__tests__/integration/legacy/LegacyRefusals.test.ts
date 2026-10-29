@@ -21,11 +21,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import {
-  AdtObjectErrorCodes,
-  type AdtObjectType,
-  type AdtSourceObjectType,
-} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { integrationHeadersOf } from '../../../../../adt-clients/src/__tests__/helpers/adtHeaders';
 import { expectResult } from '../../../../../adt-clients/src/__tests__/helpers/contract';
 import {
@@ -63,11 +59,13 @@ const refusedRows = Object.entries(LEGACY_REFUSED).flatMap(([getter, rows]) =>
 
 /** Which configured object a sending case reads, by its type's spelling. */
 function kindOf(objectType: string): 'program' | 'class' {
-  const type = objectType.toLowerCase();
-  if (type === 'program' || type === 'prog/p') return 'program';
-  if (type === 'class' || type === 'clas/oc') return 'class';
+  if (objectType === 'PROG/P') return 'program';
+  if (objectType === 'CLAS/OC') return 'class';
   throw new Error(`No configured object for a ${objectType} read`);
 }
+
+/** The code a served case reads, by the kind of its configured object. */
+const CODE_OF = { program: 'PROG/P', class: 'CLAS/OC' } as const;
 
 /** The sending cases of the argument-dependent members, and what they read. */
 const servedCases = Object.entries(ARGUMENT_DEPENDENT).flatMap(([key, cases]) =>
@@ -148,7 +146,7 @@ describeLegacyRfc(
           const answer =
             member === 'readObjectMetadata'
               ? await utils.readObjectMetadata(
-                  objectType as AdtObjectType,
+                  CODE_OF[kind],
                   objectName,
                   undefined,
                   kind === 'class'
@@ -159,7 +157,7 @@ describeLegacyRfc(
                     : { analyse: analyseException },
                 )
               : await utils.readObjectSource(
-                  objectType as AdtSourceObjectType,
+                  CODE_OF[kind],
                   objectName,
                   undefined,
                   undefined,

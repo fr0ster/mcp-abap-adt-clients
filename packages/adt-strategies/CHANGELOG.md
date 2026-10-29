@@ -14,7 +14,90 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
-## [Unreleased]
+## [0.16.0] - 2026-10-29
+
+A breaking 0.x minor: every reading that takes a type code from an answer
+answers it as an `IAdtAnsweredObject` of `@mcp-abap-adt/interfaces-adt`
+(21.0.0 and later; this release depends on `^23.0.4`). Released with
+adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
+
+### Changed (breaking)
+
+- **A code read from an answer is looked up once against the ADT type
+  tables.** A code a table names is `type: AdtTypeCode`; any other text — a
+  code no table holds (`PROG/PS`, `CLAS/OM` are in the recorded answers) or
+  one of a newer release — is `unknownType`, exactly as ADT sent it. The two
+  are exclusive. The readings that do this:
+  - `readSearchHits` / `utilSearchHits` (`adtcore:type`);
+  - `readNodeStructure` and `utilNodeContents` (`OBJECT_TYPE` of a child type
+    and of an object);
+  - `utilInactiveObjects` (`adtcore:type`);
+  - `utilWhereUsedReferences` (the object's `type`; packages are still
+    skipped);
+  - the trace readings' `callingProgram` / `calledProgram` (`adtcore:type`).
+- The shapes they answer are type aliases over `IAdtAnsweredObject` now, not
+  interfaces: `IAdtObjectHit`, `ISearchResult`, `IWhereUsedReference`,
+  `IRepositoryObjectNode`, `IRepositoryNodeChild`, `ITraceProgramRef`.
+  `IRepositoryObjectNode` and `IRepositoryNodeChild` carry `type` /
+  `unknownType` where they carried `objectType: string`.
+- `IInactiveObjectsResponse.objects` is `IInactiveObject[]`
+  (`IAdtAnsweredObject & { name }`), no longer `IObjectReference[]`: an
+  unknown code is no reference `activateObjectsGroup` takes.
+- Depends on `@mcp-abap-adt/interfaces-adt` `^23.1.1` (was `^20.1.0`): the
+  ADT type tables came with 21.0.0, 23.1.0 brought the ABAP Unit run
+  registry, and 23.1.1 (the function group's source on 7.40) is the range
+  adt-clients 38.0.0 and adt-clients-legacy 0.2.0 take, so the three install
+  one copy.
+
+### Added
+
+- `answeredObject(text)`: the lookup the readings use, for a consumer reading
+  a code from an answer itself.
+
+### Fixed
+
+- **Parsed answers are read as data, and a value now has its declared type.**
+  Every reading that took a parsed document typed `any` reads it through one
+  reader (`parsed.ts`), as data from outside the type system. Where the old
+  reading handed back a value of another type than declared, the value now
+  has its type:
+  - feeds: text the XML parser turned into a number (`<id>123</id>`) reads as
+    the string `'123'`; a call stack's and a source line's `number`, `line`
+    and `errorLine` read as numbers (they came back as text such as `'42'`);
+    an element where text is declared reads as `''`;
+  - feature toggles: an optional text field that holds no text reads as
+    `undefined`, and a `null` entry in a state list no longer throws.
+
+  A consumer that relied on the old, mistyped values reads the declared type.
+  The readings of refusals, versions and message classes answer as before.
+
+### Documentation
+
+- The examples in the comments of `abapGit`, `feeds` and `traces` construct
+  with adt-clients 38.0.0's options: `AdtAbapGitClient.create(connection,
+  { logger, results })`, `new FeedRepository(connection, { logger, results })`,
+  `new Profiler(connection, { logger, results })`.
+
+### Tests
+
+- The literal scan of type codes (`typeCodeLiterals.test.ts`, the scan shared
+  from adt-clients): a code literal in this package's source passes only where
+  the compiler types it by the tables, and a code named in a comment or inside
+  a longer string is a code of the tables or an allow-listed example of one
+  that is not.
+
+### Migration
+
+- Switch on `type` for the codes you act on, and handle `unknownType` — it is
+  what an older reading would have handed you as `type: string`.
+- `objectType` of a repository node or child is `type` (or `unknownType`).
+- To activate the inactive objects, keep those with a `type`, and name the
+  function group of a function module or include — they are addressed under
+  it, and the listing names no parent:
+  `objects.flatMap((o) => (o.type === 'FUGR/FF' || o.type === 'FUGR/I' ? [{ name: o.name, type: o.type, parentName: groupOf(o) }] : o.type ? [{ name: o.name, type: o.type }] : []))`,
+  where `groupOf` is the caller's (the group the module was created in).
+- A type that extended `IAdtObjectHit` or `ISearchResult` with `interface …
+  extends` intersects it instead: `type IMyHit = ISearchResult & { … }`.
 
 ### Security
 

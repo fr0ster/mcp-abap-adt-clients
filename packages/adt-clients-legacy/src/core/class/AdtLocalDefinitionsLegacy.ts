@@ -8,6 +8,7 @@
 
 import {
   AdtLocalDefinitions,
+  type AdtPerformedBy,
   CLASS,
   type classDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -22,7 +23,7 @@ import { noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtLocalDefinitionsLegacy<
   R extends IClassResults = typeof classDocuments,
-> extends AdtLocalDefinitions<R> {
+> extends AdtLocalDefinitions<R, 'basis740'> {
   /**
    * Refused without a request: the inherited member asks for the container
    * class's `GET <class URI>/transport`, which answers `404` on 7.40 SP04
@@ -30,6 +31,7 @@ export class AdtLocalDefinitionsLegacy<
    * `AdtClassLegacy.readTransport` refuses).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'localDefinitions', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

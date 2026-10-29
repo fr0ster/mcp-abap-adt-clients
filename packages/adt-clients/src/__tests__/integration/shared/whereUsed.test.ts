@@ -14,6 +14,7 @@ import {
   type IWhereUsedListResult,
   utilWhereUsedReferences,
 } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtAnsweredObject } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -21,6 +22,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
@@ -35,6 +37,10 @@ import {
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
+
+/** A reference's code as ADT sent it, known to the type tables or not. */
+const codeOf = (reference: IAdtAnsweredObject): string =>
+  reference.type ?? reference.unknownType;
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
@@ -125,7 +131,10 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger);
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      });
       const scopeXml = expectResult(
         await withAcceptHandling(
           utils.getWhereUsedScope(
@@ -209,7 +218,10 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger);
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      });
       const scopeXml = expectResult(
         await withAcceptHandling(
           utils.getWhereUsedScope(
@@ -314,7 +326,10 @@ describe('Shared - getWhereUsed', () => {
 
         const document = expectResult(
           await withAcceptHandling(
-            new AdtUtils(connection, testsLogger).getWhereUsed(
+            new AdtUtils(connection, {
+              logger: testsLogger,
+              results: utilDocuments,
+            }).getWhereUsed(
               {
                 object_name: objectName,
                 object_type: objectType,
@@ -322,7 +337,10 @@ describe('Shared - getWhereUsed', () => {
               {
                 analyse: analyseException,
                 headers: integrationHeadersOf(
-                  new AdtUtils(connection, testsLogger),
+                  new AdtUtils(connection, {
+                    logger: testsLogger,
+                    results: utilDocuments,
+                  }),
                   'getWhereUsed',
                 ),
               },
@@ -387,15 +405,21 @@ describe('Shared - getWhereUsed', () => {
       // empty name is asked of the server and the server's own refusal comes
       // back inside `IAdtResponse`.
       logTestStep('an empty object name is answered, not thrown', testsLogger);
-      const noName = await new AdtUtils(connection, testsLogger).getWhereUsed(
+      const noName = await new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      }).getWhereUsed(
         {
           object_name: '',
-          object_type: 'class',
+          object_type: 'CLAS/OC',
         },
         {
           analyse: analyseException,
           headers: integrationHeadersOf(
-            new AdtUtils(connection, testsLogger),
+            new AdtUtils(connection, {
+              logger: testsLogger,
+              results: utilDocuments,
+            }),
             'getWhereUsed',
           ),
         },
@@ -415,15 +439,22 @@ describe('Shared - getWhereUsed', () => {
       // it cannot address is the caller's argument, thrown as itself.
       logTestStep('an empty object type is thrown, not asked', testsLogger);
       await expect(
-        new AdtUtils(connection, testsLogger).getWhereUsed(
+        new AdtUtils(connection, {
+          logger: testsLogger,
+          results: utilDocuments,
+        }).getWhereUsed(
           {
             object_name: 'TEST',
+            // @ts-expect-error -- an empty code is no code of the tables
             object_type: '',
           },
           {
             analyse: analyseException,
             headers: integrationHeadersOf(
-              new AdtUtils(connection, testsLogger),
+              new AdtUtils(connection, {
+                logger: testsLogger,
+                results: utilDocuments,
+              }),
               'getWhereUsed',
             ),
           },
@@ -465,7 +496,10 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger);
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      });
 
       // The composed sequence: scope, edit, search, read. The reading is named,
       // because `whereUsed` answers the document by default.
@@ -571,7 +605,10 @@ describe('Shared - getWhereUsed', () => {
       // `AdtUtils` and not `client.getUtils()`: the two-step flow fetches a scope
       // document and hands it back, and `getWhereUsed(scopeXml)` is a class
       // member that `IAdtInformationSystem` does not carry.
-      const utils = new AdtUtils(connection, testsLogger);
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      });
       const document = expectResult(
         await utils.getWhereUsed(
           {
@@ -623,7 +660,10 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger);
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      });
 
       // The three calls a caller composes since 19.0.0, in place of the member
       // that used to make them: fetch the scope, edit it, search with it. The
@@ -668,7 +708,7 @@ describe('Shared - getWhereUsed', () => {
       const all = await searchWith(
         utils.modifyWhereUsedScope(await scopeOf(), { enableAll: true }),
       );
-      const allTypes = [...new Set(all.references.map((r) => r.type))].sort();
+      const allTypes = [...new Set(all.references.map(codeOf))].sort();
       testsLogger.info?.(
         `📊 ALL: ${all.references.length} refs across types [${allTypes.join(', ')}]`,
       );
@@ -686,7 +726,7 @@ describe('Shared - getWhereUsed', () => {
       const kept = await searchWith(
         utils.modifyWhereUsedScope(await scopeOf(), { enableOnly: [keepType] }),
       );
-      const keptTypes = [...new Set(kept.references.map((r) => r.type))].sort();
+      const keptTypes = [...new Set(kept.references.map(codeOf))].sort();
       testsLogger.info?.(
         `📊 KEEP [${keepType}]: ${kept.references.length} refs across types [${keptTypes.join(', ')}]`,
       );
@@ -694,7 +734,7 @@ describe('Shared - getWhereUsed', () => {
       // Every returned reference must be the type we asked for — proves SAP did
       // not search (and did not return) any of the other ~40 object types.
       for (const ref of kept.references) {
-        expect(ref.type).toBe(keepType);
+        expect(codeOf(ref)).toBe(keepType);
       }
       expect(kept.references.length).toBeLessThanOrEqual(all.references.length);
       if (allTypes.includes(keepType)) {

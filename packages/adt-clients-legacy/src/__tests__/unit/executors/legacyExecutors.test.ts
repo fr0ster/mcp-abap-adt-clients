@@ -4,8 +4,16 @@
  * executor's, request for request.
  */
 
-import { ClassExecutor, ProgramExecutor } from '@mcp-abap-adt/adt-clients';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+  ProgramExecutor,
+  programExecutorDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import {
+  AdtObjectErrorCodes,
+  type AdtVariant,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { headersOf } from '../../../../../adt-clients/src/__tests__/helpers/adtHeaders';
 import { expectFailure } from '../../../../../adt-clients/src/__tests__/helpers/contract';
@@ -28,7 +36,13 @@ function connection() {
   };
 }
 
-type Executor = ClassExecutor | ProgramExecutor;
+/**
+ * The modern executor or the 7.40 one, either: of any variant. The trace
+ * members this drives are served on every variant.
+ */
+type Executor =
+  | ClassExecutor<typeof classExecutorDocuments, AdtVariant>
+  | ProgramExecutor<typeof programExecutorDocuments, AdtVariant>;
 
 describe('legacy executors', () => {
   it('the legacy executor hands out the legacy class and program executors', () => {
@@ -41,16 +55,20 @@ describe('legacy executors', () => {
   describe.each([
     [
       'class',
-      (c: IAbapConnection): Executor => new ClassExecutorLegacy(c),
-      (c: IAbapConnection): Executor => new ClassExecutor(c),
+      (c: IAbapConnection): Executor =>
+        new ClassExecutorLegacy(c, { results: classExecutorDocuments }),
+      (c: IAbapConnection): Executor =>
+        new ClassExecutor(c, { results: classExecutorDocuments }),
       { className: 'ZCL_GUARD' },
       '/sap/bc/adt/oo/classrun',
       'measured',
     ],
     [
       'program',
-      (c: IAbapConnection): Executor => new ProgramExecutorLegacy(c),
-      (c: IAbapConnection): Executor => new ProgramExecutor(c),
+      (c: IAbapConnection): Executor =>
+        new ProgramExecutorLegacy(c, { results: programExecutorDocuments }),
+      (c: IAbapConnection): Executor =>
+        new ProgramExecutor(c, { results: programExecutorDocuments }),
       { programName: 'ZGUARD' },
       '/sap/bc/adt/programs/programrun',
       'not-measured',

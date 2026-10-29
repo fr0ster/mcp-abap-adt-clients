@@ -108,6 +108,7 @@ const FEATURE_TOGGLE = 'create_feature_toggle.test_cases[adt_feature_toggle]';
 const CHECK_RUN = 'check_run.test_cases[class_check]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
+const ABAP_UNIT = 'run_abap_unit.test_cases';
 
 /** `[path, rule]` → the frozen key rule the loader reads. */
 function overlayKey([keyPath, rule]) {
@@ -189,6 +190,14 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${ATC_RUN}.params.expected_priority`, { type: 'integer' }],
     [`${ATC_KINDS}.enabled`, { type: 'boolean' }],
     [`${ATC_KINDS}.params.check_variant`, { empty: true }],
+    // The generic ABAP Unit runner's live cases: off until turned on, each
+    // with the local package its objects go into (a `$` package on premise).
+    [`${ABAP_UNIT}[adt_abap_unit_class_run].enabled`, { type: 'boolean' }],
+    [`${ABAP_UNIT}[adt_abap_unit_class_run].params.package_name`, {}],
+    [`${ABAP_UNIT}[adt_abap_unit_cds_run].enabled`, { type: 'boolean' }],
+    [`${ABAP_UNIT}[adt_abap_unit_cds_run].params.package_name`, {}],
+    [`${ABAP_UNIT}[adt_abap_unit_package_run].enabled`, { type: 'boolean' }],
+    [`${ABAP_UNIT}[adt_abap_unit_package_run].params.package_name`, {}],
     // Standard objects the enhancement hosts expect, if the system lacks them.
     [`${ENHANCEMENT}[program_host].params.program_name`, {}],
     [`${ENHANCEMENT}[function_group_host].params.function_group_name`, {}],

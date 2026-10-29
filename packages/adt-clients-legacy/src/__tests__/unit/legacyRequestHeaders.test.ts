@@ -7,6 +7,7 @@
  */
 
 import { join } from 'node:path';
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createLibraryLogger } from '../../../../adt-clients/src/__tests__/helpers/testLogger';
 import {
@@ -59,6 +60,13 @@ const SENDS_NO_REQUEST: ReadonlySet<string> = new Set([
   // Measured on 7.40 SP04 (B4-cycles-20261026-2019): refused, no request
   // (readTransport and the DDL version reads take no headers: not in this table).
   'AdtMessageClassLegacy.updateMetadata',
+  // Not measured on 7.40: refused, no request.
+  'AdtClassLegacy.updateMetadata',
+  'AdtProgramLegacy.updateMetadata',
+  'AdtInterfaceLegacy.updateMetadata',
+  'AdtFunctionModuleLegacy.updateMetadata',
+  'AdtDdlLegacy.updateMetadata',
+  'AdtIncludeLegacy.updateMetadata',
   // Measured 404 on 7.40 (spec §10.2).
   'AdtUtilsLegacy.getWhereUsed',
   'AdtUtilsLegacy.getWhereUsedScope',
@@ -69,10 +77,17 @@ const legacy = (connection: IAbapConnection) =>
   new AdtClientLegacy(connection, createLibraryLogger());
 
 const ROWS: Row[] = [
+  // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
   ...objectRows(legacy, 'legacy '),
+  // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
   ...requestRows(legacy, 'legacy '),
   ...utilRows(
-    (connection) => new AdtUtilsLegacy(connection, createLibraryLogger()),
+    (connection) =>
+      // @ts-expect-error -- the modern harness drives the 7.40 utilities, whose codes are 7.40's, as a caller outside the type system would
+      new AdtUtilsLegacy(connection, {
+        logger: createLibraryLogger(),
+        results: utilDocuments,
+      }),
     'legacy ',
   ),
 ];

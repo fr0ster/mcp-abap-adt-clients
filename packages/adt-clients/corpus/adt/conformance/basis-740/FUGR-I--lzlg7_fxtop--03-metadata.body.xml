@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<finclude:abapFunctionGroupInclude abapsource:sourceUri="source/main" abapsource:sourceLanguageType="ABAP_SOURCE" adtcore:name="LZLG7_FXTOP" adtcore:type="FUGR/I" adtcore:changedAt="2026-10-26T15:14:53Z" adtcore:version="active" adtcore:createdAt="2026-10-26T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:language="EN" xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/zlg7_fx" adtcore:type="FUGR/F" adtcore:name="ZLG7_FX" adtcore:packageName="$TMP"/>
+  <atom:link href="source/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" etag="202610261514530011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/progpx/object_name/SAPLZLG7_FX" rel="http://www.sap.com/adt/relations/sources/textelements" type="application/vnd.sap.sapgui" title="Text elements" xmlns:atom="http://www.w3.org/2005/Atom"/>
+</finclude:abapFunctionGroupInclude>

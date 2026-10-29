@@ -1,5 +1,11 @@
+import type { AdtVariant } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import {
+  AbapUnitTestRunner,
+  abapUnitTestRunnerDocuments,
+  type IAbapUnitTestRunnerResults,
+} from '../executors/abapUnitTestRunner';
 import {
   ClassExecutor,
   classExecutorDocuments,
@@ -31,8 +37,22 @@ import {
   programTestRunnerDocuments,
 } from '../executors/program/ProgramTestRunner';
 import { withRequestTrace } from '../utils/requestTrace';
+import type { AdtModernVariant } from './variant';
 
-export class AdtExecutor {
+/**
+ * Every getter has two overloads: with no argument it answers its runner or
+ * executor typed by the shipped documents (`typeof <x>Documents`); with a
+ * result set it answers one typed by that set. A caller naming its own `R`
+ * passes its results — there is no default the compiler would type as `R`.
+ */
+export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * executors and runners it answers are of this variant, and their members'
+   * gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
+
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
 
@@ -44,10 +64,17 @@ export class AdtExecutor {
     this.logger = logger;
   }
 
-  getClassExecutor<
-    R extends IClassExecutorResults = typeof classExecutorDocuments,
-  >(results: R = classExecutorDocuments as unknown as R): ClassExecutor<R> {
-    return new ClassExecutor<R>(this.connection, this.logger, results);
+  getClassExecutor(): ClassExecutor<typeof classExecutorDocuments, V>;
+  getClassExecutor<R extends IClassExecutorResults>(
+    results: R,
+  ): ClassExecutor<R, V>;
+  getClassExecutor(
+    results: IClassExecutorResults = classExecutorDocuments,
+  ): ClassExecutor<IClassExecutorResults, V> {
+    return new ClassExecutor<IClassExecutorResults, V>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   /**
@@ -56,16 +83,30 @@ export class AdtExecutor {
    * The tests themselves are written through `AdtClient.getLocalTestClass()`;
    * a container class for them, where one is wanted, is `getClass()`.
    */
-  getClassTestRunner<
-    R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
-  >(results: R = classTestRunnerDocuments as unknown as R): ClassTestRunner<R> {
-    return new ClassTestRunner<R>(this.connection, this.logger, results);
+  getClassTestRunner(): ClassTestRunner<typeof classTestRunnerDocuments, V>;
+  getClassTestRunner<R extends IClassTestRunnerResults>(
+    results: R,
+  ): ClassTestRunner<R, V>;
+  getClassTestRunner(
+    results: IClassTestRunnerResults = classTestRunnerDocuments,
+  ): ClassTestRunner<IClassTestRunnerResults, V> {
+    return new ClassTestRunner<IClassTestRunnerResults, V>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
-  getProgramExecutor<
-    R extends IProgramExecutorResults = typeof programExecutorDocuments,
-  >(results: R = programExecutorDocuments as unknown as R): ProgramExecutor<R> {
-    return new ProgramExecutor<R>(this.connection, this.logger, results);
+  getProgramExecutor(): ProgramExecutor<typeof programExecutorDocuments, V>;
+  getProgramExecutor<R extends IProgramExecutorResults>(
+    results: R,
+  ): ProgramExecutor<R, V>;
+  getProgramExecutor(
+    results: IProgramExecutorResults = programExecutorDocuments,
+  ): ProgramExecutor<IProgramExecutorResults, V> {
+    return new ProgramExecutor<IProgramExecutorResults, V>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   /**
@@ -73,28 +114,39 @@ export class AdtExecutor {
    * and asking about the run. The tests are written through
    * `AdtClient.getProgram()` or `getInclude()`.
    */
-  getProgramTestRunner<
-    R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
-  >(
-    results: R = programTestRunnerDocuments as unknown as R,
-  ): ProgramTestRunner<R> {
-    return new ProgramTestRunner<R>(this.connection, this.logger, results);
+  getProgramTestRunner(): ProgramTestRunner<
+    typeof programTestRunnerDocuments,
+    V
+  >;
+  getProgramTestRunner<R extends IProgramTestRunnerResults>(
+    results: R,
+  ): ProgramTestRunner<R, V>;
+  getProgramTestRunner(
+    results: IProgramTestRunnerResults = programTestRunnerDocuments,
+  ): ProgramTestRunner<IProgramTestRunnerResults, V> {
+    return new ProgramTestRunner<IProgramTestRunnerResults, V>(
+      this.connection,
+      { logger: this.logger, results },
+    );
   }
 
   /**
    * Running every ABAP Unit test of a function group, and asking about the
    * run. The tests are written through `AdtClient.getFunctionInclude()`.
    */
-  getFunctionGroupTestRunner<
-    R extends
-      IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
-  >(
-    results: R = functionGroupTestRunnerDocuments as unknown as R,
-  ): FunctionGroupTestRunner<R> {
-    return new FunctionGroupTestRunner<R>(
+  getFunctionGroupTestRunner(): FunctionGroupTestRunner<
+    typeof functionGroupTestRunnerDocuments,
+    V
+  >;
+  getFunctionGroupTestRunner<R extends IFunctionGroupTestRunnerResults>(
+    results: R,
+  ): FunctionGroupTestRunner<R, V>;
+  getFunctionGroupTestRunner(
+    results: IFunctionGroupTestRunnerResults = functionGroupTestRunnerDocuments,
+  ): FunctionGroupTestRunner<IFunctionGroupTestRunnerResults, V> {
+    return new FunctionGroupTestRunner<IFunctionGroupTestRunnerResults, V>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -102,16 +154,44 @@ export class AdtExecutor {
    * Running the ABAP Unit tests that exercise one function module, and asking
    * about the run.
    */
-  getFunctionModuleTestRunner<
-    R extends
-      IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
-  >(
-    results: R = functionModuleTestRunnerDocuments as unknown as R,
-  ): FunctionModuleTestRunner<R> {
-    return new FunctionModuleTestRunner<R>(
+  getFunctionModuleTestRunner(): FunctionModuleTestRunner<
+    typeof functionModuleTestRunnerDocuments,
+    V
+  >;
+  getFunctionModuleTestRunner<R extends IFunctionModuleTestRunnerResults>(
+    results: R,
+  ): FunctionModuleTestRunner<R, V>;
+  getFunctionModuleTestRunner(
+    results: IFunctionModuleTestRunnerResults = functionModuleTestRunnerDocuments,
+  ): FunctionModuleTestRunner<IFunctionModuleTestRunnerResults, V> {
+    return new FunctionModuleTestRunner<IFunctionModuleTestRunnerResults, V>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
+    );
+  }
+
+  /**
+   * The generic ABAP Unit runner: a run of one object of any type the
+   * registry (`ABAP_UNIT_RUN_TYPES`) lists, or of a package, and a run of
+   * objects named by their ADT URIs — beside the four per-object runners,
+   * which keep the types they send. A CDS view's tests are assigned tests:
+   * they execute only with `scope: { foreignTests: true }` — with the default
+   * preview they are listed without being executed, a failing one with no
+   * alert.
+   */
+  getAbapUnitTestRunner(): AbapUnitTestRunner<
+    typeof abapUnitTestRunnerDocuments,
+    V
+  >;
+  getAbapUnitTestRunner<R extends IAbapUnitTestRunnerResults>(
+    results: R,
+  ): AbapUnitTestRunner<R, V>;
+  getAbapUnitTestRunner(
+    results: IAbapUnitTestRunnerResults = abapUnitTestRunnerDocuments,
+  ): AbapUnitTestRunner<IAbapUnitTestRunnerResults, V> {
+    return new AbapUnitTestRunner<IAbapUnitTestRunnerResults, V>(
+      this.connection,
+      { logger: this.logger, results },
     );
   }
 }

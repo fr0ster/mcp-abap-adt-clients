@@ -38,7 +38,12 @@ import {
   createTestsLogger,
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
-import type { AdtSourceObjectType } from '../src/core/shared/types';
+import type { AdtTypeCode } from '../src/core/shared/types';
+import {
+  adtTypeCode,
+  metadataReadCode,
+  sourceReadCode,
+} from '../src/__tests__/helpers/typeCode';
 import { orThrow } from '../src/utils/adtResponse';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
@@ -54,7 +59,7 @@ const builderLogger = createBuilderLogger();
 const testsLogger = createTestsLogger();
 
 type Options = {
-  objectType: AdtSourceObjectType | string;
+  objectType: AdtTypeCode;
   objectName: string;
   functionGroup?: string;
   readOnly: boolean;
@@ -81,7 +86,7 @@ function parseVersions(value: string): Set<'active' | 'inactive'> {
 
 function parseArgs(argv: string[]): Options {
   let objectName: string | undefined;
-  let objectType = 'class';
+  let objectType: AdtTypeCode = 'CLAS/OC';
   let functionGroup: string | undefined;
   let readOnly = true;
   let transportRequest: string | undefined;
@@ -102,7 +107,8 @@ function parseArgs(argv: string[]): Options {
       continue;
     }
     if (arg.startsWith('--type=')) {
-      objectType = arg.slice('--type='.length).trim();
+      // A command-line argument: checked once against the type tables.
+      objectType = adtTypeCode(arg.slice('--type='.length).trim());
       continue;
     }
     if (arg.startsWith('--function-group=')) {
@@ -197,7 +203,7 @@ async function readSource(
     try {
       const utils = client.getUtils();
       let url = utils.getObjectSourceUri(
-        options.objectType as any,
+        sourceReadCode(options.objectType),
         options.objectName,
         options.functionGroup,
         version,
@@ -310,7 +316,7 @@ async function run(): Promise<void> {
     options.transportRequest ?? process.env.SAP_TRANSPORT,
   );
   const marker = `TEMP_VERSION_CHECK ${new Date().toISOString()}`;
-  const objectType = options.objectType.toLowerCase();
+  const objectType = options.objectType;
 
   let originalSource = '';
   let updatedSource = '';
@@ -319,7 +325,7 @@ async function run(): Promise<void> {
   let activeAfter = '';
 
   try {
-    if (options.readOnly || objectType !== 'class') {
+    if (options.readOnly || objectType !== 'CLAS/OC') {
       const utils = client.getUtils();
 
       testsLogger.info?.(
@@ -328,7 +334,7 @@ async function run(): Promise<void> {
       try {
         const metadata = await orThrow(
           utils.readObjectMetadata(
-            options.objectType as any,
+            metadataReadCode(options.objectType),
             options.objectName,
             options.functionGroup,
           ),
@@ -338,7 +344,7 @@ async function run(): Promise<void> {
         logHttpError(error, 'Read metadata');
       }
 
-      if (utils.supportsSourceCode(options.objectType as any)) {
+      if (utils.supportsSourceCode(options.objectType)) {
         let activeSource = '';
         let inactiveSource = '';
         if (options.versions.has('active')) {

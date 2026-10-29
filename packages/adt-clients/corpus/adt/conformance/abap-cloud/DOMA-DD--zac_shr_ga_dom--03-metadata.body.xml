@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doma:domain adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="cloudDevelopment" adtcore:name="ZAC_SHR_GA_DOM" adtcore:type="DOMA/DD" adtcore:changedAt="2026-10-01T20:17:33Z" adtcore:version="active" adtcore:createdAt="2026-08-12T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" adtcore:description="Shared domain — base of the group-activation chain" adtcore:language="EN" xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/domadd/object_name/ZAC_SHR_GA_DOM" rel="self" type="application/vnd.sap.sapgui" title="Representation in SAP Gui" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/docu/object_type/do/object_name/zac_shr_ga_dom?masterLanguage=E&amp;mode=edit" rel="http://www.sap.com/adt/relations/documentation" type="application/vnd.sap.sapgui" title="Documentation" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/ddic/logs/db/ACTDOMAZAC_SHR_GA_DOM" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.adt.logs+xml" title="Activation Log" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./zac_shr_ga_dom" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Landing Page (HTML)" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="ZAC_SHR_PKG" adtcore:description="Shared test dependencies package"/>
+  <doma:content>
+    <doma:typeInformation>
+      <doma:datatype>CHAR</doma:datatype>
+      <doma:length>000010</doma:length>
+      <doma:decimals>000000</doma:decimals>
+    </doma:typeInformation>
+    <doma:outputInformation>
+      <doma:length>000010</doma:length>
+      <doma:style>00</doma:style>
+      <doma:conversionExit/>
+      <doma:signExists>false</doma:signExists>
+      <doma:lowercase>false</doma:lowercase>
+      <doma:ampmFormat>false</doma:ampmFormat>
+    </doma:outputInformation>
+    <doma:valueInformation>
+      <doma:valueTableRef/>
+      <doma:appendExists>false</doma:appendExists>
+      <doma:fixValues/>
+    </doma:valueInformation>
+  </doma:content>
+</doma:domain>

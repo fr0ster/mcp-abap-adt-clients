@@ -2,11 +2,8 @@ import { buildObjectUri } from '../../../utils/activationUtils';
 import { getObjectUri } from '../../../utils/checkRun';
 
 describe('DSFI/DSFD object-uri mappings', () => {
-  it('checkRun.getObjectUri maps dsfi aliases', () => {
-    expect(getObjectUri('scalar_function_implementation', 'ZOK_IMPL')).toBe(
-      '/sap/bc/adt/ddic/dsfi/zok_impl',
-    );
-    expect(getObjectUri('dsfi/sfi', 'ZOK_IMPL')).toBe(
+  it('checkRun.getObjectUri maps DSFI/SFI', () => {
+    expect(getObjectUri('DSFI/SFI', 'ZOK_IMPL')).toBe(
       '/sap/bc/adt/ddic/dsfi/zok_impl',
     );
   });

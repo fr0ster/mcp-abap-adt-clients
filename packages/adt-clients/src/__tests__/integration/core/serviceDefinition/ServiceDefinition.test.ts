@@ -169,6 +169,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
           `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n expose ZOK_C_CDS_TEST;\n}`;
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: sourceCode,
           updateConfig: {
             serviceDefinitionName: config.serviceDefinitionName,

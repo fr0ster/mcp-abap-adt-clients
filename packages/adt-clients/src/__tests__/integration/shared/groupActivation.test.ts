@@ -29,6 +29,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
+import type { AdtModernVariant } from '../../../clients/variant';
+import type {
+  AdtActivationCode,
+  IAdtGroupReference,
+} from '../../../core/shared/codeSets';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
@@ -685,9 +690,11 @@ define structure ${structureName} {
           // Step 4: Group activation - activate all objects together
           currentStep = 'group activation';
           logTestStep(currentStep, testsLogger);
-          const objectsToActivate = [
-            { type: 'DOMA', name: domainName },
-            { type: 'DTEL', name: dataElementName },
+          const objectsToActivate: IAdtGroupReference<
+            AdtActivationCode<AdtModernVariant>
+          >[] = [
+            { type: 'DOMA/DD', name: domainName },
+            { type: 'DTEL/DE', name: dataElementName },
             { type: 'TABL/DS', name: structureName },
           ];
 

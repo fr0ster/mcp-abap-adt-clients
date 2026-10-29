@@ -10,6 +10,10 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
+import {
+  classExecutorDocuments,
+  programExecutorDocuments,
+} from '../../../index.executors';
 import { debuggeePassport } from '../../../runtime/debugger/passport';
 
 const debuggee = {
@@ -61,12 +65,14 @@ describe('debuggeePassport', () => {
 describe.each([
   [
     'ClassExecutor',
-    (c: IAbapConnection) => new ClassExecutor(c),
+    (c: IAbapConnection) =>
+      new ClassExecutor(c, { results: classExecutorDocuments }),
     { className: 'ZCL_X' },
   ],
   [
     'ProgramExecutor',
-    (c: IAbapConnection) => new ProgramExecutor(c),
+    (c: IAbapConnection) =>
+      new ProgramExecutor(c, { results: programExecutorDocuments }),
     { programName: 'ZPROG_X' },
   ],
 ] as const)('%s.run', (_name, make, target) => {

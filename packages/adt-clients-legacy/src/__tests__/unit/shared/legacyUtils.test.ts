@@ -5,15 +5,15 @@
  * answered `404`; a legacy group activation is synchronous and yields no run
  * id. Each of those answers the library's refusal without a request, naming
  * the operation and the endpoint 7.40 lacks. `readObjectMetadata` and
- * `readObjectSource` refuse the DDIC types 7.40 does not serve — in every
- * alias, in any case — and send for the types it does; an unknown type is
+ * `readObjectSource` refuse the DDIC types 7.40 does not serve, by their codes
+ * of the ADT type tables, and send for the types it does; an unknown type is
  * still the caller's mistake and is thrown, as on the modern client.
  */
 
 import {
   AdtObjectErrorCodes,
-  type AdtObjectType,
-  type AdtSourceObjectType,
+  type AdtSourceTypeCode,
+  type AdtTypeCode,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { headersOf } from '../../../../../adt-clients/src/__tests__/helpers/adtHeaders';
@@ -80,7 +80,7 @@ describe('legacy utilities', () => {
         `${RIS}/usageReferences`,
         (utils) =>
           utils.getWhereUsed(
-            { object_name: 'ZCL_GUARD', object_type: 'class' },
+            { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
             { headers: headersOf(utils, 'getWhereUsed') },
           ),
       ],
@@ -89,7 +89,7 @@ describe('legacy utilities', () => {
         `${RIS}/usageReferences/scope`,
         (utils) =>
           utils.getWhereUsedScope(
-            { object_name: 'ZCL_GUARD', object_type: 'class' },
+            { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
             { headers: headersOf(utils, 'getWhereUsedScope') },
           ),
       ],
@@ -123,6 +123,7 @@ describe('legacy utilities', () => {
     it('getWhereUsed refuses before reading the type, an unknown one included', async () => {
       const { utils, sent } = legacyUtils();
       const answer = await utils.getWhereUsed(
+        // @ts-expect-error -- 'nosuchtype' is no code of the tables
         { object_name: 'ZGUARD', object_type: 'nosuchtype' },
         { headers: headersOf(utils, 'getWhereUsed') },
       );
@@ -145,7 +146,7 @@ describe('legacy utilities', () => {
       async (member) => {
         const { utils } = legacyUtils();
         const answer = (await utils[member](
-          { object_name: 'ZCL_GUARD', object_type: 'class' },
+          { object_name: 'ZCL_GUARD', object_type: 'CLAS/OC' },
           { headers: headersOf(utils, member) },
         )) as Answer;
         const message = answer.getError?.().message;
@@ -156,12 +157,23 @@ describe('legacy utilities', () => {
       },
     );
 
-    it('getAllTypes names repository/typestructure, which 7.40 serves object types through', async () => {
+    it('getAllTypes names repository/typestructure, which 7.40 serves object types through, and its member', async () => {
       const { utils } = legacyUtils();
       const answer = (await utils.getAllTypes()) as Answer;
       const message = answer.getError?.().message;
       expect(message).toContain('repository/typestructure');
-      expect(message).toContain('which this library does not implement');
+      expect(message).toContain('getTypeStructure');
+    });
+
+    it('getTypeStructure sends, as on the modern client', async () => {
+      const { utils, sent } = legacyUtils();
+      const answer = await utils.getTypeStructure({
+        headers: headersOf(utils, 'getTypeStructure'),
+      });
+      expect(answer.ok).toBe(true);
+      expect(sent).toEqual([
+        { method: 'POST', url: '/sap/bc/adt/repository/typestructure' },
+      ]);
     });
 
     it.each([['getActivationRun'], ['getActivationResults']] as const)(
@@ -174,31 +186,18 @@ describe('legacy utilities', () => {
     );
   });
 
-  const METADATA_REFUSED: [alias: string, endpoint: string][] = [
-    ['domain', '/sap/bc/adt/ddic/domains'],
-    ['doma/dd', '/sap/bc/adt/ddic/domains'],
-    ['dataelement', '/sap/bc/adt/ddic/dataelements'],
-    ['dtel', '/sap/bc/adt/ddic/dataelements'],
-    ['dtel/de', '/sap/bc/adt/ddic/dataelements'],
-    ['structure', '/sap/bc/adt/ddic/structures'],
-    ['stru/dt', '/sap/bc/adt/ddic/structures'],
-    ['table', '/sap/bc/adt/ddic/tables'],
-    ['tabl/dt', '/sap/bc/adt/ddic/tables'],
-    ['tabletype', '/sap/bc/adt/ddic/tabletypes'],
-    ['ttyp/df', '/sap/bc/adt/ddic/tabletypes'],
-    ['package', '/sap/bc/adt/packages/{name}'],
-    ['devc/k', '/sap/bc/adt/packages/{name}'],
+  const METADATA_REFUSED: [code: AdtTypeCode, endpoint: string][] = [
+    ['DOMA/DD', '/sap/bc/adt/ddic/domains'],
+    ['DTEL/DE', '/sap/bc/adt/ddic/dataelements'],
+    ['TABL/DS', '/sap/bc/adt/ddic/structures'],
+    ['TABL/DT', '/sap/bc/adt/ddic/tables'],
+    ['TTYP/DA', '/sap/bc/adt/ddic/tabletypes'],
+    ['DEVC/K', '/sap/bc/adt/packages/{name}'],
   ];
-  const SOURCE_REFUSED = METADATA_REFUSED.filter(([alias]) =>
-    [
-      'structure',
-      'stru/dt',
-      'table',
-      'tabl/dt',
-      'tabletype',
-      'ttyp/df',
-    ].includes(alias),
-  );
+  const SOURCE_REFUSED: [code: AdtSourceTypeCode, endpoint: string][] = [
+    ['TABL/DS', '/sap/bc/adt/ddic/structures'],
+    ['TABL/DT', '/sap/bc/adt/ddic/tables'],
+  ];
   /**
    * The table type is the one family here no run measured (it is only absent
    * from discovery); the others answered `404`, and their refusal says so.
@@ -214,102 +213,164 @@ describe('legacy utilities', () => {
       expect(message).not.toContain('not measured');
     }
   };
-  const inEveryCase = (rows: [string, string][]) =>
-    rows.flatMap(([alias, endpoint]) => [
-      [alias, endpoint],
-      [alias.toUpperCase(), endpoint],
-    ]);
 
   describe('readObjectMetadata', () => {
-    it.each(inEveryCase(METADATA_REFUSED))(
+    it.each(METADATA_REFUSED)(
       'refuses %s without a request',
-      async (alias, endpoint) => {
+      async (code, endpoint) => {
         const { utils, sent } = legacyUtils();
-        const answer = await utils.readObjectMetadata(
-          alias as AdtObjectType,
-          'ZGUARD',
-        );
+        // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
+        const answer = await utils.readObjectMetadata(code, 'ZGUARD');
         expectRefusal(answer, sent, 'readObjectMetadata', endpoint);
-        expect((answer as Answer).getError?.().message).toContain(alias);
+        expect((answer as Answer).getError?.().message).toContain(code);
         expectEvidence(answer, endpoint);
       },
     );
 
     it.each([
-      ['class', '/sap/bc/adt/oo/classes/zguard'],
-      ['program', '/sap/bc/adt/programs/programs/zguard'],
-      ['interface', '/sap/bc/adt/oo/interfaces/zguard'],
-      ['functionmodule', '/sap/bc/adt/functions/groups/zfg/fmodules/zguard'],
-      ['view', '/sap/bc/adt/ddic/ddl/sources/zguard'],
-      ['functiongroup', '/sap/bc/adt/functions/groups/zguard'],
-    ])('sends for %s', async (type, url) => {
+      ['CLAS/OC', '/sap/bc/adt/oo/classes/zguard'],
+      ['PROG/P', '/sap/bc/adt/programs/programs/zguard'],
+      ['INTF/OI', '/sap/bc/adt/oo/interfaces/zguard'],
+      ['FUGR/FF', '/sap/bc/adt/functions/groups/zfg/fmodules/zguard'],
+      ['DDLS/DF', '/sap/bc/adt/ddic/ddl/sources/zguard'],
+      ['FUGR/F', '/sap/bc/adt/functions/groups/zguard'],
+    ] as const)('sends for %s', async (type, url) => {
       const { utils, sent } = legacyUtils();
-      const answer = await utils.readObjectMetadata(
-        type as AdtObjectType,
-        'ZGUARD',
-        'ZFG',
-      );
+      const answer = await utils.readObjectMetadata(type, 'ZGUARD', 'ZFG');
       expect(answer.ok).toBe(true);
       expect(sent).toEqual([{ method: 'GET', url }]);
     });
 
-    it('still throws for an unknown type', async () => {
+    // The codes 7.40's table lacks, the ones its probe sent GETs for among
+    // them, and text no table holds: refused, and nothing is sent.
+    it.each([
+      'BDEF/BDO',
+      'SRVD/SRV',
+      'DDLX/EX',
+      'DCLS/DL',
+      'ENHO/XHH',
+      'nosuchtype',
+    ])('refuses %s, a code 7.40 lacks, without a request', async (code) => {
       const { utils, sent } = legacyUtils();
-      await expect(
-        utils.readObjectMetadata('nosuchtype' as AdtObjectType, 'ZGUARD'),
-      ).rejects.toThrow('Unsupported object type for metadata: nosuchtype');
-      expect(sent).toEqual([]);
+      // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
+      const answer = await utils.readObjectMetadata(code, 'ZGUARD');
+      expectRefusal(answer, sent, 'readObjectMetadata', 'ADT_TYPES_BASIS_740');
+      expect((answer as Answer).getError?.().message).toContain(code);
     });
   });
 
   describe('readObjectSource', () => {
-    it.each(inEveryCase(SOURCE_REFUSED))(
+    it.each(SOURCE_REFUSED)(
       'refuses %s without a request',
-      async (alias, endpoint) => {
+      async (code, endpoint) => {
         const { utils, sent } = legacyUtils();
-        const answer = await utils.readObjectSource(
-          alias as AdtSourceObjectType,
-          'ZGUARD',
-        );
+        // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
+        const answer = await utils.readObjectSource(code, 'ZGUARD');
         expectRefusal(answer, sent, 'readObjectSource', endpoint);
-        expect((answer as Answer).getError?.().message).toContain(alias);
+        expect((answer as Answer).getError?.().message).toContain(code);
         expectEvidence(answer, endpoint);
       },
     );
 
     it.each([
-      ['class', '/sap/bc/adt/oo/classes/zguard/source/main'],
-      ['program', '/sap/bc/adt/programs/programs/zguard/source/main'],
-      ['interface', '/sap/bc/adt/oo/interfaces/zguard/source/main'],
+      ['CLAS/OC', '/sap/bc/adt/oo/classes/zguard/source/main'],
+      ['PROG/P', '/sap/bc/adt/programs/programs/zguard/source/main'],
+      ['INTF/OI', '/sap/bc/adt/oo/interfaces/zguard/source/main'],
       [
-        'functionmodule',
+        'FUGR/FF',
         '/sap/bc/adt/functions/groups/zfg/fmodules/zguard/source/main',
       ],
-      ['view', '/sap/bc/adt/ddic/ddl/sources/zguard/source/main'],
-    ])('sends for %s', async (type, url) => {
+      ['DDLS/DF', '/sap/bc/adt/ddic/ddl/sources/zguard/source/main'],
+    ] as const)('sends for %s', async (type, url) => {
       const { utils, sent } = legacyUtils();
-      const answer = await utils.readObjectSource(
-        type as AdtSourceObjectType,
-        'ZGUARD',
-        'ZFG',
-      );
+      const answer = await utils.readObjectSource(type, 'ZGUARD', 'ZFG');
       expect(answer.ok).toBe(true);
       expect(sent).toEqual([{ method: 'GET', url }]);
     });
 
     it.each([
-      ['an unknown type', 'nosuchtype'],
-      ['a type with no source', 'functiongroup'],
-      ['a DDIC type with no source', 'domain'],
-    ])('still throws for %s', async (_what, type) => {
+      'BDEF/BDO',
+      'SRVD/SRV',
+      'DDLX/EX',
+      'DCLS/DL',
+      'ENHO/XHH',
+      'DOMA/DD',
+      'TTYP/DA',
+      'nosuchtype',
+    ])('refuses %s, a code 7.40 lacks, without a request', async (code) => {
+      const { utils, sent } = legacyUtils();
+      // @ts-expect-error -- no source code ADT_TYPES_BASIS_740 lists
+      const answer = await utils.readObjectSource(code, 'ZGUARD');
+      expectRefusal(answer, sent, 'readObjectSource', 'ADT_TYPES_BASIS_740');
+    });
+
+    it('still throws for a 7.40 code with no source, from a caller outside the types', async () => {
       const { utils, sent } = legacyUtils();
       await expect(
-        utils.readObjectSource(type as AdtSourceObjectType, 'ZGUARD'),
+        // @ts-expect-error -- FUGR/F has no source
+        utils.readObjectSource('FUGR/F', 'ZGUARD'),
       ).rejects.toThrow(
-        `Object type ${type} does not support source code reading`,
+        'Object type FUGR/F does not support source code reading',
       );
       expect(sent).toEqual([]);
     });
+  });
+
+  describe('the other members taking a code take only 7.40 codes', () => {
+    it('search filtered by a code 7.40 lacks is refused without a request', async () => {
+      const { utils, sent } = legacyUtils();
+      const answer = await utils.search({
+        query: 'Z*',
+        // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
+        objectType: 'TABL/DT',
+      });
+      expectRefusal(answer, sent, 'search', 'ADT_TYPES_BASIS_740');
+    });
+
+    it('the structure reads refuse a code 7.40 lacks, and serve a package', async () => {
+      const { utils, sent } = legacyUtils();
+      expectRefusal(
+        await utils.fetchNodeStructure(
+          // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
+          'TABL/DT',
+          'ZGUARD',
+          { headers: headersOf(utils, 'fetchNodeStructure') },
+        ),
+        sent,
+        'fetchNodeStructure',
+        'ADT_TYPES_BASIS_740',
+      );
+      expectRefusal(
+        // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
+        await utils.getObjectStructure('TABL/DT', 'ZGUARD'),
+        sent,
+        'getObjectStructure',
+        'ADT_TYPES_BASIS_740',
+      );
+      await utils.fetchNodeStructure('DEVC/K', '$TMP', {
+        headers: headersOf(utils, 'fetchNodeStructure'),
+      });
+      expect(sent.map((r) => r.method)).toEqual(['POST']);
+    });
+
+    it.each(['MSAG/N', 'DEVC/K', 'TABL/DT'])(
+      'a group activation of %s, which 7.40 does not activate, is refused without a request',
+      async (code) => {
+        const { utils, sent } = legacyUtils();
+        const answer = await utils.activateObjectsGroup(
+          // @ts-expect-error -- ADT_TYPES_BASIS_740 activates no such code
+          [{ name: 'ZGUARD', type: code }],
+          false,
+          { headers: headersOf(utils, 'activateObjectsGroup') },
+        );
+        expectRefusal(
+          answer,
+          sent,
+          'activateObjectsGroup',
+          'ADT_TYPES_BASIS_740',
+        );
+      },
+    );
   });
 
   describe('members that send nothing are unchanged', () => {
@@ -327,11 +388,11 @@ describe('legacy utilities', () => {
 
     it('supportsSourceCode and getObjectSourceUri describe the address', () => {
       const { utils, sent } = legacyUtils();
-      expect(utils.supportsSourceCode('table' as AdtObjectType)).toBe(true);
-      expect(utils.supportsSourceCode('domain' as AdtObjectType)).toBe(false);
-      expect(
-        utils.getObjectSourceUri('table' as AdtSourceObjectType, 'ZGUARD'),
-      ).toBe('/sap/bc/adt/ddic/tables/zguard/source/main');
+      expect(utils.supportsSourceCode('TABL/DT')).toBe(true);
+      expect(utils.supportsSourceCode('DOMA/DD')).toBe(false);
+      expect(utils.getObjectSourceUri('TABL/DT', 'ZGUARD')).toBe(
+        '/sap/bc/adt/ddic/tables/zguard/source/main',
+      );
       expect(sent).toEqual([]);
     });
   });

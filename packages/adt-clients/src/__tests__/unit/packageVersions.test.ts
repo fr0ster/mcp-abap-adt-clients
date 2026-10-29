@@ -9,17 +9,18 @@
  */
 
 import { AdtPackage } from '../../core/package/AdtPackage';
+import { packageDocuments } from '../../core/package/types';
 
 describe('AdtPackage version history (non-source)', () => {
   it('has no version methods at all', () => {
-    const pkg = new AdtPackage({} as never);
+    const pkg = new AdtPackage({} as never, { results: packageDocuments });
 
     expect('getVersions' in pkg).toBe(false);
     expect('getVersionSource' in pkg).toBe(false);
   });
 
   it('has no activate either — ADT activates no package', () => {
-    const pkg = new AdtPackage({} as never);
+    const pkg = new AdtPackage({} as never, { results: packageDocuments });
 
     expect('activate' in pkg).toBe(false);
   });

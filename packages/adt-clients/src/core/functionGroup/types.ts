@@ -88,6 +88,7 @@ export const functionGroupDocuments = {
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
+  updated: rawDocument,
   metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,

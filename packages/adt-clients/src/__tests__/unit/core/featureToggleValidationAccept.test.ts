@@ -10,6 +10,7 @@
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtFeatureToggle } from '../../../core/featureToggle/AdtFeatureToggle';
+import { featureToggleDocuments } from '../../../core/featureToggle/types';
 
 it('validate sends exactly Accept application/vnd.sap.as+xml', async () => {
   const request = jest.fn().mockResolvedValue({
@@ -17,9 +18,12 @@ it('validate sends exactly Accept application/vnd.sap.as+xml', async () => {
     data: '<asx:abap><asx:values><DATA><CHECK_RESULT>X</CHECK_RESULT></DATA></asx:values></asx:abap>',
     headers: {},
   });
-  const toggle = new AdtFeatureToggle({
-    makeAdtRequest: request,
-  } as unknown as IAbapConnection);
+  const toggle = new AdtFeatureToggle(
+    {
+      makeAdtRequest: request,
+    } as unknown as IAbapConnection,
+    { results: featureToggleDocuments },
+  );
 
   await toggle.validate({
     featureToggleName: 'zft_probe',

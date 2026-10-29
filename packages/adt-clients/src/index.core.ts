@@ -15,7 +15,21 @@
  * compiler's — what such a subclass cannot build without — and nothing more.
  */
 export { AdtClient } from './clients/AdtClient';
-export { createAdtClient } from './clients/createAdtClient';
+export { AdtClientCloud, AdtClientOnPrem } from './clients/AdtClientVariants';
+export {
+  createAdtClient,
+  type ICreateAdtClientOptions,
+} from './clients/createAdtClient';
+export type {
+  AdtCodeOf,
+  AdtCodeWith,
+  AdtModernVariant,
+  AdtPerformedBy,
+  AdtPerformingVariantsIn,
+  AdtServedBy,
+  AdtServingVariantsIn,
+  IAdtServedOn,
+} from './clients/variant';
 export { AdtAccessControl } from './core/accessControl';
 export { AdtAppendStructure } from './core/appendStructure';
 export { AdtAuthorizationField } from './core/authorizationField';
@@ -32,7 +46,7 @@ export { startClassUnitTestRunSync } from './core/class/run';
 export { AdtDataElement } from './core/dataElement';
 export { AdtDdl } from './core/ddl';
 export { AdtDomain } from './core/domain';
-export { AdtEnhancement } from './core/enhancement';
+export { AdtEnhancement, type EnhancementTypeWith } from './core/enhancement';
 export { AdtFeatureToggle } from './core/featureToggle';
 export { AdtFunctionGroup } from './core/functionGroup';
 export { AdtFunctionInclude } from './core/functionInclude';
@@ -54,16 +68,40 @@ export {
 export { AdtServiceDefinition } from './core/serviceDefinition';
 export { AdtUtils } from './core/shared/AdtUtils';
 export { startUnitTestRunSync } from './core/shared/abapUnit';
+export type {
+  AdtActivationCode,
+  AdtDeletionCheckCode,
+  AdtDeletionCode,
+  AdtMetadataReadCode,
+  AdtMetadataReadCodeOf,
+  AdtSearchCode,
+  AdtSourceReadCode,
+  AdtSourceReadCodeOf,
+  AdtStructureCode,
+  AdtWhereUsedCode,
+  IAdtGroupReference,
+  ParentedArguments,
+} from './core/shared/codeSets';
 export {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
+export type {
+  AdtHandlerOptions,
+  AdtLoggedOptions,
+  AdtShippedOptions,
+  IAdtHandlerContext,
+} from './core/shared/handlerOptions';
 export { AdtStructure } from './core/structure';
 export { AdtTable } from './core/table';
 export { AdtDdicTableType } from './core/tabletype';
 export { AdtTransformation } from './core/transformation';
 export { AdtRequest } from './core/transport';
 export { changeTransportTaskType } from './core/transport/objects';
+export type {
+  AdtAddressableCode,
+  AdtGroupOnlyCode,
+} from './endpoints/codes';
 export {
   ACCESS_CONTROL,
   AUTHORIZATION_FIELD,

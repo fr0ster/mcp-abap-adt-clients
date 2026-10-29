@@ -13,7 +13,7 @@ import {
   assertIssuesItsRequest,
   factoryOf,
   invoke,
-  recordingClient,
+  recordingClientOf,
 } from '../../../../../adt-clients/src/__tests__/unit/capabilities/behaviourGuard';
 import {
   ATOM_METHODS,
@@ -94,10 +94,11 @@ describe('capability guard — legacy behaviour', () => {
         for (const method of ATOM_METHODS[atom as Atom]) {
           const refused = LEGACY_REFUSED[getter]?.[method] !== undefined;
           it(`${atom}: ${method} ${refused ? 'is refused without a request' : 'issues a request'}`, async () => {
-            const { client, calls, sessionTypes } = recordingClient(
-              ACTIVATION_OK,
+            const { client, calls, sessionTypes } = recordingClientOf(
               AdtClientLegacy,
+              ACTIVATION_OK,
             );
+            // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
             const handler = entry.factory(client) as unknown as Record<
               string,
               unknown

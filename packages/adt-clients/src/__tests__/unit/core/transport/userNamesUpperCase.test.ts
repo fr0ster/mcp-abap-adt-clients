@@ -10,6 +10,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { transportDocuments } from '../../../../core/transport/types';
 import { headersFor } from '../../../helpers/adtHeaders';
 
 function recordingConnection() {
@@ -38,7 +39,7 @@ const body = (call: IAbapRequestOptions | undefined) =>
 describe('transport user names', () => {
   it('create sends the owner upper-cased', async () => {
     const { connection, calls } = recordingConnection();
-    await new AdtRequest(connection).create(
+    await new AdtRequest(connection, { results: transportDocuments }).create(
       { description: 'x', owner: 'devuser01' },
       { headers: headersFor('AdtRequest.create') },
     );
@@ -48,8 +49,11 @@ describe('transport user names', () => {
 
   it("create sends the system context's responsible upper-cased", async () => {
     const { connection, calls } = recordingConnection();
-    await new AdtRequest(connection, undefined, {
-      responsible: 'Mixed_User',
+    await new AdtRequest(connection, {
+      systemContext: {
+        responsible: 'Mixed_User',
+      },
+      results: transportDocuments,
     }).create(
       { description: 'x' },
       { headers: headersFor('AdtRequest.create') },
@@ -59,7 +63,9 @@ describe('transport user names', () => {
 
   it('createTask sends targetUser upper-cased', async () => {
     const { connection, calls } = recordingConnection();
-    await new AdtRequest(connection).createTask('DEVK900001', {
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).createTask('DEVK900001', {
       headers: headersFor('AdtRequest.createTask'),
       targetUser: 'devuser02',
     });
@@ -71,7 +77,7 @@ describe('transport user names', () => {
     // Why a refused task part can leave the request behind: SAP does both in
     // this one POST, and the library makes no second call it could report.
     const { connection, calls } = recordingConnection();
-    await new AdtRequest(connection).create(
+    await new AdtRequest(connection, { results: transportDocuments }).create(
       { description: 'x', owner: 'DEVUSER01' },
       { headers: headersFor('AdtRequest.create') },
     );

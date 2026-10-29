@@ -143,7 +143,10 @@ Each runs under `describeLegacyRfc` — only when the loaded configuration says
 otherwise — and every case is a `legacy_740` test case of the configuration
 (`enabled: false` in `test-config.yaml.template`, enabled in the 7.40 system's overlay).
 Refused members are asserted on a wire recorder (`helpers/requestRecorder.ts`),
-not on a log: nothing may leave.
+not on a log: nothing may leave. A refused member whose operation `ADT_TYPES_BASIS_740`
+does not list does not compile on `AdtClientLegacy` (since 0.2.0); the suites
+call it under `// @ts-expect-error`, as a caller outside the type system
+would.
 
 | File | `legacy_740` case | Checks |
 |---|---|---|

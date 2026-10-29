@@ -75,6 +75,8 @@ export {
   type IAbapGitExternalRepoInfo,
   type IAbapGitRepo,
 } from './results/abapGit';
+// A code read from an answer, looked up once against the ADT type tables.
+export { answeredObject } from './results/answeredObject';
 export {
   atcRunStatus,
   atcStartedRun,
@@ -151,6 +153,7 @@ export { unitTestRunId } from './results/unitTest';
 export {
   extractRunId,
   type IAdtObjectHit,
+  type IInactiveObject,
   type IInactiveObjectsResponse,
   type INamedItem,
   type IParsedNodeStructure,

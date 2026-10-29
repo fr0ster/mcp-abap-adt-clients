@@ -5,6 +5,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
+import { scalarFunctionDocuments } from '../../../../core/scalarFunction/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 
@@ -35,7 +36,9 @@ function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
 describe('AdtScalarFunction handler', () => {
   it('create() only POSTs metadata — no lock/update even if sourceCode is given', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
-    const sf = new AdtScalarFunction(conn);
+    const sf = new AdtScalarFunction(conn, {
+      results: scalarFunctionDocuments,
+    });
     // No source either way: `create` posts the metadata document, and since
     // interfaces 38.0.0 the signature says so rather than the comment.
     await sf.create(
@@ -55,7 +58,9 @@ describe('AdtScalarFunction handler', () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('not found'), { response: { status: 404 } }),
     );
-    const sf = new AdtScalarFunction(conn);
+    const sf = new AdtScalarFunction(conn, {
+      results: scalarFunctionDocuments,
+    });
     // `undefined` for a 404 used to be the answer, and it read like an empty
     // object. It is a failure the caller can see in the type now.
     const failure = expectFailure(
@@ -69,7 +74,9 @@ describe('AdtScalarFunction handler', () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 405 } }),
     );
-    const sf = new AdtScalarFunction(conn);
+    const sf = new AdtScalarFunction(conn, {
+      results: scalarFunctionDocuments,
+    });
     // Some systems have no validation resource at all. That is not a verdict
     // about the name, but the library reads nothing into the status: the
     // failure comes back as the transport saw it...
@@ -99,7 +106,9 @@ describe('AdtScalarFunction handler', () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('forbidden'), { response: { status: 403 } }),
     );
-    const sf = new AdtScalarFunction(conn);
+    const sf = new AdtScalarFunction(conn, {
+      results: scalarFunctionDocuments,
+    });
 
     // A system that refused the caller is not a system without the resource,
     // and nothing here renames a 403: it comes back as itself.
@@ -118,7 +127,9 @@ describe('AdtScalarFunction handler', () => {
         ? new Error('unlock boom')
         : { data: '' },
     );
-    const sf = new AdtScalarFunction(conn);
+    const sf = new AdtScalarFunction(conn, {
+      results: scalarFunctionDocuments,
+    });
 
     const failure = expectFailure(
       await sf.unlock({ scalarFunctionName: 'ZOK_F' }, 'LH1'),
@@ -134,7 +145,9 @@ describe('AdtScalarFunction handler', () => {
   it('update() is the PUT, and it carries the handle it was given', async () => {
     const { conn, sessionTypes, calls } = makeConn(() => ({ data: '' }));
 
-    const sf = new AdtScalarFunction(conn);
+    const sf = new AdtScalarFunction(conn, {
+      results: scalarFunctionDocuments,
+    });
     await sf.update(
       { scalarFunctionName: 'ZOK_SF' },
       {

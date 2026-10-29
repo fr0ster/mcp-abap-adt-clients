@@ -1,0 +1,36 @@
+{
+  "case": "DSFD-SCF--sqrt",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:41:02.329Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/dsfd/sources/sqrt",
+    "params": {
+      "version": "active"
+    },
+    "effectiveUrl": "/sap/bc/adt/ddic/dsfd/sources/sqrt?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, sap-client and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-encoding": "gzip",
+      "content-length": "923",
+      "content-type": "application/vnd.sap.adt.blues.v1+xml; charset=utf-8",
+      "etag": "20220429095952001application/vnd.sap.adt.blues.v1+xmleeZtMHBwV1fHI2Us7PTotdioVEQ=",
+      "last-modified": "Fri, 29 Apr 2022 09:59:52 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "61062.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "DSFD-SCF--sqrt--03-metadata.body.xml"
+  }
+}

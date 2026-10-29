@@ -7,6 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { CLASS } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 
@@ -36,7 +37,7 @@ export async function validateBehaviorImplementationName(
   // Build query parameters for behavior implementation validation
   const params = new URLSearchParams({
     objname: className,
-    objtype: 'CLAS/OC',
+    objtype: TYPE_CODE.behaviorImplementation,
     packagename: packageName,
   });
 

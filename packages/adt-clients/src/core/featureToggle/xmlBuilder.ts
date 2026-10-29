@@ -7,6 +7,7 @@
  * handled separately by updateSource.ts.
  */
 
+import { TYPE_CODE } from '../../constants/typeCodes';
 import type { ICreateFeatureToggleParams } from './types';
 
 const NS_BLUE = 'http://www.sap.com/wbobj/blue';
@@ -30,7 +31,7 @@ export function buildFeatureToggleXml(
 
   const adtcoreAttrs = [
     `adtcore:name="${escapeXml(name)}"`,
-    `adtcore:type="FTG2/FT"`,
+    `adtcore:type="${TYPE_CODE.featureToggle}"`,
     `adtcore:description="${escapeXml(description)}"`,
   ];
   if (params.master_system) {

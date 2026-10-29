@@ -15,8 +15,7 @@ export async function checkScalarFunction(
   const response = await runCheckRun(
     connection,
     headers,
-    'scalar_function',
-    name,
+    { type: 'DSFD/SCF', name: name },
     version,
     'abapCheckRun',
     sourceCode,

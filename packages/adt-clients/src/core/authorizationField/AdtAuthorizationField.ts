@@ -1,5 +1,5 @@
 /**
- * AdtAuthorizationField - CRUD for `SUSO/O` authorization fields.
+ * AdtAuthorizationField - CRUD for `AUTH` authorization fields.
  *
  * An XML-based object: no source, so `read` and `readMetadata` fetch the same
  * document and `update` writes that XML.
@@ -33,11 +33,8 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
@@ -45,9 +42,9 @@ import { create as createAuthorizationField } from './create';
 import { checkDeletion, deleteAuthorizationField } from './delete';
 import { lockAuthorizationField } from './lock';
 import { readAuthorizationField } from './read';
-import {
+import type {
   authorizationFieldDocuments,
-  type IAuthorizationFieldConfig,
+  IAuthorizationFieldConfig,
 } from './types';
 import { unlockAuthorizationField } from './unlock';
 import { updateAuthorizationField } from './update';
@@ -78,17 +75,14 @@ export class AdtAuthorizationField<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AuthorizationField';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = authorizationFieldDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

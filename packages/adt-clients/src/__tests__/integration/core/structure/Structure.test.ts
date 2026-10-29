@@ -159,6 +159,7 @@ describe('Structure (using AdtClient)', () => {
           testCase?.params?.updated_ddl_code || config.source || '';
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: updatedDdlCode,
           updateConfig: {
             structureName: config.structureName,

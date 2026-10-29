@@ -41,7 +41,10 @@ import {
   closeOwnTestConnection,
   createTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
-import { ClassExecutor } from '../src/executors/class/ClassExecutor';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+} from '../src/executors/class/ClassExecutor';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -272,7 +275,10 @@ async function main(): Promise<void> {
 
     out(`run ${CLASS_NAME} on its own session`);
     let runDone = false;
-    run = new ClassExecutor(T, quiet)
+    run = new ClassExecutor(T, {
+      logger: quiet,
+      results: classExecutorDocuments,
+    })
       .run({ className: CLASS_NAME })
       .finally(() => {
         runDone = true;

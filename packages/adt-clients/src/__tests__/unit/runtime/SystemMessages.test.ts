@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
+import {
+  SystemMessages,
+  systemMessagesDocuments,
+} from '../../../runtime/systemMessages/SystemMessages';
 
 describe('SystemMessages', () => {
   function createConnectionMock() {
@@ -19,7 +22,10 @@ describe('SystemMessages', () => {
 
   it('list() delegates to /sap/bc/adt/runtime/systemmessages', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger());
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
+      results: systemMessagesDocuments,
+    });
 
     await sm.list();
 
@@ -33,7 +39,10 @@ describe('SystemMessages', () => {
 
   it('list() with maxResults passes $top parameter', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger());
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
+      results: systemMessagesDocuments,
+    });
 
     await sm.list({ maxResults: 10 });
 
@@ -43,7 +52,10 @@ describe('SystemMessages', () => {
 
   it('list() with user passes $query parameter', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger());
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
+      results: systemMessagesDocuments,
+    });
 
     await sm.list({ user: 'ADMIN' });
 
@@ -54,7 +66,10 @@ describe('SystemMessages', () => {
 
   it('getById() delegates to /sap/bc/adt/runtime/systemmessages/MSG001', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger());
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
+      results: systemMessagesDocuments,
+    });
 
     await sm.getById('MSG001');
 

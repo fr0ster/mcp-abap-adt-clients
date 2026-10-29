@@ -42,10 +42,12 @@ type Assert<T extends true> = T;
 /**
  * The public methods of `C` that `T` does not declare; `never` when none.
  * Methods, not every key: a data member like `objectType` is the handler's
- * label, not something a caller invokes, and no atom carries it.
+ * label, not something a caller invokes, and no atom carries it. `-?` keeps an
+ * optional data member (`variant`, the gates' type-only marker) from leaving
+ * `undefined` among the keys.
  */
 type Methods<C> = {
-  [K in keyof C]: C[K] extends (...args: never[]) => unknown ? K : never;
+  [K in keyof C]-?: C[K] extends (...args: never[]) => unknown ? K : never;
 }[keyof C];
 type Uncovered<C, T> = Exclude<Methods<C>, keyof T>;
 
@@ -86,12 +88,31 @@ type FeatureToggleAtoms = LifecycleAtoms &
   }>;
 
 type ServiceBindingAtoms = LifecycleAtoms &
+  IAdtMetadataUpdatable<U, U> &
   IAdtTransportAware<U, U> &
   IAdtServiceBindingTypes<U> &
   IAdtServiceGroupReadable<U>;
 
+/**
+ * The one member of `AdtUtils` no atom of interfaces-adt 21.0.0 declares:
+ * `getTypeStructure`, added for the conformance check of the ADT type tables,
+ * which calls it on the class. Named here, not hidden: until the contract
+ * package carries its atom, a consumer's composed contract cannot reach it.
+ * Any other uncovered method still fails below.
+ */
+type AwaitingItsAtom = 'getTypeStructure';
+
 export type _UtilsCovered = Assert<
-  [Uncovered<typeof utils, UtilsAtoms>] extends [never] ? true : false
+  [Exclude<Uncovered<typeof utils, UtilsAtoms>, AwaitingItsAtom>] extends [
+    never,
+  ]
+    ? true
+    : false
+>;
+
+/** And the exception names a member that exists, so it cannot go stale. */
+export type _AwaitingItsAtomExists = Assert<
+  AwaitingItsAtom extends Uncovered<typeof utils, UtilsAtoms> ? true : false
 >;
 
 export type _FeatureToggleCovered = Assert<

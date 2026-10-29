@@ -4,6 +4,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { parseMessageClass } from '../../core/messageClass';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
+import { messageClassDocuments } from '../../core/messageClass/types';
 import { noopLogger } from '../../utils/noopLogger';
 import { headersOf } from '../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../helpers/contract';
@@ -69,7 +70,7 @@ describe('AdtMessageClass', () => {
         seen = o;
         return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     await mc.create(
       { name: 'ZT', description: 'D', packageName: 'ZP' },
@@ -88,7 +89,7 @@ describe('AdtMessageClass', () => {
           seen = o;
           return { data: '', status: 201, headers: {} } as IAdtWireResponse;
         }),
-        noopLogger,
+        { logger: noopLogger, results: messageClassDocuments },
       );
     await make().create(
       {
@@ -118,12 +119,23 @@ describe('AdtMessageClass', () => {
           headers: {},
         }) as IAdtWireResponse,
     );
-    await new AdtMessageClass(c, noopLogger).delete(
+    await new AdtMessageClass(c, {
+      logger: noopLogger,
+      results: messageClassDocuments,
+    }).delete(
       {
         name: 'ZT',
         transportRequest: 'DEVK900001',
       },
-      { headers: headersOf(new AdtMessageClass(c, noopLogger), 'delete') },
+      {
+        headers: headersOf(
+          new AdtMessageClass(c, {
+            logger: noopLogger,
+            results: messageClassDocuments,
+          }),
+          'delete',
+        ),
+      },
     );
     const del = calls.find((x) => x.url === '/sap/bc/adt/deletion/delete');
     expect(String(del?.data)).toContain(
@@ -135,11 +147,17 @@ describe('AdtMessageClass', () => {
     const { conn: c, calls } = recorder(
       async () => ({ data: '', status: 200, headers: {} }) as IAdtWireResponse,
     );
-    await new AdtMessageClass(c, noopLogger).updateMetadata(
+    await new AdtMessageClass(c, {
+      logger: noopLogger,
+      results: messageClassDocuments,
+    }).updateMetadata(
       { name: 'ZT', transportRequest: 'DEVK900001' },
       {
         headers: headersOf(
-          new AdtMessageClass(c, noopLogger),
+          new AdtMessageClass(c, {
+            logger: noopLogger,
+            results: messageClassDocuments,
+          }),
           'updateMetadata',
         ),
         source: CLASS_XML_WITH_MSG,
@@ -158,7 +176,7 @@ describe('AdtMessageClass', () => {
         seen = o;
         return { data: '', status: 200, headers: {} } as IAdtWireResponse;
       }),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     await mc.validate({ name: 'ZT', description: 'Desc' });
     expect(seen.method).toBe('POST');
@@ -174,7 +192,7 @@ describe('AdtMessageClass', () => {
         seen = o;
         return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     await mc.create(
       { name: 'ZT', description: 'D', packageName: 'ZP' },
@@ -192,7 +210,7 @@ describe('AdtMessageClass', () => {
         seen = o;
         return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     await mc.create(
       {
@@ -214,8 +232,11 @@ describe('AdtMessageClass', () => {
         seen = o;
         return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
-      noopLogger,
-      { masterLanguage: 'DE' },
+      {
+        logger: noopLogger,
+        systemContext: { masterLanguage: 'DE' },
+        results: messageClassDocuments,
+      },
     );
     await mc.create(
       { name: 'ZT', description: 'D', packageName: 'ZP' },
@@ -231,7 +252,7 @@ describe('AdtMessageClass', () => {
         async () =>
           ({ data: CLASS_XML, status: 200, headers: {} }) as IAdtWireResponse,
       ),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     // The document, as it arrived. `parseMessageClass` is the reading beside
     // it — the member answers the class, not a shape chosen for the caller.
@@ -248,7 +269,7 @@ describe('AdtMessageClass', () => {
     // travels in its package's transport rather than carrying one of its own.
     const mc = new AdtMessageClass(
       conn(async () => ({}) as IAdtWireResponse),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     for (const name of [
       'activate',
@@ -270,7 +291,10 @@ describe('AdtMessageClass', () => {
       async () => ({ data: '', status: 200, headers: {} }) as IAdtWireResponse,
     );
 
-    const mc = new AdtMessageClass(c, noopLogger);
+    const mc = new AdtMessageClass(c, {
+      logger: noopLogger,
+      results: messageClassDocuments,
+    });
     // The caller built this document — here the class with a new description
     // and its message kept. Until 23.0.0 the member read the class itself and
     // patched `config.description` into it; that read is the caller's now.
@@ -308,7 +332,10 @@ describe('AdtMessageClass', () => {
         }) as IAdtWireResponse,
     );
 
-    const mc = new AdtMessageClass(c, noopLogger);
+    const mc = new AdtMessageClass(c, {
+      logger: noopLogger,
+      results: messageClassDocuments,
+    });
 
     // Two members, one request each. Whether to ask before deleting is the
     // consumer's call, and it can read the answer to it.
@@ -347,7 +374,10 @@ describe('AdtMessageClass', () => {
       });
     });
 
-    const mc = new AdtMessageClass(c, noopLogger);
+    const mc = new AdtMessageClass(c, {
+      logger: noopLogger,
+      results: messageClassDocuments,
+    });
     expect(
       expectFailure(
         await mc.updateMetadata(
@@ -375,7 +405,7 @@ describe('AdtMessageClass', () => {
         async () =>
           ({ data: body, status: 200, headers: {} }) as IAdtWireResponse,
       ),
-      noopLogger,
+      { logger: noopLogger, results: messageClassDocuments },
     );
     expect(expectResult(await mc.lock({ name: 'ZT' }), 'lock')).toBe('LH');
 

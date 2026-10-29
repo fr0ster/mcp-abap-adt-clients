@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {
@@ -42,12 +43,16 @@ export class RuntimeDumps<
 > implements IRuntimeDumps<ReturnType<R['list']>, ReturnType<R['dump']>>
 {
   readonly kind = 'runtimeDumps' as const;
+  private readonly results: R;
+  private readonly logger: ILogger;
+
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = runtimeDumpsDocuments as unknown as R,
-  ) {}
+    options: AdtLoggedOptions<R>,
+  ) {
+    this.logger = options.logger;
+    this.results = options.results;
+  }
 
   async list<E extends IAdtError = IAdtError>(
     options?: IRuntimeDumpsListOptions & IAdtAnalyseOptions<E>,

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="SD_RET_MULTI_ADDRESS" adtcore:type="FTG2/FT" adtcore:changedAt="2023-05-18T01:14:14Z" adtcore:version="active" adtcore:createdAt="2023-04-27T13:05:37Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Support Multiple Addresses for Manage Customer Returns - Ver" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/odata_sd_return_v2" adtcore:type="DEVC/K" adtcore:name="ODATA_SD_RETURN_V2"/>
+</adtcore:mainObject>

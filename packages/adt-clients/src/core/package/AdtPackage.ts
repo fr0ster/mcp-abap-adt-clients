@@ -40,18 +40,15 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { checkPackage } from './check';
 import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
-import { type IPackageConfig, packageDocuments } from './types';
+import type { IPackageConfig, packageDocuments } from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
@@ -80,14 +77,14 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Package';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = packageDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

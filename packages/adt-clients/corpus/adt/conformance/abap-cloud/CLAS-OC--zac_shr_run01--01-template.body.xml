@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="cloudDevelopment" adtcore:name="ZAC_SHR_RUN01" adtcore:type="CLAS/OC" adtcore:changedAt="2026-09-05T06:10:34Z" adtcore:version="active" adtcore:createdAt="2026-09-05T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:description="Shared runnable class (if_oo_adt_classrun) for profiler/exec" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="ZAC_SHR_PKG"/>
+</adtcore:mainObject>

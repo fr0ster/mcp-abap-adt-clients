@@ -1,0 +1,33 @@
+{
+  "case": "MSAG-N--sapmtran",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/messageclass/sapmtran",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/messageclass/sapmtran",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.mc.messageclass+xml, application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "1377",
+      "content-type": "application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8",
+      "etag": "B350D9A172BB6046047D05867E2E9D0BCEE04760",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "710966.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "MSAG-N--sapmtran--03-metadata.body.xml"
+  }
+}

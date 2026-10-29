@@ -41,6 +41,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -198,7 +199,10 @@ type Connection = IAbapConnection & ISessionLifecycleAware;
 
 /** The probe class runs through classrun. */
 const asClass = (connection: Connection) =>
-  new ClassExecutor(connection, connectionLogger);
+  new ClassExecutor(connection, {
+    logger: connectionLogger,
+    results: classExecutorDocuments,
+  });
 
 /** Another debugger of the same user: its own terminal and its own IDE. */
 function otherIde(of: IDebuggerIdentity, label: string): IDebuggerIdentity {
@@ -294,11 +298,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
       ownSession: true,
     });
     sessionConnection.setSessionType('stateful');
-    debuggerApi = new AbapDebugger(
-      sessionConnection,
-      connectionLogger,
-      abapDebuggerDocuments,
-    );
+    debuggerApi = new AbapDebugger(sessionConnection, {
+      logger: connectionLogger,
+      results: abapDebuggerDocuments,
+    });
     if (previous) {
       previous.setSessionType('stateless');
       await closeOwnTestConnection(previous);
@@ -331,11 +334,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
-    listenerApi = new AbapDebugger(
-      listenerConnection,
-      connectionLogger,
-      abapDebuggerDocuments,
-    );
+    listenerApi = new AbapDebugger(listenerConnection, {
+      logger: connectionLogger,
+      results: abapDebuggerDocuments,
+    });
     await ensureDebugTarget(
       listenerConnection,
       'classes',
@@ -874,12 +876,11 @@ describe('ABAP debugger (AbapDebugger)', () => {
       const holderIdentity = otherIde(identity, 'holder');
       // The holder registers the way Eclipse does — with the conflict
       // parameters — from an IDE of its own.
-      const holder = new AbapDebugger(
-        holderConnection,
-        connectionLogger,
-        abapDebuggerDocuments,
-        { onConflict: 'refuse' },
-      );
+      const holder = new AbapDebugger(holderConnection, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+        onConflict: 'refuse',
+      });
       await withCleanup(
         async () => {
           const holding = holder.listen(holderIdentity, {
@@ -924,18 +925,16 @@ describe('ABAP debugger (AbapDebugger)', () => {
       holderConnection.setSessionType('stateful');
       const holderIdentity = otherIde(identity, 'holder');
       // The one being displaced listens the way Eclipse does.
-      const holder = new AbapDebugger(
-        holderConnection,
-        connectionLogger,
-        abapDebuggerDocuments,
-        { onConflict: 'refuse' },
-      );
-      const taker = new AbapDebugger(
-        listenerConnection as Connection,
-        connectionLogger,
-        abapDebuggerDocuments,
-        { onConflict: 'takeOver' },
-      );
+      const holder = new AbapDebugger(holderConnection, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+        onConflict: 'refuse',
+      });
+      const taker = new AbapDebugger(listenerConnection as Connection, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+        onConflict: 'takeOver',
+      });
       await withCleanup(
         async () => {
           const holding = holder.listen(holderIdentity, {
@@ -986,12 +985,11 @@ describe('ABAP debugger (AbapDebugger)', () => {
       });
       holderConnection.setSessionType('stateful');
       const holderIdentity = otherIde(identity, 'quiet-holder');
-      const holder = new AbapDebugger(
-        holderConnection,
-        connectionLogger,
-        abapDebuggerDocuments,
-        { onConflict: 'takeOver' },
-      );
+      const holder = new AbapDebugger(holderConnection, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+        onConflict: 'takeOver',
+      });
       await withCleanup(
         async () => {
           const holding = holder.listen(holderIdentity, {
@@ -1047,11 +1045,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
         ...identity,
         terminalId: otherIde(identity, 'same-ide').terminalId,
       };
-      const other = new AbapDebugger(
-        otherConnection,
-        connectionLogger,
-        abapDebuggerDocuments,
-      );
+      const other = new AbapDebugger(otherConnection, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+      });
       await withCleanup(
         async () => {
           const holding = other.listen(sameIde, {

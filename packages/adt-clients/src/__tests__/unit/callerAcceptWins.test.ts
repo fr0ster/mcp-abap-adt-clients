@@ -20,9 +20,12 @@ import {
   ACCEPT_FUNCTION_INCLUDE,
 } from '../../constants/contentTypes';
 import { AdtAuthorizationField } from '../../core/authorizationField/AdtAuthorizationField';
+import { authorizationFieldDocuments } from '../../core/authorizationField/types';
 import { AdtClass } from '../../core/class/AdtClass';
 import { AdtLocalTypes } from '../../core/class/AdtLocalTypes';
+import { classDocuments } from '../../core/class/types';
 import { AdtFunctionInclude } from '../../core/functionInclude/AdtFunctionInclude';
+import { functionIncludeDocuments } from '../../core/functionInclude/types';
 import { AdtContentTypesModern } from '../../core/shared/contentTypes';
 import { expectResult } from '../helpers/contract';
 
@@ -52,12 +55,10 @@ const members: {
     name: 'AdtClass.readMetadata (with content types)',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtClass(
-          connection,
-          undefined,
-          undefined,
+        await new AdtClass(connection, {
           contentTypes,
-        ).readMetadata(
+          results: classDocuments,
+        }).readMetadata(
           { className: 'ZCL_X' },
           accept === undefined ? {} : { accept },
         ),
@@ -69,12 +70,10 @@ const members: {
     name: 'AdtLocalTypes.readMetadata (with content types)',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtLocalTypes(
-          connection,
-          undefined,
-          undefined,
+        await new AdtLocalTypes(connection, {
           contentTypes,
-        ).readMetadata(
+          results: classDocuments,
+        }).readMetadata(
           { className: 'ZCL_X' },
           accept === undefined ? {} : { accept },
         ),
@@ -86,7 +85,9 @@ const members: {
     name: 'AdtAuthorizationField.readMetadata',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtAuthorizationField(connection).readMetadata(
+        await new AdtAuthorizationField(connection, {
+          results: authorizationFieldDocuments,
+        }).readMetadata(
           { authorizationFieldName: 'ZAUTH' },
           accept === undefined ? {} : { accept },
         ),
@@ -98,7 +99,9 @@ const members: {
     name: 'AdtFunctionInclude.readMetadata',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtFunctionInclude(connection).readMetadata(
+        await new AdtFunctionInclude(connection, {
+          results: functionIncludeDocuments,
+        }).readMetadata(
           { functionGroupName: 'ZFG', includeName: 'LZFGF01' },
           accept === undefined ? {} : { accept },
         ),

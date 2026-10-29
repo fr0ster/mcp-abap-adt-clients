@@ -26,6 +26,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { AdtBatchConnection } from '../../../../batch';
 import { parseBatchResponse } from '../../../../batch/wire';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -175,7 +176,10 @@ type Connection = IAbapConnection & ISessionLifecycleAware;
 
 /** The probe class runs through classrun. */
 const asClass = (connection: Connection) =>
-  new ClassExecutor(connection, connectionLogger);
+  new ClassExecutor(connection, {
+    logger: connectionLogger,
+    results: classExecutorDocuments,
+  });
 
 describe('Debugger batch wire measurements', () => {
   let listenerConnection: Connection | undefined;
@@ -256,11 +260,10 @@ describe('Debugger batch wire measurements', () => {
       ownSession: true,
     });
     sessionConnection.setSessionType('stateful');
-    debuggerApi = new AbapDebugger(
-      sessionConnection,
-      connectionLogger,
-      abapDebuggerDocuments,
-    );
+    debuggerApi = new AbapDebugger(sessionConnection, {
+      logger: connectionLogger,
+      results: abapDebuggerDocuments,
+    });
     if (previous) {
       previous.setSessionType('stateless');
       await closeOwnTestConnection(previous);
@@ -307,11 +310,10 @@ describe('Debugger batch wire measurements', () => {
     }
     identity = identityFor(await abapUserOf(listenerConnection));
     logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
-    listenerApi = new AbapDebugger(
-      listenerConnection,
-      connectionLogger,
-      abapDebuggerDocuments,
-    );
+    listenerApi = new AbapDebugger(listenerConnection, {
+      logger: connectionLogger,
+      results: abapDebuggerDocuments,
+    });
     await ensureDebugTarget(
       listenerConnection,
       'classes',
@@ -653,11 +655,10 @@ describe('Debugger batch wire measurements', () => {
             : new AdtBatchConnection(recordingConnection, {
                 endpoint: 'debugger',
               });
-        const api = new AbapDebugger(
-          batch ?? recordingConnection,
-          connectionLogger,
-          abapDebuggerDocuments,
-        );
+        const api = new AbapDebugger(batch ?? recordingConnection, {
+          logger: connectionLogger,
+          results: abapDebuggerDocuments,
+        });
         const answers: IAdtResponse<unknown>[] = [];
         let elapsed = 0;
         try {
@@ -945,11 +946,10 @@ describe('Debugger batch wire measurements', () => {
         logger: connectionLogger,
       });
       batch.setSessionType('stateful');
-      const api = new AbapDebugger(
-        batch,
-        connectionLogger,
-        abapDebuggerDocuments,
-      );
+      const api = new AbapDebugger(batch, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+      });
       const pending = [
         api.step('stepOver', { analyse: analyseException }),
         api.getStack({ analyse: analyseException }),

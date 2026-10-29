@@ -15,8 +15,7 @@ export async function checkScalarFunctionImplementation(
   const response = await runCheckRun(
     connection,
     headers,
-    'scalar_function_implementation',
-    name,
+    { type: 'DSFI/SFI', name: name },
     version,
     'abapCheckRun',
     sourceCode,

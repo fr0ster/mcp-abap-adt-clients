@@ -14,6 +14,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtError,
@@ -26,6 +27,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -48,9 +50,27 @@ import {
   getClassVersionSource,
 } from './versions';
 
+/**
+ * The APIs a class member handler serves: the class itself and its four local
+ * includes. The base's gates read the subclass's own entry.
+ */
+export type ClassFamilyApi =
+  | 'class'
+  | 'localTestClass'
+  | 'localTypes'
+  | 'localDefinitions'
+  | 'localMacros';
+
 export abstract class AdtClassMemberBase<
   R extends IClassResults = typeof classDocuments,
+  V extends AdtVariant = AdtModernVariant,
+  A extends ClassFamilyApi = 'class',
 > {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   /**
    * The readings this implementation performs, given when it was constructed.
    *
@@ -205,6 +225,7 @@ export abstract class AdtClassMemberBase<
    * class, so this reads the class's.
    */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<A, 'transport'>,
     config: Partial<IClassConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

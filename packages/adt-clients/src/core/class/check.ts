@@ -45,8 +45,7 @@ export async function checkClass(
     response = await runCheckRunWithSource(
       connection,
       headers,
-      'class',
-      className,
+      { type: 'CLAS/OC', name: className },
       sourceCode,
       version,
       'abapCheckRun',
@@ -57,8 +56,7 @@ export async function checkClass(
     response = await runCheckRun(
       connection,
       headers,
-      'class',
-      className,
+      { type: 'CLAS/OC', name: className },
       version,
       'abapCheckRun',
     );

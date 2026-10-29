@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -15,6 +16,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -28,16 +30,16 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { TRANSFORMATION } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateTransformation } from './activation';
 import { checkTransformation } from './check';
@@ -49,7 +51,7 @@ import {
   getTransformationSource,
   getTransformationTransport,
 } from './read';
-import { type ITransformationConfig, transformationDocuments } from './types';
+import type { ITransformationConfig, transformationDocuments } from './types';
 import { unlockTransformation } from './unlock';
 import { updateTransformation } from './update';
 import { validateTransformationName } from './validation';
@@ -60,11 +62,16 @@ import {
 
 export class AdtTransformation<
   R extends ITransformationResults = typeof transformationDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<ITransformationConfig, ReturnType<R['created']>>,
     IAdtReadable<ITransformationConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<ITransformationConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<ITransformationConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       ITransformationConfig,
       ReturnType<R['deletion']>,
@@ -81,23 +88,25 @@ export class AdtTransformation<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Transformation';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = transformationDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -293,6 +302,41 @@ export class AdtTransformation<
           options?.lockHandle,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the transformation's metadata document — one PUT of `options.source`,
+   * as the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'transformation', 'updateMetadata'>,
+    config: Partial<ITransformationConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          TRANSFORMATION.uri(this.name(config)),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

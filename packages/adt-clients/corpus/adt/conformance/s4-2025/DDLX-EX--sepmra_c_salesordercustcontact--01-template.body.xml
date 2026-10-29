@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SEPMRA_C_SALESORDERCUSTCONTACT" adtcore:type="DDLX/EX" adtcore:changedAt="2018-04-11T08:43:34Z" adtcore:version="active" adtcore:createdAt="2016-12-06T21:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Fiori Reference Apps: UI annotations" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/s_odata_epmra_so_man" adtcore:type="DEVC/K" adtcore:name="S_ODATA_EPMRA_SO_MAN"/>
+</adtcore:mainObject>

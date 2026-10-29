@@ -48,6 +48,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -309,7 +310,11 @@ const debuggerOn = (
   connection: Connection,
   onConflict: 'refuse' | 'takeOver' = 'refuse',
 ): Debugger =>
-  new AbapDebugger(connection, connectionLogger, readings, { onConflict });
+  new AbapDebugger(connection, {
+    logger: connectionLogger,
+    results: readings,
+    onConflict,
+  });
 
 interface ICaught {
   debuggeeId: string;
@@ -448,7 +453,10 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
     trigger: Connection | undefined = triggerConnection,
   ): Promise<IAdtResponse<unknown>> {
     needs(trigger, 'the trigger connection');
-    const run = new ClassExecutor(trigger as Connection, connectionLogger).run(
+    const run = new ClassExecutor(trigger as Connection, {
+      logger: connectionLogger,
+      results: classExecutorDocuments,
+    }).run(
       {
         className,
       },

@@ -18,13 +18,13 @@
  * const utils = client.getUtils();
  *
  * // Search for objects
- * const searchResult = await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+ * const searchResult = await utils.searchObjects({ query: 'Z*', objectType: 'CLAS/OC' });
  *
  * // Get where-used references
- * const whereUsed = await utils.getWhereUsed({ objectName: 'ZMY_CLASS', objectType: 'CLAS' });
+ * const whereUsed = await utils.getWhereUsed({ object_name: 'ZMY_CLASS', object_type: 'CLAS/OC' });
  *
  * // Group activation
- * await utils.activateObjectsGroup([{ type: 'DOMA', name: 'ZMY_DOMAIN' }]);
+ * await utils.activateObjectsGroup([{ type: 'DOMA/DD', name: 'ZMY_DOMAIN' }]);
  * ```
  *
  * ## Six members removed, and what went with them
@@ -81,6 +81,8 @@
  */
 
 import type {
+  AdtOperation,
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtDataPreview,
   IAdtDiscovery,
@@ -101,6 +103,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { withRequestTrace } from '../../utils/requestTrace';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { fetchInactiveObjects } from './getInactiveObjects';
@@ -110,6 +113,7 @@ import {
   getActivationRun,
 } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
+import type { AdtLoggedOptions } from './handlerOptions';
 import { getInclude as getIncludeUtil } from './include';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectProperties as getObjectPropertiesUtil } from './objectProperties';
@@ -125,6 +129,7 @@ import {
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableColumns, getTableContents } from './tableContents';
+import { getTypeStructure as getTypeStructureUtil } from './typeStructure';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   getWhereUsed,
@@ -139,10 +144,33 @@ import {
 // Note: DDIC Activation Graph is in runtime/logs/ddic.ts
 // It is accessed via AdtRuntime.getDdicActivationGraph(), not AdtUtils
 
+import type { AdtModernVariant } from '../../clients/variant';
+import {
+  type AdtAddressableCode,
+  codeHas,
+  isGroupOnlyCode,
+} from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
+// Import types
+import {
+  type AdtActivationCode,
+  type AdtDeletionCheckCode,
+  type AdtDeletionCode,
+  type AdtMetadataReadCodeOf,
+  type AdtSearchCode,
+  type AdtSourceReadCode,
+  type AdtSourceReadCodeOf,
+  type AdtStructureCode,
+  type AdtWhereUsedCode,
+  type IAdtGroupReference,
+  isActivatedWithoutTable,
+  isMetadataReadCode,
+  METADATA_READ,
+  type ParentedArguments,
+} from './codeSets';
 import type {
-  AdtObjectType,
-  AdtSourceObjectType,
+  AdtSourceTypeCode,
+  AdtTypeCode,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
   IGetSqlQueryParams,
@@ -154,8 +182,7 @@ import type {
   IReadOptions,
   ISearchObjectsParams,
 } from './types';
-// Import types
-import { utilDocuments } from './utilResultSet';
+import type { utilDocuments } from './utilResultSet';
 
 /**
  * Declared against every atom, not only `IAdtSearchable`.
@@ -200,12 +227,33 @@ import { utilDocuments } from './utilResultSet';
  * argument of theirs. Built here, it is thrown, as decision 15 wants for a
  * cause on the caller's side.
  */
-function addressEvery(objects: IObjectReference[]): void {
+function addressEvery(
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
+): void {
   for (const o of objects) buildObjectUri(o.name, o.type, o.parentName);
 }
 
-export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
-  implements
+/**
+ * Every object's code lists `operation`, checked before a group request is
+ * sent. The member's type admits only such codes; this answers a caller
+ * outside the type system, whose code is thrown before any request.
+ */
+function performEvery(
+  objects: readonly IAdtGroupReference<string>[],
+  operation: AdtOperation,
+): void {
+  for (const o of objects) {
+    if (isGroupOnlyCode(o.type) || codeHas(o.type, operation)) continue;
+    throw new Error(
+      `${o.type} ${o.name}: the ADT type tables list no ${operation} for it, so no group request is sent`,
+    );
+  }
+}
+
+export class AdtUtils<
+  R extends IUtilResults = typeof utilDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtInformationSystem<
       ReturnType<R['search']>,
       ReturnType<R['whereUsed']>,
@@ -241,17 +289,15 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   protected connection: IAbapConnection;
   private logger: ILogger;
 
-  constructor(
-    connection: IAbapConnection,
-    logger: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = utilDocuments as unknown as R,
-  ) {
+  protected readonly results: R;
+
+  constructor(connection: IAbapConnection, options: AdtLoggedOptions<R>) {
+    this.results = options.results;
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
     // is the caller's, through the `analyse` they pass.
     this.connection = withRequestTrace(connection);
-    this.logger = logger;
+    this.logger = options.logger;
   }
 
   /**
@@ -268,7 +314,9 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * from `@mcp-abap-adt/adt-strategies` for `search` when constructing this.
    */
   async search<E extends IAdtError = IAdtError>(
-    criteria: ISearchObjectsParams,
+    criteria: Omit<ISearchObjectsParams, 'objectType'> & {
+      objectType?: AdtSearchCode<V>;
+    },
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -315,7 +363,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * // Get scope for a class
    * const scopeResponse = await utils.getWhereUsedScope({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class'
+   *   object_type: 'CLAS/OC'
    * });
    *
    * // Parse and display types to user, then modify XML
@@ -326,12 +374,14 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * // Execute search with modified scope
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class',
+   *   object_type: 'CLAS/OC',
    *   scopeXml: scopeXml
    * });
    */
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
-    params: IGetWhereUsedScopeParams,
+    params: Omit<IGetWhereUsedScopeParams, 'object_type'> & {
+      object_type: AdtWhereUsedCode<V>;
+    },
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
     // Built before the request: a type where-used cannot address is the
@@ -359,7 +409,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Modified scope XML
    *
    * @example
-   * const scopeResponse = await utils.getWhereUsedScope({ object_name: 'ZMY_CLASS', object_type: 'class' });
+   * const scopeResponse = await utils.getWhereUsedScope({ object_name: 'ZMY_CLASS', object_type: 'CLAS/OC' });
    * let scopeXml = scopeResponse.data;
    *
    * // Enable function modules in search
@@ -370,7 +420,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    *
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class',
+   *   object_type: 'CLAS/OC',
    *   scopeXml: scopeXml
    * });
    */
@@ -405,25 +455,27 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * // Simple usage with default scope
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class'
+   *   object_type: 'CLAS/OC'
    * });
    *
    * // Advanced: use custom scope from getWhereUsedScope()
    * const scopeResponse = await utils.getWhereUsedScope({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class'
+   *   object_type: 'CLAS/OC'
    * });
    * let scopeXml = scopeResponse.data;
    * // Modify selections...
    * const result = await utils.getWhereUsed({
    *   object_name: 'ZMY_CLASS',
-   *   object_type: 'class',
+   *   object_type: 'CLAS/OC',
    *   scopeXml: scopeXml
    *   searchInAllTypes: ['CLAS/OC', 'INTF/OI']
    * });
    */
   async getWhereUsed<E extends IAdtError = IAdtError>(
-    params: IGetWhereUsedParams,
+    params: Omit<IGetWhereUsedParams, 'object_type'> & {
+      object_type: AdtWhereUsedCode<V>;
+    },
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
@@ -463,11 +515,15 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * exchange with `wireItself` and reads it with `extractRunId`).
    */
   async activateObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IObjectReference[],
+    objects: IAdtGroupReference<AdtActivationCode<V>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     addressEvery(objects);
+    performEvery(
+      objects.filter((o) => !isActivatedWithoutTable(o.type)),
+      'activate',
+    );
     return answering(
       () =>
         activateObjectsGroup(
@@ -527,10 +583,11 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Check result
    */
   async checkDeletionGroup<E extends IAdtError = IAdtError>(
-    objects: IObjectReference[],
+    objects: IAdtGroupReference<AdtDeletionCheckCode<V>>[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     addressEvery(objects);
+    performEvery(objects, 'deletionCheck');
     return answering(
       () => checkDeletionGroup(this.connection, options.headers, objects),
       this.results.deletionCheck as IResultStrategy<
@@ -552,11 +609,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param transportRequest - Optional transport request
    */
   async deleteObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IObjectReference[],
+    objects: IAdtGroupReference<AdtDeletionCode<V>>[],
     transportRequest: string | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     addressEvery(objects);
+    performEvery(objects, 'delete');
     return answering(
       () =>
         deleteObjectsGroup(
@@ -581,16 +639,30 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param options.accept - Optional Accept override for the metadata request
    * @returns Metadata response
    */
-  async readObjectMetadata<E extends IAdtError = IAdtError>(
-    objectType: AdtObjectType,
+  async readObjectMetadata<
+    C extends AdtMetadataReadCodeOf<V>,
+    E extends IAdtError = IAdtError,
+  >(
+    objectType: C,
     objectName: string,
-    functionGroup?: string,
-    options?: IReadOptions & IAdtAnalyseOptions<E>,
+    ...[functionGroup, options]: ParentedArguments<
+      C,
+      [options?: IReadOptions & IAdtAnalyseOptions<E>]
+    >
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
-    // Built here, not inside the request: `getObjectMetadataUri` refuses a type
-    // it has no resource for, and that is the caller's mistake. Classified
-    // inside `answering` it would come back as `origin: 'connection'`, pointing
-    // at a network nothing reached.
+    // Refused before anything is asked: the member reads only the codes whose
+    // request it sent before 38.0.0 (`METADATA_READ`), which its type holds; a
+    // caller outside the type system gets the refusal, and no request.
+    if (!isMetadataReadCode(objectType)) {
+      throw new Error(
+        `readObjectMetadata reads no ${objectType}; it reads ${Object.keys(METADATA_READ).join(', ')}`,
+      );
+    }
+    // Built here, not inside the request: `getObjectMetadataUri` refuses an
+    // object it cannot address (a function module without its group), and
+    // that is the caller's mistake. Classified inside `answering` it would
+    // come back as `origin: 'connection'`, pointing at a network nothing
+    // reached.
     getObjectMetadataUri(objectType, objectName, functionGroup);
 
     return answering(
@@ -621,25 +693,34 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param options.accept - Optional Accept override for the source request
    * @returns Source code response
    */
-  async readObjectSource<E extends IAdtError = IAdtError>(
-    objectType: AdtSourceObjectType,
+  async readObjectSource<
+    C extends AdtSourceReadCodeOf<V>,
+    E extends IAdtError = IAdtError,
+  >(
+    objectType: C,
     objectName: string,
-    functionGroup?: string,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtAnalyseOptions<E>,
+    ...[functionGroup, version, options]: ParentedArguments<
+      C,
+      [
+        version?: 'active' | 'inactive',
+        options?: IReadOptions & IAdtAnalyseOptions<E>,
+      ]
+    >
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // Raised before anything is asked, rather than dressed as a verdict about
-    // the server: a type with no source resource, and a function module with no
-    // function group, are both the caller's mistake. `getObjectSourceUri` is
-    // pure, so building the URI here is how its own guards surface as
-    // themselves — inside `answering` they came back as
-    // `origin: 'connection'`, advice to check a network nothing reached.
+    // the server: a code this member does not read (`SOURCE_READ`, which its
+    // type holds), and a function module with no function group, are both
+    // the caller's mistake. `getObjectSourceUri` is pure, so building the URI
+    // here is how its own guards surface as themselves — inside `answering`
+    // they came back as `origin: 'connection'`, advice to check a network
+    // nothing reached.
     if (!supportsSourceCode(objectType)) {
       throw new Error(
         `Object type ${objectType} does not support source code reading`,
       );
     }
-    getObjectSourceUri(objectType, objectName, functionGroup, version);
+    const code: AdtSourceReadCode = objectType;
+    getObjectSourceUri(code, objectName, functionGroup, version);
 
     return answering(
       () =>
@@ -663,7 +744,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param objectType - Object type to check
    * @returns true if object type supports source code reading
    */
-  supportsSourceCode(objectType: AdtObjectType): boolean {
+  supportsSourceCode(objectType: AdtTypeCode): boolean {
     return supportsSourceCode(objectType);
   }
 
@@ -676,13 +757,16 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param version - 'active' or 'inactive'
    * @returns Source URI
    */
-  getObjectSourceUri(
-    objectType: AdtSourceObjectType,
+  getObjectSourceUri<C extends AdtSourceTypeCode>(
+    objectType: C,
     objectName: string,
-    functionGroup?: string,
-    version?: 'active' | 'inactive',
+    ...[functionGroup, version]: ParentedArguments<
+      C,
+      [version?: 'active' | 'inactive']
+    >
   ): string {
-    return getObjectSourceUri(objectType, objectName, functionGroup, version);
+    const code: AdtSourceTypeCode = objectType;
+    return getObjectSourceUri(code, objectName, functionGroup, version);
   }
 
   /**
@@ -773,7 +857,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async fetchNodeStructure<E extends IAdtError = IAdtError>(
-    parentType: string,
+    parentType: AdtStructureCode<V>,
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
@@ -808,7 +892,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async getObjectStructure<E extends IAdtError = IAdtError>(
-    objectType: string,
+    objectType: AdtStructureCode<V>,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['objectStructure']>, E>> {
@@ -907,6 +991,34 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     return answering(
       () => getAllTypesUtil(this.connection, maxItemCount, name, data),
       this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The repository's object types, as the system states them —
+   * `POST /sap/bc/adt/repository/typestructure`, no body.
+   *
+   * Each type's code, label, category, `URI_TEMPLATE`, parent type, name
+   * length and capabilities: what the conformance check of the ADT type tables
+   * holds the tables to.
+   *
+   * **The document as it came, always.** `IUtilResults` of interfaces-adt
+   * 21.0.0 has no slot for this member, so no reading can be given for it;
+   * adding a slot here would make the set this class takes wider than the one
+   * a consumer composes from the contract package. It joins the set when the
+   * contract package names it.
+   *
+   * @param options.headers - The Accept and Content-Type to send; the type
+   *   list's own Accept, which S/4HANA 2025, ABAP cloud and SAP_BASIS 7.40 SP04
+   *   answered, is `ACCEPT_TYPE_STRUCTURE`
+   */
+  async getTypeStructure<E extends IAdtError = IAdtError>(
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return answering(
+      () => getTypeStructureUtil(this.connection, options.headers),
+      rawDocument,
       options?.analyse,
     );
   }

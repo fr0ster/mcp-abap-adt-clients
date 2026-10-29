@@ -69,9 +69,12 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
       skipUnlessConfigured(error, testsLogger);
       throw error;
     }
-    atc = new AdtAtc(connection, libraryLogger, {
-      ...atcDocuments,
-      checkVariant: atcSystemCheckVariant,
+    atc = new AdtAtc(connection, {
+      logger: libraryLogger,
+      results: {
+        ...atcDocuments,
+        checkVariant: atcSystemCheckVariant,
+      },
     });
   });
 

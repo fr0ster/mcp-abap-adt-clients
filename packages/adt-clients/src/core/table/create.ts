@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { TABLE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -37,7 +38,7 @@ export async function createTable(
   // Create empty table with POST
   const createUrl = `${TABLE.collection}${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
 
-  const tableXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.table_name.toUpperCase()}" adtcore:type="TABL/DT" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+  const tableXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.table_name.toUpperCase()}" adtcore:type="${TYPE_CODE.table}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
 
   <adtcore:packageRef adtcore:name="${params.package_name.toUpperCase()}"/>
 

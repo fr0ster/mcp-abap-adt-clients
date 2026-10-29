@@ -146,6 +146,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
+      updateMetadata: '/sap/bc/adt/oo/classes/zcl_guard',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -159,7 +160,7 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/oo/classes/zcl_guard/includes/main/versions',
       readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
     },
-    capabilities: [...FULL, 'enhancementHost'],
+    capabilities: [...FULL, 'metadataUpdatable', 'enhancementHost'],
   },
   interface: {
     factory: (c: AdtClient) => c.getInterface(),
@@ -175,6 +176,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/interfaces/zif_guard/source/main',
       readMetadata: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
       update: '/sap/bc/adt/oo/interfaces/zif_guard/source/main',
+      updateMetadata: '/sap/bc/adt/oo/interfaces/zif_guard',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -188,7 +190,7 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/oo/interfaces/zif_guard/source/main/versions',
       readTransport: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   include: {
     factory: (c: AdtClient) => c.getInclude(),
@@ -208,6 +210,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
       readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
       update: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
+      updateMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
       // The manifest was wrong about ADT here, and the handler was written to
       // match it: an include's delete went to `DELETE …/includes/<name>` with a
       // `lockHandle`, on the belief that a deletion needs a lock. It does not —
@@ -241,6 +244,7 @@ export const HANDLERS = {
       'validatable',
       'activatable',
       'lockable',
+      'metadataUpdatable',
     ],
   },
   program: {
@@ -261,6 +265,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/programs/programs/ZGUARD/source/main',
       readMetadata: '/sap/bc/adt/programs/programs/ZGUARD',
       update: '/sap/bc/adt/programs/programs/zguard/source/main',
+      updateMetadata: '/sap/bc/adt/programs/programs/zguard',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -274,7 +279,10 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/programs/programs/ZGUARD/source/main/versions',
       readTransport: '/sap/bc/adt/programs/programs/ZGUARD/transport',
     },
-    capabilities: [...FULL, 'enhancementHost'],
+    // `updateMetadata` is on premise only: the cloud table lists no
+    // `updateMetadata` for `PROG/P`, so its gate refuses the default variant
+    // at compile time. The handler offers it, and ADT gives it on premise.
+    capabilities: [...FULL, 'metadataUpdatable', 'enhancementHost'],
   },
   ddl: {
     factory: (c: AdtClient) => c.getDdl(),
@@ -289,6 +297,7 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/ddl/sources',
       read: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main',
       update: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl/source/main',
+      updateMetadata: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl',
       readMetadata: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -306,7 +315,7 @@ export const HANDLERS = {
         '/sap/bc/adt/ddic/ddl/sources/zguard_ddl/versions',
       readTransport: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   table: {
     factory: (c: AdtClient) => c.getTable(),
@@ -321,6 +330,7 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/tables',
       read: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main',
       update: '/sap/bc/adt/ddic/tables/zguard_tab/source/main',
+      updateMetadata: '/sap/bc/adt/ddic/tables/zguard_tab',
       readMetadata: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -335,7 +345,7 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   structure: {
     factory: (c: AdtClient) => c.getStructure(),
@@ -350,6 +360,7 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/structures',
       read: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main',
       update: '/sap/bc/adt/ddic/structures/zguard_stru/source/main',
+      updateMetadata: '/sap/bc/adt/ddic/structures/zguard_stru',
       readMetadata: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -365,7 +376,7 @@ export const HANDLERS = {
         '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   tableType: {
     factory: (c: AdtClient) => c.getTableType(),
@@ -427,6 +438,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
       readMetadata: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
       update: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
+      updateMetadata: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -442,7 +454,7 @@ export const HANDLERS = {
         '/sap/bc/adt/acm/dcl/sources/zguard_dcl/versions',
       readTransport: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   appendStructure: {
     factory: (c: AdtClient) => c.getAppendStructure(),
@@ -491,6 +503,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
       readMetadata: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
       update: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
+      updateMetadata: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -505,7 +518,7 @@ export const HANDLERS = {
         '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main/versions',
       readTransport: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   behaviorImplementation: {
     factory: (c: AdtClient) => c.getBehaviorImplementation(),
@@ -551,6 +564,7 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/ddlx/sources',
       read: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main',
       update: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main',
+      updateMetadata: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
       readMetadata: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
       delete: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
       checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
@@ -563,7 +577,7 @@ export const HANDLERS = {
         '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   enhancement: {
     factory: (c: AdtClient) => c.getEnhancement(),
@@ -616,6 +630,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
       readMetadata: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
       update: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
+      updateMetadata: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -630,7 +645,7 @@ export const HANDLERS = {
         '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   functionModule: {
     factory: (c: AdtClient) => c.getFunctionModule(),
@@ -648,6 +663,8 @@ export const HANDLERS = {
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
       update:
         '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm/source/main',
+      updateMetadata:
+        '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -663,7 +680,7 @@ export const HANDLERS = {
       readTransport:
         '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   scalarFunction: {
     factory: (c: AdtClient) => c.getScalarFunction(),
@@ -679,6 +696,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
       readMetadata: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
       update: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
+      updateMetadata: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -693,7 +711,7 @@ export const HANDLERS = {
         '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   scalarFunctionImplementation: {
     factory: (c: AdtClient) => c.getScalarFunctionImplementation(),
@@ -758,6 +776,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
       readMetadata: '/sap/bc/adt/xslt/transformations/zguard_xslt',
       update: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
+      updateMetadata: '/sap/bc/adt/xslt/transformations/zguard_xslt',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -772,7 +791,7 @@ export const HANDLERS = {
         '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main/versions',
       readTransport: '/sap/bc/adt/xslt/transformations/zguard_xslt/transport',
     },
-    capabilities: FULL,
+    capabilities: [...FULL, 'metadataUpdatable'],
   },
   // ── Objects with no version history ──────────────────────────────────────
   domain: {
@@ -864,7 +883,9 @@ export const HANDLERS = {
       readEnhancementOptions:
         '/sap/bc/adt/functions/groups/zguard_fg/enhancements/options',
       create: '/sap/bc/adt/functions/groups',
+      read: '/sap/bc/adt/functions/groups/zguard_fg/source/main',
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      update: '/sap/bc/adt/functions/groups/zguard_fg/source/main',
       updateMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -881,7 +902,9 @@ export const HANDLERS = {
     capabilities: [
       'enhancementHost',
       'creatable',
+      'readable',
       'metadataReadable',
+      'updatable',
       'metadataUpdatable',
       'deletable',
       'validatable',
@@ -1084,6 +1107,7 @@ export const HANDLERS = {
       },
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      updateMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
       checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/cts/transportchecks',
@@ -1104,6 +1128,7 @@ export const HANDLERS = {
       'activatable',
       'transportAware',
       'lockable',
+      'metadataUpdatable',
     ],
     why:
       'No versions resource. It DOES lock: measured from Eclipse on an ABAP Cloud system, ' +

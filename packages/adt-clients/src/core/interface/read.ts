@@ -21,7 +21,7 @@ export async function getInterfaceMetadata(
 ): Promise<IAdtWireResponse> {
   return objectMetadataWire(
     connection,
-    'interface',
+    'INTF/OI',
     interfaceName,
     undefined,
     options,
@@ -40,7 +40,7 @@ export async function getInterfaceSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'interface',
+    'INTF/OI',
     interfaceName,
     undefined,
     version,

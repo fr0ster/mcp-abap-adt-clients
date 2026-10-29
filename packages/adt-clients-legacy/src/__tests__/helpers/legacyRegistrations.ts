@@ -12,8 +12,12 @@
  * their own package, which takes it with them.
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtClientOptions,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type IHandlerClass,
   registerHeaderPairs,
@@ -41,6 +45,7 @@ import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
 import { AdtProgramLegacy } from '../../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
+import { AbapUnitTestRunnerLegacy } from '../../executors/abapUnit/AbapUnitTestRunnerLegacy';
 import { ClassExecutorLegacy } from '../../executors/class/ClassExecutorLegacy';
 import { ClassTestRunnerLegacy } from '../../executors/class/ClassTestRunnerLegacy';
 import { FunctionGroupTestRunnerLegacy } from '../../executors/functionGroup/FunctionGroupTestRunnerLegacy';
@@ -68,7 +73,7 @@ export const LEGACY_HEADER_PAIRS: [
   // completed for 36.0.0: accept was not sent, contentType was not sent
   [AdtDdlLegacy, { delete: XML }],
   // completed for 36.0.0: accept was not sent, contentType was not sent
-  [AdtFunctionGroupLegacy, { delete: XML }],
+  [AdtFunctionGroupLegacy, { delete: XML, activate: XML }],
   // measured on 7.40 SP04 over RFC: v2 answers 400 "No content handler found"
   [
     AdtFunctionIncludeLegacy,
@@ -99,7 +104,19 @@ export const LEGACY_HEADER_PAIRS: [
     },
   ],
   [AdtMessageClassLegacy, { delete: XML }],
-  [AdtUtilsLegacy, { activateObjectsGroup: XML }],
+  [
+    AdtUtilsLegacy,
+    {
+      activateObjectsGroup: XML,
+      // The override refuses a code 7.40 lacks, and otherwise sends the base's
+      // request with the base's pair (`AdtUtils.fetchNodeStructure`).
+      fetchNodeStructure: {
+        accept:
+          'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
+        contentType: 'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
+      },
+    },
+  ],
 ];
 
 /**
@@ -167,17 +184,20 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'getObjectProperties',
     ],
   ],
-  // No deletion API on 7.40 (spec §4.3, §5).
-  [AdtClassLegacy, ['checkDeletion', 'readTransport']],
+  // No deletion API on 7.40 (spec §4.3, §5); updateMetadata not measured there.
+  [AdtClassLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
   // The includes' inherited readTransport asks for the class's (B4 c6).
   [AdtLocalTestClassLegacy, ['readTransport']],
   [AdtLocalTypesLegacy, ['readTransport']],
   [AdtLocalDefinitionsLegacy, ['readTransport']],
   [AdtLocalMacrosLegacy, ['readTransport']],
-  [AdtProgramLegacy, ['checkDeletion', 'readTransport']],
-  [AdtInterfaceLegacy, ['checkDeletion', 'readTransport']],
+  [AdtProgramLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
+  [AdtInterfaceLegacy, ['checkDeletion', 'readTransport', 'updateMetadata']],
   [AdtFunctionGroupLegacy, ['checkDeletion', 'readTransport']],
-  [AdtFunctionModuleLegacy, ['checkDeletion', 'readTransport']],
+  [
+    AdtFunctionModuleLegacy,
+    ['checkDeletion', 'readTransport', 'updateMetadata'],
+  ],
   // `checkCdsTestDoubles` stays refused (spec §10.3).
   [
     AdtDdlLegacy,
@@ -187,9 +207,10 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'readTransport',
       'getVersions',
       'getVersionSource',
+      'updateMetadata',
     ],
   ],
-  [AdtIncludeLegacy, ['checkDeletion']],
+  [AdtIncludeLegacy, ['checkDeletion', 'updateMetadata']],
   [AdtFunctionIncludeLegacy, ['checkDeletion', 'delete']],
   [AdtMessageClassLegacy, ['checkDeletion', 'updateMetadata']],
   // A legacy run is answered finished, with no run id to ask about; the
@@ -199,6 +220,7 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
   [ProgramTestRunnerLegacy, ['getStatus', 'getResult']],
   [FunctionGroupTestRunnerLegacy, ['getStatus', 'getResult']],
   [FunctionModuleTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
+  [AbapUnitTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
   // The runs, the profiled runs and the trace type lists: not advertised on
   // 7.40, or no class run there at all (spec §6.3).
   [
@@ -300,9 +322,29 @@ export function isLegacyEnvironment(): boolean {
  * `createTestAdtClient` takes, and the one the live sessions
  * (`legacyLive.ts`) build their client with.
  */
-export const legacyClientFactory = (async (connection, logger, options) => ({
-  client: new AdtClientLegacy(connection, logger, options),
-})) satisfies TestClientFactory;
+export function legacyClientOn(
+  connection: IAbapConnection,
+  logger: ILogger,
+  options?: IAdtClientOptions,
+): AdtClientLegacy {
+  return new AdtClientLegacy(connection, logger, options);
+}
+
+/**
+ * `legacyClientOn` as the modern harness's factory. The harness types its
+ * client as the modern `AdtClient`; a 7.40 client is not one — its gates
+ * refuse what 7.40 does not serve — so the harness drives it as a caller
+ * outside the type system would, and the run proves the runtime refusals.
+ */
+// @ts-expect-error -- a 7.40 client in the modern harness, outside the type system on purpose
+export const legacyClientFactory: TestClientFactory = async (
+  connection,
+  logger,
+  options,
+) => {
+  const client = legacyClientOn(connection, logger, options);
+  return { client };
+};
 
 /**
  * The connection options of a legacy session, for `createTestConnection`: a

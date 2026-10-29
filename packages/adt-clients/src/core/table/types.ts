@@ -81,6 +81,7 @@ export const tableDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: rawDocument,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
   versions: rawDocument,

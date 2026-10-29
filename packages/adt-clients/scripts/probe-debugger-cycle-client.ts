@@ -32,7 +32,10 @@ import {
   createTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import { AdtClient } from '../src/clients/AdtClient';
-import { ClassExecutor } from '../src/executors/class/ClassExecutor';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+} from '../src/executors/class/ClassExecutor';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -444,7 +447,12 @@ async function main(): Promise<void> {
         `classrun ${CLASS_NAME} — if a debugger catches it, this waits until it is released`,
       );
       const run = await call('run', 'classrun returned', () =>
-        new ClassExecutor(only, quietLogger).run({ className: CLASS_NAME }),
+        new ClassExecutor(only, {
+          logger: quietLogger,
+          results: classExecutorDocuments,
+        }).run({
+          className: CLASS_NAME,
+        }),
       );
       section('Program output');
       out(
@@ -470,12 +478,11 @@ async function main(): Promise<void> {
     'trigger',
     `session ${c.gray(String(triggerConnection.getSessionId()))}`,
   );
-  const debuggerApi = new AbapDebugger(
-    debuggerConnection,
-    quietLogger,
-    abapDebuggerDocuments,
-    { onConflict },
-  );
+  const debuggerApi = new AbapDebugger(debuggerConnection, {
+    logger: quietLogger,
+    results: abapDebuggerDocuments,
+    onConflict,
+  });
 
   try {
     section('Probe class');
@@ -552,7 +559,10 @@ async function main(): Promise<void> {
       );
       // The run stays open while the debuggee is suspended.
       trigger = call('run', 'classrun returned', () =>
-        new ClassExecutor(triggerConnection, quietLogger).run({
+        new ClassExecutor(triggerConnection, {
+          logger: quietLogger,
+          results: classExecutorDocuments,
+        }).run({
           className: CLASS_NAME,
         }),
       );

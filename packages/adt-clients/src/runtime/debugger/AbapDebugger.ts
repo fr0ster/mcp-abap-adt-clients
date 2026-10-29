@@ -21,7 +21,10 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type {
+  AdtHandlerOptions,
+  AdtShippedOptions,
+} from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
@@ -98,6 +101,13 @@ export interface IAbapDebuggerOptions {
   readonly onConflict?: IDebuggerListenerConflict;
 }
 
+/**
+ * What `new AbapDebugger` takes after its connection: its results (required),
+ * a logger, and the settings of `IAbapDebuggerOptions`, by name.
+ */
+export type AbapDebuggerConstructorOptions<R extends IAbapDebuggerResults> =
+  AdtHandlerOptions<R, 'logger'> & IAbapDebuggerOptions;
+
 type Of<
   R extends IAbapDebuggerResults,
   K extends keyof IAbapDebuggerResults,
@@ -134,13 +144,40 @@ export class AbapDebugger<
 {
   readonly kind = 'abapDebugger' as const;
 
+  private readonly results: R;
+  private readonly options: IAbapDebuggerOptions;
+
+  /**
+   * A debugger with the shipped documents, or with the caller's results.
+   * No client hands a debugger out (it needs a session of its own), so this
+   * is where the shipped documents are the default, as a getter's are.
+   */
+  static create(
+    connection: IAbapConnection,
+    options?: AdtShippedOptions<'logger'> & IAbapDebuggerOptions,
+  ): AbapDebugger<typeof abapDebuggerDocuments>;
+  static create<R extends IAbapDebuggerResults>(
+    connection: IAbapConnection,
+    options: AbapDebuggerConstructorOptions<R>,
+  ): AbapDebugger<R>;
+  static create(
+    connection: IAbapConnection,
+    options: Partial<AbapDebuggerConstructorOptions<IAbapDebuggerResults>> = {},
+  ): AbapDebugger<IAbapDebuggerResults> {
+    return new AbapDebugger<IAbapDebuggerResults>(connection, {
+      ...options,
+      results: options.results ?? abapDebuggerDocuments,
+    });
+  }
+
   constructor(
     private readonly connection: IAbapConnection,
-    _logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = abapDebuggerDocuments as unknown as R,
-    private readonly options: IAbapDebuggerOptions = {},
-  ) {}
+    options: AbapDebuggerConstructorOptions<R>,
+  ) {
+    const { results, logger: _logger, ...settings } = options;
+    this.results = results;
+    this.options = settings;
+  }
 
   private reading<K extends keyof IAbapDebuggerResults>(
     key: K,

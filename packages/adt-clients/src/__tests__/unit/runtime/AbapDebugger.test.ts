@@ -40,17 +40,16 @@ describe('AbapDebugger', () => {
     const connection = {
       makeAdtRequest: jest.fn().mockResolvedValue(answer),
     } as unknown as IAbapConnection;
-    const debugger_ = new AbapDebugger(
-      connection,
-      {
+    const debugger_ = new AbapDebugger(connection, {
+      logger: {
         info: jest.fn(),
         error: jest.fn(),
         warn: jest.fn(),
         debug: jest.fn(),
       } as never,
-      abapDebuggerDocuments,
-      options,
-    );
+      results: abapDebuggerDocuments,
+      ...options,
+    });
     const sent = () =>
       (connection.makeAdtRequest as jest.Mock).mock.calls[0][0] as {
         url: string;
@@ -652,7 +651,10 @@ describe('AbapDebugger', () => {
         }),
       ),
     } as unknown as IAbapConnection;
-    const debugger_ = new AbapDebugger(connection, {} as never);
+    const debugger_ = new AbapDebugger(connection, {
+      logger: {} as never,
+      results: abapDebuggerDocuments,
+    });
 
     const answer = await debugger_.step('stepContinue');
     expect(answer.ok).toBe(false);
@@ -675,7 +677,10 @@ describe('AbapDebugger', () => {
         }),
       ),
     } as unknown as IAbapConnection;
-    const debugger_ = new AbapDebugger(connection, {} as never);
+    const debugger_ = new AbapDebugger(connection, {
+      logger: {} as never,
+      results: abapDebuggerDocuments,
+    });
 
     const answer = await debugger_.step('stepContinue', {
       analyse: analyseDebuggeeEnd,

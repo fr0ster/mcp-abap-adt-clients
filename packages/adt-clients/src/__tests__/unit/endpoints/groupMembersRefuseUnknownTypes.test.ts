@@ -8,6 +8,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { headersOf } from '../../helpers/adtHeaders';
 
 const makeAdtRequest = jest.fn();
@@ -23,7 +24,8 @@ const logger = {
   error: jest.fn(),
 } as unknown as ILogger;
 
-const utils = () => new AdtUtils(connection, logger);
+const utils = () =>
+  new AdtUtils(connection, { logger, results: utilDocuments });
 const unknown = [{ name: 'ZX', type: 'ABCD/XY' }];
 const untyped = [{ name: 'ZCL_X' }];
 const moduleWithoutGroup = [{ name: 'Z_FM', type: 'FUGR/FF' }];

@@ -13,11 +13,13 @@
  */
 
 import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
-import type {
-  IAdtHeaders,
-  IObjectReference,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
+import type { AdtModernVariant } from '../src/clients/variant';
+import type {
+  AdtActivationCode,
+  IAdtGroupReference,
+} from '../src/core/shared/codeSets';
 import { utilDocuments } from '../src/core/shared/utilResultSet';
 
 // Since 36.0.0 a request's Accept and Content-Type are the caller's
@@ -33,7 +35,9 @@ const statusIn = (document: string): string =>
 
 export async function activateAGroup(
   client: AdtClient,
-  objects: IObjectReference[],
+  // The codes a group activation activates: a message class or a package is
+  // no activatable object, and does not compile here.
+  objects: IAdtGroupReference<AdtActivationCode<AdtModernVariant>>[],
   deadlineMs = 60_000,
 ): Promise<string> {
   const utils = client.getUtils({

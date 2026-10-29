@@ -22,8 +22,7 @@ export async function checkServiceDefinition(
   const response = await runCheckRun(
     connection,
     headers,
-    'service_definition',
-    serviceDefinitionName,
+    { type: 'SRVD/SRV', name: serviceDefinitionName },
     version,
     'abapCheckRun',
     sourceCode,

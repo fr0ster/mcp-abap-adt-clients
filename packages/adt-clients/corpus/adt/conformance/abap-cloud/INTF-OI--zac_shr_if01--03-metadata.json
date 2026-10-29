@@ -1,0 +1,34 @@
+{
+  "case": "INTF-OI--zac_shr_if01",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/interfaces/zac_shr_if01",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/interfaces/zac_shr_if01",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.oo.interfaces.v5+xml, application/vnd.sap.adt.oo.interfaces.v4+xml, application/vnd.sap.adt.oo.interfaces.v3+xml, application/vnd.sap.adt.oo.interfaces.v2+xml, application/vnd.sap.adt.oo.interfaces+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "694",
+      "content-type": "application/vnd.sap.adt.oo.interfaces.v5+xml; charset=utf-8",
+      "etag": "2026081210544800159205",
+      "last-modified": "Wed, 12 Aug 2026 10:54:48 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "68668.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "INTF-OI--zac_shr_if01--03-metadata.body.xml"
+  }
+}

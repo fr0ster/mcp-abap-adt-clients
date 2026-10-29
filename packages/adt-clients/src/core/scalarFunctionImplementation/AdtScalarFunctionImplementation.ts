@@ -1,5 +1,5 @@
 /**
- * AdtScalarFunctionImplementation - CRUD for `DSFI/DSF` scalar function
+ * AdtScalarFunctionImplementation - CRUD for `DSFI/SFI` scalar function
  * implementations.
  *
  * Asymmetric by the endpoint's design: the source is JSON on `/source/main`,
@@ -41,11 +41,8 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateScalarFunctionImplementation } from './activation';
 import { checkScalarFunctionImplementation } from './check';
@@ -57,8 +54,8 @@ import {
   getScalarFunctionImplementationSource,
   getScalarFunctionImplementationTransport,
 } from './read';
-import {
-  type IScalarFunctionImplementationConfig,
+import type {
+  IScalarFunctionImplementationConfig,
   scalarFunctionImplementationDocuments,
 } from './types';
 import { unlockScalarFunctionImplementation } from './unlock';
@@ -118,17 +115,14 @@ export class AdtScalarFunctionImplementation<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ScalarFunctionImplementation';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = scalarFunctionImplementationDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

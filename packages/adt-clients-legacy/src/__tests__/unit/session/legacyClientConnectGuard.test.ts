@@ -75,6 +75,7 @@ describe('AdtClient connect guard', () => {
   it('hands out a legacy handler once the connection reports connected', () => {
     const client = new AdtClientLegacy(sessionAware(true), undefined);
     expect(client.getInclude()).toBeDefined();
+    // @ts-expect-error -- 7.40 does not serve domain; the refusal is for a caller outside the type system
     expect(client.getDomain()).toBeDefined();
   });
 });

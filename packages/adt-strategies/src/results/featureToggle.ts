@@ -1,4 +1,5 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import { field, leafText } from '../parsed';
 
 /**
  * Readings of what the SFW state resources answer for a feature toggle.
@@ -52,7 +53,8 @@ function state(raw: unknown): FeatureToggleState {
     : 'undefined';
 }
 
-function json(data: unknown): any {
+/** The answer's body, parsed. JSON is data from outside the type system. */
+function json(data: unknown): unknown {
   if (typeof data !== 'string') return data;
   if (data.trim() === '') return {};
   // Our own reading failing on a document is ours, and it throws — the
@@ -60,28 +62,35 @@ function json(data: unknown): any {
   return JSON.parse(data);
 }
 
+/** A text field, or `undefined` when it is empty or no text. */
+function optionalText(node: unknown, key: string): string | undefined {
+  return leafText(field(node, key)) || undefined;
+}
+
 /** `getRuntimeState`'s answer, read. */
 export const featureToggleRuntimeState: IResultStrategy<
   IFeatureToggleRuntimeState
 > = (answer) => {
-  const s = json(answer.data)?.STATES ?? {};
+  const s = field(json(answer.data), 'STATES') ?? {};
+  const clientStates = field(s, 'CLIENT_STATES');
+  const userStates = field(s, 'USER_STATES');
   return {
-    name: String(s.NAME ?? ''),
-    clientState: state(s.CLIENT_STATE),
-    userState: state(s.USER_STATE),
-    clientChangedBy: s.CLIENT_CHANGED_BY || undefined,
-    clientChangedOn: s.CLIENT_CHANGED_ON || undefined,
-    clientStates: Array.isArray(s.CLIENT_STATES)
-      ? s.CLIENT_STATES.map((c: any) => ({
-          client: String(c.CLIENT),
-          description: c.DESCRIPTION || undefined,
-          state: state(c.STATE),
+    name: String(field(s, 'NAME') ?? ''),
+    clientState: state(field(s, 'CLIENT_STATE')),
+    userState: state(field(s, 'USER_STATE')),
+    clientChangedBy: optionalText(s, 'CLIENT_CHANGED_BY'),
+    clientChangedOn: optionalText(s, 'CLIENT_CHANGED_ON'),
+    clientStates: Array.isArray(clientStates)
+      ? clientStates.map((c: unknown) => ({
+          client: String(field(c, 'CLIENT')),
+          description: optionalText(c, 'DESCRIPTION'),
+          state: state(field(c, 'STATE')),
         }))
       : [],
-    userStates: Array.isArray(s.USER_STATES)
-      ? s.USER_STATES.map((u: any) => ({
-          user: String(u.USER),
-          state: state(u.STATE),
+    userStates: Array.isArray(userStates)
+      ? userStates.map((u: unknown) => ({
+          user: String(field(u, 'USER')),
+          state: state(field(u, 'STATE')),
         }))
       : [],
   };
@@ -91,11 +100,13 @@ export const featureToggleRuntimeState: IResultStrategy<
 export const featureToggleCheckState: IResultStrategy<
   IFeatureToggleCheckState
 > = (answer) => {
-  const r = json(answer.data)?.RESULT ?? {};
+  const r = field(json(answer.data), 'RESULT') ?? {};
   return {
-    currentState: state(r.CURRENT_STATE),
-    transportPackage: r.TRANSPORT_PACKAGE || undefined,
-    transportUri: r.TRANSPORT_URI || undefined,
-    customizingTransportAllowed: Boolean(r.CUSTOMIZING_TRANSPORT_ALLOWED),
+    currentState: state(field(r, 'CURRENT_STATE')),
+    transportPackage: optionalText(r, 'TRANSPORT_PACKAGE'),
+    transportUri: optionalText(r, 'TRANSPORT_URI'),
+    customizingTransportAllowed: Boolean(
+      field(r, 'CUSTOMIZING_TRANSPORT_ALLOWED'),
+    ),
   };
 };

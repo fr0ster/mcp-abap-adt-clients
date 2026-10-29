@@ -223,6 +223,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — program cycle', () => {
         mark = at();
         // B4 p8-readTransport: 404 for every type — refused, nothing sent.
         expectRefusedUnsent(
+          // @ts-expect-error -- 7.40 does not serve program.transport; the refusal is for a caller outside the type system
           await prog.handler.readTransport(config, {
             analyse: analyseException,
           }),

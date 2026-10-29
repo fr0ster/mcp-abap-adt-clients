@@ -61,7 +61,7 @@ async function main(): Promise<void> {
         `    nodes ${nodes.length}, objectTypes ${objectTypes.length}\n`,
       );
       process.stdout.write(
-        `    types: ${objectTypes.map((t) => `${t.objectType}#${t.nodeId}`).join(', ') || '(none)'}\n`,
+        `    types: ${objectTypes.map((t) => `${t.type ?? t.unknownType}#${t.nodeId}`).join(', ') || '(none)'}\n`,
       );
       process.stdout.write(
         `    direct: ${

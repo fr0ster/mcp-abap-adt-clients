@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SCMG_RECORD_C" adtcore:type="ENHS/XSB" adtcore:changedAt="2008-11-07T00:00:00Z" adtcore:version="active" adtcore:createdAt="2008-10-31T00:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/scmg_general" adtcore:type="DEVC/K" adtcore:name="SCMG_GENERAL"/>
+</adtcore:mainObject>

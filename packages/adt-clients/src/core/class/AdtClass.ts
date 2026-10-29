@@ -1,4 +1,5 @@
 import { withCallTimeout } from '../../utils/callTimeout';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import {
   getClassEnhancementElements,
   getClassEnhancementOptions,
@@ -24,10 +25,10 @@ import {
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
-  IAdtContentTypes,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
@@ -36,10 +37,10 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
-  IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
@@ -47,9 +48,10 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
-import type { LockRegistry } from '../shared/LockRegistry';
+import { writeObjectDocument } from '../shared/documentWrite';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClass } from './check';
@@ -57,12 +59,15 @@ import { create as createClass } from './create';
 import { checkDeletion, deleteClass } from './delete';
 import { getClassSource } from './read';
 import { activateClassTestClasses } from './testclasses';
-import { classDocuments, type IClassConfig } from './types';
+import type { classDocuments, IClassConfig } from './types';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
 
-export class AdtClass<R extends IClassResults = typeof classDocuments>
-  extends AdtClassMemberBase<R>
+export class AdtClass<
+    R extends IClassResults = typeof classDocuments,
+    V extends AdtVariant = AdtModernVariant,
+  >
+  extends AdtClassMemberBase<R, V, 'class'>
   implements
     IAdtEnhancementHost<
       IClassConfig,
@@ -73,6 +78,10 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     IAdtReadable<IClassConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IClassConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IClassConfig,
       ReturnType<R['deletion']>,
@@ -90,19 +99,18 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
 {
   public readonly objectType: string = 'Class';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: `classDocuments`
-    // satisfies the erased bound, which the compiler cannot see through the
-    // eight `unknown`s. A cast on a *member* would be the factory lying about
-    // what it answers, which is exactly what this shape avoids.
-    protected readonly results: R = classDocuments as unknown as R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
     super(connection, logger, systemContext, contentTypes, lockRegistry);
+    this.results = options.results;
   }
 
   /** Read the host's enhancement elements. */
@@ -301,9 +309,45 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
   }
 
   /**
+   * Write the class's metadata document — one PUT of `options.source`, as
+   * the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    config: Partial<IClassConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          CLASS.uri(config.className as string),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
    * Ask whether the class can be deleted now.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

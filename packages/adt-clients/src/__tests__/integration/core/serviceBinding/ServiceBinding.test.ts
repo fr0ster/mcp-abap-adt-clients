@@ -458,6 +458,7 @@ describe('ServiceBinding (using AdtClient)', () => {
         // activate and delete; publication is `publication.test.ts`, two
         // deliberate runs.
         await tester.flowTestAuto({
+          metadataUpdate: true,
           activateOnCreate: true,
           ...(updatePublicationState === 'unchanged'
             ? {}

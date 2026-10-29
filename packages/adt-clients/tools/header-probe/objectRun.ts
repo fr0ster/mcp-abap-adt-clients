@@ -37,6 +37,7 @@ import {
   pairOf,
 } from './members';
 import {
+  type IProbeClient,
   type ITemporaryContext,
   type ITemporarySpec,
   temporarySpec,
@@ -422,7 +423,7 @@ export async function runOnTemporaryObjects<T>(
       ...(made.object.parent ? { parent: made.object.parent } : {}),
     };
     const config = spec.config(name, context);
-    const handle = (client: AdtClient) => spec.handle(client);
+    const handle = (client: IProbeClient) => spec.handle(client);
     const overrides = overridesFor(type, name, context);
     await prepare(probe, type, name, context);
     /** The lock handle the next call is given, if any. */
@@ -809,7 +810,7 @@ async function build(
   const config = spec.config(name, context);
   const pair = (member: string) =>
     pairOf(spec.handler, member) as IAdtHeaders | undefined;
-  const handle = (client: AdtClient) => spec.handle(client);
+  const handle = (client: IProbeClient) => spec.handle(client);
   const created = await probe.direct1(
     (client, analyse) =>
       handle(client).create?.(config, { headers: pair('create'), analyse }) ??

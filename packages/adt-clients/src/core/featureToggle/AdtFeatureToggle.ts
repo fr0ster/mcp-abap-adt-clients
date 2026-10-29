@@ -35,11 +35,8 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateFeatureToggle } from './activation';
 import { checkFeatureToggle } from './check';
@@ -51,11 +48,11 @@ import { lockFeatureToggle } from './lock';
 import { readFeatureToggle } from './read';
 import { readFeatureToggleSource } from './readSource';
 import { toggleFeatureToggle } from './switch';
-import {
+import type {
   featureToggleDocuments,
-  type ICreateFeatureToggleParams,
-  type IDeleteFeatureToggleParams,
-  type IFeatureToggleConfig,
+  ICreateFeatureToggleParams,
+  IDeleteFeatureToggleParams,
+  IFeatureToggleConfig,
 } from './types';
 import { unlockFeatureToggle } from './unlock';
 import { updateFeatureToggle } from './update';
@@ -93,17 +90,14 @@ export class AdtFeatureToggle<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FeatureToggle';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = featureToggleDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

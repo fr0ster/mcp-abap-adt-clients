@@ -4,18 +4,18 @@
  * One GET. For confirming that a shared dependency a run needs is actually on
  * the system — a green `shared:setup` that printed nothing is not evidence.
  *
- *   ../../node_modules/.bin/ts-node scripts/probe-object.ts class ZAC_CLS023
+ *   ../../node_modules/.bin/ts-node scripts/probe-object.ts CLAS/OC ZAC_CLS023
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AdtSourceObjectType } from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
+import { sourceReadCode } from '../src/__tests__/helpers/typeCode';
 import { AdtClient } from '../src/clients/AdtClient';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   try {
     const answer = await new AdtClient(connection, logger)
       .getUtils()
-      .readObjectSource(type as AdtSourceObjectType, name, functionGroup);
+      .readObjectSource(sourceReadCode(type), name, functionGroup);
     if (!answer.ok) {
       const failure = answer.getError();
       // biome-ignore lint/suspicious/noConsole: same

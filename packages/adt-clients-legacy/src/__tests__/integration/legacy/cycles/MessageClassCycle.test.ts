@@ -199,6 +199,7 @@ describeLegacyRfc(
           // B4 r2-m2-updateMetadata: 400 ExceptionInvalidData — refused,
           // nothing sent.
           expectRefusedUnsent(
+            // @ts-expect-error -- 7.40 does not serve messageClass.updateMetadata; the refusal is for a caller outside the type system
             await msag.handler.updateMetadata(
               { ...config, description: `${DESCRIPTION}, changed` },
               {

@@ -20,6 +20,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
@@ -29,11 +30,12 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import {
   startClassUnitTestRun,
   startClassUnitTestRunSync,
 } from '../../core/class/run';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import {
   AbapUnitRunner,
@@ -65,8 +67,9 @@ export const classTestRunnerDocuments = abapUnitRunnerDocuments;
 
 export class ClassTestRunner<
     R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
+    V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R>
+  extends AbapUnitRunner<R, V, 'class'>
   implements
     IAdtRunnable<
       IClassTestRunTarget,
@@ -76,11 +79,9 @@ export class ClassTestRunner<
 {
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = classTestRunnerDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
-    super(connection, logger, results);
+    super(connection, options);
   }
 
   /**
@@ -95,6 +96,7 @@ export class ClassTestRunner<
    * read as a failure.
    */
   async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestRun'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -129,6 +131,7 @@ export class ClassTestRunner<
    * same defaults.
    */
   async runSync<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestRunSync'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {

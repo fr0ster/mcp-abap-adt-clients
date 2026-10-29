@@ -10,6 +10,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -28,22 +29,20 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
 import { getMessageClassSource } from './read';
-import { type IMessageClassConfig, messageClassDocuments } from './types';
+import type { IMessageClassConfig, messageClassDocuments } from './types';
 import { unlockMessageClass } from './unlock';
 import { updateMessageClass } from './update';
 
@@ -51,6 +50,7 @@ const VALIDATE_BASE = MESSAGE_CLASS.validation;
 
 export class AdtMessageClass<
   R extends IMessageClassResults = typeof messageClassDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
@@ -66,20 +66,25 @@ export class AdtMessageClass<
     IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
     IAdtLockable<IMessageClassConfig>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'MessageClass';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = messageClassDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
   ) {
+    const { logger, systemContext, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -214,6 +219,7 @@ export class AdtMessageClass<
    * library composed in place of the caller's.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
@@ -257,6 +263,7 @@ export class AdtMessageClass<
    * means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

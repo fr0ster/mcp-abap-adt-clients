@@ -4,6 +4,7 @@
  * Retrieves ADT object structure as compact JSON tree.
  */
 
+import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -28,7 +29,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  */
 export async function getObjectStructure(
   connection: IAbapConnection,
-  objectType: string,
+  objectType: AdtTypeCode,
   objectName: string,
 ): Promise<IAdtWireResponse> {
   const encodedType = encodeURIComponent(objectType);

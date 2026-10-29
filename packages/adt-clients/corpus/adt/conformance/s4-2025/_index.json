@@ -1,0 +1,693 @@
+{
+  "release": "s4-2025",
+  "table": "ADT_TYPES_ONPREM",
+  "interfacesAdt": "23.0.3",
+  "note": "One sample object per code the release table lists for an API the library serves: 01 the typestructure URI_TEMPLATE address, 02 /sap/bc/adt/vit/urimapper for that address, 03 the metadata read with the Accept the library sends. Reads only.",
+  "codes": {
+    "CLAS/OC": {
+      "apis": ["class", "behaviorImplementation"],
+      "sample": {
+        "name": "ZAC_SHR_RUN01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/oo/classes/zac_shr_run01",
+      "libraryUri": "/sap/bc/adt/oo/classes/zac_shr_run01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "CLAS-OC--zac_shr_run01--01-template.json",
+        "urimapper": "CLAS-OC--zac_shr_run01--02-urimapper.json",
+        "metadata": "CLAS-OC--zac_shr_run01--03-metadata.json"
+      }
+    },
+    "INTF/OI": {
+      "apis": ["interface"],
+      "sample": {
+        "name": "ZAC_SHR_IF01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/oo/interfaces/zac_shr_if01",
+      "libraryUri": "/sap/bc/adt/oo/interfaces/zac_shr_if01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "INTF-OI--zac_shr_if01--01-template.json",
+        "urimapper": "INTF-OI--zac_shr_if01--02-urimapper.json",
+        "metadata": "INTF-OI--zac_shr_if01--03-metadata.json"
+      }
+    },
+    "PROG/P": {
+      "apis": ["program"],
+      "sample": {
+        "name": "ZAC_SHR_PROG",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/programs/programs/zac_shr_prog",
+      "libraryUri": "/sap/bc/adt/programs/programs/zac_shr_prog",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "PROG-P--zac_shr_prog--01-template.json",
+        "urimapper": "PROG-P--zac_shr_prog--02-urimapper.json",
+        "metadata": "PROG-P--zac_shr_prog--03-metadata.json"
+      }
+    },
+    "PROG/I": {
+      "apis": ["include"],
+      "sample": {
+        "name": "S0600F01",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/programs/includes/s0600f01",
+      "libraryUri": "/sap/bc/adt/programs/includes/s0600f01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "PROG-I--s0600f01--01-template.json",
+        "urimapper": "PROG-I--s0600f01--02-urimapper.json",
+        "metadata": "PROG-I--s0600f01--03-metadata.json"
+      }
+    },
+    "FUGR/F": {
+      "apis": ["functionGroup"],
+      "sample": {
+        "name": "ZAC_SHR_FUGR",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/functions/groups/zac_shr_fugr",
+      "libraryUri": "/sap/bc/adt/functions/groups/zac_shr_fugr",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "FUGR-F--zac_shr_fugr--01-template.json",
+        "urimapper": "FUGR-F--zac_shr_fugr--02-urimapper.json",
+        "metadata": "FUGR-F--zac_shr_fugr--03-metadata.json"
+      }
+    },
+    "FUGR/FF": {
+      "apis": ["functionModule"],
+      "sample": {
+        "name": "Z_AC_SHR_FM01",
+        "parent": "ZAC_SHR_FUGR",
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/functions/groups/zac_shr_fugr/fmodules/z_ac_shr_fm01",
+      "libraryUri": "/sap/bc/adt/functions/groups/zac_shr_fugr/fmodules/z_ac_shr_fm01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "FUGR-FF--z_ac_shr_fm01--01-template.json",
+        "urimapper": "FUGR-FF--z_ac_shr_fm01--02-urimapper.json",
+        "metadata": "FUGR-FF--z_ac_shr_fm01--03-metadata.json"
+      }
+    },
+    "FUGR/I": {
+      "apis": ["functionInclude"],
+      "sample": {
+        "name": "LZAC_SHR_FUGRZ02",
+        "parent": "ZAC_SHR_FUGR",
+        "origin": "own",
+        "foundBy": "its metadata read (the quick search answers the parent for this code)"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/functions/groups/zac_shr_fugr/includes/lzac_shr_fugrz02",
+      "libraryUri": "/sap/bc/adt/functions/groups/zac_shr_fugr/includes/lzac_shr_fugrz02",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "FUGR-I--lzac_shr_fugrz02--01-template.json",
+        "urimapper": "FUGR-I--lzac_shr_fugrz02--02-urimapper.json",
+        "metadata": "FUGR-I--lzac_shr_fugrz02--03-metadata.json"
+      }
+    },
+    "DEVC/K": {
+      "apis": ["package"],
+      "sample": {
+        "name": "ZAC_SHR_PKG",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/packages/zac_shr_pkg",
+      "libraryUri": "/sap/bc/adt/packages/zac_shr_pkg",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DEVC-K--zac_shr_pkg--01-template.json",
+        "urimapper": "DEVC-K--zac_shr_pkg--02-urimapper.json",
+        "metadata": "DEVC-K--zac_shr_pkg--03-metadata.json"
+      }
+    },
+    "DDLS/DF": {
+      "apis": ["ddl"],
+      "sample": {
+        "name": "ZAC_SHR_BDEF_DDLS",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/ddl/sources/zac_shr_bdef_ddls",
+      "libraryUri": "/sap/bc/adt/ddic/ddl/sources/zac_shr_bdef_ddls",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DDLS-DF--zac_shr_bdef_ddls--01-template.json",
+        "urimapper": "DDLS-DF--zac_shr_bdef_ddls--02-urimapper.json",
+        "metadata": "DDLS-DF--zac_shr_bdef_ddls--03-metadata.json"
+      }
+    },
+    "TABL/DT": {
+      "apis": ["table"],
+      "sample": {
+        "name": "ZAC_SHR_BTABL",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/tables/zac_shr_btabl",
+      "libraryUri": "/sap/bc/adt/ddic/tables/zac_shr_btabl",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "TABL-DT--zac_shr_btabl--01-template.json",
+        "urimapper": "TABL-DT--zac_shr_btabl--02-urimapper.json",
+        "metadata": "TABL-DT--zac_shr_btabl--03-metadata.json"
+      }
+    },
+    "TABL/DS": {
+      "apis": ["structure", "appendStructure"],
+      "sample": {
+        "name": "ZAC_SHR_STRU",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/structures/zac_shr_stru",
+      "libraryUri": "/sap/bc/adt/ddic/structures/zac_shr_stru",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "TABL-DS--zac_shr_stru--01-template.json",
+        "urimapper": "TABL-DS--zac_shr_stru--02-urimapper.json",
+        "metadata": "TABL-DS--zac_shr_stru--03-metadata.json"
+      }
+    },
+    "TTYP/DA": {
+      "apis": ["tableType"],
+      "sample": {
+        "name": "SAPPLCO_ADDRESS_TAB",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/tabletypes/sapplco_address_tab",
+      "libraryUri": "/sap/bc/adt/ddic/tabletypes/sapplco_address_tab",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "TTYP-DA--sapplco_address_tab--01-template.json",
+        "urimapper": "TTYP-DA--sapplco_address_tab--02-urimapper.json",
+        "metadata": "TTYP-DA--sapplco_address_tab--03-metadata.json"
+      }
+    },
+    "DOMA/DD": {
+      "apis": ["domain"],
+      "sample": {
+        "name": "ZAC_SHR_GA_DOM",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/domains/zac_shr_ga_dom",
+      "libraryUri": "/sap/bc/adt/ddic/domains/zac_shr_ga_dom",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DOMA-DD--zac_shr_ga_dom--01-template.json",
+        "urimapper": "DOMA-DD--zac_shr_ga_dom--02-urimapper.json",
+        "metadata": "DOMA-DD--zac_shr_ga_dom--03-metadata.json"
+      }
+    },
+    "DTEL/DE": {
+      "apis": ["dataElement"],
+      "sample": {
+        "name": "ZAC_SHR_AUTH_DTEL",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/dataelements/zac_shr_auth_dtel",
+      "libraryUri": "/sap/bc/adt/ddic/dataelements/zac_shr_auth_dtel",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DTEL-DE--zac_shr_auth_dtel--01-template.json",
+        "urimapper": "DTEL-DE--zac_shr_auth_dtel--02-urimapper.json",
+        "metadata": "DTEL-DE--zac_shr_auth_dtel--03-metadata.json"
+      }
+    },
+    "DCLS/DL": {
+      "apis": ["accessControl"],
+      "sample": {
+        "name": "ZAC_SHR_AC01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/acm/dcl/sources/zac_shr_ac01",
+      "libraryUri": "/sap/bc/adt/acm/dcl/sources/zac_shr_ac01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DCLS-DL--zac_shr_ac01--01-template.json",
+        "urimapper": "DCLS-DL--zac_shr_ac01--02-urimapper.json",
+        "metadata": "DCLS-DL--zac_shr_ac01--03-metadata.json"
+      }
+    },
+    "BDEF/BDO": {
+      "apis": ["behaviorDefinition"],
+      "sample": {
+        "name": "ZAC_SHR_BIMP_DDLS",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls",
+      "libraryUri": "/sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "BDEF-BDO--zac_shr_bimp_ddls--01-template.json",
+        "urimapper": "BDEF-BDO--zac_shr_bimp_ddls--02-urimapper.json",
+        "metadata": "BDEF-BDO--zac_shr_bimp_ddls--03-metadata.json"
+      }
+    },
+    "DDLX/EX": {
+      "apis": ["metadataExtension"],
+      "sample": {
+        "name": "SEPMRA_C_SALESORDERCUSTCONTACT",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/ddlx/sources/sepmra_c_salesordercustcontact",
+      "libraryUri": "/sap/bc/adt/ddic/ddlx/sources/sepmra_c_salesordercustcontact",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DDLX-EX--sepmra_c_salesordercustcontact--01-template.json",
+        "urimapper": "DDLX-EX--sepmra_c_salesordercustcontact--02-urimapper.json",
+        "metadata": "DDLX-EX--sepmra_c_salesordercustcontact--03-metadata.json"
+      }
+    },
+    "SRVD/SRV": {
+      "apis": ["serviceDefinition"],
+      "sample": {
+        "name": "ZAC_SHR_SRVD01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/srvd/sources/zac_shr_srvd01",
+      "libraryUri": "/sap/bc/adt/ddic/srvd/sources/zac_shr_srvd01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "SRVD-SRV--zac_shr_srvd01--01-template.json",
+        "urimapper": "SRVD-SRV--zac_shr_srvd01--02-urimapper.json",
+        "metadata": "SRVD-SRV--zac_shr_srvd01--03-metadata.json"
+      }
+    },
+    "SRVB/SVB": {
+      "apis": ["serviceBinding"],
+      "sample": {
+        "name": "ZAC_SHR_SRVB01",
+        "parent": null,
+        "origin": "own"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/businessservices/bindings/zac_shr_srvb01",
+      "libraryUri": "/sap/bc/adt/businessservices/bindings/zac_shr_srvb01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "SRVB-SVB--zac_shr_srvb01--01-template.json",
+        "urimapper": "SRVB-SVB--zac_shr_srvb01--02-urimapper.json",
+        "metadata": "SRVB-SVB--zac_shr_srvb01--03-metadata.json"
+      }
+    },
+    "DSFD/SCF": {
+      "apis": ["scalarFunction"],
+      "sample": {
+        "name": "SQRT",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/dsfd/sources/sqrt",
+      "libraryUri": "/sap/bc/adt/ddic/dsfd/sources/sqrt",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DSFD-SCF--sqrt--01-template.json",
+        "urimapper": "DSFD-SCF--sqrt--02-urimapper.json",
+        "metadata": "DSFD-SCF--sqrt--03-metadata.json"
+      }
+    },
+    "DSFI/SFI": {
+      "apis": ["scalarFunctionImplementation"],
+      "sample": {
+        "name": "SQRT_ANA",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/dsfi/sqrt_ana",
+      "libraryUri": "/sap/bc/adt/ddic/dsfi/sqrt_ana",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "DSFI-SFI--sqrt_ana--01-template.json",
+        "urimapper": "DSFI-SFI--sqrt_ana--02-urimapper.json",
+        "metadata": "DSFI-SFI--sqrt_ana--03-metadata.json"
+      }
+    },
+    "XSLT/VT": {
+      "apis": ["transformation"],
+      "sample": {
+        "name": "SEC_DSIG_KEYINFO_RSAKEY_IN",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/xslt/transformations/sec_dsig_keyinfo_rsakey_in",
+      "libraryUri": "/sap/bc/adt/xslt/transformations/sec_dsig_keyinfo_rsakey_in",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "XSLT-VT--sec_dsig_keyinfo_rsakey_in--01-template.json",
+        "urimapper": "XSLT-VT--sec_dsig_keyinfo_rsakey_in--02-urimapper.json",
+        "metadata": "XSLT-VT--sec_dsig_keyinfo_rsakey_in--03-metadata.json"
+      }
+    },
+    "MSAG/N": {
+      "apis": ["messageClass"],
+      "sample": {
+        "name": "SAPLWOSA",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/messageclass/saplwosa",
+      "libraryUri": "/sap/bc/adt/messageclass/saplwosa",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "MSAG-N--saplwosa--01-template.json",
+        "urimapper": "MSAG-N--saplwosa--02-urimapper.json",
+        "metadata": "MSAG-N--saplwosa--03-metadata.json"
+      }
+    },
+    "MSAG/NN": {
+      "apis": ["messageClassMessage"],
+      "sample": {
+        "name": "001",
+        "parent": "SAPLWOSA",
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/messageclass/saplwosa/messages/001",
+      "libraryUri": "/sap/bc/adt/messageclass/saplwosa",
+      "urimapperMatchesLibrary": false,
+      "files": {
+        "template": "MSAG-NN--saplwosa-001--01-template.json",
+        "urimapper": "MSAG-NN--saplwosa-001--02-urimapper.json",
+        "metadata": "MSAG-NN--saplwosa-001--03-metadata.json"
+      }
+    },
+    "FTG2/FT": {
+      "apis": ["featureToggle"],
+      "sample": {
+        "name": "SD_RET_MULTI_ADDRESS",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/sfw/featuretoggles/sd_ret_multi_address",
+      "libraryUri": "/sap/bc/adt/sfw/featuretoggles/sd_ret_multi_address",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "FTG2-FT--sd_ret_multi_address--01-template.json",
+        "urimapper": "FTG2-FT--sd_ret_multi_address--02-urimapper.json",
+        "metadata": "FTG2-FT--sd_ret_multi_address--03-metadata.json"
+      }
+    },
+    "AUTH": {
+      "apis": ["authorizationField"],
+      "sample": {
+        "name": "SAAAREA",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/aps/iam/auth/saaarea",
+      "libraryUri": "/sap/bc/adt/aps/iam/auth/saaarea",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "AUTH--saaarea--01-template.json",
+        "urimapper": "AUTH--saaarea--02-urimapper.json",
+        "metadata": "AUTH--saaarea--03-metadata.json"
+      }
+    },
+    "ENHO/XHH": {
+      "apis": ["enhancement"],
+      "sample": {
+        "name": "MM06EFKO_KOND_TAXES_01",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/enhancements/enhoxhh/mm06efko_kond_taxes_01",
+      "libraryUri": "/sap/bc/adt/enhancements/enhoxhh/mm06efko_kond_taxes_01",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "ENHO-XHH--mm06efko_kond_taxes_01--01-template.json",
+        "urimapper": "ENHO-XHH--mm06efko_kond_taxes_01--02-urimapper.json",
+        "metadata": "ENHO-XHH--mm06efko_kond_taxes_01--03-metadata.json"
+      }
+    },
+    "ENHO/XHB": {
+      "apis": ["enhancement"],
+      "sample": {
+        "name": "SHP_SE_SORTER_CUSTOMERRETURNSD",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/enhancements/enhoxhb/shp_se_sorter_customerreturnsd",
+      "libraryUri": "/sap/bc/adt/enhancements/enhoxhb/shp_se_sorter_customerreturnsd",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "ENHO-XHB--shp_se_sorter_customerreturnsd--01-template.json",
+        "urimapper": "ENHO-XHB--shp_se_sorter_customerreturnsd--02-urimapper.json",
+        "metadata": "ENHO-XHB--shp_se_sorter_customerreturnsd--03-metadata.json"
+      }
+    },
+    "ENHS/XSB": {
+      "apis": ["enhancement"],
+      "sample": {
+        "name": "SC_BADI_MM_SRV",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/enhancements/enhsxsb/sc_badi_mm_srv",
+      "libraryUri": "/sap/bc/adt/enhancements/enhsxsb/sc_badi_mm_srv",
+      "urimapperMatchesLibrary": true,
+      "files": {
+        "template": "ENHS-XSB--sc_badi_mm_srv--01-template.json",
+        "urimapper": "ENHS-XSB--sc_badi_mm_srv--02-urimapper.json",
+        "metadata": "ENHS-XSB--sc_badi_mm_srv--03-metadata.json"
+      }
+    }
+  },
+  "apisWithoutCodes": {
+    "localTestClass": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "localTypes": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "localDefinitions": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "localMacros": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    },
+    "request": {
+      "reason": "codes: {} — the entry lists no code, so there is no sample by definition"
+    }
+  }
+}

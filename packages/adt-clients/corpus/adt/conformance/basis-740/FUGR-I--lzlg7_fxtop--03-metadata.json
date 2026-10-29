@@ -1,0 +1,31 @@
+{
+  "case": "FUGR-I--lzlg7_fxtop",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-29T13:02:32.751Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/functions/groups/zlg7_fx/includes/lzlg7_fxtop",
+    "params": {
+      "version": "active"
+    },
+    "effectiveUrl": "/sap/bc/adt/functions/groups/zlg7_fx/includes/lzlg7_fxtop?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.functions.fincludes.v2+xml, application/vnd.sap.adt.functions.fincludes+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.functions.fincludes+xml",
+      "etag": "202610261514530011",
+      "last-modified": "Mon, 26 Oct 2026 15:14:53 GMT",
+      "x-sap-adt-profiling": "server-time=147236",
+      "~server_protocol": "HTTP/1.1"
+    },
+    "bodyFile": "FUGR-I--lzlg7_fxtop--03-metadata.body.xml"
+  }
+}

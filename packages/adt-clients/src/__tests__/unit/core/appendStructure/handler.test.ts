@@ -5,6 +5,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
+import { appendStructureDocuments } from '../../../../core/appendStructure/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 
@@ -34,7 +35,9 @@ function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
 describe('AdtAppendStructure handler', () => {
   it('create() only POSTs metadata (no lock/update) with a valid baseObject', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
-    const as = new AdtAppendStructure(conn);
+    const as = new AdtAppendStructure(conn, {
+      results: appendStructureDocuments,
+    });
     await as.create(
       {
         appendStructureName: 'ZOK_S',
@@ -55,7 +58,9 @@ describe('AdtAppendStructure handler', () => {
         ? new Error('unlock boom')
         : { data: '' },
     );
-    const as = new AdtAppendStructure(conn);
+    const as = new AdtAppendStructure(conn, {
+      results: appendStructureDocuments,
+    });
 
     const failure = expectFailure(
       await as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
@@ -72,7 +77,9 @@ describe('AdtAppendStructure handler', () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 501 } }),
     );
-    const as = new AdtAppendStructure(conn);
+    const as = new AdtAppendStructure(conn, {
+      results: appendStructureDocuments,
+    });
     // A system with no validation resource has not looked at the name. The
     // library reports the status as it came; naming it is a strategy's.
     expect(
@@ -100,7 +107,9 @@ describe('AdtAppendStructure handler', () => {
   it('update() is the PUT, and it carries the handle it was given', async () => {
     const { conn, sessionTypes, calls } = makeConn(() => ({ data: '' }));
 
-    const as = new AdtAppendStructure(conn);
+    const as = new AdtAppendStructure(conn, {
+      results: appendStructureDocuments,
+    });
     await as.update(
       { appendStructureName: 'ZOK_X' },
       {

@@ -1,0 +1,27 @@
+{
+  "case": "FUGR-I--lzlg7_fxtop",
+  "step": 2,
+  "stepTag": "urimapper",
+  "capturedAt": "2026-10-29T13:02:33.115Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/urimapper",
+    "params": {
+      "uri": "/sap/bc/adt/vit/wb/object_type/fugri/object_name/%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20LZLG7_FXTOP"
+    },
+    "effectiveUrl": "/sap/bc/adt/vit/urimapper?uri=%2Fsap%2Fbc%2Fadt%2Fvit%2Fwb%2Fobject_type%2Ffugri%2Fobject_name%2F%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520%2520LZLG7_FXTOP",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "",
+    "headers": {
+      "content-type": "text/plain"
+    },
+    "bodyFile": "FUGR-I--lzlg7_fxtop--02-urimapper.body.txt"
+  }
+}

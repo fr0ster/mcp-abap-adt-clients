@@ -9,6 +9,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtContentTypes,
@@ -20,6 +21,7 @@ import type {
   IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -32,6 +34,8 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -39,6 +43,8 @@ import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
+import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
@@ -48,7 +54,7 @@ import {
 } from './enhancements';
 import { includeUrl, lockInclude } from './lock';
 import { getIncludeMetadata, getIncludeSource } from './read';
-import { includeDocuments } from './types';
+import type { includeDocuments } from './types';
 import { unlockInclude } from './unlock';
 import { uploadIncludeSource } from './update';
 
@@ -56,8 +62,10 @@ function requireName(config: Partial<IIncludeConfig>): string {
   return config.includeName as string;
 }
 
-export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
-  implements
+export class AdtInclude<
+  R extends IIncludeResults = typeof includeDocuments,
+  V extends AdtVariant = AdtModernVariant,
+> implements
     IAdtIncludeEnhancementHost<
       IIncludeConfig,
       ReturnType<R['enhancementElements']>,
@@ -67,6 +75,10 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IIncludeConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IIncludeConfig,
       ReturnType<R['deletion']>,
@@ -76,21 +88,28 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>,
     IAdtLockable<IIncludeConfig>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
+  // Part of the options every handler in this library takes. It is unread
+  // here now that the members are single requests with nothing to narrate.
+  private readonly logger: ILogger | undefined;
+  // Read by `create` until 36.0.0; its headers are the caller's now.
+  private readonly contentTypes: IAdtContentTypes | undefined;
+  protected readonly results: R;
+  private readonly systemContext: IAdtSystemContext;
+
   constructor(
     protected readonly connection: IAbapConnection,
-    // Part of the constructor shape every client in this library shares. It is
-    // unread here now that the members are single requests with nothing to
-    // narrate; removing it would make this one class take different arguments.
-    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
-    private readonly logger?: ILogger,
-    // Read by `create` until 36.0.0; its headers are the caller's now.
-    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
-    private readonly contentTypes?: IAdtContentTypes,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = includeDocuments as unknown as R,
-    // Last, so the constructor every consumer already calls keeps its shape.
-    private readonly systemContext: IAdtSystemContext = {},
-  ) {}
+    options: AdtHandlerOptions<R, 'logger' | 'contentTypes' | 'systemContext'>,
+  ) {
+    this.logger = options.logger;
+    this.contentTypes = options.contentTypes;
+    this.results = options.results;
+    this.systemContext = options.systemContext ?? {};
+  }
 
   /** Read the host's enhancement elements. */
   async readEnhancementElements<E extends IAdtError = IAdtError>(
@@ -151,7 +170,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
 
     const params = new URLSearchParams({
       objname: includeName.toUpperCase(),
-      objtype: 'PROG/I',
+      objtype: TYPE_CODE.include,
       packagename: (config.packageName as string).toUpperCase(),
     });
     if (config.description) {
@@ -295,12 +314,48 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   }
 
   /**
+   * Write the include's metadata document — one PUT of `options.source`,
+   * as the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    config: Partial<IIncludeConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          PROGRAM_INCLUDE.uri(requireName(config)),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
    * Ask whether the object can be deleted now.
    *
    * The deletion service is asked by URI, and a standalone include has one of
    * its own — unlike a class include, which is emptied by writing its parent.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {

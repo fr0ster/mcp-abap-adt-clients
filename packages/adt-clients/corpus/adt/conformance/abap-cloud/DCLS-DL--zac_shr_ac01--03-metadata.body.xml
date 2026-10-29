@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dcl:dclSource abapsource:sourceUri="source/main" abapsource:fixPointArithmetic="false" abapsource:activeUnicodeCheck="false" adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="cloudDevelopment" adtcore:name="ZAC_SHR_AC01" adtcore:type="DCLS/DL" adtcore:changedAt="2026-09-08T11:29:25Z" adtcore:version="active" adtcore:createdAt="2026-08-12T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" adtcore:description="Shared access control for CDS view ZAC_SHR_CDSUT_DDLS" adtcore:language="EN" xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" etag="202609081129250012" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/html" etag="202609081129250012" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="ZAC_SHR_PKG" adtcore:packageName="ZAC_SHR_PKG" adtcore:description="Shared test dependencies package"/>
+</dcl:dclSource>

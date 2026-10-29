@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<enho:objectData adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SHP_SE_SORTER_CUSTOMERRETURNSD" adtcore:type="ENHO/XHB" adtcore:changedAt="2008-12-11T14:17:30Z" adtcore:version="active" adtcore:createdAt="2008-12-11T14:17:30Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="BAdI for sorting Customer Returns Delivery" adtcore:language="EN" xmlns:enho="http://www.sap.com/adt/enhancements/enho" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/repository/informationsystem/abaplanguageversions?uri=%2Fsap%2Fbc%2Fadt%2Fenhancements%2Fenhoxhb%2Fshp_se_sorter_customerreturnsd" rel="http://www.sap.com/adt/relations/informationsystem/abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="Allowed ABAP language versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/enhoxh/object_name/SHP_SE_SORTER_CUSTOMERRETURNSD" rel="self" type="application/vnd.sap.sapgui" title="Representation in SAP GUI" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./shp_se_sorter_customerreturnsd" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Landing Page (HTML)" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/ops-se_shp_xi_proxy_s" adtcore:type="DEVC/K" adtcore:name="OPS-SE_SHP_XI_PROXY_S" adtcore:description="Service Enabling LE Shipping"/>
+  <enho:contentCommon enho:toolType="BADI_IMPL" enho:adjustmentStatus="adjusted" enho:upgradeFlag="false" enho:switchSupported="true">
+    <enho:usages>
+      <enhcore:referencedObject enhcore:program_id="R3TR" enhcore:element_usage="USEO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/cl_badi_sort_impl_by_layer" adtcore:type="CLAS/OC" adtcore:name="CL_BADI_SORT_IMPL_BY_LAYER"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/oo/classes/cl_badi_sort_impl_by_layer" adtcore:type="CLAS/OC" adtcore:name="CL_BADI_SORT_IMPL_BY_LAYER"/>
+      </enhcore:referencedObject>
+      <enhcore:referencedObject enhcore:program_id="LIMU" enhcore:element_usage="USEO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/fugrps/object_name/SAPLENH_%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20EDT_" adtcore:type="FUGR/PS" adtcore:name="SAPLENH_                                EDT_"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/functions/groups/enh_edt_badi/source/main" adtcore:type="FUGR/I" adtcore:name="SAPLENH_EDT_BADI"/>
+      </enhcore:referencedObject>
+      <enhcore:referencedObject enhcore:program_id="R3TR" enhcore:element_usage="EXTO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/badi_sorter" adtcore:type="ENHS/XSB" adtcore:name="BADI_SORTER"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/badi_sorter" adtcore:type="ENHS/XSB" adtcore:name="BADI_SORTER"/>
+      </enhcore:referencedObject>
+      <enhcore:referencedObject enhcore:program_id="R3TR" enhcore:element_usage="USEO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/oo/interfaces/if_badi_sorter" adtcore:type="INTF/OI" adtcore:name="IF_BADI_SORTER"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/oo/interfaces/if_badi_sorter" adtcore:type="INTF/OI" adtcore:name="IF_BADI_SORTER"/>
+      </enhcore:referencedObject>
+    </enho:usages>
+  </enho:contentCommon>
+  <enho:contentSpecific>
+    <enho:badiTechnology>
+      <enho:badiImplementations>
+        <enho:badiImplementation enho:name="SHP_SE_SORTER_CUSTOMERRETURNSD" enho:shortText="BAdI sorter for Customer Returns Delivery with ref. to Cust.Ret.Crt Req." enho:example="false" enho:default="false" enho:active="true" enho:customizingLock="" enho:runtimeBehaviorShorttext="Execution depends on runtime filter values">
+          <enho:enhancementSpot adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/badi_sorter" adtcore:type="ENHS/XSB" adtcore:name="BADI_SORTER"/>
+          <enho:badiDefinition adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/badi_sorter#type=enhs%2fxb;name=badi_sorter" adtcore:type="ENHS/XB" adtcore:name="BADI_SORTER"/>
+          <enho:implementingClass adtcore:uri="/sap/bc/adt/oo/classes/cl_badi_sort_impl_by_layer" adtcore:type="CLAS/OC" adtcore:name="CL_BADI_SORT_IMPL_BY_LAYER"/>
+          <enho:filterTree>
+            <enho:filterToken xsi:type="enho:Filter" enho:filterName="BADI_NAME" enho:comparator="=" enho:value="SHP_SE_CUSTOMERRETURNSDLVCRTRC" enho:filterProperty="#//badi/contentSpecific///SHP_SE_SORTER_CUSTOMERRETURNSD/filterTree/filterProperty.BADI_NAME" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+            <enho:filterProperty enho:filterName="BADI_NAME" enho:filterType="C"/>
+          </enho:filterTree>
+        </enho:badiImplementation>
+        <enho:badiImplementation enho:name="SHP_SE_SORTER_CUSTRETSDLVIDQR" enho:shortText="BAdI Sorter for Customer Returns Delivery ERP By ID Query Response" enho:example="false" enho:default="false" enho:active="false" enho:customizingLock="" enho:runtimeBehaviorShorttext="The implementation will not be called">
+          <enho:enhancementSpot adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/badi_sorter" adtcore:type="ENHS/XSB" adtcore:name="BADI_SORTER"/>
+          <enho:badiDefinition adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/badi_sorter#type=enhs%2fxb;name=badi_sorter" adtcore:type="ENHS/XB" adtcore:name="BADI_SORTER"/>
+          <enho:implementingClass adtcore:uri="/sap/bc/adt/oo/classes/cl_badi_sort_impl_by_layer" adtcore:type="CLAS/OC" adtcore:name="CL_BADI_SORT_IMPL_BY_LAYER"/>
+          <enho:filterTree>
+            <enho:filterToken xsi:type="enho:Filter" enho:filterName="BADI_NAME" enho:comparator="=" enho:value="SHP_SE_CUSTRETSDELIVIDQR" enho:filterProperty="#//badi/contentSpecific///SHP_SE_SORTER_CUSTRETSDLVIDQR/filterTree/filterProperty.BADI_NAME" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+            <enho:filterProperty enho:filterName="BADI_NAME" enho:filterType="C"/>
+          </enho:filterTree>
+        </enho:badiImplementation>
+      </enho:badiImplementations>
+    </enho:badiTechnology>
+  </enho:contentSpecific>
+</enho:objectData>

@@ -8,7 +8,10 @@
 import {
   FunctionGroupTestRunner,
   FunctionModuleTestRunner,
+  functionGroupTestRunnerDocuments,
+  functionModuleTestRunnerDocuments,
   ProgramTestRunner,
+  programTestRunnerDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseUnitTest } from '@mcp-abap-adt/adt-strategies';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -99,79 +102,78 @@ describe('legacy runners send the synchronous request', () => {
     {
       label: 'ProgramTestRunnerLegacy.run',
       call: (conn: IAbapConnection, options?: object) =>
-        new ProgramTestRunnerLegacy(conn, createLibraryLogger(), marked).run(
-          'ZR_REPORT',
-          options,
-        ),
+        new ProgramTestRunnerLegacy(conn, {
+          logger: createLibraryLogger(),
+          results: marked,
+        }).run('ZR_REPORT', options),
       modern: (conn: IAbapConnection, options?: object) =>
-        new ProgramTestRunner(conn, createLibraryLogger()).runSync(
-          'ZR_REPORT',
-          options,
-        ),
+        new ProgramTestRunner(conn, {
+          logger: createLibraryLogger(),
+          results: programTestRunnerDocuments,
+        }).runSync('ZR_REPORT', options),
       uri: '/sap/bc/adt/programs/programs/zr_report',
       readBy: 'read by run',
     },
     {
       label: 'ProgramTestRunnerLegacy.runSync',
       call: (conn: IAbapConnection, options?: object) =>
-        new ProgramTestRunnerLegacy(
-          conn,
-          createLibraryLogger(),
-          marked,
-        ).runSync('ZR_REPORT', options),
+        new ProgramTestRunnerLegacy(conn, {
+          logger: createLibraryLogger(),
+          results: marked,
+        }).runSync('ZR_REPORT', options),
       modern: (conn: IAbapConnection, options?: object) =>
-        new ProgramTestRunner(conn, createLibraryLogger()).runSync(
-          'ZR_REPORT',
-          options,
-        ),
+        new ProgramTestRunner(conn, {
+          logger: createLibraryLogger(),
+          results: programTestRunnerDocuments,
+        }).runSync('ZR_REPORT', options),
       uri: '/sap/bc/adt/programs/programs/zr_report',
       readBy: 'read by result',
     },
     {
       label: 'FunctionGroupTestRunnerLegacy.run',
       call: (conn: IAbapConnection, options?: object) =>
-        new FunctionGroupTestRunnerLegacy(
-          conn,
-          createLibraryLogger(),
-          marked,
-        ).run('Z_GROUP', options),
+        new FunctionGroupTestRunnerLegacy(conn, {
+          logger: createLibraryLogger(),
+          results: marked,
+        }).run('Z_GROUP', options),
       modern: (conn: IAbapConnection, options?: object) =>
-        new FunctionGroupTestRunner(conn, createLibraryLogger()).runSync(
-          'Z_GROUP',
-          options,
-        ),
+        new FunctionGroupTestRunner(conn, {
+          logger: createLibraryLogger(),
+          results: functionGroupTestRunnerDocuments,
+        }).runSync('Z_GROUP', options),
       uri: '/sap/bc/adt/functions/groups/z_group',
       readBy: 'read by run',
     },
     {
       label: 'FunctionGroupTestRunnerLegacy.runSync',
       call: (conn: IAbapConnection, options?: object) =>
-        new FunctionGroupTestRunnerLegacy(
-          conn,
-          createLibraryLogger(),
-          marked,
-        ).runSync('Z_GROUP', options),
+        new FunctionGroupTestRunnerLegacy(conn, {
+          logger: createLibraryLogger(),
+          results: marked,
+        }).runSync('Z_GROUP', options),
       modern: (conn: IAbapConnection, options?: object) =>
-        new FunctionGroupTestRunner(conn, createLibraryLogger()).runSync(
-          'Z_GROUP',
-          options,
-        ),
+        new FunctionGroupTestRunner(conn, {
+          logger: createLibraryLogger(),
+          results: functionGroupTestRunnerDocuments,
+        }).runSync('Z_GROUP', options),
       uri: '/sap/bc/adt/functions/groups/z_group',
       readBy: 'read by result',
     },
     {
       label: 'FunctionModuleTestRunnerLegacy.runSync',
       call: (conn: IAbapConnection, options?: object) =>
-        new FunctionModuleTestRunnerLegacy(
-          conn,
-          createLibraryLogger(),
-          marked,
-        ).runSync(
+        new FunctionModuleTestRunnerLegacy(conn, {
+          logger: createLibraryLogger(),
+          results: marked,
+        }).runSync(
           { functionGroupName: 'Z_GROUP', functionModuleName: 'Z_MODULE' },
           options,
         ),
       modern: (conn: IAbapConnection, options?: object) =>
-        new FunctionModuleTestRunner(conn, createLibraryLogger()).runSync(
+        new FunctionModuleTestRunner(conn, {
+          logger: createLibraryLogger(),
+          results: functionModuleTestRunnerDocuments,
+        }).runSync(
           { functionGroupName: 'Z_GROUP', functionModuleName: 'Z_MODULE' },
           options,
         ),
@@ -234,11 +236,12 @@ describe('legacy runners send the synchronous request', () => {
 
   it("FunctionModuleTestRunnerLegacy.run refuses without a request: it takes no group, and the module's URI lies under it", async () => {
     const { conn, calls } = makeConn();
-    const runner = new FunctionModuleTestRunnerLegacy(
-      conn,
-      createLibraryLogger(),
-    );
+    const runner = new FunctionModuleTestRunnerLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: functionModuleTestRunnerDocuments,
+    });
 
+    // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const refusal = expectFailure(await runner.run(), 'no module run on 7.40');
     expect(refusal.origin).toBe('refusal');
     expect(refusal.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);

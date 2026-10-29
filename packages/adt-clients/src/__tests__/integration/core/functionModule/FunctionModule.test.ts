@@ -196,6 +196,7 @@ describe('FunctionModule (using AdtClient)', () => {
         const sourceCode = testCase?.params?.source_code || config.source || '';
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: sourceCode,
           updateConfig: {
             functionModuleName: config.functionModuleName,

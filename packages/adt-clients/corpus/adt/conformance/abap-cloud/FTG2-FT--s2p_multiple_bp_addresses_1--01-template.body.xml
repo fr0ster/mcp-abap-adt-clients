@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:name="S2P_MULTIPLE_BP_ADDRESSES_1" adtcore:type="FTG2/FT" adtcore:changedAt="2025-04-26T13:47:53Z" adtcore:version="active" adtcore:createdAt="2024-01-11T12:28:24Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="Business partner Multiple Addresses of Supplier - Phase 1" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/s_bupa_general" adtcore:type="DEVC/K" adtcore:name="S_BUPA_GENERAL"/>
+</adtcore:mainObject>

@@ -13,8 +13,8 @@
  * question; it is the one way, used by the member and by us.
  */
 import type {
-  AdtObjectType,
-  AdtSourceObjectType,
+  AdtParentedTypeCode,
+  AdtSourceTypeCode,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -22,39 +22,19 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { sourceUri } from '../../endpoints/objects';
+import { buildObjectUri } from '../../utils/activationUtils';
+import { enhancementVersionToken } from '../enhancement/read';
 import {
-  ACCEPT_CLASS,
-  ACCEPT_DATA_ELEMENT,
-  ACCEPT_DOMAIN,
-  ACCEPT_FUNCTION_GROUP,
-  ACCEPT_FUNCTION_MODULE,
-  ACCEPT_INTERFACE,
-  ACCEPT_PACKAGE,
-  ACCEPT_PROGRAM,
-  ACCEPT_STRUCTURE,
-  ACCEPT_TABLE,
-  ACCEPT_TABLE_TYPE,
-  CT_VIEW,
-} from '../../constants/contentTypes';
-import {
-  CLASS,
-  DATA_ELEMENT,
-  DDL_SOURCE,
-  DOMAIN,
-  FUNCTION_GROUP,
-  FUNCTION_MODULE,
-  INTERFACE,
-  PACKAGE,
-  PROGRAM,
-  STRUCTURE,
-  sourceUri,
-  TABLE,
-  TABLE_TYPE,
-} from '../../endpoints/objects';
+  type AdtMetadataReadCode,
+  type AdtSourceReadCode,
+  isSourceReadCode,
+  METADATA_READ,
+} from './codeSets';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
-  objectType: AdtSourceObjectType,
+  objectType: AdtSourceReadCode,
   objectName: string,
   functionGroup?: string,
   version?: 'active' | 'inactive',
@@ -95,7 +75,7 @@ export async function objectSourceWire(
  */
 export async function objectMetadataWire(
   connection: IAbapConnection,
-  objectType: AdtObjectType,
+  objectType: AdtMetadataReadCode,
   objectName: string,
   functionGroup?: string,
   options?: IReadOptions,
@@ -123,166 +103,61 @@ export async function objectMetadataWire(
   });
 }
 
+/**
+ * An object's metadata address: its address from the type tables. A
+ * parented code takes its parent as `functionGroup`, the only parent the
+ * tables name (`FUGR/FF` under `functionGroup`).
+ */
 export function getObjectMetadataUri(
-  objectType: AdtObjectType,
+  objectType: AdtMetadataReadCode,
   objectName: string,
   functionGroup?: string,
 ): string {
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `${CLASS.uri(objectName)}`;
-    case 'program':
-    case 'prog/p':
-      return `${PROGRAM.uri(objectName)}`;
-    case 'interface':
-    case 'intf/if':
-    // ADT's own code for an interface; 'intf/if' stays because callers pass it.
-    case 'intf/oi':
-      return `${INTERFACE.uri(objectName)}`;
-    case 'functionmodule':
-    case 'fugr/ff': {
-      return `${FUNCTION_MODULE.uri(functionGroup as string, objectName)}`;
-    }
-    case 'view':
-    case 'ddls/df':
-      return `${DDL_SOURCE.uri(objectName)}`;
-    case 'structure':
-    case 'stru/dt':
-      return `${STRUCTURE.uri(objectName)}`;
-    case 'table':
-    case 'tabl/dt':
-      return `${TABLE.uri(objectName)}`;
-    case 'tabletype':
-    case 'ttyp/df':
-      return `${TABLE_TYPE.uri(objectName)}`;
-    case 'domain':
-    case 'doma/dd':
-      return `${DOMAIN.uri(objectName)}`;
-    case 'dataelement':
-    case 'dtel':
-    case 'dtel/de':
-      return `${DATA_ELEMENT.uri(objectName)}`;
-    case 'functiongroup':
-    case 'fugr':
-      return `${FUNCTION_GROUP.uri(objectName)}`;
-    case 'package':
-    case 'devc/k':
-      return `${PACKAGE.uri(objectName)}`;
-    default:
-      throw new Error(`Unsupported object type for metadata: ${objectType}`);
-  }
+  return buildObjectUri(objectName, objectType, functionGroup);
 }
 
-export function getMetadataAcceptHeader(objectType: AdtObjectType): string {
-  const type = objectType.toLowerCase();
-
-  switch (type) {
-    case 'class':
-    case 'clas/oc':
-      return ACCEPT_CLASS;
-    case 'interface':
-    case 'intf/if':
-    // ADT's own code for an interface; 'intf/if' stays because callers pass it.
-    case 'intf/oi':
-      return ACCEPT_INTERFACE;
-    case 'table':
-    case 'tabl/dt':
-      return ACCEPT_TABLE;
-    case 'tabletype':
-    case 'ttyp/df':
-      return ACCEPT_TABLE_TYPE;
-    case 'domain':
-    case 'doma/dd':
-      return ACCEPT_DOMAIN;
-    case 'dataelement':
-    case 'dtel':
-    case 'dtel/de':
-      return ACCEPT_DATA_ELEMENT;
-    case 'structure':
-    case 'stru/dt':
-      return ACCEPT_STRUCTURE;
-    case 'view':
-    case 'ddls/df':
-      return CT_VIEW;
-    case 'program':
-    case 'prog/p':
-      return ACCEPT_PROGRAM;
-    case 'functiongroup':
-    case 'fugr':
-      return ACCEPT_FUNCTION_GROUP;
-    case 'functionmodule':
-    case 'fugr/ff':
-      return ACCEPT_FUNCTION_MODULE;
-    case 'package':
-    case 'devc/k':
-      return ACCEPT_PACKAGE;
-    default:
-      return 'application/xml';
-  }
-}
-
-export function getObjectSourceUri(
-  objectType: AdtSourceObjectType,
-  objectName: string,
-  functionGroup?: string,
-  version?: 'active' | 'inactive',
+/** The Accept a code's metadata document is asked for by default. */
+export function getMetadataAcceptHeader(
+  objectType: AdtMetadataReadCode,
 ): string {
-  const versionParam = version ? `?version=${version}` : '';
-
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `${sourceUri(CLASS.uri(objectName))}${versionParam}`;
-    case 'program':
-    case 'prog/p':
-      return `${sourceUri(PROGRAM.uri(objectName))}${versionParam}`;
-    case 'interface':
-    case 'intf/if':
-    // ADT's own code for an interface; 'intf/if' stays because callers pass it.
-    case 'intf/oi':
-      return `${sourceUri(INTERFACE.uri(objectName))}${versionParam}`;
-    case 'functionmodule':
-    case 'fugr/ff': {
-      return `${sourceUri(FUNCTION_MODULE.uri(functionGroup as string, objectName))}${versionParam}`;
-    }
-    case 'view':
-    case 'ddls/df':
-      return `${sourceUri(DDL_SOURCE.uri(objectName))}${versionParam}`;
-    case 'structure':
-    case 'stru/dt':
-      return `${sourceUri(STRUCTURE.uri(objectName))}${versionParam}`;
-    case 'table':
-    case 'tabl/dt':
-      return `${sourceUri(TABLE.uri(objectName))}${versionParam}`;
-    case 'tabletype':
-    case 'ttyp/df':
-      return `${sourceUri(TABLE_TYPE.uri(objectName))}${versionParam}`;
-    default:
-      throw new Error(
-        `Object type ${objectType} does not support source code reading`,
-      );
-  }
+  return METADATA_READ[objectType];
 }
 
-export function supportsSourceCode(objectType: AdtObjectType): boolean {
-  const supportedTypes = [
-    'class',
-    'clas/oc',
-    'program',
-    'prog/p',
-    'interface',
-    'intf/if',
-    'functionmodule',
-    'fugr/ff',
-    'view',
-    'ddls/df',
-    'structure',
-    'stru/dt',
-    'table',
-    'tabl/dt',
-    'tabletype',
-    'ttyp/df',
-  ];
-  return supportedTypes.includes(objectType.toLowerCase());
+/**
+ * The `version` each code's source is asked for, where it is not the word
+ * itself: an enhancement's inactive source is its `workingArea`.
+ */
+const VERSION_TOKEN: Readonly<
+  Partial<Record<AdtSourceTypeCode, (version: 'active' | 'inactive') => string>>
+> = {
+  'ENHO/XHH': enhancementVersionToken,
+};
+
+/**
+ * An object's main source address: its address from the tables, then
+ * `/source/main`, and the version as the code's own resource spells it. A
+ * pure address — it sends nothing — so it is built for every code with a
+ * source, the parent required for a parented one.
+ */
+export function getObjectSourceUri<C extends AdtSourceTypeCode>(
+  objectType: C,
+  objectName: string,
+  ...[functionGroup, version]: [C] extends [AdtParentedTypeCode]
+    ? [functionGroup: string, version?: 'active' | 'inactive']
+    : [functionGroup?: string, version?: 'active' | 'inactive']
+): string {
+  const token = version
+    ? (VERSION_TOKEN[objectType]?.(version) ?? version)
+    : undefined;
+  const versionParam = token ? `?version=${token}` : '';
+  const code: AdtSourceTypeCode = objectType;
+  return `${sourceUri(buildObjectUri(objectName, code, functionGroup))}${versionParam}`;
+}
+
+/**
+ * Whether `readObjectSource` reads the code's source: the codes of
+ * {@link SOURCE_READ}. Answered for any code, from outside the types too.
+ */
+export function supportsSourceCode(objectType: string): boolean {
+  return isSourceReadCode(objectType);
 }

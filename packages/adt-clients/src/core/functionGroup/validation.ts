@@ -9,6 +9,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 
@@ -37,7 +38,7 @@ export async function validateFunctionGroupName(
 ): Promise<IAdtWireResponse> {
   const url = FUNCTION_GROUP.validation;
   const queryParams = new URLSearchParams({
-    objtype: 'FUGR/F',
+    objtype: TYPE_CODE.functionGroup,
     objname: functionGroupName,
   });
 

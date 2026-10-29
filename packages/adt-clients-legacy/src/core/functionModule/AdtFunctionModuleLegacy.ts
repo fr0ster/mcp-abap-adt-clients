@@ -5,16 +5,19 @@
  * Overrides delete() to send `DELETE <URI>?lockHandle=…` under the lock handle the
  * caller holds (7.40 SP04 has no /sap/bc/adt/deletion/ API).
  * checkDeletion() is refused without a request: 7.40 has no deletion API.
+ * updateMetadata() is refused without a request: not measured on 7.40.
  */
 
 import {
   AdtFunctionModule,
+  type AdtPerformedBy,
   answering,
   FUNCTION_MODULE,
   type functionModuleDocuments,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -24,11 +27,15 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
+import {
+  legacyNotMeasuredRefusal,
+  noDeletionCheck,
+  noTransportResource,
+} from '../shared/refusalLegacy';
 
 export class AdtFunctionModuleLegacy<
   R extends IFunctionModuleResults = typeof functionModuleDocuments,
-> extends AdtFunctionModule<R> {
+> extends AdtFunctionModule<R, 'basis740'> {
   /**
    * Delete function module — legacy override.
    *
@@ -42,7 +49,7 @@ export class AdtFunctionModuleLegacy<
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const group = config.functionGroupName as string;
@@ -69,10 +76,27 @@ export class AdtFunctionModuleLegacy<
    * the object's lock handle is the delete.
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    _config: Partial<IFunctionModuleConfig>,
+    this: this & AdtPerformedBy<'functionModule', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the function module, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/functions/groups/{group}/fmodules/{name}',
+    );
   }
 
   /**
@@ -80,7 +104,8 @@ export class AdtFunctionModuleLegacy<
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
   override async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionModuleConfig>,
+    this: this & AdtPerformedBy<'functionModule', 'transport'>,
+    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     return noTransportResource<ReturnType<R['transport']>, E>(

@@ -13,6 +13,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -24,6 +25,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -37,16 +39,16 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { INTERFACE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateInterface } from './activation';
 import { checkInterface } from './check';
@@ -58,7 +60,7 @@ import {
   getInterfaceSource,
   getInterfaceTransport,
 } from './read';
-import { type IInterfaceConfig, interfaceDocuments } from './types';
+import type { IInterfaceConfig, interfaceDocuments } from './types';
 import { unlockInterface } from './unlock';
 import { upload } from './update';
 import { validateInterfaceName } from './validation';
@@ -66,11 +68,16 @@ import { getInterfaceVersionSource, getInterfaceVersions } from './versions';
 
 export class AdtInterface<
   R extends IInterfaceResults = typeof interfaceDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>>,
     IAdtReadable<IInterfaceConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<Partial<IInterfaceConfig>, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IInterfaceConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IInterfaceConfig,
       ReturnType<R['deletion']>,
@@ -87,6 +94,11 @@ export class AdtInterface<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -94,15 +106,17 @@ export class AdtInterface<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Interface';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = interfaceDocuments as unknown as R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -267,6 +281,41 @@ export class AdtInterface<
   }
 
   /**
+   * Write the interface's metadata document — one PUT of `options.source`, as
+   * the caller built it, under the caller's `options.lockHandle` (and
+   * `config.transportRequest` as `corrNr`), with the caller's headers.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
+    config: Partial<IInterfaceConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          INTERFACE.uri(config.interfaceName as string),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
    * Asks ADT whether the object can be deleted.
    *
    * Its own member because it is its own endpoint. `delete` no longer runs
@@ -274,6 +323,7 @@ export class AdtInterface<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
     config: Partial<IInterfaceConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
@@ -367,6 +417,7 @@ export class AdtInterface<
 
   /** The transport request the interface belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'transport'>,
     config: Partial<IInterfaceConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {

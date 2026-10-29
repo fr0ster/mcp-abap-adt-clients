@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -54,7 +55,7 @@ export async function create(
     ? ` adtcore:responsible="${responsible}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="BDEF/BDO" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="${TYPE_CODE.behaviorDefinition}" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
     <adtcore:adtTemplate>
         <adtcore:adtProperty adtcore:key="implementation_type">${params.implementationType}</adtcore:adtProperty>
     </adtcore:adtTemplate>

@@ -22,8 +22,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import type { AdtClient } from '../../clients/AdtClient';
-import { createAdtClient } from '../../clients/createAdtClient';
+import { AdtClient } from '../../clients/AdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
 import {
   type ISessionMaterial,
@@ -642,13 +641,17 @@ export type TestClientFactory = (
   options?: IAdtClientOptions,
 ) => Promise<ITestAdtClient>;
 
-/** The modern factory: `createAdtClient`, as every test built its client before. */
+/**
+ * The modern factory. A run targets an on-premise or a cloud system, and its
+ * tests are the same for both: the client is `AdtClient` of the modern
+ * variant, whose gates are what both tables serve.
+ */
 export const modernClientFactory: TestClientFactory = async (
   connection,
   logger,
   options,
 ) => ({
-  client: await createAdtClient(connection, logger, options),
+  client: new AdtClient(connection, logger, options),
 });
 
 /**

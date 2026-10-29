@@ -176,6 +176,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
           testCase?.params?.source_code || config.source || defaultSourceCode;
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           // Whether this system offers name validation for transformations
           // is its configuration, never read off a refusal.
           skipValidation: requiredEnvironmentFlag(

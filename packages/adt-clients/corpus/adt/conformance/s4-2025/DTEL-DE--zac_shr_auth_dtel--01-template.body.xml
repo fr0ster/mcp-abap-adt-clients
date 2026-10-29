@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="standard" adtcore:name="ZAC_SHR_AUTH_DTEL" adtcore:type="DTEL/DE" adtcore:changedAt="2026-10-19T13:05:11Z" adtcore:version="active" adtcore:createdAt="2026-09-30T21:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:description="Shared data element for the authorization field tests" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="ZAC_SHR_PKG"/>
+</adtcore:mainObject>

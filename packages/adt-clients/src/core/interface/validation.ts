@@ -9,6 +9,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { INTERFACE } from '../../endpoints/objects';
 
 /**
@@ -35,7 +36,7 @@ export async function validateInterfaceName(
   // Build query parameters for interface validation (same format as class validation)
   const params = new URLSearchParams({
     objname: interfaceName,
-    objtype: 'INTF/OI',
+    objtype: TYPE_CODE.interface,
     packagename: packageName,
   });
 

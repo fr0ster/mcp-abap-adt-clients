@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<enhs:objectData adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SCMG_RECORD_C" adtcore:type="ENHS/XSB" adtcore:changedAt="2008-11-07T00:00:00Z" adtcore:version="active" adtcore:createdAt="2008-10-31T00:00:00Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:language="EN" xmlns:enhs="http://www.sap.com/adt/enhancements/enhs" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/repository/informationsystem/abaplanguageversions?uri=%2Fsap%2Fbc%2Fadt%2Fenhancements%2Fenhsxsb%2Fscmg_record_c" rel="http://www.sap.com/adt/relations/informationsystem/abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="Allowed ABAP language versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/enhsxs/object_name/SCMG_RECORD_C" rel="self" type="application/vnd.sap.sapgui" title="Representation in SAP GUI" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/enhancements/enhsxsb/scmg_record_c/enhancements/definitions" rel="http://www.sap.com/adt/relations/badiDefinitions" type="application/xml" title="BAdI Definitions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./scmg_record_c" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Landing Page (HTML)" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/scmg_general" adtcore:type="DEVC/K" adtcore:name="SCMG_GENERAL" adtcore:description="Case Management: General Elements"/>
+  <enhs:contentCommon enhs:toolType="BADI_DEF" enhs:internal="false" enhs:internalFlagEditable="false">
+    <enhs:usages>
+      <enhcore:referencedObject enhcore:program_id="R3TR" enhcore:element_usage="USEO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/oo/interfaces/if_ex_scmg_record_c" adtcore:type="INTF/OI" adtcore:name="IF_EX_SCMG_RECORD_C"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/oo/interfaces/if_ex_scmg_record_c" adtcore:type="INTF/OI" adtcore:name="IF_EX_SCMG_RECORD_C"/>
+      </enhcore:referencedObject>
+    </enhs:usages>
+  </enhs:contentCommon>
+  <enhs:contentSpecific>
+    <enhs:badiTechnology>
+      <enhs:badiDefinitions>
+        <enhs:badiDefinition enhs:name="BADI_SCMG_RECORD_C" enhs:shorttext="BAdI Interface for IF_EX_SCMG_RECORD_C" enhs:singleUse="false" enhs:useFallbackClass="false" enhs:filterLimitation="false" enhs:documentationId="" enhs:contextMode="S" enhs:amdp="false" enhs:internalUse="false" enhs:customLogicRegistered="false">
+          <enhs:interface adtcore:uri="/sap/bc/adt/oo/interfaces/if_ex_scmg_record_c" adtcore:type="INTF/OI" adtcore:name="IF_EX_SCMG_RECORD_C"/>
+          <atom:link href="/sap/bc/adt/enhancements/enhsxsb/scmg_record_c#type=enhs%2fxb;name=badi_scmg_record_c" rel="http://www.sap.com/adt/relations/badiDefinition" xmlns:atom="http://www.w3.org/2005/Atom"/>
+          <atom:link href="/sap/bc/adt/enhancements/enhsxsb/scmg_record_c/customlogic/badi_scmg_record_c/check" rel="http://www.sap.com/adt/relations/badiCustomLogicCheck" title="Custom Logic Check" xmlns:atom="http://www.w3.org/2005/Atom"/>
+          <atom:link href="/sap/bc/adt/enhancements/enhsxsb/scmg_record_c/customlogic/badi_scmg_record_c/registration" rel="http://www.sap.com/adt/relations/badiCustomLogicRegistration" title="Custom Logic Registration" xmlns:atom="http://www.w3.org/2005/Atom"/>
+        </enhs:badiDefinition>
+      </enhs:badiDefinitions>
+    </enhs:badiTechnology>
+  </enhs:contentSpecific>
+</enhs:objectData>

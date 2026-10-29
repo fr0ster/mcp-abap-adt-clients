@@ -3,6 +3,7 @@
  * configured and written.
  */
 
+import type { AdtVariant } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../../src/clients/AdtClient';
 
 /** What a spec needs to build a config. */
@@ -30,7 +31,7 @@ export interface IObjectSpec {
   functionModule?: boolean;
   /** Created first, deleted last. */
   needs?: 'functionGroup' | 'ddl';
-  handle(client: AdtClient): IProbeable;
+  handle(client: IProbeClient): IProbeable;
   config(name: string, context: ISpecContext): Record<string, unknown>;
   /**
    * How the update phase writes: `update` with a source, `updateMetadata` with
@@ -40,6 +41,23 @@ export interface IObjectSpec {
   /** The source to write; without one the source read is written back unchanged. */
   source?(name: string, context: ISpecContext): string;
 }
+
+/**
+ * The client the probe makes, reads and removes its temporary objects through:
+ * the handler getters of any release variant, with the variant erased. The
+ * specs below ask it for handlers dynamically, whatever the variant of the
+ * client behind it (the base client of the run, or a registered set's of its
+ * own, e.g. a 7.40 client). A getter's variant gate is a `this` parameter, which
+ * an assignment to this type does not carry: the handler the spec then drives
+ * is the object the client hands out, and an operation the variant refuses
+ * answers its own refusal at run time, as it does for any caller outside the
+ * type system.
+ */
+export type IProbeClient = {
+  readonly [K in keyof AdtClient<AdtVariant> as K extends `get${string}`
+    ? K
+    : never]: (...args: never[]) => unknown;
+};
 
 const as = (handler: unknown): IProbeable => handler as IProbeable;
 
@@ -239,7 +257,7 @@ export function ddlSource(name: string): string {
 export const LOCAL_INCLUDES: readonly {
   type: string;
   handler: string;
-  handle(client: AdtClient): IProbeable;
+  handle(client: IProbeClient): IProbeable;
   source(className: string): string;
 }[] = [
   {

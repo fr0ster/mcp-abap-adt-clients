@@ -8,6 +8,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM } from '../../endpoints/objects';
 
 /**
@@ -34,7 +35,7 @@ export async function validateProgramName(
   const url = PROGRAM.validation;
   const queryParams = new URLSearchParams({
     objname: programName,
-    objtype: 'PROG/P',
+    objtype: TYPE_CODE.program,
     packagename: packageName,
   });
 

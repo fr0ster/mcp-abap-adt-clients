@@ -1,4 +1,5 @@
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtHeaders,
@@ -14,7 +15,9 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { runClass } from '../../core/class/run';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {
@@ -53,6 +56,7 @@ export const classExecutorDocuments = {
  */
 export class ClassExecutor<
   R extends IClassExecutorResults = typeof classExecutorDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtRunnable<IClassExecutionTarget, ReturnType<R['run']>>,
     IRunnableWithProfiler<
@@ -66,6 +70,11 @@ export class ClassExecutor<
       ReturnType<R['scheduled']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly results: R;
@@ -73,14 +82,13 @@ export class ClassExecutor<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = classExecutorDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;
-    this.scheduling = new TraceScheduling(connection, results);
+    this.scheduling = new TraceScheduling(connection, { results });
   }
 
   // --- ITraceScheduling, delegated. Composed into the executor because a run
@@ -120,6 +128,7 @@ export class ClassExecutor<
   }
 
   async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'run'>,
     target: IClassExecutionTarget,
     options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -138,6 +147,7 @@ export class ClassExecutor<
   }
 
   async runWithProfiler<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'class', 'profile'>,
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {

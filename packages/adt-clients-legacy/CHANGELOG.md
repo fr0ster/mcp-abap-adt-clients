@@ -4,14 +4,48 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
-## [0.2.0] - 2026-10-27
+## [0.2.0] - 2026-10-29
 
-On `@mcp-abap-adt/adt-clients` `^38.0.0` (#216), where each factory answers its
-class and the compositions of atoms are gone. No request and no answer changes.
-A breaking change of a 0.x package, so a minor.
+On `@mcp-abap-adt/adt-clients` `^38.0.0`, with its two changes of contract:
+each factory answers its class and the compositions of atoms are gone (#216),
+and the ADT type tables of `@mcp-abap-adt/interfaces-adt` decide what a client
+serves (#282) — here `ADT_TYPES_BASIS_740`. Answers do not change; a request
+changes only where a code no table holds is no longer taken. A breaking change
+of a 0.x package, so a minor.
 
 ### Breaking
 
+- **`AdtClientLegacy`'s and `AdtExecutorLegacy`'s getters have adt-clients
+  38's two overloads**: no argument answers the legacy handler, runner or
+  executor typed by the shipped documents, a result set one typed by it;
+  `getClass<MyResults>()` or `getClassTestRunner<MyResults>()` without
+  results no longer compiles. Every override of `AdtClientLegacy` (the
+  sixteen served types' and the eighteen absent ones') takes them, its
+  variant gate unchanged. The legacy handlers, runners and executors inherit
+  their base constructors, which take an options object with a required
+  `results` (adt-clients 38.0.0):
+  `new AdtClassLegacy(connection, { logger, results: classDocuments })`,
+  `new AdtUtilsLegacy(connection, { logger, results: utilDocuments })`,
+  `new ClassTestRunnerLegacy(connection, { logger, results: classTestRunnerDocuments })`;
+  or take one from the getter. No request and no answer changes.
+- **`AdtClientLegacy` is `AdtClient<'basis740'>`, typed by 7.40's table.**
+  `AdtExecutorLegacy` is `AdtExecutor<'basis740'>`, and every legacy handler
+  extends its base fixed to `'basis740'`. A getter or member
+  `ADT_TYPES_BASIS_740` does not list does not compile (`getTable()`,
+  `getPackage()`, `getClass().checkDeletion()`, `getDdl().getVersions()`, the
+  transport request's `create` / `updateMetadata` / `delete`, the executors'
+  class run and profiling, a runner's `getStatus` / `getResult`, …); every
+  override keeps its base's gate. A legacy client is not assignable to a
+  modern `AdtClient`. The refusals stay, for callers outside the type system,
+  and still send nothing.
+- **Every code is a code of 7.40's table.** `getUtils()`'
+  `readObjectMetadata`, `readObjectSource`, `search`, `fetchNodeStructure`,
+  `getObjectStructure` and `activateObjectsGroup` take 7.40's codes
+  (`DEVC/K` too for the two structure reads) and refuse any other without a
+  request — `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`, `DCLS/DL` and `ENHO/XHH`
+  included; the refusal names the table. The friendly names (`class`,
+  `program`, …), bare R3TR types and lower-case spellings are gone with
+  adt-clients 38.
 - **The getters answer classes.** The eleven that re-declared the base's two
   overloads over a composition (`getFunctionInclude`, `getInclude`,
   `getMessageClass`, `getLocalTestClass`, `getLocalTypes`,
@@ -26,12 +60,60 @@ A breaking change of a 0.x package, so a minor.
   38.0.0 no longer exports them
   ([MIGRATION-38.md](../adt-clients/docs/usage/MIGRATION-38.md)).
 
+### Added
+
+- **The function group's source on 7.40**: `getFunctionGroup().read(config,
+  version?)` and `update(config, { source, lockHandle, headers })` are
+  adt-clients 38's, inherited — one `GET …/source/main` (`Accept:
+  text/plain`) and one `PUT …/source/main?lockHandle=` of the caller's text.
+  Measured on SAP_BASIS 7.40 SP04 over RFC (2026-10-29, in `$TMP`): the GET
+  answered `200 text/plain` (the main program `SAPL<group>`), the PUT with
+  `Content-Type: text/plain; charset=utf-8` `200` under the lock, the
+  one-reference activation activated the group and its main program, and the
+  source read back equalled what was written. 7.40's table lists `read`,
+  `source` and `update` for `FUGR/F` since interfaces-adt 23.1.1, so both
+  compile on `AdtClientLegacy`. The function group live cycle reads, writes,
+  activates and reads back the group's source.
+- Refusals, without a request, of the members adt-clients 38 adds and 7.40 has
+  not measured: `updateMetadata` of the class, interface, program, function
+  module, DDL source and include. 7.40's table lists none of them, so each
+  also does not compile on `AdtClientLegacy`.
+- `getUtils().getTypeStructure()` is served, inherited (7.40's answer is in
+  adt-clients' corpus).
+- **The generic ABAP Unit runner on 7.40**, `AbapUnitTestRunnerLegacy`
+  (`AdtExecutorLegacy.getAbapUnitTestRunner()`): `runSync(uris, { headers })`
+  is adt-clients' — one `POST /abapunit/testruns` with `<options>`; `run` of
+  an object or a package target, `getStatus` and `getResult` are refused
+  without a request (no `/abapunit/runs`) and do not compile on
+  `'basis740'`.
+
 ### Changed
 
-- Peer dependency `@mcp-abap-adt/adt-clients` `^38.0.0` (was `^37.4.0`);
-  `@mcp-abap-adt/interfaces-adt` `^20.2.0` (was `^20.1.0`).
+- **The function group's activation sends the group alone**, as in 0.1.0.
+  adt-clients 38 adds the group's main program (`SAPL<group>`, `FUGR/I`) as a
+  second reference, measured on S/4HANA 2025 and ABAP cloud only;
+  `AdtFunctionGroupLegacy.activate()` keeps the one reference.
+- Peer and dev dependency `@mcp-abap-adt/adt-clients` `^38.0.0` (was
+  `^37.4.0`); `@mcp-abap-adt/interfaces-adt` `^23.1.1` (was `^20.1.0`);
+  dev `@mcp-abap-adt/adt-strategies` `^0.16.0` (was `^0.10.0`).
 - `legacyConsumerContract.test.ts` proves that a contract composed from
-  interfaces-adt alone accepts `AdtClientLegacy`.
+  interfaces-adt alone accepts `AdtClientLegacy`; `legacyVariantGates.test.ts`
+  holds every 7.40 gate through the overrides with `@ts-expect-error`; the
+  literal scan of type codes (`typeCodeLiterals.test.ts`) runs over this
+  package's source.
+
+### Migration
+
+- Code that calls a getter or member 7.40's table does not list no longer
+  compiles: drop the call, or, where the value comes from outside the type
+  system, keep reading the refusal (`UNSUPPORTED_OPERATION`).
+- Pass codes of the tables (`'CLAS/OC'`, `'PROG/P'`, `'FUGR/FF'` with its
+  group) where a friendly name or another spelling was passed.
+- A function typed `(client: AdtClient)` does not take an `AdtClientLegacy`
+  any more; type it `AdtClient<'basis740'>`, `AdtClientLegacy`, or the
+  consumer's own contract composed from `@mcp-abap-adt/interfaces-adt`.
+- Install `@mcp-abap-adt/adt-clients` `^38.0.0` beside it, and see its
+  [MIGRATION-38.md](../adt-clients/docs/usage/MIGRATION-38.md).
 
 ## [0.1.0] - 2026-10-27
 

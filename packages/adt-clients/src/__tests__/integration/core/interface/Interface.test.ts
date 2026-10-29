@@ -155,6 +155,7 @@ describe('Interface (using AdtClient)', () => {
         const config = await tester.requireConfig();
 
         await tester.flowTestAuto({
+          metadataUpdate: true,
           source: config.source,
           updateConfig: {
             interfaceName: config.interfaceName,

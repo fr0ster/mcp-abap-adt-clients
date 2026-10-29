@@ -7,93 +7,23 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCESS_CONTROL,
-  CLASS,
-  DATA_ELEMENT,
-  DDL_SOURCE,
-  DOMAIN,
-  FUNCTION_GROUP,
-  FUNCTION_MODULE,
-  INTERFACE,
-  METADATA_EXTENSION,
-  PACKAGE,
-  PROGRAM,
-  SCALAR_FUNCTION,
-  SCALAR_FUNCTION_IMPLEMENTATION,
-  SERVICE_DEFINITION,
-  STRUCTURE,
-  TABLE,
-  TRANSFORMATION,
-} from '../endpoints/objects';
+import type { IAdtGroupReference } from '../core/shared/codeSets';
+import type { AdtAddressableCode } from '../endpoints/codes';
+import { buildObjectUri } from './activationUtils';
 import { requestHeaders } from './requestHeaders';
 
 /**
- * Get ADT URI for object type
+ * The ADT URI a check run names: the object's address from the type tables.
+ * A function module names its group as `parentName`, where it used to be
+ * folded into the name as `GROUP/FM` — which a namespaced name, holding
+ * slashes of its own, could not survive.
  */
-export function getObjectUri(objectType: string, objectName: string): string {
-  switch (objectType.toLowerCase()) {
-    case 'class':
-      return `${CLASS.uri(objectName)}`;
-    case 'program':
-      return `${PROGRAM.uri(objectName)}`;
-    case 'interface':
-      return `${INTERFACE.uri(objectName)}`;
-    case 'function_group':
-    case 'fugr':
-      return `${FUNCTION_GROUP.uri(objectName)}`;
-    case 'function_module':
-    case 'fugr/ff': {
-      // Function module needs function group in format: "FUGR_NAME/FM_NAME"
-      if (!objectName.includes('/')) {
-        throw new Error(
-          'Function module requires function group. Use format: "functionGroupName/functionModuleName"',
-        );
-      }
-      const [fugrName, fmName] = objectName.split('/');
-      return `${FUNCTION_MODULE.uri(fugrName, fmName)}`;
-    }
-    case 'table':
-    case 'tabl/dt':
-      return `${TABLE.uri(objectName)}`;
-    case 'structure':
-    case 'stru/dt':
-      return `${STRUCTURE.uri(objectName)}`;
-    case 'view':
-    case 'ddls/df':
-      return `${DDL_SOURCE.uri(objectName)}`;
-    case 'metadata_extension':
-    case 'ddlx/ex':
-      return `${METADATA_EXTENSION.uri(objectName)}`;
-    case 'domain':
-      return `${DOMAIN.uri(objectName)}`;
-    case 'data_element':
-    case 'dtel':
-      return `${DATA_ELEMENT.uri(objectName)}`;
-    case 'package':
-    case 'devc/k':
-      return `${PACKAGE.uri(objectName)}`;
-    case 'service_definition':
-    case 'srvd/srv':
-      return `${SERVICE_DEFINITION.uri(objectName)}`;
-    case 'scalar_function':
-    case 'dsfd/scf':
-      return `${SCALAR_FUNCTION.uri(objectName)}`;
-    case 'scalar_function_implementation':
-    case 'dsfi/sfi':
-      return `${SCALAR_FUNCTION_IMPLEMENTATION.uri(objectName)}`;
-    case 'append_structure':
-    case 'tabl/ds':
-      return `${STRUCTURE.uri(objectName)}`;
-    case 'access_control':
-    case 'dcls/dl':
-      return `${ACCESS_CONTROL.uri(objectName)}`;
-    case 'transformation':
-    case 'xslt/vt':
-      return `${TRANSFORMATION.uri(objectName)}`;
-    default:
-      throw new Error(`Unsupported object type: ${objectType}`);
-  }
+export function getObjectUri(
+  objectType: AdtAddressableCode,
+  objectName: string,
+  parentName?: string,
+): string {
+  return buildObjectUri(objectName, objectType, parentName);
 }
 
 /**
@@ -172,14 +102,13 @@ export function buildCheckRunXmlWithSource(
 export async function runCheckRun(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  objectType: string,
-  objectName: string,
+  object: IAdtGroupReference<AdtAddressableCode>,
   version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',
   sourceCode?: string,
   artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<IAdtWireResponse> {
-  const objectUri = getObjectUri(objectType, objectName);
+  const objectUri = getObjectUri(object.type, object.name, object.parentName);
   const xmlBody = sourceCode
     ? buildCheckRunXmlWithSource(
         objectUri,
@@ -207,8 +136,7 @@ export async function runCheckRun(
  * similar to real-time validation in Eclipse ADT editor during typing.
  *
  * @param connection - The ABAP connection
- * @param objectType - Type of object (e.g., 'class', 'program')
- * @param objectName - Name of the object
+ * @param object - The object: its code of the type tables, its name and, for a function module, its group
  * @param sourceCode - The source code to validate
  * @param version - Version to validate against ('active' or 'inactive')
  * @param reporter - Reporter type for check results
@@ -218,14 +146,13 @@ export async function runCheckRun(
 export async function runCheckRunWithSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  objectType: string,
-  objectName: string,
+  object: IAdtGroupReference<AdtAddressableCode>,
   sourceCode: string,
   version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',
   artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<IAdtWireResponse> {
-  const objectUri = await getObjectUri(objectType, objectName);
+  const objectUri = getObjectUri(object.type, object.name, object.parentName);
   const xmlBody = buildCheckRunXmlWithSource(
     objectUri,
     sourceCode,

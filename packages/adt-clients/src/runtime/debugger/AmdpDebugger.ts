@@ -20,7 +20,10 @@ import type {
   IStartAmdpDebuggerOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type {
+  AdtHandlerOptions,
+  AdtShippedOptions,
+} from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument, wireItself } from '../../utils/resultStrategy';
 import {
@@ -74,12 +77,37 @@ export class AmdpDebugger<
 {
   readonly kind = 'amdpDebugger' as const;
 
+  private readonly results: R;
+
+  /**
+   * An AMDP debugger with the shipped documents, or with the caller's results.
+   * No client hands one out, so this is where the shipped documents are the
+   * default, as a getter's are.
+   */
+  static create(
+    connection: IAbapConnection,
+    options?: AdtShippedOptions<'logger'>,
+  ): AmdpDebugger<typeof amdpDebuggerDocuments>;
+  static create<R extends IAmdpDebuggerResults>(
+    connection: IAbapConnection,
+    options: AdtHandlerOptions<R, 'logger'>,
+  ): AmdpDebugger<R>;
+  static create(
+    connection: IAbapConnection,
+    options: Partial<AdtHandlerOptions<IAmdpDebuggerResults, 'logger'>> = {},
+  ): AmdpDebugger<IAmdpDebuggerResults> {
+    return new AmdpDebugger<IAmdpDebuggerResults>(connection, {
+      ...options,
+      results: options.results ?? amdpDebuggerDocuments,
+    });
+  }
+
   constructor(
     private readonly connection: IAbapConnection,
-    _logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = amdpDebuggerDocuments as unknown as R,
-  ) {}
+    options: AdtHandlerOptions<R, 'logger'>,
+  ) {
+    this.results = options.results;
+  }
 
   private reading<K extends keyof IAmdpDebuggerResults>(
     key: K,

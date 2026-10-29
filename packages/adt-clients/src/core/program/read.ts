@@ -21,7 +21,7 @@ export async function getProgramMetadata(
 ): Promise<IAdtWireResponse> {
   return objectMetadataWire(
     connection,
-    'program',
+    'PROG/P',
     programName,
     undefined,
     options,
@@ -39,7 +39,7 @@ export async function getProgramSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'program',
+    'PROG/P',
     programName,
     undefined,
     version,

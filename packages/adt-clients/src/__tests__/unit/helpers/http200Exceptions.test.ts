@@ -149,11 +149,14 @@ describe('a feed call', () => {
     makeAdtRequest: async () => wire,
   };
   const logger = { debug() {}, info() {}, warn() {}, error() {} };
-  const feeds = new FeedRepository(connection as never, logger, {
-    feeds: feedDescriptors,
-    variants: feedVariants,
-    entries: feedEntries,
-  } as never);
+  const feeds = new FeedRepository(connection as never, {
+    logger,
+    results: {
+      feeds: feedDescriptors,
+      variants: feedVariants,
+      entries: feedEntries,
+    } as never,
+  });
 
   it('reads an exception document as [] when nothing judges it', async () => {
     const answer = await feeds.list();

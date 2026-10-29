@@ -22,6 +22,7 @@
  */
 
 import type {
+  AdtVariant,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
@@ -29,7 +30,8 @@ import type {
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { PROGRAM } from '../../endpoints/objects';
 import {
   AbapUnitRunner,
@@ -42,22 +44,22 @@ export const programTestRunnerDocuments = abapUnitRunnerDocuments;
 
 export class ProgramTestRunner<
     R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
+    V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R>
+  extends AbapUnitRunner<R, V, 'program'>
   implements
     IAdtRunnable<string, ReturnType<R['run']>, IClassUnitTestRunOptions>
 {
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = programTestRunnerDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
-    super(connection, logger, results);
+    super(connection, options);
   }
 
   /** Run every test class of the report. One POST. */
   async run<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestRun'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
@@ -84,6 +86,7 @@ export class ProgramTestRunner<
    * @mcp-abap-adt/adt-strategies reads it so).
    */
   async runSync<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestRunSync'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {

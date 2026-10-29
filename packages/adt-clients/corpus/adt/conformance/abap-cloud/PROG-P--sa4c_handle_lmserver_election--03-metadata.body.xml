@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<program:abapProgram program:lockedByEditor="false" program:programType="executableProgram" abapsource:sourceUri="source/main" abapsource:sourceObjectStatus="system" abapsource:fixPointArithmetic="true" abapsource:activeUnicodeCheck="true" adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="SA4C_HANDLE_LMSERVER_ELECTION" adtcore:type="PROG/P" adtcore:changedAt="2023-09-29T08:00:41Z" adtcore:version="active" adtcore:createdAt="2023-04-04T00:00:00Z" adtcore:changedBy="SAP" adtcore:description="Program SA4C_HANDLE_LMSERVER_ELECTION" adtcore:descriptionTextLimit="70" adtcore:language="EN" xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="source/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/plain" etag="202309290800410011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" type="text/html" etag="202309290800410011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./sa4c_handle_lmserver_election/objectstructure" rel="http://www.sap.com/adt/relations/objectstructure" type="application/vnd.sap.adt.objectstructure.v2+xml" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/textelements/programs/sa4c_handle_lmserver_election" rel="http://www.sap.com/adt/relations/sources/textelements" title="Text Elements" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/programs/programs/sa4c_handle_lmserver_election/enhancements/implementations" rel="http://www.sap.com/adt/relations/enhancementImplementations" type="application/vnd.sap.adt.enhancementimplementations.v1+xml" title="Enhancement Implementations" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/programs/programs/sa4c_handle_lmserver_election/enhancements/options" rel="http://www.sap.com/adt/relations/enhancementOptionsOfMainObject" type="application/vnd.sap.adt.enhancementoptions.v2+xml" title="Enhancement Options of Main Object" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/programs/programs/sa4c_handle_lmserver_election/source/main/enhancements/options" rel="http://www.sap.com/adt/relations/enhancementOptions" type="application/vnd.sap.adt.enhancementoptions.v2+xml" title="Enhancement Options" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/sa4c_env" adtcore:type="DEVC/K" adtcore:name="SA4C_ENV"/>
+  <abapsource:syntaxConfiguration>
+    <abapsource:language>
+      <abapsource:version>X</abapsource:version>
+      <abapsource:description>Standard ABAP</abapsource:description>
+      <atom:link href="/sap/bc/adt/abapsource/parsers/rnd/grammar" rel="http://www.sap.com/adt/relations/abapsource/parser" type="text/plain" title="Standard ABAP" etag="920" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    </abapsource:language>
+  </abapsource:syntaxConfiguration>
+</program:abapProgram>

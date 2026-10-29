@@ -2,9 +2,12 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { create as createAccessControl } from '../../../../core/accessControl/create';
 import { AdtBehaviorImplementation } from '../../../../core/behaviorImplementation/AdtBehaviorImplementation';
+import { classDocuments } from '../../../../core/class/types';
 import { AdtInclude } from '../../../../core/include/AdtInclude';
 import { create as createInclude } from '../../../../core/include/create';
+import { includeDocuments } from '../../../../core/include/types';
 import { AdtMessageClass } from '../../../../core/messageClass/AdtMessageClass';
+import { messageClassDocuments } from '../../../../core/messageClass/types';
 import { create as createServiceDefinition } from '../../../../core/serviceDefinition/create';
 import { create as createTransformation } from '../../../../core/transformation/create';
 import { headersFor, headersOf } from '../../../helpers/adtHeaders';
@@ -35,8 +38,17 @@ describe('message class create', () => {
 
   it('carries the context responsible and master system', async () => {
     const { conn, bodies } = recorder();
-    await new AdtMessageClass(conn, undefined, CTX).create(config, {
-      headers: headersOf(new AdtMessageClass(conn, undefined, CTX), 'create'),
+    await new AdtMessageClass(conn, {
+      systemContext: CTX,
+      results: messageClassDocuments,
+    }).create(config, {
+      headers: headersOf(
+        new AdtMessageClass(conn, {
+          systemContext: CTX,
+          results: messageClassDocuments,
+        }),
+        'create',
+      ),
     });
     expect(bodies[0]).toContain('adtcore:responsible="DEVELOPER"');
     expect(bodies[0]).toContain('adtcore:masterSystem="SID"');
@@ -44,14 +56,20 @@ describe('message class create', () => {
 
   it('writes neither attribute for an empty-string context', async () => {
     const { conn, bodies } = recorder();
-    await new AdtMessageClass(conn, undefined, {
-      responsible: '',
-      masterSystem: '',
+    await new AdtMessageClass(conn, {
+      systemContext: {
+        responsible: '',
+        masterSystem: '',
+      },
+      results: messageClassDocuments,
     }).create(config, {
       headers: headersOf(
-        new AdtMessageClass(conn, undefined, {
-          responsible: '',
-          masterSystem: '',
+        new AdtMessageClass(conn, {
+          systemContext: {
+            responsible: '',
+            masterSystem: '',
+          },
+          results: messageClassDocuments,
         }),
         'create',
       ),
@@ -62,9 +80,15 @@ describe('message class create', () => {
 
   it('writes neither attribute when the context has none', async () => {
     const { conn, bodies } = recorder();
-    await new AdtMessageClass(conn).create(config, {
-      headers: headersOf(new AdtMessageClass(conn), 'create'),
-    });
+    await new AdtMessageClass(conn, { results: messageClassDocuments }).create(
+      config,
+      {
+        headers: headersOf(
+          new AdtMessageClass(conn, { results: messageClassDocuments }),
+          'create',
+        ),
+      },
+    );
     expect(bodies[0]).not.toContain('adtcore:responsible');
     expect(bodies[0]).not.toContain('adtcore:masterSystem');
   });
@@ -174,13 +198,20 @@ describe('behavior implementation create through the client', () => {
 
   it('the class itself, without a context, sends neither', async () => {
     const { conn, bodies } = recorder();
-    await new AdtBehaviorImplementation(conn).create(
+    await new AdtBehaviorImplementation(conn, {
+      results: classDocuments,
+    }).create(
       {
         className: 'ZBP_I_X',
         packageName: 'ZPKG',
         description: 'd',
       } as never,
-      { headers: headersOf(new AdtBehaviorImplementation(conn), 'create') },
+      {
+        headers: headersOf(
+          new AdtBehaviorImplementation(conn, { results: classDocuments }),
+          'create',
+        ),
+      },
     );
     expect(bodies[0]).not.toContain('adtcore:responsible');
     expect(bodies[0]).not.toContain('adtcore:masterSystem');
@@ -192,15 +223,15 @@ describe('include create', () => {
 
   it('carries the context responsible and master system', async () => {
     const { conn, bodies } = recorder();
-    await new AdtInclude(conn, undefined, undefined, undefined, CTX).create(
-      config,
-      {
-        headers: headersOf(
-          new AdtInclude(conn, undefined, undefined, undefined, CTX),
-          'create',
-        ),
-      },
-    );
+    await new AdtInclude(conn, {
+      results: includeDocuments,
+      systemContext: CTX,
+    }).create(config, {
+      headers: headersOf(
+        new AdtInclude(conn, { results: includeDocuments, systemContext: CTX }),
+        'create',
+      ),
+    });
     expect(bodies[0]).toContain('adtcore:responsible="DEVELOPER"');
     expect(bodies[0]).toContain('adtcore:masterSystem="SID"');
   });

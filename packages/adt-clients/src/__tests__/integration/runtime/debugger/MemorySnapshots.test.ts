@@ -40,11 +40,15 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
-import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
+import {
+  MemorySnapshots,
+  memorySnapshotsDocuments,
+} from '../../../../runtime/memory/MemorySnapshots';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -202,11 +206,10 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       terminalId: id('t'),
       ideId: id('i'),
     };
-    listenerApi = new AbapDebugger(
-      listenerConnection,
-      connectionLogger,
-      abapDebuggerDocuments,
-    );
+    listenerApi = new AbapDebugger(listenerConnection, {
+      logger: connectionLogger,
+      results: abapDebuggerDocuments,
+    });
     if (!Number.isFinite(ROWS)) {
       throw new Error(
         `the source of shared class ${CLASS_NAME} has no DO <n> TIMES line`,
@@ -298,10 +301,10 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         );
       }
       needs(triggerConnection, 'the trigger connection');
-      run = new ClassExecutor(
-        triggerConnection as Connection,
-        connectionLogger,
-      ).run({ className: CLASS_NAME }, { analyse: analyseException });
+      run = new ClassExecutor(triggerConnection as Connection, {
+        logger: connectionLogger,
+        results: classExecutorDocuments,
+      }).run({ className: CLASS_NAME }, { analyse: analyseException });
       const caught = documentOf(await listener);
       const debuggeeId = tag(caught, 'DEBUGGEE_ID');
       needs(debuggeeId, `a debuggee: ${caught.slice(0, 300)}`);
@@ -310,11 +313,10 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         ownSession: true,
       });
       sessionConnection.setSessionType('stateful');
-      debuggerApi = new AbapDebugger(
-        sessionConnection,
-        connectionLogger,
-        abapDebuggerDocuments,
-      );
+      debuggerApi = new AbapDebugger(sessionConnection, {
+        logger: connectionLogger,
+        results: abapDebuggerDocuments,
+      });
       const attach = await debuggerApi.attach(identity, debuggeeId as string, {
         analyse: analyseException,
         server: tag(caught, 'INSTANCE_NAME'),
@@ -401,10 +403,10 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     'both snapshots reach the list',
     async () => {
       needs(stops.after, 'both snapshots written');
-      const snapshots = new MemorySnapshots(
-        triggerConnection as Connection,
-        connectionLogger,
-      );
+      const snapshots = new MemorySnapshots(triggerConnection as Connection, {
+        logger: connectionLogger,
+        results: memorySnapshotsDocuments,
+      });
       const deadline = Date.now() + LIST_WAIT_SECONDS * 1000;
       for (;;) {
         const list = await snapshots.list({
@@ -432,10 +434,10 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     'reads a snapshot, its overview, ranking list and references, and the delta',
     async () => {
       needs(ids.before && ids.after, 'both snapshots listed');
-      const snapshots = new MemorySnapshots(
-        triggerConnection as Connection,
-        connectionLogger,
-      );
+      const snapshots = new MemorySnapshots(triggerConnection as Connection, {
+        logger: connectionLogger,
+        results: memorySnapshotsDocuments,
+      });
       const before = ids.before as string;
       const after = ids.after as string;
 

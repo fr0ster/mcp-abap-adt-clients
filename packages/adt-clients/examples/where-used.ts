@@ -10,6 +10,8 @@
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtModernVariant } from '../src/clients/variant';
+import type { AdtWhereUsedCode } from '../src/core/shared/codeSets';
 import type { AdtClient } from '../src/clients/AdtClient';
 
 // Since 36.0.0 a request's Accept and Content-Type are the caller's
@@ -30,7 +32,7 @@ const WHERE_USED: IAdtHeaders = {
 export async function whereUsed(
   client: AdtClient,
   objectName: string,
-  objectType = 'class',
+  objectType: AdtWhereUsedCode<AdtModernVariant> = 'CLAS/OC',
   searchOnlyIn?: string[],
 ): Promise<string> {
   const utils = client.getUtils();

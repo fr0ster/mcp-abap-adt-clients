@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
@@ -63,7 +64,7 @@ export async function createPackage(
     : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${escapeXml(params.package_name)}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${escapeXml(params.package_name)}" adtcore:type="${TYPE_CODE.package}" adtcore:version="active" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapeXml(params.package_name)}"/>
   <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="${params.record_changes ? 'true' : 'false'}"/>
   ${superPackageXml}

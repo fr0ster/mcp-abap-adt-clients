@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<enho:enhancement abapsource:sourceUri="./mm06efko_kond_taxes_01/source/main" abapsource:fixPointArithmetic="false" abapsource:activeUnicodeCheck="false" adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="MM06EFKO_KOND_TAXES_01" adtcore:type="ENHO/XHH" adtcore:changedAt="2009-07-24T02:30:52Z" adtcore:version="active" adtcore:createdAt="2009-07-24T02:30:52Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="MM06EFKO_KOND_TAXES_01" adtcore:language="EN" xmlns:enho="http://www.sap.com/adt/enhancements/enho" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="./mm06efko_kond_taxes_01/source/main/versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/repository/informationsystem/abaplanguageversions?uri=%2Fsap%2Fbc%2Fadt%2Fenhancements%2Fenhoxhh%2Fmm06efko_kond_taxes_01%2Fsource%2Fmain" rel="http://www.sap.com/adt/relations/informationsystem/abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="Allowed ABAP language versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./mm06efko_kond_taxes_01/source/main" rel="http://www.sap.com/adt/relations/source" type="text/plain" title="Source Content" etag="BIoDH1PHq1XO/M9ntMIjWUDmuCg=" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./mm06efko_kond_taxes_01/source/main" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Source Content (HTML)" etag="" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/enhoxh/object_name/MM06EFKO_KOND_TAXES_01" rel="self" type="application/vnd.sap.sapgui" title="Representation in SAP Gui" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/programs/includes/mm06efko_kond_taxes/enhancements/options?enhancementImplementation=MM06EFKO_KOND_TAXES_01" rel="http://www.sap.com/adt/relations/enhancementOptionsOfEnhancedObject" type="application/vnd.sap.adt.enhancementoptions.v2+xml" title="Enhancement Options" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/oih_cv_br" adtcore:type="DEVC/K" adtcore:name="OIH_CV_BR" adtcore:description="Oil country version Brazil"/>
+  <enho:contentCommon enho:toolType="HOOK_IMPL" enho:adjustmentStatus="adjusted" enho:upgradeFlag="false">
+    <enho:switch enho:state="off">
+      <enho:reference adtcore:uri="/sap/bc/adt/vit/wb/object_type/sfsw6s/object_name/OIH_BRASIL" adtcore:type="SFSW/6S" adtcore:name="OIH_BRASIL"/>
+    </enho:switch>
+    <enho:usages>
+      <enhcore:referencedObject enhcore:program_id="R3TR" enhcore:element_usage="REDO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/es_mm06efko_kond_taxes" adtcore:type="ENHS/XSB" adtcore:name="ES_MM06EFKO_KOND_TAXES"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/enhancements/enhsxsb/es_mm06efko_kond_taxes" adtcore:type="ENHS/XSB" adtcore:name="ES_MM06EFKO_KOND_TAXES"/>
+      </enhcore:referencedObject>
+      <enhcore:referencedObject enhcore:program_id="LIMU" enhcore:element_usage="REDO" enhcore:upgrade="false" enhcore:automatic_transport="false" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore">
+        <enhcore:objectReference adtcore:uri="/sap/bc/adt/programs/includes/mm06efko_kond_taxes" adtcore:type="PROG/I" adtcore:name="MM06EFKO_KOND_TAXES"/>
+        <enhcore:mainObjectReference adtcore:uri="/sap/bc/adt/programs/includes/mm06efko_kond_taxes" adtcore:type="PROG/I" adtcore:name="MM06EFKO_KOND_TAXES"/>
+      </enhcore:referencedObject>
+    </enho:usages>
+  </enho:contentCommon>
+  <enho:contentSpecific>
+    <enho:hookTechnology enho:nextId="2">
+      <enho:enhancedObject adtcore:uri="/sap/bc/adt/programs/includes/mm06efko_kond_taxes" adtcore:type="PROG/I" adtcore:name="MM06EFKO_KOND_TAXES"/>
+      <enho:hookImplementation enho:id="1" enho:spotname="ES_MM06EFKO_KOND_TAXES" enho:programname="MM06EFKO_KOND_TAXES" enho:overwrite="" enho:method="" enho:enhmode="D" enho:full_name="\IC:MM06EFKO_KOND_TAXES\EX:KOND_TAXES_01\EI" enho:full_description=" Include MM06EFKO_KOND_TAXES, Enhancement Exit KOND_TAXES_01">
+        <atom:link href="/sap/bc/adt/programs/includes/mm06efko_kond_taxes/source/main#start=316,76" rel="enclosure" title="The enclosing object" xmlns:atom="http://www.w3.org/2005/Atom"/>
+      </enho:hookImplementation>
+    </enho:hookTechnology>
+  </enho:contentSpecific>
+</enho:enhancement>

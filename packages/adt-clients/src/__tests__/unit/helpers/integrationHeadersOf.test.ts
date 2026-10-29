@@ -4,10 +4,21 @@ import { join, sep } from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
+import { abapGitDocuments } from '../../../clients/abapGit/types';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
-import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
-import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
+import {
+  classExecutorDocuments,
+  programExecutorDocuments,
+} from '../../../index.executors';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+} from '../../../runtime/debugger/AbapDebugger';
+import {
+  AmdpDebugger,
+  amdpDebuggerDocuments,
+} from '../../../runtime/debugger/AmdpDebugger';
 import {
   headersOf,
   integrationHeadersOf,
@@ -124,11 +135,26 @@ function everyHeaderMember(conn: IAbapConnection): {
       headerMembers(`${factory}()`, handler),
     );
   const standalone: [string, unknown][] = [
-    ['AdtAbapGitClient', new AdtAbapGitClient(conn, logger)],
-    ['AbapDebugger', new AbapDebugger(conn, logger)],
-    ['AmdpDebugger', new AmdpDebugger(conn, logger)],
-    ['ClassExecutor', new ClassExecutor(conn, logger)],
-    ['ProgramExecutor', new ProgramExecutor(conn, logger)],
+    [
+      'AdtAbapGitClient',
+      new AdtAbapGitClient(conn, { logger, results: abapGitDocuments }),
+    ],
+    [
+      'AbapDebugger',
+      new AbapDebugger(conn, { logger, results: abapDebuggerDocuments }),
+    ],
+    [
+      'AmdpDebugger',
+      new AmdpDebugger(conn, { logger, results: amdpDebuggerDocuments }),
+    ],
+    [
+      'ClassExecutor',
+      new ClassExecutor(conn, { logger, results: classExecutorDocuments }),
+    ],
+    [
+      'ProgramExecutor',
+      new ProgramExecutor(conn, { logger, results: programExecutorDocuments }),
+    ],
   ];
   return {
     modern: [

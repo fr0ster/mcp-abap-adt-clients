@@ -1,0 +1,34 @@
+{
+  "case": "TABL-DS--zac_shr_stru",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/structures/zac_shr_stru",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/structures/zac_shr_stru",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.structures.v2+xml, application/vnd.sap.adt.structures.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "677",
+      "content-type": "application/vnd.sap.adt.structures.v2+xml; charset=utf-8",
+      "etag": "20260908112829001application/vnd.sap.adt.structures.v2+xmlS5Dl/za8r7mOw6WhtQE0VJAzBT8=",
+      "last-modified": "Tue, 08 Sep 2026 11:28:29 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "105616.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "TABL-DS--zac_shr_stru--03-metadata.body.xml"
+  }
+}

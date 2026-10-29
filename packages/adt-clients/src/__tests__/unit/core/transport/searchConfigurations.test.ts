@@ -97,7 +97,9 @@ describe('AdtRequest.searchConfigurations', () => {
       answering(CONFIGURATIONS),
     );
 
-    const answer = await new AdtRequest(connection).searchConfigurations();
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).searchConfigurations();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe(
@@ -113,12 +115,9 @@ describe('AdtRequest.searchConfigurations', () => {
   it('answers the configurations, addressable as configUri', async () => {
     const { connection } = connectionOver(() => answering(CONFIGURATIONS));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).searchConfigurations();
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).searchConfigurations();
     if (!answer.ok) throw new Error('expected the configurations');
     const configurations = answer.getResult()
       .value as ITransportSearchConfiguration[];
@@ -145,12 +144,7 @@ describe('AdtRequest.searchConfigurations', () => {
           : '<tm:root/>',
       ),
     );
-    const request = new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    );
+    const request = new AdtRequest(connection, { results: transportParsing });
 
     const answer = await request.searchConfigurations();
     if (!answer.ok) throw new Error('expected the configurations');
@@ -173,7 +167,9 @@ describe('AdtRequest.searchConfigurations', () => {
     });
 
     const seen: unknown[] = [];
-    const answer = await new AdtRequest(connection).searchConfigurations({
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).searchConfigurations({
       analyse: (verdict, wire) => {
         seen.push(wire?.status);
         return verdict === ADT_NO_FAILURE
@@ -196,7 +192,9 @@ describe('AdtRequest.searchConfigurations', () => {
   it('answers the configurations document as it arrived by default', async () => {
     const { connection } = connectionOver(() => answering(CONFIGURATIONS));
 
-    const answer = await new AdtRequest(connection).searchConfigurations();
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).searchConfigurations();
 
     if (!answer.ok) throw new Error('expected the document');
     expect(answer.getResult().value).toBe(CONFIGURATIONS);
@@ -205,10 +203,12 @@ describe('AdtRequest.searchConfigurations', () => {
   it('reads the answer the caller injected, where one was injected', async () => {
     const { connection } = connectionOver(() => answering(CONFIGURATIONS));
 
-    const answer = await new AdtRequest(connection, undefined, undefined, {
-      ...transportDocuments,
-      searchConfigurations: (wire) =>
-        `document of ${String(wire.data).length} bytes`,
+    const answer = await new AdtRequest(connection, {
+      results: {
+        ...transportDocuments,
+        searchConfigurations: (wire) =>
+          `document of ${String(wire.data).length} bytes`,
+      },
     }).searchConfigurations();
 
     if (!answer.ok) throw new Error('expected the injected reading');

@@ -7,8 +7,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtAddressableCode } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
+import type { AdtCodes } from './codeSets';
 import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
@@ -19,7 +21,7 @@ import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
  * @returns Modified scope XML
  *
  * @example
- * const scopeResponse = await getWhereUsedScope(connection, { object_name: 'ZMY_CLASS', object_type: 'class' });
+ * const scopeResponse = await getWhereUsedScope(connection, { object_name: 'ZMY_CLASS', object_type: 'CLAS/OC' });
  * let scopeXml = scopeResponse.data;
  *
  * // Enable all types
@@ -37,7 +39,7 @@ import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
  *
  * // Disable specific types
  * scopeXml = modifyWhereUsedScope(scopeXml, {
- *   disable: ['WDYN/YT', 'WAPA/WO']
+ *   disable: ['PROG/I', 'DEVC/K']
  * });
  */
 export function modifyWhereUsedScope(
@@ -97,69 +99,51 @@ function setIsSelected(typeTag: string, selected: boolean): string {
 }
 
 /**
- * The friendly names where-used has always accepted, mapped to the type codes
- * `buildObjectUri` knows. `buildObjectUri` is the address every family's
- * activation is verified against; where-used used to keep a vocabulary of its
- * own beside it, which answered `intf/if` and `stru/dt` — codes ADT does not
- * use — and knew no behavior definition, metadata extension or service.
+ * What where-used addresses: every addressable code but a function include,
+ * whose group the parameters have no field for (`FUGR/FF` names its group as
+ * `GROUP|FM`). `VIEW/DV` included, as before 38.0.0.
  */
-const WHERE_USED_ALIASES: Readonly<Record<string, string>> = {
-  class: 'CLAS/OC',
-  program: 'PROG/P',
-  include: 'PROG/I',
-  function: 'FUGR/F',
-  functiongroup: 'FUGR/F',
-  interface: 'INTF/OI',
-  package: 'DEVC/K',
-  table: 'TABL/DT',
-  structure: 'STRU/DS',
-  domain: 'DOMA/DD',
-  dataelement: 'DTEL/DE',
-  view: 'DDLS/DF',
-  functionmodule: 'FUGR/FF',
-  function_module: 'FUGR/FF',
+export type WhereUsedAddressCode = Exclude<
+  AdtAddressableCode,
+  AdtCodes<'FUGR/I'>
+>;
+
+/** What the where-used requests take: their params, `object_type` addressable. */
+export type IWhereUsedScopeRequest = Omit<
+  IGetWhereUsedScopeParams,
+  'object_type'
+> & { object_type: WhereUsedAddressCode };
+export type IWhereUsedRequest = Omit<IGetWhereUsedParams, 'object_type'> & {
+  object_type: WhereUsedAddressCode;
 };
 
 /**
  * The address a where-used request asks about.
  *
- * `objectType` is a type code (`CLAS/OC`, `BDEF/BDO`, …, any case) or one of
- * the friendly names above. A function module is named `GROUP|FM`, because the
+ * `objectType` is a code of the ADT type tables (`CLAS/OC`, `BDEF/BDO`, …).
+ * The friendly names this used to accept beside the codes (`class`,
+ * `structure`, …) went with interfaces-adt 21.0.0, whose `object_type` is an
+ * `AdtTypeCode`: one of them, `structure`, mapped to `STRU/DS`, a code no
+ * release lists. A function module is named `GROUP|FM`, because the
  * parameters carry no separate group.
  *
- * Throws for a type neither vocabulary knows, and for a function module without
- * its group — both are the caller's argument, found before any request is made.
- * `buildObjectUri` answers an unknown code with a guess (the lowercased code as
- * a path), which for where-used would be a request about an address that exists
- * nowhere, so the guess is refused here.
+ * Throws for a function module without its group — the caller's argument,
+ * found before any request is made.
  */
 export function whereUsedObjectUri(
   objectName: string,
-  objectType: string,
+  objectType: WhereUsedAddressCode,
 ): string {
-  const code = (
-    WHERE_USED_ALIASES[objectType.toLowerCase()] ?? objectType
-  ).toUpperCase();
-
-  if (!code) {
-    throw new Error(`Where-used needs an object type for ${objectName}`);
-  }
-
-  let name = objectName;
-  let parentName: string | undefined;
-  if (code === 'FUGR/FF') {
+  if (objectType === 'FUGR/FF') {
     const [group, fm] = objectName.split('|');
-    if (!fm) {
+    if (!group || !fm) {
       throw new Error(
         `A function module is named GROUP|FM_NAME for where-used; got ${objectName}`,
       );
     }
-    name = fm;
-    parentName = group;
+    return buildObjectUri(fm, objectType, group);
   }
-
-  // An unknown type is refused inside buildObjectUri, before any request.
-  return buildObjectUri(name, code, parentName);
+  return buildObjectUri(objectName, objectType);
 }
 
 /**
@@ -176,7 +160,7 @@ export function whereUsedObjectUri(
  * // Step 1: Get scope
  * const scopeResponse = await getWhereUsedScope(connection, {
  *   object_name: 'ZMY_CLASS',
- *   object_type: 'class'
+ *   object_type: 'CLAS/OC'
  * });
  *
  * // Modify scope XML to select/deselect object types
@@ -186,14 +170,14 @@ export function whereUsedObjectUri(
  * // Step 2: Execute search with modified scope
  * const result = await getWhereUsed(connection, {
  *   object_name: 'ZMY_CLASS',
- *   object_type: 'class',
+ *   object_type: 'CLAS/OC',
  *   scopeXml: scopeXml
  * });
  */
 export async function getWhereUsedScope(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  params: IGetWhereUsedScopeParams,
+  params: IWhereUsedScopeRequest,
 ): Promise<IAdtWireResponse> {
   const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
@@ -226,7 +210,7 @@ export async function getWhereUsedScope(
 export async function getWhereUsed(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  params: IGetWhereUsedParams,
+  params: IWhereUsedRequest,
 ): Promise<IAdtWireResponse> {
   const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
 

@@ -10,6 +10,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtDomain } from '../../../core/domain/AdtDomain';
+import { domainDocuments } from '../../../core/domain/types';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
 import { expectFailure, expectResult } from '../../helpers/contract';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
@@ -60,7 +61,10 @@ describe('AdtDomain lock registry wiring', () => {
     });
     const { conn } = fakeConnection();
     const registry = new LockRegistry();
-    const domain = new AdtDomain(conn, undefined, undefined, registry);
+    const domain = new AdtDomain(conn, {
+      lockRegistry: registry,
+      results: domainDocuments,
+    });
 
     await domain.lock({ domainName });
 
@@ -76,7 +80,10 @@ describe('AdtDomain lock registry wiring', () => {
     });
     const { conn } = fakeConnection();
     const registry = new LockRegistry();
-    const domain = new AdtDomain(conn, undefined, undefined, registry);
+    const domain = new AdtDomain(conn, {
+      lockRegistry: registry,
+      results: domainDocuments,
+    });
 
     const handle = expectResult(await domain.lock({ domainName }), 'lock');
     await domain.unlock({ domainName }, handle);
@@ -93,7 +100,10 @@ describe('AdtDomain lock registry wiring', () => {
     });
     const { conn, calls } = fakeConnection();
     const registry = new LockRegistry();
-    const domain = new AdtDomain(conn, undefined, undefined, registry);
+    const domain = new AdtDomain(conn, {
+      lockRegistry: registry,
+      results: domainDocuments,
+    });
 
     await domain.lock({ domainName });
     const failures = await registry.unlockAll();

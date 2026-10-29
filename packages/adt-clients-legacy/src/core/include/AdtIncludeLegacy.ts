@@ -4,6 +4,7 @@
  *
  * Overrides:
  * - checkDeletion() — refused without a request: 7.40 has no deletion API.
+ * - updateMetadata() — refused without a request: not measured on 7.40.
  * - delete() — `DELETE <URI>?lockHandle=…` under the lock handle the caller
  *   holds (measured on 7.40 SP04: `200`, a read afterwards answers `404`;
  *   record B4-cycles-20261026-2019).
@@ -11,6 +12,7 @@
 
 import {
   AdtInclude,
+  type AdtPerformedBy,
   answering,
   type includeDocuments,
   PROGRAM_INCLUDE,
@@ -26,17 +28,37 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { noDeletionCheck } from '../shared/refusalLegacy';
+import {
+  legacyNotMeasuredRefusal,
+  noDeletionCheck,
+} from '../shared/refusalLegacy';
 
 export class AdtIncludeLegacy<
   R extends IIncludeResults = typeof includeDocuments,
-> extends AdtInclude<R> {
+> extends AdtInclude<R, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
     _config: Partial<IIncludeConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  }
+
+  /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `updateMetadata` for the include, and no run there has sent the PUT of its
+   * metadata document.
+   */
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    _config: Partial<IIncludeConfig>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+      'updateMetadata',
+      'PUT /sap/bc/adt/programs/includes/{name}',
+    );
   }
 
   /**

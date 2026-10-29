@@ -1,5 +1,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { field } from '../parsed';
 import { rawOf } from '../result';
 
 /** One entry of an object's version history. */
@@ -23,19 +24,17 @@ const parser = new XMLParser({
 
 const TRANSPORT_REL = 'http://www.sap.com/adt/relations/transport/request';
 
-function transportOf(entry: Record<string, any>): {
+function transportOf(entry: unknown): {
   request?: string;
   description?: string;
 } {
-  const raw = entry['atom:link'] ?? entry.link;
+  const raw = field(entry, 'atom:link') ?? field(entry, 'link');
   const links = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const link = links.find(
-    (l: Record<string, any>) => l?.['@_rel'] === TRANSPORT_REL,
-  );
+  const link = links.find((l: unknown) => field(l, '@_rel') === TRANSPORT_REL);
   if (!link) return {};
   return {
-    request: String(link['@_adtcore:name'] ?? '') || undefined,
-    description: String(link['@_title'] ?? '') || undefined,
+    request: String(field(link, '@_adtcore:name') ?? '') || undefined,
+    description: String(field(link, '@_title') ?? '') || undefined,
   };
 }
 
@@ -52,27 +51,26 @@ function transportOf(entry: Record<string, any>): {
 export const objectVersions: IResultStrategy<IObjectVersion[]> = (answer) => {
   const text = rawOf(answer);
   if (!text.trim()) return [];
-  const root = parser.parse(text) as Record<string, any>;
-  const feed = root['atom:feed'] ?? root.feed;
+  const root: unknown = parser.parse(text);
+  const feed = field(root, 'atom:feed') ?? field(root, 'feed');
   if (!feed) return [];
-  const title = feed['atom:title'] ?? feed.title;
-  const raw = feed['atom:entry'] ?? feed.entry;
-  const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  return entries.map((e: Record<string, any>) => {
-    const content = e['atom:content'] ?? e.content ?? {};
-    const author = e['atom:author'] ?? e.author;
+  const title = field(feed, 'atom:title') ?? field(feed, 'title');
+  const raw = field(feed, 'atom:entry') ?? field(feed, 'entry');
+  const entries: unknown[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return entries.map((e) => {
+    const content = field(e, 'atom:content') ?? field(e, 'content') ?? {};
+    const author = field(e, 'atom:author') ?? field(e, 'author');
+    const updated = field(e, 'atom:updated') ?? field(e, 'updated');
     const transport = transportOf(e);
     return {
-      versionId: String(e['atom:id'] ?? e.id ?? ''),
+      versionId: String(field(e, 'atom:id') ?? field(e, 'id') ?? ''),
       author: author
-        ? String(author['atom:name'] ?? author.name ?? '') || undefined
+        ? String(field(author, 'atom:name') ?? field(author, 'name') ?? '') ||
+          undefined
         : undefined,
-      updatedAt:
-        (e['atom:updated'] ?? e.updated)
-          ? String(e['atom:updated'] ?? e.updated)
-          : undefined,
+      updatedAt: updated ? String(updated) : undefined,
       title: title ? String(title) : undefined,
-      contentUri: String(content['@_src'] ?? ''),
+      contentUri: String(field(content, '@_src') ?? ''),
       transportRequest: transport.request,
       transportDescription: transport.description,
     };

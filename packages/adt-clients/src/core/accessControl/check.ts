@@ -26,8 +26,7 @@ export async function checkAccessControl(
   return runCheckRun(
     connection,
     headers,
-    'access_control',
-    accessControlName,
+    { type: 'DCLS/DL', name: accessControlName },
     version,
     'abapCheckRun',
     sourceCode,

@@ -45,6 +45,7 @@ export const serviceDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: rawDocument,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   bindingTypes: rawDocument,
   odata: rawDocument,

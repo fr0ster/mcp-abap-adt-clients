@@ -1,4 +1,5 @@
 import type {
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -9,6 +10,7 @@ import type {
   IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -29,10 +31,12 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import {
   ACCEPT_TRANSPORT_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
+import { TYPE_CODE } from '../../constants/typeCodes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -41,6 +45,8 @@ import { lockHandleOf } from '../../utils/lockHandle';
 import { requestHeaders } from '../../utils/requestHeaders';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
@@ -52,15 +58,20 @@ import type {
   IServiceBindingPublicationParams,
   ITransportCheckServiceBindingParams,
 } from './types';
-import { resolveBindingVariant, serviceDocuments } from './types';
+import { resolveBindingVariant, type serviceDocuments } from './types';
 
 export class AdtServiceBinding<
   R extends IServiceResults = typeof serviceDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>>,
     IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IServiceBindingConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IServiceBindingConfig,
       ReturnType<R['deletion']>,
@@ -74,6 +85,11 @@ export class AdtServiceBinding<
     IAdtServiceBindingTypes<ReturnType<R['bindingTypes']>>,
     IAdtServiceGroupReadable<ReturnType<R['odata']>>
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   // The list above is the whole of it. `IAdtServiceBinding` used to sit in the
   // contracts package declaring `publishODataV2` and `unpublishODataV2` — two
   // method names for one endpoint with a `serviceType` parameter — and this
@@ -88,12 +104,14 @@ export class AdtServiceBinding<
 
   public readonly objectType: string = 'ServiceBinding';
 
+  private readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    private readonly results: R = serviceDocuments as unknown as R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext'>,
   ) {
+    const { logger, systemContext } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -126,7 +144,7 @@ export class AdtServiceBinding<
       ? ` adtcore:responsible="${responsible}"`
       : '';
 
-    return `<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${escapedDescription}" adtcore:language="${masterLanguage}" adtcore:name="${escapedBindingName}" adtcore:type="SRVB/SVB" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
+    return `<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${escapedDescription}" adtcore:language="${masterLanguage}" adtcore:name="${escapedBindingName}" adtcore:type="${TYPE_CODE.serviceBinding}" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapedPackageName}"/>
   <srvb:services srvb:name="${escapedServiceName}">
     <srvb:content srvb:version="${escapedServiceVersion}">
@@ -558,6 +576,44 @@ export class AdtServiceBinding<
    * alone deleted without asking, and a delete the server never approved is one
    * a caller has no reason to believe happened.
    */
+  /**
+   * Write the service binding's metadata document — one PUT of
+   * `options.source`, as the caller built it, under the caller's
+   * `options.lockHandle` (and `config.transportRequest` as `corrNr`), with
+   * the caller's headers.
+   *
+   * A binding has one document: this writes it; `update` is its publication.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds (`readMetadata`), change what you mean to change,
+   * and pass the result: anything left out is gone, because nothing is read
+   * here to keep it.
+   */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
+    config: Partial<IServiceBindingConfig>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () =>
+        writeObjectDocument(
+          connection,
+          options.headers,
+          SERVICE_BINDING.uri(this.name(config)),
+          options?.source as string,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
+  }
+
   /**
    * Asks ADT whether the binding can be deleted.
    *

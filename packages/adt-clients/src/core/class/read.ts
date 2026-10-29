@@ -26,7 +26,13 @@ export async function getClassMetadata(
   className: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return objectMetadataWire(connection, 'class', className, undefined, options);
+  return objectMetadataWire(
+    connection,
+    'CLAS/OC',
+    className,
+    undefined,
+    options,
+  );
 }
 
 /**
@@ -43,7 +49,7 @@ export async function getClassSource(
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
     connection,
-    'class',
+    'CLAS/OC',
     className,
     undefined,
     version,

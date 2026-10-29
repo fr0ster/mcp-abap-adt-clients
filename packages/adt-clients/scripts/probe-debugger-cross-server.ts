@@ -41,7 +41,10 @@ import {
   createTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import { AdtClient } from '../src/clients/AdtClient';
-import { ClassExecutor } from '../src/executors/class/ClassExecutor';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+} from '../src/executors/class/ClassExecutor';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -144,7 +147,10 @@ async function main(): Promise<void> {
     const T = await createTestConnection(quiet, { ownSession: true });
     const t0 = Date.now();
     out(`running ${CLASS_NAME}…`);
-    const ran = await new ClassExecutor(T, quiet).run({
+    const ran = await new ClassExecutor(T, {
+      logger: quiet,
+      results: classExecutorDocuments,
+    }).run({
       className: CLASS_NAME,
     });
     out(
@@ -199,7 +205,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const armer = new AbapDebugger(setup, quiet, abapDebuggerDocuments);
+  const armer = new AbapDebugger(setup, {
+    logger: quiet,
+    results: abapDebuggerDocuments,
+  });
   setup.setSessionType('stateful');
   const armed = await armer.setBreakpoints(
     identity,
@@ -223,12 +232,17 @@ async function main(): Promise<void> {
       try {
         L = await stateful();
         T = await createTestConnection(quiet, { ownSession: true });
-        const onL = new AbapDebugger(L, quiet, abapDebuggerDocuments, {
+        const onL = new AbapDebugger(L, {
+          logger: quiet,
+          results: abapDebuggerDocuments,
           onConflict: takeOver ? 'takeOver' : 'refuse',
         });
         const listening = onL.listen(identity, { holdSeconds: 30 });
         await new Promise((r) => setTimeout(r, 2000));
-        const running = new ClassExecutor(T, quiet).run({
+        const running = new ClassExecutor(T, {
+          logger: quiet,
+          results: classExecutorDocuments,
+        }).run({
           className: CLASS_NAME,
         });
         const caught = await listening;
@@ -243,7 +257,10 @@ async function main(): Promise<void> {
         const server = `${tag(doc, 'INSTANCE_NAME')} (${tag(doc, 'HOST')})`;
 
         A = await stateful();
-        const onA = new AbapDebugger(A, quiet, abapDebuggerDocuments);
+        const onA = new AbapDebugger(A, {
+          logger: quiet,
+          results: abapDebuggerDocuments,
+        });
         // Routed to the debuggee's server, as Eclipse does (saplb).
         const instance = tag(doc, 'INSTANCE_NAME');
         const viaA = await onA.attach(identity, debuggeeId, {

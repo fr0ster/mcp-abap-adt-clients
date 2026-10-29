@@ -29,6 +29,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { AdtOperationError } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -93,12 +94,16 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
     IAtcRunStatusReadable<ReturnType<R['runStatus']>>,
     IAtcFindings<ReturnType<R['findings']>>
 {
+  private readonly results: R;
+  private readonly logger: ILogger;
+
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = atcDocuments as unknown as R,
-  ) {}
+    options: AdtLoggedOptions<R>,
+  ) {
+    this.logger = options.logger;
+    this.results = options.results;
+  }
 
   /**
    * Start a run against a worklist — `/atc/runs`.

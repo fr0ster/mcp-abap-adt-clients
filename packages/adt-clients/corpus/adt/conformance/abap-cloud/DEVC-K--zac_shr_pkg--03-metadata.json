@@ -1,0 +1,36 @@
+{
+  "case": "DEVC-K--zac_shr_pkg",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-28T19:50:04.056Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/packages/zac_shr_pkg",
+    "params": {
+      "version": "active"
+    },
+    "effectiveUrl": "/sap/bc/adt/packages/zac_shr_pkg?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (C6); it added Authorization, x-sap-security-session and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-encoding": "br",
+      "content-length": "944",
+      "content-type": "application/vnd.sap.adt.packages.v2+xml; charset=utf-8",
+      "etag": "20260812000000001application/vnd.sap.adt.packages.v2+xmlsSYozSbG5fz1OxqOOQgtyhCjGvA=",
+      "last-modified": "Wed, 12 Aug 2026 00:00:00 GMT",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-perf-fesrec": "127250.000000",
+      "sap-server": "true"
+    },
+    "bodyFile": "DEVC-K--zac_shr_pkg--03-metadata.body.xml"
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<blue:blueSource abapsource:sourceUri="./zac_shr_bimp_ddls/source/main" abapsource:fixPointArithmetic="true" abapsource:activeUnicodeCheck="true" adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:abapLanguageVersion="standard" adtcore:name="ZAC_SHR_BIMP_DDLS" adtcore:type="BDEF/BDO" adtcore:changedAt="2026-10-24T19:59:52Z" adtcore:version="active" adtcore:createdAt="2026-08-18T21:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" adtcore:description="Shared BDEF for BehaviorImplementation" adtcore:descriptionTextLimit="60" adtcore:language="EN" xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="./zac_shr_bimp_ddls/source/main/versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/repository/informationsystem/abaplanguageversions?uri=%2Fsap%2Fbc%2Fadt%2Fbo%2Fbehaviordefinitions%2Fzac_shr_bimp_ddls" rel="http://www.sap.com/adt/relations/informationsystem/abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="Allowed ABAP language versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./zac_shr_bimp_ddls/source/main" rel="http://www.sap.com/adt/relations/source" type="text/plain" title="Source Content" etag="20261024195952001text/plain_mN3M1vOD9cFOeJZSWVaV8+jhJQQ=" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="./zac_shr_bimp_ddls/source/main" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Source Content (HTML)" etag="" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/test_ac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="TEST_AC_SHR_PKG" adtcore:description="Shared test dependencies package"/>
+  <abapsource:syntaxConfiguration>
+    <abapsource:language>
+      <abapsource:version>X</abapsource:version>
+      <abapsource:description>Standard ABAP</abapsource:description>
+      <atom:link href="/sap/bc/adt/abapsource/parsers/rnd/grammar" rel="http://www.sap.com/adt/relations/abapsource/parser" type="text/plain" title="Standard ABAP" etag="816" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    </abapsource:language>
+  </abapsource:syntaxConfiguration>
+</blue:blueSource>

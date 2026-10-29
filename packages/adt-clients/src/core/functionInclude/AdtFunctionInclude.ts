@@ -11,6 +11,8 @@
  */
 
 import type {
+  AdtObjectIdentity,
+  AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -34,11 +36,13 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionInclude } from './activation';
@@ -52,8 +56,11 @@ import {
 import { lockFunctionInclude } from './lock';
 import { readFunctionInclude } from './read';
 import { readFunctionIncludeSource } from './readSource';
-import type { ICreateFunctionIncludeParams } from './types';
-import { functionIncludeDocuments, type IFunctionIncludeConfig } from './types';
+import type {
+  functionIncludeDocuments,
+  ICreateFunctionIncludeParams,
+  IFunctionIncludeConfig,
+} from './types';
 import { unlockFunctionInclude } from './unlock';
 import { updateFunctionInclude } from './update';
 import { uploadFunctionIncludeSource } from './updateSource';
@@ -65,6 +72,7 @@ import {
 
 export class AdtFunctionInclude<
   R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
+  V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>>,
@@ -85,6 +93,11 @@ export class AdtFunctionInclude<
       ReturnType<R['versionSource']>
     >
 {
+  /**
+   * The release variant this serves, as a type only — never set. The
+   * factories' and members' gates read it (see `clients/variant.ts`).
+   */
+  declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -92,15 +105,17 @@ export class AdtFunctionInclude<
   private readonly lockRegistry?: LockRegistry;
   public readonly objectType: string = 'FunctionInclude';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = functionIncludeDocuments as unknown as R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -131,7 +146,9 @@ export class AdtFunctionInclude<
   }
 
   /** Both names, or the caller's mistake. */
-  private names(config: Partial<IFunctionIncludeConfig>): {
+  private names(
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+  ): {
     group: string;
     include: string;
   } {
@@ -154,7 +171,7 @@ export class AdtFunctionInclude<
   }
 
   private buildDeleteParams(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
   ): IDeleteFunctionIncludeParams {
     return {
       function_group_name: config.functionGroupName ?? '',
@@ -179,7 +196,7 @@ export class AdtFunctionInclude<
    * thing that can be checked before the POST.
    */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -225,7 +242,7 @@ export class AdtFunctionInclude<
    * function module.
    */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
@@ -255,7 +272,7 @@ export class AdtFunctionInclude<
    * this rather than the source.
    */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IReadOptions & {
       version?: 'active' | 'inactive';
     } & IAdtOperationOptions<E>,
@@ -289,7 +306,7 @@ export class AdtFunctionInclude<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -327,7 +344,7 @@ export class AdtFunctionInclude<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -365,7 +382,8 @@ export class AdtFunctionInclude<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    this: this & AdtPerformedBy<'functionInclude', 'deletionCheck'>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -392,7 +410,8 @@ export class AdtFunctionInclude<
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    this: this & AdtPerformedBy<'functionInclude', 'delete'>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -413,7 +432,7 @@ export class AdtFunctionInclude<
 
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -431,7 +450,7 @@ export class AdtFunctionInclude<
 
   /** Check the include. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
@@ -464,7 +483,7 @@ export class AdtFunctionInclude<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const { group, include } = this.names(config);
@@ -484,7 +503,7 @@ export class AdtFunctionInclude<
 
   /** Unlock the include. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -506,7 +525,7 @@ export class AdtFunctionInclude<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionIncludeConfig>,
+    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
     return answering(

@@ -26,6 +26,7 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
+import { randomBytes } from 'node:crypto';
 import {
   analyseActivation,
   analyseDeletion,
@@ -49,6 +50,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtClient } from '../../clients/AdtClient';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult } from './contract';
@@ -60,6 +62,7 @@ import {
   lockReleaseCheckEnabled,
   noteLockReleaseCheckOff,
 } from './lockReleased';
+import { readRootDescription, replaceRootDescription } from './rootDescription';
 import {
   createTestAdtClient,
   recycleTestSession,
@@ -107,6 +110,20 @@ export interface IFlowTestOptions {
    */
   updateTakesDocument?: boolean | ((current: string) => string);
   /**
+   * This type's write takes the object's **source**, and the flow edits what
+   * the object holds: the source is read (`read`, not `readMetadata`), the
+   * function receives it and returns the one to write, and after activation the
+   * source read back has to contain `marker` — the line the function added.
+   *
+   * The function group's `update` is its source since interfaces-adt 23.0.4;
+   * what the generated main program holds is the system's, so a test adds one
+   * comment line and writes the rest back untouched.
+   */
+  updateEditsSource?: {
+    edit: (current: string) => string;
+    marker: string;
+  };
+  /**
    * The validate step is not sent, and the run logs this sentence, which names
    * the configuration key that turned it off. Absent, the name is validated
    * and any refusal fails.
@@ -133,6 +150,17 @@ export interface IFlowTestOptions {
    * of such knowledge.
    */
   afterCreate?: () => Promise<void>;
+  /**
+   * Prove `updateMetadata` live: after the flow's update and activation, read
+   * the object document, change only the root's `adtcore:description` to
+   * `MCP metadata <8 hex>`, write it under a lock, activate, and read it back.
+   *
+   * Runs only for an object that offers `updateMetadata`. A suite for a type
+   * the system does not offer (the program and the include on ABAP cloud)
+   * passes `false` there: the member's presence cannot say that, because the
+   * handler is the same on every system.
+   */
+  metadataUpdate?: boolean;
 }
 
 export interface IReadTestOptions {
@@ -221,7 +249,7 @@ export class BaseTester<TConfig, TState = unknown> {
 
   // Setup state
   private connection?: IAbapConnection;
-  private client?: any;
+  private client?: AdtClient;
   private hasConfig: boolean = false;
   private isCloudSystem: boolean = false;
   private buildConfigFn?: (
@@ -524,14 +552,37 @@ export class BaseTester<TConfig, TState = unknown> {
     );
   }
 
+  /** The metadata write, named: the flow's `metadataUpdate` step goes through it. */
+  private writeMetadata(
+    config: Partial<TConfig>,
+    options?: Omit<IAdtOperationOptions, 'analyse'>,
+  ): Promise<IAdtResponse<unknown>> {
+    if (!this.adtObject.updateMetadata) {
+      throw new Error(
+        `${this.loggerPrefix} offers no updateMetadata() — the flow asked for ` +
+          'a metadata update and this type has none.',
+      );
+    }
+    return this.adtObject.updateMetadata(config, {
+      analyse: analyseException,
+      ...options,
+      headers: integrationHeadersOf(this.adtObject, 'updateMetadata'),
+    });
+  }
+
   private async updateUnderLock(
     config: Partial<TConfig>,
     options: IAdtOperationOptions,
+    /** Which write: the flow's own choice, or the metadata one, explicitly. */
+    write: (
+      config: Partial<TConfig>,
+      options: IAdtOperationOptions,
+    ) => Promise<IAdtResponse<unknown>> = (c, o) => this.writeWhatItHas(c, o),
   ): Promise<unknown> {
     if (!(this.adtObject.lock && this.adtObject.unlock)) {
       // No lock resource for this type. The write goes out without a handle,
       // and whether that is allowed is ADT's answer to give.
-      return await this.writeWhatItHas(config, options);
+      return await write(config, options);
     }
 
     const handle = expectResult(
@@ -545,7 +596,7 @@ export class BaseTester<TConfig, TState = unknown> {
     let writeThrew = false;
     let unlockRefusal = '';
     try {
-      written = await this.writeWhatItHas(config, {
+      written = await write(config, {
         ...options,
         lockHandle: handle,
       });
@@ -714,7 +765,7 @@ export class BaseTester<TConfig, TState = unknown> {
       const configAny = config as any;
       if (configAny.className) {
         return utils.getObjectSourceUri(
-          'class',
+          'CLAS/OC',
           configAny.className,
           undefined,
           version,
@@ -722,7 +773,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.interfaceName) {
         return utils.getObjectSourceUri(
-          'interface',
+          'INTF/OI',
           configAny.interfaceName,
           undefined,
           version,
@@ -730,7 +781,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.programName) {
         return utils.getObjectSourceUri(
-          'program',
+          'PROG/P',
           configAny.programName,
           undefined,
           version,
@@ -738,7 +789,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.functionModuleName && configAny.functionGroupName) {
         return utils.getObjectSourceUri(
-          'functionmodule',
+          'FUGR/FF',
           configAny.functionModuleName,
           configAny.functionGroupName,
           version,
@@ -746,7 +797,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.ddlName) {
         return utils.getObjectSourceUri(
-          'view',
+          'DDLS/DF',
           configAny.ddlName,
           undefined,
           version,
@@ -754,7 +805,7 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.structureName) {
         return utils.getObjectSourceUri(
-          'structure',
+          'TABL/DS',
           configAny.structureName,
           undefined,
           version,
@@ -762,20 +813,13 @@ export class BaseTester<TConfig, TState = unknown> {
       }
       if (configAny.tableName) {
         return utils.getObjectSourceUri(
-          'table',
+          'TABL/DT',
           configAny.tableName,
           undefined,
           version,
         );
       }
-      if (configAny.tableTypeName) {
-        return utils.getObjectSourceUri(
-          'tabletype',
-          configAny.tableTypeName,
-          undefined,
-          version,
-        );
-      }
+      // A table type has no source (no TTYP code among the source codes).
 
       return undefined;
     };
@@ -1131,7 +1175,16 @@ export class BaseTester<TConfig, TState = unknown> {
         // lock window would be this harness inventing a sequence the library no
         // longer performs.
         let documentToWrite: string | undefined;
-        if (options?.updateTakesDocument) {
+        if (options?.updateEditsSource) {
+          logTestStep('read source (before update)', this.logger);
+          const heldSource = getPayloadText(
+            expectResult(
+              await this.readWhatItHas(config as Partial<TConfig>),
+              'read source (before update)',
+            ),
+          );
+          documentToWrite = options.updateEditsSource.edit(heldSource ?? '');
+        } else if (options?.updateTakesDocument) {
           const current = await readMetadata(
             'read document (before update)',
             false,
@@ -1309,6 +1362,14 @@ export class BaseTester<TConfig, TState = unknown> {
         }
       }
 
+      if (options?.updateEditsSource) {
+        // The write is proven by the read after it: the line the edit added
+        // is in the source the system holds now.
+        expect(postActivateActive ?? postUpdateInactive ?? '').toContain(
+          options.updateEditsSource.marker,
+        );
+      }
+
       if (options?.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
@@ -1316,6 +1377,49 @@ export class BaseTester<TConfig, TState = unknown> {
           config as Partial<TConfig>,
           options.readMetadataOptions,
         );
+      }
+
+      if (options?.metadataUpdate && this.adtObject.updateMetadata) {
+        currentStep = 'metadata update';
+        const description = `MCP metadata ${randomBytes(4).toString('hex')}`;
+        const current = await readMetadata(
+          'read metadata (before metadata update)',
+        );
+        const patched = replaceRootDescription(
+          current ?? '',
+          description,
+          this.loggerPrefix,
+        );
+        const target = {
+          ...config,
+          ...options.updateConfig,
+        } as Partial<TConfig>;
+        logTestStep(
+          `metadata update: description "${description}"`,
+          this.logger,
+        );
+        expectResult(
+          (await this.updateUnderLock(
+            target,
+            { source: patched, timeout: options.timeout },
+            (c, o) => this.writeMetadata(c, o),
+          )) as IAdtResponse<unknown>,
+          'updateMetadata',
+        );
+        if (this.adtObject.activate) {
+          logTestStep('activate (after metadata update)', this.logger);
+          expectResult(
+            await this.adtObject.activate(config as Partial<TConfig>, {
+              headers: integrationHeadersOf(this.adtObject, 'activate'),
+              analyse: judged(analyseActivation),
+            }),
+            'activate after metadata update',
+          );
+        }
+        const after = await readMetadata(
+          'read metadata (after metadata update)',
+        );
+        expect(readRootDescription(after ?? '')).toBe(description);
       }
 
       // 5. Cleanup (if enabled)
