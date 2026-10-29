@@ -33,6 +33,7 @@ import {
   assignedTestSources,
   createClassWithTests,
   createView,
+  FAILING_TEST_METHOD,
   freshSuffix,
   PROBE_TEST_METHOD,
   probePlace,
@@ -118,7 +119,7 @@ describe("ABAP Unit: a CDS view's assigned tests by object target DDLS/DF (AdtEx
   });
 
   gate(SECTION, CASE)(
-    'runs the assigned test with foreignTests, and nothing with own tests only',
+    'runs the assigned tests with foreignTests, nothing with own tests only, and records the preview',
     async () => {
       const testCase = configuredCase(SECTION, CASE);
       if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
@@ -156,24 +157,70 @@ describe("ABAP Unit: a CDS view's assigned tests by object target DDLS/DF (AdtEx
           type: 'DDLS/DF',
         } as const;
 
-        logTestStep('run (DDLS/DF, foreignTests)', testsLogger);
+        // (a) Assigned tests, no preview: both methods execute, and the
+        // failing one carries its failure.
+        logTestStep('run (DDLS/DF, foreignTests, no preview)', testsLogger);
         const assigned = await runToCompletion(runner, target, {
-          scope: { ownTests: true, foreignTests: true },
+          scope: {
+            ownTests: true,
+            foreignTests: true,
+            addForeignTestsAsPreview: false,
+          },
         });
         testsLogger.info?.(
           `Run ${assigned.runId}: ${assigned.methods.join(', ')}`,
         );
-        expect(ranMethods(readMethodVerdicts(assigned.result).methods)).toEqual(
-          [{ testClass: 'LTC_VIEW', name: PROBE_TEST_METHOD, alerts: [] }],
+        const executed = ranMethods(
+          readMethodVerdicts(assigned.result).methods,
         );
-        expect(assigned.failures).toEqual([]);
+        expect(executed.map((m) => `${m.testClass}.${m.name}`).sort()).toEqual([
+          `LTC_VIEW.${FAILING_TEST_METHOD}`,
+          `LTC_VIEW.${PROBE_TEST_METHOD}`,
+        ]);
+        expect(
+          executed.find((m) => m.name === PROBE_TEST_METHOD)?.alerts,
+        ).toEqual([]);
+        expect(
+          executed.find((m) => m.name === FAILING_TEST_METHOD)?.alerts,
+        ).toContain('failedAssertion');
 
-        logTestStep('run (DDLS/DF, own tests only)', testsLogger);
+        // (b) Own tests only, no preview: a view holds none — nothing runs,
+        // and the endpoint refuses nothing.
+        logTestStep('run (DDLS/DF, own tests only, no preview)', testsLogger);
         const own = await runToCompletion(runner, target, {
-          scope: { ownTests: true, foreignTests: false },
+          scope: {
+            ownTests: true,
+            foreignTests: false,
+            addForeignTestsAsPreview: false,
+          },
         });
         expect(own.methods).toEqual([]);
         expect(own.alerts).toEqual([]);
+
+        // (c) Own tests only, with the preview (the library's default for
+        // addForeignTestsAsPreview): not asserted yet. What it answers says
+        // whether a preview executes an assigned test (a failure alert on
+        // FAILS_ON_PURPOSE) or only lists it.
+        logTestStep('run (DDLS/DF, own tests only, preview)', testsLogger);
+        const preview = await runToCompletion(runner, target, {
+          scope: {
+            ownTests: true,
+            foreignTests: false,
+            addForeignTestsAsPreview: true,
+          },
+        });
+        const previewed = {
+          runId: preview.runId,
+          methods: ranMethods(readMethodVerdicts(preview.result).methods),
+          alerts: preview.alerts,
+        };
+        testsLogger.info?.(
+          `Preview run (own tests only, addForeignTestsAsPreview): ${JSON.stringify(previewed)}`,
+        );
+        const previewOut = process.env.AUNIT_PREVIEW_OUT;
+        if (previewOut) {
+          fs.writeFileSync(previewOut, JSON.stringify(previewed, null, 2));
+        }
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
         failed = { error };

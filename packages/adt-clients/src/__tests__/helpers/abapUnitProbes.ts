@@ -99,7 +99,13 @@ define view entity ${viewName}
 }`;
 }
 
-/** A container class's local test class, assigned to the view. */
+/** The assigned test class's method that fails on purpose, as ADT spells it. */
+export const FAILING_TEST_METHOD = 'FAILS_ON_PURPOSE';
+
+/**
+ * A container class's local test class, assigned to the view: one method that
+ * passes, one that fails on purpose — a failure alert shows a method executed.
+ */
 export function assignedTestSources(
   className: string,
   viewName: string,
@@ -115,11 +121,15 @@ ENDCLASS.`,
 CLASS ltc_view DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
   PRIVATE SECTION.
     METHODS passes FOR TESTING.
+    METHODS fails_on_purpose FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_view IMPLEMENTATION.
   METHOD passes.
     cl_abap_unit_assert=>assert_equals( act = 1 exp = 1 ).
+  ENDMETHOD.
+  METHOD fails_on_purpose.
+    cl_abap_unit_assert=>assert_equals( act = 1 exp = 2 ).
   ENDMETHOD.
 ENDCLASS.`,
   };
