@@ -213,7 +213,8 @@ async function main(): Promise<void> {
 
     // One group run for both.
     // The run id comes back in Location, so the activation answer is read whole.
-    const utils = new AdtUtils(connection, quiet, {
+    const utils = new AdtUtils(connection, {
+      logger: quiet,
       results: {
         ...utilDocuments,
         activation: wireItself,

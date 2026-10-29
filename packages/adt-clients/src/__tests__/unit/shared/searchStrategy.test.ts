@@ -68,7 +68,8 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     const { connection } = createConnection();
 
     const seen: unknown[] = [];
-    const utils = new AdtUtils(connection, logger, {
+    const utils = new AdtUtils(connection, {
+      logger,
       results: {
         ...utilDocuments,
         search: (answer) => {
@@ -90,7 +91,8 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
 
   it('issues the same request whichever reading it was built with', async () => {
     const injected = createConnection();
-    await new AdtUtils(injected.connection, logger, {
+    await new AdtUtils(injected.connection, {
+      logger,
       results: {
         ...utilDocuments,
         search: (answer) => String(answer.data),
@@ -98,7 +100,8 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     }).search({ query: 'ZCL_*' });
 
     const shipped = createConnection();
-    await new AdtUtils(shipped.connection, logger, {
+    await new AdtUtils(shipped.connection, {
+      logger,
       results: utilDocuments,
     }).search({
       query: 'ZCL_*',
@@ -114,7 +117,7 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     const { connection } = createConnection();
 
     const value = expectResult(
-      await new AdtUtils(connection, logger, { results: utilDocuments }).search(
+      await new AdtUtils(connection, { logger, results: utilDocuments }).search(
         {
           query: 'ZCL_*',
         },
@@ -131,7 +134,8 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     const { connection } = createConnection();
 
     const hits = expectResult(
-      await new AdtUtils(connection, logger, {
+      await new AdtUtils(connection, {
+        logger,
         results: {
           ...utilDocuments,
           search: utilSearchHits,

@@ -7,7 +7,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
+import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import { getSt05TraceDirectory, getSt05TraceState } from './st05';
@@ -34,12 +34,13 @@ export class St05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>
   readonly kind = 'st05Trace' as const;
 
   private readonly results: R;
+  private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
-    options: AdtHandlerOptions<R>,
+    options: AdtLoggedOptions<R>,
   ) {
+    this.logger = options.logger;
     this.results = options.results;
   }
 

@@ -22,7 +22,8 @@ describe('ApplicationLog', () => {
 
   it('getObject() delegates to /sap/bc/adt/applicationlog/objects/Z_MY_LOG', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger(), {
+    const appLog = new ApplicationLog(connection, {
+      logger: createLogger(),
       results: applicationLogDocuments,
     });
 
@@ -42,7 +43,8 @@ describe('ApplicationLog', () => {
   // blues.v1+xml.
   it('getObject() sends exactly Accept application/vnd.sap.adt.blues.v1+xml', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger(), {
+    const appLog = new ApplicationLog(connection, {
+      logger: createLogger(),
       results: applicationLogDocuments,
     });
 
@@ -58,7 +60,8 @@ describe('ApplicationLog', () => {
 
   it('getSource() sends exactly Accept application/json', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger(), {
+    const appLog = new ApplicationLog(connection, {
+      logger: createLogger(),
       results: applicationLogDocuments,
     });
 
@@ -74,7 +77,8 @@ describe('ApplicationLog', () => {
 
   it('getSource() delegates to /sap/bc/adt/applicationlog/objects/Z_MY_LOG/source/main', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger(), {
+    const appLog = new ApplicationLog(connection, {
+      logger: createLogger(),
       results: applicationLogDocuments,
     });
 
@@ -90,7 +94,8 @@ describe('ApplicationLog', () => {
 
   it('validateName() delegates to /sap/bc/adt/applicationlog/objects/validation', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger(), {
+    const appLog = new ApplicationLog(connection, {
+      logger: createLogger(),
       results: applicationLogDocuments,
     });
 

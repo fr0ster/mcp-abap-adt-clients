@@ -7,10 +7,11 @@
  *
  * Type-level: the checks sit in a function nothing calls.
  */
-import { classDocuments, type utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { classDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { RecordingConnection } from '../../../../../adt-clients/src/__tests__/helpers/recordingConnection';
 import type { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { AdtClassLegacy } from '../../../core/class/AdtClassLegacy';
+import { AdtUtilsLegacy } from '../../../core/shared/AdtUtilsLegacy';
 
 /** `true` only when `A` and `B` are the same type. */
 type Equal<A, B> =
@@ -55,6 +56,13 @@ function legacyConstructorTypes(): void {
   // @ts-expect-error -- results are required
   new AdtClassLegacy<Marked<typeof classDocuments>>(connection, {});
   new AdtClassLegacy(connection, { results: classDocuments });
+  // The base's required logger, inherited: in the options, by type alone.
+  // @ts-expect-error -- the logger is required
+  new AdtUtilsLegacy(connection, { results: utilDocuments });
+  new AdtUtilsLegacy(connection, {
+    logger: { debug() {}, info() {}, warn() {}, error() {} },
+    results: utilDocuments,
+  });
 }
 
 describe('legacy client getters and handler constructors', () => {

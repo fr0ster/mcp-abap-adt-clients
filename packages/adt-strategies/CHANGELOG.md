@@ -57,8 +57,8 @@ adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
 
 - The examples in the comments of `abapGit`, `feeds` and `traces` construct
   with adt-clients 38.0.0's options: `AdtAbapGitClient.create(connection,
-  { logger, results })`, `new FeedRepository(connection, logger, { results })`,
-  `new Profiler(connection, logger, { results })`.
+  { logger, results })`, `new FeedRepository(connection, { logger, results })`,
+  `new Profiler(connection, { logger, results })`.
 
 ### Tests
 

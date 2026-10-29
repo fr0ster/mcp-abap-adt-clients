@@ -7,7 +7,8 @@
  * readings in the result set it constructs the implementation with:
  *
  * ```typescript
- * new Profiler(connection, logger, {
+ * new Profiler(connection, {
+ *   logger,
  *   results: {
  *     ...profilerDocuments,
  *     list: profilerTraceEntries,

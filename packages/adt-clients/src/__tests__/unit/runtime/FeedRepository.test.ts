@@ -44,7 +44,8 @@ describe('FeedRepository', () => {
 
   it('list() delegates to /sap/bc/adt/feeds', async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
 
@@ -60,7 +61,8 @@ describe('FeedRepository', () => {
 
   it('variants() delegates to /sap/bc/adt/feeds/variants with the category', async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
 
@@ -76,7 +78,8 @@ describe('FeedRepository', () => {
 
   it('variants() refuses without a category rather than sending a request the server rejects', async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
 
@@ -97,7 +100,8 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
 
@@ -118,7 +122,8 @@ describe('FeedRepository', () => {
 
   it("passes the caller's analyse through on every member", async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
     const refuse = {
@@ -144,7 +149,8 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: reading,
     });
 
@@ -171,7 +177,8 @@ describe('FeedRepository', () => {
       status: 200,
       data: '<feed xmlns="http://www.w3.org/2005/Atom"></feed>',
     });
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: reading,
     });
 
@@ -190,7 +197,8 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
 
@@ -206,7 +214,8 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), {
+    const repo = new FeedRepository(connection, {
+      logger: createLogger(),
       results: feedDocuments,
     });
 

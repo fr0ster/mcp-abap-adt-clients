@@ -165,7 +165,7 @@ describe('AdtAtc — resolving the check variant', () => {
 
     const result = expectResult(
       await runAtc(
-        new AdtAtc(connection, logger() as never, { results: reading }),
+        new AdtAtc(connection, { logger: logger() as never, results: reading }),
         TARGET,
       ),
       'result',
@@ -183,7 +183,7 @@ describe('AdtAtc — resolving the check variant', () => {
     const { connection, calls } = connectionFor();
 
     await runAtc(
-      new AdtAtc(connection, logger() as never, { results: reading }),
+      new AdtAtc(connection, { logger: logger() as never, results: reading }),
       TARGET,
       {},
     );
@@ -201,7 +201,7 @@ describe('AdtAtc — resolving the check variant', () => {
     const { connection, calls } = connectionFor();
 
     await runAtc(
-      new AdtAtc(connection, logger() as never, { results: reading }),
+      new AdtAtc(connection, { logger: logger() as never, results: reading }),
       TARGET,
       {
         checkVariant: 'ZMY_VARIANT',
@@ -223,7 +223,10 @@ describe('AdtAtc — resolving the check variant', () => {
     const { connection, calls } = connectionFor({
       customizing: { status: 200, data: '<atc:customizing/>', headers: {} },
     });
-    const atc = new AdtAtc(connection, logger() as never, { results: reading });
+    const atc = new AdtAtc(connection, {
+      logger: logger() as never,
+      results: reading,
+    });
 
     expect(expectResult(await atc.resolveCheckVariant(), 'variant')).toBe('');
 
@@ -245,7 +248,8 @@ describe('AdtAtc — resolving the check variant', () => {
 describe('AdtAtc — one request per member, each answer through its slot', () => {
   it('answers every document as it arrived when no reading is given', async () => {
     const { connection } = connectionFor();
-    const atc = new AdtAtc(connection, logger() as never, {
+    const atc = new AdtAtc(connection, {
+      logger: logger() as never,
       results: atcDocuments,
     });
 
@@ -275,7 +279,8 @@ describe('AdtAtc — one request per member, each answer through its slot', () =
     const started = connectionFor();
     expect(
       expectResult(
-        await new AdtAtc(started.connection, logger() as never, {
+        await new AdtAtc(started.connection, {
+          logger: logger() as never,
           results: reading,
         }).startRun(WORKLIST_ID, TARGET),
         'started',
@@ -287,7 +292,8 @@ describe('AdtAtc — one request per member, each answer through its slot', () =
     });
     expect(
       expectResult(
-        await new AdtAtc(waiting.connection, logger() as never, {
+        await new AdtAtc(waiting.connection, {
+          logger: logger() as never,
           results: reading,
         }).startRun(WORKLIST_ID, TARGET, { wait: true }),
         'waiting',
@@ -297,7 +303,8 @@ describe('AdtAtc — one request per member, each answer through its slot', () =
 
   it("passes the caller's analyse through on every member", async () => {
     const { connection } = connectionFor();
-    const atc = new AdtAtc(connection, logger() as never, {
+    const atc = new AdtAtc(connection, {
+      logger: logger() as never,
       results: atcDocuments,
     });
     const refuse = {
@@ -329,7 +336,7 @@ describe('AdtAtc — the request itself', () => {
     const { connection, calls } = connectionFor();
 
     await runAtc(
-      new AdtAtc(connection, logger() as never, { results: reading }),
+      new AdtAtc(connection, { logger: logger() as never, results: reading }),
       {
         objects: [
           { objectType: 'class', objectName: 'ZCL_X' },
@@ -352,7 +359,7 @@ describe('AdtAtc — the request itself', () => {
     });
 
     await runAtc(
-      new AdtAtc(connection, logger() as never, { results: reading }),
+      new AdtAtc(connection, { logger: logger() as never, results: reading }),
       TARGET,
       {
         wait: true,
@@ -369,7 +376,10 @@ describe('AdtAtc — the request itself', () => {
   // and a checkstyle Accept is refused with 406.
   it('every request carries the media types the server answers to', async () => {
     const { connection, calls } = connectionFor();
-    const atc = new AdtAtc(connection, logger() as never, { results: reading });
+    const atc = new AdtAtc(connection, {
+      logger: logger() as never,
+      results: reading,
+    });
 
     await runAtc(atc, TARGET);
     await atc.getRunStatus(RUN_ID);
@@ -411,7 +421,8 @@ describe('AdtAtc — refusing before the request', () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never, {
+      new AdtAtc(connection, {
+        logger: logger() as never,
         results: atcDocuments,
       }).startRun('WL1', {
         objects: [],
@@ -429,7 +440,8 @@ describe('AdtAtc — refusing before the request', () => {
       const { connection } = connectionFor();
 
       await expect(
-        new AdtAtc(connection, logger() as never, {
+        new AdtAtc(connection, {
+          logger: logger() as never,
           results: atcDocuments,
         }).startRun('WL1', TARGET, {
           maximumVerdicts: value,
@@ -458,7 +470,8 @@ describe('AdtAtc — the confirmed URI templates', () => {
   ] as const)('%s is checked at %s', async (objectType, uri) => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never, {
+    await new AdtAtc(connection, {
+      logger: logger() as never,
       results: atcDocuments,
     }).startRun('WL1', {
       objects: [{ objectType, objectName: 'ZX' }],
@@ -479,7 +492,8 @@ describe('AdtAtc — the confirmed URI templates', () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never, {
+      new AdtAtc(connection, {
+        logger: logger() as never,
         results: atcDocuments,
       }).startRun('WL1', {
         // A member the union does not have yet — the shape a future addition
@@ -504,7 +518,8 @@ describe('AdtAtc.listCheckVariants', () => {
         .fn()
         .mockResolvedValue({ status: 200, data: VARIANTS, headers: {} }),
     };
-    const atc = new AdtAtc(connection as never, logger() as never, {
+    const atc = new AdtAtc(connection as never, {
+      logger: logger() as never,
       results: atcDocuments,
     });
     const sent = () => connection.makeAdtRequest.mock.calls[0][0];

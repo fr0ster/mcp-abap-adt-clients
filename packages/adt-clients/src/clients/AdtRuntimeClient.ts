@@ -119,7 +119,8 @@ export class AdtRuntimeClient {
   getProfiler(
     results: IProfilerResults = profilerDocuments,
   ): Profiler<IProfilerResults> {
-    return new Profiler<IProfilerResults>(this.connection, this.logger, {
+    return new Profiler<IProfilerResults>(this.connection, {
+      logger: this.logger,
       results,
     });
   }
@@ -129,7 +130,8 @@ export class AdtRuntimeClient {
   getCrossTrace(
     results: ICrossTraceResultSet = crossTraceDocuments,
   ): CrossTrace<ICrossTraceResultSet> {
-    return new CrossTrace<ICrossTraceResultSet>(this.connection, this.logger, {
+    return new CrossTrace<ICrossTraceResultSet>(this.connection, {
+      logger: this.logger,
       results,
     });
   }
@@ -139,7 +141,8 @@ export class AdtRuntimeClient {
   getSt05Trace(
     results: ISt05TraceResults = st05TraceDocuments,
   ): St05Trace<ISt05TraceResults> {
-    return new St05Trace<ISt05TraceResults>(this.connection, this.logger, {
+    return new St05Trace<ISt05TraceResults>(this.connection, {
+      logger: this.logger,
       results,
     });
   }
@@ -151,11 +154,10 @@ export class AdtRuntimeClient {
   getApplicationLog(
     results: IApplicationLogResults = applicationLogDocuments,
   ): ApplicationLog<IApplicationLogResults> {
-    return new ApplicationLog<IApplicationLogResults>(
-      this.connection,
-      this.logger,
-      { results },
-    );
+    return new ApplicationLog<IApplicationLogResults>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   /**
@@ -167,13 +169,17 @@ export class AdtRuntimeClient {
   getAtc(): AdtAtc<typeof atcDocuments>;
   getAtc<R extends IAtcResults>(results: R): AdtAtc<R>;
   getAtc(results: IAtcResults = atcDocuments): AdtAtc<IAtcResults> {
-    return new AdtAtc<IAtcResults>(this.connection, this.logger, { results });
+    return new AdtAtc<IAtcResults>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   getAtcLog(): AtcLog<typeof atcLogDocuments>;
   getAtcLog<R extends IAtcLogResults>(results: R): AtcLog<R>;
   getAtcLog(results: IAtcLogResults = atcLogDocuments): AtcLog<IAtcLogResults> {
-    return new AtcLog<IAtcLogResults>(this.connection, this.logger, {
+    return new AtcLog<IAtcLogResults>(this.connection, {
+      logger: this.logger,
       results,
     });
   }
@@ -185,11 +191,10 @@ export class AdtRuntimeClient {
   getDdicActivation(
     results: IDdicActivationResults = ddicActivationDocuments,
   ): DdicActivation<IDdicActivationResults> {
-    return new DdicActivation<IDdicActivationResults>(
-      this.connection,
-      this.logger,
-      { results },
-    );
+    return new DdicActivation<IDdicActivationResults>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   getDumps(): RuntimeDumps<typeof runtimeDumpsDocuments>;
@@ -197,11 +202,10 @@ export class AdtRuntimeClient {
   getDumps(
     results: IRuntimeDumpsResults = runtimeDumpsDocuments,
   ): RuntimeDumps<IRuntimeDumpsResults> {
-    return new RuntimeDumps<IRuntimeDumpsResults>(
-      this.connection,
-      this.logger,
-      { results },
-    );
+    return new RuntimeDumps<IRuntimeDumpsResults>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   // ============================================================================
@@ -213,7 +217,8 @@ export class AdtRuntimeClient {
   getFeeds(
     results: IFeedResults = feedDocuments,
   ): FeedRepository<IFeedResults> {
-    return new FeedRepository<IFeedResults>(this.connection, this.logger, {
+    return new FeedRepository<IFeedResults>(this.connection, {
+      logger: this.logger,
       results,
     });
   }
@@ -225,11 +230,10 @@ export class AdtRuntimeClient {
   getSystemMessages(
     results: ISystemMessagesResults = systemMessagesDocuments,
   ): SystemMessages<ISystemMessagesResults> {
-    return new SystemMessages<ISystemMessagesResults>(
-      this.connection,
-      this.logger,
-      { results },
-    );
+    return new SystemMessages<ISystemMessagesResults>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 
   getGatewayErrorLog(): GatewayErrorLog<typeof gatewayErrorLogDocuments>;
@@ -239,10 +243,9 @@ export class AdtRuntimeClient {
   getGatewayErrorLog(
     results: IGatewayErrorLogResults = gatewayErrorLogDocuments,
   ): GatewayErrorLog<IGatewayErrorLogResults> {
-    return new GatewayErrorLog<IGatewayErrorLogResults>(
-      this.connection,
-      this.logger,
-      { results },
-    );
+    return new GatewayErrorLog<IGatewayErrorLogResults>(this.connection, {
+      logger: this.logger,
+      results,
+    });
   }
 }

@@ -88,6 +88,7 @@ export {
 } from './core/shared/contentTypes';
 export type {
   AdtHandlerOptions,
+  AdtLoggedOptions,
   AdtShippedOptions,
   IAdtHandlerContext,
 } from './core/shared/handlerOptions';

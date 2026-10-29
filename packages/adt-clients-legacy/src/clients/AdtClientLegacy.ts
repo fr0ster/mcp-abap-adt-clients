@@ -515,7 +515,8 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IUtilResults = utilDocuments,
   ): AdtUtilsLegacy<IUtilResults> {
     this.assertConnected();
-    return new AdtUtilsLegacy<IUtilResults>(this.connection, this.logger, {
+    return new AdtUtilsLegacy<IUtilResults>(this.connection, {
+      logger: this.logger,
       results,
     });
   }

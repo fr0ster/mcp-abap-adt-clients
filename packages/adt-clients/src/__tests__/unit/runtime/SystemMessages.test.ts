@@ -22,7 +22,8 @@ describe('SystemMessages', () => {
 
   it('list() delegates to /sap/bc/adt/runtime/systemmessages', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger(), {
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
       results: systemMessagesDocuments,
     });
 
@@ -38,7 +39,8 @@ describe('SystemMessages', () => {
 
   it('list() with maxResults passes $top parameter', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger(), {
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
       results: systemMessagesDocuments,
     });
 
@@ -50,7 +52,8 @@ describe('SystemMessages', () => {
 
   it('list() with user passes $query parameter', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger(), {
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
       results: systemMessagesDocuments,
     });
 
@@ -63,7 +66,8 @@ describe('SystemMessages', () => {
 
   it('getById() delegates to /sap/bc/adt/runtime/systemmessages/MSG001', async () => {
     const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, createLogger(), {
+    const sm = new SystemMessages(connection, {
+      logger: createLogger(),
       results: systemMessagesDocuments,
     });
 

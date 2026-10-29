@@ -86,16 +86,18 @@ holds is no longer sent), and the new members.
   parameter they took — `logger`, `systemContext`, `contentTypes`,
   `lockRegistry`, `AbapDebugger`'s `onConflict` — optional and by name
   (`AdtHandlerOptions<R, K>`; a part the class does not read is refused). A
-  logger a class required stays positional: `AdtUtils` and the runtime
-  handlers but the debuggers and memory snapshots take
-  `(connection, logger, { results })`. The fields and the behaviour of each
+  logger a class required is a required field of its options: `AdtUtils` and
+  the runtime handlers but the debuggers and memory snapshots take
+  `(connection, { logger, results })` (`AdtLoggedOptions<R>`; a call without
+  the logger does not compile), so every constructor has the one shape
+  `(connection, options)`. The fields and the behaviour of each
   class are unchanged; the legacy classes inherit the constructors. No
   `as unknown as` is left in the package's source. No request and no answer
   changes. A caller of a getter with no argument, or with its own documents,
   changes nothing; `getX<MyResults>()` passes its results; a caller
   constructing a handler directly passes the options
   (`new AdtClass(connection, { logger, results: classDocuments })`,
-  `new AdtUtils(connection, logger, { results: utilDocuments })`,
+  `new AdtUtils(connection, { logger, results: utilDocuments })`,
   `new ClassTestRunner(connection, { logger, results: classTestRunnerDocuments })`),
   takes it from the getter, or — for the four classes no client hands out —
   from their static `create` (below). See MIGRATION-38, "A getter answers
@@ -228,8 +230,8 @@ holds is no longer sent), and the new members.
   without its results does not compile. Each builds the instance its
   constructor builds, so what it sends is the same. `AdtAbapGitClient` stays
   a standalone client, not a factory on `AdtClient`.
-- `AdtHandlerOptions<R, K>`, `IAdtHandlerContext` and `AdtShippedOptions<K>`
-  (what a constructor and a `create` take), and
+- `AdtHandlerOptions<R, K>`, `AdtLoggedOptions<R>`, `IAdtHandlerContext` and
+  `AdtShippedOptions<K>` (what a constructor and a `create` take), and
   `AbapDebuggerConstructorOptions<R>`.
 - `AdtClientOnPrem`, `AdtClientCloud`, `ICreateAdtClientOptions`, the gate
   types (`AdtServedBy`, `AdtPerformedBy`, `IAdtServedOn`, `AdtCodeOf`,
@@ -284,7 +286,9 @@ holds is no longer sent), and the new members.
   the shipped documents' type with no results, the given type with them — from
   a variable too — and refuses a custom `R` without them; `create` sends what
   the constructor sends, `onConflict` included. The header guard's scan skips
-  static members, which implement no contract.
+  static members, which implement no contract. `requiredLogger` (and the
+  legacy `AdtUtilsLegacy` case): each of the twelve classes that require a
+  logger refuses options without it at compile time.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
 - Request-shape tests for every `updateMetadata`, the function group's
@@ -323,7 +327,10 @@ See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
 - Construct a handler, runner or executor with its options:
   `new AdtClass(connection, logger)` → `new AdtClass(connection, { logger,
   results: classDocuments })`, or take it from the getter; a debugger, memory
-  snapshots or the abapGit client from its `create`.
+  snapshots or the abapGit client from its `create`. A required logger moves
+  into the options too: `new AdtUtils(connection, logger)` →
+  `new AdtUtils(connection, { logger, results: utilDocuments })`, likewise
+  the runtime handlers but the debuggers and memory snapshots.
 
 ## [37.4.0] - 2026-10-27
 

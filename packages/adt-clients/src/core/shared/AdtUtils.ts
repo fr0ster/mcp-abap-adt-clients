@@ -113,7 +113,7 @@ import {
   getActivationRun,
 } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
-import type { AdtHandlerOptions } from './handlerOptions';
+import type { AdtLoggedOptions } from './handlerOptions';
 import { getInclude as getIncludeUtil } from './include';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectProperties as getObjectPropertiesUtil } from './objectProperties';
@@ -291,17 +291,13 @@ export class AdtUtils<
 
   protected readonly results: R;
 
-  constructor(
-    connection: IAbapConnection,
-    logger: ILogger,
-    options: AdtHandlerOptions<R>,
-  ) {
+  constructor(connection: IAbapConnection, options: AdtLoggedOptions<R>) {
     this.results = options.results;
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
     // is the caller's, through the `analyse` they pass.
     this.connection = withRequestTrace(connection);
-    this.logger = logger;
+    this.logger = options.logger;
   }
 
   /**

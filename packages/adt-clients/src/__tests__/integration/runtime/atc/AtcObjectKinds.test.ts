@@ -147,7 +147,8 @@ describe('ATC over programs and every kind of include', () => {
       }
 
       try {
-        const atc = new AdtAtc(connection, libraryLogger, {
+        const atc = new AdtAtc(connection, {
+          logger: libraryLogger,
           results: atcReading,
         });
         const pinned = String(testCase.params.check_variant ?? '').trim();

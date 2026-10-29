@@ -149,7 +149,8 @@ describe('a feed call', () => {
     makeAdtRequest: async () => wire,
   };
   const logger = { debug() {}, info() {}, warn() {}, error() {} };
-  const feeds = new FeedRepository(connection as never, logger, {
+  const feeds = new FeedRepository(connection as never, {
+    logger,
     results: {
       feeds: feedDescriptors,
       variants: feedVariants,

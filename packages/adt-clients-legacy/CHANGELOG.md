@@ -25,7 +25,7 @@ of a 0.x package, so a minor.
   their base constructors, which take an options object with a required
   `results` (adt-clients 38.0.0):
   `new AdtClassLegacy(connection, { logger, results: classDocuments })`,
-  `new AdtUtilsLegacy(connection, logger, { results: utilDocuments })`,
+  `new AdtUtilsLegacy(connection, { logger, results: utilDocuments })`,
   `new ClassTestRunnerLegacy(connection, { logger, results: classTestRunnerDocuments })`;
   or take one from the getter. No request and no answer changes.
 - **`AdtClientLegacy` is `AdtClient<'basis740'>`, typed by 7.40's table.**

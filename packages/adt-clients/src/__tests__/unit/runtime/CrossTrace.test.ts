@@ -22,7 +22,8 @@ describe('CrossTrace', () => {
 
   it('list() delegates to /sap/bc/adt/crosstrace/traces', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger(), {
+    const crossTrace = new CrossTrace(connection, {
+      logger: createLogger(),
       results: crossTraceDocuments,
     });
 
@@ -38,7 +39,8 @@ describe('CrossTrace', () => {
 
   it('getById() delegates to /sap/bc/adt/crosstrace/traces/TRACE001', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger(), {
+    const crossTrace = new CrossTrace(connection, {
+      logger: createLogger(),
       results: crossTraceDocuments,
     });
 
@@ -54,7 +56,8 @@ describe('CrossTrace', () => {
 
   it('getRecords() delegates to /sap/bc/adt/crosstrace/traces/TRACE001/records', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger(), {
+    const crossTrace = new CrossTrace(connection, {
+      logger: createLogger(),
       results: crossTraceDocuments,
     });
 
@@ -70,7 +73,8 @@ describe('CrossTrace', () => {
 
   it('getRecordContent() delegates to /sap/bc/adt/crosstrace/traces/TRACE001/records/3/content', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger(), {
+    const crossTrace = new CrossTrace(connection, {
+      logger: createLogger(),
       results: crossTraceDocuments,
     });
 
@@ -86,7 +90,8 @@ describe('CrossTrace', () => {
 
   it('getActivations() delegates to /sap/bc/adt/crosstrace/activations', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger(), {
+    const crossTrace = new CrossTrace(connection, {
+      logger: createLogger(),
       results: crossTraceDocuments,
     });
 

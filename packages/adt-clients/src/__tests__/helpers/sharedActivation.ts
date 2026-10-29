@@ -44,7 +44,8 @@ export async function activateSharedGroup(
   logger: ILogger,
 ): Promise<void> {
   const what = objects.map((o) => `${o.type} ${o.name}`).join(', ');
-  const utils = new AdtUtils(connection, logger, {
+  const utils = new AdtUtils(connection, {
+    logger,
     results: {
       ...utilDocuments,
       activation: wireItself,

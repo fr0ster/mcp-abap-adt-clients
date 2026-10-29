@@ -7,7 +7,8 @@
  * result set it constructs the repository with:
  *
  * ```typescript
- * new FeedRepository(connection, logger, {
+ * new FeedRepository(connection, {
+ *   logger,
  *   results: { ...feedDocuments, feeds: feedDescriptors, entries: feedEntries },
  * });
  * ```

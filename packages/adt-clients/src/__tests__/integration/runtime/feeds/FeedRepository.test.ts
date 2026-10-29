@@ -87,7 +87,8 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      feeds = new FeedRepository(connection, libraryLogger, {
+      feeds = new FeedRepository(connection, {
+        logger: libraryLogger,
         results: feedReading,
       });
     } catch (error) {

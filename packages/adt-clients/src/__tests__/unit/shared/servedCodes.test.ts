@@ -35,7 +35,10 @@ function recording() {
     }),
   } as unknown as IAbapConnection;
   return {
-    utils: new AdtUtils(connection, noopLogger, { results: utilDocuments }),
+    utils: new AdtUtils(connection, {
+      logger: noopLogger,
+      results: utilDocuments,
+    }),
     sent,
   };
 }

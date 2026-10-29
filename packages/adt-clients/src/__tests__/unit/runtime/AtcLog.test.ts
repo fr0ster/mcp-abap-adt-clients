@@ -19,7 +19,8 @@ describe('AtcLog', () => {
 
   it('getCheckFailureLogs() delegates to /sap/bc/adt/atc/checkfailures/logs', async () => {
     const connection = createConnectionMock();
-    const atcLog = new AtcLog(connection, createLogger(), {
+    const atcLog = new AtcLog(connection, {
+      logger: createLogger(),
       results: atcLogDocuments,
     });
 
@@ -35,7 +36,8 @@ describe('AtcLog', () => {
 
   it('getCheckFailureLogs() passes options as query params', async () => {
     const connection = createConnectionMock();
-    const atcLog = new AtcLog(connection, createLogger(), {
+    const atcLog = new AtcLog(connection, {
+      logger: createLogger(),
       results: atcLogDocuments,
     });
 
@@ -60,7 +62,8 @@ describe('AtcLog', () => {
 
   it('getExecutionLog() delegates to /sap/bc/adt/atc/results/exec123/log', async () => {
     const connection = createConnectionMock();
-    const atcLog = new AtcLog(connection, createLogger(), {
+    const atcLog = new AtcLog(connection, {
+      logger: createLogger(),
       results: atcLogDocuments,
     });
 

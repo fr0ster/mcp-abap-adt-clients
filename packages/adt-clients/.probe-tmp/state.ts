@@ -9,7 +9,8 @@ const q = { debug() {}, info() {}, warn() {}, error() {} } as any;
 (async () => {
   const c = createAbapConnection(getConfig(), q);
   await c.connect();
-  const items = await new AdtUtils(c, q, {
+  const items = await new AdtUtils(c, {
+    logger: q,
     results: utilDocuments,
   }).getPackageContentsList('ZBASE_PROBE01', { includeSubpackages: true });
   process.stdout.write(`--- ZBASE_PROBE01 holds ${items.length}\n`);

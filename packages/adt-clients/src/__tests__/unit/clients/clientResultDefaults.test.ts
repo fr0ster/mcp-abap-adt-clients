@@ -96,7 +96,8 @@ function constructorTypes(): void {
   void isOwn;
 
   // A constructor takes its options: `results` required, the context parts
-  // the handler reads optional and by name, a required logger positional.
+  // the handler reads optional and by name, a required logger required
+  // (`unit/clients/requiredLogger.test.ts`).
   new AdtClass(connection, {
     results: classDocuments,
     logger: noopLogger,
@@ -106,10 +107,10 @@ function constructorTypes(): void {
   new AdtClass<Marked<typeof classDocuments>>(connection, {
     logger: noopLogger,
   });
-  // @ts-expect-error -- results are required (a required logger, positional)
-  new AdtUtils(connection, noopLogger, {});
+  // @ts-expect-error -- results are required (beside a required logger)
+  new AdtUtils(connection, { logger: noopLogger });
   // @ts-expect-error -- results are required
-  new RuntimeDumps(connection, noopLogger, {});
+  new RuntimeDumps(connection, { logger: noopLogger });
   // A part the handler does not read is not taken.
   new AdtDomain(connection, {
     results: domainDocuments,
@@ -137,7 +138,8 @@ describe('client getters and handler constructors', () => {
 
   it('answer with the documents they are given', async () => {
     const connection = new RecordingConnection();
-    const dumps = new RuntimeDumps(connection, noopLogger, {
+    const dumps = new RuntimeDumps(connection, {
+      logger: noopLogger,
       results: runtimeDumpsDocuments,
     });
 

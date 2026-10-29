@@ -61,19 +61,20 @@ const members: [string, (c: IAbapConnection) => Member][] = [
   [
     'RuntimeDumps.list',
     (c) => (o) =>
-      new RuntimeDumps(c, logger, { results: runtimeDumpsDocuments }).list(o),
+      new RuntimeDumps(c, { logger, results: runtimeDumpsDocuments }).list(o),
   ],
   [
     'RuntimeDumps.listByUser',
     (c) => (o) =>
-      new RuntimeDumps(c, logger, {
+      new RuntimeDumps(c, {
+        logger,
         results: runtimeDumpsDocuments,
       }).listByUser('U', o),
   ],
   [
     'RuntimeDumps.getById',
     (c) => (o) =>
-      new RuntimeDumps(c, logger, { results: runtimeDumpsDocuments }).getById(
+      new RuntimeDumps(c, { logger, results: runtimeDumpsDocuments }).getById(
         'D',
         o,
       ),
@@ -81,14 +82,14 @@ const members: [string, (c: IAbapConnection) => Member][] = [
   [
     'AtcLog.getCheckFailureLogs',
     (c) => (o) =>
-      new AtcLog(c, logger, { results: atcLogDocuments }).getCheckFailureLogs(
+      new AtcLog(c, { logger, results: atcLogDocuments }).getCheckFailureLogs(
         o,
       ),
   ],
   [
     'AtcLog.getExecutionLog',
     (c) => (o) =>
-      new AtcLog(c, logger, { results: atcLogDocuments }).getExecutionLog(
+      new AtcLog(c, { logger, results: atcLogDocuments }).getExecutionLog(
         'X',
         o,
       ),
@@ -96,78 +97,85 @@ const members: [string, (c: IAbapConnection) => Member][] = [
   [
     'ApplicationLog.getObject',
     (c) => (o) =>
-      new ApplicationLog(c, logger, {
+      new ApplicationLog(c, {
+        logger,
         results: applicationLogDocuments,
       }).getObject('Z', o),
   ],
   [
     'ApplicationLog.getSource',
     (c) => (o) =>
-      new ApplicationLog(c, logger, {
+      new ApplicationLog(c, {
+        logger,
         results: applicationLogDocuments,
       }).getSource('Z', o),
   ],
   [
     'ApplicationLog.validateName',
     (c) => (o) =>
-      new ApplicationLog(c, logger, {
+      new ApplicationLog(c, {
+        logger,
         results: applicationLogDocuments,
       }).validateName('Z', o),
   ],
   [
     'DdicActivation.getGraph',
     (c) => (o) =>
-      new DdicActivation(c, logger, {
+      new DdicActivation(c, {
+        logger,
         results: ddicActivationDocuments,
       }).getGraph(o),
   ],
   [
     'SystemMessages.list',
     (c) => (o) =>
-      new SystemMessages(c, logger, { results: systemMessagesDocuments }).list(
+      new SystemMessages(c, { logger, results: systemMessagesDocuments }).list(
         o,
       ),
   ],
   [
     'SystemMessages.getById',
     (c) => (o) =>
-      new SystemMessages(c, logger, {
+      new SystemMessages(c, {
+        logger,
         results: systemMessagesDocuments,
       }).getById('M', o),
   ],
   [
     'GatewayErrorLog.list',
     (c) => (o) =>
-      new GatewayErrorLog(c, logger, {
+      new GatewayErrorLog(c, {
+        logger,
         results: gatewayErrorLogDocuments,
       }).list(o),
   ],
   [
     'GatewayErrorLog.getById',
     (c) => (o) =>
-      new GatewayErrorLog(c, logger, {
+      new GatewayErrorLog(c, {
+        logger,
         results: gatewayErrorLogDocuments,
       }).getById('T', 'I', o),
   ],
   [
     'St05Trace.getState',
     (c) => (o) =>
-      new St05Trace(c, logger, { results: st05TraceDocuments }).getState(o),
+      new St05Trace(c, { logger, results: st05TraceDocuments }).getState(o),
   ],
   [
     'St05Trace.getDirectory',
     (c) => (o) =>
-      new St05Trace(c, logger, { results: st05TraceDocuments }).getDirectory(o),
+      new St05Trace(c, { logger, results: st05TraceDocuments }).getDirectory(o),
   ],
   [
     'CrossTrace.list',
     (c) => (o) =>
-      new CrossTrace(c, logger, { results: crossTraceDocuments }).list(o),
+      new CrossTrace(c, { logger, results: crossTraceDocuments }).list(o),
   ],
   [
     'CrossTrace.getById',
     (c) => (o) =>
-      new CrossTrace(c, logger, { results: crossTraceDocuments }).getById(
+      new CrossTrace(c, { logger, results: crossTraceDocuments }).getById(
         'T',
         undefined,
         o,
@@ -176,7 +184,7 @@ const members: [string, (c: IAbapConnection) => Member][] = [
   [
     'CrossTrace.getRecords',
     (c) => (o) =>
-      new CrossTrace(c, logger, { results: crossTraceDocuments }).getRecords(
+      new CrossTrace(c, { logger, results: crossTraceDocuments }).getRecords(
         'T',
         o,
       ),
@@ -184,14 +192,16 @@ const members: [string, (c: IAbapConnection) => Member][] = [
   [
     'CrossTrace.getRecordContent',
     (c) => (o) =>
-      new CrossTrace(c, logger, {
+      new CrossTrace(c, {
+        logger,
         results: crossTraceDocuments,
       }).getRecordContent('T', 1, o),
   ],
   [
     'CrossTrace.getActivations',
     (c) => (o) =>
-      new CrossTrace(c, logger, {
+      new CrossTrace(c, {
+        logger,
         results: crossTraceDocuments,
       }).getActivations(o),
   ],
@@ -212,7 +222,8 @@ describe.each(members)('%s', (_name, build) => {
 });
 
 it('a result set given at construction reads the answer', async () => {
-  const dumps = new RuntimeDumps(connection(), logger, {
+  const dumps = new RuntimeDumps(connection(), {
+    logger,
     results: {
       list: (answer) => String(answer.data).length,
       dump: (answer) => answer.status,

@@ -193,7 +193,8 @@ const ROWS: Row[] = [
   ...requestRows(modern),
   ...utilRows(
     (connection) =>
-      new AdtUtils(connection, createLibraryLogger(), {
+      new AdtUtils(connection, {
+        logger: createLibraryLogger(),
         results: utilDocuments,
       }),
   ),

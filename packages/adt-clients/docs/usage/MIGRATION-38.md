@@ -416,11 +416,13 @@ documents typed as `MyResults`.
   optional field of the same name — `logger`, `systemContext`,
   `contentTypes`, `lockRegistry`, and `AbapDebugger`'s `onConflict`. The
   type is `AdtHandlerOptions<R, K>`, `K` naming the parts the class reads; a
-  part it does not read is a compile error. A logger a class required stays
-  positional: `AdtUtils` and the runtime handlers `Profiler`, `CrossTrace`,
-  `St05Trace`, `ApplicationLog`, `AdtAtc`, `AtcLog`, `DdicActivation`,
-  `RuntimeDumps`, `FeedRepository`, `SystemMessages`, `GatewayErrorLog` take
-  `(connection, logger, { results })`. This covers:
+  part it does not read is a compile error. A logger a class required is a
+  required field of its options: `AdtUtils` and the runtime handlers
+  `Profiler`, `CrossTrace`, `St05Trace`, `ApplicationLog`, `AdtAtc`,
+  `AtcLog`, `DdicActivation`, `RuntimeDumps`, `FeedRepository`,
+  `SystemMessages`, `GatewayErrorLog` take `(connection, { logger, results })`
+  (`AdtLoggedOptions<R>`), and a call without the logger does not compile.
+  Every constructor has the one shape `(connection, options)`. This covers:
   - every `core/*` handler (`AdtClass`, `AdtProgram`, `AdtInclude`,
     `AdtInterface`, `AdtDomain`, `AdtDataElement`, `AdtStructure`, `AdtTable`,
     `AdtDdicTableType`, `AdtDdl`, `AdtFunctionGroup`, `AdtFunctionModule`,
@@ -466,10 +468,12 @@ Requests and answers do not change.
   new AdtClass(connection, logger);
   new AdtInclude(connection, logger, undefined, undefined, systemContext);
   new AdtUtils(connection, logger);
+  new RuntimeDumps(connection, logger);
   // 38.0.0
   new AdtClass(connection, { logger, results: classDocuments });
   new AdtInclude(connection, { logger, systemContext, results: includeDocuments });
-  new AdtUtils(connection, logger, { results: utilDocuments });
+  new AdtUtils(connection, { logger, results: utilDocuments });
+  new RuntimeDumps(connection, { logger, results: runtimeDumpsDocuments });
   ```
 
   — or take it from the getter, `client.getClass()`.
@@ -491,7 +495,8 @@ Requests and answers do not change.
 
 Every `<x>Documents` is exported where its class is (the root, `/core`,
 `/runtime`, `/abapgit`, `/executors`), and `AdtHandlerOptions`,
-`AdtShippedOptions` and `IAdtHandlerContext` from the root and `/core`.
+`AdtLoggedOptions`, `AdtShippedOptions` and `IAdtHandlerContext` from the
+root and `/core`.
 
 ## The legacy package
 

@@ -131,7 +131,8 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger, {
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
         results: utilDocuments,
       });
       const scopeXml = expectResult(
@@ -217,7 +218,8 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger, {
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
         results: utilDocuments,
       });
       const scopeXml = expectResult(
@@ -324,7 +326,8 @@ describe('Shared - getWhereUsed', () => {
 
         const document = expectResult(
           await withAcceptHandling(
-            new AdtUtils(connection, testsLogger, {
+            new AdtUtils(connection, {
+              logger: testsLogger,
               results: utilDocuments,
             }).getWhereUsed(
               {
@@ -334,7 +337,8 @@ describe('Shared - getWhereUsed', () => {
               {
                 analyse: analyseException,
                 headers: integrationHeadersOf(
-                  new AdtUtils(connection, testsLogger, {
+                  new AdtUtils(connection, {
+                    logger: testsLogger,
                     results: utilDocuments,
                   }),
                   'getWhereUsed',
@@ -401,7 +405,8 @@ describe('Shared - getWhereUsed', () => {
       // empty name is asked of the server and the server's own refusal comes
       // back inside `IAdtResponse`.
       logTestStep('an empty object name is answered, not thrown', testsLogger);
-      const noName = await new AdtUtils(connection, testsLogger, {
+      const noName = await new AdtUtils(connection, {
+        logger: testsLogger,
         results: utilDocuments,
       }).getWhereUsed(
         {
@@ -411,7 +416,10 @@ describe('Shared - getWhereUsed', () => {
         {
           analyse: analyseException,
           headers: integrationHeadersOf(
-            new AdtUtils(connection, testsLogger, { results: utilDocuments }),
+            new AdtUtils(connection, {
+              logger: testsLogger,
+              results: utilDocuments,
+            }),
             'getWhereUsed',
           ),
         },
@@ -431,7 +439,8 @@ describe('Shared - getWhereUsed', () => {
       // it cannot address is the caller's argument, thrown as itself.
       logTestStep('an empty object type is thrown, not asked', testsLogger);
       await expect(
-        new AdtUtils(connection, testsLogger, {
+        new AdtUtils(connection, {
+          logger: testsLogger,
           results: utilDocuments,
         }).getWhereUsed(
           {
@@ -442,7 +451,10 @@ describe('Shared - getWhereUsed', () => {
           {
             analyse: analyseException,
             headers: integrationHeadersOf(
-              new AdtUtils(connection, testsLogger, { results: utilDocuments }),
+              new AdtUtils(connection, {
+                logger: testsLogger,
+                results: utilDocuments,
+              }),
               'getWhereUsed',
             ),
           },
@@ -484,7 +496,8 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger, {
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
         results: utilDocuments,
       });
 
@@ -592,7 +605,8 @@ describe('Shared - getWhereUsed', () => {
       // `AdtUtils` and not `client.getUtils()`: the two-step flow fetches a scope
       // document and hands it back, and `getWhereUsed(scopeXml)` is a class
       // member that `IAdtInformationSystem` does not carry.
-      const utils = new AdtUtils(connection, testsLogger, {
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
         results: utilDocuments,
       });
       const document = expectResult(
@@ -646,7 +660,8 @@ describe('Shared - getWhereUsed', () => {
       // member that `IAdtInformationSystem` does not carry. The contract's
       // `getWhereUsedList` builds its own scope from flags instead, so it cannot
       // stand in here — see the CHANGELOG entry for the gap and what closes it.
-      const utils = new AdtUtils(connection, testsLogger, {
+      const utils = new AdtUtils(connection, {
+        logger: testsLogger,
         results: utilDocuments,
       });
 

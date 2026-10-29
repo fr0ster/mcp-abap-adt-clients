@@ -73,7 +73,7 @@ export function readingProfiler(
   connection: IAbapConnection,
   logger: ILogger,
 ): ReadingProfiler {
-  return new Profiler(connection, logger, { results: profilerReading });
+  return new Profiler(connection, { logger, results: profilerReading });
 }
 
 export interface IWaitForTraceOptions extends IProfilerListOptions {

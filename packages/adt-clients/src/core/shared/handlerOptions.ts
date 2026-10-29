@@ -18,9 +18,9 @@ export interface IAdtHandlerContext {
 }
 
 /**
- * What a handler, runner or executor is constructed with after its connection
- * (and after a logger it requires, which stays positional): its result set,
- * required, and the parts of the context named by `K`, optional.
+ * What a handler, runner or executor is constructed with after its connection:
+ * its result set, required, and the parts of the context named by `K`,
+ * optional. A class that requires a logger takes `AdtLoggedOptions` instead.
  *
  * `results` is required because a constructor cannot choose its generic per
  * overload: a caller naming its own `R` hands its results, and the shipped
@@ -39,3 +39,13 @@ export type AdtHandlerOptions<R, K extends keyof IAdtHandlerContext = never> = {
 export type AdtShippedOptions<K extends keyof IAdtHandlerContext = never> = {
   results?: undefined;
 } & Pick<IAdtHandlerContext, K>;
+
+/**
+ * What a class that requires a logger is constructed with after its
+ * connection: its result set and its logger, both required. The type is the
+ * only check: a call without the logger does not compile.
+ */
+export type AdtLoggedOptions<R> = {
+  results: R;
+  logger: ILogger;
+};

@@ -34,7 +34,8 @@ function recording(body = '<asx:abap/>') {
 describe('getUtils().getTypeStructure()', () => {
   it('POSTs typestructure with no body and the type list Accept', async () => {
     const { connection, sent } = recording();
-    const utils = new AdtUtils(connection, noopLogger, {
+    const utils = new AdtUtils(connection, {
+      logger: noopLogger,
       results: utilDocuments,
     });
     const answer = await utils.getTypeStructure({
@@ -59,7 +60,8 @@ describe('getUtils().getTypeStructure()', () => {
 
   it("sends the caller's headers as given", async () => {
     const { connection, sent } = recording();
-    await new AdtUtils(connection, noopLogger, {
+    await new AdtUtils(connection, {
+      logger: noopLogger,
       results: utilDocuments,
     }).getTypeStructure({
       headers: { accept: 'application/xml', contentType: 'text/plain' },
@@ -72,7 +74,8 @@ describe('getUtils().getTypeStructure()', () => {
 
   it('touches no session type', async () => {
     const { connection } = recording();
-    const utils = new AdtUtils(connection, noopLogger, {
+    const utils = new AdtUtils(connection, {
+      logger: noopLogger,
       results: utilDocuments,
     });
     await utils.getTypeStructure({
