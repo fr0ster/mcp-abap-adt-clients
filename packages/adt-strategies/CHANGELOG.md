@@ -56,8 +56,9 @@ adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
 
 - The literal scan of type codes (`typeCodeLiterals.test.ts`, the scan shared
   from adt-clients): a code literal in this package's source passes only where
-  the compiler types it by the tables, and a code named in a comment is a code
-  of the tables or an allow-listed example of one that is not.
+  the compiler types it by the tables, and a code named in a comment or inside
+  a longer string is a code of the tables or an allow-listed example of one
+  that is not.
 
 ### Migration
 

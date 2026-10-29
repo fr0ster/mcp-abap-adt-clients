@@ -749,8 +749,9 @@ answers: its `typestructure`, its `discovery` and, per sample object, its
 
 - **In CI** — `src/__tests__/unit/conformance/typeTablesConformance.test.ts`
   runs the check against the recorded answers. What it finds is committed
-  beside it: the known divergences with their reasons and the list of creates
-  without `CREATE` (`recorded.ts`), and the coverage (`coverage.json`). A
+  beside it: the known divergences with their reasons, the list of creates
+  without `CREATE` and the collections that advertise no `app:accept` for an
+  `updateMetadata` (`recorded.ts`), and the coverage (`coverage.json`). A
   change that changes what the check finds is an edit of those lists.
 - **On a live system** — `src/__tests__/integration/shared/typeTablesConformance.test.ts`
   reads the same endpoints for the configured variant (`environment.system`)
@@ -1325,7 +1326,8 @@ them to what each release answers.
 
 `src/__tests__/unit/typeCodeLiterals.test.ts` (one per package) holds the
 source to it: a code literal passes only where the compiler types it by the
-tables, and a code named in a comment is a code of the tables.
+tables, and a code named in a comment or inside a longer string (a message,
+an XML template's span) is a code of the tables.
 
 ### The contract you accept is yours
 

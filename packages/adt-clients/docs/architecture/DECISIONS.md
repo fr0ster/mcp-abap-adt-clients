@@ -934,7 +934,7 @@ release answers (`typestructure`, `discovery`, per sample `urimapper` and
 metadata), in CI against the recorded answers and live on demand; a known
 divergence is data with its reason (`recorded.ts`). The literal scan
 (`typeCodeLiterals.test.ts`) fails a code literal the compiler does not type
-by the tables, and a comment naming a code no table holds.
+by the tables, and a comment or string naming a code no table holds.
 
 **What it costs.** A consumer names its variant, and a code from outside the
 type system (a tool argument, a file) is checked once where it enters, against

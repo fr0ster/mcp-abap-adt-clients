@@ -179,8 +179,9 @@ holds is no longer sent), and the new members.
 - **The literal scan of type codes** (`typeCodeLiterals.test.ts` in each
   package, `typeCodeScan.ts`): a code literal in production source passes
   only where the compiler types it by the tables, and a code named in a
-  comment must be a code of the tables; the allow-list of non-codes carries a
-  reason per entry.
+  comment or inside a longer string (a message, a template's text span) must
+  be a code of the tables; the allow-list of non-codes carries a reason per
+  entry.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
 - Request-shape tests for every `updateMetadata`, the function group's

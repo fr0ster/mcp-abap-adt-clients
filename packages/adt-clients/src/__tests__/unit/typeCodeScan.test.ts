@@ -12,6 +12,9 @@ const ROOT = join(__dirname, '../../..');
 const TSCONFIG = join(ROOT, 'tsconfig.json');
 const FIXTURE = join(ROOT, 'src/__typeCodeScanFixture__/fixture.ts');
 
+/** A template substitution in a fixture's source, spelled without `${` in a plain string. */
+const SUBSTITUTION = `${'$'}{name}`;
+
 function scan(text: string): string[] {
   return typeCodeFindings(ROOT, TSCONFIG, [], new Map([[FIXTURE, text]])).map(
     (finding) => finding.line,
@@ -57,7 +60,7 @@ describe('the literal scan of type codes', () => {
       scan(
         [
           'export const reference = (name: string) =>',
-          '  `<adtcore:objectReference adtcore:name="${name}" adtcore:type="FUGR/I"/>`;',
+          `  \`<adtcore:objectReference adtcore:name="${SUBSTITUTION}" adtcore:type="FUGR/I"/>\`;`,
           "export const message = 'pass a code, e.g. CLAS/OC or PROG/P';",
         ].join('\n'),
       ),
@@ -69,7 +72,7 @@ describe('the literal scan of type codes', () => {
       scan(
         [
           'export const reference = (name: string) =>',
-          '  `<adtcore:objectReference adtcore:name="${name}"',
+          `  \`<adtcore:objectReference adtcore:name="${SUBSTITUTION}"`,
           '    adtcore:type="FUGR/ZZ"/>`;',
         ].join('\n'),
       ),
