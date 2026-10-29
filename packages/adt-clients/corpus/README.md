@@ -25,6 +25,7 @@ recorded name, which its `.json` names as `bodyFile`.
 
 | Folder | What it holds | Read by |
 |---|---|---|
+| `abapunit/` | per release (`abapunit/<release>/`), `GET /sap/bc/adt/abapunit/metadata` — the `osl:object` types ABAP Unit lists (`supportedTypeFeatures`, each `globalWorkbenchType` with `ownTests`, `assignedTests` and `coverage`) and the client's and user's execution setup — `abapunit-metadata--01-metadata`; `s4-2025` and `abap-cloud` (7.40 has no such endpoint) | the conformance check's ABAP Unit rules (`ABAP_UNIT_RUN_TYPES`) |
 | `answers/` | the answer shapes: reads, refusals, writes, with the collector's run manifests (`_run-*.json`) | `adt-strategies`' tests, this package's unit tests, `docs/usage/ANSWER_SHAPES.md`; written by `scripts/capture-adt-corpus.ts` |
 | `debugger/` | the debugger conversations and the memory snapshot list, kept for information | `adt-strategies`' tests, `docs/research/debugger-endpoints.md`, `docs/usage/ERRATA.md` |
 | `discovery/` | each release's `GET /sap/bc/adt/discovery`: its collections, their `app:accept` and templates — `system-description-<release>--03-discovery` | the type tables' evidence |

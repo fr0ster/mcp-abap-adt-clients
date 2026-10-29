@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<aunit:metadata xmlns:aunit="http://www.sap.com/adt/aunit">
+  <aunit:supportedTypeFeatures globalWorkbenchType="BDEF/BDO" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="DEVC/K" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="DDLS/DF" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="CLAS/OCP" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="CLAS/OC" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="CLAS/OCI" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="CLAS/OCL" ownTests="true" assignedTests="false" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="CLAS/OLD" ownTests="true" assignedTests="false" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="FUGR/F" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="FUGR/FF" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="FUGR/I" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="FUGR/PL" ownTests="true" assignedTests="false" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="FUGR/PLM" ownTests="true" assignedTests="false" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="PROG/P" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="PROG/I" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="PROG/PL" ownTests="true" assignedTests="false" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="PROG/PLM" ownTests="true" assignedTests="false" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="SRVB/SVB" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="XSLT/VT" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="TABL/DT" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="RQRQ/RQ" ownTests="true" assignedTests="true" coverage="true"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="CMPT" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:supportedTypeFeatures globalWorkbenchType="DCLS/DL" ownTests="false" assignedTests="true" coverage="false"/>
+  <aunit:clientSetup maxRiskLevel="harmless" executionDenied="false"/>
+  <aunit:userAuthorization executionDenied="false"/>
+</aunit:metadata>
