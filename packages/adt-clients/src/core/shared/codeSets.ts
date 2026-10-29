@@ -12,6 +12,8 @@
 
 import type {
   AdtParentedTypeCode,
+  AdtTypeCode,
+  AdtUtilityCode,
   AdtVariant,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -53,7 +55,14 @@ export const METADATA_READ = {
   'DOMA/DD': ACCEPT_DOMAIN,
   'DTEL/DE': ACCEPT_DATA_ELEMENT,
   'DEVC/K': ACCEPT_PACKAGE,
-} as const;
+} as const satisfies Partial<Record<AdtTypeCode, string>>;
+
+/**
+ * Codes written out in a type, checked to be codes of the tables:
+ * `AdtCodes<'FUGR/I' | 'MSAG/NN'>` does not compile for a code no table
+ * holds. Internal.
+ */
+export type AdtCodes<C extends AdtUtilityCode> = C;
 
 /** A code `readObjectMetadata` reads. */
 export type AdtMetadataReadCode = keyof typeof METADATA_READ;
@@ -71,7 +80,7 @@ export const SOURCE_READ = {
   'DDLS/DF': true,
   'TABL/DT': true,
   'TABL/DS': true,
-} as const;
+} as const satisfies Partial<Record<AdtTypeCode, true>>;
 
 /** A code `readObjectSource` reads. */
 export type AdtSourceReadCode = keyof typeof SOURCE_READ;
@@ -116,7 +125,9 @@ export type AdtSearchCode<V extends AdtVariant> = AdtCodeOf<V>;
  * legacy `UtilsReaders` cycle, `fetchNodeStructure('DEVC/K', '$TMP')`), though
  * 7.40's table has no package API.
  */
-export type AdtStructureCode<V extends AdtVariant> = AdtCodeOf<V> | 'DEVC/K';
+export type AdtStructureCode<V extends AdtVariant> =
+  | AdtCodeOf<V>
+  | AdtCodes<'DEVC/K'>;
 
 /**
  * The codes where-used is asked of: every addressable code but a function
@@ -125,7 +136,7 @@ export type AdtStructureCode<V extends AdtVariant> = AdtCodeOf<V> | 'DEVC/K';
  */
 export type AdtWhereUsedCode<V extends AdtVariant> = Exclude<
   AdtCodeOf<V>,
-  'FUGR/I' | 'MSAG/NN'
+  AdtCodes<'FUGR/I' | 'MSAG/NN'>
 >;
 
 /**
@@ -134,7 +145,9 @@ export type AdtWhereUsedCode<V extends AdtVariant> = Exclude<
  * 38.0.0, so it stays — unmeasured, and listed for interfaces-adt 21.1.0 to
  * measure. Not on 7.40, whose utilities take only 7.40's codes.
  */
-export const ACTIVATED_WITHOUT_TABLE = { 'DEVC/K': true } as const;
+export const ACTIVATED_WITHOUT_TABLE = {
+  'DEVC/K': true,
+} as const satisfies Partial<Record<AdtTypeCode, true>>;
 
 /** The codes of {@link ACTIVATED_WITHOUT_TABLE} on variant `V`. */
 type ActivatedWithoutTable<V extends AdtVariant> = [V] extends [
@@ -149,7 +162,7 @@ type ActivatedWithoutTable<V extends AdtVariant> = [V] extends [
  * variant, a package (`ACTIVATED_WITHOUT_TABLE`).
  */
 export type AdtActivationCode<V extends AdtVariant> =
-  | Exclude<AdtCodeWith<V, 'activate'>, 'MSAG/NN'>
+  | Exclude<AdtCodeWith<V, 'activate'>, AdtCodes<'MSAG/NN'>>
   | ActivatedWithoutTable<V>;
 
 /** Whether text from outside the types is activated without the table's word. */
@@ -160,13 +173,13 @@ export function isActivatedWithoutTable(code: string): boolean {
 /** The codes a group deletion check asks about. */
 export type AdtDeletionCheckCode<V extends AdtVariant> = Exclude<
   AdtCodeWith<V, 'deletionCheck'>,
-  'MSAG/NN'
+  AdtCodes<'MSAG/NN'>
 >;
 
 /** The codes a group deletion deletes. */
 export type AdtDeletionCode<V extends AdtVariant> = Exclude<
   AdtCodeWith<V, 'delete'>,
-  'MSAG/NN'
+  AdtCodes<'MSAG/NN'>
 >;
 
 /** The codes `readObjectMetadata` reads on variant `V`. */

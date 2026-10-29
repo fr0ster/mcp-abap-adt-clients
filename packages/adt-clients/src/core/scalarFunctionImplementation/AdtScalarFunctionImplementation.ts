@@ -1,5 +1,5 @@
 /**
- * AdtScalarFunctionImplementation - CRUD for `DSFI/DSF` scalar function
+ * AdtScalarFunctionImplementation - CRUD for `DSFI/SFI` scalar function
  * implementations.
  *
  * Asymmetric by the endpoint's design: the source is JSON on `/source/main`,

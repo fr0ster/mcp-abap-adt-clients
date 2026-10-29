@@ -1,5 +1,5 @@
 /**
- * AdtAuthorizationField - CRUD for `SUSO/O` authorization fields.
+ * AdtAuthorizationField - CRUD for `AUTH` authorization fields.
  *
  * An XML-based object: no source, so `read` and `readMetadata` fetch the same
  * document and `update` writes that XML.

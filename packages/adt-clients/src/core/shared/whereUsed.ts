@@ -10,6 +10,7 @@ import type {
 import type { AdtAddressableCode } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
+import type { AdtCodes } from './codeSets';
 import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
@@ -38,7 +39,7 @@ import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
  *
  * // Disable specific types
  * scopeXml = modifyWhereUsedScope(scopeXml, {
- *   disable: ['WDYN/YT', 'WAPA/WO']
+ *   disable: ['PROG/I', 'DEVC/K']
  * });
  */
 export function modifyWhereUsedScope(
@@ -102,7 +103,10 @@ function setIsSelected(typeTag: string, selected: boolean): string {
  * whose group the parameters have no field for (`FUGR/FF` names its group as
  * `GROUP|FM`). `VIEW/DV` included, as before 38.0.0.
  */
-export type WhereUsedAddressCode = Exclude<AdtAddressableCode, 'FUGR/I'>;
+export type WhereUsedAddressCode = Exclude<
+  AdtAddressableCode,
+  AdtCodes<'FUGR/I'>
+>;
 
 /** What the where-used requests take: their params, `object_type` addressable. */
 export type IWhereUsedScopeRequest = Omit<

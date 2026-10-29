@@ -21,6 +21,7 @@ import {
   type AdtOperation,
   type AdtParentedTypeCode,
   type AdtTypeCode,
+  type AdtUtilityCode,
   type IAdtCodeFacts,
 } from '@mcp-abap-adt/interfaces-adt';
 import { DDIC_VIEW } from './objects';
@@ -103,7 +104,7 @@ export const NO_OWN_ADDRESS: Readonly<Partial<Record<string, string>>> =
  */
 export const GROUP_ONLY_ADDRESS = {
   'VIEW/DV': (name: string) => DDIC_VIEW.uri(name),
-} as const;
+} as const satisfies Partial<Record<AdtUtilityCode, (name: string) => string>>;
 
 /** A code only the group operations address: see {@link GROUP_ONLY_ADDRESS}. */
 export type AdtGroupOnlyCode = keyof typeof GROUP_ONLY_ADDRESS;

@@ -1,5 +1,5 @@
 /**
- * AdtScalarFunction - CRUD for `DSFD/DSF` scalar function definitions.
+ * AdtScalarFunction - CRUD for `DSFD/SCF` scalar function definitions.
  *
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
  * at construction makes of that endpoint's answer.
