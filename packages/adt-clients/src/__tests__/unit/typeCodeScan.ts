@@ -259,13 +259,22 @@ function finding(
   position: number,
   text: string,
   why: string,
+  linesInto = 0,
 ): ITypeCodeFinding {
   const file = relative(root, source.fileName);
   const { line } = source.getLineAndCharacterOfPosition(position);
   return {
     key: `${file}:${text}`,
-    line: `${file}:${line + 1} '${text}' — ${why}`,
+    line: `${file}:${line + 1 + linesInto} '${text}' — ${why}`,
   };
+}
+
+/** The line breaks in `text` before `offset`: the line of a word inside a literal. */
+function newlinesBefore(text: string, offset: number): number {
+  let count = 0;
+  for (let index = 0; index < offset; index += 1)
+    if (text[index] === '\n') count += 1;
+  return count;
 }
 
 /** The findings of one source file: its code literals and its comments. */
@@ -287,6 +296,28 @@ function findingsOf(
         findings.push(
           finding(root, source, node.getStart(source), node.text, why),
         );
+    } else if (
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node)
+    ) {
+      // A code inside a longer text — a message, an XML template's span —
+      // is read like prose: it must be a code of the tables.
+      const start = node.getStart(source);
+      for (const { word, offset } of codeShapedWords(node.text))
+        if (!TABLE_CODES.has(word))
+          findings.push(
+            finding(
+              root,
+              source,
+              start,
+              word,
+              'inside a string, not a code of the tables',
+              newlinesBefore(node.text, offset),
+            ),
+          );
     }
     ts.forEachChild(node, visit);
   };

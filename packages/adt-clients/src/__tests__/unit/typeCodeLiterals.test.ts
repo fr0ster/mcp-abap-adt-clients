@@ -33,6 +33,14 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
   ],
   [
+    'src/batch/wire.ts:HTTP/1',
+    "The HTTP version of a batch part's request line (`HTTP/1.1`), not a type code.",
+  ],
+  [
+    'src/core/enhancement/create.ts:ENHS/XS',
+    "The type of the enhancement spot as the BAdI implementation's create body references it (`enhcore:objectReference adtcore:type`): a type the systems list (`coverage.json`, unserved) that no API of the library serves, so no table holds it; it is the request body as sent, unchanged.",
+  ],
+  [
     'src/core/shared/whereUsed.ts:STRU/DS',
     'Named as the code the friendly name `structure` used to map to before 38.0.0 — the comment says it is a code no release lists, which is why the mapping went.',
   ],

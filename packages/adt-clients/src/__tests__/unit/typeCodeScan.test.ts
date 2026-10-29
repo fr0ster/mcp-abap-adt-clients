@@ -52,6 +52,32 @@ describe('the literal scan of type codes', () => {
     ]);
   });
 
+  it('passes a code of the tables inside a longer string or a template span', () => {
+    expect(
+      scan(
+        [
+          'export const reference = (name: string) =>',
+          '  `<adtcore:objectReference adtcore:name="${name}" adtcore:type="FUGR/I"/>`;',
+          "export const message = 'pass a code, e.g. CLAS/OC or PROG/P';",
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('fails a code no table holds inside a template span, naming its line', () => {
+    expect(
+      scan(
+        [
+          'export const reference = (name: string) =>',
+          '  `<adtcore:objectReference adtcore:name="${name}"',
+          '    adtcore:type="FUGR/ZZ"/>`;',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      "src/__typeCodeScanFixture__/fixture.ts:3 'FUGR/ZZ' — inside a string, not a code of the tables",
+    ]);
+  });
+
   it('passes keys, comparisons and type arguments typed by the codes', () => {
     expect(
       scan(
