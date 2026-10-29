@@ -63,11 +63,19 @@ two resources they touch, and a type offers only the pairs it has:
 | the **source** at `source/main` | `read` | `update` |
 | the object's **own document** | `readMetadata` | `updateMetadata` |
 
-A class, a program, a DDL source have a source: `read`/`update`. A **domain, a
-data element, a package, a table type, a function group, a transport request, a
-message class and an authorization field have none** — they *are* their document,
-so they offer `readMetadata`/`updateMetadata` and nothing else. Three types have
-both: a function include, a scalar function implementation and a feature toggle.
+Which pairs a type has is its code's `operations` in the ADT type tables of
+`@mcp-abap-adt/interfaces-adt` (`source`/`update`, `readMetadata`/`updateMetadata`),
+per release variant. A **domain, a data element, a package, a table type, a
+transport request, a message class and an authorization field have no source**
+— they *are* their document, so they offer `readMetadata`/`updateMetadata` and
+nothing else. Since 38.0.0 the types with a source have both pairs: a class, an
+interface, a program, an include, a function group (its `source/main`, the
+function pool's main program), a function module, a function include, a DDL
+source, an access control, a metadata extension, a behavior definition, a
+service definition, a scalar function and its implementation, a
+transformation, a table, a structure and a feature toggle. A program's, an
+include's and a feature toggle's `updateMetadata` are on premise only; on
+SAP_BASIS 7.40 the legacy package refuses the ones it has not measured.
 
 ```typescript
 // a class — has a source
@@ -177,11 +185,16 @@ assembled: what you pass is the body.
 
 ### `updateMetadata()` — the object's whole document
 
-A domain, a data element, a package, a table type, a function group, a
-transport request and an authorization field have no source at all: the object
-**is** its document, and the write sends that document. Four more types offer
-both members, each addressing a resource of its own — a feature toggle, a
-message class, a function include and a scalar function implementation:
+A domain, a data element, a package, a table type, a transport request and an
+authorization field have no source at all: the object **is** its document, and
+the write sends that document. The types with a source offer both members, each
+addressing a resource of its own — since 38.0.0 a class, an interface, a
+program, an include, a function group, a function module, a DDL source, an
+access control, a metadata extension, a behavior definition, a service
+definition, a scalar function, a transformation, a table, a structure and a
+service binding among them, beside the feature toggle, message class, function
+include and scalar function implementation that had it before. Each sends the
+caller's document as it is, under the caller's lock:
 
 ```typescript
 const current = await domain.readMetadata({ domainName });

@@ -151,6 +151,27 @@ result set:
 | `traceSchedulingTypes`, `traceSchedulingRequests`, `traceSchedulingProfilerId` | executors: `types`, `requests`, `scheduled` | the catalogue, the requests, the profiler id |
 | `feedDescriptors`, `feedVariants`, `feedEntries`, `feedSystemMessages`, `feedGatewayErrors`, `feedGatewayErrorDetail` | `getFeeds` | the Atom feeds, read |
 
+**A code read from an answer is an `IAdtAnsweredObject`** (since 0.16.0). The
+readings that take a type code from an answer — `readSearchHits` /
+`utilSearchHits`, `readNodeStructure` / `utilNodeContents`,
+`utilInactiveObjects`, `utilWhereUsedReferences` and the trace readings' program
+references — look it up once against the ADT type tables of
+`@mcp-abap-adt/interfaces-adt` (every variant: an answer does not say which
+release sent it) and answer `{ type: AdtTypeCode }` for a code a table holds,
+`{ unknownType: string }` — the text exactly as ADT sent it — for any other.
+`answeredObject(text)` is that lookup, for a consumer reading a code itself:
+
+```typescript
+import { answeredObject } from '@mcp-abap-adt/adt-strategies';
+
+const object = answeredObject('CLAS/OC');
+if (object.type !== undefined) {
+  // a code of the tables: act on it
+} else {
+  console.warn(`not a code the library serves: ${object.unknownType}`);
+}
+```
+
 **Use a named strategy where the form is known.** `analyseAny` answers `null`
 for a document it does not recognise, and `null` here means "not a failure" — so
 a form nobody wrote a reading for passes as a success.

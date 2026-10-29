@@ -28,12 +28,22 @@ import { AdtClientLegacy, AdtExecutorLegacy } from '@mcp-abap-adt/adt-clients-le
 const client = new AdtClientLegacy(connection, logger);       // connection: an RFC connection
 const executor = new AdtExecutorLegacy(connection, logger);
 
-const program = client.getProgram();                          // the same getters as AdtClient
+const program = client.getProgram();                          // the getters 7.40's table serves
 ```
 
 - **The consumer declares the system type.** Nothing here detects a legacy system
-  and no factory chooses a legacy class: `createAdtClient()` of
-  `@mcp-abap-adt/adt-clients` always returns the modern `AdtClient`.
+  and no factory chooses a legacy class: `createAdtClient(connection, { variant })`
+  of `@mcp-abap-adt/adt-clients` answers a modern client (`'onprem'` or
+  `'cloud'`) only.
+- **Typed by 7.40's ADT type table** (since 0.2.0). `AdtClientLegacy` is
+  `AdtClient<'basis740'>` of adt-clients 38, typed by `ADT_TYPES_BASIS_740` of
+  `@mcp-abap-adt/interfaces-adt`: a getter or member that table does not list
+  does not compile (`client.getTable()`, `getClass().checkDeletion()`), and
+  every override keeps its base's gate. It is not assignable to a modern
+  `AdtClient`. The refusals below stay, for callers outside the type system.
+  `AdtExecutorLegacy` is `AdtExecutor<'basis740'>` the same way. Every code a
+  member takes is a code of that table (`'CLAS/OC'`, `'FUGR/FF'`, …): no
+  friendly name, bare R3TR type or lower-case spelling.
 - **RFC only.** The legacy client is supported, and was measured, over RFC; HTTP to
   a 7.40 system is not a supported wire (no logon without a workaround, a write
   under a lock answers `423`, some reads disagree with RFC; the records are in
@@ -77,7 +87,7 @@ The library passes a request's `Accept` / `Content-Type` through unchanged
 | Member | Pair 7.40 SP04 accepts |
 |---|---|
 | Include `create` | **only** `application/vnd.sap.adt.programs.includes+xml`, both ways. The v2 pair answers `400 ExceptionContentHandlerNotFound` |
-| Class `readMetadata` (`getClass()` and `getUtils().readObjectMetadata('class' …)`) | **only** `Accept: application/vnd.sap.adt.oo.classes+xml`. Every versioned type, a list naming one (`v4, unversioned`), and `application/xml` answer `400 ExceptionContentHandlerNotFound` — not the `406` a modern system answers |
+| Class `readMetadata` (`getClass()` and `getUtils().readObjectMetadata('CLAS/OC', …)`) | **only** `Accept: application/vnd.sap.adt.oo.classes+xml`. Every versioned type, a list naming one (`v4, unversioned`), and `application/xml` answer `400 ExceptionContentHandlerNotFound` — not the `406` a modern system answers |
 | Function include `create` | `application/vnd.sap.adt.functions.fincludes+xml` both ways; v2 answers `400` |
 | Message class `create` | `application/xml` both ways (`201`) |
 | Every other type | the library's default pairs work (class create: `application/vnd.sap.adt.oo.classes+xml`; program, function group and module creates: the unversioned types; interface create: the v5 pair; DDL create: `application/vnd.sap.adt.ddlSource+xml`; a source write: `text/plain`) |
@@ -142,7 +152,10 @@ The measured pairs are passed by the tests as a consumer would pass them
 ## The members, per handler
 
 The records `B2`, `B3` (earlier runs) and `B4` (the 2026-10-26 cycles) are listed in
-LEGACY.md. Every handler hands out the same getter as `AdtClient`.
+LEGACY.md. Every handler is the getter `AdtClient` has for it, fixed to
+`'basis740'`. A member marked **refused** whose operation `ADT_TYPES_BASIS_740`
+does not list also does not compile; the refusal answers a caller outside the
+type system.
 
 ### Class — `getClass()`
 
@@ -158,6 +171,7 @@ LEGACY.md. Every handler hands out the same getter as `AdtClient`.
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `readTransport` | **refused** — `GET …/transport` answered `404` |
 | `checkDeletion` | **refused** — no deletion API |
+| `updateMetadata` | **refused** — not measured on 7.40 (7.40's table lists none) |
 | `activateTestClasses`, `readEnhancementElements`, `readEnhancementOptions` | kept, not measured |
 
 ### Class includes — `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()`
@@ -184,6 +198,7 @@ LEGACY.md. Every handler hands out the same getter as `AdtClient`.
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `readTransport` | **refused** — `404` |
 | `checkDeletion` | **refused** |
+| `updateMetadata` | **refused** — not measured on 7.40 (7.40's table lists none) |
 | `readEnhancementElements`, `readEnhancementOptions` | kept, not measured |
 
 ### Interface — `getInterface()`
@@ -197,14 +212,17 @@ LEGACY.md. Every handler hands out the same getter as `AdtClient`.
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `readTransport` | **refused** — `404` |
 | `checkDeletion` | **refused** |
+| `updateMetadata` | **refused** — not measured on 7.40 (7.40's table lists none) |
 
 ### Function group — `getFunctionGroup()`
 
 | Member | On 7.40 SP04 |
 |---|---|
-| `create`, `lock`, `unlock`, `activate`, `check` | sends |
+| `create`, `lock`, `unlock`, `check` | sends |
+| `activate` | sends the group alone, one reference — the modern client (adt-clients 38) adds its main program `SAPL<group>` (`FUGR/I`), measured on S/4HANA 2025 and ABAP cloud only |
 | `validate` | sends `/functions/validation` (`200`) |
 | `readMetadata` | sends (a system group) |
+| `read`, `update` (the group's source, `source/main`) | **refused** — not measured on 7.40 (7.40's table lists no `source` for `FUGR/F`) |
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `readTransport` | **refused** — `404` |
 | `checkDeletion` | **refused** |
@@ -224,6 +242,9 @@ A function group has no version members.
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `readTransport` | **refused** — `404` |
 | `checkDeletion` | **refused** |
+| `updateMetadata` | **refused** — not measured on 7.40 (7.40's table lists none) |
+
+Its members take the group (`functionGroupName`), required by type.
 
 ### Function include — `getFunctionInclude()`
 
@@ -245,6 +266,7 @@ A function group has no version members.
 | `validate` | sends: free `200`, existing `400 InvalidProgramName` |
 | `delete` | sends one `DELETE /programs/includes/<name>?lockHandle=` under your lock (`200`; the read afterwards `404`) |
 | `checkDeletion` | **refused** |
+| `updateMetadata` | **refused** — not measured on 7.40 (7.40's table lists none) |
 | `readEnhancementElements`, `readEnhancementOptions` | kept, not measured |
 
 ### DDL source — `getDdl()`
@@ -257,6 +279,7 @@ A function group has no version members.
 | `getVersions`, `getVersionSource` | **refused** — `GET …/ddic/ddl/sources/<name>/versions` answered `404` |
 | `readTransport` | **refused** — `GET …/transport` answered `404` for a class, program, interface, function group, function module and (`T6-20261027`) DDL source |
 | `checkDeletion`, `checkCdsTestDoubles` | **refused** |
+| `updateMetadata` | **refused** — not measured on 7.40 (7.40's table lists none) |
 
 ### Message class — `getMessageClass()`, and a message — `getMessageClassMessage()`
 
@@ -293,7 +316,12 @@ request.
 
 Served: `search`, `fetchNodeStructure`, `getObjectStructure`, `discovery`,
 `getInactiveObjects` (7.40 answers the older `adtcore:objectReferences`
-document), `readObjectMetadata` / `readObjectSource` for the served types.
+document), `readObjectMetadata` / `readObjectSource` for the served types,
+`getTypeStructure`. `readObjectMetadata`, `readObjectSource`, `search`,
+`fetchNodeStructure`, `getObjectStructure` and `activateObjectsGroup` take
+7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads) and
+refuse any other without a request — `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`,
+`DCLS/DL` and `ENHO/XHH` among them.
 Refused: where-used (7.40 serves it only through RIS), virtual folders, object
 types, activation runs, group deletion, data preview, and the DDIC and package
 types' reads. Member by member: LEGACY.md.
@@ -316,9 +344,10 @@ types' reads. Member by member: LEGACY.md.
 `getScalarFunction()`, `getScalarFunctionImplementation()`, `getEnhancement()`,
 `getAccessControl()`, `getServiceDefinition()`, `getServiceBinding()`,
 `getBehaviorDefinition()`, `getBehaviorImplementation()`,
-`getMetadataExtension()`, `getAuthorizationField()`, `getFeatureToggle()`: the
-getter hands out a handler, so code written against `AdtClient` keeps running, and
-every member of it is **refused**.
+`getMetadataExtension()`, `getAuthorizationField()`, `getFeatureToggle()`:
+`ADT_TYPES_BASIS_740` has no such API, so the getter does not compile on
+`AdtClientLegacy` (since 0.2.0). Called from outside the type system, it hands
+out a handler and every member of it is **refused**.
 
 ## Development
 

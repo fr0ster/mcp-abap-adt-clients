@@ -14,11 +14,12 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
-## [0.16.0] - 2026-10-28
+## [0.16.0] - 2026-10-29
 
 A breaking 0.x minor: every reading that takes a type code from an answer
 answers it as an `IAdtAnsweredObject` of `@mcp-abap-adt/interfaces-adt`
-21.0.0.
+(21.0.0 and later; this release depends on `^23.0.4`). Released with
+adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
 
 ### Changed (breaking)
 
@@ -42,12 +43,21 @@ answers it as an `IAdtAnsweredObject` of `@mcp-abap-adt/interfaces-adt`
 - `IInactiveObjectsResponse.objects` is `IInactiveObject[]`
   (`IAdtAnsweredObject & { name }`), no longer `IObjectReference[]`: an
   unknown code is no reference `activateObjectsGroup` takes.
-- Depends on `@mcp-abap-adt/interfaces-adt` `^21.0.0`.
+- Depends on `@mcp-abap-adt/interfaces-adt` `^23.0.4` (was `^20.1.0`): the
+  ADT type tables came with 21.0.0, and 23.0.x is the range adt-clients 38.0.0
+  and adt-clients-legacy 0.2.0 take, so the three install one copy.
 
 ### Added
 
 - `answeredObject(text)`: the lookup the readings use, for a consumer reading
   a code from an answer itself.
+
+### Tests
+
+- The literal scan of type codes (`typeCodeLiterals.test.ts`, the scan shared
+  from adt-clients): a code literal in this package's source passes only where
+  the compiler types it by the tables, and a code named in a comment is a code
+  of the tables or an allow-listed example of one that is not.
 
 ### Migration
 

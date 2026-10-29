@@ -262,10 +262,8 @@ export class AdtFunctionGroup<
   }
 
   /**
-   * Read the group's metadata.
-   *
-   * The same resource `read` fetches — a group has no source to tell it apart
-   * from — declared separately because the contract asks both of a readable.
+   * Read the group's metadata: the group's own document, beside `read`,
+   * which reads its source (the function pool's main program).
    */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,

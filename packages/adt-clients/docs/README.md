@@ -22,7 +22,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
-- [**MIGRATION-38.md**](usage/MIGRATION-38.md) — what a consumer on 37.x has to change: the result-set contracts come from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt
+- [**MIGRATION-38.md**](usage/MIGRATION-38.md) — what a consumer on 37.x has to change: the ADT type tables decide (release variants, codes of the tables, parents, `type` / `unknownType`, the new `updateMetadata` members); the result-set contracts come from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt
 - [**MIGRATION-37.md**](usage/MIGRATION-37.md) — what a consumer on 36.x has to change: `getSystemInformation` answers an `IAdtResponse`, and `IUtilResults` has the required `objectProperties` slot; and, in 37.4.0, the legacy classes live in `@mcp-abap-adt/adt-clients-legacy`
 - [**MIGRATION-36.md**](usage/MIGRATION-36.md) — what a consumer on 35.x has to change: a request's `Accept` and `Content-Type` are the caller's
 - [**MIGRATION-23.md**](usage/MIGRATION-23.md) — what a consumer on 22.x has to change: every reading and verdict the library applied is a strategy in `@mcp-abap-adt/adt-strategies`, with the replacing code for each
@@ -82,7 +82,7 @@ docs/
 
 The package provides the main client classes:
 
-- **AdtClient** - High-level CRUD API; one member, one ADT request (recommended)
+- **AdtClient** - High-level CRUD API; one member, one ADT request (recommended). Fixed to its release variant since 38.0.0: `AdtClientOnPrem`, `AdtClientCloud`, typed by the ADT type tables of `@mcp-abap-adt/interfaces-adt`
 - **AdtRuntimeClient** - Runtime operations (traces, dumps, logs, feeds, ATC check runs)
 - **AdtExecutor** - Class and program execution, under the profiler if asked
 - **AdtAbapGitClient** - ADT-integrated abapGit, constructed directly
@@ -98,10 +98,10 @@ See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method
 
 **Using AdtClient (recommended):**
 ```typescript
-import { AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { AdtClientOnPrem, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 
-const client = new AdtClient(connection, logger);
+const client = new AdtClientOnPrem(connection, logger); // AdtClientCloud for ABAP cloud
 
 // Every member answers a contract: a result or a failure, never both.
 const created = await client.getClass().create({
@@ -113,7 +113,7 @@ if (!created.ok) throw new Error(created.getError().message);
 
 // Utility operations. The search hits are a reading you choose, once.
 const utils = client.getUtils({ ...utilDocuments, search: utilSearchHits });
-const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
+const found = await utils.search({ query: 'Z*', objectType: 'CLAS/OC' });
 if (found.ok) found.getResult().value;   // ISearchResult[]; the document without utilSearchHits
 ```
 

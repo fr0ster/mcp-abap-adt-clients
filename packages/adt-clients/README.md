@@ -16,12 +16,16 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
-> **From 37.x?** 38.0.0 (on `interfaces-adt` ^20.2.0) puts each contract where
-> it is accepted: the result-set contracts (`IClassResults`, …) are imported from
-> `@mcp-abap-adt/interfaces-adt`, and each factory answers its class
-> (`getClass(): AdtClass<…>`) — the compositions `IClassContract<R>` and its
-> siblings are gone, and a consumer composes the contract it accepts from
-> interfaces-adt. No request or answer changes. See
+> **From 37.x?** 38.0.0 (on `interfaces-adt` ^23.0.4) is typed by the ADT type
+> tables: a client is fixed to its release variant (`AdtClientOnPrem`,
+> `AdtClientCloud`, `createAdtClient(connection, { variant })`), every type
+> code is a code of the tables (the `AdtObjectType*` unions, friendly names,
+> `FUNC` and the other codes no table holds are gone), an API with a parent
+> takes it, and `updateMetadata` is there for fifteen more types. It also puts
+> each contract where it is accepted: the result-set contracts (`IClassResults`,
+> …) are imported from `@mcp-abap-adt/interfaces-adt`, and each factory answers
+> its class — a consumer composes the contract it accepts from interfaces-adt.
+> See [Release variants and type codes](#release-variants-and-type-codes),
 > [The contract you accept is yours](#the-contract-you-accept-is-yours) and
 > [`docs/usage/MIGRATION-38.md`](docs/usage/MIGRATION-38.md).
 >
@@ -113,7 +117,7 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^20.1.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^23.0.4` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
   | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
@@ -155,7 +159,8 @@ npm install @mcp-abap-adt/adt-clients
    - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { headers })` — the POST, and nothing else
-   - **Legacy systems (SAP_BASIS 7.40, measured on 7.40 SP04) are a separate package**, [`@mcp-abap-adt/adt-clients-legacy`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/README.md): its `AdtClientLegacy` and `AdtExecutorLegacy` extend this package's classes. The consumer declares the system type by constructing them over an RFC connection (`new AdtClientLegacy(connection, logger)`); nothing here detects a system, and `createAdtClient()` returns `AdtClient` and sends no request. They are **RFC clients**, supported and measured on SAP_BASIS 7.40 SP04 over RFC only — HTTP to a legacy system is unsupported. What each member does on 7.40 is in that package's [README](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/README.md) and [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/docs/LEGACY.md)
+   - **Fixed to a release variant** (since 38.0.0): `AdtClientOnPrem` (S/4HANA 2025, `ADT_TYPES_ONPREM`), `AdtClientCloud` (ABAP cloud, `ADT_TYPES_CLOUD`), or a plain `AdtClient` served what both serve. A factory or member the variant's table lacks does not compile — see [Release variants and type codes](#release-variants-and-type-codes)
+   - **Legacy systems (SAP_BASIS 7.40, measured on 7.40 SP04) are a separate package**, [`@mcp-abap-adt/adt-clients-legacy`](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/README.md): its `AdtClientLegacy` and `AdtExecutorLegacy` extend this package's classes. The consumer declares the system type by constructing them over an RFC connection (`new AdtClientLegacy(connection, logger)`); nothing here detects a system, and `createAdtClient(connection, { variant })` answers the declared modern variant's client and sends no request. They are **RFC clients**, supported and measured on SAP_BASIS 7.40 SP04 over RFC only — HTTP to a legacy system is unsupported. What each member does on 7.40 is in that package's [README](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/README.md) and [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/docs/LEGACY.md)
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
@@ -193,28 +198,51 @@ npm install @mcp-abap-adt/adt-clients
 
 ## Supported Object Types
 
-| Object Type | AdtClient |
-|------------|-----------|
-| Classes (CLAS) | ✅ |
-| Behavior Implementations (CLAS) | ✅ |
-| Behavior Definitions (BDEF) | ✅ |
-| Interfaces (INTF) | ✅ |
-| Programs (PROG) | ✅ |
-| Includes (PROG/I) | ✅ |
-| Enhancements (ENHO/XHB, ENHO/XHH, ENHS/XSB) | ✅ |
-| Function Groups (FUGR) | ✅ |
-| Function Modules (FUGR/FF) | ✅ |
-| Function Includes (FUGR/I) | ✅ |
-| Domains (DOMA) | ✅ |
-| Data Elements (DTEL) | ✅ |
-| Structures (TABL/DS) | ✅ |
-| Tables (TABL/DT) | ✅ |
-| Views (DDLS) | ✅ |
-| Metadata Extensions (DDLX) | ✅ |
-| Packages (DEVC) | ✅ |
-| Authorization Fields (SUSO / AUTH) | ✅ |
-| Feature Toggles (FTG2/FT) | ✅ |
-| Transports (TRNS) | ✅ |
+What the library serves is declared by the ADT type tables of
+`@mcp-abap-adt/interfaces-adt`, one per release variant; the factory is the
+API, the codes are the tables'. ✅ the variant's table holds the API, — it does
+not (the factory does not compile there). 7.40 is `AdtClientLegacy` of
+`@mcp-abap-adt/adt-clients-legacy`, which serves less than its table lists
+where 7.40 is not measured (its [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/docs/LEGACY.md)).
+
+| Object type | Factory | Codes | On premise | Cloud | 7.40 |
+|---|---|---|---|---|---|
+| Classes | `getClass()` | `CLAS/OC` | ✅ | ✅ | ✅ |
+| Behavior implementations | `getBehaviorImplementation()` | `CLAS/OC` | ✅ | ✅ | — |
+| Behavior definitions | `getBehaviorDefinition()` | `BDEF/BDO` | ✅ | ✅ | — |
+| Interfaces | `getInterface()` | `INTF/OI` | ✅ | ✅ | ✅ |
+| Programs | `getProgram()` | `PROG/P` | ✅ | ✅ | ✅ |
+| Includes | `getInclude()` | `PROG/I` | ✅ | ✅ | ✅ |
+| Enhancements | `getEnhancement()` | `ENHO/XHH`, `ENHO/XHB`, `ENHS/XSB` | ✅ | ✅ | — |
+| Function groups | `getFunctionGroup()` | `FUGR/F` | ✅ | ✅ | ✅ |
+| Function modules | `getFunctionModule()` | `FUGR/FF`, under its group | ✅ | ✅ | ✅ |
+| Function includes | `getFunctionInclude()` | `FUGR/I`, under its group | ✅ | ✅ | ✅ |
+| Domains | `getDomain()` | `DOMA/DD` | ✅ | ✅ | — |
+| Data elements | `getDataElement()` | `DTEL/DE` | ✅ | ✅ | — |
+| Structures | `getStructure()` | `TABL/DS` | ✅ | ✅ | — |
+| Append structures | `getAppendStructure()` | `TABL/DS` | ✅ | ✅ | — |
+| Tables | `getTable()` | `TABL/DT` | ✅ | ✅ | — |
+| Table types | `getTableType()` | `TTYP/DA` | ✅ | ✅ | — |
+| DDL sources (CDS views) | `getDdl()` | `DDLS/DF` | ✅ | ✅ | ✅ |
+| Access controls | `getAccessControl()` | `DCLS/DL` | ✅ | ✅ | — |
+| Metadata extensions | `getMetadataExtension()` | `DDLX/EX` | ✅ | ✅ | — |
+| Service definitions | `getServiceDefinition()` | `SRVD/SRV` | ✅ | ✅ | — |
+| Service bindings | `getServiceBinding()` | `SRVB/SVB` | ✅ | ✅ | — |
+| Scalar functions | `getScalarFunction()` | `DSFD/SCF` | ✅ | ✅ | — |
+| Scalar function implementations | `getScalarFunctionImplementation()` | `DSFI/SFI` | ✅ | ✅ | — |
+| Transformations | `getTransformation()` | `XSLT/VT` | ✅ | ✅ | — |
+| Message classes | `getMessageClass()` | `MSAG/N` | ✅ | ✅ | ✅ |
+| Messages | `getMessageClassMessage()` | `MSAG/NN`, read from its class | ✅ | ✅ | ✅ |
+| Packages | `getPackage()` | `DEVC/K` | ✅ | ✅ | — |
+| Authorization fields | `getAuthorizationField()` | `AUTH` | ✅ | ✅ | — |
+| Feature toggles | `getFeatureToggle()` | `FTG2/FT` | ✅ | ✅ | — |
+| Local includes of a class | `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()` | — | ✅ | ✅ | ✅ |
+| Transport requests | `getRequest()` | — | ✅ | ✅ | ✅ |
+
+Which operations each code has — `source`, `updateMetadata`, `run`, … — is the
+code's `operations` in the table; a member whose operation the variant's table
+does not list for the code does not compile (`getProgram().updateMetadata()`
+on a cloud client, say).
 
 `getEnhancement().updateMetadata()` writes the whole object document from
 `options.source` under the caller's lock, then the caller unlocks and activates.
@@ -238,7 +266,7 @@ import {
   AdtOnPremConnector,
   OnPremHttpTransport,
 } from '@mcp-abap-adt/connection';
-import { AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { AdtClientOnPrem, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   utilSearchHits,
   utilWhereUsedReferences,
@@ -274,7 +302,9 @@ const connection = new AdtOnPremConnector(
 // surfacing later as `400 Session not found` mid-edit.
 await connection.connect();
 
-const client = new AdtClient(connection, console);
+// The release variant is yours to declare, like the system: an on-premise
+// client is typed by ADT_TYPES_ONPREM (AdtClientCloud for ABAP cloud).
+const client = new AdtClientOnPrem(connection, console);
 
 // One member, one request: this is the POST that makes the class shell.
 // Writing its source and activating it are calls of your own, below.
@@ -314,7 +344,7 @@ const utils = client.getUtils({
   whereUsed: utilWhereUsedReferences,
 });
 
-const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
+const found = await utils.search({ query: 'Z*', objectType: 'CLAS/OC' });
 if (found.ok) {
   found.getResult().value;        // ISearchResult[] — the document, without utilSearchHits
 } else {
@@ -327,7 +357,7 @@ if (found.ok) {
 // /usageReferences/scope sub-resource (some S/4 releases 404 it) is a decision
 // about your system, so it is yours rather than a fallback hidden in here.
 const scope = await utils.getWhereUsedScope(
-  { object_name: 'ZMY_TABLE', object_type: 'table' },
+  { object_name: 'ZMY_TABLE', object_type: 'TABL/DT' },
   { headers: WHERE_USED_SCOPE },
 );
 if (!scope.ok) {
@@ -343,7 +373,7 @@ const narrowed = utils.modifyWhereUsedScope(scope.getResult().value, {
 });
 
 const answer = await utils.getWhereUsed(
-  { object_name: 'ZMY_TABLE', object_type: 'table', scopeXml: narrowed },
+  { object_name: 'ZMY_TABLE', object_type: 'TABL/DT', scopeXml: narrowed },
   { headers: WHERE_USED },
 );
 
@@ -353,7 +383,8 @@ if (answer.ok) {
   const references = answer.getResult().value;
   console.log(`Found ${references.totalReferences} references`);
   for (const ref of references.references) {
-    console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+    // `type` for a code of the tables, `unknownType` for any other text.
+    console.log(`${ref.name} (${ref.type ?? ref.unknownType}) in ${ref.packageName}`);
   }
 }
 ```
@@ -518,13 +549,14 @@ scope answered the group's tests as a preview (`isForeign="true"`, nothing
 executed) and `scope: { foreignTests: true }` ran them.
 
 **AdtUtils read type safety:**
-`readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.
+`readObjectMetadata` and `readObjectSource` take the codes of the tables they
+read (`AdtMetadataReadCode`, `AdtSourceReadCode`), so `'view'` or `'CLAS'` does
+not compile, and a function module's group is required:
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces-adt';
-
-await utils.readObjectMetadata('DDLS/DF' satisfies AdtObjectType, 'ZOK_I_CDS_TEST');
-await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TEST');
+await utils.readObjectMetadata('DDLS/DF', 'ZOK_I_CDS_TEST');
+await utils.readObjectSource('DDLS/DF', 'ZOK_I_CDS_TEST');
+await utils.readObjectSource('FUGR/FF', 'Z_MY_FM', 'ZMY_GROUP');
 ```
 
 **Benefits:**
@@ -587,10 +619,13 @@ change what you mean to change, pass the result. Anything you leave out is gone,
 because nothing is read on your behalf to keep it.
 
 For a class, a program or a DDL source the whole content is the **full source**.
-For domain, package, dataElement, tableType, transport, functionGroup and
-message class it is the object's own **document**, passed as `options.source` to
-`updateMetadata` — the first six fetched and patched it for you until 19.0.0,
-the message class until 23.0.0, and none of them does now.
+For domain, package, dataElement, tableType, transport and message class it is
+the object's own **document**, passed as `options.source` to `updateMetadata` —
+the first five and the function group fetched and patched it for you until
+19.0.0, the message class until 23.0.0, and none of them does now. Every type
+that has both — a class, a function group, a table, … (38.0.0 added
+`updateMetadata` to fifteen of them) — writes its metadata document the same way:
+read it, change it, pass the whole document back.
 
 ```typescript
 const cls = client.getClass();
@@ -1122,7 +1157,9 @@ hold yourself:
   headers) or `AdtContentTypesBase` (v1, universal) from that answer.
 - `fetchDiscoveryEndpoints(connection)` / `isEndpointInDiscovery(...)` — the
   discovery document and a membership test over it.
-- `createAdtClient(connection, logger?, options?)` — `AdtClient`. It detects
+- `createAdtClient(connection, { variant, logger?, …options })` —
+  `AdtClientOnPrem` for `variant: 'onprem'`, `AdtClientCloud` for `'cloud'`
+  (since 38.0.0; it took `(connection, logger?, options?)` before). It detects
   nothing and sends no request (since 37.4.0): the consumer declares the system
   type, and a legacy system is served by `AdtClientLegacy` of
   `@mcp-abap-adt/adt-clients-legacy`, an RFC client constructed by the consumer.
@@ -1168,7 +1205,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^20.2.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^23.0.4`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -1250,6 +1287,46 @@ sourced from the contract packages.
 
 > **Version pairing.** `adt-clients` 32 pairs with `interfaces-adt` 18 and `interfaces-adt-connection` 3 (the enhancement subtype and host contracts), and `adt-strategies` 0.12.0 declares the same ranges. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
+### Release variants and type codes
+
+Since **38.0.0** the library is typed by the ADT type tables of
+`@mcp-abap-adt/interfaces-adt`: `ADT_TYPES_ONPREM` (S/4HANA 2025),
+`ADT_TYPES_CLOUD` (ABAP cloud) and `ADT_TYPES_BASIS_740` (SAP_BASIS 7.40). Each
+names the APIs the library offers on that release — one per factory — with
+their codes, and for each code its parent API, its name length and the
+operations the library performs there. The tables are the library's
+declaration; the [conformance check](#the-type-tables-conformance-check) holds
+them to what each release answers.
+
+- **The variant is declared, never detected.** `AdtClient<V>` is fixed to one:
+  `AdtClientOnPrem`, `AdtClientCloud`, or the plain `AdtClient`, served what
+  both modern tables serve. `createAdtClient(connection, { variant, logger })`
+  answers the declared one. A SAP_BASIS 7.40 system is `AdtClientLegacy`
+  (`AdtClient<'basis740'>`) of `@mcp-abap-adt/adt-clients-legacy`.
+- **The gates are types.** A factory takes `this: this & AdtServedBy<'<api>'>`
+  and a member whose availability differs by variant `this: this &
+  AdtPerformedBy<'<api>', '<operation>'>`: a factory or operation the variant's
+  table lacks is a compile error naming it. The executors and ABAP Unit runners
+  (`AdtExecutor<V>`) are gated the same way.
+- **A code is a code of the tables.** Every code taken or answered is an
+  `AdtTypeCode` (`'CLAS/OC'`, `'FUGR/FF'`, `'TABL/DT'`, …) or a subset of it
+  (`AdtSourceTypeCode`, `AdtCodeOf<V>`, the `getUtils()` code sets). No
+  friendly name, bare R3TR type or lower-case spelling is taken. `VIEW/DV` is
+  a group-only code: group activation, group deletion and where-used address
+  it, and no factory serves it.
+- **An API with a parent takes it.** A function module and a function include
+  are addressed under their function group: their members, a
+  `readObjectSource('FUGR/FF', name, group)` and an
+  `IObjectReference<'FUGR/FF'>` require the group.
+- **What an answer names is `type` or `unknownType`.** A reading of
+  `@mcp-abap-adt/adt-strategies` that takes a code from an answer answers an
+  `IAdtAnsweredObject`: `type` for a code a table holds, `unknownType` — the
+  text as ADT sent it — for any other.
+
+`src/__tests__/unit/typeCodeLiterals.test.ts` (one per package) holds the
+source to it: a code literal passes only where the compiler types it by the
+tables, and a code named in a comment is a code of the tables.
+
 ### The contract you accept is yours
 
 Since **38.0.0** a contract lives in the package that accepts it. A factory
@@ -1282,7 +1359,10 @@ interface IMyClient {
     IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>>;
 }
 
-const client: IMyClient = await createAdtClient(connection, logger);
+const client: IMyClient = await createAdtClient(connection, {
+  variant: 'onprem',
+  logger,
+});
 const classes = client.getClass(classDocuments); // read answers a string
 ```
 
@@ -1326,7 +1406,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
-- **[37.x → 38.0.0](docs/usage/MIGRATION-38.md)** — the result-set contracts are imported from `@mcp-abap-adt/interfaces-adt`; the compositions are gone and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt.
+- **[37.x → 38.0.0](docs/usage/MIGRATION-38.md)** — the ADT type tables decide: a client is fixed to its release variant, every type code is a code of the tables, an API with a parent takes it, answered objects are `type` / `unknownType`, and `updateMetadata` covers fifteen more types; the result-set contracts are imported from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt.
 - **[36.x → 37.0.0](docs/usage/MIGRATION-37.md)** — `getSystemInformation` answers an `IAdtResponse` (present, absent for a `404`, or a failure, through `options.analyse`), and `IUtilResults` has the required `objectProperties` slot.
 - **[35.x → 36.0.0](docs/usage/MIGRATION-36.md)** — a request's `Accept` and `Content-Type` are the caller's: 32 members take the required `options.headers` and send exactly that pair.
 - **[34.x → 35.0.0](docs/usage/MIGRATION-35.md)** — accept negotiation is off by default: a `406`/`415` is the call's answer unless you switch it on.

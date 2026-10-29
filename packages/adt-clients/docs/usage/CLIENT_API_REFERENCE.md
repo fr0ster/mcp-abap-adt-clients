@@ -242,7 +242,9 @@ see [The reading is injected once](#the-reading-is-injected-once) below.
 
 ### The legacy client (separate package)
 
-`createAdtClient(connection)` returns `AdtClient` and detects nothing. A legacy
+`createAdtClient(connection, { variant: 'onprem' | 'cloud' })` answers
+`AdtClientOnPrem` or `AdtClientCloud` and detects nothing (since 38.0.0; see
+[Release variants and type codes](../../README.md#release-variants-and-type-codes)). A legacy
 system (SAP_BASIS 7.40, measured on 7.40 SP04) is served by `AdtClientLegacy` from
 `@mcp-abap-adt/adt-clients-legacy`, which the consumer constructs over an RFC
 connection — the consumer declares the system type:
@@ -255,8 +257,10 @@ const executor = new AdtExecutorLegacy(connection, logger);
 ```
 
 It is an **RFC client**: supported, and measured on SAP_BASIS 7.40 SP04, over RFC
-only; HTTP to a legacy system is unsupported. It hands out every getter of
-`AdtClient`, so code written against `AdtClient` compiles against it. Each member
+only; HTTP to a legacy system is unsupported. It is `AdtClient<'basis740'>`
+(since 0.2.0): a getter or member `ADT_TYPES_BASIS_740` does not list does not
+compile on it, and code written against a modern `AdtClient` is checked against
+7.40's table when it takes an `AdtClientLegacy`. Each member
 sends the request measured accepted on 7.40 SP04, or keeps an unmeasured request
 under a collection 7.40 advertises, or answers a refusal without a request
 (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`). Member by member, with the
@@ -1022,8 +1026,9 @@ What "the whole content" is depends on the type, and on nothing else:
 
 | types | the whole content | passed as |
 |---|---|---|
-| class, program, interface, DDL, and the other source-bearing types | the full source | `options.source` |
-| domain, package, dataElement, tableType, transport, functionGroup | the object's own document | `config.document` |
+| class, program, interface, DDL, function group (its main program), and the other source-bearing types | the full source | `options.source` of `update` |
+| domain, package, dataElement, tableType, transport, message class | the object's own document | `options.source` of `updateMetadata` |
+| the source-bearing types' metadata (since 38.0.0: class, interface, program and include (on premise only), function module, DDL source, access control, metadata extension, behavior definition, service definition, scalar function, transformation, table, structure, service binding; the function group's, feature toggle's, function include's and scalar function implementation's before) | the object's whole metadata document | `options.source` of `updateMetadata` |
 
 ```typescript
 // A source type. Sending one method body replaces the class with that body.
@@ -1162,14 +1167,22 @@ A read still takes an optional `accept` (`IReadOptions`); a member taking
 
 ### AdtUtils (Object Metadata/Source)
 
-`AdtUtils.readObjectMetadata` and `AdtUtils.readObjectSource` enforce strict object types to prevent invalid inputs like `view:ZOBJ`.
+`AdtUtils.readObjectMetadata` and `AdtUtils.readObjectSource` take the codes of
+the ADT type tables whose request they send (`AdtMetadataReadCode`,
+`AdtSourceReadCode`, since 38.0.0): a friendly name (`'view'`), a bare type
+(`'DDLS'`) or a code outside the set does not compile, and from a caller
+outside the type system is refused before any request. A function module's
+group is required (`readObjectSource('FUGR/FF', 'Z_MY_FM', 'ZMY_GROUP')`).
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtMetadataReadCode,
+  AdtSourceReadCode,
+} from '@mcp-abap-adt/adt-clients';
 
 const utils = client.getUtils();
-const metadataType: AdtObjectType = 'DDLS/DF';
-const sourceType: AdtSourceObjectType = 'view';
+const metadataType: AdtMetadataReadCode = 'DDLS/DF';
+const sourceType: AdtSourceReadCode = 'DDLS/DF';
 
 const metadata = await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
 const source = await utils.readObjectSource(
@@ -1610,9 +1623,13 @@ if (!listed.ok) {
 ### AdtUtils (Group activation and deletion)
 
 `activateObjectsGroup`, `checkDeletionGroup` and `deleteObjectsGroup` take
-`IObjectReference[]`. Each reference names its ADT type code (`CLAS/OC`,
-`PROG/P`, `PROG/I`, `DDLS/DF`, …). Two kinds also need the object that owns
-them: `FUGR/FF` (a function module) and `FUGR/I` (a function include) need
+`IAdtGroupReference<C>[]`, `C` the codes of the client's variant whose API
+lists the operation (`AdtActivationCode<V>`, `AdtDeletionCheckCode<V>`,
+`AdtDeletionCode<V>`, since 38.0.0; a group activation also takes `DEVC/K` on
+the modern variants, and `VIEW/DV` is addressed for a caller outside the type
+system). Each reference names its ADT type code (`CLAS/OC`, `PROG/P`,
+`PROG/I`, `DDLS/DF`, …). Two kinds also need the object that owns them:
+`FUGR/FF` (a function module) and `FUGR/I` (a function include) need
 `parentName`, the function group.
 
 A reference **without a type**, with a type this library has no address for, or
@@ -1683,7 +1700,7 @@ const utils = client.getUtils({
 
 const scope = await utils.getWhereUsedScope({
   object_name: 'ZMY_TABLE',
-  object_type: 'table',
+  object_type: 'TABL/DT',
 }, { headers });
 if (!scope.ok) throw new Error(scope.getError().message);
 
@@ -1695,14 +1712,14 @@ const scopeXml = utils.modifyWhereUsedScope(String(scope.getResult().value), {
 
 const result = await utils.getWhereUsed({
   object_name: 'ZMY_TABLE',
-  object_type: 'table',
+  object_type: 'TABL/DT',
   scopeXml,
 }, { headers });
 if (result.ok) {
   const found = result.getResult().value;
   console.log(`Found ${found.totalReferences} references`);
   for (const ref of found.references) {
-    console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+    console.log(`${ref.name} (${ref.type ?? ref.unknownType}) in ${ref.packageName}`);
   }
 }
 ```
@@ -1719,15 +1736,14 @@ serves where-used only through RIS (`fullnamemapping` → `metadata` →
 `whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY`), another endpoint family this
 library does not implement.
 
-**`object_type`** is an ADT type code (`CLAS/OC`, `BDEF/BDO`, …, any case) or
-one of the friendly names `class`, `program`, `include`, `function`,
-`functiongroup`, `interface`, `package`, `table`, `structure`, `domain`,
-`dataelement`, `view`, `functionmodule`. A function module is named
-`GROUP|FM_NAME`. Since 23.0.0 the address is built by the same `buildObjectUri`
-each family's activation is checked against; the separate vocabulary where-used
-kept before accepted `intf/if` and `stru/dt`, which are not ADT codes, and those
-are now refused — thrown before any request, because the argument is what is
-wrong, not anything the server said.
+**`object_type`** is a code of the ADT type tables (`CLAS/OC`, `BDEF/BDO`,
+`VIEW/DV`, …; `AdtWhereUsedCode<V>`), exactly as the tables spell it — since
+38.0.0 no friendly name (`class`, `table`, …) and no other spelling is taken.
+A function module is named `GROUP|FM_NAME`; a function include (`FUGR/I`) is
+not taken, because the parameters have no field for its group. The address is
+built by the same `buildObjectUri` each family's activation is checked against;
+a code it cannot address is thrown before any request, because the argument is
+what is wrong, not anything the server said.
 
 ## AdtRuntimeClient
 

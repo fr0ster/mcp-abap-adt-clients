@@ -900,3 +900,46 @@ members a composition hid (`AdtMessageClassMessage.readMetadata`).
 **What would change it.** A consumer that accepts the client and cannot express
 its contract from interfaces-adt alone.
 
+
+---
+
+## 18. The ADT type tables decide what a client serves, per declared variant
+
+**Problem.** Until 37.x the library knew its type codes from maps of its own: a
+hand-written address switch, the friendly-name aliases of where-used, the
+metadata Accept map, the legacy refusal maps. They disagreed with each other
+and with the systems: `FUNC`, `STRU/DS`, `TTYP/DF` and lower-case spellings
+were accepted that no release lists, a code could be sent to a release whose
+ADT does not serve it, and nothing said which release a client was for.
+
+**Decided.** `@mcp-abap-adt/interfaces-adt` declares, per release variant, the
+APIs the library offers, their codes and the operations each performs
+(`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`), and this
+package is typed by them. A client is fixed to a variant the consumer declares
+(`AdtClient<V>`, `AdtClientOnPrem`, `AdtClientCloud`; `AdtClientLegacy` is
+`AdtClient<'basis740'>`); a factory or member the variant's table lacks is a
+compile error, not a request. Every code taken or answered is a code of the
+tables (`AdtTypeCode` or a subset); an address is built from the tables; an
+API with a parent takes it by type. A code read from an answer is looked up
+once (`IAdtAnsweredObject`: `type` or `unknownType`). `getUtils()`' generic
+reads keep exactly the codes whose request they sent before, so no request
+this library never sent becomes possible through them.
+
+**Against.** Detecting the release at run time. A probe is a request the
+consumer did not ask for, it can fail for reasons that say nothing about the
+release, and it moves a compile-time fact to run time.
+
+**Why it stays true.** The conformance check holds each table to what its
+release answers (`typestructure`, `discovery`, per sample `urimapper` and
+metadata), in CI against the recorded answers and live on demand; a known
+divergence is data with its reason (`recorded.ts`). The literal scan
+(`typeCodeLiterals.test.ts`) fails a code literal the compiler does not type
+by the tables, and a comment naming a code no table holds.
+
+**What it costs.** A consumer names its variant, and a code from outside the
+type system (a tool argument, a file) is checked once where it enters, against
+the tables.
+
+**What would change it.** A release whose answers the tables cannot describe
+as a variant, or one ADT answer that serves a code differently per system of
+the same release.

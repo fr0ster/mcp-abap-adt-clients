@@ -121,6 +121,15 @@ package's live checks in
 `SAPNWRFC_HOME` and `LD_LIBRARY_PATH` must be passed at launch because `dotenv`
 does not expand `PATH`.
 
+## The type tables' conformance check, live
+
+`src/__tests__/integration/shared/typeTablesConformance.test.ts` reads the
+configured system's `typestructure`, `discovery` and per-sample answers and
+holds the variant's ADT type table (`environment.system`) to them; it only
+reads. How to run it, and how to refresh a release's recorded answers from it,
+is in the package README:
+[The type tables' conformance check](../../README.md#the-type-tables-conformance-check).
+
 ## The one case the full run deliberately leaves out
 
 **Publishing a service binding.** `create_service_binding.params.

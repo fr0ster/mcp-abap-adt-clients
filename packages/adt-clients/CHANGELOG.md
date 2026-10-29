@@ -24,14 +24,28 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [38.0.0] - 2026-10-28
+## [38.0.0] - 2026-10-29
 
-A contract lives where it is accepted (#216). A factory accepts a result set, so
-the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a consumer
-accepts the client, so the consumer composes the client contract it needs, and
-this package declares no composition of its own. No answer changes, and one
-request does — a measured fix, below. [MIGRATION-38.md](docs/usage/MIGRATION-38.md)
-says what a consumer on 37.x does.
+Two changes of contract, released once, on `@mcp-abap-adt/interfaces-adt`
+`^23.0.4`:
+
+- **A contract lives where it is accepted** (#216). A factory accepts a result
+  set, so the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a
+  consumer accepts the client, so the consumer composes the client contract it
+  needs, and this package declares no composition of its own.
+- **The ADT type tables decide** (#282). interfaces-adt declares, per release
+  variant, every API the library offers, its codes and the operations each
+  performs (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`).
+  A client is fixed to its variant (`AdtClient<V>`, `AdtClientOnPrem`,
+  `AdtClientCloud`), a factory or member the variant's table lacks does not
+  compile, every type code is a code of the tables (`AdtTypeCode`), and every
+  address is built from them. New members fill the table's operations:
+  `updateMetadata` for fifteen types, and a function group's source.
+
+[MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on 37.x
+does. Requests change in four places, each listed below: the function group's
+metadata Accept, its activation, the codes a member takes (a code no table
+holds is no longer sent), and the new members.
 
 ### Fixed
 
@@ -42,9 +56,72 @@ says what a consumer on 37.x does.
   and `200` with `functions.groups.v3+xml`. The Accept now lists v3, then v2
   and v1, so the releases that serve only those still answer.
   `getFunctionGroup().readMetadata` sends `*/*` and is unchanged.
+- **A function group's activation names its main program too.** A group's
+  `source/main` is an activation object of its own (`FUGR/I` `SAPL<group>`):
+  in a transportable package, activating the group alone left both inactive.
+  `getFunctionGroup().activate()` sends both references in one request
+  (measured 2026-10-29 on S/4HANA 2025 and ABAP cloud). The legacy group
+  keeps the one reference (adt-clients-legacy 0.2.0).
 
 ### Breaking
 
+- **A client is fixed to its release variant.** `AdtClient<V extends
+  AdtVariant = AdtModernVariant>`; `AdtClientOnPrem` (`'onprem'`, S/4HANA
+  2025) and `AdtClientCloud` (`'cloud'`, ABAP cloud) fix it, and a plain
+  `AdtClient` serves what both modern tables serve. A factory takes
+  `this: this & AdtServedBy<'<api>'>` and a member whose availability differs
+  by variant `this: this & AdtPerformedBy<'<api>', '<operation>'>`, so a
+  factory or an operation the variant's table lacks is a compile error naming
+  it. The executors and ABAP Unit runners are gated the same way
+  (`AdtExecutor<V>`: `run`, `runWithProfiler`, `run` / `runSync` /
+  `getStatus` / `getResult` of the runners). Nothing is checked at run time
+  for a caller inside the type system.
+- **`createAdtClient(connection, { variant, logger?, …options })`** — the
+  variant is declared, required, and answers `AdtClientOnPrem` or
+  `AdtClientCloud` (`AdtClient` for a variant known only as one of the two).
+  It was `createAdtClient(connection, logger?, options?)`. It still probes
+  nothing; `new AdtClient(connection, logger?, options?)` stays.
+- **Every type code is a code of the tables.** The unions
+  `AdtObjectType`, `AdtObjectTypeLower`, `AdtSourceObjectType` and
+  `AdtSourceObjectTypeLower` are gone from interfaces-adt with 21.0.0;
+  `IObjectReference.type`, `ISearchObjectsParams.objectType` and where-used's
+  `object_type` are `AdtTypeCode`s. Gone with them, because no table holds
+  them: `FUNC`, the bare R3TR aliases (`CLAS`, `PROG`, …), the lower-case
+  spellings (`clas/oc`, …), the friendly names (`class`, `functionmodule`,
+  `view`, `structure`, `table`, …), `STRU/DS`, `STRU/DT`, `TTYP/DF`,
+  `TTYP/TT` and `INTF/IF`. New from the tables: `TTYP/DA` (table type),
+  `MSAG/N` (message class). `VIEW/DV` stays for group activation, group
+  deletion and where-used only, typed as a group-only code
+  (`AdtGroupOnlyCode`).
+- **`getUtils()` takes each code as its variant serves it** (`AdtUtils<R, V>`,
+  the code sets exported as `AdtMetadataReadCode`, `AdtSourceReadCode`,
+  `AdtActivationCode`, `AdtDeletionCode`, `AdtDeletionCheckCode`,
+  `AdtWhereUsedCode`, `AdtStructureCode`, `AdtSearchCode`). The generic reads
+  take exactly the codes they read before: `readObjectMetadata` `CLAS/OC`,
+  `INTF/OI`, `PROG/P`, `FUGR/F`, `FUGR/FF`, `DDLS/DF`, `TABL/DT`, `TABL/DS`,
+  `TTYP/DA`, `DOMA/DD`, `DTEL/DE`, `DEVC/K`; `readObjectSource` `CLAS/OC`,
+  `INTF/OI`, `PROG/P`, `FUGR/FF`, `DDLS/DF`, `TABL/DT`, `TABL/DS`. A group
+  activation takes the codes whose API lists `activate` (and `DEVC/K` on the
+  modern variants, as before); deletion and its check take `delete` /
+  `deletionCheck`. Any other code does not compile, and from a caller outside
+  the type system is refused before any request.
+- **An API with a parent takes it.** A function module (`FUGR/FF`) and a
+  function include (`FUGR/I`) are addressed under their group: their members
+  take the group by type (`functionGroupName`), `readObjectMetadata` /
+  `readObjectSource` / `getObjectSourceUri` require it for `FUGR/FF`, an
+  `IObjectReference<'FUGR/FF'>` requires `parentName`. Where-used does not take `FUGR/I`; a function module there is still
+  named `GROUP|FM`.
+- **Addresses come from the tables.** `buildObjectUri` builds a code's
+  collection, then the name, and a parented code under its parent's address;
+  its hand-written switch and `WHERE_USED_ALIASES` are gone. `MSAG/NN` has no
+  address of its own: a message is read from its class's document (the
+  owner's ruling, recorded as a conformance divergence with its reason).
+- **`getUtils().getTypeStructure({ headers })`** reads
+  `/sap/bc/adt/repository/typestructure` with the caller's headers, answered
+  as the document came.
+- `@mcp-abap-adt/adt-strategies` `^0.16.0` (was `^0.10.0`): a code read from an answer is an
+  `IAdtAnsweredObject` — `type` (an `AdtTypeCode`) or `unknownType` (the text
+  as ADT sent it). See its [CHANGELOG](../adt-strategies/CHANGELOG.md).
 - **The result-set contracts come from `@mcp-abap-adt/interfaces-adt` 20.2.0.**
   The 30 client result-set contracts (`IClassResults`, `IProgramResults`, …,
   `IUtilResults`, `IMessageClassMessageResults` with its generic parameters) and
@@ -63,13 +140,52 @@ says what a consumer on 37.x does.
   class's single generic one. `createAdtClient()` still answers
   `Promise<AdtClient>`.
 
+### Added
+
+- **`updateMetadata`** for the class, interface, program, function module,
+  DDL source, access control (`DCLS/DL`), metadata extension (`DDLX/EX`),
+  behavior definition (`BDEF/BDO`), service definition (`SRVD/SRV`), scalar
+  function (`DSFD/SCF`), transformation (`XSLT/VT`), table, structure,
+  include and service binding. One PUT of the caller's document
+  (`options.source`) as it is, to the object's resource with the caller's `lockHandle` (and `corrNr` when the
+  config names a request) and headers, answered through
+  `results.metadataUpdated`. The library builds and merges no field: read
+  the metadata, change it, pass the whole document back. Gated by the
+  tables: the program's and the include's on premise only, the service
+  binding's on both modern variants; `update` of a service binding stays its
+  publication.
+- **A function group's source:** `getFunctionGroup().read(config, version?)`
+  is one GET of `.../source/main` (`text/plain`), and `update(config,
+  { source, lockHandle, headers })` one PUT of the caller's text — the
+  function pool's main program. Both modern variants.
+- **The conformance check of the type tables**: in CI against the recorded
+  answers of each release (`corpus/adt/conformance/`), and live on demand —
+  see the README's [conformance section](README.md#the-type-tables-conformance-check).
+- `AdtClientOnPrem`, `AdtClientCloud`, `ICreateAdtClientOptions`, the gate
+  types (`AdtServedBy`, `AdtPerformedBy`, `IAdtServedOn`, `AdtCodeOf`,
+  `AdtCodeWith`, `AdtModernVariant`, …), `EnhancementTypeWith`,
+  `IAdtGroupReference`, `ParentedArguments`, `AdtAddressableCode`.
+
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` `^20.2.0` (was `^20.1.0`).
+- `@mcp-abap-adt/interfaces-adt` `^23.0.4` (was `^20.1.0`; #216 needed
+  `^20.2.0`, the type tables `^21.0.0`, the `metadataUpdated` slots and the
+  function group's source `^23.0.1`–`^23.0.4`).
 - Decision 10 ("a factory's return type is a contract") is superseded by
   decision 17 in `docs/architecture/DECISIONS.md`.
 
 ### Tests
+
+- **The literal scan of type codes** (`typeCodeLiterals.test.ts` in each
+  package, `typeCodeScan.ts`): a code literal in production source passes
+  only where the compiler types it by the tables, and a code named in a
+  comment must be a code of the tables; the allow-list of non-codes carries a
+  reason per entry.
+- Negative compile checks (`variantGates`): a factory the variant lacks, an
+  operation the API lacks, an operation one code lacks, a missing parent.
+- Request-shape tests for every `updateMetadata`, the function group's
+  source and its two-reference activation; a live metadata-update step in
+  the integration flow (on in 16 suites).
 
 - The shape check reads the classes the factories answer;
   `factoryReturnsCoverClass.ts` asserts that every public method `getUtils`,
@@ -80,6 +196,22 @@ says what a consumer on 37.x does.
   set; `consumerContract.test.ts` proves that a contract composed from
   interfaces-adt alone accepts `AdtClient` and a hand-written object and
   refuses one missing a member it names.
+
+### Migration
+
+See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
+
+- Name the variant: `createAdtClient(connection, { variant: 'onprem', logger })`
+  or `new AdtClientOnPrem(connection, logger)`; a 7.40 system is
+  `AdtClientLegacy` of adt-clients-legacy.
+- Pass codes of the tables (`'CLAS/OC'`, `'FUGR/FF'`, `'TABL/DT'`) where a
+  friendly name, a bare R3TR type or a lower-case spelling was passed; type
+  them `AdtTypeCode` (or a code set above), never `string`.
+- Name the function group of a function module or include wherever it is
+  addressed.
+- Read `type ?? unknownType` from an answered object (adt-strategies 0.16.0).
+- Import the result-set contracts from interfaces-adt, and compose the client
+  contract you accept from it (#216).
 
 ## [37.4.0] - 2026-10-27
 

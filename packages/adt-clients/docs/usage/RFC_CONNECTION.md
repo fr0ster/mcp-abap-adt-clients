@@ -103,8 +103,9 @@ ADT clients work transparently with RFC connections — no code changes needed. 
 ```typescript
 import { createAdtClient } from '@mcp-abap-adt/adt-clients';
 
-// AdtClient — the factory detects nothing and returns the modern client
-const client = await createAdtClient(connection, logger);
+// The factory detects nothing: the variant is declared, and the client
+// answered is fixed to it (AdtClientOnPrem here).
+const client = await createAdtClient(connection, { variant: 'onprem', logger });
 const program = client.getProgram();
 await program.read({ programName: 'ZTEST' });
 ```
