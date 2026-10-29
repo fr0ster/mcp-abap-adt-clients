@@ -41,6 +41,7 @@ import type {
   IAdtTransportSortAndCompress,
   IListTransportsOptions,
   IResultStrategy,
+  ITransportResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -66,7 +67,6 @@ import { getTransport } from './read';
 import {
   type IAbapObjectEntry,
   type ITransportConfig,
-  type ITransportResults,
   transportDocuments,
 } from './types';
 import { updateTransport } from './update';

@@ -16,7 +16,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import type { IServiceBindingContract } from '../../../../clients/AdtClient';
+import type { AdtServiceBinding } from '../../../../core/service/AdtService';
 import type { serviceDocuments } from '../../../../core/service/types';
 import { gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
@@ -61,7 +61,7 @@ const readsBinding = gateOn(() => !!sharedBinding());
 
 describe('Service binding reads (getServiceBinding contract)', () => {
   let connection: IAbapConnection | undefined;
-  let bindings: IServiceBindingContract<typeof serviceDocuments>;
+  let bindings: AdtServiceBinding<typeof serviceDocuments>;
   let shared: ISharedBinding | undefined;
 
   beforeAll(async () => {

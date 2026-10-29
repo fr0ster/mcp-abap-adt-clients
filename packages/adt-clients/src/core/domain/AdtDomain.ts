@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
+  IDomainResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -45,11 +46,7 @@ import { create as createDomain } from './create';
 import { checkDeletion, deleteDomain } from './delete';
 import { lockDomain } from './lock';
 import { getDomain, getDomainTransport } from './read';
-import {
-  domainDocuments,
-  type IDomainConfig,
-  type IDomainResults,
-} from './types';
+import { domainDocuments, type IDomainConfig } from './types';
 import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';

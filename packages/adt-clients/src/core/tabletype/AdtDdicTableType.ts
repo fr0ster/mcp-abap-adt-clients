@@ -27,6 +27,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IResultStrategy,
+  ITableTypeResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -47,11 +48,7 @@ import { createTableType } from './create';
 import { checkDeletion, deleteTableType } from './delete';
 import { lockTableType } from './lock';
 import { getTableTypeMetadata, getTableTypeTransport } from './read';
-import {
-  type ITableTypeConfig,
-  type ITableTypeResults,
-  tableTypeDocuments,
-} from './types';
+import { type ITableTypeConfig, tableTypeDocuments } from './types';
 import { unlockTableType } from './unlock';
 import { updateTableType } from './update';
 import { validateTableTypeName } from './validation';

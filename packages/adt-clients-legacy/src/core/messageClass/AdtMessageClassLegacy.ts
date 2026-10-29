@@ -15,7 +15,6 @@
 import {
   AdtMessageClass,
   answering,
-  type IMessageClassResults,
   MESSAGE_CLASS,
   type messageClassDocuments,
   withCallTimeout,
@@ -26,6 +25,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IMessageClassConfig,
+  IMessageClassResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';

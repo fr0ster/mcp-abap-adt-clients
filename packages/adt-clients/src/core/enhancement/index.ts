@@ -30,7 +30,6 @@ export type {
   ICreateEnhancementParams,
   IDeleteEnhancementParams,
   IEnhancementConfig,
-  IEnhancementResults,
   IUpdateEnhancementParams,
   IValidateEnhancementParams,
 } from './types';

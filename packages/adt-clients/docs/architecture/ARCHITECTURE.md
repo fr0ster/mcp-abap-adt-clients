@@ -69,10 +69,10 @@ src/
     <object>/                 # class, program, package, table, ...
       Adt<Object>.ts          # implements the capability atoms the type supports
       create.ts/read.ts/...   # low-level endpoint helpers
-      types.ts                # I<Object>Results + <object>Documents
+      types.ts                # <object>Documents (I<Object>Results is interfaces-adt's)
     shared/
       AdtUtils.ts             # cross-cutting non-CRUD utilities
-      utilResultSet.ts        # IUtilResults + utilDocuments
+      utilResultSet.ts        # utilDocuments (IUtilResults is interfaces-adt's)
       contentTypes.ts         # AdtContentTypesBase / AdtContentTypesModern
       *.ts                    # discovery, search, where-used, etc.
 
@@ -296,24 +296,25 @@ export type { IClassConfig, ICreateClassParams } from '@mcp-abap-adt/interfaces-
 ```
 
 The `IXxxState` half of every pair is gone: a member answers one value and a
-failure, and neither is a state bag. Each `types.ts` now also declares what the
-contract does **not** carry — the module's `IXxxResults` strategy set and the
-`<type>Documents` default that satisfies it. The shapes readings build live
+failure, and neither is a state bag. Each `types.ts` now also holds the
+`<type>Documents` default result set; the `IXxxResults` contract it satisfies is
+accepted by a factory, so since 38.0.0 it is declared in
+`@mcp-abap-adt/interfaces-adt` and imported here. The shapes readings build live
 beside those readings, in `@mcp-abap-adt/adt-strategies`. A contract carries
 what is needed to use or replace it; a shape a replacement reading would not
 produce is neither.
 
 Rationale: the two packages previously held independent copies of the same interfaces, and they drifted silently — a field required on one side and optional on the other produced no error anywhere. A single definition site makes that class of bug impossible.
 
-**Honest capability types (8.0.0, finished in 12.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces-adt` (`IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtEnhancementHost`, `IAdtIncludeEnhancementHost`) — and since interfaces 29.0.0 there is nothing above them: `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed for forcing one result type on members that answer different things. Each `Adt<Object>` class `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to that honest set, so calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error rather than a runtime throw.
+**Honest capability types (8.0.0, finished in 12.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces-adt` (`IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtEnhancementHost`, `IAdtIncludeEnhancementHost`) — and since interfaces 29.0.0 there is nothing above them: `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed for forcing one result type on members that answer different things. Each `Adt<Object>` class `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` answers that class (since 38.0.0; a composition of its atoms before), so calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error rather than a runtime throw.
 
 Since **12.0.0** the claim is enforced rather than asserted. Every stub that threw is gone — not narrowed, deleted — including the last three handlers whose composites lived in the interfaces package (`transport`, `featureToggle`, `serviceBinding`). Four class-include handlers lost `create()`, because an include is not created: it exists because its class does, and writing source into it is `update`. They no longer extend `AdtClass` either — a shared `AdtClassMemberBase` gives them the container's lock, activation, metadata, transport and include version history and nothing else, so their declared type and their runtime shape agree.
 
-A guard under `src/__tests__/unit/capabilities/` holds the line: a manifest authored from ADT rather than from the code, a compile-time comparison of all 37 factory return types against the 12 atoms **in both directions**, a completeness check over both clients' prototype chains, and a behavioural pass that calls every method of every claimed capability against a recording connection and asserts it issues the request its capability names — the verb included, since a chain that locks, reads and unlocks without ever writing issues three requests and none of them the one that matters.
+A guard under `src/__tests__/unit/capabilities/` holds the line: a manifest authored from ADT rather than from the code, a compile-time comparison of what every factory answers against the atoms **in both directions**, a completeness check over both clients' prototype chains, and a behavioural pass that calls every method of every claimed capability against a recording connection and asserts it issues the request its capability names — the verb included, since a chain that locks, reads and unlocks without ever writing issues three requests and none of them the one that matters.
 
 Package root (`src/index.ts`) exports:
 - client classes (`AdtClient`, `createAdtClient`, runtime/ws/executor/abapGit clients) and the handler classes exported directly,
-- the injection surface (`src/index.readings.ts` and the runtime/executor/abapGit barrels): one `IXxxResults` + `<type>Documents` pair per implementation, and the building blocks `rawDocument`, `nothing`, `wireItself`, `nothingIsARefusal`,
+- the injection surface (`src/index.readings.ts` and the runtime/executor/abapGit barrels): one `<type>Documents` default per implementation (with its `IXxxResults` for the runtime, executor and abapGit sets; the client result-set contracts are interfaces-adt's since 38.0.0), and the building blocks `rawDocument`, `nothing`, `wireItself`, `nothingIsARefusal`,
 - `AdtSAPError`, `AdtParseError`, the content-type sets and the system probes.
 
 No contract type is re-exported, and no reading or verdict ships: those are in

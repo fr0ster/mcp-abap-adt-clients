@@ -38,6 +38,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IProgramResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -67,11 +68,7 @@ import {
   getProgramSource,
   getProgramTransport,
 } from './read';
-import {
-  type IProgramConfig,
-  type IProgramResults,
-  programDocuments,
-} from './types';
+import { type IProgramConfig, programDocuments } from './types';
 import { unlockProgram } from './unlock';
 import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';

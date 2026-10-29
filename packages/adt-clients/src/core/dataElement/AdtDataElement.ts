@@ -25,6 +25,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
+  IDataElementResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -46,11 +47,7 @@ import { create as createDataElement } from './create';
 import { checkDeletion, deleteDataElement } from './delete';
 import { lockDataElement } from './lock';
 import { getDataElement, getDataElementTransport } from './read';
-import {
-  dataElementDocuments,
-  type IDataElementConfig,
-  type IDataElementResults,
-} from './types';
+import { dataElementDocuments, type IDataElementConfig } from './types';
 import { unlockDataElement } from './unlock';
 import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';

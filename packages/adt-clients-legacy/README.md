@@ -18,7 +18,7 @@ behind each claim, and what is not measured, are in
 npm install @mcp-abap-adt/adt-clients-legacy @mcp-abap-adt/adt-clients
 ```
 
-`@mcp-abap-adt/adt-clients` is a peer dependency (`^37.4.0`): the consumer installs it, and the
+`@mcp-abap-adt/adt-clients` is a peer dependency (`^38.0.0`): the consumer installs it, and the
 legacy classes extend that one copy, so `AdtClientLegacy` is an `AdtClient` of the consumer's own
 version. npm warns when the installed version is outside the range.
 
@@ -38,8 +38,17 @@ const program = client.getProgram();                          // the same getter
   a 7.40 system is not a supported wire (no logon without a workaround, a write
   under a lock answers `423`, some reads disagree with RFC; the records are in
   LEGACY.md). The package does not detect the wire and has no branch for it.
-- The package depends on `@mcp-abap-adt/adt-clients` `^37.4.0`. It also exports
+- The package depends on `@mcp-abap-adt/adt-clients` `^38.0.0`. It also exports
   `AdtRequestLegacy`.
+- **Each getter answers a class** (since 0.2.0): its legacy class
+  (`getProgram(): AdtProgramLegacy<…>`, `getInclude(): AdtIncludeLegacy<…>`, …)
+  or, for a type 7.40 does not have, the base class answering refusals. Each is
+  assignable to the `AdtClient` getter it overrides. A consumer that names the
+  type of the client it accepts composes that contract from
+  `@mcp-abap-adt/interfaces-adt` alone (the atoms, the result-set contracts and
+  the config types), as for `AdtClient`; the compiler checks there that
+  `AdtClientLegacy` satisfies it. The result-set contracts (`IClassResults`, …)
+  are imported from `@mcp-abap-adt/interfaces-adt`.
 
 The package does not engineer around a consumer who ignores what follows: it
 states what 7.40 SP04 does and passes the request through.

@@ -28,6 +28,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IEnhancementResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -57,7 +58,6 @@ import {
   type EnhancementType,
   enhancementDocuments,
   type IEnhancementConfig,
-  type IEnhancementResults,
 } from './types';
 import { unlockEnhancement } from './unlock';
 import { updateEnhancement, updateEnhancementMetadata } from './update';

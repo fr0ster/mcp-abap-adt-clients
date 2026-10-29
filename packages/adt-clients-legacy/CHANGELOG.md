@@ -4,6 +4,35 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.2.0] - 2026-10-27
+
+On `@mcp-abap-adt/adt-clients` `^38.0.0` (#216), where each factory answers its
+class and the compositions of atoms are gone. No request and no answer changes.
+A breaking change of a 0.x package, so a minor.
+
+### Breaking
+
+- **The getters answer classes.** The eleven that re-declared the base's two
+  overloads over a composition (`getFunctionInclude`, `getInclude`,
+  `getMessageClass`, `getLocalTestClass`, `getLocalTypes`,
+  `getLocalDefinitions`, `getLocalMacros`, and `getTransformation`,
+  `getScalarFunction`, `getScalarFunctionImplementation`, `getAppendStructure`)
+  have one signature each, answering their legacy class or, for the last four,
+  the base class through `absentOnLegacy`. A consumer composes the contract it
+  accepts from `@mcp-abap-adt/interfaces-adt`; `AdtClientLegacy` satisfies such
+  a contract as `AdtClient` does.
+- **The result-set contracts come from `@mcp-abap-adt/interfaces-adt`.** A
+  consumer imports `IClassResults` and its siblings from there; adt-clients
+  38.0.0 no longer exports them
+  ([MIGRATION-38.md](../adt-clients/docs/usage/MIGRATION-38.md)).
+
+### Changed
+
+- Peer dependency `@mcp-abap-adt/adt-clients` `^38.0.0` (was `^37.4.0`);
+  `@mcp-abap-adt/interfaces-adt` `^20.2.0` (was `^20.1.0`).
+- `legacyConsumerContract.test.ts` proves that a contract composed from
+  interfaces-adt alone accepts `AdtClientLegacy`.
+
 ## [0.1.0] - 2026-10-27
 
 The first release: the clients for legacy SAP ABAP systems (SAP_BASIS

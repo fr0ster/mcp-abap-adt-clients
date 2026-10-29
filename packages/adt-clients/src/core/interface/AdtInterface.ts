@@ -32,6 +32,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IInterfaceResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -57,11 +58,7 @@ import {
   getInterfaceSource,
   getInterfaceTransport,
 } from './read';
-import {
-  type IInterfaceConfig,
-  type IInterfaceResults,
-  interfaceDocuments,
-} from './types';
+import { type IInterfaceConfig, interfaceDocuments } from './types';
 import { unlockInterface } from './unlock';
 import { upload } from './update';
 import { validateInterfaceName } from './validation';

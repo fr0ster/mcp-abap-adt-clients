@@ -32,6 +32,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
+  IFunctionGroupResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -57,11 +58,7 @@ import {
 } from './enhancements';
 import { lockFunctionGroup } from './lock';
 import { getFunctionGroup, getFunctionGroupTransport } from './read';
-import {
-  functionGroupDocuments,
-  type IFunctionGroupConfig,
-  type IFunctionGroupResults,
-} from './types';
+import { functionGroupDocuments, type IFunctionGroupConfig } from './types';
 import { unlockFunctionGroup } from './unlock';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';

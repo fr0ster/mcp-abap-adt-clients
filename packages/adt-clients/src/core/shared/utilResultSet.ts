@@ -27,72 +27,8 @@
  * for.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IUtilResults } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
-
-export interface IUtilResults {
-  /** Hits of an object search — `/informationsystem/search`. */
-  readonly search: IResultStrategy<unknown>;
-  /**
-   * What `/usageReferences` answers.
-   *
-   * The default is the document. A parsed reference list used to be what
-   * `getWhereUsedList` returned, and that member joined two requests to get
-   * there — the scope, then the search — so it could never be given a reading
-   * at all. Now the join is the caller's and the shape is a reading like any
-   * other. `utilWhereUsedReferences` in `@mcp-abap-adt/adt-strategies` is that
-   * parse, for whoever wants it.
-   */
-  readonly whereUsed: IResultStrategy<unknown>;
-  /** The scope document `/usageReferences/scope` answers. */
-  readonly whereUsedScope: IResultStrategy<unknown>;
-  /** What one virtual-folder level answers — `/virtualfolders/contents`. */
-  readonly folders: IResultStrategy<unknown>;
-  /** A named-item list — the repository's types. */
-  readonly types: IResultStrategy<unknown>;
-  /** One level of the repository tree, with what is below it. */
-  readonly node: IResultStrategy<unknown>;
-  /** What `/nodestructure` answers for a single object. */
-  readonly objectStructure: IResultStrategy<unknown>;
-  /** What `/activation/inactiveobjects` answers. */
-  readonly inactive: IResultStrategy<unknown>;
-  /**
-   * What starting an activation run answers.
-   *
-   * `/activation/runs` answers `202` with the run id in `Location` and a body
-   * that carries nothing; `utilActivationRunId` in `@mcp-abap-adt/adt-strategies`
-   * reads the id, and `wireItself` keeps the exchange. The legacy synchronous
-   * `/activation` answers its result in the body, which the default keeps.
-   */
-  readonly activation: IResultStrategy<unknown>;
-  /** What an activation run is doing — `/activation/runs/{runId}`. */
-  readonly run: IResultStrategy<unknown>;
-  /** What an activation run produced — `/activation/results/{runId}`. */
-  readonly results: IResultStrategy<unknown>;
-  /** ADT's answer to whether a set of objects may be deleted. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** ADT's answer to deleting a set of objects. */
-  readonly deletion: IResultStrategy<unknown>;
-  /** What a freestyle SQL query answers — `/datapreview/freestyle`. */
-  readonly query: IResultStrategy<unknown>;
-  /** A table's columns — `/datapreview/ddic/{name}/metadata`. */
-  readonly columns: IResultStrategy<unknown>;
-  /** A table's rows — `/datapreview/ddic`. */
-  readonly contents: IResultStrategy<unknown>;
-  /** The discovery catalogue — `/discovery`. */
-  readonly discovery: IResultStrategy<unknown>;
-  /** An object's source — `<objectUri>/source/main`. */
-  readonly source: IResultStrategy<unknown>;
-  /** An object's metadata document, without its source. */
-  readonly metadata: IResultStrategy<unknown>;
-  /** One include of a program — `/programs/includes/{name}`. */
-  readonly include: IResultStrategy<unknown>;
-  /**
-   * What `/informationsystem/objectproperties/values` answers for one object
-   * uri — the `opr:objectProperties` document.
-   */
-  readonly objectProperties: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default.

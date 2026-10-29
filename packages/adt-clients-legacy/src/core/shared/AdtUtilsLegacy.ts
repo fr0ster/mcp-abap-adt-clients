@@ -51,7 +51,6 @@ import {
   DATA_ELEMENT,
   DOMAIN,
   failed,
-  type IUtilResults,
   PACKAGE,
   requestHeaders,
   STRUCTURE,
@@ -70,6 +69,7 @@ import type {
   IGetWhereUsedScopeParams,
   IObjectReference,
   IReadOptions,
+  IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   AdtObjectErrorCodes,

@@ -23,6 +23,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IMetadataExtensionResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -52,7 +53,6 @@ import {
 } from './read';
 import {
   type IMetadataExtensionConfig,
-  type IMetadataExtensionResults,
   metadataExtensionDocuments,
 } from './types';
 import { unlockMetadataExtension } from './unlock';

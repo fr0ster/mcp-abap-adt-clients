@@ -8,7 +8,7 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IIncludeResults } from '@mcp-abap-adt/interfaces-adt';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -64,23 +64,6 @@ export type IncludeDeletionResult = string;
  * A source upload writes; ADT answers it with nothing worth reading.
  */
 export type IncludeUpdated = undefined;
-
-/** One strategy per member of a include implementation. See `IClassResults`. */
-export interface IIncludeResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  /** Enhancement implementations in the host's source. */
-  readonly enhancementElements: IResultStrategy<unknown>;
-  /** Places in the host that can be enhanced. */
-  readonly enhancementOptions: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

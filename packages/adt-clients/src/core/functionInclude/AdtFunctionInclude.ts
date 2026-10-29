@@ -29,6 +29,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IFunctionIncludeResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -52,11 +53,7 @@ import { lockFunctionInclude } from './lock';
 import { readFunctionInclude } from './read';
 import { readFunctionIncludeSource } from './readSource';
 import type { ICreateFunctionIncludeParams } from './types';
-import {
-  functionIncludeDocuments,
-  type IFunctionIncludeConfig,
-  type IFunctionIncludeResults,
-} from './types';
+import { functionIncludeDocuments, type IFunctionIncludeConfig } from './types';
 import { unlockFunctionInclude } from './unlock';
 import { updateFunctionInclude } from './update';
 import { uploadFunctionIncludeSource } from './updateSource';

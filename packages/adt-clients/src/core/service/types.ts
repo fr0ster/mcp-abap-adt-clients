@@ -1,8 +1,4 @@
-import type {
-  GeneratedServiceType as GST,
-  IResultStrategy,
-  IServiceBindingConfig as ISBC,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IServiceResults } from '@mcp-abap-adt/interfaces-adt';
 import {
   type DesiredPublicationState,
   type GeneratedServiceType,
@@ -36,45 +32,6 @@ export function resolveBindingVariant(variant: ServiceBindingVariant): {
 }
 
 /**
- * One strategy per member of a service binding implementation.
- *
- * A record rather than fourteen positional type parameters — the fourteenth
- * would be unnameable without spelling the thirteen before it, and a consumer
- * overriding one reading writes the key. `IServiceBindingResults` in the
- * contract names five of these; the rest belong to the capability atoms.
- */
-export interface IServiceResults {
-  /** What the create answers: the binding's own document. */
-  readonly created: IResultStrategy<unknown>;
-  /** What a read answers: the binding document, active or inactive. */
-  readonly source: IResultStrategy<unknown>;
-  /** The same document, read as metadata — a binding has no second resource. */
-  readonly metadata: IResultStrategy<unknown>;
-  /** What a check run answers: `chkl:messages`, whose `E` entries are the verdict. */
-  readonly check: IResultStrategy<unknown>;
-  /** What activation answers. */
-  readonly activation: IResultStrategy<unknown>;
-  /** What the pre-create transport check answers. */
-  readonly validation: IResultStrategy<unknown>;
-  /** What the deletion answers. */
-  readonly deletion: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** What a publication change answers. */
-  readonly updated: IResultStrategy<unknown>;
-  /** What the transport check answers. */
-  readonly transport: IResultStrategy<unknown>;
-  /** The binding types this system offers. */
-  readonly bindingTypes: IResultStrategy<unknown>;
-  /** What generating the service answers. */
-  /** What an OData v2 or v4 read of the binding answers. */
-  readonly odata: IResultStrategy<unknown>;
-  /** What publishing or withdrawing answers. */
-  readonly publication: IResultStrategy<unknown>;
-  /** What classifying the binding answers. */
-}
-
-/**
  * The shipped default: every member answers its document as it arrived.
  *
  * `satisfies`, never an annotation — see `classDocuments` for why.
@@ -94,44 +51,6 @@ export const serviceDocuments = {
   publication: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IServiceResults;
-
-/**
- * What a publication change needs, as this package currently understands it.
- *
- * Declared **here** rather than in `@mcp-abap-adt/interfaces` on purpose: the
- * shape is still being settled against measured ADT traffic, and a contract
- * moves to the contracts package once it does what it needs to, not before.
- *
- * **The binding and the protocol, and nothing else.** The job is posted with no
- * query string and a body that names the target by type and name, so the
- * service name and version have nowhere to go — they were derived from the
- * binding's own document by a read that made this member two requests, and both
- * the read and the fields went. `serviceType` stays because it selects the
- * endpoint (`odatav2` or `odatav4`), and a caller holding a binding knows it
- * from the variant.
- *
- * There is no `publishODataV2` and no `publishODataV4`: the protocol is a
- * **parameter**, not a method name. Two members that differ only by a value
- * they could have taken as an argument are two names for one endpoint.
- */
-/**
- * What a caller must name to change a binding's publication, **in the signature
- * they call**.
- *
- * `Partial<IServiceBindingConfig>` is what `IAdtUpdatable` gives every other
- * type, and for a binding it is too loose in two ways a compiler could catch:
- * `serviceType` is optional there, and `desiredPublicationState` still admits
- * `'unchanged'`. Both compiled and then threw before reaching the wire, which
- * is a demand made where the caller cannot see it.
- */
-export type IServiceBindingPublicationConfig = Partial<ISBC> & {
-  /** Which binding. Without it there is no object to publish. */
-  bindingName: string;
-  /** `unchanged` is not one of them: there is no request that changes nothing. */
-  desiredPublicationState: 'published' | 'unpublished';
-  /** Selects the endpoint, `odatav2` or `odatav4`. */
-  serviceType: GST;
-};
 
 /**
  * What a publication job needs, which is not the same for the two protocols.

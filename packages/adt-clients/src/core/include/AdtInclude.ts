@@ -27,6 +27,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IIncludeConfig,
+  IIncludeResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -47,7 +48,7 @@ import {
 } from './enhancements';
 import { includeUrl, lockInclude } from './lock';
 import { getIncludeMetadata, getIncludeSource } from './read';
-import { type IIncludeResults, includeDocuments } from './types';
+import { includeDocuments } from './types';
 import { unlockInclude } from './unlock';
 import { uploadIncludeSource } from './update';
 

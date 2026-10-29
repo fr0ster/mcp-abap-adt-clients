@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  IAccessControlResults,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -48,11 +49,7 @@ import {
   getAccessControlSource,
   getAccessControlTransport,
 } from './read';
-import {
-  accessControlDocuments,
-  type IAccessControlConfig,
-  type IAccessControlResults,
-} from './types';
+import { accessControlDocuments, type IAccessControlConfig } from './types';
 import { unlockAccessControl } from './unlock';
 import { updateAccessControl } from './update';
 import { validateAccessControlName } from './validation';

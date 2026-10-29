@@ -9,7 +9,6 @@
 import {
   AdtProgram,
   answering,
-  type IProgramResults,
   PROGRAM,
   type programDocuments,
   withCallTimeout,
@@ -20,6 +19,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IProgramConfig,
+  IProgramResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';

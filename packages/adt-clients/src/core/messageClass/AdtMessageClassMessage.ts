@@ -35,6 +35,7 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtUpdatable,
+  IMessageClassMessageResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -49,11 +50,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 import { chain } from '../shared/chain';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
-import {
-  type IMessageClassMessageConfig,
-  type IMessageClassMessageResults,
-  messageDocuments,
-} from './types';
+import { type IMessageClassMessageConfig, messageDocuments } from './types';
 import { unlockAllMessages, unlockMessageClass } from './unlock';
 import { buildMessageClassXml, parseMessageClass } from './xml';
 

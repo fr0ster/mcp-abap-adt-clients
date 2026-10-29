@@ -29,6 +29,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   ICdsTestDoubleCheckable,
+  IDdlResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -51,7 +52,7 @@ import { checkDeletion, deleteDdl } from './delete';
 import { lockDDLS } from './lock';
 import { getDdlMetadata, getDdlSource, getDdlTransport } from './read';
 import { checkCdsTestDoublesAvailability } from './testDoubles';
-import { ddlDocuments, type IDdlConfig, type IDdlResults } from './types';
+import { ddlDocuments, type IDdlConfig } from './types';
 import { unlockDDLS } from './unlock';
 import { updateDdl } from './update';
 import { validateDdlName } from './validation';

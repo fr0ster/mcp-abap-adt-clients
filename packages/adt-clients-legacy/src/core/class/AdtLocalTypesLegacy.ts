@@ -10,13 +10,13 @@ import {
   AdtLocalTypes,
   CLASS,
   type classDocuments,
-  type IClassResults,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IClassConfig,
+  IClassResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { noTransportResource } from '../shared/refusalLegacy';
 

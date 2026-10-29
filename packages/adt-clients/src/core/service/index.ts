@@ -11,8 +11,6 @@ export type {
   IPublishODataV2Params,
   IReadServiceBindingParams,
   IServiceBindingConfig,
-  IServiceBindingPublicationConfig,
-  IServiceResults,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
   IUpdateServiceBindingParams,

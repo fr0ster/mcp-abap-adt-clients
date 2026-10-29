@@ -11,7 +11,7 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IClassResults } from '@mcp-abap-adt/interfaces-adt';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -67,46 +67,6 @@ export type ClassDeletionResult = string;
 
 /** An update writes; ADT answers it with nothing worth reading. */
 export type ClassUpdated = undefined;
-
-/**
- * One strategy per member of a class implementation.
- *
- * An implementation is given a whole set when it is constructed, not a strategy
- * per call: a consumer that wants documents whole wants them for every member it
- * touches, and none of them changes its mind between `create` and `read` of the
- * same object.
- *
- * **The set carries no type parameters.** `ReturnType<R['created']>` reads the
- * type out of the strategy a consumer passed, so a positional parameter per slot
- * would only restate what is already derivable — and every constraint naming the
- * interface would have to repeat them. It did, and adding a slot then left the
- * new parameter at its default in every constraint that still listed the old
- * count: legal TypeScript, silently un-injectable. Twice. The shipped defaults
- * live in the `…Documents` constant below instead, which is what the handlers
- * default their `R` to.
- */
-export interface IClassResults {
-  readonly created: IResultStrategy<unknown>;
-  readonly source: IResultStrategy<unknown>;
-  readonly metadata: IResultStrategy<unknown>;
-  /** Enhancement implementations in the host's source. */
-  readonly enhancementElements: IResultStrategy<unknown>;
-  /** Places in the host that can be enhanced. */
-  readonly enhancementOptions: IResultStrategy<unknown>;
-  readonly check: IResultStrategy<unknown>;
-  readonly activation: IResultStrategy<unknown>;
-  readonly validation: IResultStrategy<unknown>;
-  readonly deletion: IResultStrategy<unknown>;
-  readonly updated: IResultStrategy<unknown>;
-  /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<unknown>;
-  /** The transport request document of the class. */
-  readonly transport: IResultStrategy<unknown>;
-  /** The version history — an Atom feed; `objectVersions` reads it. */
-  readonly versions: IResultStrategy<unknown>;
-  /** One version's source. */
-  readonly versionSource: IResultStrategy<unknown>;
-}
 
 /**
  * The shipped default: every member answers its document as it arrived.

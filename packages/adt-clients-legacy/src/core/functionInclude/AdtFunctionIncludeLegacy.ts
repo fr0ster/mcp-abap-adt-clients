@@ -12,7 +12,6 @@
 import {
   AdtFunctionInclude,
   type functionIncludeDocuments,
-  type IFunctionIncludeResults,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAdtError,
@@ -20,6 +19,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IFunctionIncludeConfig,
+  IFunctionIncludeResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   noDeletionApi,

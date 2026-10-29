@@ -23,6 +23,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtValidatable,
+  IMessageClassResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -42,11 +43,7 @@ import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
 import { getMessageClassSource } from './read';
-import {
-  type IMessageClassConfig,
-  type IMessageClassResults,
-  messageClassDocuments,
-} from './types';
+import { type IMessageClassConfig, messageClassDocuments } from './types';
 import { unlockMessageClass } from './unlock';
 import { updateMessageClass } from './update';
 

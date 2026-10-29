@@ -33,6 +33,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IFunctionModuleResults,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -54,11 +55,7 @@ import {
   getFunctionModuleTransport,
   getFunctionSource,
 } from './read';
-import {
-  functionModuleDocuments,
-  type IFunctionModuleConfig,
-  type IFunctionModuleResults,
-} from './types';
+import { functionModuleDocuments, type IFunctionModuleConfig } from './types';
 import { unlockFunctionModule } from './unlock';
 import { update } from './update';
 import { validateFunctionModuleName } from './validation';

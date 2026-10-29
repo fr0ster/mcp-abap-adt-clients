@@ -176,11 +176,19 @@ export type Offenders = {
  */
 // Optional context does not distinguish these atoms structurally: each host
 // satisfies both interfaces. The manifest records which contract it exposes.
+//
+// `messageClassMessage.metadataReadable` since 38.0.0, when the factory began
+// answering its class: `AdtMessageClassMessage` implements
+// `IAdtMetadataReadable`, and its `readMetadata` sends the same request as
+// `read` (the parent class's document; a message has no resource of its own).
+// The deleted composition left the atom out, so the type hid it. The class's
+// members are not changed by #216, so the disagreement is recorded here.
 export type KnownDisagreements =
   | 'include.enhancementHost — offered but not claimed'
   | 'class.includeEnhancementHost — offered but not claimed'
   | 'program.includeEnhancementHost — offered but not claimed'
-  | 'functionGroup.includeEnhancementHost — offered but not claimed';
+  | 'functionGroup.includeEnhancementHost — offered but not claimed'
+  | 'messageClassMessage.metadataReadable — offered but not claimed';
 
 /**
  * The assertion.

@@ -24,6 +24,7 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IResultStrategy,
+  ITransformationResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -48,11 +49,7 @@ import {
   getTransformationSource,
   getTransformationTransport,
 } from './read';
-import {
-  type ITransformationConfig,
-  type ITransformationResults,
-  transformationDocuments,
-} from './types';
+import { type ITransformationConfig, transformationDocuments } from './types';
 import { unlockTransformation } from './unlock';
 import { updateTransformation } from './update';
 import { validateTransformationName } from './validation';
