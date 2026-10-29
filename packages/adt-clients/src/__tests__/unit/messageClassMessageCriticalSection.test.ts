@@ -80,14 +80,19 @@ describe('AdtMessageClassMessage: the critical section around a write', () => {
     );
 
     expect(answer.ok).toBe(false);
-    const events = steps(connection.events);
-    expect(events.filter((e) => e === 'begin')).toHaveLength(1);
-    expect(events.filter((e) => e === 'end')).toHaveLength(1);
-    expect(events.at(-1)).toBe('end');
-    expect(events.indexOf('begin')).toBeLessThan(
-      events.indexOf('POST LOCK_MSG'),
-    );
-    expect(events.indexOf('end')).toBeGreaterThan(events.indexOf('PUT'));
+    // The PUT went out and was refused; the chain then unwinds in reverse
+    // order of registration — the class lock, the message locks — and the
+    // section closes last, once.
+    expect(steps(connection.events)).toEqual([
+      'GET',
+      'begin',
+      'POST LOCK_MSG',
+      'POST LOCK',
+      'PUT',
+      'POST UNLOCK',
+      'POST UNLOCK_ALL',
+      'end',
+    ]);
   });
 
   it('delete runs in it as well', async () => {
