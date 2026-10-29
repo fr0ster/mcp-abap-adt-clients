@@ -272,6 +272,8 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 | class, program, function group `run` | the same request, read by the `run` strategy: on 7.40 the testruns POST is the run |
 | function module `runSync` | measured — inherited |
 | function module `run` | refused: `run(functionModuleName)` names no group, and the measured request needs the module's URI under its group. Use `runSync({ functionGroupName, functionModuleName })` |
+| generic runner (`AbapUnitTestRunnerLegacy`) `runSync(uris, { headers })` | inherited — the modern request: one testruns POST with `<options>` and the caller's headers, read by the `result` strategy |
+| generic runner `run`, object or package target | refused: both name a run on `/abapunit/runs`, which 7.40 does not have, and testruns has no form for either — it names objects by URI, not by `osl:object type`, and has no package set. Use `runSync` with the objects' URIs |
 | every `getStatus`, `getResult` | refused: a legacy run answers finished; there is no run id |
 
 `<options>` is always sent — the caller's scope, risk levels and durations, with `run`'s defaults.

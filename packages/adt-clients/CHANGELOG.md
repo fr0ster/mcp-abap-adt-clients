@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [38.0.0] - 2026-10-29
 
 Two changes of contract, released once, on `@mcp-abap-adt/interfaces-adt`
-`^23.0.4`:
+`^23.1.0`:
 
 - **A contract lives where it is accepted** (#216). A factory accepts a result
   set, so the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a
@@ -40,7 +40,9 @@ Two changes of contract, released once, on `@mcp-abap-adt/interfaces-adt`
   `AdtClientCloud`), a factory or member the variant's table lacks does not
   compile, every type code is a code of the tables (`AdtTypeCode`), and every
   address is built from them. New members fill the table's operations:
-  `updateMetadata` for fifteen types, and a function group's source.
+  `updateMetadata` for fifteen types, and a function group's source. ABAP
+  Unit runs what its registry (`ABAP_UNIT_RUN_TYPES`) names, through a
+  generic runner beside the four per-object ones.
 
 [MIGRATION-38.md](docs/usage/MIGRATION-38.md) says what a consumer on 37.x
 does. Requests change in four places, each listed below: the function group's
@@ -142,6 +144,26 @@ holds is no longer sent), and the new members.
 
 ### Added
 
+- **The generic ABAP Unit runner, `AbapUnitTestRunner`**
+  (`AdtExecutor.getAbapUnitTestRunner()`, default result set
+  `abapUnitTestRunnerDocuments`), implementing interfaces-adt 23.1.0's
+  `IAbapUnitRunner`. `run(target)` starts one `AbapUnitRunTarget` on
+  `POST /sap/bc/adt/abapunit/runs`: `{ kind: 'object', name, type }` as an
+  `osl:flatObjectSet` with one `osl:object`, `type` any key of
+  `ABAP_UNIT_RUN_TYPES` (`AbapUnitRunObjectType`) — `CLAS/OC`, `CLAS/OCL`,
+  `DDLS/DF`, `FUGR/F`, … —, or `{ kind: 'package', name,
+  includeSubpackages }` as an `osl:packageSet` with one `osl:package`, the
+  one form measured to run a package's tests (2026-10-29, S/4HANA 2025 and
+  ABAP cloud). `runSync(uris, { headers })` runs objects by ADT URI on
+  `/abapunit/testruns`, always with `<options>`; `getStatus` / `getResult`
+  by the run id. Scope, risk levels and durations as every runner's. **A CDS
+  view's tests are assigned tests**: local test classes marked
+  `"! @testing <view>`, run by `DDLS/DF` (or `DDLS`) only with
+  `scope: { foreignTests: true }`. **A wrong type is no error**: the endpoint
+  answers `201` and an empty `<aunit:runResult/>`, so only the compiler
+  catches it. `run`, `getStatus` and `getResult` are gated on a modern
+  variant; adt-clients-legacy 0.2.0 refuses them on 7.40 and keeps
+  `runSync`.
 - **`updateMetadata`** for the class, interface, program, function module,
   DDL source, access control (`DCLS/DL`), metadata extension (`DDLX/EX`),
   behavior definition (`BDEF/BDO`), service definition (`SRVD/SRV`), scalar
@@ -168,9 +190,16 @@ holds is no longer sent), and the new members.
 
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` `^23.0.4` (was `^20.1.0`; #216 needed
+- `@mcp-abap-adt/interfaces-adt` `^23.1.0` (was `^20.1.0`; #216 needed
   `^20.2.0`, the type tables `^21.0.0`, the `metadataUpdated` slots and the
-  function group's source `^23.0.1`–`^23.0.4`).
+  function group's source `^23.0.1`–`^23.0.4`, the ABAP Unit run registry
+  and the generic runner's contract `^23.1.0`).
+- **The four ABAP Unit runners' `osl:object type` is typed
+  `AbapUnitRunObjectType`**, the union of `ABAP_UNIT_RUN_TYPES`' keys:
+  `AbapUnitRunner.startByObject`'s `type` (protected) and
+  `IUnitTestRunObject.type` were `string`. No narrowing: the union holds
+  every value measured to run, and the runners keep sending `CLAS`, `PROG`,
+  `FUGR` and `FUNC` — requests unchanged.
 - Decision 10 ("a factory's return type is a contract") is superseded by
   decision 17 in `docs/architecture/DECISIONS.md`.
 
@@ -182,6 +211,20 @@ holds is no longer sent), and the new members.
   comment or inside a longer string (a message, a template's text span) must
   be a code of the tables; the allow-list of non-codes carries a reason per
   entry.
+- The literal scan counts the ABAP Unit run registry's keys among the codes
+  of the tables, so a literal typed `AbapUnitRunObjectType` passes, and the
+  four allow-list entries for the runners' `CLAS`, `PROG`, `FUGR` went.
+- **The conformance check's ABAP Unit rules**, against the recorded
+  `GET /abapunit/metadata` of S/4HANA 2025 and ABAP cloud
+  (`corpus/adt/abapunit/`): every listed `globalWorkbenchType` is a key of
+  `ABAP_UNIT_RUN_TYPES`, and every key entered on the metadata's evidence is
+  listed; a negative fixture per rule.
+- Request-shape tests of the generic runner: an object target, a package
+  target with and without subpackages, a URI run with the headers as given.
+  Live suites (`unitTest/AbapUnit{Class,Cds,Package}Run`, case section
+  `run_abap_unit`, off by default): a class by `CLAS/OC`, a CDS view's
+  assigned test by `DDLS/DF` with and without `foreignTests`, a package run —
+  each in a local package, under fresh names, deleted and read back absent.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
 - Request-shape tests for every `updateMetadata`, the function group's
@@ -211,6 +254,8 @@ See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
 - Name the function group of a function module or include wherever it is
   addressed.
 - Read `type ?? unknownType` from an answered object (adt-strategies 0.16.0).
+- A runner subclass that passes a `string` to `startByObject` types it
+  `AbapUnitRunObjectType`.
 - Import the result-set contracts from interfaces-adt, and compose the client
   contract you accept from it (#216).
 

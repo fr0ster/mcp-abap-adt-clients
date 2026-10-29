@@ -1,6 +1,6 @@
 # Migrating to 38.0.0
 
-38.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^23.0.4` and
+38.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^23.1.0` and
 `@mcp-abap-adt/adt-strategies` `^0.16.0`, and carries two changes of contract.
 
 **A contract lives where it is accepted** (#216). Only types move or go:
@@ -361,6 +361,19 @@ Each sends one request, gated by the tables:
 - **A function group's metadata Accept** in `readObjectMetadata('FUGR/F', …)`
   lists `functions.groups.v3+xml` first (v2 and v1 answered `406` on S/4HANA
   2025).
+- **The generic ABAP Unit runner**, `AdtExecutor.getAbapUnitTestRunner()`:
+  `run({ kind: 'object', name, type })` with any `osl:object type` of
+  `ABAP_UNIT_RUN_TYPES`, `run({ kind: 'package', name, includeSubpackages })`,
+  and `runSync(uris, { headers })` on `/abapunit/testruns`. Nothing to
+  migrate: the four per-object runners stay and send what they sent. See the
+  README's [ABAP Unit](../../README.md#abap-unit) section.
+
+**A runner subclass.** `AbapUnitRunner.startByObject(name, type, options)`
+(protected) and `IUnitTestRunObject.type` take `AbapUnitRunObjectType` where
+they took `string`: a subclass that passed a `string` variable types it
+`AbapUnitRunObjectType` (from interfaces-adt). A literal of the registry
+(`'CLAS'`, `'PROG/P'`, `'DDLS/DF'`) compiles as before; one the registry does
+not hold does not — the endpoint would have answered it with an empty result.
 
 A custom result set for the class, interface, program, function module, DDL
 source and the nine others needs a `metadataUpdated` slot (interfaces-adt

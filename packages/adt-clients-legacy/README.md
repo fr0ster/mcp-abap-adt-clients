@@ -332,6 +332,8 @@ types' reads. Member by member: LEGACY.md.
 |---|---|
 | class, program, function group `run` / `runSync`; function module `runSync` | sends one `POST /abapunit/testruns` with `<options>`, the finished result |
 | function module `run` | **refused** — it names no group; use `runSync({ functionGroupName, functionModuleName })` |
+| generic runner (`getAbapUnitTestRunner()`) `runSync(uris, { headers })` | sends one `POST /abapunit/testruns` with `<options>` and the caller's headers, the finished result — inherited |
+| generic runner `run` (object or package target) | **refused** — no `/abapunit/runs`, and `/testruns` names objects by URI, with no package set; use `runSync` with the objects' URIs |
 | every `getStatus`, `getResult` | **refused** — a legacy run answers finished; there is no run id |
 | class `run`, `runWithProfiler` | **refused** — no `/oo/classrun` (`404`) |
 | program `run`, trace type lists | **refused until measured** — not advertised |

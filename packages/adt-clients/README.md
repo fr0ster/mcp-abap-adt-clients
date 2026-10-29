@@ -16,7 +16,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
-> **From 37.x?** 38.0.0 (on `interfaces-adt` ^23.0.4) is typed by the ADT type
+> **From 37.x?** 38.0.0 (on `interfaces-adt` ^23.1.0) is typed by the ADT type
 > tables: a client is fixed to its release variant (`AdtClientOnPrem`,
 > `AdtClientCloud`, `createAdtClient(connection, { variant })`), every type
 > code is a code of the tables (the `AdtObjectType*` unions, friendly names,
@@ -117,7 +117,7 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^23.0.4` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^23.1.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
   | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
@@ -175,6 +175,7 @@ npm install @mcp-abap-adt/adt-clients
      - `getClassTestRunner()` for a class's ABAP Unit tests: `run`, `getStatus`, `getResult` (asynchronous, the default), or `runSync` (synchronous)
      - `getProgramTestRunner()` for a report's ABAP Unit tests, in its source or its includes — `run` (asynchronous, the default) or `runSync`
      - `getFunctionGroupTestRunner()` / `getFunctionModuleTestRunner()` for a function group's tests, or a module's — `run` (asynchronous, the default) or `runSync`
+     - `getAbapUnitTestRunner()`, the generic runner: `run` of an object target of any type the run registry `ABAP_UNIT_RUN_TYPES` lists (a class include, a CDS view's assigned tests, …) or of a package target, `runSync` of ADT URIs, `getStatus`, `getResult`
      - `getProgramExecutor()` for `programrun` (on-premise systems)
    - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
    - Each executor factory takes an optional result set, like the runtime client's
@@ -547,6 +548,48 @@ caller who wants one module's tests reads them out of the result. With an ABAP
 Doc test relation (`"! @testing FUNC:<module>`) on a test class, the default
 scope answered the group's tests as a preview (`isForeign="true"`, nothing
 executed) and `scope: { foreignTests: true }` ran them.
+
+**The generic runner, `getAbapUnitTestRunner()`.** The four runners above each
+fix the `osl:object type` they send (`CLAS`, `PROG`, `FUGR`, `FUNC`). The
+generic one takes it from the caller, typed `AbapUnitRunObjectType` — every key
+of `ABAP_UNIT_RUN_TYPES` in `@mcp-abap-adt/interfaces-adt`, and nothing else —
+or runs a package:
+
+```typescript
+import { abapUnitTestRunnerDocuments } from '@mcp-abap-adt/adt-clients';
+
+const generic = executor.getAbapUnitTestRunner({
+  ...abapUnitTestRunnerDocuments,
+  run: unitTestRunId,
+});
+// An object target: one osl:object in an osl:flatObjectSet.
+await generic.run({ kind: 'object', name: 'ZCL_UNDER_TEST', type: 'CLAS/OC' });
+// A CDS view's tests are assigned tests: they need foreignTests.
+await generic.run(
+  { kind: 'object', name: 'ZI_VIEW', type: 'DDLS/DF' },
+  { scope: { foreignTests: true }, analyse: analyseUnitTestStart },
+);
+// A package target: an osl:packageSet with one osl:package.
+await generic.run({ kind: 'package', name: '$ZPKG', includeSubpackages: true });
+// ADT URIs, on /abapunit/testruns, with the request's headers.
+await generic.runSync(['/sap/bc/adt/oo/classes/zcl_under_test'], {
+  headers: { accept: 'application/xml', contentType: 'application/xml' },
+  analyse: analyseUnitTest,
+});
+```
+
+Both targets go to `POST /sap/bc/adt/abapunit/runs` and are polled with
+`getStatus` and `getResult`, as every runner's. **A CDS view holds no test
+class**: its tests are local test classes elsewhere — a class's testclasses
+include — marked `"! @testing <view>`, and they run by `DDLS/DF` (or `DDLS`)
+only when the scope sets `foreignTests: true`; with own tests only the result
+is empty. **A package** runs only as an `osl:packageSet` — `osl:object
+type="DEVC/K"` answered empty (measured 2026-10-29, S/4HANA 2025 and ABAP
+cloud). **A wrong type is not an error**: the endpoint answers the start `201`
+and the result as an empty `<aunit:runResult/>`, which is why the type is the
+compiler's to check. On a legacy system the generic runner keeps `runSync` and
+refuses a target run, `getStatus` and `getResult` without a request (7.40 has
+no `/abapunit/runs`).
 
 **AdtUtils read type safety:**
 `readObjectMetadata` and `readObjectSource` take the codes of the tables they
@@ -1206,7 +1249,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^23.0.4`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^23.1.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 

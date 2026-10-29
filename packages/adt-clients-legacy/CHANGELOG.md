@@ -56,6 +56,12 @@ of a 0.x package, so a minor.
   compile on `AdtClientLegacy`.
 - `getUtils().getTypeStructure()` is served, inherited (7.40's answer is in
   adt-clients' corpus).
+- **The generic ABAP Unit runner on 7.40**, `AbapUnitTestRunnerLegacy`
+  (`AdtExecutorLegacy.getAbapUnitTestRunner()`): `runSync(uris, { headers })`
+  is adt-clients' — one `POST /abapunit/testruns` with `<options>`; `run` of
+  an object or a package target, `getStatus` and `getResult` are refused
+  without a request (no `/abapunit/runs`) and do not compile on
+  `'basis740'`.
 
 ### Changed
 
@@ -64,7 +70,7 @@ of a 0.x package, so a minor.
   second reference, measured on S/4HANA 2025 and ABAP cloud only;
   `AdtFunctionGroupLegacy.activate()` keeps the one reference.
 - Peer and dev dependency `@mcp-abap-adt/adt-clients` `^38.0.0` (was
-  `^37.4.0`); `@mcp-abap-adt/interfaces-adt` `^23.0.4` (was `^20.1.0`);
+  `^37.4.0`); `@mcp-abap-adt/interfaces-adt` `^23.1.0` (was `^20.1.0`);
   dev `@mcp-abap-adt/adt-strategies` `^0.16.0` (was `^0.10.0`).
 - `legacyConsumerContract.test.ts` proves that a contract composed from
   interfaces-adt alone accepts `AdtClientLegacy`; `legacyVariantGates.test.ts`
