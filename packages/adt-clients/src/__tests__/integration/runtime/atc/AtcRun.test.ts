@@ -211,7 +211,9 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestStep(`run ATC over class ${className}, waiting`, testsLogger);
         // Three calls since 19.0.0, because a run is three requests: the
         // system's check variant, a worklist for it, then the run.
-        const atc = new AdtAtc(connection, libraryLogger, atcReading);
+        const atc = new AdtAtc(connection, libraryLogger, {
+          results: atcReading,
+        });
         const variant = await checkVariantFor(atc, testCase);
         const worklistId = expectResult(
           await atc.createWorklist(variant, { analyse: analyseException }),
@@ -299,7 +301,9 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
       const intervalMs = POLL_INTERVAL_MS;
 
       try {
-        const atc = new AdtAtc(connection, libraryLogger, atcReading);
+        const atc = new AdtAtc(connection, libraryLogger, {
+          results: atcReading,
+        });
 
         logTestStep(`start ATC run over class ${className}`, testsLogger);
         const variant = await checkVariantFor(atc, testCase);

@@ -22,6 +22,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
@@ -95,13 +96,15 @@ export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
 {
   readonly kind = 'profiler' as const;
 
+  private readonly results: R;
+
   constructor(
     private readonly connection: IAbapConnection,
     readonly _logger: ILogger,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    private readonly results: R,
-  ) {}
+    options: AdtHandlerOptions<R>,
+  ) {
+    this.results = options.results;
+  }
 
   /** What traces exist. */
   async list<E extends IAdtError = IAdtError>(

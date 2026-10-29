@@ -150,10 +150,12 @@ describe('a feed call', () => {
   };
   const logger = { debug() {}, info() {}, warn() {}, error() {} };
   const feeds = new FeedRepository(connection as never, logger, {
-    feeds: feedDescriptors,
-    variants: feedVariants,
-    entries: feedEntries,
-  } as never);
+    results: {
+      feeds: feedDescriptors,
+      variants: feedVariants,
+      entries: feedEntries,
+    } as never,
+  });
 
   it('reads an exception document as [] when nothing judges it', async () => {
     const answer = await feeds.list();

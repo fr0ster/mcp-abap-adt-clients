@@ -18,7 +18,7 @@ import type {
   ISnapshotReferencesOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {
@@ -77,13 +77,14 @@ export class MemorySnapshots<
 {
   readonly kind = 'memorySnapshots' as const;
 
+  private readonly results: R;
+
   constructor(
     private readonly connection: IAbapConnection,
-    _logger: ILogger | undefined,
-    // Required: no getter hands this out, so the caller passes the
-    // results — `memorySnapshotsDocuments` for the shipped ones.
-    private readonly results: R,
-  ) {}
+    options: AdtHandlerOptions<R, 'logger'>,
+  ) {
+    this.results = options.results;
+  }
 
   private reading<K extends keyof IMemorySnapshotsResults>(
     key: K,

@@ -46,7 +46,9 @@ const SE38 = '/sap/bc/adt/vit/wb/object_type/trant/object_name/SE38';
 describe('AdtUtilsLegacy.getObjectProperties', () => {
   it('answers an unsupported operation and asks nothing', async () => {
     const { connection, requests } = recording();
-    const utils = new AdtUtilsLegacy(connection, logger, utilDocuments);
+    const utils = new AdtUtilsLegacy(connection, logger, {
+      results: utilDocuments,
+    });
 
     const answer = await utils.getObjectProperties(SE38);
 

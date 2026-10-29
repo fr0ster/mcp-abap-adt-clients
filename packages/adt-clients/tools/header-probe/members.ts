@@ -136,7 +136,7 @@ export function clientsOn(
     adt: new AdtClient(connection, undefined, options),
     runtime: new AdtRuntimeClient(connection),
     executor: new AdtExecutor(connection),
-    abapGit: new AdtAbapGitClient(connection, undefined, abapGitDocuments),
+    abapGit: new AdtAbapGitClient(connection, { results: abapGitDocuments }),
     more: Object.fromEntries(
       CLIENT_SETS.flatMap((set) =>
         Object.entries(set.build(connection, options)).map(([key, client]) => [

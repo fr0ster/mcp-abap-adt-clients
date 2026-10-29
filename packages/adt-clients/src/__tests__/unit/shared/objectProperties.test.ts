@@ -45,7 +45,7 @@ const SE38 = '/sap/bc/adt/vit/wb/object_type/trant/object_name/SE38';
 describe('AdtUtils.getObjectProperties', () => {
   it('sends one GET with the uri encoded and the measured Accept', async () => {
     const { connection, requests } = recording();
-    const utils = new AdtUtils(connection, logger, utilDocuments);
+    const utils = new AdtUtils(connection, logger, { results: utilDocuments });
 
     const answer = await utils.getObjectProperties(SE38);
 
@@ -69,7 +69,7 @@ describe('AdtUtils.getObjectProperties', () => {
 
   it('encodes characters a uri query would otherwise split on', async () => {
     const { connection, requests } = recording();
-    const utils = new AdtUtils(connection, logger, utilDocuments);
+    const utils = new AdtUtils(connection, logger, { results: utilDocuments });
 
     await utils.getObjectProperties('/sap/bc/adt/x?a=1&b=/c d');
 

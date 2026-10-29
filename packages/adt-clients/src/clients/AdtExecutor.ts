@@ -71,11 +71,10 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   getClassExecutor(
     results: IClassExecutorResults = classExecutorDocuments,
   ): ClassExecutor<IClassExecutorResults, V> {
-    return new ClassExecutor<IClassExecutorResults, V>(
-      this.connection,
-      this.logger,
+    return new ClassExecutor<IClassExecutorResults, V>(this.connection, {
+      logger: this.logger,
       results,
-    );
+    });
   }
 
   /**
@@ -91,11 +90,10 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   getClassTestRunner(
     results: IClassTestRunnerResults = classTestRunnerDocuments,
   ): ClassTestRunner<IClassTestRunnerResults, V> {
-    return new ClassTestRunner<IClassTestRunnerResults, V>(
-      this.connection,
-      this.logger,
+    return new ClassTestRunner<IClassTestRunnerResults, V>(this.connection, {
+      logger: this.logger,
       results,
-    );
+    });
   }
 
   getProgramExecutor(): ProgramExecutor<typeof programExecutorDocuments, V>;
@@ -105,11 +103,10 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   getProgramExecutor(
     results: IProgramExecutorResults = programExecutorDocuments,
   ): ProgramExecutor<IProgramExecutorResults, V> {
-    return new ProgramExecutor<IProgramExecutorResults, V>(
-      this.connection,
-      this.logger,
+    return new ProgramExecutor<IProgramExecutorResults, V>(this.connection, {
+      logger: this.logger,
       results,
-    );
+    });
   }
 
   /**
@@ -129,8 +126,7 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   ): ProgramTestRunner<IProgramTestRunnerResults, V> {
     return new ProgramTestRunner<IProgramTestRunnerResults, V>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -150,8 +146,7 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   ): FunctionGroupTestRunner<IFunctionGroupTestRunnerResults, V> {
     return new FunctionGroupTestRunner<IFunctionGroupTestRunnerResults, V>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -171,8 +166,7 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   ): FunctionModuleTestRunner<IFunctionModuleTestRunnerResults, V> {
     return new FunctionModuleTestRunner<IFunctionModuleTestRunnerResults, V>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -197,8 +191,7 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
   ): AbapUnitTestRunner<IAbapUnitTestRunnerResults, V> {
     return new AbapUnitTestRunner<IAbapUnitTestRunnerResults, V>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 }

@@ -53,11 +53,10 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   override getClassExecutor(
     results: IClassExecutorResults = classExecutorDocuments,
   ): ClassExecutorLegacy<IClassExecutorResults> {
-    return new ClassExecutorLegacy<IClassExecutorResults>(
-      this.connection,
-      this.logger,
+    return new ClassExecutorLegacy<IClassExecutorResults>(this.connection, {
+      logger: this.logger,
       results,
-    );
+    });
   }
 
   /** Runs and the trace type lists refuse on 7.40; the trace schedule is inherited. */
@@ -70,11 +69,10 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   override getProgramExecutor(
     results: IProgramExecutorResults = programExecutorDocuments,
   ): ProgramExecutorLegacy<IProgramExecutorResults> {
-    return new ProgramExecutorLegacy<IProgramExecutorResults>(
-      this.connection,
-      this.logger,
+    return new ProgramExecutorLegacy<IProgramExecutorResults>(this.connection, {
+      logger: this.logger,
       results,
-    );
+    });
   }
 
   override getClassTestRunner(): ClassTestRunnerLegacy<
@@ -86,11 +84,10 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   override getClassTestRunner(
     results: IClassTestRunnerResults = classTestRunnerDocuments,
   ): ClassTestRunnerLegacy<IClassTestRunnerResults> {
-    return new ClassTestRunnerLegacy<IClassTestRunnerResults>(
-      this.connection,
-      this.logger,
+    return new ClassTestRunnerLegacy<IClassTestRunnerResults>(this.connection, {
+      logger: this.logger,
       results,
-    );
+    });
   }
 
   override getProgramTestRunner(): ProgramTestRunnerLegacy<
@@ -104,8 +101,7 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   ): ProgramTestRunnerLegacy<IProgramTestRunnerResults> {
     return new ProgramTestRunnerLegacy<IProgramTestRunnerResults>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -120,8 +116,7 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   ): FunctionGroupTestRunnerLegacy<IFunctionGroupTestRunnerResults> {
     return new FunctionGroupTestRunnerLegacy<IFunctionGroupTestRunnerResults>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -136,8 +131,7 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   ): FunctionModuleTestRunnerLegacy<IFunctionModuleTestRunnerResults> {
     return new FunctionModuleTestRunnerLegacy<IFunctionModuleTestRunnerResults>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -156,8 +150,7 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   ): AbapUnitTestRunnerLegacy<IAbapUnitTestRunnerResults> {
     return new AbapUnitTestRunnerLegacy<IAbapUnitTestRunnerResults>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 }

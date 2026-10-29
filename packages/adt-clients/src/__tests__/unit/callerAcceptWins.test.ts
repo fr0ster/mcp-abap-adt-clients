@@ -55,14 +55,10 @@ const members: {
     name: 'AdtClass.readMetadata (with content types)',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtClass(
-          connection,
-          undefined,
-          undefined,
+        await new AdtClass(connection, {
           contentTypes,
-          undefined,
-          classDocuments,
-        ).readMetadata(
+          results: classDocuments,
+        }).readMetadata(
           { className: 'ZCL_X' },
           accept === undefined ? {} : { accept },
         ),
@@ -74,14 +70,10 @@ const members: {
     name: 'AdtLocalTypes.readMetadata (with content types)',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtLocalTypes(
-          connection,
-          undefined,
-          undefined,
+        await new AdtLocalTypes(connection, {
           contentTypes,
-          undefined,
-          classDocuments,
-        ).readMetadata(
+          results: classDocuments,
+        }).readMetadata(
           { className: 'ZCL_X' },
           accept === undefined ? {} : { accept },
         ),
@@ -93,13 +85,9 @@ const members: {
     name: 'AdtAuthorizationField.readMetadata',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtAuthorizationField(
-          connection,
-          undefined,
-          undefined,
-          undefined,
-          authorizationFieldDocuments,
-        ).readMetadata(
+        await new AdtAuthorizationField(connection, {
+          results: authorizationFieldDocuments,
+        }).readMetadata(
           { authorizationFieldName: 'ZAUTH' },
           accept === undefined ? {} : { accept },
         ),
@@ -111,14 +99,9 @@ const members: {
     name: 'AdtFunctionInclude.readMetadata',
     read: async (connection, accept) =>
       expectResult(
-        await new AdtFunctionInclude(
-          connection,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          functionIncludeDocuments,
-        ).readMetadata(
+        await new AdtFunctionInclude(connection, {
+          results: functionIncludeDocuments,
+        }).readMetadata(
           { functionGroupName: 'ZFG', includeName: 'LZFGF01' },
           accept === undefined ? {} : { accept },
         ),

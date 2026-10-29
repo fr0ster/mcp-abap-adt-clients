@@ -38,21 +38,15 @@ describe('message class create', () => {
 
   it('carries the context responsible and master system', async () => {
     const { conn, bodies } = recorder();
-    await new AdtMessageClass(
-      conn,
-      undefined,
-      CTX,
-      undefined,
-      messageClassDocuments,
-    ).create(config, {
+    await new AdtMessageClass(conn, {
+      systemContext: CTX,
+      results: messageClassDocuments,
+    }).create(config, {
       headers: headersOf(
-        new AdtMessageClass(
-          conn,
-          undefined,
-          CTX,
-          undefined,
-          messageClassDocuments,
-        ),
+        new AdtMessageClass(conn, {
+          systemContext: CTX,
+          results: messageClassDocuments,
+        }),
         'create',
       ),
     });
@@ -62,27 +56,21 @@ describe('message class create', () => {
 
   it('writes neither attribute for an empty-string context', async () => {
     const { conn, bodies } = recorder();
-    await new AdtMessageClass(
-      conn,
-      undefined,
-      {
+    await new AdtMessageClass(conn, {
+      systemContext: {
         responsible: '',
         masterSystem: '',
       },
-      undefined,
-      messageClassDocuments,
-    ).create(config, {
+      results: messageClassDocuments,
+    }).create(config, {
       headers: headersOf(
-        new AdtMessageClass(
-          conn,
-          undefined,
-          {
+        new AdtMessageClass(conn, {
+          systemContext: {
             responsible: '',
             masterSystem: '',
           },
-          undefined,
-          messageClassDocuments,
-        ),
+          results: messageClassDocuments,
+        }),
         'create',
       ),
     });
@@ -92,24 +80,15 @@ describe('message class create', () => {
 
   it('writes neither attribute when the context has none', async () => {
     const { conn, bodies } = recorder();
-    await new AdtMessageClass(
-      conn,
-      undefined,
-      undefined,
-      undefined,
-      messageClassDocuments,
-    ).create(config, {
-      headers: headersOf(
-        new AdtMessageClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          messageClassDocuments,
+    await new AdtMessageClass(conn, { results: messageClassDocuments }).create(
+      config,
+      {
+        headers: headersOf(
+          new AdtMessageClass(conn, { results: messageClassDocuments }),
+          'create',
         ),
-        'create',
-      ),
-    });
+      },
+    );
     expect(bodies[0]).not.toContain('adtcore:responsible');
     expect(bodies[0]).not.toContain('adtcore:masterSystem');
   });
@@ -219,12 +198,9 @@ describe('behavior implementation create through the client', () => {
 
   it('the class itself, without a context, sends neither', async () => {
     const { conn, bodies } = recorder();
-    await new AdtBehaviorImplementation(
-      conn,
-      undefined,
-      undefined,
-      classDocuments,
-    ).create(
+    await new AdtBehaviorImplementation(conn, {
+      results: classDocuments,
+    }).create(
       {
         className: 'ZBP_I_X',
         packageName: 'ZPKG',
@@ -232,12 +208,7 @@ describe('behavior implementation create through the client', () => {
       } as never,
       {
         headers: headersOf(
-          new AdtBehaviorImplementation(
-            conn,
-            undefined,
-            undefined,
-            classDocuments,
-          ),
+          new AdtBehaviorImplementation(conn, { results: classDocuments }),
           'create',
         ),
       },
@@ -252,15 +223,12 @@ describe('include create', () => {
 
   it('carries the context responsible and master system', async () => {
     const { conn, bodies } = recorder();
-    await new AdtInclude(
-      conn,
-      undefined,
-      undefined,
-      includeDocuments,
-      CTX,
-    ).create(config, {
+    await new AdtInclude(conn, {
+      results: includeDocuments,
+      systemContext: CTX,
+    }).create(config, {
       headers: headersOf(
-        new AdtInclude(conn, undefined, undefined, includeDocuments, CTX),
+        new AdtInclude(conn, { results: includeDocuments, systemContext: CTX }),
         'create',
       ),
     });

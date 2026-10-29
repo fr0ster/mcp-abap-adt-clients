@@ -85,9 +85,12 @@ function makeConn(handler?: (call: Call) => Partial<IAdtWireResponse>) {
 describe('ClassTestRunner — running', () => {
   it('named test classes: one POST to /runs, and the id from the header', async () => {
     const { conn, calls } = makeConn(() => RUN_STARTED);
-    const runner = new ClassTestRunner(conn, createLibraryLogger(), {
-      ...classTestRunnerDocuments,
-      run: unitTestRunId,
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: {
+        ...classTestRunnerDocuments,
+        run: unitTestRunId,
+      },
     });
 
     const runId = expectResult(
@@ -104,11 +107,10 @@ describe('ClassTestRunner — running', () => {
 
   it('a class name runs the whole class, by object', async () => {
     const { conn, calls } = makeConn(() => RUN_STARTED);
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.run('zcl_tests');
 
@@ -121,11 +123,10 @@ describe('ClassTestRunner — running', () => {
 
   it('asking about a run is a separate request, taking the id', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.getStatus('00155D-3F2A', false);
     await runner.getResult('00155D-3F2A');
@@ -138,11 +139,10 @@ describe('ClassTestRunner — running', () => {
 
   it('manages nothing: no create, update, delete or lock', () => {
     const { conn } = makeConn();
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     for (const name of ['create', 'read', 'update', 'delete', 'lock']) {
       expect(name in runner).toBe(false);
@@ -168,7 +168,10 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 
   it('one POST to /testruns, application/xml both ways, read by `result`', async () => {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunner(conn, createLibraryLogger(), results);
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results,
+    });
 
     const answer = expectResult(await runner.runSync('zcl_tests'), 'runSync');
 
@@ -184,11 +187,10 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 
   it('the run configuration names the class by URI, with the default options', async () => {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.runSync('zcl_tests');
 
@@ -213,11 +215,10 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 
   it('the body is pinned byte for byte', async () => {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.runSync('ZCL_TESTS');
 
@@ -226,11 +227,10 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 
   it('scope, risk levels and durations are sent as given', async () => {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.runSync('ZCL_TESTS', {
       title: 'not in this format',
@@ -255,11 +255,10 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 
   it('test definitions run each distinct container whole', async () => {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.runSync([
       { containerClass: 'ZCL_A', testClass: 'LTCL_1' },
@@ -280,11 +279,10 @@ describe('ClassTestRunner — running synchronously (runSync)', () => {
 
   it('a failing test is the caller’s analyse to judge, not the runner’s', async () => {
     const { conn } = makeConn(() => ({ data: RUN_RESULT }));
-    const runner = new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     const asItCame = expectResult(
       await runner.runSync('ZCL_TESTS'),

@@ -3,7 +3,8 @@
  *
  * Standalone top-level class — NOT a factory on AdtClient (which is
  * reserved for IAdtObject<Config, State> implementations only).
- * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, results)
+ * Consumers instantiate directly:
+ * `new AdtAbapGitClient(connection, { logger, results })`
  * (`abapGitDocuments` for the shipped result set).
  *
  * Implements IAdtAbapGitClient. HTTP operations are delegated to
@@ -27,6 +28,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';
@@ -62,13 +64,11 @@ export class AdtAbapGitClient<
 
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    // The options (`contentTypeVersion`, which chose what `link` and `pull`
-    // sent) are gone since 36.0.0: those members send the caller's `headers`.
-    // Required: no getter hands this out, so the caller passes the
-    // results — `abapGitDocuments` for the shipped ones.
-    results: R,
+    // `contentTypeVersion`, which chose what `link` and `pull` sent, is gone
+    // since 36.0.0: those members send the caller's `headers`.
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;

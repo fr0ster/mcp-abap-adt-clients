@@ -60,11 +60,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
   beforeAll(async () => {
     try {
       connection = await createTestConnection(createConnectionLogger());
-      abapGit = new AdtAbapGitClient(
-        connection,
-        createLibraryLogger(),
+      abapGit = new AdtAbapGitClient(connection, {
+        logger: createLibraryLogger(),
         results,
-      );
+      });
     } catch (err) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.

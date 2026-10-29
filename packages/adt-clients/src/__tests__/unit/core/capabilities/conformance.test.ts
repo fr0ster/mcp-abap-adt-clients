@@ -35,32 +35,22 @@ const cases = [
   {
     name: 'AdtClass',
     make: (c: any) =>
-      new AdtClass(
-        c,
-        noopLogger,
-        undefined,
-        undefined,
-        undefined,
-        classDocuments,
-      ),
+      new AdtClass(c, { logger: noopLogger, results: classDocuments }),
     cfg: { className: 'ZC' },
   },
   {
     name: 'AdtDomain',
     make: (c: any) =>
-      new AdtDomain(c, noopLogger, undefined, undefined, domainDocuments),
+      new AdtDomain(c, { logger: noopLogger, results: domainDocuments }),
     cfg: { domainName: 'ZD' },
   },
   {
     name: 'AdtServiceDefinition',
     make: (c: any) =>
-      new AdtServiceDefinition(
-        c,
-        noopLogger,
-        undefined,
-        undefined,
-        serviceDefinitionDocuments,
-      ),
+      new AdtServiceDefinition(c, {
+        logger: noopLogger,
+        results: serviceDefinitionDocuments,
+      }),
     cfg: { serviceDefinitionName: 'ZS' },
   },
 ];

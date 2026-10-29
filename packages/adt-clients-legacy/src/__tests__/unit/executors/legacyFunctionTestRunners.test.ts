@@ -45,16 +45,14 @@ describe.each([
 ] as const)('%s', (_label, Runner) => {
   it("refuses to poll or fetch without a request, with the class runner's reason", async () => {
     const { conn, calls } = makeConn();
-    const runner = new Runner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
-    const classRunner = new ClassTestRunnerLegacy(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new Runner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
+    const classRunner = new ClassTestRunnerLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const status = expectFailure(await runner.getStatus(), 'status');

@@ -107,12 +107,9 @@ describe('removeObject', () => {
   it('sends the useraction document the server was sent', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).removeObject(
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).removeObject(
       'DEVK905942',
       {
         name: 'ZMCP_BLD_FGR_H1',
@@ -122,7 +119,7 @@ describe('removeObject', () => {
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'removeObject',
         ),
       },
@@ -151,12 +148,9 @@ describe('removeObject', () => {
   it('sends the headers the capture carried, odd as they look', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).removeObject(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).removeObject(
       'DEVK905942',
       {
         name: 'ZCL_X',
@@ -165,7 +159,7 @@ describe('removeObject', () => {
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'removeObject',
         ),
       },
@@ -190,12 +184,9 @@ describe('removeObject', () => {
   it('always writes the position, since without it the server no-ops', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).removeObject(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).removeObject(
       'DEVK905942',
       {
         name: 'ZCL_X',
@@ -204,7 +195,7 @@ describe('removeObject', () => {
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'removeObject',
         ),
       },
@@ -220,12 +211,9 @@ describe('removeObject', () => {
   it('escapes what would otherwise break the document', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).removeObject(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).removeObject(
       'DEVK905942',
       {
         name: 'ZCL_X',
@@ -235,7 +223,7 @@ describe('removeObject', () => {
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'removeObject',
         ),
       },
@@ -252,12 +240,7 @@ describe('addObject', () => {
   it('sends the same shape with the other useraction', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).addObject(
+    await new AdtRequest(connection, { results: transportDocuments }).addObject(
       'DEVK907073',
       {
         name: 'Z_CL_000001',
@@ -265,7 +248,7 @@ describe('addObject', () => {
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'addObject',
         ),
       },
@@ -292,12 +275,9 @@ describe('addObject', () => {
       throw error;
     });
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).addObject(
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).addObject(
       'DEVK907073',
       {
         name: 'Z_CL_000001',
@@ -305,7 +285,7 @@ describe('addObject', () => {
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'addObject',
         ),
       },
@@ -321,14 +301,11 @@ describe('createTask', () => {
       answering(NEW_TASK, 201),
     );
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).createTask('DEVK905941', {
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).createTask('DEVK905941', {
       headers: headersOf(
-        new AdtRequest(connection, undefined, undefined, transportDocuments),
+        new AdtRequest(connection, { results: transportDocuments }),
         'createTask',
       ),
       targetUser: 'SAPUSER01',
@@ -354,14 +331,11 @@ describe('createTask', () => {
   it('answers the new number, which is the point of calling it', async () => {
     const { connection } = connectionOver(() => answering(NEW_TASK, 201));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).createTask('DEVK905941', {
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).createTask('DEVK905941', {
       headers: headersOf(
-        new AdtRequest(connection, undefined, undefined, transportParsing),
+        new AdtRequest(connection, { results: transportParsing }),
         'createTask',
       ),
       targetUser: 'SAPUSER01',
@@ -396,14 +370,11 @@ describe('createTask', () => {
       answering(NEW_TASK, 200),
     );
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).createTask('DEVK905941', {
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).createTask('DEVK905941', {
       headers: headersOf(
-        new AdtRequest(connection, undefined, undefined, transportDocuments),
+        new AdtRequest(connection, { results: transportDocuments }),
         'createTask',
       ),
       targetUser: 'SAPUSER01',
@@ -417,12 +388,9 @@ describe('readActionLog', () => {
   it('reads the log with the media type that answers it', async () => {
     const { connection, calls } = connectionOver(() => answering(ACTION_LOG));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).readActionLog('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).readActionLog('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the log');
     expect(calls[0].method).toBe('GET');
@@ -446,12 +414,9 @@ describe('readObjects', () => {
   it('asks for the representation that carries the list', async () => {
     const { connection, calls } = connectionOver(() => answering(OBJECT_LIST));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).readObjects('DEVK905942');
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).readObjects('DEVK905942');
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('GET');
@@ -468,12 +433,9 @@ describe('readObjects', () => {
   it('answers the entries with the positions removeObject needs', async () => {
     const { connection } = connectionOver(() => answering(OBJECT_LIST));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).readObjects('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
@@ -507,12 +469,9 @@ describe('readObjects', () => {
   it('keeps the position a string, leading zeros and all', async () => {
     const { connection } = connectionOver(() => answering(OBJECT_LIST));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).readObjects('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     expect(answer.getResult().value[0].position).toBe('000025');
@@ -541,12 +500,9 @@ describe('readObjects', () => {
       ),
     );
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).readObjects('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const [entry] = answer.getResult().value;
@@ -566,12 +522,9 @@ describe('readObjects', () => {
       ),
     );
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).readObjects('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     expect(answer.getResult().value).toEqual([]);
@@ -586,12 +539,9 @@ describe('readObjects', () => {
   it('finds the entries wherever the document keeps them', async () => {
     const { connection } = connectionOver(() => answering(REMOVED));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).readObjects('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
@@ -618,14 +568,11 @@ describe('changeTaskType', () => {
   it('nests the type under tm:task, which is what the server reads', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).changeTaskType('DEVK905943', ADT_TASK_TYPE.developmentCorrection, {
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).changeTaskType('DEVK905943', ADT_TASK_TYPE.developmentCorrection, {
       headers: headersOf(
-        new AdtRequest(connection, undefined, undefined, transportDocuments),
+        new AdtRequest(connection, { results: transportDocuments }),
         'changeTaskType',
       ),
     });
@@ -646,14 +593,11 @@ describe('changeTaskType', () => {
   it('carries the headers its user-action siblings carry', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).changeTaskType('DEVK905943', ADT_TASK_TYPE.repair, {
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).changeTaskType('DEVK905943', ADT_TASK_TYPE.repair, {
       headers: headersOf(
-        new AdtRequest(connection, undefined, undefined, transportDocuments),
+        new AdtRequest(connection, { results: transportDocuments }),
         'changeTaskType',
       ),
     });
@@ -670,14 +614,11 @@ describe('changeTaskType', () => {
     async (type) => {
       const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-      await new AdtRequest(
-        connection,
-        undefined,
-        undefined,
-        transportDocuments,
-      ).changeTaskType('DEVK905943', type, {
+      await new AdtRequest(connection, {
+        results: transportDocuments,
+      }).changeTaskType('DEVK905943', type, {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'changeTaskType',
         ),
       });
@@ -696,12 +637,9 @@ describe('sortAndCompress', () => {
   it('posts to the task with no body, as Eclipse does', async () => {
     const { connection, calls } = connectionOver(() => answering(''));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).sortAndCompress('DEVK905943');
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).sortAndCompress('DEVK905943');
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
@@ -719,12 +657,9 @@ describe('sortAndCompress', () => {
   it('leaves the verdict to the strategy the caller passes', async () => {
     const { connection } = connectionOver(() => answering(''));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).sortAndCompress('DEVK905943', {
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).sortAndCompress('DEVK905943', {
       analyse: () => ({ origin: 'refusal', message: 'not this time' }),
     });
 
@@ -742,12 +677,9 @@ describe('moveObjects', () => {
   it('posts to the source and names the target in the document', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).moveObjects(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).moveObjects(
       'DEVK905943',
       'DEVK907073',
       [
@@ -760,7 +692,7 @@ describe('moveObjects', () => {
       ],
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'moveObjects',
         ),
       },
@@ -788,12 +720,9 @@ describe('moveObjects', () => {
   it('sends every entry it is given, each with its position', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).moveObjects(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).moveObjects(
       'DEVK905943',
       'DEVK907073',
       [
@@ -802,7 +731,7 @@ describe('moveObjects', () => {
       ],
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'moveObjects',
         ),
       },
@@ -823,12 +752,9 @@ describe('readObjects and createTask by default', () => {
   it('answers the object list as it arrived', async () => {
     const { connection } = connectionOver(() => answering(OBJECT_LIST));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).readObjects('DEVK905942');
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).readObjects('DEVK905942');
 
     if (!answer.ok) throw new Error('expected the document');
     expect(answer.getResult().value).toBe(OBJECT_LIST);
@@ -837,14 +763,11 @@ describe('readObjects and createTask by default', () => {
   it('answers the created task as it arrived', async () => {
     const { connection } = connectionOver(() => answering(NEW_TASK, 201));
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).createTask('DEVK905941', {
+    const answer = await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).createTask('DEVK905941', {
       headers: headersOf(
-        new AdtRequest(connection, undefined, undefined, transportDocuments),
+        new AdtRequest(connection, { results: transportDocuments }),
         'createTask',
       ),
       targetUser: 'SAPUSER01',

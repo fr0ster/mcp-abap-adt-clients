@@ -14,14 +14,10 @@ describe('AdtFunctionGroupLegacy.activate', () => {
     const conn = new RecordingConnection();
     const sent = conn.sent;
 
-    await new AdtFunctionGroupLegacy(
-      conn,
-      createLibraryLogger(),
-      undefined,
-      undefined,
-      undefined,
-      functionGroupDocuments,
-    ).activate(
+    await new AdtFunctionGroupLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: functionGroupDocuments,
+    }).activate(
       { functionGroupName: 'ZFG_ACT' },
       {
         headers: { accept: 'application/xml', contentType: 'application/xml' },

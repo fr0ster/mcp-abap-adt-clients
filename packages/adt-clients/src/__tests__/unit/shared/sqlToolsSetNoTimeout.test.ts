@@ -74,13 +74,13 @@ const calls: Array<[string, (c: IAbapConnection) => Promise<unknown>]> = [
   [
     'AdtUtils.getSqlQuery',
     (c) =>
-      new AdtUtils(c, logger, utilDocuments).getSqlQuery(
+      new AdtUtils(c, logger, { results: utilDocuments }).getSqlQuery(
         {
           sql_query: 'SELECT * FROM T000',
         },
         {
           headers: headersOf(
-            new AdtUtils(c, logger, utilDocuments),
+            new AdtUtils(c, logger, { results: utilDocuments }),
             'getSqlQuery',
           ),
         },
@@ -89,14 +89,14 @@ const calls: Array<[string, (c: IAbapConnection) => Promise<unknown>]> = [
   [
     'AdtUtils.getTableContents',
     (c) =>
-      new AdtUtils(c, logger, utilDocuments).getTableContents(
+      new AdtUtils(c, logger, { results: utilDocuments }).getTableContents(
         {
           table_name: 't000',
           sql_query: 'SELECT T000~MANDT FROM T000',
         },
         {
           headers: headersOf(
-            new AdtUtils(c, logger, utilDocuments),
+            new AdtUtils(c, logger, { results: utilDocuments }),
             'getTableContents',
           ),
         },

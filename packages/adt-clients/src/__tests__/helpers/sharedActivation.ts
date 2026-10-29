@@ -45,8 +45,10 @@ export async function activateSharedGroup(
 ): Promise<void> {
   const what = objects.map((o) => `${o.type} ${o.name}`).join(', ');
   const utils = new AdtUtils(connection, logger, {
-    ...utilDocuments,
-    activation: wireItself,
+    results: {
+      ...utilDocuments,
+      activation: wireItself,
+    },
   });
   const started = await utils.activateObjectsGroup(objects, undefined, {
     analyse: analyseException,

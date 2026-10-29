@@ -22,11 +22,9 @@ describe('GatewayErrorLog', () => {
 
   it('list() delegates to /sap/bc/adt/gw/errorlog', async () => {
     const connection = createConnectionMock();
-    const gwLog = new GatewayErrorLog(
-      connection,
-      createLogger(),
-      gatewayErrorLogDocuments,
-    );
+    const gwLog = new GatewayErrorLog(connection, createLogger(), {
+      results: gatewayErrorLogDocuments,
+    });
 
     await gwLog.list();
 
@@ -40,11 +38,9 @@ describe('GatewayErrorLog', () => {
 
   it('list() with maxResults passes $top parameter', async () => {
     const connection = createConnectionMock();
-    const gwLog = new GatewayErrorLog(
-      connection,
-      createLogger(),
-      gatewayErrorLogDocuments,
-    );
+    const gwLog = new GatewayErrorLog(connection, createLogger(), {
+      results: gatewayErrorLogDocuments,
+    });
 
     await gwLog.list({ maxResults: 20 });
 
@@ -54,11 +50,9 @@ describe('GatewayErrorLog', () => {
 
   it('getById() encodes error type in URL', async () => {
     const connection = createConnectionMock();
-    const gwLog = new GatewayErrorLog(
-      connection,
-      createLogger(),
-      gatewayErrorLogDocuments,
-    );
+    const gwLog = new GatewayErrorLog(connection, createLogger(), {
+      results: gatewayErrorLogDocuments,
+    });
 
     await gwLog.getById('Frontend Error', '66BF65D1A9DD1FD18D97D52042DF3925');
 
@@ -71,11 +65,9 @@ describe('GatewayErrorLog', () => {
 
   it('getById() works with simple error type', async () => {
     const connection = createConnectionMock();
-    const gwLog = new GatewayErrorLog(
-      connection,
-      createLogger(),
-      gatewayErrorLogDocuments,
-    );
+    const gwLog = new GatewayErrorLog(connection, createLogger(), {
+      results: gatewayErrorLogDocuments,
+    });
 
     await gwLog.getById('BackendError', 'ABC123');
 

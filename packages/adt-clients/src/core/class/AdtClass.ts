@@ -1,4 +1,5 @@
 import { withCallTimeout } from '../../utils/callTimeout';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import {
   getClassEnhancementElements,
   getClassEnhancementOptions,
@@ -28,7 +29,6 @@ import type {
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
-  IAdtContentTypes,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
@@ -41,7 +41,6 @@ import type {
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
-  IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
@@ -49,12 +48,10 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { writeObjectDocument } from '../shared/documentWrite';
-import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClass } from './check';
@@ -102,17 +99,18 @@ export class AdtClass<
 {
   public readonly objectType: string = 'Class';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    systemContext: IAdtSystemContext | undefined,
-    contentTypes: IAdtContentTypes | undefined,
-    lockRegistry: LockRegistry | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    protected readonly results: R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
     super(connection, logger, systemContext, contentTypes, lockRegistry);
+    this.results = options.results;
   }
 
   /** Read the host's enhancement elements. */

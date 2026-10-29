@@ -14,14 +14,12 @@ import type {
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
-  IAdtContentTypes,
   IAdtError,
   IAdtHeaders,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
-  IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
   IClassResults,
@@ -29,12 +27,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant } from '../../clients/variant';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import type { LockRegistry } from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassMacros } from './check';
@@ -73,17 +70,18 @@ export class AdtLocalMacros<
 {
   public readonly objectType: string = 'LocalMacros';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    systemContext: IAdtSystemContext | undefined,
-    contentTypes: IAdtContentTypes | undefined,
-    lockRegistry: LockRegistry | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    protected readonly results: R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
     super(connection, logger, systemContext, contentTypes, lockRegistry);
+    this.results = options.results;
   }
 
   /** Syntax-check the source a caller is about to write. */

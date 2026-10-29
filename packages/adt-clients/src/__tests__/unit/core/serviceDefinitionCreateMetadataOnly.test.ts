@@ -33,13 +33,10 @@ function fakeConn(): { conn: IAbapConnection; calls: any[] } {
 describe('AdtServiceDefinition.create is metadata-only', () => {
   it('does not put source code in the create POST body', async () => {
     const { conn, calls } = fakeConn();
-    const handler = new AdtServiceDefinition(
-      conn,
+    const handler = new AdtServiceDefinition(conn, {
       logger,
-      undefined,
-      undefined,
-      serviceDefinitionDocuments,
-    );
+      results: serviceDefinitionDocuments,
+    });
 
     // The source can no longer be handed to `create` at all — the signature
     // refuses it, on the class as well as through the contract. The two calls

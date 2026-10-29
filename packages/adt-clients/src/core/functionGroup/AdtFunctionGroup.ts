@@ -47,11 +47,8 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
@@ -112,16 +109,17 @@ export class AdtFunctionGroup<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FunctionGroup';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    systemContext: IAdtSystemContext | undefined,
-    contentTypes: IAdtContentTypes | undefined,
-    lockRegistry: LockRegistry | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    protected readonly results: R,
+    options: AdtHandlerOptions<
+      R,
+      'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
+    >,
   ) {
+    const { logger, systemContext, contentTypes, lockRegistry } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

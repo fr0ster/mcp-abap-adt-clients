@@ -46,6 +46,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
@@ -103,14 +104,14 @@ export class AdtServiceBinding<
 
   public readonly objectType: string = 'ServiceBinding';
 
+  private readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    systemContext: IAdtSystemContext | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    private readonly results: R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext'>,
   ) {
+    const { logger, systemContext } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

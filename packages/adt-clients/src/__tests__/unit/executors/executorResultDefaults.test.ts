@@ -87,9 +87,9 @@ function getterTypes(executor: AdtExecutor): void {
   // A constructor takes its results.
   const connection = new RecordingConnection();
   // @ts-expect-error -- results are required
-  new ClassTestRunner<Marked<typeof classTestRunnerDocuments>>(connection);
+  new ClassTestRunner<Marked<typeof classTestRunnerDocuments>>(connection, {});
   // @ts-expect-error -- results are required
-  new ClassExecutor(connection, undefined);
+  new ClassExecutor(connection, { logger: undefined });
 }
 
 describe('executor getters and runner constructors', () => {

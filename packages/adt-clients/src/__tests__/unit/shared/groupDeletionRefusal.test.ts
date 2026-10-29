@@ -73,7 +73,9 @@ const ONE_PACKAGE: IAdtGroupReference<'DEVC/K'>[] = [
 
 describe('deleteObjectsGroup', () => {
   it('answers the document as it came when no analyse is given', async () => {
-    const utils = new AdtUtils(answering(NOT_DELETED), logger, utilDocuments);
+    const utils = new AdtUtils(answering(NOT_DELETED), logger, {
+      results: utilDocuments,
+    });
 
     const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
       headers: headersOf(utils, 'deleteObjectsGroup'),
@@ -87,7 +89,9 @@ describe('deleteObjectsGroup', () => {
   });
 
   it('answers a failure through analyseDeletion when the objects were not deleted', async () => {
-    const utils = new AdtUtils(answering(NOT_DELETED), logger, utilDocuments);
+    const utils = new AdtUtils(answering(NOT_DELETED), logger, {
+      results: utilDocuments,
+    });
 
     const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
       headers: headersOf(utils, 'deleteObjectsGroup'),
@@ -109,7 +113,9 @@ describe('deleteObjectsGroup', () => {
   });
 
   it('answers a result when they were', async () => {
-    const utils = new AdtUtils(answering(DELETED), logger, utilDocuments);
+    const utils = new AdtUtils(answering(DELETED), logger, {
+      results: utilDocuments,
+    });
 
     const response = await utils.deleteObjectsGroup(
       [{ name: 'ZGONE', type: 'CLAS/OC' }],
@@ -126,7 +132,9 @@ describe('deleteObjectsGroup', () => {
 
 describe('checkDeletionGroup', () => {
   it('answers a result when the objects cannot be deleted', async () => {
-    const utils = new AdtUtils(answering(NOT_DELETABLE), logger, utilDocuments);
+    const utils = new AdtUtils(answering(NOT_DELETABLE), logger, {
+      results: utilDocuments,
+    });
 
     const response = await utils.checkDeletionGroup(ONE_PACKAGE, {
       headers: headersOf(utils, 'checkDeletionGroup'),
@@ -155,15 +163,14 @@ describe('the package URI the group operations ask about', () => {
       }),
     } as unknown as IAbapConnection;
 
-    await new AdtUtils(connection, logger, utilDocuments).checkDeletionGroup(
-      ONE_PACKAGE,
-      {
-        headers: headersOf(
-          new AdtUtils(connection, logger, utilDocuments),
-          'checkDeletionGroup',
-        ),
-      },
-    );
+    await new AdtUtils(connection, logger, {
+      results: utilDocuments,
+    }).checkDeletionGroup(ONE_PACKAGE, {
+      headers: headersOf(
+        new AdtUtils(connection, logger, { results: utilDocuments }),
+        'checkDeletionGroup',
+      ),
+    });
 
     // `DEVC/K` fell through 40 mapped types to a fallback that lowercases the
     // type code, producing `/sap/bc/adt/devc/k/…`. ADT answers that address with

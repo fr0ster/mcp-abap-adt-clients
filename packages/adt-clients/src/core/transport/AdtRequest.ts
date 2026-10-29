@@ -52,6 +52,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createTransport } from './create';
 import { checkTransportDeletion, deleteTransport } from './delete';
 import { listTransports, requestTransportSearchConfigurations } from './list';
@@ -129,14 +130,14 @@ export class AdtRequest<
   private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Request';
 
+  protected readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    systemContext: IAdtSystemContext | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    protected readonly results: R,
+    options: AdtHandlerOptions<R, 'logger' | 'systemContext'>,
   ) {
+    const { logger, systemContext } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

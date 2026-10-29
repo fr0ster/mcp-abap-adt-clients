@@ -22,7 +22,9 @@ describe('St05Trace', () => {
 
   it('getState() delegates to /sap/bc/adt/st05/trace/state', async () => {
     const connection = createConnectionMock();
-    const trace = new St05Trace(connection, createLogger(), st05TraceDocuments);
+    const trace = new St05Trace(connection, createLogger(), {
+      results: st05TraceDocuments,
+    });
 
     await trace.getState();
 
@@ -36,7 +38,9 @@ describe('St05Trace', () => {
 
   it('getDirectory() delegates to /sap/bc/adt/st05/trace/directory', async () => {
     const connection = createConnectionMock();
-    const trace = new St05Trace(connection, createLogger(), st05TraceDocuments);
+    const trace = new St05Trace(connection, createLogger(), {
+      results: st05TraceDocuments,
+    });
 
     await trace.getDirectory();
 

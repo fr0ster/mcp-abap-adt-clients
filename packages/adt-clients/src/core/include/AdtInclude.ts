@@ -44,6 +44,7 @@ import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { writeObjectDocument } from '../shared/documentWrite';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
@@ -92,22 +93,23 @@ export class AdtInclude<
    * factories' and members' gates read it (see `clients/variant.ts`).
    */
   declare readonly variant?: V;
+  // Part of the options every handler in this library takes. It is unread
+  // here now that the members are single requests with nothing to narrate.
+  private readonly logger: ILogger | undefined;
+  // Read by `create` until 36.0.0; its headers are the caller's now.
+  private readonly contentTypes: IAdtContentTypes | undefined;
+  protected readonly results: R;
+  private readonly systemContext: IAdtSystemContext;
+
   constructor(
     protected readonly connection: IAbapConnection,
-    // Part of the constructor shape every client in this library shares. It is
-    // unread here now that the members are single requests with nothing to
-    // narrate; removing it would make this one class take different arguments.
-    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
-    private readonly logger: ILogger | undefined,
-    // Read by `create` until 36.0.0; its headers are the caller's now.
-    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
-    private readonly contentTypes: IAdtContentTypes | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    protected readonly results: R,
-    // Last, so the constructor every consumer already calls keeps its shape.
-    private readonly systemContext: IAdtSystemContext = {},
-  ) {}
+    options: AdtHandlerOptions<R, 'logger' | 'contentTypes' | 'systemContext'>,
+  ) {
+    this.logger = options.logger;
+    this.contentTypes = options.contentTypes;
+    this.results = options.results;
+    this.systemContext = options.systemContext ?? {};
+  }
 
   /** Read the host's enhancement elements. */
   async readEnhancementElements<E extends IAdtError = IAdtError>(

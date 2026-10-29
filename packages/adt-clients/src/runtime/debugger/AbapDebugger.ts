@@ -21,7 +21,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
@@ -98,6 +98,13 @@ export interface IAbapDebuggerOptions {
   readonly onConflict?: IDebuggerListenerConflict;
 }
 
+/**
+ * What `new AbapDebugger` takes after its connection: its results (required),
+ * a logger, and the settings of `IAbapDebuggerOptions`, by name.
+ */
+export type AbapDebuggerConstructorOptions<R extends IAbapDebuggerResults> =
+  AdtHandlerOptions<R, 'logger'> & IAbapDebuggerOptions;
+
 type Of<
   R extends IAbapDebuggerResults,
   K extends keyof IAbapDebuggerResults,
@@ -134,14 +141,17 @@ export class AbapDebugger<
 {
   readonly kind = 'abapDebugger' as const;
 
+  private readonly results: R;
+  private readonly options: IAbapDebuggerOptions;
+
   constructor(
     private readonly connection: IAbapConnection,
-    _logger: ILogger | undefined,
-    // Required: no getter hands this out, so the caller passes the
-    // results — `abapDebuggerDocuments` for the shipped ones.
-    private readonly results: R,
-    private readonly options: IAbapDebuggerOptions = {},
-  ) {}
+    options: AbapDebuggerConstructorOptions<R>,
+  ) {
+    const { results, logger: _logger, ...settings } = options;
+    this.results = results;
+    this.options = settings;
+  }
 
   private reading<K extends keyof IAbapDebuggerResults>(
     key: K,

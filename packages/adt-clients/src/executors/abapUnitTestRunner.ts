@@ -57,6 +57,7 @@ import {
   startUnitTestRunByTarget,
   startUnitTestRunSyncWith,
 } from '../core/shared/abapUnit';
+import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import {
   abapUnitRunnerDocuments,
@@ -105,11 +106,9 @@ export class AbapUnitTestRunner<
 
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    // Required: a caller naming its own R hands its results. The default
-    // documents are the getter's (`AdtExecutor`), typed by its overloads.
-    results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;

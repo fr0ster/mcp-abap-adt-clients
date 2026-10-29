@@ -167,14 +167,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IProgramResults = programDocuments,
   ): AdtProgramLegacy<IProgramResults> {
     this.assertConnected();
-    return new AdtProgramLegacy<IProgramResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtProgramLegacy<IProgramResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getClass(
@@ -189,14 +188,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IClassResults = classDocuments,
   ): AdtClassLegacy<IClassResults> {
     this.assertConnected();
-    return new AdtClassLegacy<IClassResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtClassLegacy<IClassResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getFunctionInclude(
@@ -213,11 +211,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     this.assertConnected();
     return new AdtFunctionIncludeLegacy<IFunctionIncludeResults>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        contentTypes: this.contentTypes,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -233,13 +233,12 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IIncludeResults = includeDocuments,
   ): AdtIncludeLegacy<IIncludeResults> {
     this.assertConnected();
-    return new AdtIncludeLegacy<IIncludeResults>(
-      this.connection,
-      this.logger,
-      this.contentTypes,
+    return new AdtIncludeLegacy<IIncludeResults>(this.connection, {
+      logger: this.logger,
+      contentTypes: this.contentTypes,
       results,
-      this.systemContext,
-    );
+      systemContext: this.systemContext,
+    });
   }
 
   override getMessageClass(
@@ -254,13 +253,12 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IMessageClassResults = messageClassDocuments,
   ): AdtMessageClassLegacy<IMessageClassResults> {
     this.assertConnected();
-    return new AdtMessageClassLegacy<IMessageClassResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtMessageClassLegacy<IMessageClassResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getLocalTestClass(
@@ -275,14 +273,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IClassResults = classDocuments,
   ): AdtLocalTestClassLegacy<IClassResults> {
     this.assertConnected();
-    return new AdtLocalTestClassLegacy<IClassResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalTestClassLegacy<IClassResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getLocalTypes(
@@ -297,14 +294,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IClassResults = classDocuments,
   ): AdtLocalTypesLegacy<IClassResults> {
     this.assertConnected();
-    return new AdtLocalTypesLegacy<IClassResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalTypesLegacy<IClassResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getLocalDefinitions(
@@ -319,14 +315,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IClassResults = classDocuments,
   ): AdtLocalDefinitionsLegacy<IClassResults> {
     this.assertConnected();
-    return new AdtLocalDefinitionsLegacy<IClassResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalDefinitionsLegacy<IClassResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getLocalMacros(
@@ -341,14 +336,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IClassResults = classDocuments,
   ): AdtLocalMacrosLegacy<IClassResults> {
     this.assertConnected();
-    return new AdtLocalMacrosLegacy<IClassResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalMacrosLegacy<IClassResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getInterface(
@@ -363,14 +357,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IInterfaceResults = interfaceDocuments,
   ): AdtInterfaceLegacy<IInterfaceResults> {
     this.assertConnected();
-    return new AdtInterfaceLegacy<IInterfaceResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtInterfaceLegacy<IInterfaceResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getFunctionGroup(
@@ -385,14 +378,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IFunctionGroupResults = functionGroupDocuments,
   ): AdtFunctionGroupLegacy<IFunctionGroupResults> {
     this.assertConnected();
-    return new AdtFunctionGroupLegacy<IFunctionGroupResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtFunctionGroupLegacy<IFunctionGroupResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getFunctionModule(
@@ -409,11 +401,13 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     this.assertConnected();
     return new AdtFunctionModuleLegacy<IFunctionModuleResults>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        contentTypes: this.contentTypes,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -429,13 +423,12 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IPackageResults = packageDocuments,
   ): AdtPackageLegacy<IPackageResults> {
     this.assertConnected();
-    return new AdtPackageLegacy<IPackageResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtPackageLegacy<IPackageResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   override getDdl(
@@ -450,13 +443,12 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IDdlResults = ddlDocuments,
   ): AdtDdlLegacy<IDdlResults> {
     this.assertConnected();
-    return new AdtDdlLegacy<IDdlResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtDdlLegacy<IDdlResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   // --- Transport with legacy URL prefix ---
@@ -492,12 +484,11 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: ITransportResults = transportDocuments,
   ): AdtRequestLegacy<ITransportResults> {
     this.assertConnected();
-    return new AdtRequestLegacy<ITransportResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
+    return new AdtRequestLegacy<ITransportResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
       results,
-    );
+    });
   }
 
   // --- Utilities with legacy restrictions ---
@@ -524,11 +515,9 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     results: IUtilResults = utilDocuments,
   ): AdtUtilsLegacy<IUtilResults> {
     this.assertConnected();
-    return new AdtUtilsLegacy<IUtilResults>(
-      this.connection,
-      this.logger,
+    return new AdtUtilsLegacy<IUtilResults>(this.connection, this.logger, {
       results,
-    );
+    });
   }
 
   // --- Types absent from legacy /sap/bc/adt/discovery ---

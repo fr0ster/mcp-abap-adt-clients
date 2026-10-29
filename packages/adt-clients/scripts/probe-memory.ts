@@ -148,11 +148,10 @@ async function main(): Promise<void> {
     const only = await createTestConnection(quiet, { ownSession: true });
     const t0 = Date.now();
     out(`running ${CLASS_NAME}…`);
-    const ran = await new ClassExecutor(
-      only,
-      quiet,
-      classExecutorDocuments,
-    ).run({
+    const ran = await new ClassExecutor(only, {
+      logger: quiet,
+      results: classExecutorDocuments,
+    }).run({
       className: CLASS_NAME,
     });
     out(
@@ -206,7 +205,9 @@ async function main(): Promise<void> {
   const cls = new AdtClient(listener, quiet).getClass();
   // --take-over: displace another debugger of the user (an IDE kept open to
   // watch the snapshots).
-  const onListener = new AbapDebugger(listener, quiet, abapDebuggerDocuments, {
+  const onListener = new AbapDebugger(listener, {
+    logger: quiet,
+    results: abapDebuggerDocuments,
     onConflict: process.argv.includes('--take-over') ? 'takeOver' : 'refuse',
   });
   const armed: string[] = [];
@@ -258,7 +259,10 @@ async function main(): Promise<void> {
       );
       return;
     }
-    const run = new ClassExecutor(trigger, quiet, classExecutorDocuments).run({
+    const run = new ClassExecutor(trigger, {
+      logger: quiet,
+      results: classExecutorDocuments,
+    }).run({
       className: CLASS_NAME,
     });
     const caught = documentOf(await listening);
@@ -272,7 +276,10 @@ async function main(): Promise<void> {
       ownSession: true,
     })) as Connection;
     session.setSessionType('stateful');
-    const onSession = new AbapDebugger(session, quiet, abapDebuggerDocuments);
+    const onSession = new AbapDebugger(session, {
+      logger: quiet,
+      results: abapDebuggerDocuments,
+    });
     const server = /<INSTANCE_NAME>([^<]*)</.exec(caught)?.[1];
     const attached = await onSession.attach(identity, debuggeeId, { server });
     out(`attach: ${attached.ok ? 'ok' : documentOf(attached).slice(0, 300)}`);

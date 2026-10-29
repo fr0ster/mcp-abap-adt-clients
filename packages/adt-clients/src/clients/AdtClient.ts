@@ -258,14 +258,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IClassResults = classDocuments,
   ): AdtClass<IClassResults, V> {
     this.assertConnected();
-    return new AdtClass<IClassResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtClass<IClassResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -284,14 +283,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IProgramResults = programDocuments,
   ): AdtProgram<IProgramResults, V> {
     this.assertConnected();
-    return new AdtProgram<IProgramResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtProgram<IProgramResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -317,13 +315,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IIncludeResults = includeDocuments,
   ): AdtInclude<IIncludeResults, V> {
     this.assertConnected();
-    return new AdtInclude<IIncludeResults, V>(
-      this.connection,
-      this.logger,
-      this.contentTypes,
+    return new AdtInclude<IIncludeResults, V>(this.connection, {
+      logger: this.logger,
+      contentTypes: this.contentTypes,
       results,
-      this.systemContext,
-    );
+      systemContext: this.systemContext,
+    });
   }
 
   /**
@@ -342,14 +339,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IInterfaceResults = interfaceDocuments,
   ): AdtInterface<IInterfaceResults, V> {
     this.assertConnected();
-    return new AdtInterface<IInterfaceResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      undefined,
-      this.lockRegistry,
+    return new AdtInterface<IInterfaceResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -368,13 +363,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IDomainResults = domainDocuments,
   ): AdtDomain<IDomainResults> {
     this.assertConnected();
-    return new AdtDomain<IDomainResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtDomain<IDomainResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -445,13 +439,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IDataElementResults = dataElementDocuments,
   ): AdtDataElement<IDataElementResults> {
     this.assertConnected();
-    return new AdtDataElement<IDataElementResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtDataElement<IDataElementResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -472,10 +465,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this.assertConnected();
     return new AdtAuthorizationField<IAuthorizationFieldResults>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -495,13 +490,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IStructureResults = structureDocuments,
   ): AdtStructure<IStructureResults, V> {
     this.assertConnected();
-    return new AdtStructure<IStructureResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtStructure<IStructureResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -520,13 +514,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: ITableResults = tableDocuments,
   ): AdtTable<ITableResults, V> {
     this.assertConnected();
-    return new AdtTable<ITableResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtTable<ITableResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -545,13 +538,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: ITableTypeResults = tableTypeDocuments,
   ): AdtDdicTableType<ITableTypeResults> {
     this.assertConnected();
-    return new AdtDdicTableType<ITableTypeResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtDdicTableType<ITableTypeResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -571,13 +563,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IDdlResults = ddlDocuments,
   ): AdtDdl<IDdlResults, V> {
     this.assertConnected();
-    return new AdtDdl<IDdlResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtDdl<IDdlResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -596,14 +587,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IFunctionGroupResults = functionGroupDocuments,
   ): AdtFunctionGroup<IFunctionGroupResults, V> {
     this.assertConnected();
-    return new AdtFunctionGroup<IFunctionGroupResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtFunctionGroup<IFunctionGroupResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -622,14 +612,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IFunctionModuleResults = functionModuleDocuments,
   ): AdtFunctionModule<IFunctionModuleResults, V> {
     this.assertConnected();
-    return new AdtFunctionModule<IFunctionModuleResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtFunctionModule<IFunctionModuleResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -648,14 +637,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IFunctionIncludeResults = functionIncludeDocuments,
   ): AdtFunctionInclude<IFunctionIncludeResults, V> {
     this.assertConnected();
-    return new AdtFunctionInclude<IFunctionIncludeResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtFunctionInclude<IFunctionIncludeResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -674,13 +662,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IPackageResults = packageDocuments,
   ): AdtPackage<IPackageResults> {
     this.assertConnected();
-    return new AdtPackage<IPackageResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtPackage<IPackageResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -699,13 +686,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IMessageClassResults = messageClassDocuments,
   ): AdtMessageClass<IMessageClassResults, V> {
     this.assertConnected();
-    return new AdtMessageClass<IMessageClassResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtMessageClass<IMessageClassResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -730,8 +716,7 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this.assertConnected();
     return new AdtMessageClassMessage<IMessageClassMessageResults>(
       this.connection,
-      this.logger,
-      results,
+      { logger: this.logger, results },
     );
   }
 
@@ -751,13 +736,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IAccessControlResults = accessControlDocuments,
   ): AdtAccessControl<IAccessControlResults, V> {
     this.assertConnected();
-    return new AdtAccessControl<IAccessControlResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtAccessControl<IAccessControlResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -777,13 +761,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: ITransformationResults = transformationDocuments,
   ): AdtTransformation<ITransformationResults, V> {
     this.assertConnected();
-    return new AdtTransformation<ITransformationResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtTransformation<ITransformationResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -804,10 +787,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this.assertConnected();
     return new AdtServiceDefinition<IServiceDefinitionResults, V>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -826,13 +811,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IScalarFunctionResults = scalarFunctionDocuments,
   ): AdtScalarFunction<IScalarFunctionResults, V> {
     this.assertConnected();
-    return new AdtScalarFunction<IScalarFunctionResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtScalarFunction<IScalarFunctionResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -856,10 +840,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this.assertConnected();
     return new AdtScalarFunctionImplementation<IScalarFunctionImplementationResults>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -878,13 +864,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IAppendStructureResults = appendStructureDocuments,
   ): AdtAppendStructure<IAppendStructureResults> {
     this.assertConnected();
-    return new AdtAppendStructure<IAppendStructureResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtAppendStructure<IAppendStructureResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -903,12 +888,11 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IServiceResults = serviceDocuments,
   ): AdtServiceBinding<IServiceResults, V> {
     this.assertConnected();
-    return new AdtServiceBinding<IServiceResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
+    return new AdtServiceBinding<IServiceResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
       results,
-    );
+    });
   }
 
   /**
@@ -929,10 +913,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this.assertConnected();
     return new AdtBehaviorDefinition<IBehaviorDefinitionResults, V>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -952,13 +938,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IClassResults = classDocuments,
   ): AdtBehaviorImplementation<IClassResults> {
     this.assertConnected();
-    return new AdtBehaviorImplementation<IClassResults>(
-      this.connection,
-      this.logger,
-      this.lockRegistry,
+    return new AdtBehaviorImplementation<IClassResults>(this.connection, {
+      logger: this.logger,
+      lockRegistry: this.lockRegistry,
       results,
-      this.systemContext,
-    );
+      systemContext: this.systemContext,
+    });
   }
 
   /**
@@ -979,10 +964,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this.assertConnected();
     return new AdtMetadataExtension<IMetadataExtensionResults, V>(
       this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
-      results,
+      {
+        logger: this.logger,
+        systemContext: this.systemContext,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
     );
   }
 
@@ -1008,13 +995,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IEnhancementResults = enhancementDocuments,
   ): AdtEnhancement<IEnhancementResults, V> {
     this.assertConnected();
-    return new AdtEnhancement<IEnhancementResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtEnhancement<IEnhancementResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -1033,13 +1019,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IFeatureToggleResults = featureToggleDocuments,
   ): AdtFeatureToggle<IFeatureToggleResults> {
     this.assertConnected();
-    return new AdtFeatureToggle<IFeatureToggleResults>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.lockRegistry,
+    return new AdtFeatureToggle<IFeatureToggleResults>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -1073,12 +1058,11 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: ITransportResults = transportDocuments,
   ): AdtRequest<ITransportResults, V> {
     this.assertConnected();
-    return new AdtRequest<ITransportResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
+    return new AdtRequest<ITransportResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
       results,
-    );
+    });
   }
 
   /**
@@ -1113,7 +1097,9 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   getUtils<R extends IUtilResults>(results: R): AdtUtils<R, V>;
   getUtils(results: IUtilResults = utilDocuments): AdtUtils<IUtilResults, V> {
     this.assertConnected();
-    return new AdtUtils<IUtilResults, V>(this.connection, this.logger, results);
+    return new AdtUtils<IUtilResults, V>(this.connection, this.logger, {
+      results,
+    });
   }
 
   /**
@@ -1136,14 +1122,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IClassResults = classDocuments,
   ): AdtLocalTestClass<IClassResults, V> {
     this.assertConnected();
-    return new AdtLocalTestClass<IClassResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalTestClass<IClassResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -1166,14 +1151,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IClassResults = classDocuments,
   ): AdtLocalTypes<IClassResults, V> {
     this.assertConnected();
-    return new AdtLocalTypes<IClassResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalTypes<IClassResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -1196,14 +1180,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IClassResults = classDocuments,
   ): AdtLocalDefinitions<IClassResults, V> {
     this.assertConnected();
-    return new AdtLocalDefinitions<IClassResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalDefinitions<IClassResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 
   /**
@@ -1226,13 +1209,12 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     results: IClassResults = classDocuments,
   ): AdtLocalMacros<IClassResults, V> {
     this.assertConnected();
-    return new AdtLocalMacros<IClassResults, V>(
-      this.connection,
-      this.logger,
-      this.systemContext,
-      this.contentTypes,
-      this.lockRegistry,
+    return new AdtLocalMacros<IClassResults, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      contentTypes: this.contentTypes,
+      lockRegistry: this.lockRegistry,
       results,
-    );
+    });
   }
 }

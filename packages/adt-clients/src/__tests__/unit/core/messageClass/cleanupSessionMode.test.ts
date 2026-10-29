@@ -74,11 +74,10 @@ describe('message-class cleanup after a refused PUT', () => {
 
     expect(
       expectFailure(
-        await new AdtMessageClassMessage(
-          connection,
+        await new AdtMessageClassMessage(connection, {
           logger,
-          messageDocuments,
-        ).update(
+          results: messageDocuments,
+        }).update(
           {
             className: 'ZTEST_MSG',
             msgno: '001',
@@ -86,7 +85,10 @@ describe('message-class cleanup after a refused PUT', () => {
           },
           {
             headers: headersOf(
-              new AdtMessageClassMessage(connection, logger, messageDocuments),
+              new AdtMessageClassMessage(connection, {
+                logger,
+                results: messageDocuments,
+              }),
               'update',
             ),
           },
@@ -112,18 +114,20 @@ describe('message-class cleanup after a refused PUT', () => {
 
     expect(
       expectFailure(
-        await new AdtMessageClassMessage(
-          connection,
+        await new AdtMessageClassMessage(connection, {
           logger,
-          messageDocuments,
-        ).delete(
+          results: messageDocuments,
+        }).delete(
           {
             className: 'ZTEST_MSG',
             msgno: '001',
           },
           {
             headers: headersOf(
-              new AdtMessageClassMessage(connection, logger, messageDocuments),
+              new AdtMessageClassMessage(connection, {
+                logger,
+                results: messageDocuments,
+              }),
               'delete',
             ),
           },

@@ -61,13 +61,10 @@ describe('AdtDomain lock registry wiring', () => {
     });
     const { conn } = fakeConnection();
     const registry = new LockRegistry();
-    const domain = new AdtDomain(
-      conn,
-      undefined,
-      undefined,
-      registry,
-      domainDocuments,
-    );
+    const domain = new AdtDomain(conn, {
+      lockRegistry: registry,
+      results: domainDocuments,
+    });
 
     await domain.lock({ domainName });
 
@@ -83,13 +80,10 @@ describe('AdtDomain lock registry wiring', () => {
     });
     const { conn } = fakeConnection();
     const registry = new LockRegistry();
-    const domain = new AdtDomain(
-      conn,
-      undefined,
-      undefined,
-      registry,
-      domainDocuments,
-    );
+    const domain = new AdtDomain(conn, {
+      lockRegistry: registry,
+      results: domainDocuments,
+    });
 
     const handle = expectResult(await domain.lock({ domainName }), 'lock');
     await domain.unlock({ domainName }, handle);
@@ -106,13 +100,10 @@ describe('AdtDomain lock registry wiring', () => {
     });
     const { conn, calls } = fakeConnection();
     const registry = new LockRegistry();
-    const domain = new AdtDomain(
-      conn,
-      undefined,
-      undefined,
-      registry,
-      domainDocuments,
-    );
+    const domain = new AdtDomain(conn, {
+      lockRegistry: registry,
+      results: domainDocuments,
+    });
 
     await domain.lock({ domainName });
     const failures = await registry.unlockAll();

@@ -24,11 +24,9 @@ describe('AmdpDebugger', () => {
     const connection = {
       makeAdtRequest: jest.fn().mockResolvedValue(answer),
     } as unknown as IAbapConnection;
-    const debugger_ = new AmdpDebugger(
-      connection,
-      undefined,
-      amdpDebuggerDocuments,
-    );
+    const debugger_ = new AmdpDebugger(connection, {
+      results: amdpDebuggerDocuments,
+    });
     const sent = () =>
       (connection.makeAdtRequest as jest.Mock).mock.calls[0][0] as {
         url: string;

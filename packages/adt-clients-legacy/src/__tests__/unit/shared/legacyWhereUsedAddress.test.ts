@@ -34,7 +34,9 @@ const recording = () => {
 describe('AdtUtilsLegacy refusals', () => {
   it('answer an unsupported operation, not a connection failure, and ask nothing', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtilsLegacy(connection, logger, utilDocuments);
+    const utils = new AdtUtilsLegacy(connection, logger, {
+      results: utilDocuments,
+    });
 
     for (const answer of [
       await utils.getSqlQuery(

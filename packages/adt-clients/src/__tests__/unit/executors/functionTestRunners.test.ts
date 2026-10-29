@@ -43,11 +43,10 @@ describe.each([
 
     // One of two runner classes: each gates `run` on its own receiver, so
     // the call goes through what both take.
-    const runner: { run(name: string): Promise<unknown> } = new Runner(
-      conn,
-      createLibraryLogger(),
-      abapUnitRunnerDocuments,
-    );
+    const runner: { run(name: string): Promise<unknown> } = new Runner(conn, {
+      logger: createLibraryLogger(),
+      results: abapUnitRunnerDocuments,
+    });
     await runner.run(name);
 
     expect(calls).toHaveLength(1);

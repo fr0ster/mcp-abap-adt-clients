@@ -20,11 +20,9 @@ const HEADERS = { accept: 'application/xml', contentType: 'application/xml' };
 describe('AbapUnitTestRunnerLegacy', () => {
   it('refuses an object target without a request', async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunnerLegacy(
-      connection,
-      undefined,
-      abapUnitTestRunnerDocuments,
-    );
+    const runner = new AbapUnitTestRunnerLegacy(connection, {
+      results: abapUnitTestRunnerDocuments,
+    });
 
     const refusal = expectFailure(
       // @ts-expect-error -- 7.40 has no /abapunit/runs; the refusal is for a caller outside the type system
@@ -40,11 +38,9 @@ describe('AbapUnitTestRunnerLegacy', () => {
 
   it('refuses a package target without a request', async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunnerLegacy(
-      connection,
-      undefined,
-      abapUnitTestRunnerDocuments,
-    );
+    const runner = new AbapUnitTestRunnerLegacy(connection, {
+      results: abapUnitTestRunnerDocuments,
+    });
 
     const refusal = expectFailure(
       // @ts-expect-error -- 7.40 has no /abapunit/runs; the refusal is for a caller outside the type system
@@ -63,11 +59,9 @@ describe('AbapUnitTestRunnerLegacy', () => {
 
   it('refuses to poll or fetch without a request', async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunnerLegacy(
-      connection,
-      undefined,
-      abapUnitTestRunnerDocuments,
-    );
+    const runner = new AbapUnitTestRunnerLegacy(connection, {
+      results: abapUnitTestRunnerDocuments,
+    });
 
     // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const status = expectFailure(await runner.getStatus(), 'status');
@@ -84,18 +78,14 @@ describe('AbapUnitTestRunnerLegacy', () => {
     const modern = new RecordingConnection();
     const uris = ['/sap/bc/adt/oo/classes/zcl_tested'] as const;
 
-    await new AbapUnitTestRunnerLegacy(
-      legacy,
-      undefined,
-      abapUnitTestRunnerDocuments,
-    ).runSync(uris, {
+    await new AbapUnitTestRunnerLegacy(legacy, {
+      results: abapUnitTestRunnerDocuments,
+    }).runSync(uris, {
       headers: HEADERS,
     });
-    await new AbapUnitTestRunner(
-      modern,
-      undefined,
-      abapUnitTestRunnerDocuments,
-    ).runSync(uris, { headers: HEADERS });
+    await new AbapUnitTestRunner(modern, {
+      results: abapUnitTestRunnerDocuments,
+    }).runSync(uris, { headers: HEADERS });
 
     expect(legacy.sent).toHaveLength(1);
     expect(legacy.sent[0]?.url).toBe('/sap/bc/adt/abapunit/testruns');

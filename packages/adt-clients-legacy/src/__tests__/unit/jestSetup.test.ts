@@ -31,14 +31,9 @@ describe('the Jest setup', () => {
   );
 
   it('has the legacy pairs registered in a file that imports none', () => {
-    const include = new AdtFunctionIncludeLegacy(
-      {} as IAbapConnection,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      functionIncludeDocuments,
-    );
+    const include = new AdtFunctionIncludeLegacy({} as IAbapConnection, {
+      results: functionIncludeDocuments,
+    });
     const v1 = 'application/vnd.sap.adt.functions.fincludes+xml';
     expect(integrationHeadersOf(include, 'create')).toEqual({
       accept: v1,

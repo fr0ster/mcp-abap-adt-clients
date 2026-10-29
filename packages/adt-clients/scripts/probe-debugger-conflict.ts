@@ -174,14 +174,11 @@ async function main(): Promise<void> {
     ownSession: true,
   });
   // Variant A's debugger displaces; B goes out raw, with Eclipse's parameters.
-  const debuggerApi = new AbapDebugger(
-    connection,
-    quietLogger,
-    abapDebuggerDocuments,
-    {
-      onConflict: 'takeOver',
-    },
-  );
+  const debuggerApi = new AbapDebugger(connection, {
+    logger: quietLogger,
+    results: abapDebuggerDocuments,
+    onConflict: 'takeOver',
+  });
   connection.setSessionType('stateful');
   try {
     for (const variant of variants) {

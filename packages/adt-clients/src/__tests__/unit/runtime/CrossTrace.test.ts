@@ -22,11 +22,9 @@ describe('CrossTrace', () => {
 
   it('list() delegates to /sap/bc/adt/crosstrace/traces', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(
-      connection,
-      createLogger(),
-      crossTraceDocuments,
-    );
+    const crossTrace = new CrossTrace(connection, createLogger(), {
+      results: crossTraceDocuments,
+    });
 
     await crossTrace.list();
 
@@ -40,11 +38,9 @@ describe('CrossTrace', () => {
 
   it('getById() delegates to /sap/bc/adt/crosstrace/traces/TRACE001', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(
-      connection,
-      createLogger(),
-      crossTraceDocuments,
-    );
+    const crossTrace = new CrossTrace(connection, createLogger(), {
+      results: crossTraceDocuments,
+    });
 
     await crossTrace.getById('TRACE001');
 
@@ -58,11 +54,9 @@ describe('CrossTrace', () => {
 
   it('getRecords() delegates to /sap/bc/adt/crosstrace/traces/TRACE001/records', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(
-      connection,
-      createLogger(),
-      crossTraceDocuments,
-    );
+    const crossTrace = new CrossTrace(connection, createLogger(), {
+      results: crossTraceDocuments,
+    });
 
     await crossTrace.getRecords('TRACE001');
 
@@ -76,11 +70,9 @@ describe('CrossTrace', () => {
 
   it('getRecordContent() delegates to /sap/bc/adt/crosstrace/traces/TRACE001/records/3/content', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(
-      connection,
-      createLogger(),
-      crossTraceDocuments,
-    );
+    const crossTrace = new CrossTrace(connection, createLogger(), {
+      results: crossTraceDocuments,
+    });
 
     await crossTrace.getRecordContent('TRACE001', 3);
 
@@ -94,11 +86,9 @@ describe('CrossTrace', () => {
 
   it('getActivations() delegates to /sap/bc/adt/crosstrace/activations', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(
-      connection,
-      createLogger(),
-      crossTraceDocuments,
-    );
+    const crossTrace = new CrossTrace(connection, createLogger(), {
+      results: crossTraceDocuments,
+    });
 
     await crossTrace.getActivations();
 

@@ -25,8 +25,8 @@ import type {
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import {
   AbapUnitRunner,
@@ -48,12 +48,9 @@ export class FunctionGroupTestRunner<
 {
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    // Required: a caller naming its own R hands its results. The default
-    // documents are the getter's (`AdtExecutor`), typed by its overloads.
-    results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
-    super(connection, logger, results);
+    super(connection, options);
   }
 
   /** Run every test class of the group. One POST. */

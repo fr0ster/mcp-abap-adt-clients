@@ -84,16 +84,13 @@ describe('AdtRequest.update()', () => {
     );
 
     // The body goes in the options, where the contract puts it.
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).updateMetadata(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).updateMetadata(
       { transportNumber: 'DEVK900438' },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'updateMetadata',
         ),
         source: edited,
@@ -129,19 +126,16 @@ describe('AdtRequest.update()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).updateMetadata(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).updateMetadata(
       {
         transportNumber: 'DEVK900438',
         description: 'New description',
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'updateMetadata',
         ),
       },
@@ -159,18 +153,15 @@ describe('AdtRequest.update()', () => {
     // it. What the caller must guarantee is that the document is valid.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).updateMetadata(
+    await new AdtRequest(connection, {
+      results: transportDocuments,
+    }).updateMetadata(
       {
         transportNumber: 'DEVK900438',
       },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'updateMetadata',
         ),
       },
@@ -185,16 +176,11 @@ describe('AdtRequest.delete()', () => {
   it('issues exactly one DELETE to the item URL', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).delete(
+    await new AdtRequest(connection, { results: transportDocuments }).delete(
       { transportNumber: 'DEVK900438' },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'delete',
         ),
       },
@@ -208,16 +194,11 @@ describe('AdtRequest.delete()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).delete(
+    await new AdtRequest(connection, { results: transportDocuments }).delete(
       { transportNumber: 'DEVK900438' },
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'delete',
         ),
       },
@@ -235,16 +216,11 @@ describe('AdtRequest.delete()', () => {
     // server's words, which a strategy can read.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).delete(
+    await new AdtRequest(connection, { results: transportDocuments }).delete(
       {},
       {
         headers: headersOf(
-          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          new AdtRequest(connection, { results: transportDocuments }),
           'delete',
         ),
       },

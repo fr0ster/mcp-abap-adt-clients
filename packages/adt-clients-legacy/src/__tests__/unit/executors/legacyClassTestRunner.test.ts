@@ -105,11 +105,10 @@ describe('ClassTestRunnerLegacy', () => {
     options?: Parameters<ClassTestRunner['runSync']>[1],
   ): Promise<unknown> {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    await new ClassTestRunner(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    ).runSync(target, options);
+    await new ClassTestRunner(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    }).runSync(target, options);
     expect(calls).toHaveLength(1);
     return calls[0].data;
   }
@@ -121,11 +120,10 @@ describe('ClassTestRunnerLegacy', () => {
     '%s: one POST to /testruns, the modern runSync body byte for byte, read by %s',
     async (member, readBy) => {
       const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-      const runner = new ClassTestRunnerLegacy(
-        conn,
-        createLibraryLogger(),
-        marked,
-      );
+      const runner = new ClassTestRunnerLegacy(conn, {
+        logger: createLibraryLogger(),
+        results: marked,
+      });
 
       expect(expectResult(await runner[member]('ZCL_TESTS'), member)).toBe(
         readBy,
@@ -152,11 +150,10 @@ describe('ClassTestRunnerLegacy', () => {
         analyse: analyseUnitTest,
       };
       const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-      const runner = new ClassTestRunnerLegacy(
-        conn,
-        createLibraryLogger(),
-        classTestRunnerDocuments,
-      );
+      const runner = new ClassTestRunnerLegacy(conn, {
+        logger: createLibraryLogger(),
+        results: classTestRunnerDocuments,
+      });
 
       await runner[member]('ZCL_TESTS', options);
 
@@ -176,11 +173,10 @@ describe('ClassTestRunnerLegacy', () => {
 
   it('runs each distinct container whole, on /testruns', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunnerLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     await runner.run([
       { containerClass: 'ZCL_TESTS', testClass: 'LTCL_A' },
@@ -196,11 +192,10 @@ describe('ClassTestRunnerLegacy', () => {
 
   it('refuses to poll or fetch without a request: the POST answered the result', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(
-      conn,
-      createLibraryLogger(),
-      classTestRunnerDocuments,
-    );
+    const runner = new ClassTestRunnerLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: classTestRunnerDocuments,
+    });
 
     // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     expectFailure(await runner.getStatus(), 'no run to poll');

@@ -14,9 +14,9 @@ import type {
   ITraceScheduling,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { runProgram } from '../../core/program/run';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -81,14 +81,12 @@ export class ProgramExecutor<
 
   constructor(
     connection: IAbapConnection,
-    _logger: ILogger | undefined,
-    // Required: a caller naming its own R hands its results. The default
-    // documents are the getter's (`AdtExecutor`), typed by its overloads.
-    results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { results } = options;
     this.connection = connection;
     this.results = results;
-    this.scheduling = new TraceScheduling(connection, results);
+    this.scheduling = new TraceScheduling(connection, { results });
   }
 
   // --- ITraceScheduling, delegated. Composed into the executor because a run

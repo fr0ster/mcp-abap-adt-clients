@@ -8,6 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import { getCheckFailureLogs, getExecutionLog } from './logs';
@@ -34,13 +35,15 @@ export class AtcLog<R extends IAtcLogResults = typeof atcLogDocuments>
 {
   readonly kind = 'atcLog' as const;
 
+  private readonly results: R;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    private readonly results: R,
-  ) {}
+    options: AdtHandlerOptions<R>,
+  ) {
+    this.results = options.results;
+  }
 
   async getCheckFailureLogs<E extends IAdtError = IAdtError>(
     options?: IGetCheckFailureLogsOptions & IAdtAnalyseOptions<E>,

@@ -12,7 +12,9 @@ import { logTestStep } from '../../helpers/testProgressLogger';
 
 describe('AdtUtils.getObjectSourceUri', () => {
   const testsLogger = createTestsLogger();
-  const utils = new AdtUtils({} as IAbapConnection, noopLogger, utilDocuments);
+  const utils = new AdtUtils({} as IAbapConnection, noopLogger, {
+    results: utilDocuments,
+  });
   const objectName = 'ZADT_TEST_OBJ';
   const functionGroup = 'ZADT_TEST_FG';
 

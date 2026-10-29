@@ -22,10 +22,7 @@ it('validate sends exactly Accept application/vnd.sap.as+xml', async () => {
     {
       makeAdtRequest: request,
     } as unknown as IAbapConnection,
-    undefined,
-    undefined,
-    undefined,
-    featureToggleDocuments,
+    { results: featureToggleDocuments },
   );
 
   await toggle.validate({

@@ -98,11 +98,10 @@ describe('a message-class write (chain)', () => {
     );
 
     await expect(
-      new AdtMessageClassMessage(
-        connection,
-        noopLogger,
-        messageDocuments,
-      ).update(
+      new AdtMessageClassMessage(connection, {
+        logger: noopLogger,
+        results: messageDocuments,
+      }).update(
         {
           className: 'ZT',
           msgno: '001',
@@ -110,11 +109,10 @@ describe('a message-class write (chain)', () => {
         },
         {
           headers: headersOf(
-            new AdtMessageClassMessage(
-              connection,
-              noopLogger,
-              messageDocuments,
-            ),
+            new AdtMessageClassMessage(connection, {
+              logger: noopLogger,
+              results: messageDocuments,
+            }),
             'update',
           ),
         },
@@ -136,11 +134,10 @@ describe('a message-class write (chain)', () => {
     );
 
     await expect(
-      new AdtMessageClassMessage(
-        connection,
-        noopLogger,
-        messageDocuments,
-      ).update(
+      new AdtMessageClassMessage(connection, {
+        logger: noopLogger,
+        results: messageDocuments,
+      }).update(
         {
           className: 'ZT',
           msgno: '001',
@@ -148,11 +145,10 @@ describe('a message-class write (chain)', () => {
         },
         {
           headers: headersOf(
-            new AdtMessageClassMessage(
-              connection,
-              noopLogger,
-              messageDocuments,
-            ),
+            new AdtMessageClassMessage(connection, {
+              logger: noopLogger,
+              results: messageDocuments,
+            }),
             'update',
           ),
         },
@@ -175,14 +171,10 @@ describe('a class create', () => {
     } as unknown as IAbapConnection;
 
     await expect(
-      new AdtClass(
-        connection,
-        noopLogger,
-        undefined,
-        undefined,
-        undefined,
-        classDocuments,
-      ).create(
+      new AdtClass(connection, {
+        logger: noopLogger,
+        results: classDocuments,
+      }).create(
         {
           className: 'ZCL_T',
           packageName: 'ZP',
@@ -190,14 +182,10 @@ describe('a class create', () => {
         },
         {
           headers: headersOf(
-            new AdtClass(
-              connection,
-              noopLogger,
-              undefined,
-              undefined,
-              undefined,
-              classDocuments,
-            ),
+            new AdtClass(connection, {
+              logger: noopLogger,
+              results: classDocuments,
+            }),
             'create',
           ),
         },

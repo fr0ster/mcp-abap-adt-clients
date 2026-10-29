@@ -22,11 +22,9 @@ describe('DdicActivation', () => {
 
   it('getGraph() delegates to /sap/bc/adt/ddic/logs/activationgraph', async () => {
     const connection = createConnectionMock();
-    const activation = new DdicActivation(
-      connection,
-      createLogger(),
-      ddicActivationDocuments,
-    );
+    const activation = new DdicActivation(connection, createLogger(), {
+      results: ddicActivationDocuments,
+    });
 
     await activation.getGraph();
 
@@ -40,11 +38,9 @@ describe('DdicActivation', () => {
 
   it('getGraph() passes options as query params', async () => {
     const connection = createConnectionMock();
-    const activation = new DdicActivation(
-      connection,
-      createLogger(),
-      ddicActivationDocuments,
-    );
+    const activation = new DdicActivation(connection, createLogger(), {
+      results: ddicActivationDocuments,
+    });
 
     await activation.getGraph({
       objectName: 'ZTABLE',

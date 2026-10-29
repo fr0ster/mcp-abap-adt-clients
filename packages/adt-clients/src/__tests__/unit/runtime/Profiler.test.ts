@@ -67,7 +67,9 @@ describe('Profiler', () => {
     } as unknown as IAbapConnection;
 
     const entries = expectResult(
-      await new Profiler(connection, createLogger(), parsing).list(),
+      await new Profiler(connection, createLogger(), {
+        results: parsing,
+      }).list(),
       'entries',
     );
     // Exactly the snippet the CHANGELOG and the reference publish, guard and
@@ -93,7 +95,9 @@ describe('Profiler', () => {
     } as unknown as IAbapConnection;
 
     const entries = expectResult(
-      await new Profiler(connection, createLogger(), parsing).list(),
+      await new Profiler(connection, createLogger(), {
+        results: parsing,
+      }).list(),
       'entries',
     );
     expect(entries).toEqual([]);
@@ -112,37 +116,33 @@ describe('Profiler', () => {
 
   it('answers the feed as it came unless a reading is given', async () => {
     const connection = createConnectionMock();
-    const answer = await new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    ).list();
+    const answer = await new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    }).list();
     expect(expectResult(answer, 'list')).toBe(FEED);
   });
 
   it('read() answers each view through its own strategy', async () => {
     const connection = createConnectionMock();
-    const raw = await new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    ).read('T1', 'hitlist', {});
+    const raw = await new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    }).read('T1', 'hitlist', {});
     expect(expectResult(raw, 'hitlist')).toBe(HITLIST);
 
     const parsed = await new Profiler(connection, createLogger(), {
-      ...profilerDocuments,
-      hitlist: profilerHitList,
+      results: {
+        ...profilerDocuments,
+        hitlist: profilerHitList,
+      },
     }).read('T1', 'hitlist', {});
     expect(expectResult(parsed, 'hitlist')).toEqual({ entries: [] });
   });
 
   it("passes the caller's analyse through, so the verdict is theirs", async () => {
     const connection = createConnectionMock();
-    const answer = await new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    ).delete('T1', {
+    const answer = await new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    }).delete('T1', {
       analyse: () => ({ origin: 'refusal', message: 'not wanted' }),
     });
     expect(answer.ok).toBe(false);
@@ -151,11 +151,9 @@ describe('Profiler', () => {
 
   it('delete() sends DELETE to the trace itself', async () => {
     const connection = createConnectionMock();
-    const profiler = new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    );
+    const profiler = new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    });
 
     await profiler.delete('T1');
 
@@ -171,9 +169,9 @@ describe('Profiler', () => {
     // `list()` hands back a `uri`, so a caller should be able to pass it
     // straight back without unpicking it first.
     const connection = createConnectionMock();
-    await new Profiler(connection, createLogger(), profilerDocuments).delete(
-      '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD',
-    );
+    await new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    }).delete('/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -185,11 +183,9 @@ describe('Profiler', () => {
 
   it('list() delegates to /sap/bc/adt/runtime/traces/abaptraces', async () => {
     const connection = createConnectionMock();
-    const profiler = new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    );
+    const profiler = new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    });
 
     await profiler.list();
 
@@ -203,11 +199,9 @@ describe('Profiler', () => {
 
   it('read() sends the view the caller asked for, not a fixed one', async () => {
     const connection = createConnectionMock();
-    const profiler = new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    );
+    const profiler = new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    });
 
     await profiler.read('T1', 'statements', { withDetails: true });
 
@@ -223,11 +217,9 @@ describe('Profiler', () => {
 
   it('read() refuses a view this family does not have', async () => {
     const connection = createConnectionMock();
-    const profiler = new Profiler(
-      connection,
-      createLogger(),
-      profilerDocuments,
-    );
+    const profiler = new Profiler(connection, createLogger(), {
+      results: profilerDocuments,
+    });
 
     // The compiler rejects this; JavaScript callers reach it, so it throws
     // rather than silently requesting a URL that cannot answer.
@@ -246,7 +238,7 @@ describe('Profiler', () => {
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-      profilerDocuments,
+      { results: profilerDocuments },
     );
 
     const xml = profiler.buildParametersXml();
@@ -265,7 +257,7 @@ describe('Profiler', () => {
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-      profilerDocuments,
+      { results: profilerDocuments },
     );
 
     const defaults = profiler.getDefaultParameters();

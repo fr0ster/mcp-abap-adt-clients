@@ -66,13 +66,13 @@ describe.each([
   [
     'ClassExecutor',
     (c: IAbapConnection) =>
-      new ClassExecutor(c, undefined, classExecutorDocuments),
+      new ClassExecutor(c, { results: classExecutorDocuments }),
     { className: 'ZCL_X' },
   ],
   [
     'ProgramExecutor',
     (c: IAbapConnection) =>
-      new ProgramExecutor(c, undefined, programExecutorDocuments),
+      new ProgramExecutor(c, { results: programExecutorDocuments }),
     { programName: 'ZPROG_X' },
   ],
 ] as const)('%s.run', (_name, make, target) => {

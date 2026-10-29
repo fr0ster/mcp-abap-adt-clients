@@ -275,7 +275,10 @@ async function main(): Promise<void> {
 
     out(`run ${CLASS_NAME} on its own session`);
     let runDone = false;
-    run = new ClassExecutor(T, quiet, classExecutorDocuments)
+    run = new ClassExecutor(T, {
+      logger: quiet,
+      results: classExecutorDocuments,
+    })
       .run({ className: CLASS_NAME })
       .finally(() => {
         runDone = true;

@@ -135,13 +135,25 @@ function everyHeaderMember(conn: IAbapConnection): {
       headerMembers(`${factory}()`, handler),
     );
   const standalone: [string, unknown][] = [
-    ['AdtAbapGitClient', new AdtAbapGitClient(conn, logger, abapGitDocuments)],
-    ['AbapDebugger', new AbapDebugger(conn, logger, abapDebuggerDocuments)],
-    ['AmdpDebugger', new AmdpDebugger(conn, logger, amdpDebuggerDocuments)],
-    ['ClassExecutor', new ClassExecutor(conn, logger, classExecutorDocuments)],
+    [
+      'AdtAbapGitClient',
+      new AdtAbapGitClient(conn, { logger, results: abapGitDocuments }),
+    ],
+    [
+      'AbapDebugger',
+      new AbapDebugger(conn, { logger, results: abapDebuggerDocuments }),
+    ],
+    [
+      'AmdpDebugger',
+      new AmdpDebugger(conn, { logger, results: amdpDebuggerDocuments }),
+    ],
+    [
+      'ClassExecutor',
+      new ClassExecutor(conn, { logger, results: classExecutorDocuments }),
+    ],
     [
       'ProgramExecutor',
-      new ProgramExecutor(conn, logger, programExecutorDocuments),
+      new ProgramExecutor(conn, { logger, results: programExecutorDocuments }),
     ],
   ];
   return {

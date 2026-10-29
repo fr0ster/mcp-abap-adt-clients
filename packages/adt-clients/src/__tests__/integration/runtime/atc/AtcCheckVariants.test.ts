@@ -70,8 +70,10 @@ describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
       throw error;
     }
     atc = new AdtAtc(connection, libraryLogger, {
-      ...atcDocuments,
-      checkVariant: atcSystemCheckVariant,
+      results: {
+        ...atcDocuments,
+        checkVariant: atcSystemCheckVariant,
+      },
     });
   });
 

@@ -21,10 +21,9 @@ it('a function group metadata read sends v3, then v2 and v1', async () => {
     ),
   } as unknown as IAbapConnection;
 
-  await new AdtUtils(connection, noopLogger, utilDocuments).readObjectMetadata(
-    'FUGR/F',
-    'ZFG_GUARD',
-  );
+  await new AdtUtils(connection, noopLogger, {
+    results: utilDocuments,
+  }).readObjectMetadata('FUGR/F', 'ZFG_GUARD');
 
   expect(sent).toHaveLength(1);
   expect(sent[0]?.method).toBe('GET');

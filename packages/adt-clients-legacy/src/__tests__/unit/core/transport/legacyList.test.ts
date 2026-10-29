@@ -45,12 +45,9 @@ describe('legacy transport list', () => {
     const { connection, calls } = recordingConnection();
 
     const tree = expectResult(
-      await new AdtRequestLegacy(
-        connection,
-        undefined,
-        undefined,
-        transportParsing,
-      ).list(),
+      await new AdtRequestLegacy(connection, {
+        results: transportParsing,
+      }).list(),
       'legacy list',
     );
 
@@ -64,12 +61,9 @@ describe('legacy transport list', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      await new AdtRequestLegacy(
-        connection,
-        undefined,
-        undefined,
-        transportDocuments,
-      ).list({ configUri: '/x' }),
+      await new AdtRequestLegacy(connection, {
+        results: transportDocuments,
+      }).list({ configUri: '/x' }),
       'legacy list with configUri',
     );
 
@@ -84,12 +78,9 @@ describe('legacy transport update/delete', () => {
   it('refuses update() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
-    const request = new AdtRequestLegacy(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    );
+    const request = new AdtRequestLegacy(connection, {
+      results: transportDocuments,
+    });
     const failure = expectFailure(
       // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       await request.updateMetadata(),
@@ -105,12 +96,9 @@ describe('legacy transport update/delete', () => {
   it('refuses delete() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
-    const request = new AdtRequestLegacy(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    );
+    const request = new AdtRequestLegacy(connection, {
+      results: transportDocuments,
+    });
     const failure = expectFailure(
       // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
       await request.delete(),
@@ -172,12 +160,7 @@ describe('legacy transport members', () => {
 
     const failure = expectFailure(
       (await call(
-        new AdtRequestLegacy(
-          connection,
-          undefined,
-          undefined,
-          transportDocuments,
-        ),
+        new AdtRequestLegacy(connection, { results: transportDocuments }),
       )) as Parameters<typeof expectFailure>[0],
       'legacy transport member',
     );
@@ -195,12 +178,7 @@ describe('legacy transport members', () => {
     ]) {
       const { connection, calls } = recordingConnection();
       await call(
-        new AdtRequestLegacy(
-          connection,
-          undefined,
-          undefined,
-          transportParsing,
-        ),
+        new AdtRequestLegacy(connection, { results: transportParsing }),
       );
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe('GET');

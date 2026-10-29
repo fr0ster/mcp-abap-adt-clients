@@ -46,11 +46,14 @@ async function main(): Promise<void> {
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
-    const request = new AdtRequest(connection, logger, undefined, {
-      ...transportDocuments,
-      objects: transportObjectEntries,
-      // Status, headers and body: the measurement is what the answer was.
-      movedObjects: wireItself,
+    const request = new AdtRequest(connection, {
+      logger,
+      results: {
+        ...transportDocuments,
+        objects: transportObjectEntries,
+        // Status, headers and body: the measurement is what the answer was.
+        movedObjects: wireItself,
+      },
     });
 
     const show = async (task: string) => {

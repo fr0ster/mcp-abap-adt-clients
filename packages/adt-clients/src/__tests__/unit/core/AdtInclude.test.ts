@@ -52,19 +52,17 @@ describe('AdtInclude', () => {
   describe('the create document', () => {
     it('escapes every user value, so a quote or an ampersand cannot break it', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).create(
+        results: includeDocuments,
+      }).create(
         {
           ...BASE,
           description: 'R&D "quoted" <tagged>',
         },
         {
           headers: headersOf(
-            new AdtInclude(connection, logger, undefined, includeDocuments),
+            new AdtInclude(connection, { logger, results: includeDocuments }),
             'create',
           ),
         },
@@ -83,14 +81,12 @@ describe('AdtInclude', () => {
 
     it('is an include document, not a program one', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).create(BASE, {
+        results: includeDocuments,
+      }).create(BASE, {
         headers: headersOf(
-          new AdtInclude(connection, logger, undefined, includeDocuments),
+          new AdtInclude(connection, { logger, results: includeDocuments }),
           'create',
         ),
       });
@@ -110,16 +106,14 @@ describe('AdtInclude', () => {
       // No source: `createInclude` reads the description, package, transport
       // and master language, and nothing else. Passing it here said a create
       // writes a source, which it does not.
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).create(
+        results: includeDocuments,
+      }).create(
         { ...BASE },
         {
           headers: headersOf(
-            new AdtInclude(connection, logger, undefined, includeDocuments),
+            new AdtInclude(connection, { logger, results: includeDocuments }),
             'create',
           ),
         },
@@ -130,16 +124,14 @@ describe('AdtInclude', () => {
 
     it('accepts a source given only in options, with none in the config', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).update(
+        results: includeDocuments,
+      }).update(
         { includeName: 'ZMY_INC' },
         {
           headers: headersOf(
-            new AdtInclude(connection, logger, undefined, includeDocuments),
+            new AdtInclude(connection, { logger, results: includeDocuments }),
             'update',
           ),
           source: '" only in options',
@@ -152,16 +144,14 @@ describe('AdtInclude', () => {
 
     it('does not activate on update unless activateOnUpdate says so', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).update(
+        results: includeDocuments,
+      }).update(
         { includeName: 'ZMY_INC' },
         {
           headers: headersOf(
-            new AdtInclude(connection, logger, undefined, includeDocuments),
+            new AdtInclude(connection, { logger, results: includeDocuments }),
             'update',
           ),
           source: '" code',
@@ -174,16 +164,14 @@ describe('AdtInclude', () => {
     it('uses a caller-held lock and neither locks nor unlocks around it', async () => {
       const { connection, calls } = createConnection();
       expectResult(
-        await new AdtInclude(
-          connection,
+        await new AdtInclude(connection, {
           logger,
-          undefined,
-          includeDocuments,
-        ).update(
+          results: includeDocuments,
+        }).update(
           { includeName: 'ZMY_INC' },
           {
             headers: headersOf(
-              new AdtInclude(connection, logger, undefined, includeDocuments),
+              new AdtInclude(connection, { logger, results: includeDocuments }),
               'update',
             ),
             source: '" code',
@@ -207,16 +195,14 @@ describe('AdtInclude', () => {
   describe('an empty source is a value, not an absence', () => {
     it('clears an include to empty instead of refusing the edit', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).update(
+        results: includeDocuments,
+      }).update(
         { includeName: 'ZMY_INC' },
         {
           headers: headersOf(
-            new AdtInclude(connection, logger, undefined, includeDocuments),
+            new AdtInclude(connection, { logger, results: includeDocuments }),
             'update',
           ),
           source: '',
@@ -252,18 +238,16 @@ describe('AdtInclude', () => {
       );
 
       const failure = expectFailure(
-        await new AdtInclude(
-          connection,
+        await new AdtInclude(connection, {
           logger,
-          undefined,
-          includeDocuments,
-        ).activate(
+          results: includeDocuments,
+        }).activate(
           {
             includeName: 'ZMY_INC',
           },
           {
             headers: headersOf(
-              new AdtInclude(connection, logger, undefined, includeDocuments),
+              new AdtInclude(connection, { logger, results: includeDocuments }),
               'activate',
             ),
           },
@@ -283,12 +267,10 @@ describe('AdtInclude', () => {
   describe('the endpoints are the include ones', () => {
     it('addresses /programs/includes, never /programs/programs', async () => {
       const { connection, calls } = createConnection();
-      const include = new AdtInclude(
-        connection,
+      const include = new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      );
+        results: includeDocuments,
+      });
       await include.create(
         { ...BASE },
         { headers: headersOf(include, 'create') },
@@ -310,12 +292,10 @@ describe('AdtInclude', () => {
 
     it('validates at the include endpoint with the three measured params', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(
-        connection,
+      await new AdtInclude(connection, {
         logger,
-        undefined,
-        includeDocuments,
-      ).validate(BASE);
+        results: includeDocuments,
+      }).validate(BASE);
 
       const validation = calls.find((c) =>
         c.url.includes('/includes/validation'),

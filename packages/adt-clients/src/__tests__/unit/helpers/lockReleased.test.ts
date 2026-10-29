@@ -132,15 +132,7 @@ describe('verifyLockReleased', () => {
 
     const check = verifyLockReleased(
       open,
-      () =>
-        new AdtClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          classDocuments,
-        ),
+      () => new AdtClass(conn, { results: classDocuments }),
       config,
       'class ZCL_LOCKREL_UNIT',
     );
@@ -164,15 +156,7 @@ describe('verifyLockReleased', () => {
 
     await verifyLockReleased(
       open,
-      () =>
-        new AdtClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          classDocuments,
-        ),
+      () => new AdtClass(conn, { results: classDocuments }),
       config,
       'class ZCL_LOCKREL_UNIT',
     );
@@ -189,15 +173,7 @@ describe('verifyLockReleased', () => {
     await expect(
       verifyLockReleased(
         open,
-        () =>
-          new AdtClass(
-            conn,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            classDocuments,
-          ),
+        () => new AdtClass(conn, { results: classDocuments }),
         config,
         'class X',
       ),
@@ -228,15 +204,7 @@ describe('verifyLockReleased', () => {
     await expect(
       verifyLockReleased(
         open,
-        () =>
-          new AdtClass(
-            conn,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            classDocuments,
-          ),
+        () => new AdtClass(conn, { results: classDocuments }),
         config,
         'class X',
       ),
@@ -254,15 +222,7 @@ describe('verifyLockReleased', () => {
     await expect(
       verifyLockReleased(
         async () => ({ client: {} as AdtClient, close }),
-        () =>
-          new AdtClass(
-            conn,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            classDocuments,
-          ),
+        () => new AdtClass(conn, { results: classDocuments }),
         config,
         'class X',
         { warn } as any,
@@ -310,53 +270,21 @@ describe('factoryOf', () => {
         return {};
       }
       getClass() {
-        return new AdtClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          classDocuments,
-        );
+        return new AdtClass(conn, { results: classDocuments });
       }
       getDomain() {
-        return new AdtDomain(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          domainDocuments,
-        );
+        return new AdtDomain(conn, { results: domainDocuments });
       }
       getNeedsArgument(_x: string) {
-        return new AdtDomain(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          domainDocuments,
-        );
+        return new AdtDomain(conn, { results: domainDocuments });
       }
     }
     const client = new FakeClient();
     expect(
-      factoryOf(
-        client,
-        new AdtDomain(conn, undefined, undefined, undefined, domainDocuments),
-      ),
+      factoryOf(client, new AdtDomain(conn, { results: domainDocuments })),
     ).toBe('getDomain');
     expect(
-      factoryOf(
-        client,
-        new AdtClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          classDocuments,
-        ),
-      ),
+      factoryOf(client, new AdtClass(conn, { results: classDocuments })),
     ).toBe('getClass');
     expect(factoryOf(client, { constructor: Map })).toBeUndefined();
   });
@@ -420,15 +348,7 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
 
     const check = verifyLockReleased(
       open,
-      () =>
-        new AdtClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          classDocuments,
-        ),
+      () => new AdtClass(conn, { results: classDocuments }),
       config,
       'class ZCL_LOCKREL_UNIT',
     );
@@ -447,15 +367,7 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
 
     const check = verifyLockReleased(
       open,
-      () =>
-        new AdtClass(
-          conn,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          classDocuments,
-        ),
+      () => new AdtClass(conn, { results: classDocuments }),
       config,
       'x',
     );

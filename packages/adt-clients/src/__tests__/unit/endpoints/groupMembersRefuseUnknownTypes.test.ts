@@ -24,7 +24,8 @@ const logger = {
   error: jest.fn(),
 } as unknown as ILogger;
 
-const utils = () => new AdtUtils(connection, logger, utilDocuments);
+const utils = () =>
+  new AdtUtils(connection, logger, { results: utilDocuments });
 const unknown = [{ name: 'ZX', type: 'ABCD/XY' }];
 const untyped = [{ name: 'ZCL_X' }];
 const moduleWithoutGroup = [{ name: 'Z_FM', type: 'FUGR/FF' }];

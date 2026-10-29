@@ -59,12 +59,9 @@ describe('list runs the named search', () => {
   it('sends exactly one request, carrying the configUri it was given', async () => {
     const { connection, calls } = connectionOver(bodies(CONFIGURATIONS('/a')));
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).list({ configUri: '/explicit' });
+    await new AdtRequest(connection, { results: transportDocuments }).list({
+      configUri: '/explicit',
+    });
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain('configUri=%2Fexplicit');
@@ -76,12 +73,9 @@ describe('list runs the named search', () => {
       bodies(CONFIGURATIONS('/a', '/b')),
     );
 
-    const answer = await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportParsing,
-    ).searchConfigurations();
+    const answer = await new AdtRequest(connection, {
+      results: transportParsing,
+    }).searchConfigurations();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain('searchconfiguration/configurations');
@@ -101,12 +95,9 @@ describe('the batch guard', () => {
       deferred,
     );
 
-    await new AdtRequest(
-      connection,
-      undefined,
-      undefined,
-      transportDocuments,
-    ).list({ configUri: '/explicit' });
+    await new AdtRequest(connection, { results: transportDocuments }).list({
+      configUri: '/explicit',
+    });
 
     expect(calls).toHaveLength(1);
   });

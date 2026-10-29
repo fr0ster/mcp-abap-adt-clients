@@ -29,6 +29,7 @@ import {
   startUnitTestRunByObject,
   startUnitTestRunSync,
 } from '../core/shared/abapUnit';
+import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import { rawDocument } from '../utils/resultStrategy';
 
@@ -80,9 +81,9 @@ export abstract class AbapUnitRunner<
 
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;

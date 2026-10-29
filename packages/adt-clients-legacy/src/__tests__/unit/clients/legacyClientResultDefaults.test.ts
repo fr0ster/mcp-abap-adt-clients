@@ -53,15 +53,8 @@ function legacyConstructorTypes(): void {
   const connection = new RecordingConnection();
   // The base constructor's required results, inherited.
   // @ts-expect-error -- results are required
-  new AdtClassLegacy<Marked<typeof classDocuments>>(connection);
-  new AdtClassLegacy(
-    connection,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    classDocuments,
-  );
+  new AdtClassLegacy<Marked<typeof classDocuments>>(connection, {});
+  new AdtClassLegacy(connection, { results: classDocuments });
 }
 
 describe('legacy client getters and handler constructors', () => {

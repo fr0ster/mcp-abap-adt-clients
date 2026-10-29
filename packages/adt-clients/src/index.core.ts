@@ -86,6 +86,10 @@ export {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
+export type {
+  AdtHandlerOptions,
+  IAdtHandlerContext,
+} from './core/shared/handlerOptions';
 export { AdtStructure } from './core/structure';
 export { AdtTable } from './core/table';
 export { AdtDdicTableType } from './core/tabletype';

@@ -56,9 +56,9 @@ describe('legacy executors', () => {
     [
       'class',
       (c: IAbapConnection): Executor =>
-        new ClassExecutorLegacy(c, undefined, classExecutorDocuments),
+        new ClassExecutorLegacy(c, { results: classExecutorDocuments }),
       (c: IAbapConnection): Executor =>
-        new ClassExecutor(c, undefined, classExecutorDocuments),
+        new ClassExecutor(c, { results: classExecutorDocuments }),
       { className: 'ZCL_GUARD' },
       '/sap/bc/adt/oo/classrun',
       'measured',
@@ -66,9 +66,9 @@ describe('legacy executors', () => {
     [
       'program',
       (c: IAbapConnection): Executor =>
-        new ProgramExecutorLegacy(c, undefined, programExecutorDocuments),
+        new ProgramExecutorLegacy(c, { results: programExecutorDocuments }),
       (c: IAbapConnection): Executor =>
-        new ProgramExecutor(c, undefined, programExecutorDocuments),
+        new ProgramExecutor(c, { results: programExecutorDocuments }),
       { programName: 'ZGUARD' },
       '/sap/bc/adt/programs/programrun',
       'not-measured',

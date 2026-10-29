@@ -42,11 +42,9 @@ describe.each([
 
     // One of four runner classes: each gates `run` on its own receiver, so
     // the call goes through what all of them take.
-    const runner: { run(name: string): Promise<unknown> } = new Runner(
-      conn,
-      undefined,
-      abapUnitRunnerDocuments,
-    );
+    const runner: { run(name: string): Promise<unknown> } = new Runner(conn, {
+      results: abapUnitRunnerDocuments,
+    });
     await runner.run(name);
 
     const body = String(calls[0].data);
@@ -61,7 +59,7 @@ describe('a namespaced class, by test class', () => {
   it('keeps its slashes in containerClass', async () => {
     const { conn, calls } = makeConn();
 
-    await new ClassTestRunner(conn, undefined, classTestRunnerDocuments).run([
+    await new ClassTestRunner(conn, { results: classTestRunnerDocuments }).run([
       { containerClass: '/acme/cl_class', testClass: 'LTC_A' },
     ]);
 
@@ -77,11 +75,9 @@ describe('what XML would read as markup', () => {
   it('is escaped, in the title and the context', async () => {
     const { conn, calls } = makeConn();
 
-    await new ProgramTestRunner(
-      conn,
-      undefined,
-      programTestRunnerDocuments,
-    ).run('ZREPORT', {
+    await new ProgramTestRunner(conn, {
+      results: programTestRunnerDocuments,
+    }).run('ZREPORT', {
       title: 'a < b & "c"',
       context: "it's",
     });

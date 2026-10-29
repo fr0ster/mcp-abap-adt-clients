@@ -46,13 +46,7 @@ describe('legacy package', () => {
 
     const failure = expectFailure(
       (await call(
-        new AdtPackageLegacy(
-          connection,
-          undefined,
-          undefined,
-          undefined,
-          packageDocuments,
-        ),
+        new AdtPackageLegacy(connection, { results: packageDocuments }),
       )) as Parameters<typeof expectFailure>[0],
       'legacy package',
     );
@@ -70,13 +64,7 @@ describe('legacy package', () => {
       const { connection } = recordingConnection();
       const failure = expectFailure(
         (await call(
-          new AdtPackageLegacy(
-            connection,
-            undefined,
-            undefined,
-            undefined,
-            packageDocuments,
-          ),
+          new AdtPackageLegacy(connection, { results: packageDocuments }),
         )) as Parameters<typeof expectFailure>[0],
         'legacy package',
       );
@@ -88,13 +76,10 @@ describe('legacy package', () => {
   it('a refused lock tracks nothing, so unlockAll sends nothing', async () => {
     const { connection, calls } = recordingConnection();
     const registry = new LockRegistry(connection);
-    const handler = new AdtPackageLegacy(
-      connection,
-      undefined,
-      undefined,
-      registry,
-      packageDocuments,
-    );
+    const handler = new AdtPackageLegacy(connection, {
+      lockRegistry: registry,
+      results: packageDocuments,
+    });
 
     await handler.lock(config);
 

@@ -34,7 +34,10 @@ function recording() {
       return { status: 200, statusText: 'OK', data: '<x/>', headers: {} };
     }),
   } as unknown as IAbapConnection;
-  return { utils: new AdtUtils(connection, noopLogger, utilDocuments), sent };
+  return {
+    utils: new AdtUtils(connection, noopLogger, { results: utilDocuments }),
+    sent,
+  };
 }
 
 describe('readObjectMetadata serves the codes it served, and only those', () => {

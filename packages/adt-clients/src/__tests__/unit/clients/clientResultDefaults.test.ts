@@ -10,7 +10,9 @@
  * naming its own `R` and passing nothing got the shipped documents back, typed
  * as `R`. Now each getter has two overloads — no argument answers the shipped
  * documents' type, a custom `R` needs its results — and each constructor takes
- * `results`.
+ * an options object whose `results` is required (`AdtHandlerOptions`). The
+ * four classes no client hands out have a static `create` with the getters'
+ * two overloads (`unit/clients/handlerFactories.test.ts`).
  */
 
 import { AdtClient } from '../../../clients/AdtClient';
@@ -18,6 +20,8 @@ import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import type { AdtModernVariant } from '../../../clients/variant';
 import { AdtClass } from '../../../core/class/AdtClass';
 import { classDocuments } from '../../../core/class/types';
+import { AdtDomain } from '../../../core/domain/AdtDomain';
+import { domainDocuments } from '../../../core/domain/types';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import type { utilDocuments } from '../../../core/shared/utilResultSet';
 import { type AdtAtc, atcDocuments } from '../../../runtime/atc/AdtAtc';
@@ -84,27 +88,34 @@ function constructorTypes(): void {
   const connection = new RecordingConnection();
 
   // Given results: their type.
-  const own = new AdtClass(
-    connection,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    marked(classDocuments),
-  );
+  const own = new AdtClass(connection, { results: marked(classDocuments) });
   const isOwn: Equal<
     typeof own,
     AdtClass<Marked<typeof classDocuments>, AdtModernVariant>
   > = true;
   void isOwn;
 
-  // A constructor takes its results.
+  // A constructor takes its options: `results` required, the context parts
+  // the handler reads optional and by name, a required logger positional.
+  new AdtClass(connection, {
+    results: classDocuments,
+    logger: noopLogger,
+    systemContext: {},
+  });
   // @ts-expect-error -- results are required
-  new AdtClass<Marked<typeof classDocuments>>(connection);
+  new AdtClass<Marked<typeof classDocuments>>(connection, {
+    logger: noopLogger,
+  });
+  // @ts-expect-error -- results are required (a required logger, positional)
+  new AdtUtils(connection, noopLogger, {});
   // @ts-expect-error -- results are required
-  new AdtUtils(connection, noopLogger);
-  // @ts-expect-error -- results are required
-  new RuntimeDumps(connection, noopLogger);
+  new RuntimeDumps(connection, noopLogger, {});
+  // A part the handler does not read is not taken.
+  new AdtDomain(connection, {
+    results: domainDocuments,
+    // @ts-expect-error -- AdtDomain takes no contentTypes
+    contentTypes: {},
+  });
 }
 
 describe('client getters and handler constructors', () => {
@@ -126,11 +137,9 @@ describe('client getters and handler constructors', () => {
 
   it('answer with the documents they are given', async () => {
     const connection = new RecordingConnection();
-    const dumps = new RuntimeDumps(
-      connection,
-      noopLogger,
-      runtimeDumpsDocuments,
-    );
+    const dumps = new RuntimeDumps(connection, noopLogger, {
+      results: runtimeDumpsDocuments,
+    });
 
     const answer = await dumps.list();
 

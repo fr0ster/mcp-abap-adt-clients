@@ -85,7 +85,9 @@ const ROWS: Row[] = [
   ...utilRows(
     (connection) =>
       // @ts-expect-error -- the modern harness drives the 7.40 utilities, whose codes are 7.40's, as a caller outside the type system would
-      new AdtUtilsLegacy(connection, createLibraryLogger(), utilDocuments),
+      new AdtUtilsLegacy(connection, createLibraryLogger(), {
+        results: utilDocuments,
+      }),
     'legacy ',
   ),
 ];

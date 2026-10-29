@@ -24,10 +24,7 @@ function setup() {
     {
       makeAdtRequest: request,
     } as unknown as IAbapConnection,
-    undefined,
-    undefined,
-    undefined,
-    enhancementDocuments,
+    { results: enhancementDocuments },
   );
   return { client, request };
 }

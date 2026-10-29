@@ -77,7 +77,7 @@ describe('whereUsedObjectUri', () => {
 describe('AdtUtils where-used members', () => {
   it('ask about the shared address', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtils(connection, logger, utilDocuments);
+    const utils = new AdtUtils(connection, logger, { results: utilDocuments });
 
     await utils.getWhereUsed(
       {
@@ -102,7 +102,7 @@ describe('AdtUtils where-used members', () => {
 
   it('throw an unknown type before any request is made', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtils(connection, logger, utilDocuments);
+    const utils = new AdtUtils(connection, logger, { results: utilDocuments });
 
     await expect(
       utils.getWhereUsed(

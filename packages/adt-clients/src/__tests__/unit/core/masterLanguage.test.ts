@@ -156,14 +156,12 @@ describe('masterLanguage on create', () => {
 
     it('uses systemContext.masterLanguage (global option) when params omit it', async () => {
       const c = bindingConnection();
-      const binding = new AdtServiceBinding(
-        c,
-        undefined,
-        {
+      const binding = new AdtServiceBinding(c, {
+        systemContext: {
           masterLanguage: 'FR',
         },
-        serviceDocuments,
-      );
+        results: serviceDocuments,
+      });
       // `createServiceBinding` is gone: it and `create` were one request under
       // two names, and the pair existed only because the second answered the
       // envelope. `create` is the member now.
@@ -175,14 +173,12 @@ describe('masterLanguage on create', () => {
 
     it('explicit params.masterLanguage overrides the global option', async () => {
       const c = bindingConnection();
-      const binding = new AdtServiceBinding(
-        c,
-        undefined,
-        {
+      const binding = new AdtServiceBinding(c, {
+        systemContext: {
           masterLanguage: 'FR',
         },
-        serviceDocuments,
-      );
+        results: serviceDocuments,
+      });
       await binding.create(
         {
           ...(baseParams as object),
@@ -219,20 +215,17 @@ describe('masterLanguage on create', () => {
 
     it('high-level: config language in both attributes', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        {},
-        undefined,
-        packageDocuments,
-      ).create(
+      await new AdtPackage(c, {
+        systemContext: {},
+        results: packageDocuments,
+      }).create(
         {
           ...baseConfig,
           masterLanguage: 'DE',
         } as never,
         {
           headers: headersOf(
-            new AdtPackage(c, undefined, {}, undefined, packageDocuments),
+            new AdtPackage(c, { systemContext: {}, results: packageDocuments }),
             'create',
           ),
         },
@@ -242,25 +235,19 @@ describe('masterLanguage on create', () => {
     });
     it('high-level: systemContext fallback', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        { masterLanguage: 'IT' },
-        undefined,
-        packageDocuments,
-      ).create(
+      await new AdtPackage(c, {
+        systemContext: { masterLanguage: 'IT' },
+        results: packageDocuments,
+      }).create(
         {
           ...baseConfig,
         } as never,
         {
           headers: headersOf(
-            new AdtPackage(
-              c,
-              undefined,
-              { masterLanguage: 'IT' },
-              undefined,
-              packageDocuments,
-            ),
+            new AdtPackage(c, {
+              systemContext: { masterLanguage: 'IT' },
+              results: packageDocuments,
+            }),
             'create',
           ),
         },
@@ -270,26 +257,20 @@ describe('masterLanguage on create', () => {
     });
     it('high-level: config overrides systemContext', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        { masterLanguage: 'IT' },
-        undefined,
-        packageDocuments,
-      ).create(
+      await new AdtPackage(c, {
+        systemContext: { masterLanguage: 'IT' },
+        results: packageDocuments,
+      }).create(
         {
           ...baseConfig,
           masterLanguage: 'FR',
         } as never,
         {
           headers: headersOf(
-            new AdtPackage(
-              c,
-              undefined,
-              { masterLanguage: 'IT' },
-              undefined,
-              packageDocuments,
-            ),
+            new AdtPackage(c, {
+              systemContext: { masterLanguage: 'IT' },
+              results: packageDocuments,
+            }),
             'create',
           ),
         },
@@ -299,15 +280,12 @@ describe('masterLanguage on create', () => {
     });
     it('high-level: neither set -> EN', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        {},
-        undefined,
-        packageDocuments,
-      ).create({ ...baseConfig } as never, {
+      await new AdtPackage(c, {
+        systemContext: {},
+        results: packageDocuments,
+      }).create({ ...baseConfig } as never, {
         headers: headersOf(
-          new AdtPackage(c, undefined, {}, undefined, packageDocuments),
+          new AdtPackage(c, { systemContext: {}, results: packageDocuments }),
           'create',
         ),
       });
@@ -316,26 +294,20 @@ describe('masterLanguage on create', () => {
     });
     it('high-level: empty config falls through to systemContext', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        { masterLanguage: 'IT' },
-        undefined,
-        packageDocuments,
-      ).create(
+      await new AdtPackage(c, {
+        systemContext: { masterLanguage: 'IT' },
+        results: packageDocuments,
+      }).create(
         {
           ...baseConfig,
           masterLanguage: '',
         } as never,
         {
           headers: headersOf(
-            new AdtPackage(
-              c,
-              undefined,
-              { masterLanguage: 'IT' },
-              undefined,
-              packageDocuments,
-            ),
+            new AdtPackage(c, {
+              systemContext: { masterLanguage: 'IT' },
+              results: packageDocuments,
+            }),
             'create',
           ),
         },
@@ -345,26 +317,20 @@ describe('masterLanguage on create', () => {
     });
     it('high-level: whitespace config falls through to systemContext', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        { masterLanguage: 'IT' },
-        undefined,
-        packageDocuments,
-      ).create(
+      await new AdtPackage(c, {
+        systemContext: { masterLanguage: 'IT' },
+        results: packageDocuments,
+      }).create(
         {
           ...baseConfig,
           masterLanguage: '   ',
         } as never,
         {
           headers: headersOf(
-            new AdtPackage(
-              c,
-              undefined,
-              { masterLanguage: 'IT' },
-              undefined,
-              packageDocuments,
-            ),
+            new AdtPackage(c, {
+              systemContext: { masterLanguage: 'IT' },
+              results: packageDocuments,
+            }),
             'create',
           ),
         },
@@ -374,20 +340,17 @@ describe('masterLanguage on create', () => {
     });
     it('high-level: surrounding spaces are trimmed', async () => {
       const c = mockConnection();
-      await new AdtPackage(
-        c,
-        undefined,
-        {},
-        undefined,
-        packageDocuments,
-      ).create(
+      await new AdtPackage(c, {
+        systemContext: {},
+        results: packageDocuments,
+      }).create(
         {
           ...baseConfig,
           masterLanguage: ' DE ',
         } as never,
         {
           headers: headersOf(
-            new AdtPackage(c, undefined, {}, undefined, packageDocuments),
+            new AdtPackage(c, { systemContext: {}, results: packageDocuments }),
             'create',
           ),
         },
@@ -416,14 +379,10 @@ describe('masterLanguage on create', () => {
   describe('high-level AdtProgram.create resolution', () => {
     it('uses systemContext.masterLanguage when config omits it', async () => {
       const c = mockConnection();
-      const program = new AdtProgram(
-        c,
-        undefined,
-        { masterLanguage: 'IT' },
-        undefined,
-        undefined,
-        programDocuments,
-      );
+      const program = new AdtProgram(c, {
+        systemContext: { masterLanguage: 'IT' },
+        results: programDocuments,
+      });
       await program.create(
         { programName: 'ZTEST', packageName: '$TMP' },
         { headers: headersOf(program, 'create') },
@@ -433,14 +392,10 @@ describe('masterLanguage on create', () => {
 
     it('config.masterLanguage overrides systemContext', async () => {
       const c = mockConnection();
-      const program = new AdtProgram(
-        c,
-        undefined,
-        { masterLanguage: 'IT' },
-        undefined,
-        undefined,
-        programDocuments,
-      );
+      const program = new AdtProgram(c, {
+        systemContext: { masterLanguage: 'IT' },
+        results: programDocuments,
+      });
       await program.create(
         {
           programName: 'ZTEST',
@@ -454,14 +409,10 @@ describe('masterLanguage on create', () => {
 
     it('falls back to EN with no language anywhere', async () => {
       const c = mockConnection();
-      const program = new AdtProgram(
-        c,
-        undefined,
-        {},
-        undefined,
-        undefined,
-        programDocuments,
-      );
+      const program = new AdtProgram(c, {
+        systemContext: {},
+        results: programDocuments,
+      });
       await program.create(
         { programName: 'ZTEST', packageName: '$TMP' },
         { headers: headersOf(program, 'create') },

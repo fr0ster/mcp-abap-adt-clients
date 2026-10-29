@@ -36,13 +36,10 @@ describe('AdtDdl.checkCdsTestDoubles', () => {
   it('one POST to the test-doubles validation, naming the view', async () => {
     const { conn, calls } = makeConn();
 
-    await new AdtDdl(
-      conn,
-      createLibraryLogger(),
-      undefined,
-      undefined,
-      ddlDocuments,
-    ).checkCdsTestDoubles('ZI_VIEW');
+    await new AdtDdl(conn, {
+      logger: createLibraryLogger(),
+      results: ddlDocuments,
+    }).checkCdsTestDoubles('ZI_VIEW');
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');

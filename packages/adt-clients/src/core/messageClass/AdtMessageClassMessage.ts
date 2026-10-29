@@ -48,6 +48,7 @@ import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
 import { chain } from '../shared/chain';
+import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
 import type { IMessageClassMessageConfig, messageDocuments } from './types';
@@ -81,13 +82,14 @@ export class AdtMessageClassMessage<
   private readonly logger?: ILogger;
   public readonly objectType: string = 'MessageClassMessage';
 
+  private readonly results: R;
+
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    // Required: a caller naming its own R hands its results. The shipped
-    // documents are the default of the getter, typed by its overloads.
-    private readonly results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger } = options;
+    this.results = options.results;
     this.connection = connection;
     this.logger = logger;
   }

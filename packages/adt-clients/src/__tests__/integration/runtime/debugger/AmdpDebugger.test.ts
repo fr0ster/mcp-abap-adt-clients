@@ -228,11 +228,10 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
   function runClass(): void {
     needs(trigger, 'the trigger connection');
-    run = new ClassExecutor(
-      trigger as Connection,
-      connectionLogger,
-      classExecutorDocuments,
-    ).run(
+    run = new ClassExecutor(trigger as Connection, {
+      logger: connectionLogger,
+      results: classExecutorDocuments,
+    }).run(
       {
         className: CLASS_NAME,
       },
@@ -260,16 +259,14 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       skipUnlessConfigured(error, testsLogger);
       throw error;
     }
-    onSession = new AmdpDebugger(
-      session,
-      connectionLogger,
-      amdpDebuggerDocuments,
-    );
-    onCommands = new AmdpDebugger(
-      commands,
-      connectionLogger,
-      amdpDebuggerDocuments,
-    );
+    onSession = new AmdpDebugger(session, {
+      logger: connectionLogger,
+      results: amdpDebuggerDocuments,
+    });
+    onCommands = new AmdpDebugger(commands, {
+      logger: connectionLogger,
+      results: amdpDebuggerDocuments,
+    });
     // The two name each other: each is ensured written (skip_activation in
     // the shared config), then both are activated in one group run — unless
     // both were already at their source and active, and nothing was written.

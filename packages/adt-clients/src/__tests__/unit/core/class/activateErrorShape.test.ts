@@ -43,11 +43,7 @@ describe('activation failure keeps its shape', () => {
   it('a 4xx arrives as a failure carrying the status and the body', async () => {
     const cls = new AdtClass(
       failingWith(400, 'Object ZCL_X cannot be activated'),
-      createLibraryLogger(),
-      undefined,
-      undefined,
-      undefined,
-      classDocuments,
+      { logger: createLibraryLogger(), results: classDocuments },
     );
 
     const failure = expectFailure(
@@ -67,14 +63,10 @@ describe('activation failure keeps its shape', () => {
   });
 
   it('a 5xx keeps what came, not something reshaped', async () => {
-    const cls = new AdtClass(
-      failingWith(500, 'boom'),
-      createLibraryLogger(),
-      undefined,
-      undefined,
-      undefined,
-      classDocuments,
-    );
+    const cls = new AdtClass(failingWith(500, 'boom'), {
+      logger: createLibraryLogger(),
+      results: classDocuments,
+    });
 
     const failure = expectFailure(
       await cls.activate(

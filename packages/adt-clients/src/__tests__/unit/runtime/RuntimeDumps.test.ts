@@ -22,11 +22,9 @@ describe('RuntimeDumps', () => {
 
   it('list() URL contains $top=10 when top option is provided', async () => {
     const connection = createConnectionMock();
-    const dumps = new RuntimeDumps(
-      connection,
-      createLogger(),
-      runtimeDumpsDocuments,
-    );
+    const dumps = new RuntimeDumps(connection, createLogger(), {
+      results: runtimeDumpsDocuments,
+    });
 
     await dumps.list({ top: 10 });
 
@@ -37,11 +35,9 @@ describe('RuntimeDumps', () => {
 
   it('getById() delegates to /sap/bc/adt/runtime/dump/DUMP123', async () => {
     const connection = createConnectionMock();
-    const dumps = new RuntimeDumps(
-      connection,
-      createLogger(),
-      runtimeDumpsDocuments,
-    );
+    const dumps = new RuntimeDumps(connection, createLogger(), {
+      results: runtimeDumpsDocuments,
+    });
 
     await dumps.getById('DUMP123');
 
@@ -55,11 +51,9 @@ describe('RuntimeDumps', () => {
 
   it('getById() with view=summary delegates to /sap/bc/adt/runtime/dump/DUMP123/summary', async () => {
     const connection = createConnectionMock();
-    const dumps = new RuntimeDumps(
-      connection,
-      createLogger(),
-      runtimeDumpsDocuments,
-    );
+    const dumps = new RuntimeDumps(connection, createLogger(), {
+      results: runtimeDumpsDocuments,
+    });
 
     await dumps.getById('DUMP123', { view: 'summary' });
 
@@ -80,7 +74,7 @@ describe('RuntimeDumps', () => {
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-      runtimeDumpsDocuments,
+      { results: runtimeDumpsDocuments },
     );
 
     const prefix = dumps.buildIdPrefix(
@@ -102,7 +96,7 @@ describe('RuntimeDumps', () => {
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-      runtimeDumpsDocuments,
+      { results: runtimeDumpsDocuments },
     );
 
     expect(dumps.buildUserQuery()).toBeUndefined();
@@ -119,7 +113,7 @@ describe('RuntimeDumps', () => {
         warn: jest.fn(),
         debug: jest.fn(),
       } as any,
-      runtimeDumpsDocuments,
+      { results: runtimeDumpsDocuments },
     );
 
     const query = dumps.buildUserQuery('DEVELOPER');

@@ -73,7 +73,7 @@ export function readingProfiler(
   connection: IAbapConnection,
   logger: ILogger,
 ): ReadingProfiler {
-  return new Profiler(connection, logger, profilerReading);
+  return new Profiler(connection, logger, { results: profilerReading });
 }
 
 export interface IWaitForTraceOptions extends IProfilerListOptions {
@@ -165,9 +165,12 @@ export function readingClassExecutor(
   connection: IAbapConnection,
   logger: ILogger,
 ): ClassExecutor<ReadingResults<typeof classExecutorDocuments>> {
-  return new ClassExecutor(connection, logger, {
-    ...classExecutorDocuments,
-    ...schedulingReading,
+  return new ClassExecutor(connection, {
+    logger,
+    results: {
+      ...classExecutorDocuments,
+      ...schedulingReading,
+    },
   });
 }
 
@@ -179,8 +182,11 @@ export function readingProgramExecutor(
   return new ProgramExecutor<
     ReadingResults<typeof programExecutorDocuments>,
     'onprem'
-  >(connection, logger, {
-    ...programExecutorDocuments,
-    ...schedulingReading,
+  >(connection, {
+    logger,
+    results: {
+      ...programExecutorDocuments,
+      ...schedulingReading,
+    },
   });
 }

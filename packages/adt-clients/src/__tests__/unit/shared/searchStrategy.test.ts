@@ -69,10 +69,12 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
 
     const seen: unknown[] = [];
     const utils = new AdtUtils(connection, logger, {
-      ...utilDocuments,
-      search: (answer) => {
-        seen.push(answer.data);
-        return { length: String(answer.data).length };
+      results: {
+        ...utilDocuments,
+        search: (answer) => {
+          seen.push(answer.data);
+          return { length: String(answer.data).length };
+        },
       },
     });
 
@@ -89,12 +91,16 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
   it('issues the same request whichever reading it was built with', async () => {
     const injected = createConnection();
     await new AdtUtils(injected.connection, logger, {
-      ...utilDocuments,
-      search: (answer) => String(answer.data),
+      results: {
+        ...utilDocuments,
+        search: (answer) => String(answer.data),
+      },
     }).search({ query: 'ZCL_*' });
 
     const shipped = createConnection();
-    await new AdtUtils(shipped.connection, logger, utilDocuments).search({
+    await new AdtUtils(shipped.connection, logger, {
+      results: utilDocuments,
+    }).search({
       query: 'ZCL_*',
     });
 
@@ -108,9 +114,11 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     const { connection } = createConnection();
 
     const value = expectResult(
-      await new AdtUtils(connection, logger, utilDocuments).search({
-        query: 'ZCL_*',
-      }),
+      await new AdtUtils(connection, logger, { results: utilDocuments }).search(
+        {
+          query: 'ZCL_*',
+        },
+      ),
       'search',
     );
 
@@ -124,8 +132,10 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
 
     const hits = expectResult(
       await new AdtUtils(connection, logger, {
-        ...utilDocuments,
-        search: utilSearchHits,
+        results: {
+          ...utilDocuments,
+          search: utilSearchHits,
+        },
       }).search({ query: 'ZCL_*' }),
       'search',
     );

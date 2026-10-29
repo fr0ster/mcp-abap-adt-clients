@@ -44,7 +44,9 @@ describe('FeedRepository', () => {
 
   it('list() delegates to /sap/bc/adt/feeds', async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
 
     await repo.list();
 
@@ -58,7 +60,9 @@ describe('FeedRepository', () => {
 
   it('variants() delegates to /sap/bc/adt/feeds/variants with the category', async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
 
     await repo.variants('dumps');
 
@@ -72,7 +76,9 @@ describe('FeedRepository', () => {
 
   it('variants() refuses without a category rather than sending a request the server rejects', async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
 
     // The endpoint answers 400 ExceptionParameterNotFound without one, so there
     // is nothing to gain by asking.
@@ -91,7 +97,9 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
 
     expect(expectResult(await repo.list(), 'feeds')).toBe(MOCK_ATOM);
     expect(expectResult(await repo.variants('dumps'), 'variants')).toBe(
@@ -110,7 +118,9 @@ describe('FeedRepository', () => {
 
   it("passes the caller's analyse through on every member", async () => {
     const connection = createConnectionMock();
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
     const refuse = {
       analyse: () => ({ origin: 'refusal' as const, message: 'no' }),
     };
@@ -134,7 +144,9 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), reading);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: reading,
+    });
 
     const entries = expectResult(
       await repo.byUrl('/sap/bc/adt/runtime/dumps'),
@@ -159,7 +171,9 @@ describe('FeedRepository', () => {
       status: 200,
       data: '<feed xmlns="http://www.w3.org/2005/Atom"></feed>',
     });
-    const repo = new FeedRepository(connection, createLogger(), reading);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: reading,
+    });
 
     const entries = expectResult(
       await repo.byUrl('/sap/bc/adt/runtime/dumps'),
@@ -176,7 +190,9 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
 
     await repo.dumps();
 
@@ -190,7 +206,9 @@ describe('FeedRepository', () => {
       status: 200,
       data: MOCK_ATOM,
     });
-    const repo = new FeedRepository(connection, createLogger(), feedDocuments);
+    const repo = new FeedRepository(connection, createLogger(), {
+      results: feedDocuments,
+    });
 
     await repo.byUrl('/sap/bc/adt/runtime/dumps', {
       maxResults: 5,

@@ -67,11 +67,14 @@ function SCAN(): ReturnType<typeof scanImplementations> {
 
 function otherRows(): Row[] {
   const git = (connection: IAbapConnection) =>
-    new AdtAbapGitClient(connection, createLibraryLogger(), abapGitDocuments);
+    new AdtAbapGitClient(connection, {
+      logger: createLibraryLogger(),
+      results: abapGitDocuments,
+    });
   const abap = (connection: IAbapConnection) =>
-    new AbapDebugger(connection, undefined, abapDebuggerDocuments);
+    new AbapDebugger(connection, { results: abapDebuggerDocuments });
   const amdp = (connection: IAbapConnection) =>
-    new AmdpDebugger(connection, undefined, amdpDebuggerDocuments);
+    new AmdpDebugger(connection, { results: amdpDebuggerDocuments });
   const trace = { description: 'guard' };
   return [
     {
@@ -111,7 +114,7 @@ function otherRows(): Row[] {
       name: 'trace scheduling',
       member: 'scheduleTrace',
       build: (connection) =>
-        new TraceScheduling(connection, traceSchedulingDocuments),
+        new TraceScheduling(connection, { results: traceSchedulingDocuments }),
       call: (h, headers) => m(h, 'scheduleTrace')({ ...trace, headers }),
     },
     {
@@ -190,7 +193,9 @@ const ROWS: Row[] = [
   ...requestRows(modern),
   ...utilRows(
     (connection) =>
-      new AdtUtils(connection, createLibraryLogger(), utilDocuments),
+      new AdtUtils(connection, createLibraryLogger(), {
+        results: utilDocuments,
+      }),
   ),
   ...otherRows(),
 ];
@@ -254,7 +259,7 @@ describe('the batch path', () => {
     const pair = pairFor('batch.getVariables');
 
     const pending = m(
-      new AbapDebugger(batch, undefined, abapDebuggerDocuments),
+      new AbapDebugger(batch, { results: abapDebuggerDocuments }),
       'getVariables',
     )(['LV_GUARD'], {
       headers: pair,

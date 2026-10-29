@@ -17,6 +17,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { runClass } from '../../core/class/run';
+import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {
@@ -81,15 +82,13 @@ export class ClassExecutor<
 
   constructor(
     connection: IAbapConnection,
-    logger: ILogger | undefined,
-    // Required: a caller naming its own R hands its results. The default
-    // documents are the getter's (`AdtExecutor`), typed by its overloads.
-    results: R,
+    options: AdtHandlerOptions<R, 'logger'>,
   ) {
+    const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;
-    this.scheduling = new TraceScheduling(connection, results);
+    this.scheduling = new TraceScheduling(connection, { results });
   }
 
   // --- ITraceScheduling, delegated. Composed into the executor because a run
