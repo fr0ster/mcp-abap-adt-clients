@@ -5,24 +5,41 @@
  * built from this package's own `tsconfig.json`.
  *
  * What looks like a code and is not one goes into ALLOWED, with its reason;
- * an entry that matches no finding fails too, so the list cannot rot.
+ * a type alias of such a vocabulary into ALLOWED_ALIASES, by its declaration
+ * and its exact members. An entry that matches no finding fails too, so the
+ * lists cannot rot.
  */
 
 import { join } from 'node:path';
-import { productionFiles, typeCodeFindings } from './typeCodeScan';
+import {
+  type IAllowedAlias,
+  productionFiles,
+  staleAllowances,
+  typeCodeFindings,
+  unallowedFindings,
+} from './typeCodeScan';
 
 const ROOT = join(__dirname, '../../..');
 const TSCONFIG = join(ROOT, 'tsconfig.json');
 
 /**
- * `<file>:<literal or word>`, or `type:<alias>` for every literal typed by
- * that alias → why it is not a type code.
+ * `type:<declaring file>#<alias>` → the alias's exact members and why its
+ * literals are no type codes. Every literal typed by the alias, its own
+ * declaration's members included, passes while the alias holds exactly these.
  */
-const ALLOWED: ReadonlyMap<string, string> = new Map([
+const ALLOWED_ALIASES: ReadonlyMap<string, IAllowedAlias> = new Map([
   [
-    'type:AbapUnitRunObjectType',
-    "The object types of an ABAP Unit run's object set, sent in `<osl:object type>`: TADIR object types (`CLAS`, `PROG`, `FUGR`, and `FUNC`, which no table lists), not ADT type codes.",
+    'type:src/core/shared/abapUnit.ts#AbapUnitRunObjectType',
+    {
+      members: ['CLAS', 'FUGR', 'FUNC', 'PROG'],
+      reason:
+        "The object types of an ABAP Unit run's object set, sent in `<osl:object type>`: TADIR object types (`CLAS`, `PROG`, `FUGR`, and `FUNC`, which no table lists), not ADT type codes.",
+    },
   ],
+]);
+
+/** `<file>:<literal or word>` → why it is not a type code. */
+const ALLOWED: ReadonlyMap<string, string> = new Map([
   [
     'src/batch/wire.ts:HTTP/1',
     "The HTTP version of a batch part's request line (`HTTP/1.1`), not a type code.",
@@ -45,15 +62,10 @@ describe('type codes in production source come from the tables', () => {
   );
 
   it('types every code literal and names only table codes in comments', () => {
-    expect(
-      findings
-        .filter((finding) => !ALLOWED.has(finding.key))
-        .map((finding) => finding.line),
-    ).toEqual([]);
+    expect(unallowedFindings(findings, ALLOWED, ALLOWED_ALIASES)).toEqual([]);
   });
 
   it('keeps no allow-list entry that matches no finding', () => {
-    const keys = new Set(findings.map((finding) => finding.key));
-    expect([...ALLOWED.keys()].filter((key) => !keys.has(key))).toEqual([]);
+    expect(staleAllowances(findings, ALLOWED, ALLOWED_ALIASES)).toEqual([]);
   });
 });
