@@ -5,6 +5,10 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type {
+  IAdtTransport,
+  IAdtTransportRequest,
+} from '@mcp-abap-adt/connection';
 import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -442,23 +446,49 @@ export async function gateConnect(
 }
 
 /**
+ * The connector's transport seam: `AbstractAbapConnection.transport` of
+ * `@mcp-abap-adt/connection`, public and typed `IAdtTransport` there, and not
+ * a member of `IAbapConnection` — so a connection typed by the contract (as
+ * `createTestConnection` answers it, through its wrappers) does not show it to
+ * the compiler, and it is looked for at run time. Only `send` is used.
+ */
+type IWithTransport = { readonly transport: Pick<IAdtTransport, 'send'> };
+
+function hasTransport<T extends object>(
+  connection: T,
+): connection is T & IWithTransport {
+  if (!('transport' in connection)) return false;
+  const { transport } = connection;
+  return (
+    typeof transport === 'object' &&
+    transport !== null &&
+    'send' in transport &&
+    typeof transport.send === 'function'
+  );
+}
+
+/**
  * Records, into the call that issued it, the Accept and Content-Type of every
  * request the connection's transport sends — after the connection added its
  * defaults. A CSRF token fetch is left out. Only those two headers are read.
  *
  * The transport is the connector's own `transport` field, reached as the test
- * harness's wire log reaches it.
+ * harness's wire log reaches it. A connection without it throws: the probe
+ * would otherwise run and record nothing on the wire, in silence.
  */
 export function onTheWire<T extends object>(connection: T): T {
-  const seam = connection as unknown as {
-    transport?: { send?: (request: unknown) => Promise<unknown> };
-  };
-  const transport = seam.transport;
-  const send = transport?.send;
-  if (!transport || typeof send !== 'function') return connection;
-  transport.send = (request: unknown) => {
+  if (!hasTransport(connection)) {
+    throw new Error(
+      'onTheWire: the connection has no transport seam (`transport.send` of ' +
+        "@mcp-abap-adt/connection's AbstractAbapConnection), so nothing " +
+        'that goes on the wire could be recorded',
+    );
+  }
+  const { transport } = connection;
+  const send = transport.send;
+  transport.send = (request: IAdtTransportRequest) => {
     const capture = current.getStore();
-    const headers = (request as { headers?: Record<string, unknown> })?.headers;
+    const headers = request.headers;
     const fetch = String(headerOf(headers, 'x-csrf-token') ?? '');
     if (capture && fetch.toLowerCase() !== 'fetch') {
       capture.onWire ??= [];

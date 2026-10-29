@@ -305,6 +305,13 @@ holds is no longer sent), and the new members.
   class is read and before the first lock, closes it after the last unlock —
   once, after the unwinding unlocks, when the PUT fails — and answers the
   PUT's answer. No test had supplied the capability before.
+- **The header probe's wire capture fails loudly** (`onTheWire`,
+  `tools/header-probe/capture.ts`; `unit/scripts/onTheWire.test.ts`): a
+  connection without the connector's `transport.send` throws instead of being
+  handed back unchanged, when the probe would have run recording nothing on
+  the wire. The seam is typed by the connector's `IAdtTransport`, read
+  through a type guard, with no cast; with the seam, every request but a CSRF
+  fetch is recorded into the call that sent it.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
 - Request-shape tests for every `updateMetadata`, the function group's
