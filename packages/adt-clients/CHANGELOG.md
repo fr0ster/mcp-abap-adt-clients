@@ -328,6 +328,20 @@ holds is no longer sent), and the new members.
   interfaces-adt alone accepts `AdtClient` and a hand-written object and
   refuses one missing a member it names.
 
+### Documentation
+
+- `docs/usage/ADT_OBJECT_ENTITIES.md` is regenerated from the sources and can
+  no longer go stale silently. `npm run adt:entities` reads them with the
+  TypeScript parser instead of regular expressions — a getter with type
+  parameters had dropped out of the regular expression, and with it every
+  object section of the file — and `npm run check:entities` (part of
+  `check:docs`, so of `lint:check`) fails when the committed file differs.
+  The file gains the function group's source read and upload, the
+  enhancement's version token, `AdtClassMemberBase`, `AdtAbapGitClient.create`,
+  `AdtClientOnPrem` / `AdtClientCloud` with what they extend, and a section
+  for the runtime classes, among them the static `create` of `AbapDebugger`,
+  `AmdpDebugger` and `MemorySnapshots`.
+
 ### Migration
 
 See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
