@@ -59,7 +59,17 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       reason: MESSAGE_OWN_URI,
     },
   ],
-  'basis-740': [],
+  'basis-740': [
+    {
+      rule: 'source',
+      api: 'functionGroup',
+      code: 'FUGR/F',
+      detail:
+        'source not listed, the metadata document links a text/plain or untyped source',
+      reason:
+        'on SAP_BASIS 7.40 the main source is not measured yet; measured on the SAP_BASIS 7.40 system next',
+    },
+  ],
 };
 
 /**
@@ -123,8 +133,10 @@ export const METADATA_TYPE_UNADVERTISED: {
 };
 
 /**
- * The samples with no readable answer: their metadata read answered 403, so
- * the sample-based rules (`address`, `source`) are not asserted for them.
+ * The samples with no readable answer: their metadata read answered 403 (or
+ * 404), so the sample-based rules (`address`, `source`) are not asserted for
+ * them. A sample whose metadata was read is readable, with or without a
+ * urimapper answer (`ADDRESS_NOT_RUN`).
  */
 export const NO_READABLE_SAMPLE: {
   readonly [R in RecordedRelease]: Readonly<Record<string, string>>;
@@ -135,6 +147,39 @@ export const NO_READABLE_SAMPLE: {
     'FTG2/FT': 'no readable sample: every candidate answered 403',
   },
   'basis-740': {},
+};
+
+/**
+ * Why SAP_BASIS 7.40 has no urimapper answer, as its `_index.json` gives it
+ * for every code.
+ */
+const NO_URIMAPPER_740 =
+  "SAP_BASIS 7.40 has no /sap/bc/adt/vit/urimapper: discovery does not list it and a GET answers 404 'No application class found for URI' (text/plain), so there is no urimapper answer to hold the library's address to";
+
+/**
+ * The readable samples with no urimapper answer: rule `address` is not
+ * applicable there and is not run, for the reason given; rule `source` is.
+ * The urimapper is asked only of the newer releases (spec 4, rule 5).
+ */
+export const ADDRESS_NOT_RUN: {
+  readonly [R in RecordedRelease]: Readonly<Record<string, string>>;
+} = {
+  's4-2025': {},
+  'abap-cloud': {},
+  'basis-740': Object.fromEntries(
+    [
+      'CLAS/OC',
+      'DDLS/DF',
+      'FUGR/F',
+      'FUGR/FF',
+      'FUGR/I',
+      'INTF/OI',
+      'MSAG/N',
+      'MSAG/NN',
+      'PROG/I',
+      'PROG/P',
+    ].map((code) => [code, NO_URIMAPPER_740]),
+  ),
 };
 
 /** The coverage of one release, as `coverage.json` records it. */

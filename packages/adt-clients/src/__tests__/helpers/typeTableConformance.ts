@@ -71,14 +71,25 @@ export interface ICollection {
   readonly templateLinks: readonly ITemplateLink[];
 }
 
+/** A sample's urimapper read: its `adtcore:uri`, or why there is none. */
+export type UrimapperAnswer =
+  | { readonly answered: true; readonly uri: string }
+  | { readonly answered: false; readonly reason: string };
+
 /** What one sample object's reads answered. */
 export type SampleAnswer =
   | {
+      /** The metadata read answered: rule `source` runs. */
       readonly readable: true;
       readonly name: string;
       readonly parent: string | null;
-      /** `adtcore:uri` of the `urimapper` answer. */
-      readonly urimapperUri: string;
+      /**
+       * The `urimapper` answer's `adtcore:uri` — rule `address` runs — or,
+       * where the release has no urimapper answer to hold the library's
+       * address to (SAP_BASIS 7.40 has no `/sap/bc/adt/vit/urimapper`), why
+       * rule `address` is not run.
+       */
+      readonly urimapper: UrimapperAnswer;
       /**
        * The media types of the metadata document's `…/relations/source`
        * links, `''` for an untyped one (rule `source`).
@@ -86,6 +97,7 @@ export type SampleAnswer =
       readonly sourceLinkTypes: readonly string[];
     }
   | {
+      /** The metadata read failed (403, 404): no sample rule runs. */
       readonly readable: false;
       readonly name: string;
       /** Why the sample-based rules are not run for it. */
@@ -568,8 +580,16 @@ export interface IConformanceReport {
   readonly capabilityNotUsed: Readonly<Record<string, readonly string[]>>;
   /** Coverage: the release's types no entry serves, code → label. */
   readonly unserved: Readonly<Record<string, string>>;
-  /** Samples whose sample-based rules were not run, code → reason. */
+  /**
+   * Samples whose metadata read failed, so neither sample-based rule was
+   * run, code → reason.
+   */
   readonly unreadable: Readonly<Record<string, string>>;
+  /**
+   * Readable samples with no urimapper answer, so rule `address` was not run
+   * (rule `source` was), code → reason.
+   */
+  readonly addressNotRun: Readonly<Record<string, string>>;
   /**
    * 10, listed apart: the advertised collections (`href`) that carry a code
    * whose entry lists `updateMetadata` and that advertise no `app:accept`
@@ -635,6 +655,7 @@ export function checkTypeTable(
 
   const createWithoutCapability: string[] = [];
   const unreadable: [string, string][] = [];
+  const addressNotRun: [string, string][] = [];
   const metadataTypeUnadvertised = new Set<string>();
   /** Per code, the operations of every entry that holds it. */
   const opsByCode = new Map<string, Set<AdtOperation>>();
@@ -789,14 +810,18 @@ export function checkTypeTable(
       }
       if (!sampleChecked.has(code)) {
         sampleChecked.add(code);
-        const built = libraryAddress(code, sample.name, sample.parent);
-        if (built !== sample.urimapperUri) {
-          conflict(
-            'address',
-            api,
-            code,
-            `the library addresses ${built}, urimapper answers ${sample.urimapperUri}`,
-          );
+        if (!sample.urimapper.answered) {
+          addressNotRun.push([code, sample.urimapper.reason]);
+        } else {
+          const built = libraryAddress(code, sample.name, sample.parent);
+          if (built !== sample.urimapper.uri) {
+            conflict(
+              'address',
+              api,
+              code,
+              `the library addresses ${built}, urimapper answers ${sample.urimapper.uri}`,
+            );
+          }
         }
       }
       const links = sample.sourceLinkTypes;
@@ -858,6 +883,7 @@ export function checkTypeTable(
     capabilityNotUsed,
     unserved: sortedRecord(unserved),
     unreadable: sortedRecord(unreadable),
+    addressNotRun: sortedRecord(addressNotRun),
     metadataTypeUnadvertised: sorted([...metadataTypeUnadvertised]),
   };
 }

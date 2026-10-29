@@ -45,6 +45,7 @@ import {
   CORPUS,
   readExchange,
   readSampleIndex,
+  sampleAnswer,
 } from '../../helpers/recordedConformance';
 import {
   createTestAdtClient,
@@ -62,9 +63,7 @@ import {
   libraryAddress,
   librarySourceTypesOf,
   readDiscovery,
-  readSourceLinkTypes,
   readTypeStructure,
-  readUrimapperUri,
   type SampleAnswer,
   TYPE_TABLES,
 } from '../../helpers/typeTableConformance';
@@ -337,22 +336,7 @@ describe(
             metadata.accept,
             true,
           );
-          samples.set(
-            code,
-            read.status === 403
-              ? {
-                  readable: false,
-                  name: sample.name,
-                  reason: 'the metadata read answered 403',
-                }
-              : {
-                  readable: true,
-                  name: sample.name,
-                  parent: sample.parent,
-                  urimapperUri: readUrimapperUri(urimapper.body),
-                  sourceLinkTypes: readSourceLinkTypes(read.body),
-                },
-          );
+          samples.set(code, sampleAnswer(sample, urimapper, read));
           if (out) {
             const templateRead = await get(
               connection,
@@ -456,10 +440,16 @@ describe(
                 metadata: read.status,
               },
               urimapperUri:
-                answer?.readable === true ? answer.urimapperUri : null,
+                answer?.readable === true && answer.urimapper.answered
+                  ? answer.urimapper.uri
+                  : null,
               libraryUri: libraryAddress(code, sample.name, sample.parent),
               files: sample.files,
-              ...(answer?.readable === false ? { reason: answer.reason } : {}),
+              ...(answer?.readable === false
+                ? { reason: answer.reason }
+                : answer?.urimapper.answered === false
+                  ? { reason: answer.urimapper.reason }
+                  : {}),
             };
           }
           fs.writeFileSync(

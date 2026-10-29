@@ -16,15 +16,12 @@
  * that makes that rule, and only it, fail.
  */
 
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   ADT_TYPES_ONPREM,
   type AdtApiTable,
   type AdtOperations,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
-  CORPUS,
   type IIndexedSample,
   RELEASES,
   type RecordedRelease,
@@ -48,6 +45,7 @@ import {
   TYPE_TABLES,
 } from '../../helpers/typeTableConformance';
 import {
+  ADDRESS_NOT_RUN,
   CREATE_WITHOUT_CAPABILITY,
   DIVERGENCES,
   METADATA_TYPE_UNADVERTISED,
@@ -133,22 +131,55 @@ describe.each(RECORDED)(
     it('names every sample with no readable answer', () => {
       expect(report.unreadable).toEqual(NO_READABLE_SAMPLE[release]);
     });
+
+    it('names every sample with no urimapper answer, where rule address is not run', () => {
+      expect(report.addressNotRun).toEqual(ADDRESS_NOT_RUN[release]);
+    });
   },
 );
 
-describe('basis-740: answers not recorded (the SAP_BASIS 7.40 system is unavailable)', () => {
-  // The 7.40 table's sample-based rules (address, source) are not run; the
-  // other rules run above against its recorded discovery and typestructure.
-  it('has no conformance/basis-740/ yet — when it is recorded, this fails and the sample rules run', () => {
-    expect(existsSync(join(CORPUS, 'conformance', 'basis-740'))).toBe(false);
-    expect(recordedAnswers('basis-740').samples).toBeUndefined();
+describe('basis-740: the sample rules on SAP_BASIS 7.40', () => {
+  // 7.40 answers the metadata read of every sample and has no urimapper: rule
+  // source runs against every sample, rule address against none — stated per
+  // code with its reason, not passed silently.
+  let report: IConformanceReport;
+  let answers: IReleaseAnswers;
+  beforeAll(() => {
+    answers = recordedAnswers('basis-740');
+    report = checkTypeTable(tableOf('basis-740'), answers, SOURCE_TYPES);
   });
-  it.todo(
-    'basis-740: address — urimapper answers not recorded (the 7.40 system is unavailable)',
+
+  it('every code of the table has a readable sample: its metadata was read', () => {
+    const codes = Object.values(tableOf('basis-740')).flatMap((entry) =>
+      Object.keys(entry?.codes ?? {}),
+    );
+    expect(codes.length).toBeGreaterThan(0);
+    for (const code of codes) {
+      expect(answers.samples?.get(code)?.readable).toBe(true);
+    }
+    expect(report.unreadable).toEqual({});
+  });
+
+  it.each(Object.entries(ADDRESS_NOT_RUN['basis-740']))(
+    'address: not applicable for %s — %s',
+    (code, reason) => {
+      const sample = answers.samples?.get(code);
+      expect(sample?.readable === true && sample.urimapper).toEqual({
+        answered: false,
+        reason,
+      });
+      expect(report.addressNotRun[code]).toBe(reason);
+      expect(
+        report.conflicts.filter((c) => c.rule === 'address' && c.code === code),
+      ).toEqual([]);
+    },
   );
-  it.todo(
-    'basis-740: source — metadata answers not recorded (the 7.40 system is unavailable)',
-  );
+
+  it('source: run for every code, finding exactly the committed source divergences', () => {
+    expect(lines(report.conflicts.filter((c) => c.rule === 'source'))).toEqual(
+      lines(DIVERGENCES['basis-740'].filter((d) => d.rule === 'source')),
+    );
+  });
 });
 
 describe('a deliberate break fails the check against the recorded answers', () => {
@@ -392,6 +423,8 @@ interface ISampleFixture {
   uri: string;
   metadata: string;
   metadataStatus?: number;
+  urimapperStatus?: number;
+  reason?: string;
 }
 
 const BASE_SAMPLES: Record<string, ISampleFixture> = {
@@ -440,14 +473,14 @@ function fixtureAnswers(change: IAnswerChange = {}): IReleaseAnswers {
       const indexed: IIndexedSample = {
         name: s.name,
         parent: s.parent,
-        reason: undefined,
+        reason: s.reason,
         files: { template: '', urimapper: '', metadata: '' },
       };
       read.set(
         code,
         sampleAnswer(
           indexed,
-          { status: 200, body: urimapperXml(s.uri) },
+          { status: s.urimapperStatus ?? 200, body: urimapperXml(s.uri) },
           { status: s.metadataStatus ?? 200, body: s.metadata },
         ),
       );
@@ -487,6 +520,7 @@ describe('the check bites: the fixture passes', () => {
     expect(report.unserved).toEqual({ 'ZZZZ/Z': 'Other' });
     expect(report.capabilityNotUsed).toEqual({});
     expect(report.unreadable).toEqual({});
+    expect(report.addressNotRun).toEqual({});
   });
 });
 
@@ -701,6 +735,64 @@ describe('the check bites: what is not a conflict', () => {
     expect(report.unreadable).toEqual({
       'CLAS/OC': 'the metadata read answered 403',
     });
+  });
+
+  it('a sample whose metadata read answered 404 is named, and its sample rules are not run', () => {
+    const report = checkTypeTable(
+      fixtureTable(),
+      fixtureAnswers({
+        samples: samplesWith('CLAS/OC', {
+          uri: '/sap/bc/adt/oo/classes/zcl_y',
+          metadata: metadataXml([]),
+          metadataStatus: 404,
+        }),
+      }),
+      SOURCE_TYPES,
+    );
+    expect(lines(report.conflicts)).toEqual([]);
+    expect(report.unreadable).toEqual({
+      'CLAS/OC': 'the metadata read answered 404',
+    });
+  });
+
+  it('a sample with no urimapper answer: rule address is not run, stated by its reason; rule source runs', () => {
+    const report = checkTypeTable(
+      fixtureTable(),
+      fixtureAnswers({
+        samples: samplesWith('FUGR/F', {
+          uri: '/sap/bc/adt/functions/groups/zother',
+          urimapperStatus: 404,
+          reason: 'no urimapper on this release',
+          metadata: metadataXml([{ rel: SOURCE, type: '' }]),
+        }),
+      }),
+      SOURCE_TYPES,
+    );
+    expect(lines(report.conflicts)).toEqual([
+      'source: functionGroup FUGR/F: source not listed, the metadata document links a text/plain or untyped source',
+    ]);
+    expect(report.addressNotRun).toEqual({
+      'FUGR/F': 'no urimapper on this release',
+    });
+    expect(report.unreadable).toEqual({});
+  });
+
+  it('a urimapper read that did not answer, with no reason in the index, is refused', () => {
+    expect(() =>
+      fixtureAnswers({
+        samples: samplesWith('CLAS/OC', { urimapperStatus: 404 }),
+      }),
+    ).toThrow('ZCL_X: urimapper answered 404, and the index gives no reason');
+  });
+
+  it('a reason in the index where both reads answered is refused', () => {
+    expect(() =>
+      fixtureAnswers({
+        samples: samplesWith('CLAS/OC', { reason: 'stale' }),
+      }),
+    ).toThrow(
+      'ZCL_X: the index gives a reason, but urimapper and metadata both answered 200',
+    );
   });
 
   it('a release with no recorded samples runs no sample rule', () => {

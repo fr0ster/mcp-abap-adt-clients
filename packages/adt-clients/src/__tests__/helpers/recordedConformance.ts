@@ -17,6 +17,7 @@ import {
   readTypeStructure,
   readUrimapperUri,
   type SampleAnswer,
+  type UrimapperAnswer,
 } from './typeTableConformance';
 
 export const CORPUS = join(__dirname, '../../../corpus/adt');
@@ -95,7 +96,11 @@ export function readExchange(dir: string, sidecar: string): IRecordedExchange {
 export interface IIndexedSample {
   readonly name: string;
   readonly parent: string | null;
-  /** Why the release has no readable sample, where the index says so. */
+  /**
+   * Why a read of the sample has no answer to hold to, where the index says
+   * so: the metadata read refused (no readable sample), or the release has no
+   * urimapper (rule `address` not run).
+   */
   readonly reason: string | undefined;
   readonly files: {
     readonly template: string;
@@ -149,33 +154,53 @@ export function readSampleIndex(
   return samples;
 }
 
-/** What a sample's urimapper and metadata reads say, read from their answers. */
+/**
+ * What a sample's urimapper and metadata reads say, read from their answers —
+ * each read on its own.
+ *
+ * - The metadata read: `200` is a readable sample (rule `source` runs); `403`
+ *   or `404` is no readable sample, and no sample rule runs; anything else
+ *   throws.
+ * - The urimapper read, for a readable sample: `200` is the address to hold
+ *   the library's to (rule `address` runs); anything else needs the index's
+ *   `reason` — SAP_BASIS 7.40 has no urimapper — and rule `address` is not run
+ *   for it, stated by that reason; without one it throws.
+ */
 export function sampleAnswer(
   sample: IIndexedSample,
   urimapper: { readonly status: number; readonly body: string },
   metadata: { readonly status: number; readonly body: string },
 ): SampleAnswer {
-  // A metadata read the system refused is no readable sample (brief: 403).
-  if (metadata.status === 403) {
+  if (metadata.status === 403 || metadata.status === 404) {
     return {
       readable: false,
       name: sample.name,
-      reason: sample.reason ?? 'the metadata read answered 403',
+      reason: sample.reason ?? `the metadata read answered ${metadata.status}`,
     };
   }
-  if (sample.reason !== undefined) {
-    return { readable: false, name: sample.name, reason: sample.reason };
+  if (metadata.status !== 200) {
+    throw new Error(`${sample.name}: metadata answered ${metadata.status}`);
   }
-  if (urimapper.status !== 200 || metadata.status !== 200) {
+  let address: UrimapperAnswer;
+  if (urimapper.status === 200) {
+    if (sample.reason !== undefined) {
+      throw new Error(
+        `${sample.name}: the index gives a reason, but urimapper and metadata both answered 200`,
+      );
+    }
+    address = { answered: true, uri: readUrimapperUri(urimapper.body) };
+  } else if (sample.reason !== undefined) {
+    address = { answered: false, reason: sample.reason };
+  } else {
     throw new Error(
-      `${sample.name}: urimapper answered ${urimapper.status}, metadata ${metadata.status}`,
+      `${sample.name}: urimapper answered ${urimapper.status}, and the index gives no reason`,
     );
   }
   return {
     readable: true,
     name: sample.name,
     parent: sample.parent,
-    urimapperUri: readUrimapperUri(urimapper.body),
+    urimapper: address,
     sourceLinkTypes: readSourceLinkTypes(metadata.body),
   };
 }
