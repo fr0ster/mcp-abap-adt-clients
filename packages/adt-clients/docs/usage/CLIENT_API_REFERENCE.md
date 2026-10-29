@@ -2227,7 +2227,11 @@ attach names the debuggee's server (`INSTANCE_NAME` in the listener's answer),
 which this package sends as the `saplb` header.
 
 ```typescript
-import { AbapDebugger, AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import {
+  AbapDebugger,
+  AdtExecutor,
+  abapDebuggerDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 
 // terminalId and ideId: 32 upper-case hex characters, kept for the session.
@@ -2235,7 +2239,7 @@ import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 const identity = { debuggingMode: 'user', requestUser, terminalId, ideId } as const;
 
 listenerConnection.setSessionType('stateful');
-const listener = new AbapDebugger(listenerConnection, logger);
+const listener = new AbapDebugger(listenerConnection, logger, abapDebuggerDocuments);
 // clientId (any kind) is the caller's tag: the server echoes it on every row of
 // the answer, placed and refused, and does not keep the request's order, so it
 // is what pairs an answer row with the request row that made it.
@@ -2254,7 +2258,7 @@ const debuggeeId = /<DEBUGGEE_ID>([^<]*)</.exec(doc)?.[1];
 const server = /<INSTANCE_NAME>([^<]*)</.exec(doc)?.[1];
 
 debugConnection.setSessionType('stateful');   // a new connection, for this debuggee
-const session = new AbapDebugger(debugConnection, logger);
+const session = new AbapDebugger(debugConnection, logger, abapDebuggerDocuments);
 await session.attach(identity, debuggeeId!, { server });
 await session.getStack();
 await session.getChildVariables(['@ROOT'], { headers });

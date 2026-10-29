@@ -387,29 +387,74 @@ source and the nine others needs a `metadataUpdated` slot (interfaces-adt
 How the tables are held to what each release answers — in CI and live — is in
 the README: [The type tables' conformance check](../../README.md#the-type-tables-conformance-check).
 
-## An executor's getter answers what it was given
+## A getter answers what it was given; a constructor takes its results
 
 ### What changed
 
-Every getter of `AdtExecutor` defaulted its result set with
-`results: R = <x>Documents as unknown as R`, so `getClassTestRunner<MyResults>()`
-compiled and answered the shipped documents typed as `MyResults`. Each getter
-now has two overloads: `getX()` answers the runner typed by the shipped
-documents, `getX(results)` one typed by `results`. A runner's or an executor's
-constructor (`ClassExecutor`, `ProgramExecutor`, `ClassTestRunner`,
-`ProgramTestRunner`, `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
-`AbapUnitTestRunner`, `TraceScheduling`) takes `results` as a required
-parameter, after a `logger` of type `ILogger | undefined`. Requests and
-answers do not change.
+Every getter of `AdtClient`, `AdtRuntimeClient` and `AdtExecutor`, and every
+handler's, runner's and executor's constructor, defaulted its result set with
+`results: R = <x>Documents as unknown as R`. So `client.getClass<MyResults>()`
+or `executor.getClassTestRunner<MyResults>()` compiled and answered the shipped
+documents typed as `MyResults`.
+
+- **Getters.** Each getter now has two overloads: `getX()` answers the handler
+  typed by the shipped documents (`AdtClass<typeof classDocuments, V>`),
+  `getX(results)` one typed by `results`. The variant gates (`this:` and the
+  members' `AdtPerformedBy`) are unchanged. This covers the 35 getters of
+  `AdtClient` (`getClass` … `getLocalMacros`, `getUtils`), the 11 of
+  `AdtRuntimeClient` (`getProfiler`, `getCrossTrace`, `getSt05Trace`,
+  `getApplicationLog`, `getAtc`, `getAtcLog`, `getDdicActivation`,
+  `getDumps`, `getFeeds`, `getSystemMessages`, `getGatewayErrorLog`) and the
+  7 of `AdtExecutor`.
+- **Constructors.** A constructor cannot choose its generic per overload, so
+  `results` is a required parameter, and every optional parameter before it is
+  now `T | undefined` (pass `undefined` for "not given"). Parameters after it
+  (`AdtInclude`'s and `AdtBehaviorImplementation`'s `systemContext`,
+  `AbapDebugger`'s options) stay optional. This covers:
+  - every `core/*` handler (`AdtClass`, `AdtProgram`, `AdtInclude`,
+    `AdtInterface`, `AdtDomain`, `AdtDataElement`, `AdtStructure`, `AdtTable`,
+    `AdtDdicTableType`, `AdtDdl`, `AdtFunctionGroup`, `AdtFunctionModule`,
+    `AdtFunctionInclude`, `AdtPackage`, `AdtMessageClass`,
+    `AdtMessageClassMessage`, `AdtAccessControl`, `AdtTransformation`,
+    `AdtServiceDefinition`, `AdtScalarFunction`,
+    `AdtScalarFunctionImplementation`, `AdtAppendStructure`,
+    `AdtServiceBinding`, `AdtBehaviorDefinition`, `AdtBehaviorImplementation`,
+    `AdtMetadataExtension`, `AdtEnhancement`, `AdtFeatureToggle`,
+    `AdtAuthorizationField`, `AdtRequest`, `AdtUtils`, `AdtLocalTestClass`,
+    `AdtLocalTypes`, `AdtLocalDefinitions`, `AdtLocalMacros`);
+  - every `runtime/*` handler (`Profiler`, `CrossTrace`, `St05Trace`,
+    `ApplicationLog`, `AdtAtc`, `AtcLog`, `DdicActivation`, `RuntimeDumps`,
+    `FeedRepository`, `SystemMessages`, `GatewayErrorLog`, `AbapDebugger`,
+    `AmdpDebugger`, `MemorySnapshots`);
+  - `AdtAbapGitClient`;
+  - `ClassExecutor`, `ProgramExecutor`, `ClassTestRunner`,
+    `ProgramTestRunner`, `FunctionGroupTestRunner`,
+    `FunctionModuleTestRunner`, `AbapUnitTestRunner`, `TraceScheduling`.
+
+Requests and answers do not change.
 
 ### What a caller does
 
-- `executor.getClassTestRunner()` and `executor.getClassTestRunner({ ...classTestRunnerDocuments, run: unitTestRunId })`: nothing.
-- `executor.getClassTestRunner<MyResults>()` with no argument: pass the results
-  — `executor.getClassTestRunner(myResults)`.
-- `new ClassTestRunner(connection)` or `new ClassTestRunner(connection, logger)`:
-  pass the documents — `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`
-  (`undefined` for no logger). A subclass's constructor does the same.
+- `client.getClass()`, `client.getClass({ ...classDocuments, source: mine })`,
+  `executor.getClassTestRunner()`: nothing.
+- `client.getClass<MyResults>()` (or any getter named with its own `R` and no
+  argument): pass the results — `client.getClass(myResults)`.
+- A handler constructed directly — `new AdtClass(connection)`,
+  `new AdtClass(connection, logger)`: pass the documents, with `undefined` for
+  each parameter not given before them —
+  `new AdtClass(connection, logger, undefined, undefined, undefined, classDocuments)` —
+  or take it from the getter, `client.getClass()`.
+- A handler no getter hands out — `new AbapDebugger(connection, logger)`,
+  `new AdtAbapGitClient(connection)`: pass its documents —
+  `new AbapDebugger(connection, logger, abapDebuggerDocuments)`,
+  `new AdtAbapGitClient(connection, undefined, abapGitDocuments)`. Likewise
+  `amdpDebuggerDocuments`, `memorySnapshotsDocuments`.
+- A runner — `new ClassTestRunner(connection, logger)`: pass the documents —
+  `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`.
+- A subclass's constructor passes the results to its base the same way.
+
+Every `<x>Documents` is exported where its class is (the root, `/core`,
+`/runtime`, `/abapgit`, `/executors`).
 
 ## The legacy package
 

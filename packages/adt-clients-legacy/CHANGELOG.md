@@ -15,12 +15,18 @@ of a 0.x package, so a minor.
 
 ### Breaking
 
-- **`AdtExecutorLegacy`'s getters have adt-clients 38's two overloads**:
-  no argument answers the legacy runner typed by the shipped documents, a
-  result set one typed by it; `getClassTestRunner<MyResults>()` without
-  results no longer compiles. The legacy runners and executors inherit the
-  required `results` of their base constructors:
-  `new ClassTestRunnerLegacy(connection, logger, classTestRunnerDocuments)`.
+- **`AdtClientLegacy`'s and `AdtExecutorLegacy`'s getters have adt-clients
+  38's two overloads**: no argument answers the legacy handler, runner or
+  executor typed by the shipped documents, a result set one typed by it;
+  `getClass<MyResults>()` or `getClassTestRunner<MyResults>()` without
+  results no longer compiles. Every override of `AdtClientLegacy` (the
+  sixteen served types' and the eighteen absent ones') takes them, its
+  variant gate unchanged. The legacy handlers, runners and executors inherit
+  the required `results` of their base constructors:
+  `new AdtClassLegacy(connection, logger, undefined, undefined, undefined, classDocuments)`,
+  `new AdtUtilsLegacy(connection, logger, utilDocuments)`,
+  `new ClassTestRunnerLegacy(connection, logger, classTestRunnerDocuments)`;
+  or take one from the getter. No request and no answer changes.
 - **`AdtClientLegacy` is `AdtClient<'basis740'>`, typed by 7.40's table.**
   `AdtExecutorLegacy` is `AdtExecutor<'basis740'>`, and every legacy handler
   extends its base fixed to `'basis740'`. A getter or member

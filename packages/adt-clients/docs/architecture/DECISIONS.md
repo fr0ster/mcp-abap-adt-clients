@@ -873,7 +873,7 @@ accepted by this package's factories, so they live in `@mcp-abap-adt/interfaces-
 (20.2.0). The client is accepted by the consumer, so the consumer composes the
 client contract it needs from interfaces-adt's atoms, result-set contracts and
 config types. This package declares no composition: each factory answers its
-own class (`getClass<R …>(results?: R): AdtClass<R>`), and the values — the
+own class (`getClass(): AdtClass<typeof classDocuments>`, `getClass<R …>(results: R): AdtClass<R>`), and the values — the
 `<x>Documents` defaults, `rawDocument`, `nothing` — stay here.
 
 **Against.** Moving the compositions into interfaces-adt. The contract package

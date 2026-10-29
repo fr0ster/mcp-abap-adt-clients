@@ -67,22 +67,30 @@ holds is no longer sent), and the new members.
 
 ### Breaking
 
-- **An executor's getter answers what it was given; a runner's constructor
-  takes its results.** Every `AdtExecutor` getter (`getClassExecutor`,
-  `getProgramExecutor`, `getClassTestRunner`, `getProgramTestRunner`,
-  `getFunctionGroupTestRunner`, `getFunctionModuleTestRunner`,
-  `getAbapUnitTestRunner`) had `results: R = <x>Documents as unknown as R`:
-  `getClassTestRunner<MyResults>()` compiled and answered the shipped
-  documents typed as `MyResults`. Each getter now has two overloads —
-  `getX()` answers `X<typeof xDocuments, V>`, `getX(results)` answers
-  `X<R, V>` — so a custom `R` without its results does not compile. The
-  constructors of `ClassExecutor`, `ProgramExecutor`, `ClassTestRunner`,
-  `ProgramTestRunner`, `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
+- **A getter answers what it was given; a constructor takes its results.**
+  Every getter of `AdtClient` (35), `AdtRuntimeClient` (11) and
+  `AdtExecutor` (7), and every handler's, runner's and executor's
+  constructor, had `results: R = <x>Documents as unknown as R`:
+  `client.getClass<MyResults>()` compiled and answered the shipped documents
+  typed as `MyResults`. Each getter now has two overloads — `getX()` answers
+  `X<typeof xDocuments, V>`, `getX(results)` answers `X<R, V>` — so a custom
+  `R` without its results does not compile; the variant gates are unchanged.
+  The constructors of every `core/*` handler (`AdtClass` … `AdtUtils`,
+  `AdtRequest`), every `runtime/*` handler (`Profiler` … `AbapDebugger`,
+  `AmdpDebugger`, `MemorySnapshots`), `AdtAbapGitClient`, `ClassExecutor`,
+  `ProgramExecutor`, `ClassTestRunner`, `ProgramTestRunner`,
+  `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
   `AbapUnitTestRunner` and `TraceScheduling` take `results` as a required
-  parameter (`logger` is `ILogger | undefined` before it). No request and no
-  answer changes. A caller of a getter with no argument, or with its own
-  documents, changes nothing; a caller constructing one directly passes the
-  documents: `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`.
+  parameter; every optional parameter before it is now `T | undefined`. No
+  `as unknown as` is left in the package's source. No request and no answer
+  changes. A caller of a getter with no argument, or with its own documents,
+  changes nothing; `getX<MyResults>()` passes its results; a caller
+  constructing a handler directly passes the documents
+  (`new AdtClass(connection, logger, undefined, undefined, undefined, classDocuments)`,
+  `new AbapDebugger(connection, logger, abapDebuggerDocuments)`,
+  `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`) or
+  takes it from the getter. See MIGRATION-38, "A getter answers what it was
+  given; a constructor takes its results".
 - **A client is fixed to its release variant.** `AdtClient<V extends
   AdtVariant = AdtModernVariant>`; `AdtClientOnPrem` (`'onprem'`, S/4HANA
   2025) and `AdtClientCloud` (`'cloud'`, ABAP cloud) fix it, and a plain

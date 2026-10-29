@@ -11,7 +11,7 @@ import { rawOf } from '../result';
  * passes these strategies when they construct it:
  *
  * ```typescript
- * const git = new AdtAbapGitClient(connection, logger, undefined, {
+ * const git = new AdtAbapGitClient(connection, logger, {
  *   ...abapGitDocuments,
  *   repos: abapGitRepos,
  * });
