@@ -22,6 +22,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { at, field, isElement, leafText, listOf } from '../parsed';
 import { rawOf } from '../result';
 
 export interface IFeedEntry {
@@ -126,7 +127,7 @@ const xmlParser = new XMLParser({
  * The document, parsed — or nothing, for a body that is empty or is not XML.
  * Reading nothing out of it is the truth about it; judging it is `analyse`'s.
  */
-function parseOrEmpty(xml: string): any {
+function parseOrEmpty(xml: string): unknown {
   if (!xml.trim()) return {};
   try {
     return xmlParser.parse(xml) ?? {};
@@ -136,30 +137,57 @@ function parseOrEmpty(xml: string): any {
 }
 
 /**
+ * A leaf as text, `''` when absent or no text. This parser coerces element
+ * text that looks numeric (`parseTagValue` is on), so a number is read back
+ * as its text: every field below is declared a string.
+ */
+function str(value: unknown): string {
+  return leafText(value) ?? '';
+}
+
+/**
+ * A count as a number: a number as it is, a numeric text (attributes are kept
+ * as text) as its value, anything else the fallback.
+ */
+function count(value: unknown, fallback: number): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+/** An element's text: its `#text` when it has attributes, else its value. */
+function elementText(value: unknown): string {
+  return isElement(value) ? str(field(value, '#text')) : String(value ?? '');
+}
+
+/** The entries of an Atom feed, or none. */
+function feedEntriesOf(xml: string): unknown[] {
+  const entry = at(parseOrEmpty(xml), 'feed', 'entry');
+  if (!entry) return [];
+  return Array.isArray(entry) ? entry : [entry];
+}
+
+/** The `term` of an entry's `category`, where it is an element. */
+function categoryTerm(entry: unknown): string | undefined {
+  const category = field(entry, 'category');
+  return isElement(category) ? leafText(field(category, '@_term')) : undefined;
+}
+
+/**
  * Parse Atom XML feed response into IFeedEntry array
  */
 function parseAtomFeed(xml: string): IFeedEntry[] {
-  const parsed = parseOrEmpty(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    id: entry.id ?? '',
-    title:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    updated: entry.updated ?? '',
-    link: entry.link?.['@_href'] ?? '',
-    content:
-      typeof entry.content === 'object'
-        ? (entry.content['#text'] ?? '')
-        : String(entry.content ?? ''),
-    author: entry.author?.name,
-    category:
-      typeof entry.category === 'object' ? entry.category['@_term'] : undefined,
+  return feedEntriesOf(xml).map((entry) => ({
+    id: str(field(entry, 'id')),
+    title: elementText(field(entry, 'title')),
+    updated: str(field(entry, 'updated')),
+    link: str(at(entry, 'link', '@_href')),
+    content: elementText(field(entry, 'content')),
+    author: leafText(at(entry, 'author', 'name')),
+    category: categoryTerm(entry),
   }));
 }
 
@@ -167,21 +195,11 @@ function parseAtomFeed(xml: string): IFeedEntry[] {
  * Parse Atom XML feed list into IFeedDescriptor array
  */
 function parseFeedDescriptors(xml: string): IFeedDescriptor[] {
-  const parsed = parseOrEmpty(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    id: entry.id ?? '',
-    title:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    url: entry.link?.['@_href'] ?? '',
-    category:
-      typeof entry.category === 'object' ? entry.category['@_term'] : undefined,
+  return feedEntriesOf(xml).map((entry) => ({
+    id: str(field(entry, 'id')),
+    title: elementText(field(entry, 'title')),
+    url: str(at(entry, 'link', '@_href')),
+    category: categoryTerm(entry),
   }));
 }
 
@@ -189,19 +207,10 @@ function parseFeedDescriptors(xml: string): IFeedDescriptor[] {
  * Parse Atom XML feed variants into IFeedVariant array
  */
 function parseFeedVariants(xml: string): IFeedVariant[] {
-  const parsed = parseOrEmpty(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    id: entry.id ?? '',
-    title:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    url: entry.link?.['@_href'] ?? '',
+  return feedEntriesOf(xml).map((entry) => ({
+    id: str(field(entry, 'id')),
+    title: elementText(field(entry, 'title')),
+    url: str(at(entry, 'link', '@_href')),
   }));
 }
 
@@ -209,60 +218,40 @@ function parseFeedVariants(xml: string): IFeedVariant[] {
  * Parse Atom XML system messages feed into ISystemMessageEntry array
  */
 function parseSystemMessages(xml: string): ISystemMessageEntry[] {
-  const parsed = parseOrEmpty(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => {
+  return feedEntriesOf(xml).map((entry) => ({
+    id: str(field(entry, 'id')),
+    title: elementText(field(entry, 'title')),
     // System message fields may be in the content or as extensions
-    const content =
-      typeof entry.content === 'object'
-        ? (entry.content['#text'] ?? '')
-        : String(entry.content ?? '');
-    return {
-      id: entry.id ?? '',
-      title:
-        typeof entry.title === 'object'
-          ? (entry.title['#text'] ?? '')
-          : String(entry.title ?? ''),
-      text: content,
-      severity: entry.category?.['@_term'] ?? entry['sm:severity'] ?? '',
-      validFrom: entry['sm:validFrom'] ?? entry.updated ?? '',
-      validTo: entry['sm:validTo'] ?? '',
-      createdBy: entry.author?.name ?? '',
-    };
-  });
+    text: elementText(field(entry, 'content')),
+    severity: str(
+      at(entry, 'category', '@_term') ?? field(entry, 'sm:severity'),
+    ),
+    validFrom: str(field(entry, 'sm:validFrom') ?? field(entry, 'updated')),
+    validTo: str(field(entry, 'sm:validTo')),
+    createdBy: str(at(entry, 'author', 'name')),
+  }));
 }
 
 /**
  * Parse Atom XML gateway error feed into IGatewayErrorEntry array
  */
 function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
-  const parsed = parseOrEmpty(xml);
-  const feed = parsed.feed;
-  if (!feed?.entry) return [];
-
-  const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
-
-  return entries.map((entry: any) => ({
-    type:
-      typeof entry.category === 'object'
-        ? (entry.category['@_term'] ?? '')
-        : String(entry.category ?? ''),
-    shortText:
-      typeof entry.title === 'object'
-        ? (entry.title['#text'] ?? '')
-        : String(entry.title ?? ''),
-    transactionId: entry.id ?? '',
-    package: entry['gw:package'] ?? '',
-    applicationComponent: entry['gw:applicationComponent'] ?? '',
-    dateTime: entry.updated ?? '',
-    username: entry.author?.name ?? '',
-    client: entry['gw:client'] ?? '',
-    requestKind: entry['gw:requestKind'] ?? '',
-  }));
+  return feedEntriesOf(xml).map((entry) => {
+    const category = field(entry, 'category');
+    return {
+      type: isElement(category)
+        ? str(field(category, '@_term'))
+        : String(category ?? ''),
+      shortText: elementText(field(entry, 'title')),
+      transactionId: str(field(entry, 'id')),
+      package: str(field(entry, 'gw:package')),
+      applicationComponent: str(field(entry, 'gw:applicationComponent')),
+      dateTime: str(field(entry, 'updated')),
+      username: str(at(entry, 'author', 'name')),
+      client: str(field(entry, 'gw:client')),
+      requestKind: str(field(entry, 'gw:requestKind')),
+    };
+  });
 }
 
 /**
@@ -270,103 +259,67 @@ function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
  */
 function parseGatewayErrorDetail(xml: string): IGatewayErrorDetail {
   const parsed = parseOrEmpty(xml);
-  const root = parsed['errorlog:errorEntry'] ?? parsed['errorEntry'] ?? parsed;
+  const root =
+    field(parsed, 'errorlog:errorEntry') ??
+    field(parsed, 'errorEntry') ??
+    parsed;
+  /** `errorlog:<name>` or `<name>`, the first present. */
+  const either = (...names: string[]): unknown =>
+    at(root, ...names.map((n) => `errorlog:${n}`)) ?? at(root, ...names);
+  const attribute = (element: string, name: string): unknown =>
+    field(field(root, `errorlog:${element}`), name) ??
+    field(field(root, element), name);
 
-  const callStackRaw =
-    root['errorlog:callStack']?.['errorlog:entry'] ??
-    root['callStack']?.['entry'] ??
-    [];
-  const callStack = (
-    Array.isArray(callStackRaw) ? callStackRaw : [callStackRaw]
-  ).map((e: any, idx: number) => ({
-    number: e['@_number'] ?? idx,
-    event: e['@_event'] ?? '',
-    program: e['@_program'] ?? '',
-    name: e['@_name'] ?? '',
-    line: e['@_line'] ?? 0,
+  const callStackRaw = either('callStack', 'entry') ?? [];
+  const callStack = listOf(callStackRaw).map((e, idx) => ({
+    number: count(field(e, '@_number'), idx),
+    event: str(field(e, '@_event')),
+    program: str(field(e, '@_program')),
+    name: str(field(e, '@_name')),
+    line: count(field(e, '@_line'), 0),
   }));
 
-  const linesRaw =
-    root['errorlog:sourceCode']?.['errorlog:line'] ??
-    root['sourceCode']?.['line'] ??
-    [];
-  const sourceLines = (Array.isArray(linesRaw) ? linesRaw : [linesRaw]).map(
-    (l: any, idx: number) => ({
-      number: l['@_number'] ?? idx,
-      content: typeof l === 'object' ? (l['#text'] ?? '') : String(l ?? ''),
-      isError: l['@_isError'] === 'true' || l['@_isError'] === true,
-    }),
-  );
+  const linesRaw = either('sourceCode', 'line') ?? [];
+  const sourceLines = listOf(linesRaw).map((l, idx) => ({
+    number: count(field(l, '@_number'), idx),
+    content: elementText(l),
+    isError: field(l, '@_isError') === 'true' || field(l, '@_isError') === true,
+  }));
 
-  const exceptionsRaw =
-    root['errorlog:errorContext']?.['errorlog:exceptions']?.[
-      'errorlog:exception'
-    ] ??
-    root['errorContext']?.['exceptions']?.['exception'] ??
-    [];
-  const exceptions = (
-    Array.isArray(exceptionsRaw) ? exceptionsRaw : [exceptionsRaw]
-  ).map((ex: any) => ({
-    type: ex['@_type'] ?? '',
-    text: ex['#text'] ?? '',
-    raiseLocation: ex['@_raiseLocation'] ?? '',
+  const exceptionsRaw = either('errorContext', 'exceptions', 'exception') ?? [];
+  const exceptions = listOf(exceptionsRaw).map((ex) => ({
+    type: str(field(ex, '@_type')),
+    text: str(field(ex, '#text')),
+    raiseLocation: str(field(ex, '@_raiseLocation')),
     attributes: undefined,
   }));
 
   return {
-    type: root['@_type'] ?? '',
-    shortText: root['errorlog:shortText'] ?? root['shortText'] ?? '',
-    transactionId:
-      root['errorlog:transactionId'] ?? root['transactionId'] ?? '',
-    package: root['errorlog:package'] ?? root['package'] ?? '',
-    applicationComponent:
-      root['errorlog:applicationComponent'] ??
-      root['applicationComponent'] ??
-      '',
-    dateTime: root['errorlog:dateTime'] ?? root['dateTime'] ?? '',
-    username: root['errorlog:username'] ?? root['username'] ?? '',
-    client: root['errorlog:client'] ?? root['client'] ?? '',
-    requestKind: root['errorlog:requestKind'] ?? root['requestKind'] ?? '',
+    type: str(field(root, '@_type')),
+    shortText: str(either('shortText')),
+    transactionId: str(either('transactionId')),
+    package: str(either('package')),
+    applicationComponent: str(either('applicationComponent')),
+    dateTime: str(either('dateTime')),
+    username: str(either('username')),
+    client: str(either('client')),
+    requestKind: str(either('requestKind')),
     serviceInfo: {
-      namespace:
-        root['errorlog:serviceInfo']?.['@_namespace'] ??
-        root['serviceInfo']?.['@_namespace'] ??
-        '',
-      serviceName:
-        root['errorlog:serviceInfo']?.['@_serviceName'] ??
-        root['serviceInfo']?.['@_serviceName'] ??
-        '',
-      serviceVersion:
-        root['errorlog:serviceInfo']?.['@_serviceVersion'] ??
-        root['serviceInfo']?.['@_serviceVersion'] ??
-        '',
-      groupId:
-        root['errorlog:serviceInfo']?.['@_groupId'] ??
-        root['serviceInfo']?.['@_groupId'] ??
-        '',
-      serviceRepository:
-        root['errorlog:serviceInfo']?.['@_serviceRepository'] ??
-        root['serviceInfo']?.['@_serviceRepository'] ??
-        '',
-      destination:
-        root['errorlog:serviceInfo']?.['@_destination'] ??
-        root['serviceInfo']?.['@_destination'] ??
-        '',
+      namespace: str(attribute('serviceInfo', '@_namespace')),
+      serviceName: str(attribute('serviceInfo', '@_serviceName')),
+      serviceVersion: str(attribute('serviceInfo', '@_serviceVersion')),
+      groupId: str(attribute('serviceInfo', '@_groupId')),
+      serviceRepository: str(attribute('serviceInfo', '@_serviceRepository')),
+      destination: str(attribute('serviceInfo', '@_destination')),
     },
     errorContext: {
-      errorInfo:
-        root['errorlog:errorContext']?.['errorlog:errorInfo'] ??
-        root['errorContext']?.['errorInfo'] ??
-        '',
+      errorInfo: str(either('errorContext', 'errorInfo')),
       resolution: {},
       exceptions,
     },
     sourceCode: {
       lines: sourceLines,
-      errorLine:
-        root['errorlog:sourceCode']?.['@_errorLine'] ??
-        root['sourceCode']?.['@_errorLine'] ??
-        0,
+      errorLine: count(attribute('sourceCode', '@_errorLine'), 0),
     },
     callStack,
   };

@@ -33,21 +33,41 @@ const parser = new XMLParser({
 // prefix SAP may add, e.g. xmlns:foo) MUST be preserved so its prefixed
 // attributes (foo:bar) stay bound on round-trip.
 const TEMPLATE_NS = new Set(['@_xmlns:mc', '@_xmlns:adtcore']);
-const A = (o: Record<string, any>): Record<string, string> => {
+/**
+ * Parsed XML is data from outside the type system: it is held as `unknown`
+ * and read through `field`, which answers `undefined` for a value that is not
+ * an element or has no such field.
+ */
+function isElement(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function field(node: unknown, key: string): unknown {
+  return isElement(node) ? node[key] : undefined;
+}
+
+const A = (o: unknown): Record<string, string> => {
   const out: Record<string, string> = {};
+  if (!isElement(o)) return out;
   for (const [k, v] of Object.entries(o))
     if (k.startsWith('@_') && !TEMPLATE_NS.has(k)) out[k.slice(2)] = String(v);
   return out;
 };
 
 export function parseMessageClass(xml: string): IParsedMessageClass {
-  const root = parser.parse(xml) as Record<string, any>;
-  const mc = root['mc:messageClass'] ?? root.messageClass ?? {};
+  const root: unknown = parser.parse(xml);
+  const mc =
+    field(root, 'mc:messageClass') ?? field(root, 'messageClass') ?? {};
   const attrs = A(mc);
-  const pkgRef = mc['adtcore:packageRef'] ?? mc.packageRef ?? {};
-  const rawMsgs = mc['mc:messages'] ?? mc.messages;
-  const list = Array.isArray(rawMsgs) ? rawMsgs : rawMsgs ? [rawMsgs] : [];
-  const messages: IParsedMessage[] = list.map((m: Record<string, any>) => {
+  const pkgRef =
+    field(mc, 'adtcore:packageRef') ?? field(mc, 'packageRef') ?? {};
+  const rawMsgs = field(mc, 'mc:messages') ?? field(mc, 'messages');
+  const list: unknown[] = Array.isArray(rawMsgs)
+    ? rawMsgs
+    : rawMsgs
+      ? [rawMsgs]
+      : [];
+  const messages: IParsedMessage[] = list.map((m) => {
     const ma = A(m);
     return {
       msgno: ma['mc:msgno'] ?? '',
@@ -66,7 +86,7 @@ export function parseMessageClass(xml: string): IParsedMessageClass {
     masterLanguage: attrs['adtcore:masterLanguage'] || undefined,
     masterSystem: attrs['adtcore:masterSystem'] || undefined,
     responsible: attrs['adtcore:responsible'] || undefined,
-    packageName: (A(pkgRef)['adtcore:name'] as string) || undefined,
+    packageName: A(pkgRef)['adtcore:name'] || undefined,
     messages,
     rawAttrs: attrs,
   };

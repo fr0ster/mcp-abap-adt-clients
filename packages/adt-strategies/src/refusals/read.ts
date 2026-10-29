@@ -1,5 +1,6 @@
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { at, field, isElement, listOf, type ParsedElement } from '../parsed';
 
 /**
  * Reading a refusal out of the document SAP sent.
@@ -140,10 +141,7 @@ export interface AdtRefusal {
 // ---------------------------------------------------------------------------
 
 /** One child vs many children — the trap that broke the transport tree in #168. */
-function asArray<T>(value: T | T[] | undefined | null): T[] {
-  if (value === undefined || value === null) return [];
-  return Array.isArray(value) ? value : [value];
-}
+const asArray = listOf;
 
 /**
  * Text of a node that may be a bare string or an element with attributes.
@@ -154,19 +152,24 @@ function asArray<T>(value: T | T[] | undefined | null): T[] {
 function textOf(node: unknown): string {
   if (typeof node === 'string') return node.trim();
   if (typeof node === 'number') return String(node);
-  if (node && typeof node === 'object') {
-    const text = (node as Record<string, unknown>)['#text'];
+  if (isElement(node)) {
+    const text = node['#text'];
     if (typeof text === 'string') return text.trim();
     if (typeof text === 'number') return String(text);
   }
   return '';
 }
 
-function parseXml(document: unknown): Record<string, any> | null {
+/**
+ * The document, parsed, or `null` for one that is empty or not XML. Parsed XML
+ * is data from outside the type system: it is `unknown`, read through
+ * `field` / `at`.
+ */
+function parseXml(document: unknown): ParsedElement | null {
   if (typeof document !== 'string' || document.trim() === '') return null;
   try {
-    const parsed = parser.parse(document);
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    const parsed: unknown = parser.parse(document);
+    return isElement(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -186,10 +189,10 @@ function parseXml(document: unknown): Record<string, any> | null {
  * `debugger-terminate--01-terminate-debuggee` (`terminateDebuggee`).
  */
 export function readExceptionSubType(document: unknown): string | undefined {
-  const root = parseXml(document)?.exception;
+  const root = field(parseXml(document), 'exception');
   if (!root) return undefined;
-  for (const entry of asArray(root.properties?.entry)) {
-    if (entry?.['@key'] === 'com.sap.adt.communicationFramework.subType')
+  for (const entry of asArray(at(root, 'properties', 'entry'))) {
+    if (field(entry, '@key') === 'com.sap.adt.communicationFramework.subType')
       return textOf(entry) || undefined;
   }
   return undefined;
@@ -207,12 +210,12 @@ export function readExceptionSubType(document: unknown): string | undefined {
  * every consumer for themselves.
  */
 export function readExceptionRefusal(document: unknown): AdtRefusal | null {
-  const root = parseXml(document)?.exception;
+  const root = field(parseXml(document), 'exception');
   if (!root) return null;
 
   const properties = new Map<string, string>();
-  for (const entry of asArray(root.properties?.entry)) {
-    const key = entry?.['@key'];
+  for (const entry of asArray(at(root, 'properties', 'entry'))) {
+    const key = field(entry, '@key');
     if (typeof key === 'string') properties.set(key, textOf(entry));
   }
 
@@ -223,20 +226,18 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, value]) => value);
   const text =
-    textOf(root.message) ||
-    textOf(root.localizedMessage) ||
+    textOf(field(root, 'message')) ||
+    textOf(field(root, 'localizedMessage')) ||
     'ADT refused the request';
-  const adtType =
-    typeof root.type?.['@id'] === 'string' ? root.type['@id'] : undefined;
+  const typeId = at(root, 'type', '@id');
+  const adtType = typeof typeId === 'string' ? typeId : undefined;
+  const namespaceId = at(root, 'namespace', '@id');
 
   return {
     form: 'exception',
     message: text,
     adtType,
-    namespace:
-      typeof root.namespace?.['@id'] === 'string'
-        ? root.namespace['@id']
-        : undefined,
+    namespace: typeof namespaceId === 'string' ? namespaceId : undefined,
     // The severity is not in the document: an exc:exception IS the refusal and
     // the HTTP status carries the verdict. It is stated here anyway so that the
     // richest form reduces to the same {severity, text} as the poorest.
@@ -316,22 +317,26 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
  * decline nobody has ever observed, this takes the measured case.
  */
 export function readActivationRefusal(document: unknown): AdtRefusal | null {
-  const root = parseXml(document)?.messages;
+  const root = field(parseXml(document), 'messages');
   if (!root) return null;
 
-  const messages: AdtMessage[] = asArray(root.msg).map((msg: any) => ({
-    type: severity(msg?.['@type']),
-    text:
-      textOf(msg?.shortText?.txt) ||
-      textOf(msg?.shortText) ||
-      textOf(msg?.['@objDescr']) ||
-      'activation message',
-    line: msg?.['@line'] !== undefined ? String(msg['@line']) : undefined,
-    code: msg?.['@code'] !== undefined ? String(msg['@code']) : undefined,
-  }));
+  const messages: AdtMessage[] = asArray(field(root, 'msg')).map((msg) => {
+    const line = field(msg, '@line');
+    const code = field(msg, '@code');
+    return {
+      type: severity(field(msg, '@type')),
+      text:
+        textOf(at(msg, 'shortText', 'txt')) ||
+        textOf(field(msg, 'shortText')) ||
+        textOf(field(msg, '@objDescr')) ||
+        'activation message',
+      line: line !== undefined ? String(line) : undefined,
+      code: code !== undefined ? String(code) : undefined,
+    };
+  });
 
   const errors = messages.filter((m) => m.type.toUpperCase() === 'E');
-  const executed = root.properties?.['@activationExecuted'];
+  const executed = at(root, 'properties', '@activationExecuted');
   const activated = executed === 'true' || executed === true;
 
   // Read as the three states it has, not as a boolean. `!activated` is also
@@ -405,7 +410,7 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
   // about — and the parser gives an array for two or more. Read as a single
   // object, every attribute came back `undefined`, the explicit "true" was
   // missing, and a successful group deletion of two objects read as a refusal.
-  const objects = asArray(root?.object);
+  const objects = asArray(field(root, 'object'));
   if (objects.length === 0) return null;
 
   // Absent means "not stated", and a deletion the server never approved is not
@@ -416,10 +421,9 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
   const names: string[] = [];
 
   for (const object of objects) {
+    const objectName = field(object, '@name');
     const name =
-      typeof object?.['@name'] === 'string'
-        ? object['@name']
-        : '(unnamed object)';
+      typeof objectName === 'string' ? objectName : '(unnamed object)';
 
     // **Several messages, not one — the same trap one level down.** SAP sends
     // a `del:message` per thing it has to say, and a check for a service
@@ -429,14 +433,14 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
     // and an `E` on a permitted object was missed outright (issue #172). The
     // successful delete's `S` with an empty text is dropped by the text test,
     // which is what it always was: a message with nothing to say.
-    const messages: AdtMessage[] = asArray(object?.message)
-      .map((message: any): AdtMessage | null => {
-        const text = textOf(message?.text);
+    const messages: AdtMessage[] = asArray(field(object, 'message'))
+      .map((message): AdtMessage | null => {
+        const text = textOf(field(message, 'text'));
         if (!text) return null;
         return {
-          type: severity(message?.['@type']),
+          type: severity(field(message, '@type')),
           text: `${name}: ${text}`,
-          t100: t100FromLongtext(message?.link),
+          t100: t100FromLongtext(field(message, 'link')),
         };
       })
       .filter((m): m is AdtMessage => m !== null);
@@ -446,12 +450,12 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
     // and wrong for inventing one: a DDLS delete on premise (BASIS 816) answers
     // `isDeleted="true"` with `del:type=""` and the placeholder text `S::000`,
     // and the object is gone.
-    const typedError = asArray(object?.message).some(
-      (message: any) =>
-        String(message?.['@type'] ?? '').trim() !== '' &&
-        severity(message?.['@type']) === 'E',
+    const typedError = asArray(field(object, 'message')).some(
+      (message) =>
+        String(field(message, '@type') ?? '').trim() !== '' &&
+        severity(field(message, '@type')) === 'E',
     );
-    const permitted = object?.[verdictAttribute] === 'true';
+    const permitted = field(object, verdictAttribute) === 'true';
     if (permitted && !typedError) continue;
 
     names.push(name);
@@ -462,11 +466,11 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
 
     // SAP said no and gave no sentence. The reference counts are the only
     // reason the check document carries, so they stand in — and only then.
+    const strong = field(object, '@externalStrongReferences');
+    const weak = field(object, '@externalWeakReferences');
     const references =
-      isCheck &&
-      (object?.['@externalStrongReferences'] ||
-        object?.['@externalWeakReferences'])
-        ? `${object['@externalStrongReferences'] ?? 0} strong and ${object['@externalWeakReferences'] ?? 0} weak external references`
+      isCheck && (strong || weak)
+        ? `${String(strong ?? 0)} strong and ${String(weak ?? 0)} weak external references`
         : undefined;
     refused.push({
       type: 'E',
@@ -496,12 +500,7 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
  */
 function t100FromLongtext(link: unknown): AdtMessage['t100'] {
   for (const candidate of asArray(link)) {
-    const href =
-      typeof candidate === 'object' &&
-      candidate !== null &&
-      '@href' in candidate
-        ? candidate['@href']
-        : undefined;
+    const href = field(candidate, '@href');
     if (typeof href !== 'string') continue;
     const key = /\/messageclass\/([^/]+)\/messages\/([^/?]+)/i.exec(href);
     if (!key) continue;
@@ -554,7 +553,8 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   // never ran. The same trap as `del:object` above; no capture of a
   // several-object run exists yet, so this is defensive rather than measured.
   const reports = asArray(
-    parsed?.checkRunReports?.checkReport ?? parsed?.checkReport,
+    at(parsed, 'checkRunReports', 'checkReport') ??
+      field(parsed, 'checkReport'),
   );
   if (reports.length === 0) return null;
 
@@ -562,19 +562,22 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   const messages: AdtMessage[] = [];
 
   for (const report of reports) {
-    const status = String(report?.['@status'] ?? '');
-    const statusText = String(report?.['@statusText'] ?? '');
+    const status = String(field(report, '@status') ?? '');
+    const statusText = String(field(report, '@statusText') ?? '');
 
     const reported: AdtMessage[] = asArray(
-      report?.checkMessageList?.checkMessage,
-    ).map((msg: any) => ({
-      type: String(msg?.['@type'] ?? 'I'),
-      text:
-        textOf(msg?.['@shortText']) ||
-        textOf(msg?.shortText) ||
-        'check message',
-      code: msg?.['@code'] !== undefined ? String(msg['@code']) : undefined,
-    }));
+      at(report, 'checkMessageList', 'checkMessage'),
+    ).map((msg) => {
+      const code = field(msg, '@code');
+      return {
+        type: String(field(msg, '@type') ?? 'I'),
+        text:
+          textOf(field(msg, '@shortText')) ||
+          textOf(field(msg, 'shortText')) ||
+          'check message',
+        code: code !== undefined ? String(code) : undefined,
+      };
+    });
 
     if (status !== 'processed') {
       // A check that never ran carries no message list at all: the reason sits
@@ -652,8 +655,8 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
  * report as permission to create.
  */
 export function readValidationRefusal(document: unknown): AdtRefusal | null {
-  const data = parseXml(document)?.abap?.values?.DATA;
-  if (!data || typeof data !== 'object') return null;
+  const data = at(parseXml(document), 'abap', 'values', 'DATA');
+  if (!isElement(data)) return null;
 
   // The admissible-name answer. Present means "yes"; there is nothing to refuse.
   if (data.CHECK_RESULT !== undefined) return null;
@@ -679,8 +682,8 @@ export function readValidationRefusal(document: unknown): AdtRefusal | null {
 function severityEnvelope(
   document: unknown,
 ): { severity: string; shortText: string; longText: string } | null {
-  const data = parseXml(document)?.abap?.values?.DATA;
-  if (!data || typeof data !== 'object') return null;
+  const data = at(parseXml(document), 'abap', 'values', 'DATA');
+  if (!isElement(data)) return null;
   return {
     severity: textOf(data.SEVERITY).toUpperCase(),
     shortText: textOf(data.SHORT_TEXT),
@@ -747,7 +750,7 @@ export function readMessageClassMessageAbsence(
   document: unknown,
   msgno: string,
 ): AdtRefusal | null {
-  const root = parseXml(document)?.messageClass;
+  const root = field(parseXml(document), 'messageClass');
   // The class answering is what shows the message exists: an answer that is
   // not a class document shows nothing, so it is refused too.
   if (!root) {
@@ -759,11 +762,12 @@ export function readMessageClassMessageAbsence(
       messages: [{ type: 'E', text: message }],
     };
   }
-  const held = asArray(root.messages).some(
-    (m: any) => String(m?.['@msgno'] ?? '') === msgno,
+  const held = asArray(field(root, 'messages')).some(
+    (m) => String(field(m, '@msgno') ?? '') === msgno,
   );
   if (held) return null;
-  const name = typeof root['@name'] === 'string' ? root['@name'] : '';
+  const className = field(root, '@name');
+  const name = typeof className === 'string' ? className : '';
   const message = `Message ${msgno} not found in class ${name}`.trim();
   return {
     form: 'messageClass',
@@ -789,8 +793,10 @@ export function readObjectPropertiesAbsence(
   // whatever the parser makes of it.
   const wellFormed =
     typeof document === 'string' && XMLValidator.validate(document) === true;
-  const root = wellFormed ? parseXml(document)?.objectProperties : undefined;
-  if (root && root.object) return null;
+  const root = wellFormed
+    ? field(parseXml(document), 'objectProperties')
+    : undefined;
+  if (root && field(root, 'object')) return null;
   const message = 'The answer is not an object properties document';
   return {
     form: 'objectProperties',
@@ -827,23 +833,26 @@ export function readObjectPropertiesAbsence(
  * Fixtures: `unittest-run-passing` and `refusal-unittest-run-failing`.
  */
 export function readUnitTestRefusal(document: unknown): AdtRefusal | null {
-  const root = parseXml(document)?.runResult;
+  const root = field(parseXml(document), 'runResult');
   if (!root) return null;
 
   const messages: AdtMessage[] = [];
-  for (const program of asArray(root.program)) {
-    for (const testClass of asArray(program?.testClasses?.testClass)) {
-      for (const method of asArray(testClass?.testMethods?.testMethod)) {
-        for (const alert of asArray(method?.alerts?.alert)) {
-          const details = asArray(alert?.details?.detail)
-            .map((d: any) => textOf(d?.['@text']))
+  for (const program of asArray(field(root, 'program'))) {
+    for (const testClass of asArray(at(program, 'testClasses', 'testClass'))) {
+      for (const method of asArray(
+        at(testClass, 'testMethods', 'testMethod'),
+      )) {
+        const uri = field(method, '@uri');
+        for (const alert of asArray(at(method, 'alerts', 'alert'))) {
+          const details = asArray(at(alert, 'details', 'detail'))
+            .map((d) => textOf(field(d, '@text')))
             .filter(Boolean);
           messages.push({
-            type: severity(alert?.['@severity']),
-            text: textOf(alert?.title) || details[0] || 'unit test alert',
-            code: textOf(alert?.['@kind']) || undefined,
-            uri:
-              typeof method?.['@uri'] === 'string' ? method['@uri'] : undefined,
+            type: severity(field(alert, '@severity')),
+            text:
+              textOf(field(alert, 'title')) || details[0] || 'unit test alert',
+            code: textOf(field(alert, '@kind')) || undefined,
+            uri: typeof uri === 'string' ? uri : undefined,
           });
         }
       }

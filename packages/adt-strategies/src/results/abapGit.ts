@@ -1,5 +1,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { field, listOf } from '../parsed';
 import { rawOf } from '../result';
 
 /**
@@ -40,25 +41,6 @@ const parser = new XMLParser({
     name === 'branch' ||
     name === 'link',
 });
-
-/**
- * A field of a parsed element, or `undefined` when the value is not an element
- * or has no such field. Parsed XML is data from outside the type system, so it
- * is held as `unknown` and read through this.
- */
-function field(node: unknown, key: string): unknown {
-  return isElement(node) ? node[key] : undefined;
-}
-
-/** A parsed element: what the parser makes of an element with children. */
-function isElement(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-/** A value that may be one element or several, as a list. */
-function listOf(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [value];
-}
 
 function asString(value: unknown): string {
   if (value === undefined || value === null) return '';
