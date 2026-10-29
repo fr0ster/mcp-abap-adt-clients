@@ -1,6 +1,7 @@
 /**
  * The recorded answers the conformance check reads, from
- * `corpus/adt/{typestructure,discovery,conformance}/` (corpus README).
+ * `corpus/adt/{typestructure,discovery,conformance,abapunit}/` (corpus
+ * README).
  *
  * Files, so read with runtime checks: a sidecar or an index that is not the
  * recorded shape throws, naming the file.
@@ -8,6 +9,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readAbapUnitMetadata } from './abapUnitConformance';
 import {
   type IReleaseAnswers,
   readDiscovery,
@@ -209,4 +211,25 @@ export function recordedAnswers(release: RecordedRelease): IReleaseAnswers {
     collections: readDiscovery(discovery.body),
     samples,
   };
+}
+
+/**
+ * The codes a release's recorded `GET /abapunit/metadata` lists
+ * (`abapunit/<release>/`); `undefined` where the release has no answer —
+ * SAP_BASIS 7.40 has no such endpoint. A recorded answer that is not a `200`
+ * throws.
+ */
+export function recordedAbapUnitMetadata(
+  release: RecordedRelease,
+): string[] | undefined {
+  const dir = join(CORPUS, 'abapunit', release);
+  const sidecar = 'abapunit-metadata--01-metadata.json';
+  if (!existsSync(join(dir, sidecar))) return undefined;
+  const exchange = readExchange(dir, sidecar);
+  if (exchange.status !== 200) {
+    throw new Error(
+      `${join(dir, sidecar)}: answered ${exchange.status}, not 200`,
+    );
+  }
+  return readAbapUnitMetadata(exchange.body);
 }
