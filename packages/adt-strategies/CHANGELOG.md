@@ -53,6 +53,23 @@ adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
 - `answeredObject(text)`: the lookup the readings use, for a consumer reading
   a code from an answer itself.
 
+### Fixed
+
+- **Parsed answers are read as data, and a value now has its declared type.**
+  Every reading that took a parsed document typed `any` reads it through one
+  reader (`parsed.ts`), as data from outside the type system. Where the old
+  reading handed back a value of another type than declared, the value now
+  has its type:
+  - feeds: text the XML parser turned into a number (`<id>123</id>`) reads as
+    the string `'123'`; a call stack's and a source line's `number`, `line`
+    and `errorLine` read as numbers (they came back as text such as `'42'`);
+    an element where text is declared reads as `''`;
+  - feature toggles: an optional text field that holds no text reads as
+    `undefined`, and a `null` entry in a state list no longer throws.
+
+  A consumer that relied on the old, mistyped values reads the declared type.
+  The readings of refusals, versions and message classes answer as before.
+
 ### Documentation
 
 - The examples in the comments of `abapGit`, `feeds` and `traces` construct
