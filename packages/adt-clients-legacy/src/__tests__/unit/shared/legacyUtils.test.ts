@@ -317,14 +317,62 @@ describe('legacy utilities', () => {
   });
 
   describe('the other members taking a code take only 7.40 codes', () => {
-    it('search filtered by a code 7.40 lacks is refused without a request', async () => {
+    it.each(['STRU', 'DTAB', 'TABL/DT', 'NOPE'])(
+      'search filtered by %s, no name 7.40 is measured to select, is refused without a request',
+      async (name) => {
+        const { utils, sent } = legacyUtils();
+        const answer = await utils.search({
+          query: 'Z*',
+          // @ts-expect-error -- no name of ADT_SEARCH_TYPES_BASIS_740
+          objectType: name,
+        });
+        expectRefusal(answer, sent, 'search', 'ADT_SEARCH_TYPES_BASIS_740');
+      },
+    );
+
+    it('an alias the newer releases select does not compile on 7.40', () => {
       const { utils, sent } = legacyUtils();
-      const answer = await utils.search({
-        query: 'Z*',
-        // @ts-expect-error -- no code ADT_TYPES_BASIS_740 lists
-        objectType: 'TABL/DT',
-      });
-      expectRefusal(answer, sent, 'search', 'ADT_TYPES_BASIS_740');
+      // Type-level: never called. `STRU` answers no hits on 7.40.
+      const call = () =>
+        // @ts-expect-error -- `STRU` is no name of ADT_SEARCH_TYPES_BASIS_740
+        utils.search({ query: 'Z*', objectType: 'STRU' });
+      expect(typeof call).toBe('function');
+      expect(sent).toEqual([]);
+    });
+
+    it.each(['DEVC', 'TABL', 'FUNC'] as const)(
+      'search filtered by %s, a 7.40 search name, sends it as objectType',
+      async (name) => {
+        const { utils, sent } = legacyUtils();
+        const answer = await utils.search({
+          query: 'Z*',
+          objectType: name,
+          maxResults: 1,
+        });
+        expect(answer.ok).toBe(true);
+        expect(sent).toEqual([
+          {
+            method: 'GET',
+            url: `${RIS}/search?operation=quickSearch&query=Z*&maxResults=1&objectType=${name}`,
+          },
+        ]);
+      },
+    );
+
+    it('a group activation of VIEW/DV, which 7.40 lists for group activation, is sent', async () => {
+      const { utils, sent } = legacyUtils();
+      const answer = await utils.activateObjectsGroup(
+        [{ name: 'ZGUARD', type: 'VIEW/DV' }],
+        false,
+        { headers: headersOf(utils, 'activateObjectsGroup') },
+      );
+      expect(answer.ok).toBe(true);
+      expect(sent).toEqual([
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/activation?method=activate&preauditRequested=false',
+        },
+      ]);
     });
 
     it('the structure reads refuse a code 7.40 lacks, and serve a package', async () => {
