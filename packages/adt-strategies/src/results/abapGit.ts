@@ -41,6 +41,25 @@ const parser = new XMLParser({
     name === 'link',
 });
 
+/**
+ * A field of a parsed element, or `undefined` when the value is not an element
+ * or has no such field. Parsed XML is data from outside the type system, so it
+ * is held as `unknown` and read through this.
+ */
+function field(node: unknown, key: string): unknown {
+  return isElement(node) ? node[key] : undefined;
+}
+
+/** A parsed element: what the parser makes of an element with children. */
+function isElement(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** A value that may be one element or several, as a list. */
+function listOf(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [value];
+}
+
 function asString(value: unknown): string {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string') return value;
@@ -90,12 +109,14 @@ export interface IAbapGitExternalRepoInfo {
   accessMode?: string;
 }
 
-function linksOf(repoNode: any): { pullLink?: string; logLink?: string } {
+function linksOf(repoNode: unknown): { pullLink?: string; logLink?: string } {
   const out: { pullLink?: string; logLink?: string } = {};
-  for (const link of Array.isArray(repoNode?.link) ? repoNode.link : []) {
-    const href = asString(link?.href);
+  const links = field(repoNode, 'link');
+  const list: unknown[] = Array.isArray(links) ? links : [];
+  for (const link of list) {
+    const href = asString(field(link, 'href'));
     if (!href) continue;
-    const type = asString(link?.type);
+    const type = asString(field(link, 'type'));
     if (type === 'pull_link') out.pullLink = href;
     else if (type === 'log_link') out.logLink = href;
   }
@@ -104,19 +125,19 @@ function linksOf(repoNode: any): { pullLink?: string; logLink?: string } {
 
 /** The repositories list, one entry per linked repository. */
 export const abapGitRepos: IResultStrategy<IAbapGitRepo[]> = (answer) => {
-  const parsed = parser.parse(rawOf(answer)) as any;
-  const repos = parsed?.repositories?.repository ?? [];
-  return (Array.isArray(repos) ? repos : [repos])
+  const parsed: unknown = parser.parse(rawOf(answer));
+  const repos = field(field(parsed, 'repositories'), 'repository') ?? [];
+  return listOf(repos)
     .filter(Boolean)
-    .map((node: any) => ({
-      package: asString(node?.package),
-      url: asString(node?.url),
-      branchName: asString(node?.branchName),
-      status: asString(node?.status),
-      statusText: asString(node?.statusText),
-      createdBy: asString(node?.createdBy) || undefined,
-      createdAt: asString(node?.createdAt) || undefined,
-      repositoryId: asString(node?.key) || undefined,
+    .map((node) => ({
+      package: asString(field(node, 'package')),
+      url: asString(field(node, 'url')),
+      branchName: asString(field(node, 'branchName')),
+      status: asString(field(node, 'status')),
+      statusText: asString(field(node, 'statusText')),
+      createdBy: asString(field(node, 'createdBy')) || undefined,
+      createdAt: asString(field(node, 'createdAt')) || undefined,
+      repositoryId: asString(field(node, 'key')) || undefined,
       ...linksOf(node),
     }));
 };
@@ -125,15 +146,15 @@ export const abapGitRepos: IResultStrategy<IAbapGitRepo[]> = (answer) => {
 export const abapGitErrorLog: IResultStrategy<IAbapGitErrorLogEntry[]> = (
   answer,
 ) => {
-  const parsed = parser.parse(rawOf(answer)) as any;
-  const items = parsed?.abapObjects?.abapObject ?? [];
-  return (Array.isArray(items) ? items : [items])
+  const parsed: unknown = parser.parse(rawOf(answer));
+  const items = field(field(parsed, 'abapObjects'), 'abapObject') ?? [];
+  return listOf(items)
     .filter(Boolean)
-    .map((o: any) => ({
-      msgType: asString(o?.msgType),
-      objectType: asString(o?.type),
-      objectName: asString(o?.name),
-      messageText: asString(o?.msgText),
+    .map((o) => ({
+      msgType: asString(field(o, 'msgType')),
+      objectType: asString(field(o, 'type')),
+      objectName: asString(field(o, 'name')),
+      messageText: asString(field(o, 'msgText')),
     }));
 };
 
@@ -141,19 +162,21 @@ export const abapGitErrorLog: IResultStrategy<IAbapGitErrorLogEntry[]> = (
 export const abapGitExternalRepo: IResultStrategy<IAbapGitExternalRepoInfo> = (
   answer,
 ) => {
-  const parsed = parser.parse(rawOf(answer)) as any;
-  const root = parsed?.externalRepoInfo ?? {};
-  const raw = root?.branch ?? [];
+  const parsed: unknown = parser.parse(rawOf(answer));
+  const root = field(parsed, 'externalRepoInfo') ?? {};
+  const raw = field(root, 'branch') ?? [];
   return {
-    branches: (Array.isArray(raw) ? raw : [raw]).filter(Boolean).map(
-      (b: any): IAbapGitExternalRepoBranch => ({
-        name: asString(b?.name),
-        sha1: asString(b?.sha1),
-        // SAP-XML boolean: 'X' is true, an empty element is false.
-        isHead: asString(b?.isHead).toUpperCase() === 'X',
-        type: asString(b?.type) || undefined,
-      }),
-    ),
-    accessMode: asString(root?.accessMode) || undefined,
+    branches: listOf(raw)
+      .filter(Boolean)
+      .map(
+        (b): IAbapGitExternalRepoBranch => ({
+          name: asString(field(b, 'name')),
+          sha1: asString(field(b, 'sha1')),
+          // SAP-XML boolean: 'X' is true, an empty element is false.
+          isHead: asString(field(b, 'isHead')).toUpperCase() === 'X',
+          type: asString(field(b, 'type')) || undefined,
+        }),
+      ),
+    accessMode: asString(field(root, 'accessMode')) || undefined,
   };
 };

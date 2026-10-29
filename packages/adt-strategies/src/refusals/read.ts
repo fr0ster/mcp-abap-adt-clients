@@ -495,8 +495,13 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
  * message that does not change with the logon language.
  */
 function t100FromLongtext(link: unknown): AdtMessage['t100'] {
-  for (const candidate of asArray(link as any)) {
-    const href = candidate?.['@href'];
+  for (const candidate of asArray(link)) {
+    const href =
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      '@href' in candidate
+        ? candidate['@href']
+        : undefined;
     if (typeof href !== 'string') continue;
     const key = /\/messageclass\/([^/]+)\/messages\/([^/?]+)/i.exec(href);
     if (!key) continue;

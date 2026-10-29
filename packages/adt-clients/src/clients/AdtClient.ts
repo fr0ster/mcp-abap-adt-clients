@@ -146,6 +146,19 @@ import { AdtRequest, transportDocuments } from '../core/transport';
 import { withRequestTrace } from '../utils/requestTrace';
 import type { AdtModernVariant, AdtServedBy } from './variant';
 
+/**
+ * Whether the connection answers `isConnected()` — the one member of the
+ * contract's `ISessionLifecycleAware` that `assertConnected` calls, and so the
+ * one this checks and narrows to (see there for why not the whole atom).
+ */
+function answersIsConnected(
+  connection: IAbapConnection,
+): connection is IAbapConnection & Pick<ISessionLifecycleAware, 'isConnected'> {
+  return (
+    'isConnected' in connection && typeof connection.isConnected === 'function'
+  );
+}
+
 export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -221,10 +234,10 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    * the base's and so skip its call — run the same check first.
    */
   protected assertConnected(): void {
-    const candidate = this.connection as Partial<ISessionLifecycleAware>;
-    if (typeof candidate.isConnected !== 'function') return;
+    const connection = this.connection;
+    if (!answersIsConnected(connection)) return;
 
-    if (!candidate.isConnected()) {
+    if (!connection.isConnected()) {
       const error = new Error(
         'AdtClient: the connection is not connected. Call connect() on it before ' +
           'requesting a handler — this library does not connect on your behalf.',

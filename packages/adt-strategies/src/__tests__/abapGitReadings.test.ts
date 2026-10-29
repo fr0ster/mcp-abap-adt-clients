@@ -53,6 +53,45 @@ describe('abapGit readings', () => {
     expect(abapGitRepos(answer('<repositories/>'))).toEqual([]);
   });
 
+  it('a document that is none of these reads as the empty shape', () => {
+    // The parsed document is held as `unknown` and read field by field, so a
+    // root the reading does not know — an exception, a logon page, plain text —
+    // yields nothing rather than a throw.
+    for (const data of [
+      '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message>no</message></exc:exception>',
+      'not xml at all',
+      '',
+    ]) {
+      expect(abapGitRepos(answer(data))).toEqual([]);
+      expect(abapGitErrorLog(answer(data))).toEqual([]);
+      expect(abapGitExternalRepo(answer(data))).toEqual({
+        branches: [],
+        accessMode: undefined,
+      });
+    }
+  });
+
+  it('a text-only repository element reads as an entry of empty fields', () => {
+    // As before the move to `unknown`: a non-element entry has no fields, so
+    // every field reads as empty instead of being dropped.
+    expect(
+      abapGitRepos(
+        answer('<repositories><repository>x</repository></repositories>'),
+      ),
+    ).toEqual([
+      {
+        package: '',
+        url: '',
+        branchName: '',
+        status: '',
+        statusText: '',
+        createdBy: undefined,
+        createdAt: undefined,
+        repositoryId: undefined,
+      },
+    ]);
+  });
+
   it('reads an error log entry per object', () => {
     expect(
       abapGitErrorLog(

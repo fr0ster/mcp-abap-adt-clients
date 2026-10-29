@@ -88,8 +88,8 @@ export function hasDeferredResponses<T extends object>(
   connection: T,
 ): connection is T & IDeferredResponseConnection {
   return (
-    (connection as Partial<IDeferredResponseConnection>)
-      .responsesAreDeferred === true
+    'responsesAreDeferred' in connection &&
+    connection.responsesAreDeferred === true
   );
 }
 
