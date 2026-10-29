@@ -28,10 +28,11 @@ import {
   classSources,
   createClassWithTests,
   freshSuffix,
+  noProbesOwned,
   PROBE_TEST_METHOD,
   probePlace,
   ranMethods,
-  removeClass,
+  removeOwned,
 } from '../../../helpers/abapUnitProbes';
 import {
   readMethodVerdicts,
@@ -122,12 +123,15 @@ describe('ABAP Unit: a package by package target (AdtExecutor.getAbapUnitTestRun
         params: { className, packageName: place.packageName },
       });
 
+      // What this run created, and so may delete: nothing yet.
+      const owned = noProbesOwned();
       let failed: { error: unknown } | undefined;
       try {
         logTestStep('create the class and its test', testsLogger);
         await createClassWithTests(
           client,
           place,
+          owned,
           className,
           classSources(className),
         );
@@ -163,7 +167,7 @@ describe('ABAP Unit: a package by package target (AdtExecutor.getAbapUnitTestRun
         logTestError(testsLogger, TITLE, error);
       }
       logTestStep('delete and read back (cleanup)', testsLogger);
-      const refusals = [await removeClass(client, place, className)];
+      const refusals = await removeOwned(client, place, owned);
       logTestEnd(testsLogger, TITLE);
       raiseAfterCleanup(failed, refusals);
     },

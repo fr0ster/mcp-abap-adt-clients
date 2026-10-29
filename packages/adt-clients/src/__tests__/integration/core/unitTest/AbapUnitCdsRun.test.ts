@@ -43,11 +43,11 @@ import {
   createView,
   FAILING_TEST_METHOD,
   freshSuffix,
+  noProbesOwned,
   PROBE_TEST_METHOD,
   probePlace,
   ranMethods,
-  removeClass,
-  removeView,
+  removeOwned,
 } from '../../../helpers/abapUnitProbes';
 import {
   readMethodVerdicts,
@@ -140,14 +140,17 @@ describe("ABAP Unit: a CDS view's assigned tests by object target DDLS/DF (AdtEx
         params: { viewName, className, packageName: place.packageName },
       });
 
+      // What this run created, and so may delete: nothing yet.
+      const owned = noProbesOwned();
       let failed: { error: unknown } | undefined;
       try {
         logTestStep('create the view', testsLogger);
-        await createView(client, place, viewName);
+        await createView(client, place, owned, viewName);
         logTestStep('create the container class and its test', testsLogger);
         await createClassWithTests(
           client,
           place,
+          owned,
           className,
           assignedTestSources(className, viewName),
         );
@@ -237,13 +240,10 @@ describe("ABAP Unit: a CDS view's assigned tests by object target DDLS/DF (AdtEx
         failed = { error };
         logTestError(testsLogger, TITLE, error);
       }
-      // Cleanup runs whatever the body did, and reads the absence back: the
-      // class that names the view first, then the view.
+      // Cleanup deletes only what this run created — a refused create
+      // leaves the object of that name alone — and reads the absence back.
       logTestStep('delete and read back (cleanup)', testsLogger);
-      const refusals = [
-        await removeClass(client, place, className),
-        await removeView(client, place, viewName),
-      ];
+      const refusals = await removeOwned(client, place, owned);
       logTestEnd(testsLogger, TITLE);
       raiseAfterCleanup(failed, refusals);
     },

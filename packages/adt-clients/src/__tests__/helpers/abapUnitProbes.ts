@@ -10,6 +10,11 @@
  * suite's case names: on premise a `$` package, which registers nothing in
  * CTS — a transportable package makes SAP record the changes in a request it
  * generates. Every delete is read back: the object must be absent.
+ *
+ * **A suite deletes only what it created.** Each create records the object in
+ * the suite's {@link IProbeOwnership} right after SAP accepted it, and the
+ * cleanup deletes only what is recorded there: a refused create — a name
+ * taken by an object of someone else's — leaves that object alone.
  */
 
 import {
@@ -27,6 +32,35 @@ import { presenceOf } from './objectPresence';
 export interface IProbePlace {
   readonly packageName: string;
   readonly transportRequest: string;
+}
+
+/** The objects a suite created, recorded as each create succeeds. */
+export interface IProbeOwnership {
+  readonly classes: string[];
+  readonly views: string[];
+}
+
+/** Nothing created yet. */
+export function noProbesOwned(): IProbeOwnership {
+  return { classes: [], views: [] };
+}
+
+/**
+ * Delete and read back what the suite owns — the classes first (a container
+ * class names its view), then the views — and nothing else. Each answer is
+ * `''` or what went wrong, for `raiseAfterCleanup`.
+ */
+export async function removeOwned(
+  client: AdtClient,
+  place: IProbePlace,
+  owned: IProbeOwnership,
+): Promise<string[]> {
+  const refusals: string[] = [];
+  for (const className of owned.classes)
+    refusals.push(await removeClass(client, place, className));
+  for (const viewName of owned.views)
+    refusals.push(await removeView(client, place, viewName));
+  return refusals;
 }
 
 /**
@@ -139,6 +173,7 @@ ENDCLASS.`,
 export async function createClassWithTests(
   client: AdtClient,
   place: IProbePlace,
+  owned: IProbeOwnership,
   className: string,
   sources: { source: string; testClassSource: string },
 ): Promise<void> {
@@ -158,6 +193,8 @@ export async function createClassWithTests(
     ),
     `create class ${className}`,
   );
+  // Accepted: from here on the class is this suite's to delete.
+  owned.classes.push(className);
   const sourceHandle = String(
     expectResult(
       await client.getClass().lock(config, { analyse: analyseException }),
@@ -218,6 +255,7 @@ export async function createClassWithTests(
 export async function createView(
   client: AdtClient,
   place: IProbePlace,
+  owned: IProbeOwnership,
   viewName: string,
 ): Promise<void> {
   const config = {
@@ -239,6 +277,8 @@ export async function createView(
     ),
     `create view ${viewName}`,
   );
+  // Accepted: from here on the view is this suite's to delete.
+  owned.views.push(viewName);
   const handle = String(
     expectResult(
       await client.getDdl().lock(config, { analyse: analyseException }),
