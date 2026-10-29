@@ -113,14 +113,16 @@ describe('Shared - searchObjects', () => {
     'should search objects with object type filter',
     async () => {
       logTestStep('search objects with object type filter', testsLogger);
-      testsLogger.info?.('🔍 Query: T*, objectType: TABL/DT, maxResults: 10');
+      testsLogger.info?.('🔍 Query: T*, objectType: DTAB, maxResults: 10');
 
       const hits = expectResult(
         await withAcceptHandling(
           hitsUtils().search(
             {
               query: 'T*',
-              objectType: 'TABL/DT',
+              // The search name of a database table: `DTAB` selects `TABL/DT`
+              // alone; the code is no filter value (interfaces-adt 24.0.0).
+              objectType: 'DTAB',
               maxResults: 10,
             },
             { analyse: analyseException },

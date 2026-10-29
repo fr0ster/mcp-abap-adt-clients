@@ -15,14 +15,23 @@
  *   Unit run registry (`ABAP_UNIT_RUN_TYPES`'s keys: `CLAS/OCL`, `FUNC`,
  *   `DDLS`, … — the values a run names, some of which no type table lists).
  *   Everything below that says "codes of the tables" means this one set.
+ * - **Main types and search names.** Beside the codes, the tables name two
+ *   vocabularies a literal may be typed by: every `main` of the API tables'
+ *   codes (`ENHO`, `DEVC`, `TABL` — `AdtMainType`), and every name of the
+ *   search type tables (`ADT_SEARCH_TYPES_*`'s keys: `DEVC`, `STRU`,
+ *   `ABAP_TEST_COCKPIT` — `AdtSearchType`). A literal of either is held as a
+ *   code literal is (interfaces-adt 24.0.0, spec 2.4): the compiler cannot
+ *   tell a hand-written `'ENHO'` from the table's value, so it passes only
+ *   where its type says it is one.
  * - **Code literals.** A string literal, or a template without
  *   substitutions, whose whole text has the shape of a code — four upper-case
  *   letters or digits, `/`, one to three more — or is a bare code the tables
  *   list (`AUTH`, `FUNC`, or the object type of a listed code: `CLAS`,
- *   `PROG`, `DEVC`, …) passes only where the checker's contextual type is
- *   made of codes of the tables alone: `AdtTypeCode`, a union of some of its
- *   members (`AdtUtilityCode`'s group-only `VIEW/DV` included), or
- *   `AbapUnitRunObjectType`. A literal
+ *   `PROG`, `DEVC`, …), a main type or a search name, passes only where the
+ *   checker's contextual type is made of codes, main types and search names
+ *   of the tables alone: `AdtTypeCode`, a union of some of its members
+ *   (`AdtUtilityCode`'s group-only `VIEW/DV` included),
+ *   `AbapUnitRunObjectType`, `AdtMainType`, `AdtSearchTypeOf<V>`. A literal
  *   used as a property name passes where the object literal's contextual
  *   type names codes only as its keys and has no index signature
  *   (`Partial<Record<AdtTypeCode, …>>`, through `satisfies`). Where the
@@ -51,14 +60,25 @@ import { readdirSync, statSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
 import {
   ABAP_UNIT_RUN_TYPES,
+  ADT_SEARCH_TYPES_BASIS_740,
+  ADT_SEARCH_TYPES_CLOUD,
+  ADT_SEARCH_TYPES_ONPREM,
   ADT_TYPES_BASIS_740,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
   ADT_UTILITY_CODES_BASIS_740,
   ADT_UTILITY_CODES_CLOUD,
   ADT_UTILITY_CODES_ONPREM,
+  type AdtApiTable,
 } from '@mcp-abap-adt/interfaces-adt';
 import * as ts from 'typescript';
+
+/** The API tables, read as the entry shape they satisfy. */
+const API_TABLES: readonly AdtApiTable<string>[] = [
+  ADT_TYPES_ONPREM,
+  ADT_TYPES_CLOUD,
+  ADT_TYPES_BASIS_740,
+];
 
 /**
  * Every code any table of interfaces-adt lists: API tables, utility tables,
@@ -76,6 +96,31 @@ export const TABLE_CODES: ReadonlySet<string> = new Set([
     ADT_UTILITY_CODES_BASIS_740,
   ].flatMap((table) => Object.keys(table)),
   ...Object.keys(ABAP_UNIT_RUN_TYPES),
+]);
+
+/** Every `main` of the API tables' codes: `AdtMainType`. */
+export const MAIN_TYPES: ReadonlySet<string> = new Set(
+  API_TABLES.flatMap((table) =>
+    Object.values(table).flatMap((entry) =>
+      entry ? Object.values(entry.codes).map((facts) => facts.main) : [],
+    ),
+  ),
+);
+
+/** Every name of the search type tables: `AdtSearchType`. */
+export const SEARCH_NAMES: ReadonlySet<string> = new Set(
+  [
+    ADT_SEARCH_TYPES_ONPREM,
+    ADT_SEARCH_TYPES_CLOUD,
+    ADT_SEARCH_TYPES_BASIS_740,
+  ].flatMap((table) => Object.keys(table)),
+);
+
+/** What a literal's type may be made of: the codes, main types and search names. */
+const TABLE_VALUES: ReadonlySet<string> = new Set([
+  ...TABLE_CODES,
+  ...MAIN_TYPES,
+  ...SEARCH_NAMES,
 ]);
 
 /** The bare codes: a code without `/`, and the object type of every code. */
@@ -111,9 +156,17 @@ export function hasCodeShape(text: string): boolean {
   return true;
 }
 
-/** Whether a literal's whole text is a code: the shape, or a bare code. */
+/**
+ * Whether a literal's whole text is a code: the shape, a bare code, a main
+ * type or a search name.
+ */
 export function looksLikeCode(text: string): boolean {
-  return hasCodeShape(text) || BARE_CODES.has(text);
+  return (
+    hasCodeShape(text) ||
+    BARE_CODES.has(text) ||
+    MAIN_TYPES.has(text) ||
+    SEARCH_NAMES.has(text)
+  );
 }
 
 /** The words of the code shape in a piece of prose, each with its offset. */
@@ -133,7 +186,7 @@ export function codeShapedWords(
   return words;
 }
 
-/** Whether a type is made of codes of the tables alone. */
+/** Whether a type is made of codes, main types and search names of the tables alone. */
 function codesOnly(type: ts.Type, checker: ts.TypeChecker): boolean {
   const base =
     type.flags & ts.TypeFlags.TypeParameter
@@ -144,7 +197,9 @@ function codesOnly(type: ts.Type, checker: ts.TypeChecker): boolean {
   const parts = members.isUnion() ? members.types : [members];
   return (
     parts.length > 0 &&
-    parts.every((part) => part.isStringLiteral() && TABLE_CODES.has(part.value))
+    parts.every(
+      (part) => part.isStringLiteral() && TABLE_VALUES.has(part.value),
+    )
   );
 }
 
@@ -158,7 +213,7 @@ function keyedByCodes(type: ts.Type, checker: ts.TypeChecker): boolean {
       checker.getPropertiesOfType(part).length > 0 &&
       checker
         .getPropertiesOfType(part)
-        .every((property) => TABLE_CODES.has(property.getName())),
+        .every((property) => TABLE_VALUES.has(property.getName())),
   );
 }
 
@@ -246,17 +301,17 @@ function literalVerdict(
     const other = parent.left === literal ? parent.right : parent.left;
     const compared = checker.getTypeAtLocation(other);
     if (codesOnly(compared, checker)) return undefined;
-    return `compared with ${checker.typeToString(compared)}, which is not made of codes of the tables`;
+    return `compared with ${checker.typeToString(compared)}, which is not made of codes, main types or search names of the tables`;
   }
   if (parent && ts.isCaseClause(parent) && parent.expression === literal) {
     const switched = checker.getTypeAtLocation(parent.parent.parent.expression);
     if (codesOnly(switched, checker)) return undefined;
-    return `a case of a switch over ${checker.typeToString(switched)}, which is not made of codes of the tables`;
+    return `a case of a switch over ${checker.typeToString(switched)}, which is not made of codes, main types or search names of the tables`;
   }
   const contextual = checker.getContextualType(literal);
   if (!contextual) return 'no contextual type';
   if (codesOnly(contextual, checker)) return undefined;
-  return `contextual type ${checker.typeToString(contextual)} is not made of codes of the tables`;
+  return `contextual type ${checker.typeToString(contextual)} is not made of codes, main types or search names of the tables`;
 }
 
 export interface ITypeCodeFinding {

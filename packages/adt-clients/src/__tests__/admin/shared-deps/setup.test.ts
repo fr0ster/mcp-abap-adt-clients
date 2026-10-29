@@ -17,6 +17,10 @@ import {
   utilInactiveObjects,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtParentedTypeCode,
+  IAdtGroupActivationReference,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
   IAbapConnection,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -25,10 +29,7 @@ import * as dotenv from 'dotenv';
 import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtModernVariant } from '../../../clients/variant';
-import type {
-  AdtActivationCode,
-  IAdtGroupReference,
-} from '../../../core/shared/codeSets';
+import type { AdtActivationCode } from '../../../core/shared/codeSets';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -238,16 +239,18 @@ describe('Admin: Setup shared dependencies', () => {
       // Group activation for objects with skip_activation: true
       // Every type an entry may mark `skip_activation: true`. The AMDP debugger's
       // table function and class name each other, so they activate together.
-      const adtTypeMap: Record<string, AdtActivationCode<AdtModernVariant>> = {
+      const adtTypeMap: Record<
+        string,
+        Exclude<AdtActivationCode<AdtModernVariant>, AdtParentedTypeCode>
+      > = {
         views: 'DDLS/DF',
         classes: 'CLAS/OC',
         service_definitions: 'SRVD/SRV',
         service_bindings: 'SRVB/SVB',
       };
 
-      const groupActivationObjects: IAdtGroupReference<
-        AdtActivationCode<AdtModernVariant>
-      >[] = [];
+      const groupActivationObjects: IAdtGroupActivationReference<AdtModernVariant>[] =
+        [];
       for (const { type } of typeOrder) {
         const items = sharedConfig[type];
         if (!Array.isArray(items)) continue;

@@ -260,6 +260,7 @@ function fixtureTable(change: ITableChange = {}): AdtApiTable<string> {
       collection: '/sap/bc/adt/oo/classes',
       codes: {
         'CLAS/OC': {
+          main: 'CLAS',
           parent: null,
           nameMaxLength: change.classLength ?? 30,
           operations: change.classOps ?? [
@@ -280,6 +281,7 @@ function fixtureTable(change: ITableChange = {}): AdtApiTable<string> {
         change.functionGroupCollection ?? '/sap/bc/adt/functions/groups',
       codes: {
         'FUGR/F': {
+          main: 'FUGR',
           parent: null,
           nameMaxLength: 26,
           operations: ['read'],
@@ -292,6 +294,7 @@ function fixtureTable(change: ITableChange = {}): AdtApiTable<string> {
       collection: '/sap/bc/adt/functions/groups',
       codes: {
         'FUGR/FF': {
+          main: 'FUGR',
           parent:
             change.functionModuleParent === undefined
               ? 'functionGroup'

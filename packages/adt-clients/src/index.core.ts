@@ -74,7 +74,6 @@ export type {
   AdtDeletionCode,
   AdtMetadataReadCode,
   AdtMetadataReadCodeOf,
-  AdtSearchCode,
   AdtSourceReadCode,
   AdtSourceReadCodeOf,
   AdtStructureCode,

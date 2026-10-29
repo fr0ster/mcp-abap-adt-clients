@@ -14,13 +14,11 @@ import type {
   AdtParentedTypeCode,
   AdtTypeCode,
   AdtUtilityCode,
+  AdtUtilityOperation,
   AdtVariant,
+  IAdtUtilityCodeTables,
 } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  AdtCodeOf,
-  AdtCodeWith,
-  AdtModernVariant,
-} from '../../clients/variant';
+import type { AdtCodeOf, AdtCodeWith } from '../../clients/variant';
 import {
   ACCEPT_CLASS,
   ACCEPT_DATA_ELEMENT,
@@ -96,14 +94,16 @@ export function isSourceReadCode(code: string): code is AdtSourceReadCode {
 }
 
 /**
- * The group-only codes (`VIEW/DV`) are addressed by these members at run
- * time, but are in none of the sets below: a member whose parameter admitted
- * a code no table holds would no longer implement its interfaces-adt atom,
- * whose references take an `AdtTypeCode`. They are typed when the contract
- * package types them.
+ * What the request builders of a group operation read, per object.
+ *
+ * The members take the contract's typed references instead
+ * (`IAdtGroupActivationReference<V>`, `IAdtGroupDeletionCheckReference<V>`,
+ * `IAdtGroupDeletionReference<V>`): their codes are the group and where-used
+ * sets below, `VIEW/DV` among them (interfaces-adt types the group-only codes
+ * since 22.0.0, `ADT_UTILITY_CODES_*`), and they require `parentName` for a
+ * parented code. Each is assignable to this shape, so `AdtUtils<R, V>` is an
+ * `IAdtTypedGroupLifecycle<…, V>` and an `IAdtTypedWhereUsed<…, V>`.
  */
-
-/** What a group operation, where-used or a structure read is given, per object. */
 export interface IAdtGroupReference<C extends string> {
   /** Object name, `adtcore:name`. */
   name: string;
@@ -114,9 +114,6 @@ export interface IAdtGroupReference<C extends string> {
   /** The parent's name: the function group of `FUGR/FF` or `FUGR/I`. */
   parentName?: string;
 }
-
-/** The codes `search` filters by on variant `V`. */
-export type AdtSearchCode<V extends AdtVariant> = AdtCodeOf<V>;
 
 /**
  * The codes the node and object structure reads are asked of: the variant's
@@ -129,15 +126,54 @@ export type AdtStructureCode<V extends AdtVariant> =
   | AdtCodeOf<V>
   | AdtCodes<'DEVC/K'>;
 
+/** Every code a utility table of interfaces-adt holds: `VIEW/DV`, `DEVC/K`. */
+type AdtUtilityTableCode = {
+  [W in AdtVariant]: keyof IAdtUtilityCodeTables[W];
+}[AdtVariant] &
+  AdtUtilityCode;
+
+/** The variants whose utility table lists operation `Op` for code `C`. */
+type VariantsWhereUtilityHas<
+  C extends AdtUtilityTableCode,
+  Op extends AdtUtilityOperation,
+> = {
+  [W in AdtVariant]: C extends keyof IAdtUtilityCodeTables[W]
+    ? IAdtUtilityCodeTables[W][C] extends {
+        readonly operations: readonly (infer O)[];
+      }
+      ? [Op] extends [O]
+        ? W
+        : never
+      : never
+    : never;
+}[AdtVariant];
+
 /**
- * The codes where-used is asked of: every addressable code but a function
- * include, whose group where-used has no field for (a function module names
- * it as `GROUP|FM`).
+ * The codes for which every variant of `V` lists utility operation `Op` in
+ * its utility table (`ADT_UTILITY_CODES_*`): `VIEW/DV`, and `DEVC/K` in a
+ * modern group activation. interfaces-adt's `AdtUtilityCodeWith<V, Op>` per
+ * variant, written over every utility code like `AdtCodeOf`, so a member
+ * generic in `V` keeps the variance the client's gates rely on.
  */
-export type AdtWhereUsedCode<V extends AdtVariant> = Exclude<
-  AdtCodeOf<V>,
-  AdtCodes<'FUGR/I' | 'MSAG/NN'>
->;
+export type AdtUtilityCodeOf<
+  V extends AdtVariant,
+  Op extends AdtUtilityOperation,
+> = {
+  [C in AdtUtilityTableCode]: [V] extends [VariantsWhereUtilityHas<C, Op>]
+    ? C
+    : never;
+}[AdtUtilityTableCode];
+
+/**
+ * The codes where-used is asked of on variant `V` — interfaces-adt's
+ * `AdtWhereUsedCode<V>` (`utilsTypedAtoms.test.ts` holds them equal per
+ * variant): every code of `V` but a function include, whose group where-used
+ * has no field for (a function module names it as `GROUP|FM`), and a message
+ * class message, which has no address of its own; and `VIEW/DV`.
+ */
+export type AdtWhereUsedCode<V extends AdtVariant> =
+  | Exclude<AdtCodeOf<V>, AdtCodes<'FUGR/I' | 'MSAG/NN'>>
+  | AdtUtilityCodeOf<V, 'whereUsed'>;
 
 /**
  * The codes the tables list no `activate` for that a modern group activation
@@ -149,38 +185,40 @@ export const ACTIVATED_WITHOUT_TABLE = {
   'DEVC/K': true,
 } as const satisfies Partial<Record<AdtTypeCode, true>>;
 
-/** The codes of {@link ACTIVATED_WITHOUT_TABLE} on variant `V`. */
-type ActivatedWithoutTable<V extends AdtVariant> = [V] extends [
-  AdtModernVariant,
-]
-  ? keyof typeof ACTIVATED_WITHOUT_TABLE
-  : never;
-
 /**
- * The codes a group activation activates: the codes whose API lists
- * `activate` on every variant of `V` — so no message class — and, on a modern
- * variant, a package (`ACTIVATED_WITHOUT_TABLE`).
+ * The codes a group activation activates on variant `V` — interfaces-adt's
+ * `AdtGroupActivationCode<V>`: the codes whose API lists `activate` on every
+ * variant of `V` (no message class message, which lists none), and the utility codes listing
+ * `groupActivation` — `VIEW/DV`, and a package on a modern variant
+ * (`ACTIVATED_WITHOUT_TABLE`).
  */
 export type AdtActivationCode<V extends AdtVariant> =
   | Exclude<AdtCodeWith<V, 'activate'>, AdtCodes<'MSAG/NN'>>
-  | ActivatedWithoutTable<V>;
+  | AdtUtilityCodeOf<V, 'groupActivation'>;
 
 /** Whether text from outside the types is activated without the table's word. */
 export function isActivatedWithoutTable(code: string): boolean {
   return Object.hasOwn(ACTIVATED_WITHOUT_TABLE, code);
 }
 
-/** The codes a group deletion check asks about. */
+/**
+ * The codes a group deletion check asks about — interfaces-adt's
+ * `AdtGroupDeletionCheckCode<V>`: those listing `deletionCheck` (no message
+ * class message, which lists none).
+ */
 export type AdtDeletionCheckCode<V extends AdtVariant> = Exclude<
   AdtCodeWith<V, 'deletionCheck'>,
   AdtCodes<'MSAG/NN'>
 >;
 
-/** The codes a group deletion deletes. */
-export type AdtDeletionCode<V extends AdtVariant> = Exclude<
-  AdtCodeWith<V, 'delete'>,
-  AdtCodes<'MSAG/NN'>
->;
+/**
+ * The codes a group deletion deletes — interfaces-adt's
+ * `AdtGroupDeletionCode<V>`: those listing `delete` but a message class
+ * message, which has no address of its own, and `VIEW/DV`.
+ */
+export type AdtDeletionCode<V extends AdtVariant> =
+  | Exclude<AdtCodeWith<V, 'delete'>, AdtCodes<'MSAG/NN'>>
+  | AdtUtilityCodeOf<V, 'groupDeletion'>;
 
 /** The codes `readObjectMetadata` reads on variant `V`. */
 export type AdtMetadataReadCodeOf<V extends AdtVariant> = Extract<
