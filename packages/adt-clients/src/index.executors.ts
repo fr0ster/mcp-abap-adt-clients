@@ -12,8 +12,6 @@ export { createAdtExecutor } from './clients/createAdtExecutor';
  * runner classes, and the helper a class runner's override reads its
  * containers with. The set is the compiler's, and nothing more.
  */
-/** The `type` a runner subclass passes to `startByObject`. */
-export type { AbapUnitRunObjectType } from './core/shared/abapUnit';
 export {
   ClassExecutor,
   classExecutorDocuments,

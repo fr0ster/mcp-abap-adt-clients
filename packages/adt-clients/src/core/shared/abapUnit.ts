@@ -30,17 +30,11 @@ function boolAttr(value: boolean | undefined, fallback: boolean) {
   return (value ?? fallback) ? 'true' : 'false';
 }
 
-/**
- * The object types of an ABAP Unit run's object set, sent in
- * `<osl:object type>`: TADIR object types (the short type Eclipse sends), not
- * ADT type codes — `FUNC` is in no ADT type table.
- */
-export type AbapUnitRunObjectType = 'CLAS' | 'PROG' | 'FUGR' | 'FUNC';
-
 /** The one object a run names, as `osl:object` spells it. */
 export interface IUnitTestRunObject {
   name: string;
-  type: AbapUnitRunObjectType;
+  /** `CLAS`, `PROG`, … — the short type Eclipse sends. */
+  type: string;
 }
 
 /** Start a run of every test class the object holds. */

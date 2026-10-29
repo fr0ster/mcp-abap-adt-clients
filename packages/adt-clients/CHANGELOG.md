@@ -116,12 +116,6 @@ holds is no longer sent), and the new members.
   its hand-written switch and `WHERE_USED_ALIASES` are gone. `MSAG/NN` has no
   address of its own: a message is read from its class's document (the
   owner's ruling, recorded as a conformance divergence with its reason).
-- **`startByObject`'s `type`** (protected, on the four test runners
-  `ClassTestRunner`, `ProgramTestRunner`, `FunctionGroupTestRunner`,
-  `FunctionModuleTestRunner`) is `AbapUnitRunObjectType`
-  (`'CLAS' | 'PROG' | 'FUGR' | 'FUNC'`, the TADIR object types an ABAP Unit
-  run's `<osl:object type>` carries) instead of `string`; a subclass passing
-  other text no longer compiles. No request changes.
 - **`getUtils().getTypeStructure({ headers })`** reads
   `/sap/bc/adt/repository/typestructure` with the caller's headers, answered
   as the document came.
@@ -170,8 +164,7 @@ holds is no longer sent), and the new members.
 - `AdtClientOnPrem`, `AdtClientCloud`, `ICreateAdtClientOptions`, the gate
   types (`AdtServedBy`, `AdtPerformedBy`, `IAdtServedOn`, `AdtCodeOf`,
   `AdtCodeWith`, `AdtModernVariant`, …), `EnhancementTypeWith`,
-  `IAdtGroupReference`, `ParentedArguments`, `AdtAddressableCode`,
-  `AbapUnitRunObjectType`.
+  `IAdtGroupReference`, `ParentedArguments`, `AdtAddressableCode`.
 
 ### Changed
 
@@ -218,8 +211,6 @@ See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
 - Name the function group of a function module or include wherever it is
   addressed.
 - Read `type ?? unknownType` from an answered object (adt-strategies 0.16.0).
-- A test-runner subclass that calls `startByObject` passes an
-  `AbapUnitRunObjectType` (`'CLAS'`, `'PROG'`, `'FUGR'`, `'FUNC'`).
 - Import the result-set contracts from interfaces-adt, and compose the client
   contract you accept from it (#216).
 

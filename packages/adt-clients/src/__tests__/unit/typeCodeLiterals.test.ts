@@ -14,14 +14,23 @@ import { productionFiles, typeCodeFindings } from './typeCodeScan';
 const ROOT = join(__dirname, '../../..');
 const TSCONFIG = join(ROOT, 'tsconfig.json');
 
-/**
- * `<file>:<literal or word>`, or `type:<alias>` for every literal typed by
- * that alias → why it is not a type code.
- */
+/** `<file>:<literal or word>` → why it is not a type code. */
 const ALLOWED: ReadonlyMap<string, string> = new Map([
   [
-    'type:AbapUnitRunObjectType',
-    "The object types of an ABAP Unit run's object set, sent in `<osl:object type>`: TADIR object types (`CLAS`, `PROG`, `FUGR`, and `FUNC`, which no table lists), not ADT type codes.",
+    'src/core/class/run.ts:CLAS',
+    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
+  ],
+  [
+    'src/executors/class/ClassTestRunner.ts:CLAS',
+    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
+  ],
+  [
+    'src/executors/functionGroup/FunctionGroupTestRunner.ts:FUGR',
+    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
+  ],
+  [
+    'src/executors/program/ProgramTestRunner.ts:PROG',
+    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
   ],
   [
     'src/batch/wire.ts:HTTP/1',

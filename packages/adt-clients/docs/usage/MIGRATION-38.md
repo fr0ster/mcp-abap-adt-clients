@@ -369,17 +369,6 @@ source and the nine others needs a `metadataUpdated` slot (interfaces-adt
 How the tables are held to what each release answers — in CI and live — is in
 the README: [The type tables' conformance check](../../README.md#the-type-tables-conformance-check).
 
-## A test runner's `startByObject` takes the run's object types
-
-The four ABAP Unit test runners (`ClassTestRunner`, `ProgramTestRunner`,
-`FunctionGroupTestRunner`, `FunctionModuleTestRunner`) start a run through the
-protected `startByObject(name, type, options)`. Its `type` is
-`AbapUnitRunObjectType` — `'CLAS' | 'PROG' | 'FUGR' | 'FUNC'`, the TADIR object
-types an ABAP Unit run's `<osl:object type>` carries, not ADT type codes —
-where it was `string`. The request is the same. A subclass that calls it with
-other text no longer compiles; name the type from the package root
-(`import type { AbapUnitRunObjectType } from '@mcp-abap-adt/adt-clients'`).
-
 ## The legacy package
 
 `@mcp-abap-adt/adt-clients-legacy` 0.2.0 follows: it depends on

@@ -23,7 +23,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../clients/variant';
 import {
-  type AbapUnitRunObjectType,
   getUnitTestRunResult,
   getUnitTestRunStatus,
   startUnitTestRunByObject,
@@ -91,7 +90,7 @@ export abstract class AbapUnitRunner<
   /** Start a run of every test class the one named object holds. */
   protected startByObject<E extends IAdtError>(
     name: string,
-    type: AbapUnitRunObjectType,
+    type: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     return answering(
