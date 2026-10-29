@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/enhoxh/object_name/%2fBCV%2fEASYQRY_SFWS_ENH_01" adtcore:type="ENHO/XH" adtcore:name="/BCV/EASYQRY_SFWS_ENH_01"/>
+</adtcore:objectReferences>

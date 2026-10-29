@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/sadl_v_cds_view" adtcore:type="DDLS/DF" adtcore:name="SADL_V_CDS_VIEW"/>
+</adtcore:objectReferences>

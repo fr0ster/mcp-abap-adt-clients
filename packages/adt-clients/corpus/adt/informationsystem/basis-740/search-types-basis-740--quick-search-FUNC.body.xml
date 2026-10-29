@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/%2fbi0%2fqi2lis_13_vdkon/fmodules/%2fbi0%2fqi2lis_13_vdkon0001" adtcore:type="FUGR/FF" adtcore:name="/BI0/QI2LIS_13_VDKON0001"/>
+</adtcore:objectReferences>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/tablds/object_name/%2f1ACC%2fACDB_______5210001" adtcore:type="TABL/DS" adtcore:name="/1ACC/ACDB_______5210001"/>
+</adtcore:objectReferences>

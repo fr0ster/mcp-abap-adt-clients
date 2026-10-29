@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/devck/object_name/%2f1BS%2fSADL_QE_TEST" adtcore:type="DEVC/K" adtcore:name="/1BS/SADL_QE_TEST"/>
+</adtcore:objectReferences>

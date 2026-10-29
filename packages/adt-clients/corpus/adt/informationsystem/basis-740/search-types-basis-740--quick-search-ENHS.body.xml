@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/enhsxs/object_name/%2fAIN%2fACTVT_DLV_CONF_EMTS" adtcore:type="ENHS/XS" adtcore:name="/AIN/ACTVT_DLV_CONF_EMTS"/>
+</adtcore:objectReferences>
