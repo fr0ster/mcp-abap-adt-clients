@@ -26,6 +26,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { AdtBatchConnection } from '../../../../batch';
 import { parseBatchResponse } from '../../../../batch/wire';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -175,7 +176,7 @@ type Connection = IAbapConnection & ISessionLifecycleAware;
 
 /** The probe class runs through classrun. */
 const asClass = (connection: Connection) =>
-  new ClassExecutor(connection, connectionLogger);
+  new ClassExecutor(connection, connectionLogger, classExecutorDocuments);
 
 describe('Debugger batch wire measurements', () => {
   let listenerConnection: Connection | undefined;

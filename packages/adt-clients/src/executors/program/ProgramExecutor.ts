@@ -81,9 +81,10 @@ export class ProgramExecutor<
 
   constructor(
     connection: IAbapConnection,
-    _logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = programExecutorDocuments as unknown as R,
+    _logger: ILogger | undefined,
+    // Required: a caller naming its own R hands its results. The default
+    // documents are the getter's (`AdtExecutor`), typed by its overloads.
+    results: R,
   ) {
     this.connection = connection;
     this.results = results;

@@ -8,6 +8,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtExecutor } from '../../../clients/AdtExecutor';
+import { abapUnitRunnerDocuments } from '../../../executors/abapUnitRunner';
 import { FunctionGroupTestRunner } from '../../../executors/functionGroup';
 import { FunctionModuleTestRunner } from '../../../executors/functionModule';
 import { createLibraryLogger } from '../../helpers/testLogger';
@@ -45,6 +46,7 @@ describe.each([
     const runner: { run(name: string): Promise<unknown> } = new Runner(
       conn,
       createLibraryLogger(),
+      abapUnitRunnerDocuments,
     );
     await runner.run(name);
 

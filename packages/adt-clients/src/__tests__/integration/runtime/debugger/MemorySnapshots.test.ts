@@ -40,6 +40,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -301,6 +302,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       run = new ClassExecutor(
         triggerConnection as Connection,
         connectionLogger,
+        classExecutorDocuments,
       ).run({ className: CLASS_NAME }, { analyse: analyseException });
       const caught = documentOf(await listener);
       const debuggeeId = tag(caught, 'DEBUGGEE_ID');

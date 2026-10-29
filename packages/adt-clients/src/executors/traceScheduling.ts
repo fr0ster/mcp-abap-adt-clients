@@ -73,8 +73,8 @@ export class TraceScheduling<
 {
   constructor(
     private readonly connection: IAbapConnection,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = traceSchedulingDocuments as unknown as R,
+    // Required: the executor that composes this hands its own results.
+    private readonly results: R,
   ) {}
 
   async listObjectTypes<E extends IAdtError = IAdtError>(

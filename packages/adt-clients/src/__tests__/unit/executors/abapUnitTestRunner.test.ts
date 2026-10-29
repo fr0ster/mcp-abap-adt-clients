@@ -13,6 +13,10 @@ import type {
 import { AdtExecutor } from '../../../clients/AdtExecutor';
 import { AbapUnitTestRunner } from '../../../executors/abapUnitTestRunner';
 import { ClassTestRunner } from '../../../executors/class/ClassTestRunner';
+import {
+  abapUnitTestRunnerDocuments,
+  classTestRunnerDocuments,
+} from '../../../index.executors';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
 /** A `/runs` document with the default options and the given object set. */
@@ -62,7 +66,11 @@ const RUNS = {
 describe('AbapUnitTestRunner', () => {
   it('an object target: one osl:object in an osl:flatObjectSet, the type as given', async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunner(connection);
+    const runner = new AbapUnitTestRunner(
+      connection,
+      undefined,
+      abapUnitTestRunnerDocuments,
+    );
 
     await runner.run({ kind: 'object', name: 'zcl_tested', type: 'CLAS/OC' });
 
@@ -83,19 +91,31 @@ describe('AbapUnitTestRunner', () => {
     const generic = new RecordingConnection();
     const perObject = new RecordingConnection();
 
-    await new AbapUnitTestRunner(generic).run({
+    await new AbapUnitTestRunner(
+      generic,
+      undefined,
+      abapUnitTestRunnerDocuments,
+    ).run({
       kind: 'object',
       name: 'ZCL_TESTED',
       type: 'CLAS',
     });
-    await new ClassTestRunner(perObject).run('ZCL_TESTED');
+    await new ClassTestRunner(
+      perObject,
+      undefined,
+      classTestRunnerDocuments,
+    ).run('ZCL_TESTED');
 
     expect(generic.sent).toEqual(perObject.sent);
   });
 
   it("a CDS view's assigned tests: DDLS/DF with the scope's foreignTests", async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunner(connection);
+    const runner = new AbapUnitTestRunner(
+      connection,
+      undefined,
+      abapUnitTestRunnerDocuments,
+    );
 
     await runner.run(
       { kind: 'object', name: 'ZI_VIEW', type: 'DDLS/DF' },
@@ -117,7 +137,11 @@ describe('AbapUnitTestRunner', () => {
     'a package target with includeSubpackages %s: one osl:package in an osl:packageSet',
     async (includeSubpackages, attribute) => {
       const connection = new RecordingConnection();
-      const runner = new AbapUnitTestRunner(connection);
+      const runner = new AbapUnitTestRunner(
+        connection,
+        undefined,
+        abapUnitTestRunnerDocuments,
+      );
 
       await runner.run({
         kind: 'package',
@@ -141,7 +165,11 @@ describe('AbapUnitTestRunner', () => {
 
   it('a URI run: one POST to /testruns with the headers as given and <options>', async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunner(connection);
+    const runner = new AbapUnitTestRunner(
+      connection,
+      undefined,
+      abapUnitTestRunnerDocuments,
+    );
     const uris = [
       '/sap/bc/adt/oo/classes/zcl_tested',
       '/sap/bc/adt/programs/programs/zr_report',
@@ -171,7 +199,11 @@ describe('AbapUnitTestRunner', () => {
 
   it('asks about a run by its id', async () => {
     const connection = new RecordingConnection();
-    const runner = new AbapUnitTestRunner(connection);
+    const runner = new AbapUnitTestRunner(
+      connection,
+      undefined,
+      abapUnitTestRunnerDocuments,
+    );
 
     await runner.getStatus('0CC47A-RUN', false);
     await runner.getResult('0CC47A-RUN');
@@ -191,7 +223,11 @@ describe('AbapUnitTestRunner', () => {
   });
 
   it('takes only the registry run types, and a package only as a package target', () => {
-    const runner = new AbapUnitTestRunner(new RecordingConnection());
+    const runner = new AbapUnitTestRunner(
+      new RecordingConnection(),
+      undefined,
+      abapUnitTestRunnerDocuments,
+    );
     const type: AbapUnitRunObjectType = 'FUGR/FF';
     void runner.run({ kind: 'object', name: 'Z_FM', type });
     // @ts-expect-error — not a run type of the registry

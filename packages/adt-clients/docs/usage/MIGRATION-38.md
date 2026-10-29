@@ -387,6 +387,30 @@ source and the nine others needs a `metadataUpdated` slot (interfaces-adt
 How the tables are held to what each release answers — in CI and live — is in
 the README: [The type tables' conformance check](../../README.md#the-type-tables-conformance-check).
 
+## An executor's getter answers what it was given
+
+### What changed
+
+Every getter of `AdtExecutor` defaulted its result set with
+`results: R = <x>Documents as unknown as R`, so `getClassTestRunner<MyResults>()`
+compiled and answered the shipped documents typed as `MyResults`. Each getter
+now has two overloads: `getX()` answers the runner typed by the shipped
+documents, `getX(results)` one typed by `results`. A runner's or an executor's
+constructor (`ClassExecutor`, `ProgramExecutor`, `ClassTestRunner`,
+`ProgramTestRunner`, `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
+`AbapUnitTestRunner`, `TraceScheduling`) takes `results` as a required
+parameter, after a `logger` of type `ILogger | undefined`. Requests and
+answers do not change.
+
+### What a caller does
+
+- `executor.getClassTestRunner()` and `executor.getClassTestRunner({ ...classTestRunnerDocuments, run: unitTestRunId })`: nothing.
+- `executor.getClassTestRunner<MyResults>()` with no argument: pass the results
+  — `executor.getClassTestRunner(myResults)`.
+- `new ClassTestRunner(connection)` or `new ClassTestRunner(connection, logger)`:
+  pass the documents — `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`
+  (`undefined` for no logger). A subclass's constructor does the same.
+
 ## The legacy package
 
 `@mcp-abap-adt/adt-clients-legacy` 0.2.0 follows: it depends on

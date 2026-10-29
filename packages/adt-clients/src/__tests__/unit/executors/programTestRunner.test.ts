@@ -58,7 +58,11 @@ describe('ProgramTestRunner', () => {
 
   it('asks about a run by its id, as a class runner does', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ProgramTestRunner(conn, createLibraryLogger());
+    const runner = new ProgramTestRunner(
+      conn,
+      createLibraryLogger(),
+      programTestRunnerDocuments,
+    );
 
     await runner.getStatus('0CC47A-RUN', false);
     await runner.getResult('0CC47A-RUN');

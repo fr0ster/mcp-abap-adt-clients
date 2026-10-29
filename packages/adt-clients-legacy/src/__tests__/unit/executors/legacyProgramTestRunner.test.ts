@@ -4,6 +4,10 @@
  * package's `programTestRunner.test.ts`'s.
  */
 
+import {
+  classTestRunnerDocuments,
+  programTestRunnerDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -49,8 +53,16 @@ describe('ProgramTestRunner', () => {
 describe('ProgramTestRunnerLegacy', () => {
   it("refuses to poll or fetch without a request, with the class runner's reason", async () => {
     const { conn, calls } = makeConn();
-    const runner = new ProgramTestRunnerLegacy(conn, createLibraryLogger());
-    const classRunner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+    const runner = new ProgramTestRunnerLegacy(
+      conn,
+      createLibraryLogger(),
+      programTestRunnerDocuments,
+    );
+    const classRunner = new ClassTestRunnerLegacy(
+      conn,
+      createLibraryLogger(),
+      classTestRunnerDocuments,
+    );
 
     // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     const status = expectFailure(await runner.getStatus(), 'status');
@@ -73,9 +85,11 @@ describe('ProgramTestRunnerLegacy', () => {
   it('run is one POST to /testruns, not /runs: on 7.40 that POST is the run', async () => {
     const { conn, calls } = makeConn();
 
-    await new ProgramTestRunnerLegacy(conn, createLibraryLogger()).run(
-      'ZR_REPORT',
-    );
+    await new ProgramTestRunnerLegacy(
+      conn,
+      createLibraryLogger(),
+      programTestRunnerDocuments,
+    ).run('ZR_REPORT');
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');

@@ -19,11 +19,11 @@
 
 import {
   AdtExecutor,
-  type abapUnitTestRunnerDocuments,
-  type classExecutorDocuments,
-  type classTestRunnerDocuments,
-  type functionGroupTestRunnerDocuments,
-  type functionModuleTestRunnerDocuments,
+  abapUnitTestRunnerDocuments,
+  classExecutorDocuments,
+  classTestRunnerDocuments,
+  functionGroupTestRunnerDocuments,
+  functionModuleTestRunnerDocuments,
   type IAbapUnitTestRunnerResults,
   type IClassExecutorResults,
   type IClassTestRunnerResults,
@@ -31,8 +31,8 @@ import {
   type IFunctionModuleTestRunnerResults,
   type IProgramExecutorResults,
   type IProgramTestRunnerResults,
-  type programExecutorDocuments,
-  type programTestRunnerDocuments,
+  programExecutorDocuments,
+  programTestRunnerDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { AbapUnitTestRunnerLegacy } from '../executors/abapUnit/AbapUnitTestRunnerLegacy';
 import { ClassExecutorLegacy } from '../executors/class/ClassExecutorLegacy';
@@ -44,51 +44,97 @@ import { ProgramTestRunnerLegacy } from '../executors/program/ProgramTestRunnerL
 
 export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
   /** Runs and the trace type lists refuse on 7.40; the trace schedule is inherited. */
-  override getClassExecutor<
-    R extends IClassExecutorResults = typeof classExecutorDocuments,
-  >(results?: R): ClassExecutorLegacy<R> {
-    return new ClassExecutorLegacy<R>(this.connection, this.logger, results);
+  override getClassExecutor(): ClassExecutorLegacy<
+    typeof classExecutorDocuments
+  >;
+  override getClassExecutor<R extends IClassExecutorResults>(
+    results: R,
+  ): ClassExecutorLegacy<R>;
+  override getClassExecutor(
+    results: IClassExecutorResults = classExecutorDocuments,
+  ): ClassExecutorLegacy<IClassExecutorResults> {
+    return new ClassExecutorLegacy<IClassExecutorResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
   /** Runs and the trace type lists refuse on 7.40; the trace schedule is inherited. */
-  override getProgramExecutor<
-    R extends IProgramExecutorResults = typeof programExecutorDocuments,
-  >(results?: R): ProgramExecutorLegacy<R> {
-    return new ProgramExecutorLegacy<R>(this.connection, this.logger, results);
-  }
-
-  override getClassTestRunner<
-    R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
-  >(results?: R): ClassTestRunnerLegacy<R> {
-    return new ClassTestRunnerLegacy<R>(this.connection, this.logger, results);
-  }
-
-  override getProgramTestRunner<
-    R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
-  >(results?: R): ProgramTestRunnerLegacy<R> {
-    return new ProgramTestRunnerLegacy<R>(
+  override getProgramExecutor(): ProgramExecutorLegacy<
+    typeof programExecutorDocuments
+  >;
+  override getProgramExecutor<R extends IProgramExecutorResults>(
+    results: R,
+  ): ProgramExecutorLegacy<R>;
+  override getProgramExecutor(
+    results: IProgramExecutorResults = programExecutorDocuments,
+  ): ProgramExecutorLegacy<IProgramExecutorResults> {
+    return new ProgramExecutorLegacy<IProgramExecutorResults>(
       this.connection,
       this.logger,
       results,
     );
   }
 
+  override getClassTestRunner(): ClassTestRunnerLegacy<
+    typeof classTestRunnerDocuments
+  >;
+  override getClassTestRunner<R extends IClassTestRunnerResults>(
+    results: R,
+  ): ClassTestRunnerLegacy<R>;
+  override getClassTestRunner(
+    results: IClassTestRunnerResults = classTestRunnerDocuments,
+  ): ClassTestRunnerLegacy<IClassTestRunnerResults> {
+    return new ClassTestRunnerLegacy<IClassTestRunnerResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
+  }
+
+  override getProgramTestRunner(): ProgramTestRunnerLegacy<
+    typeof programTestRunnerDocuments
+  >;
+  override getProgramTestRunner<R extends IProgramTestRunnerResults>(
+    results: R,
+  ): ProgramTestRunnerLegacy<R>;
+  override getProgramTestRunner(
+    results: IProgramTestRunnerResults = programTestRunnerDocuments,
+  ): ProgramTestRunnerLegacy<IProgramTestRunnerResults> {
+    return new ProgramTestRunnerLegacy<IProgramTestRunnerResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
+  }
+
+  override getFunctionGroupTestRunner(): FunctionGroupTestRunnerLegacy<
+    typeof functionGroupTestRunnerDocuments
+  >;
   override getFunctionGroupTestRunner<
-    R extends
-      IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
-  >(results?: R): FunctionGroupTestRunnerLegacy<R> {
-    return new FunctionGroupTestRunnerLegacy<R>(
+    R extends IFunctionGroupTestRunnerResults,
+  >(results: R): FunctionGroupTestRunnerLegacy<R>;
+  override getFunctionGroupTestRunner(
+    results: IFunctionGroupTestRunnerResults = functionGroupTestRunnerDocuments,
+  ): FunctionGroupTestRunnerLegacy<IFunctionGroupTestRunnerResults> {
+    return new FunctionGroupTestRunnerLegacy<IFunctionGroupTestRunnerResults>(
       this.connection,
       this.logger,
       results,
     );
   }
 
+  override getFunctionModuleTestRunner(): FunctionModuleTestRunnerLegacy<
+    typeof functionModuleTestRunnerDocuments
+  >;
   override getFunctionModuleTestRunner<
-    R extends
-      IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
-  >(results?: R): FunctionModuleTestRunnerLegacy<R> {
-    return new FunctionModuleTestRunnerLegacy<R>(
+    R extends IFunctionModuleTestRunnerResults,
+  >(results: R): FunctionModuleTestRunnerLegacy<R>;
+  override getFunctionModuleTestRunner(
+    results: IFunctionModuleTestRunnerResults = functionModuleTestRunnerDocuments,
+  ): FunctionModuleTestRunnerLegacy<IFunctionModuleTestRunnerResults> {
+    return new FunctionModuleTestRunnerLegacy<IFunctionModuleTestRunnerResults>(
       this.connection,
       this.logger,
       results,
@@ -99,10 +145,16 @@ export class AdtExecutorLegacy extends AdtExecutor<'basis740'> {
    * The URI run on `/abapunit/testruns`; an object or package target, the
    * poll and the result refuse on 7.40, which has no `/abapunit/runs`.
    */
-  override getAbapUnitTestRunner<
-    R extends IAbapUnitTestRunnerResults = typeof abapUnitTestRunnerDocuments,
-  >(results?: R): AbapUnitTestRunnerLegacy<R> {
-    return new AbapUnitTestRunnerLegacy<R>(
+  override getAbapUnitTestRunner(): AbapUnitTestRunnerLegacy<
+    typeof abapUnitTestRunnerDocuments
+  >;
+  override getAbapUnitTestRunner<R extends IAbapUnitTestRunnerResults>(
+    results: R,
+  ): AbapUnitTestRunnerLegacy<R>;
+  override getAbapUnitTestRunner(
+    results: IAbapUnitTestRunnerResults = abapUnitTestRunnerDocuments,
+  ): AbapUnitTestRunnerLegacy<IAbapUnitTestRunnerResults> {
+    return new AbapUnitTestRunnerLegacy<IAbapUnitTestRunnerResults>(
       this.connection,
       this.logger,
       results,

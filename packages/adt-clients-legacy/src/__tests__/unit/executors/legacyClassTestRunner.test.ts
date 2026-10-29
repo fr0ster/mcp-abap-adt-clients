@@ -105,10 +105,11 @@ describe('ClassTestRunnerLegacy', () => {
     options?: Parameters<ClassTestRunner['runSync']>[1],
   ): Promise<unknown> {
     const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-    await new ClassTestRunner(conn, createLibraryLogger()).runSync(
-      target,
-      options,
-    );
+    await new ClassTestRunner(
+      conn,
+      createLibraryLogger(),
+      classTestRunnerDocuments,
+    ).runSync(target, options);
     expect(calls).toHaveLength(1);
     return calls[0].data;
   }
@@ -151,7 +152,11 @@ describe('ClassTestRunnerLegacy', () => {
         analyse: analyseUnitTest,
       };
       const { conn, calls } = makeConn(() => ({ data: RUN_RESULT }));
-      const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+      const runner = new ClassTestRunnerLegacy(
+        conn,
+        createLibraryLogger(),
+        classTestRunnerDocuments,
+      );
 
       await runner[member]('ZCL_TESTS', options);
 
@@ -171,7 +176,11 @@ describe('ClassTestRunnerLegacy', () => {
 
   it('runs each distinct container whole, on /testruns', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+    const runner = new ClassTestRunnerLegacy(
+      conn,
+      createLibraryLogger(),
+      classTestRunnerDocuments,
+    );
 
     await runner.run([
       { containerClass: 'ZCL_TESTS', testClass: 'LTCL_A' },
@@ -187,7 +196,11 @@ describe('ClassTestRunnerLegacy', () => {
 
   it('refuses to poll or fetch without a request: the POST answered the result', async () => {
     const { conn, calls } = makeConn();
-    const runner = new ClassTestRunnerLegacy(conn, createLibraryLogger());
+    const runner = new ClassTestRunnerLegacy(
+      conn,
+      createLibraryLogger(),
+      classTestRunnerDocuments,
+    );
 
     // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
     expectFailure(await runner.getStatus(), 'no run to poll');

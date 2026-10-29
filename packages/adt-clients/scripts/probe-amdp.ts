@@ -33,7 +33,10 @@ import {
 import { AdtClient } from '../src/clients/AdtClient';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
 import { utilDocuments } from '../src/core/shared/utilResultSet';
-import { ClassExecutor } from '../src/executors/class/ClassExecutor';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+} from '../src/executors/class/ClassExecutor';
 import { wireItself } from '../src/utils/resultStrategy';
 
 const {
@@ -157,7 +160,11 @@ async function main(): Promise<void> {
     if (args.includes('--run')) {
       const t0 = Date.now();
       out(`running ${CLASS_NAME}…`);
-      const ran = await new ClassExecutor(connection, quiet).run({
+      const ran = await new ClassExecutor(
+        connection,
+        quiet,
+        classExecutorDocuments,
+      ).run({
         className: CLASS_NAME,
       });
       out(

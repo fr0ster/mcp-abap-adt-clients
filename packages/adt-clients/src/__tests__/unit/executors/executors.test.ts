@@ -54,13 +54,15 @@ const refuse: IAdtAnalyseOptions = {
 describe.each([
   [
     'ClassExecutor',
-    (c: IAbapConnection) => new ClassExecutor(c),
+    (c: IAbapConnection) =>
+      new ClassExecutor(c, undefined, classExecutorDocuments),
     { className: 'ZCL_X' },
     '/sap/bc/adt/oo/classrun/ZCL_X?profilerId=',
   ],
   [
     'ProgramExecutor',
-    (c: IAbapConnection) => new ProgramExecutor(c),
+    (c: IAbapConnection) =>
+      new ProgramExecutor(c, undefined, programExecutorDocuments),
     { programName: 'ZPROG' },
     '/sap/bc/adt/programs/programrun/ZPROG?profilerId=',
   ],

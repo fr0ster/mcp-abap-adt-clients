@@ -37,6 +37,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
@@ -224,7 +225,11 @@ describe('AMDP debugger (AmdpDebugger)', () => {
 
   function runClass(): void {
     needs(trigger, 'the trigger connection');
-    run = new ClassExecutor(trigger as Connection, connectionLogger).run(
+    run = new ClassExecutor(
+      trigger as Connection,
+      connectionLogger,
+      classExecutorDocuments,
+    ).run(
       {
         className: CLASS_NAME,
       },

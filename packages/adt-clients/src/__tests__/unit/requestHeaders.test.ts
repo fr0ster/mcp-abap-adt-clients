@@ -22,6 +22,7 @@ import { AdtClient } from '../../clients/AdtClient';
 import { AdtExecutor } from '../../clients/AdtExecutor';
 import { AdtUtils } from '../../core/shared/AdtUtils';
 import { TraceScheduling } from '../../executors/traceScheduling';
+import { traceSchedulingDocuments } from '../../index.executors';
 import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
 import { AmdpDebugger } from '../../runtime/debugger/AmdpDebugger';
 import { createLibraryLogger } from '../helpers/testLogger';
@@ -99,7 +100,8 @@ function otherRows(): Row[] {
     {
       name: 'trace scheduling',
       member: 'scheduleTrace',
-      build: (connection) => new TraceScheduling(connection),
+      build: (connection) =>
+        new TraceScheduling(connection, traceSchedulingDocuments),
       call: (h, headers) => m(h, 'scheduleTrace')({ ...trace, headers }),
     },
     {

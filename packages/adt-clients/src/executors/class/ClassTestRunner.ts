@@ -79,9 +79,10 @@ export class ClassTestRunner<
 {
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = classTestRunnerDocuments as unknown as R,
+    logger: ILogger | undefined,
+    // Required: a caller naming its own R hands its results. The default
+    // documents are the getter's (`AdtExecutor`), typed by its overloads.
+    results: R,
   ) {
     super(connection, logger, results);
   }

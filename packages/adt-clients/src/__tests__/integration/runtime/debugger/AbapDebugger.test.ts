@@ -41,6 +41,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
+import { classExecutorDocuments } from '../../../../index.executors';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -198,7 +199,7 @@ type Connection = IAbapConnection & ISessionLifecycleAware;
 
 /** The probe class runs through classrun. */
 const asClass = (connection: Connection) =>
-  new ClassExecutor(connection, connectionLogger);
+  new ClassExecutor(connection, connectionLogger, classExecutorDocuments);
 
 /** Another debugger of the same user: its own terminal and its own IDE. */
 function otherIde(of: IDebuggerIdentity, label: string): IDebuggerIdentity {

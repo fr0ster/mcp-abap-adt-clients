@@ -6,9 +6,9 @@
 
 import {
   ClassExecutor,
-  type classExecutorDocuments,
+  classExecutorDocuments,
   ProgramExecutor,
-  type programExecutorDocuments,
+  programExecutorDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
   AdtObjectErrorCodes,
@@ -55,16 +55,20 @@ describe('legacy executors', () => {
   describe.each([
     [
       'class',
-      (c: IAbapConnection): Executor => new ClassExecutorLegacy(c),
-      (c: IAbapConnection): Executor => new ClassExecutor(c),
+      (c: IAbapConnection): Executor =>
+        new ClassExecutorLegacy(c, undefined, classExecutorDocuments),
+      (c: IAbapConnection): Executor =>
+        new ClassExecutor(c, undefined, classExecutorDocuments),
       { className: 'ZCL_GUARD' },
       '/sap/bc/adt/oo/classrun',
       'measured',
     ],
     [
       'program',
-      (c: IAbapConnection): Executor => new ProgramExecutorLegacy(c),
-      (c: IAbapConnection): Executor => new ProgramExecutor(c),
+      (c: IAbapConnection): Executor =>
+        new ProgramExecutorLegacy(c, undefined, programExecutorDocuments),
+      (c: IAbapConnection): Executor =>
+        new ProgramExecutor(c, undefined, programExecutorDocuments),
       { programName: 'ZGUARD' },
       '/sap/bc/adt/programs/programrun',
       'not-measured',

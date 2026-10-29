@@ -41,7 +41,10 @@ import {
   createTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import { AdtClient } from '../src/clients/AdtClient';
-import { ClassExecutor } from '../src/executors/class/ClassExecutor';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+} from '../src/executors/class/ClassExecutor';
 import {
   AbapDebugger,
   abapDebuggerDocuments,
@@ -144,7 +147,7 @@ async function main(): Promise<void> {
     const T = await createTestConnection(quiet, { ownSession: true });
     const t0 = Date.now();
     out(`running ${CLASS_NAME}…`);
-    const ran = await new ClassExecutor(T, quiet).run({
+    const ran = await new ClassExecutor(T, quiet, classExecutorDocuments).run({
       className: CLASS_NAME,
     });
     out(
@@ -228,9 +231,11 @@ async function main(): Promise<void> {
         });
         const listening = onL.listen(identity, { holdSeconds: 30 });
         await new Promise((r) => setTimeout(r, 2000));
-        const running = new ClassExecutor(T, quiet).run({
-          className: CLASS_NAME,
-        });
+        const running = new ClassExecutor(T, quiet, classExecutorDocuments).run(
+          {
+            className: CLASS_NAME,
+          },
+        );
         const caught = await listening;
         const doc = documentOf(caught);
         const debuggeeId = tag(doc, 'DEBUGGEE_ID');

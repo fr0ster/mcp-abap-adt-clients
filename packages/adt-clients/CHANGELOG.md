@@ -67,6 +67,22 @@ holds is no longer sent), and the new members.
 
 ### Breaking
 
+- **An executor's getter answers what it was given; a runner's constructor
+  takes its results.** Every `AdtExecutor` getter (`getClassExecutor`,
+  `getProgramExecutor`, `getClassTestRunner`, `getProgramTestRunner`,
+  `getFunctionGroupTestRunner`, `getFunctionModuleTestRunner`,
+  `getAbapUnitTestRunner`) had `results: R = <x>Documents as unknown as R`:
+  `getClassTestRunner<MyResults>()` compiled and answered the shipped
+  documents typed as `MyResults`. Each getter now has two overloads —
+  `getX()` answers `X<typeof xDocuments, V>`, `getX(results)` answers
+  `X<R, V>` — so a custom `R` without its results does not compile. The
+  constructors of `ClassExecutor`, `ProgramExecutor`, `ClassTestRunner`,
+  `ProgramTestRunner`, `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
+  `AbapUnitTestRunner` and `TraceScheduling` take `results` as a required
+  parameter (`logger` is `ILogger | undefined` before it). No request and no
+  answer changes. A caller of a getter with no argument, or with its own
+  documents, changes nothing; a caller constructing one directly passes the
+  documents: `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`.
 - **A client is fixed to its release variant.** `AdtClient<V extends
   AdtVariant = AdtModernVariant>`; `AdtClientOnPrem` (`'onprem'`, S/4HANA
   2025) and `AdtClientCloud` (`'cloud'`, ABAP cloud) fix it, and a plain

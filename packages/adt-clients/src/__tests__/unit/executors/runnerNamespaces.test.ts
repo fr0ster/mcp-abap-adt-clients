@@ -8,10 +8,15 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { abapUnitRunnerDocuments } from '../../../executors/abapUnitRunner';
 import { ClassTestRunner } from '../../../executors/class/ClassTestRunner';
 import { FunctionGroupTestRunner } from '../../../executors/functionGroup/FunctionGroupTestRunner';
 import { FunctionModuleTestRunner } from '../../../executors/functionModule/FunctionModuleTestRunner';
 import { ProgramTestRunner } from '../../../executors/program/ProgramTestRunner';
+import {
+  classTestRunnerDocuments,
+  programTestRunnerDocuments,
+} from '../../../index.executors';
 
 type Call = { url: string; data?: unknown };
 
@@ -37,7 +42,11 @@ describe.each([
 
     // One of four runner classes: each gates `run` on its own receiver, so
     // the call goes through what all of them take.
-    const runner: { run(name: string): Promise<unknown> } = new Runner(conn);
+    const runner: { run(name: string): Promise<unknown> } = new Runner(
+      conn,
+      undefined,
+      abapUnitRunnerDocuments,
+    );
     await runner.run(name);
 
     const body = String(calls[0].data);
@@ -52,7 +61,7 @@ describe('a namespaced class, by test class', () => {
   it('keeps its slashes in containerClass', async () => {
     const { conn, calls } = makeConn();
 
-    await new ClassTestRunner(conn).run([
+    await new ClassTestRunner(conn, undefined, classTestRunnerDocuments).run([
       { containerClass: '/acme/cl_class', testClass: 'LTC_A' },
     ]);
 
@@ -68,7 +77,11 @@ describe('what XML would read as markup', () => {
   it('is escaped, in the title and the context', async () => {
     const { conn, calls } = makeConn();
 
-    await new ProgramTestRunner(conn).run('ZREPORT', {
+    await new ProgramTestRunner(
+      conn,
+      undefined,
+      programTestRunnerDocuments,
+    ).run('ZREPORT', {
       title: 'a < b & "c"',
       context: "it's",
     });

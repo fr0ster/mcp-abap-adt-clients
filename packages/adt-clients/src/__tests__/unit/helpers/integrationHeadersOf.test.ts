@@ -6,6 +6,10 @@ import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
+import {
+  classExecutorDocuments,
+  programExecutorDocuments,
+} from '../../../index.executors';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
 import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
 import {
@@ -127,8 +131,11 @@ function everyHeaderMember(conn: IAbapConnection): {
     ['AdtAbapGitClient', new AdtAbapGitClient(conn, logger)],
     ['AbapDebugger', new AbapDebugger(conn, logger)],
     ['AmdpDebugger', new AmdpDebugger(conn, logger)],
-    ['ClassExecutor', new ClassExecutor(conn, logger)],
-    ['ProgramExecutor', new ProgramExecutor(conn, logger)],
+    ['ClassExecutor', new ClassExecutor(conn, logger, classExecutorDocuments)],
+    [
+      'ProgramExecutor',
+      new ProgramExecutor(conn, logger, programExecutorDocuments),
+    ],
   ];
   return {
     modern: [
