@@ -109,14 +109,11 @@ const traced = new WeakSet<IAbapConnection>();
  * sent the two wrappers into each other until the stack ran out.
  */
 export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
-  // A connection that cannot issue a request has no answer to annotate. Some
-  // members compute a URI and never call out, and they are exercised with a
-  // connection that offers nothing else — wrapping that would fail at
-  // construction over a method the caller was never going to use.
-  if (
-    traced.has(connection) ||
-    typeof connection?.makeAdtRequest !== 'function'
-  ) {
+  // `makeAdtRequest` is a required member of `IAbapConnection`, so it is
+  // read as the type says. Until 38.0.0 a connection without it was handed
+  // back unwrapped, a runtime guard on what the compiler proves; it served
+  // test fakes cast from `{}`, which now implement the contract.
+  if (traced.has(connection)) {
     return connection;
   }
   traced.add(connection);

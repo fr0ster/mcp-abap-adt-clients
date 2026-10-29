@@ -35,10 +35,10 @@ export async function inStatefulSession<T>(
   connection: SessionSwitchable,
   run: () => Promise<T>,
 ): Promise<T> {
-  connection.setSessionType?.('stateful');
+  connection.setSessionType('stateful');
   try {
     return await run();
   } finally {
-    connection.setSessionType?.('stateless');
+    connection.setSessionType('stateless');
   }
 }

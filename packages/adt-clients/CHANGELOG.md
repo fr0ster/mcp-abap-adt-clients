@@ -64,6 +64,14 @@ holds is no longer sent), and the new members.
   `getFunctionGroup().activate()` sends both references in one request
   (measured 2026-10-29 on S/4HANA 2025 and ABAP cloud). The legacy group
   keeps the one reference (adt-clients-legacy 0.2.0).
+- **A required member of the connection is called as the contract types
+  it.** `inStatefulSession` called `setSessionType?.(…)`, a program's upload
+  `getSessionId?.()`, and `withRequestTrace` handed back a connection without
+  `makeAdtRequest` unwrapped — runtime guards on members `IAbapConnection`
+  declares required, which let a fake lacking one skip the stateful switch
+  of every lock window in silence. They are called directly now. A
+  connection that implements the contract sees no change; two test fakes
+  cast from `{}` implement it instead (`RecordingConnection`).
 
 ### Breaking
 

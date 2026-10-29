@@ -3,16 +3,16 @@
  * Verifies active vs inactive version query handling across object types.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { noopLogger } from '../../../utils/noopLogger';
+import { RecordingConnection } from '../../helpers/recordingConnection';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
 
 describe('AdtUtils.getObjectSourceUri', () => {
   const testsLogger = createTestsLogger();
-  const utils = new AdtUtils({} as IAbapConnection, {
+  const utils = new AdtUtils(new RecordingConnection(), {
     logger: noopLogger,
     results: utilDocuments,
   });

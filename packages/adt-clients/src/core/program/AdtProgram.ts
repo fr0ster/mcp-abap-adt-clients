@@ -321,7 +321,7 @@ export class AdtProgram<
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const source = options?.source;
-    const sessionId = connection.getSessionId?.() || '';
+    const sessionId = connection.getSessionId() || '';
 
     return answering(
       () =>

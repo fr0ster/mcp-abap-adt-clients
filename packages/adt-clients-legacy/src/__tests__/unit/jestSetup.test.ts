@@ -12,8 +12,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { integrationHeadersOf } from '../../../../adt-clients/src/__tests__/helpers/adtHeaders';
+import { RecordingConnection } from '../../../../adt-clients/src/__tests__/helpers/recordingConnection';
 import { AdtFunctionIncludeLegacy } from '../../core/functionInclude/AdtFunctionIncludeLegacy';
 
 const PACKAGE = path.resolve(__dirname, '../../..');
@@ -31,7 +31,7 @@ describe('the Jest setup', () => {
   );
 
   it('has the legacy pairs registered in a file that imports none', () => {
-    const include = new AdtFunctionIncludeLegacy({} as IAbapConnection, {
+    const include = new AdtFunctionIncludeLegacy(new RecordingConnection(), {
       results: functionIncludeDocuments,
     });
     const v1 = 'application/vnd.sap.adt.functions.fincludes+xml';
