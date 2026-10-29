@@ -189,7 +189,8 @@ async function variantGates(
   await modern.getServiceBinding().updateMetadata(binding, write);
   // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `serviceBinding`: the factory is refused
   basis740.getServiceBinding();
-  // A function group's source: both modern variants, not 7.40's.
+  // A function group's source: every variant — 7.40's `FUGR/F` lists `read`
+  // and `update` too since interfaces-adt 23.1.1 (measured on 7.40 SP04).
   const fg = { functionGroupName: 'ZFG_GATE' };
   await onprem.getFunctionGroup().read(fg);
   await cloud.getFunctionGroup().read(fg);
@@ -198,9 +199,7 @@ async function variantGates(
   await cloud.getFunctionGroup().update(fg, write);
   await modern.getFunctionGroup().update(fg, write);
   const fgs740 = basis740.getFunctionGroup();
-  // @ts-expect-error -- ADT_TYPES_BASIS_740's `FUGR/F` lists no `read`
   await fgs740.read(fg);
-  // @ts-expect-error -- ADT_TYPES_BASIS_740's `FUGR/F` lists no `update`
   await fgs740.update(fg, write);
 
   // An operation one code of the API lacks: only `ENHO/XHH` reads source.

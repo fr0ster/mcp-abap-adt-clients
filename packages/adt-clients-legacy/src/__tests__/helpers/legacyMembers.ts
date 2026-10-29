@@ -669,8 +669,6 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getFunctionGroup: Object.fromEntries([
     fugr.refused('checkDeletion', '§5'),
     fugr.refused('readTransport', '§2 measured in B4'),
-    fugr.refused('read', 'not measured on 7.40'),
-    fugr.refused('update', 'not measured on 7.40'),
   ]),
   getFunctionModule: Object.fromEntries([
     func.refused('checkDeletion', '§5'),
@@ -1043,6 +1041,8 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     fugr.sends('unlock', '§10.3 measured', [unlockOf(GROUP_URI)]),
     fugr.sends('delete', '§4.2 measured', [deleteWith(GROUP_URI)]),
     fugr.sends('readMetadata', '§10.3 measured', [get(GROUP_URI)]),
+    fugr.sends('read', '§10.3 measured', [get(sourceUri(GROUP_URI))]),
+    fugr.sends('update', '§10.3 measured', [writeWith(sourceUri(GROUP_URI))]),
     fugr.sends('activate', '§10.3 measured', [activation()]),
     fugr.sends('updateMetadata', '§10.3 kept', [writeWith(GROUP_URI)]),
     fugr.sends('check', '§10.3 kept', [checkRun()]),

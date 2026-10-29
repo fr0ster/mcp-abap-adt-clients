@@ -60,6 +60,18 @@ async function legacyVariantGates(
   await legacy.getRequest().delete();
   await legacy.getRequest().list({});
 
+  // The function group's source: 7.40's `FUGR/F` lists `read`, `source` and
+  // `update` (interfaces-adt 23.1.1, measured on 7.40 SP04), so the
+  // inherited members compile on the legacy client.
+  const group = { functionGroupName: 'ZFG_GATE' };
+  await legacy.getFunctionGroup().read(group);
+  await legacy.getFunctionGroup().read(group, 'inactive');
+  await legacy.getFunctionGroup().update(group, {
+    headers: { accept: 'text/plain', contentType: 'text/plain; charset=utf-8' },
+    lockHandle: 'LOCK_GATE',
+    source: '* gate',
+  });
+
   // A function include is not deleted on 7.40 (review fix 8).
   const include = {
     functionGroupName: 'ZFG_GATE',
