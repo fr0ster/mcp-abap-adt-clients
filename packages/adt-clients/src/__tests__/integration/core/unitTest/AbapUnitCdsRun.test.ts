@@ -5,12 +5,20 @@
  *
  * A view holds no test class: its tests are local test classes elsewhere
  * marked `"! @testing <view>`, here in a container class's testclasses
- * include. They are assigned tests, so they run only when the scope sets
- * `foreignTests: true`; with own tests only, the run's result is empty — the
- * endpoint answers it, it refuses nothing.
+ * include. They are assigned tests, and they execute only when the scope sets
+ * `foreignTests: true`. Measured 2026-10-29 on S/4HANA 2025 and ABAP cloud,
+ * with a test class of one passing and one failing method:
+ *
+ * - `foreignTests: true`, no preview: both executed, the failing one carries
+ *   its `failedAssertion`;
+ * - own tests only, no preview: an empty result — the endpoint refuses
+ *   nothing;
+ * - own tests only, `addForeignTestsAsPreview: true` (the library's default):
+ *   both listed, no alert at all — a preview lists, it does not execute, so a
+ *   failing test looks like a pass.
  *
  * Creates the view (over `I_Language`, key `Language`) and the container
- * class in the local package of its case, under fresh names, runs both
+ * class in the local package of its case, under fresh names, runs the three
  * scopes, deletes both and reads back their absence.
  *
  * Run: npm test -- --testPathPatterns=unitTest/AbapUnitCdsRun
@@ -198,9 +206,8 @@ describe("ABAP Unit: a CDS view's assigned tests by object target DDLS/DF (AdtEx
         expect(own.alerts).toEqual([]);
 
         // (c) Own tests only, with the preview (the library's default for
-        // addForeignTestsAsPreview): not asserted yet. What it answers says
-        // whether a preview executes an assigned test (a failure alert on
-        // FAILS_ON_PURPOSE) or only lists it.
+        // addForeignTestsAsPreview): both methods listed, nothing executed —
+        // no alert on any method or on the run, FAILS_ON_PURPOSE included.
         logTestStep('run (DDLS/DF, own tests only, preview)', testsLogger);
         const preview = await runToCompletion(runner, target, {
           scope: {
@@ -217,10 +224,14 @@ describe("ABAP Unit: a CDS view's assigned tests by object target DDLS/DF (AdtEx
         testsLogger.info?.(
           `Preview run (own tests only, addForeignTestsAsPreview): ${JSON.stringify(previewed)}`,
         );
-        const previewOut = process.env.AUNIT_PREVIEW_OUT;
-        if (previewOut) {
-          fs.writeFileSync(previewOut, JSON.stringify(previewed, null, 2));
-        }
+        expect(
+          previewed.methods.map((m) => `${m.testClass}.${m.name}`).sort(),
+        ).toEqual([
+          `LTC_VIEW.${FAILING_TEST_METHOD}`,
+          `LTC_VIEW.${PROBE_TEST_METHOD}`,
+        ]);
+        expect(previewed.methods.flatMap((m) => m.alerts)).toEqual([]);
+        expect(previewed.alerts).toEqual([]);
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
         failed = { error };

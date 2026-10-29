@@ -20,11 +20,17 @@
  *
  * **A wrong type is no error.** The endpoint does not refuse a type it does
  * not run: the start answers `201`, and the result is an empty
- * `<aunit:runResult/>` (measured 2026-10-29). So is an object whose registry
- * entry runs `'assignedTests'` — a CDS view's tests are local test classes
- * marked `"! @testing <view>` elsewhere — run without `foreignTests: true` in
- * the scope. The compiler holds `type` to the registry; the scope is the
- * caller's.
+ * `<aunit:runResult/>` (measured 2026-10-29). The compiler holds `type` to
+ * the registry.
+ *
+ * **Assigned tests execute only with `foreignTests: true`.** A CDS view's
+ * tests (an object whose registry entry runs `'assignedTests'`) are local
+ * test classes elsewhere marked `"! @testing <view>`. With `foreignTests:
+ * false` and the default `addForeignTestsAsPreview: true` they are listed in
+ * the result without being executed — no alerts, so a failing test looks
+ * like a pass; with the preview off as well, the result is empty (measured 2026-10-29 on S/4HANA 2025 and ABAP cloud).
+ * A consumer reading a CDS run sets `scope: { foreignTests: true }`. The
+ * scope is the caller's.
  *
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
  * at construction makes of that endpoint's answer.

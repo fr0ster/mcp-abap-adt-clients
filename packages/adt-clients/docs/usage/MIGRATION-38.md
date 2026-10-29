@@ -364,16 +364,21 @@ Each sends one request, gated by the tables:
 - **The generic ABAP Unit runner**, `AdtExecutor.getAbapUnitTestRunner()`:
   `run({ kind: 'object', name, type })` with any `osl:object type` of
   `ABAP_UNIT_RUN_TYPES`, `run({ kind: 'package', name, includeSubpackages })`,
-  and `runSync(uris, { headers })` on `/abapunit/testruns`. Nothing to
-  migrate: the four per-object runners stay and send what they sent. See the
+  and `runSync(uris, { headers })` on `/abapunit/testruns`. The four
+  per-object runners stay and send what they sent. A CDS view's tests are
+  assigned tests: they execute only with `scope: { foreignTests: true }`;
+  with the default `addForeignTestsAsPreview: true` they are listed without
+  being executed (no alerts — a failing test looks like a pass). See the
   README's [ABAP Unit](../../README.md#abap-unit) section.
 
 **A runner subclass.** `AbapUnitRunner.startByObject(name, type, options)`
 (protected) and `IUnitTestRunObject.type` take `AbapUnitRunObjectType` where
-they took `string`: a subclass that passed a `string` variable types it
-`AbapUnitRunObjectType` (from interfaces-adt). A literal of the registry
-(`'CLAS'`, `'PROG/P'`, `'DDLS/DF'`) compiles as before; one the registry does
-not hold does not — the endpoint would have answered it with an empty result.
+they took `string`. The type holds every value the endpoint was measured to
+run or that `/abapunit/metadata` lists: a subclass that passed a `string`
+variable types it `AbapUnitRunObjectType` (from interfaces-adt), and a literal
+of the registry (`'CLAS'`, `'PROG/P'`, `'DDLS/DF'`) compiles as before. Any
+other text no longer compiles — a narrowing for such a subclass; a run of it
+answered an empty result.
 
 A custom result set for the class, interface, program, function module, DDL
 source and the nine others needs a `metadataUpdated` slot (interfaces-adt

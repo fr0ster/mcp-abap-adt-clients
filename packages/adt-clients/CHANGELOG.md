@@ -158,8 +158,11 @@ holds is no longer sent), and the new members.
   `/abapunit/testruns`, always with `<options>`; `getStatus` / `getResult`
   by the run id. Scope, risk levels and durations as every runner's. **A CDS
   view's tests are assigned tests**: local test classes marked
-  `"! @testing <view>`, run by `DDLS/DF` (or `DDLS`) only with
-  `scope: { foreignTests: true }`. **A wrong type is no error**: the endpoint
+  `"! @testing <view>`, executed by `DDLS/DF` (or `DDLS`) only with
+  `scope: { foreignTests: true }`; with the default
+  `addForeignTestsAsPreview: true` they are listed without being executed —
+  no alerts, a failing test looks like a pass — so a consumer reading a CDS
+  run sets `foreignTests: true`. **A wrong type is no error**: the endpoint
   answers `201` and an empty `<aunit:runResult/>`, so only the compiler
   catches it. `run`, `getStatus` and `getResult` are gated on a modern
   variant; adt-clients-legacy 0.2.0 refuses them on 7.40 and keeps
@@ -197,9 +200,11 @@ holds is no longer sent), and the new members.
 - **The four ABAP Unit runners' `osl:object type` is typed
   `AbapUnitRunObjectType`**, the union of `ABAP_UNIT_RUN_TYPES`' keys:
   `AbapUnitRunner.startByObject`'s `type` (protected) and
-  `IUnitTestRunObject.type` were `string`. No narrowing: the union holds
-  every value measured to run, and the runners keep sending `CLAS`, `PROG`,
-  `FUGR` and `FUNC` — requests unchanged.
+  `IUnitTestRunObject.type` were `string`. The union holds every value the
+  endpoint was measured to run or that `/abapunit/metadata` lists; a
+  subclass passing any other text no longer compiles (such a run answered an
+  empty result). The runners keep sending `CLAS`, `PROG`, `FUGR` and
+  `FUNC` — requests unchanged.
 - Decision 10 ("a factory's return type is a contract") is superseded by
   decision 17 in `docs/architecture/DECISIONS.md`.
 
@@ -223,7 +228,9 @@ holds is no longer sent), and the new members.
   target with and without subpackages, a URI run with the headers as given.
   Live suites (`unitTest/AbapUnit{Class,Cds,Package}Run`, case section
   `run_abap_unit`, off by default): a class by `CLAS/OC`, a CDS view's
-  assigned test by `DDLS/DF` with and without `foreignTests`, a package run —
+  assigned tests by `DDLS/DF` — executed with `foreignTests` (a failing
+  one carries its `failedAssertion`), absent with own tests only and no
+  preview, listed without an alert with the preview —, a package run —
   each in a local package, under fresh names, deleted and read back absent.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
@@ -255,7 +262,9 @@ See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
   addressed.
 - Read `type ?? unknownType` from an answered object (adt-strategies 0.16.0).
 - A runner subclass that passes a `string` to `startByObject` types it
-  `AbapUnitRunObjectType`.
+  `AbapUnitRunObjectType`; text outside the registry no longer compiles.
+- Read a CDS view's ABAP Unit run with `scope: { foreignTests: true }`:
+  without it the view's assigned tests are listed, not executed.
 - Import the result-set contracts from interfaces-adt, and compose the client
   contract you accept from it (#216).
 

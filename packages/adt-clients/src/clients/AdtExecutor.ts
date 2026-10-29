@@ -138,7 +138,9 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
    * registry (`ABAP_UNIT_RUN_TYPES`) lists, or of a package, and a run of
    * objects named by their ADT URIs — beside the four per-object runners,
    * which keep the types they send. A CDS view's tests are assigned tests:
-   * they run only with `scope: { foreignTests: true }`.
+   * they execute only with `scope: { foreignTests: true }` — with the default
+   * preview they are listed without being executed, a failing one with no
+   * alert.
    */
   getAbapUnitTestRunner<
     R extends IAbapUnitTestRunnerResults = typeof abapUnitTestRunnerDocuments,

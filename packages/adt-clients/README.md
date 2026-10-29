@@ -564,7 +564,7 @@ const generic = executor.getAbapUnitTestRunner({
 });
 // An object target: one osl:object in an osl:flatObjectSet.
 await generic.run({ kind: 'object', name: 'ZCL_UNDER_TEST', type: 'CLAS/OC' });
-// A CDS view's tests are assigned tests: they need foreignTests.
+// A CDS view's tests are assigned tests: they execute only with foreignTests.
 await generic.run(
   { kind: 'object', name: 'ZI_VIEW', type: 'DDLS/DF' },
   { scope: { foreignTests: true }, analyse: analyseUnitTestStart },
@@ -581,9 +581,13 @@ await generic.runSync(['/sap/bc/adt/oo/classes/zcl_under_test'], {
 Both targets go to `POST /sap/bc/adt/abapunit/runs` and are polled with
 `getStatus` and `getResult`, as every runner's. **A CDS view holds no test
 class**: its tests are local test classes elsewhere — a class's testclasses
-include — marked `"! @testing <view>`, and they run by `DDLS/DF` (or `DDLS`)
-only when the scope sets `foreignTests: true`; with own tests only the result
-is empty. **A package** runs only as an `osl:packageSet` — `osl:object
+include — marked `"! @testing <view>`, and they execute by `DDLS/DF` (or
+`DDLS`) only when the scope sets `foreignTests: true`. Without it, the default
+`addForeignTestsAsPreview: true` lists them in the result **without executing
+them**: every method is there with no alert, so a failing test looks like a
+pass; with the preview off too, the result is empty (measured 2026-10-29 on
+S/4HANA 2025 and ABAP cloud). **A consumer reading a CDS run sets
+`foreignTests: true`.** **A package** runs only as an `osl:packageSet` — `osl:object
 type="DEVC/K"` answered empty (measured 2026-10-29, S/4HANA 2025 and ABAP
 cloud). **A wrong type is not an error**: the endpoint answers the start `201`
 and the result as an empty `<aunit:runResult/>`, which is why the type is the
